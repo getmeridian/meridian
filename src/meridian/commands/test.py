@@ -97,7 +97,7 @@ def fleet_test_targets(
     registry: ServerRegistry | None = None,
     cluster: ClusterConfig | None = None,
 ) -> list[ServerEntry]:
-    """Public entry servers a bare `meridian test` covers: every exit, then each relay's first hop.
+    """Public entry servers a bare `meridian test` covers: every exit, each relay's first hop, then each gateway.
 
     Empty when the command runs on a saved server, only one server is saved, or no
     topology is saved; those cases keep single-target resolution. One entry means
@@ -114,6 +114,7 @@ def fleet_test_targets(
         return []
     refs = [exit_.server_ref for exit_ in intent.exits]
     refs += [relay.hop_server_refs[0] for relay in intent.transparent_relays]
+    refs += [gateway.server_ref for gateway in intent.routing_gateways]
     entries = []
     for ref in dict.fromkeys(refs):
         entry = registry.find(ref)

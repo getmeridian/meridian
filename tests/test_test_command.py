@@ -14,6 +14,7 @@ from meridian.cli import app
 from meridian.cluster import ClusterConfig
 from meridian.commands.test import collect_test_result, fleet_test_targets, recovery_hint
 from meridian.connectivity import ConnectivityChecks
+from meridian.core.topology import RoutingGatewayIntent
 from meridian.core.verification import (
     RecoveryHint,
     TransportResult,
@@ -284,12 +285,16 @@ def _fleet(servers_file: Path) -> tuple[ServerRegistry, ClusterConfig]:
     return registry, ClusterConfig(topology_intent=intent)
 
 
-def test_bare_test_covers_every_exit_then_each_relay_entry(servers_file: Path) -> None:
+def test_bare_test_covers_every_exit_then_each_relay_entry_then_each_gateway(servers_file: Path) -> None:
     registry, cluster = _fleet(servers_file)
+    registry.add(ServerEntry(host="198.51.100.40", name="gw-a"))
+    assert cluster.topology_intent is not None
+    gateway = RoutingGatewayIntent(id="gw-a", server_ref=registry.find("gw-a").id, bridge_path_ref="main-reality")
+    cluster.topology_intent = cluster.topology_intent.model_copy(update={"routing_gateways": [gateway]})
 
     targets = fleet_test_targets(registry, cluster)
 
-    assert [entry.name for entry in targets] == ["exit-a", "exit-b", "relay-a"]
+    assert [entry.name for entry in targets] == ["exit-a", "exit-b", "relay-a", "gw-a"]
 
 
 def test_bare_test_keeps_single_target_resolution_for_one_server(servers_file: Path) -> None:
