@@ -5,6 +5,16 @@ const fs = require('node:fs');
 const { createBrowser, response } = require('./support/pwa_browser.cjs');
 
 const cases = {
+  test_preferred_store_route_names_its_destination: async function(data) {
+    const browser = createBrowser(data.config, data.catalog, { info: data.info });
+    await browser.start();
+    assert.equal(browser.document.querySelector('.app-row-get').textContent, 'Google Play');
+    const platform = browser.document.getElementById('platform-choice');
+    platform.value = 'ios'; browser.fire('change', platform);
+    assert.equal(browser.document.querySelector('.app-row-get').textContent, 'App Store');
+    browser.context.page.switchLang('fa');
+    assert.equal(browser.document.querySelector('.app-row-get').textContent, 'اپ استور');
+  },
   test_single_platform_labels_follow_persian: async function(data) {
     const browser = createBrowser(data.config, data.catalog, { info: data.info });
     await browser.start();

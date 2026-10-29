@@ -75,6 +75,8 @@ that dials out to it.
   the snapshot and the recovery key, restore brings the fleet files back too.
 
 ### Changed
+- Preferred connection-page installer buttons name their app store in the
+  selected language, beside labelled direct-install alternatives.
 - Single-platform app labels and load-error titles follow the selected
   connection-page language, with polished Russian expiry text.
 - Connection-page shells and their nginx location send noindex, nofollow,

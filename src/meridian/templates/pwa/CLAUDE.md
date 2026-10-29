@@ -12,6 +12,7 @@ Server-hosted PWA; Meridian's only connection-page implementation.
 **Account** — same-origin `/info` on open, return, and refresh; save only status, traffic, expiry, days left, and check time. The saved answer is unverified until checked again, independently of reachability.
 **Three-step setup** — native platform/app pickers drive install, import, and localized plain-text Connect records. Manual import includes a selectable URL and the app's menu path; Clash desktop guides include TUN. Choices stay in memory.
 **Install alternatives** — platform-scoped records label stores, packages, and architecture without detecting the chip; new destinations come only from the existing catalog or Remnawave's pinned defaults.
+**Preferred store labels** — name App Store or Google Play from the validated destination hostname; keep their labels localized when the platform or language changes.
 **i18n** — English markup with `data-t` swaps; choose the saved language before loading, always set lang/dir, and rebuild to return to English. Support follows the same preference; account dates/numbers use Intl, including the Persian calendar.
 **Self-check** — visitor-side clock vs server Date, a 96 KB probe stream, and subscription HTTP status; copied English reports contain no links, hostnames, UUIDs, or device data.
 

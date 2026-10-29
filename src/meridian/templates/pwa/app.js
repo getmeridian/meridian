@@ -857,7 +857,11 @@ function renderAppRow(a, key) {
     'Android, desktop': 'apps.android.desktop', 'iOS, Android': 'apps.ios.android',
     'iOS, Android, macOS': 'apps.ios.android.macos' };
   html += '<span>' + escapeHtml(labels[a.platform] ? text(labels[a.platform], a.platform) : a.platform) + '</span></span>';
-  html += '<span class="app-row-get" data-t="app.get">Get</span>';
+  var kind = 'app.get';
+  var host = new URL(appUrl(a, key)).hostname;
+  if (host === 'play.google.com') kind = 'install.play';
+  else if (host === 'apps.apple.com') kind = 'install.appstore';
+  html += '<span class="app-row-get" data-t="' + kind + '">' + escapeHtml(text(kind, 'Get')) + '</span>';
   return html + '</a>';
 }
 
