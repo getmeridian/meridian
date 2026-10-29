@@ -269,7 +269,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
 | `--json` | | 将结果作为 `meridian.output/v1` 信封发出（`status`、`inventory`、`history`、`export`、`import`） |
-| `--tested` | | `fleet upgrade`：不查询 GitHub；已升级的 Realm 保持不变 |
+| `--tested` | | `fleet upgrade`：跳过 GitHub；Realm 保持在已测试的版本或你已升级到的版本 |
 | `--yes`, `-y` | | `fleet upgrade`、`fleet import`：跳过确认 |
 | `--dry-run` | | `fleet import`：显示变更和审查结果，不应用任何内容 |
 | `--forget-unreachable` | | `fleet import`：忘记已移除且 SSH 端口无响应的服务器上部署的内容 |
@@ -280,7 +280,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 **`fleet history`** — 控制服务记录的每一次经过审核的应用，最新的在前：编号、时间、作者（机器的令牌名称；CLI 自身的令牌为 `root`，控制台为 `owner`）、状态（`proposed`、`approved`、`applied` 或 `failed`）以及计划哈希的开头部分。`--json` 返回 `data.revisions[]`。
 
-**`fleet upgrade`** — 无需等待 Meridian 更新，即可把中继升级到最新的 Realm 版本：选用 GitHub 上已测试主版本内的最新版本，连同 GitHub 为每个压缩包发布的 sha256 一起记录到 `cluster.yml`，每个中继在安装前都会校验。`--tested` 保留此版本测试过的版本。它会读取每个中继运行的 Realm 版本并显示为 `current` 或 `upgrade`，确认后应用已审核的计划，并在每台服务器上运行 `meridian check`。如果某个中继的版本无法读取，命令会在任何改动之前以退出码 `3` 结束。控制服务和 agent 随 Meridian 本身发布：先运行 `meridian update`，再运行 `meridian apply` 即可升级它们。
+**`fleet upgrade`** — 通过一次已审核的应用让集群保持最新。控制服务和每个节点 agent 会升级到当前 Meridian 附带的构建，每个 agent 就地升级并保留其节点身份；要获取更新的构建，请先运行 `meridian update`。中继无需等待 Meridian 更新即可升级到最新的 Realm 版本：选用 GitHub 上已测试主版本内的最新版本，连同 GitHub 为每个压缩包发布的 sha256 一起记录到 `cluster.yml`，每个中继在安装前都会校验。它会显示每台服务器上运行的版本并标为 `current` 或 `upgrade`，确认后应用已审核的计划，并在每台服务器上运行 `meridian check`。如果某个版本无法读取，命令会在任何改动之前以退出码 `3` 结束。
+
 **`fleet export`** — 把集群已审查的拓扑输出为可编辑的 YAML 文件：出口及其协议路径、中继、网关、出口池、路由规则、路由、客户端和集群设置。服务器以保存的名称（没有名称时用地址）出现，从不使用内部 ID；文件以 `schema: meridian.fleet/v1` 开头。Reality 密钥、API 令牌、客户端链接以及 XHTTP 和 WSS 的传输路径都留在 Meridian 中，不会列出。`--json` 在 `data.document` 下返回同一份文档。
 
 **`fleet import`** — 读取编辑后的文件（或用 `-` 从标准输入读取），每处变更一行：`+` 表示添加，`-` 表示删除，`~` 表示修改字段（`~ exit-2 sni www.example.com -> www.example.org`）。随后列出变更将删除的每个资源和审查哈希，询问确认，并像 `apply` 一样只应用这次审查。未编辑的文件会输出“没有变更”。从 `access.users` 中删除客户端等同于 `client remove`：其链接失效，连接页面被删除。添加客户端等同于 `client add`，并发布其页面；用 `client show NAME` 查看链接。新的伪装 SNI 会经过与 `node sni` 相同的检查。导入会拒绝：其他 `schema`、未保存的服务器（用 `meridian server add` 保存）、文件中的传输路径、对控制服务器及其域名或后端的更改、删除或重命名控制服务器上的出口，以及把出口移到另一台服务器（请用 `node replace`）。密钥和凭据保持不变。没有终端时请传入 `--yes`；`--dry-run` 只显示变更和审查结果，不应用任何内容。
@@ -420,6 +421,7 @@ meridian panel [--setup-link]
 | `--setup-link` | | 即使控制台已有所有者，也打印一个重置链接：它会设置新密码、关闭登录验证码，并让所有设备退出登录 |
 
 设置链接只能使用一次，有效期 15 分钟；打开它来设置所有者的密码。控制台有所有者之后，`panel` 会打印地址以及是否已开启登录验证码。请像保护密码一样保护地址和设置链接。在控制台中你可以管理用户和 API 令牌；服务器、修订记录和订阅标题在那里是只读的。详见[网页控制台](/zh/client-management/#网页控制台)。
+
 ### meridian teardown
 
 从服务器上卸载 Meridian。

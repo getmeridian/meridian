@@ -101,7 +101,7 @@ IP blocked? Follow the [recovery guide](https://getmeridian.org/en/recovery/). U
 | `route add\|list\|remove` | Send chosen sites through WARP, directly, or nowhere |
 | `plan`, `apply` | Review and apply the topology |
 | `test`, `check`, `scan`, `doctor`, `logs` | Verify, inspect, find camouflage targets, report |
-| `fleet status\|inventory\|history\|upgrade`, `panel` | Fleet overview, applied revisions, Realm upgrades, the web console |
+| `fleet status\|inventory\|history\|upgrade`, `panel` | Fleet overview, applied revisions, upgrades, the web console |
 | `backup`, `restore`, `migrate` | Snapshots and the recovery key, rebuild a lost control server, move a Remnawave fleet across |
 | `teardown`, `update` | Remove Meridian from a server; update the CLI |
 | `help agents` | Explain Meridian to an AI agent |

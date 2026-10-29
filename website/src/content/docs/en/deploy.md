@@ -278,7 +278,7 @@ Store it somewhere offline, away from the machines that manage the fleet. After 
 
 ## Upgrades
 
-The control service and the node agent ship with Meridian. After `meridian update`, run `meridian apply`: it moves the control service to the new version and upgrades each agent in place, keeping every node's identity. `meridian fleet upgrade` moves relays to the newest Realm release without waiting for a Meridian update.
+The control service and the node agent ship with Meridian. After `meridian update`, run `meridian fleet upgrade`: it shows what will change, then moves the control service to the new version and upgrades each agent in place, keeping every node's identity. It also moves relays to the newest Realm release without waiting for a Meridian update. Any `meridian apply` brings the control service and agents up to the installed Meridian too.
 
 ## Moving from Remnawave
 

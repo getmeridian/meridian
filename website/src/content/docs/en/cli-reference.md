@@ -269,7 +269,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--json` | | Emit the result as a `meridian.output/v1` envelope (`status`, `inventory`, `history`, `export`, `import`) |
-| `--tested` | | `fleet upgrade`: don't ask GitHub; a Realm you already upgraded stays |
+| `--tested` | | `fleet upgrade`: skip GitHub; Realm stays on the tested version or what you already upgraded to |
 | `--yes`, `-y` | | `fleet upgrade`, `fleet import`: skip the confirmation |
 | `--dry-run` | | `fleet import`: show the changes and the review, apply nothing |
 | `--forget-unreachable` | | `fleet import`: forget what was deployed on a removed server whose SSH port does not answer |
@@ -280,7 +280,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 **`fleet history`** — every reviewed apply the control service recorded, newest first: its number, time, author (the machine's token name, `root` for the CLI's own token, `owner` for the console), status (`proposed`, `approved`, `applied`, or `failed`), and the start of its plan hash. `--json` returns `data.revisions[]`.
 
-**`fleet upgrade`** — moves relays to the newest Realm release without waiting for a Meridian update: GitHub's newest release in the tested major, recorded in `cluster.yml` with the sha256 GitHub publishes for each archive, which every relay checks before installing. `--tested` keeps the version this release was tested with. It reads the Realm version each relay runs and shows it as `current` or `upgrade`, then, after you confirm, applies the reviewed plan and runs `meridian check` on every server. A relay whose version cannot be read stops the command with exit `3` before anything changes. The control service and the agents come with Meridian itself: `meridian update`, then `meridian apply`, upgrades them.
+**`fleet upgrade`** — brings the fleet up to date in one reviewed apply. The control service and every node agent move to the build this Meridian ships, and each agent upgrades in place, keeping its node's identity; run `meridian update` first to get newer ones. Relays move to the newest Realm release without waiting for a Meridian update: GitHub's newest release in the tested major, recorded in `cluster.yml` with the sha256 GitHub publishes for each archive, which every relay checks before installing. It shows what each server runs as `current` or `upgrade`, then, after you confirm, applies the reviewed plan and runs `meridian check` on every server. A version that cannot be read stops the command with exit `3` before anything changes.
 
 **`fleet export`** — prints your fleet's reviewed topology as a YAML file you can edit: exits and their protocol paths, relays, gateways, egress pools, routing rules, routes, clients, and fleet settings. Servers appear by their saved name (or address when unnamed), never by internal ID, and the file starts with `schema: meridian.fleet/v1`. Reality keys, API tokens, client links, and the XHTTP and WSS transport paths stay in Meridian and are not listed. `--json` returns the same document under `data.document`.
 

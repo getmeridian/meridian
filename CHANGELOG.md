@@ -55,9 +55,11 @@ that dials out to it.
   the snapshot and the recovery key, restore brings the fleet files back too.
 
 ### Changed
-- **`meridian fleet upgrade`** now upgrades only Realm on relays. The control
-  service and agents ship with Meridian: `meridian update`, then
-  `meridian apply`.
+- **`meridian fleet upgrade`** covers the control service, node agents, and
+  Realm; there are no Remnawave images left to upgrade. After
+  `meridian update` it moves the service and agents to the new build (agents
+  in place, keeping each node's identity). `--tested` skips GitHub, so Realm
+  stays on the tested version or what you already upgraded to.
 
 ### Removed
 - Remnawave, its database, Valkey, the subscription page container, and Docker
