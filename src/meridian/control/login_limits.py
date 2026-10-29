@@ -1,18 +1,22 @@
-"""In-memory limits on password, code, and setup-link guesses, per account and per source.
+"""In-memory limits on password, code, and setup-link guesses, one bucket per kind of guess.
 
-Nothing here is written to disk or logged: a restart forgets every count. A source
-is kept only as an HMAC under a key that lives as long as the process, so even
-memory holds no client address. Behind nginx's 443 stream router the service sees
-every browser as loopback (by design: Meridian never learns where people connect
-from), so on today's fleets every source shares one bucket; the account limit is
-the one that binds first.
+Nothing here is written to disk or logged: a restart forgets every count. There is
+no per-source bucket: behind nginx's 443 stream router the service sees every
+browser as loopback (by design: Meridian never learns where people connect from),
+so a "source" would be one bucket every guess shares, and failures at one door
+would lock the others. The buckets are instead what is being guessed:
 
-A key that failed `free_failures` times in a row is locked for a delay that doubles
-with each further failure, up to `max_lock_seconds`. A locked key is refused before
-any password is hashed or code compared, so a lock is also cheap to enforce. Success
-clears the account's and the source's failures.
+- `owner` — the password (and code) at sign-in, before any session exists;
+- `setup-link` — setup-link tokens, so guessing links never locks sign-in;
+- `session:<id>` — a signed-in browser re-entering its password or confirming a new
+  authenticator, so failed sign-ins never lock out an owner already signed in.
 
-Guesses at one account take turns (`turn`): the check, the slow hash, and the count
+A bucket that failed `free_failures` times in a row is locked for a delay that
+doubles with each further failure, up to `max_lock_seconds`. A locked bucket is
+refused before any password is hashed or code compared, so a lock is also cheap to
+enforce. Success clears the bucket.
+
+Guesses in one bucket take turns (`turn`): the check, the slow hash, and the count
 happen while the turn is held, so concurrent requests cannot all pass the check
 before the first failure is counted. Hashing is one at a time anyway, so turns cost
 no throughput.
@@ -20,10 +24,7 @@ no throughput.
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import math
-import secrets
 import threading
 import time
 from collections import OrderedDict
@@ -33,11 +34,10 @@ from dataclasses import dataclass
 
 from meridian.control.errors import ServiceError
 
-ACCOUNT_FREE_FAILURES = 5
-SOURCE_FREE_FAILURES = 10
+FREE_FAILURES = 5
 BASE_LOCK_SECONDS = 30
 MAX_LOCK_SECONDS = 15 * 60
-# Bounds memory under a flood of distinct sources; the oldest entries go first.
+# Bounds memory (one bucket per session at most); the oldest entries go first.
 MAX_TRACKED_KEYS = 10_000
 
 
@@ -52,70 +52,59 @@ class LoginLimiter:
         self,
         *,
         clock: Callable[[], float] = time.monotonic,
-        account_free_failures: int = ACCOUNT_FREE_FAILURES,
-        source_free_failures: int = SOURCE_FREE_FAILURES,
+        free_failures: int = FREE_FAILURES,
         max_lock_seconds: int = MAX_LOCK_SECONDS,
     ) -> None:
         self._clock = clock
-        self._free = {"account": account_free_failures, "source": source_free_failures}
+        self._free = free_failures
         self._max_lock = max_lock_seconds
-        self._key = secrets.token_bytes(32)
         self._lock = threading.Lock()
         self._failures: OrderedDict[str, _Failures] = OrderedDict()
-        # One turn lock per account with a guess in progress or waiting, and how many hold or await it.
+        # One turn lock per bucket with a guess in progress or waiting, and how many hold or await it.
         self._turns: dict[str, tuple[threading.Lock, int]] = {}
 
     @contextmanager
-    def turn(self, account: str, source: str) -> Iterator[None]:
-        """Wait for the account's turn, then refuse while locked; count the guess before the block ends."""
+    def turn(self, bucket: str) -> Iterator[None]:
+        """Wait for the bucket's turn, then refuse while locked; count the guess before the block ends."""
         with self._lock:
-            lock, users = self._turns.get(account, (threading.Lock(), 0))
-            self._turns[account] = (lock, users + 1)
+            lock, users = self._turns.get(bucket, (threading.Lock(), 0))
+            self._turns[bucket] = (lock, users + 1)
         try:
             with lock:
-                self.check(account, source)
+                self.check(bucket)
                 yield
         finally:
             with self._lock:
-                lock, users = self._turns[account]
+                lock, users = self._turns[bucket]
                 if users == 1:
-                    del self._turns[account]
+                    del self._turns[bucket]
                 else:
-                    self._turns[account] = (lock, users - 1)
+                    self._turns[bucket] = (lock, users - 1)
 
-    def check(self, account: str, source: str) -> None:
-        """Refuse with 429 and the wait while either key is locked."""
+    def check(self, bucket: str) -> None:
+        """Refuse with 429 and the wait while the bucket is locked."""
         now = self._clock()
         with self._lock:
-            waits = [
-                entry.locked_until - now
-                for entry in (self._failures.get(key) for key in self._keys(account, source))
-                if entry is not None and entry.locked_until > now
-            ]
-        if waits:
-            raise LockedOut(math.ceil(max(waits)))
+            entry = self._failures.get(bucket)
+            wait = entry.locked_until - now if entry is not None else 0.0
+        if wait > 0:
+            raise LockedOut(math.ceil(wait))
 
-    def failed(self, account: str, source: str) -> None:
+    def failed(self, bucket: str) -> None:
         now = self._clock()
         with self._lock:
-            for kind, key in zip(("account", "source"), self._keys(account, source), strict=True):
-                entry = self._failures.pop(key, None) or _Failures()
-                entry.count += 1
-                over = entry.count - self._free[kind]
-                if over >= 0:
-                    entry.locked_until = now + min(self._max_lock, BASE_LOCK_SECONDS * 2**over)
-                self._failures[key] = entry
+            entry = self._failures.pop(bucket, None) or _Failures()
+            entry.count += 1
+            over = entry.count - self._free
+            if over >= 0:
+                entry.locked_until = now + min(self._max_lock, BASE_LOCK_SECONDS * 2**over)
+            self._failures[bucket] = entry
             while len(self._failures) > MAX_TRACKED_KEYS:
                 self._failures.popitem(last=False)
 
-    def succeeded(self, account: str, source: str) -> None:
+    def succeeded(self, bucket: str) -> None:
         with self._lock:
-            for key in self._keys(account, source):
-                self._failures.pop(key, None)
-
-    def _keys(self, account: str, source: str) -> tuple[str, str]:
-        digest = hmac.new(self._key, source.encode("utf-8"), hashlib.sha256).hexdigest()
-        return f"account:{account}", f"source:{digest}"
+            self._failures.pop(bucket, None)
 
 
 class LockedOut(ServiceError):

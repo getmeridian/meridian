@@ -124,7 +124,7 @@ def test_the_snapshot_drops_the_web_owner(admin: ControlClient, tmp_path: Path) 
     admin.register_device_key("laptop", device.public)
     owner = OwnerAuth(Store(tmp_path / "state" / "control.db"))
     link = owner.issue_setup_link(reset=False)
-    owner.complete_setup(link.token, "correct horse battery staple", source="test")
+    owner.complete_setup(link.token, "correct horse battery staple")
     owner.issue_setup_link(reset=True)
 
     copy = sqlite3.connect(":memory:")
