@@ -260,19 +260,27 @@ meridian route remove EXIT ROUTE [--yes] [--json]
 meridian fleet status [--json]
 meridian fleet inventory [--json]
 meridian fleet upgrade [--tested] [--yes]
+meridian fleet export [--json]
+meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 ```
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
-| `--json` | | 将结果作为 `meridian.output/v1` 信封发出（`status`、`inventory`） |
+| `--json` | | 将结果作为 `meridian.output/v1` 信封发出（`status`、`inventory`、`export`、`import`） |
 | `--tested` | | `fleet upgrade`：既不查询 Docker Hub 也不查询 GitHub；Remnawave 回到此 Meridian 版本测试过的版本，已升级的 Realm 保持不变 |
-| `--yes`, `-y` | | `fleet upgrade`：跳过确认 |
+| `--yes`, `-y` | | `fleet upgrade`、`fleet import`：跳过确认 |
+| `--dry-run` | | `fleet import`：显示变更和审查结果，不应用任何内容 |
+| `--forget-unreachable` | | `fleet import`：忘记已移除且 SSH 端口无响应的服务器上部署的内容 |
 
 **`fleet status`** — 面板健康状态、节点心跳、中继监听端口以及客户端数量。已声明但缺失的客户端会使健康状态降级；已禁用、达到限额或过期的客户端会正常统计，属于你的主动设置而非故障。中继监听端口可达只能证明 TCP 连通，因此未经完整验证的中继路由会使健康状态保持为 `unknown`；请用 `meridian test` 测试完整路径。退出码 `0` 表示健康，`4` 表示降级，`3` 表示未知。
 
 **`fleet inventory`** — 列出已配置的服务器、角色、节点和中继，并在面板可达时附带实时状态。绝不会输出面板 API 令牌或秘密路径。如果实时状态不可用，仍会显示已配置的清单并附带警告，命令以退出码 `3` 结束。要判断 `apply` 是否有待执行的变更，请使用 `plan --json`。
 
 **`fleet upgrade`** — 无需等待 Meridian 更新，即可将 Remnawave 升级到最新版本。它会向 Docker Hub 查询当前 Meridian 版本所支持主版本内最新的后端、节点和订阅页面版本（跳过预发布版和其他主版本），按多架构摘要固定每个镜像，并将选择保存到 `cluster.yml`，供之后的 `apply` 沿用；后续 Meridian 版本若带有更新的固定版本，则会自动接管。`--tested` 仅使用当前 Meridian 版本测试过的版本。PostgreSQL 和 Valkey 始终保持在 Meridian 的固定版本上。如果集群中有中继，它对 Realm 也会执行同样操作：选用 GitHub 上已测试主版本内的最新版本，并记录 GitHub 为每个压缩包发布的 sha256，每个中继在安装前都会校验。随后它通过 SSH 只读执行 `docker inspect`，读取每台服务器上运行的后端、订阅页面、PostgreSQL、Valkey 和节点镜像，并将每项显示为 `current`、`upgrade`、`install` 或保留。版本策略与 `setup` 一致：你自行选择的更新版本标签或浮动标签（`latest`、`3`）会保留并报告，绝不降级。PostgreSQL 主版本绝不会原地升级——旧主版本会继续运行，命令会说明所需的导出与恢复步骤。在你确认后，它会应用审核后的计划并在每台服务器上运行 `meridian check`。如果某台服务器的镜像无法读取，命令会在做任何改动前以退出码 `3` 停止；如果 `apply` 已收敛但某台服务器仍在运行旧镜像，同样以 `3` 退出。
+
+**`fleet export`** — 把集群已审查的拓扑输出为可编辑的 YAML 文件：出口及其协议路径、中继、网关、出口池、路由规则、路由、客户端和集群设置。服务器以保存的名称（没有名称时用地址）出现，从不使用内部 ID；文件以 `schema: meridian.fleet/v1` 开头。Reality 密钥、面板凭据、客户端链接以及 XHTTP 和 WSS 的传输路径都留在 Meridian 中，不会列出。`--json` 在 `data.document` 下返回同一份文档。
+
+**`fleet import`** — 读取编辑后的文件（或用 `-` 从标准输入读取），每处变更一行：`+` 表示添加，`-` 表示删除，`~` 表示修改字段（`~ exit-2 sni www.example.com -> www.example.org`）。随后列出变更将删除的每个资源和审查哈希，询问确认，并像 `apply` 一样只应用这次审查。未编辑的文件会输出“没有变更”。从 `access.users` 中删除客户端等同于 `client remove`：其链接失效，连接页面被删除。添加客户端等同于 `client add`，并发布其页面；用 `client show NAME` 查看链接。新的伪装 SNI 会经过与 `node sni` 相同的检查。导入会拒绝：其他 `schema`、未保存的服务器（用 `meridian server add` 保存）、文件中的传输路径、对控制服务器及其域名或后端的更改、删除或重命名控制服务器上的出口，以及把出口移到另一台服务器（请用 `node replace`）。密钥和凭据保持不变。没有终端时请传入 `--yes`；`--dry-run` 只显示变更和审查结果，不应用任何内容。
 
 ### meridian check
 
@@ -470,7 +478,7 @@ meridian help [agents | COMMAND...]
 | `--install-completion` | 为当前 shell 安装补全 |
 | `--show-completion` | 为当前 shell 打印补全脚本 |
 
-JSON 输出使用 `meridian.output/v1` 信封（`schema`、`command`、`operation_id`、`status`、`summary`、`data`、`warnings`、`errors`）。所有列出了 `--json` 的命令都支持该格式：`deploy`、`plan`、`apply`、`check`、`test`、`probe`、所有 `client` 和 `route` 命令、`fleet status`/`inventory`、`node`/`relay list` 以及 `api` 命令。全局 `--json` 与子命令自身的 `--json` 等效。所有敏感信息在输出为 JSON 前都会自动脱敏。运行 `meridian api commands --json` 可查看完整契约列表。
+JSON 输出使用 `meridian.output/v1` 信封（`schema`、`command`、`operation_id`、`status`、`summary`、`data`、`warnings`、`errors`）。所有列出了 `--json` 的命令都支持该格式：`deploy`、`plan`、`apply`、`check`、`test`、`probe`、所有 `client` 和 `route` 命令、`fleet status`/`inventory`/`export`/`import`、`node`/`relay list` 以及 `api` 命令。全局 `--json` 与子命令自身的 `--json` 等效。所有敏感信息在输出为 JSON 前都会自动脱敏。运行 `meridian api commands --json` 可查看完整契约列表。
 
 ## 常见服务器选项
 

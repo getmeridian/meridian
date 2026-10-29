@@ -19,14 +19,14 @@ You are probably helping one of two people:
 
 - The home directory is `~/.config/meridian` (or `$XDG_CONFIG_HOME/meridian`). `MERIDIAN_HOME` overrides it. Meridian also uses an existing `~/.meridian-v4` or `~/.meridian` when either holds a fleet (it has a `servers.json`) and the default directory doesn't exist yet.
 - That directory is how the deployer manages the fleet: `cluster.yml` holds the topology and panel access, and `servers.json` holds saved SSH targets. Tell the user to back it up. To manage the fleet from another machine, they copy the whole directory there.
-- Never edit `cluster.yml` by hand. Change the fleet through commands.
+- Never edit `cluster.yml` by hand. Change the fleet through commands, or edit the file `meridian fleet export` prints and apply it with `meridian fleet import`.
 
 ## Rules for agents
 
 1. **Run non-interactively.** Pass `--yes` to commands that confirm. `meridian setup` is a wizard that needs a terminal. Use `deploy`, `node add`, `relay add`, and `client add` instead, or `setup --intent FILE --yes` with a complete topology document.
 2. **Prefer JSON.** Commands that support `--json` print one `meridian.output/v1` envelope on stdout. Read results under `data`; failures come back as an envelope too. Progress, warnings, and update notices go to stderr. `meridian api commands` lists every command with a machine-readable contract.
 3. **Read before you change.** Run `meridian plan` to see pending changes. It exits `0` when converged and `2` when changes are pending. Then run `meridian apply --yes`.
-4. **Ask before destroying.** Get explicit confirmation before `teardown`, `node remove`, `relay remove`, `client remove`, or `client reissue`. Removal deletes the panel and server state for what disappears, and people relying on it lose access; a reissue cuts off the client's devices until they import the new link.
+4. **Ask before destroying.** Get explicit confirmation before `teardown`, `node remove`, `relay remove`, `client remove`, `client reissue`, or a `fleet import` whose changes include `-` lines. Removal deletes the panel and server state for what disappears, and people relying on it lose access; a reissue cuts off the client's devices until they import the new link.
 5. **Treat links as secrets.** Connection pages and subscription URLs grant access. They appear in full only in the output of the command that produced them (`deploy`, `client add`, `client show`, `client reissue`). Hand each one only to the person it belongs to, and don't log it. Never run `meridian panel --show-password` unless the user asks for the panel password.
 6. **Test from the right place.** `meridian check` inspects servers over SSH. `meridian test` sends real traffic from the machine it runs on, and `meridian test --probe` (short form: `meridian probe`) checks what a censor sees. Results about blocking only mean something when run from inside the censored network.
 7. **Report with doctor.** `meridian doctor` collects a redacted diagnostic report that is safe to attach to a bug report. `meridian logs SERVER` shows recent node, panel, nginx, and relay logs with the same redaction; narrow it with `--grep TEXT` and `--component NAME`.
@@ -74,6 +74,11 @@ meridian test --json
 # `meridian test --probe` says the camouflage SNI is blocked: switch to another site
 meridian node sni nl www.cloudflare.com --yes
 meridian relay sni 203.0.113.10 dl.google.com --yes
+
+# Change several things at once: export, edit, review the diff, apply
+meridian fleet export > fleet.yml
+meridian fleet import fleet.yml --dry-run --json
+meridian fleet import fleet.yml --yes --json
 
 # What would change, then apply it
 meridian plan --json

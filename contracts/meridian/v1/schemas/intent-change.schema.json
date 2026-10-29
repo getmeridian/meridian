@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "description": "One difference between the fleet and an imported document, in document terms.\n\n``subject`` is the kind of thing (client, exit, path, route, relay, gateway, pool,\nrule, control, access, delivery, fleet); ``target`` names it; a ``change`` also\nnames the ``field`` and its rendered ``before`` and ``after`` values.",
+  "properties": {
+    "action": {
+      "enum": [
+        "add",
+        "change",
+        "remove"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "after": {
+      "default": "",
+      "title": "After",
+      "type": "string"
+    },
+    "before": {
+      "default": "",
+      "title": "Before",
+      "type": "string"
+    },
+    "field": {
+      "default": "",
+      "title": "Field",
+      "type": "string"
+    },
+    "subject": {
+      "title": "Subject",
+      "type": "string"
+    },
+    "target": {
+      "title": "Target",
+      "type": "string"
+    }
+  },
+  "required": [
+    "action",
+    "subject",
+    "target"
+  ],
+  "title": "IntentChange",
+  "type": "object"
+}

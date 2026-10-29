@@ -139,6 +139,26 @@ meridian deploy 198.51.100.10 --display-name "Alice 的 VPN" --icon 🚀 --color
 
 `meridian deploy` 只会重新部署已经在你的集群中作为出口的服务器。要添加更多服务器，请使用 `meridian node add NEW_IP`。
 
+## 用文件编辑集群
+
+要一次修改多处，或把集群布局纳入版本控制，可以导出、编辑后再导入：
+
+```bash
+meridian fleet export > fleet.yml
+$EDITOR fleet.yml
+meridian fleet import fleet.yml
+```
+
+导入会在执行任何操作之前显示每处变更：
+
+```
+  + client carol
+  ~ exit-2 sni www.example.com -> www.example.org
+  → 应用？ [y/N]
+```
+
+文件以保存的名称指代服务器，不包含密钥、凭据、链接或传输路径，因此可以放进代码仓库。文件中出现的服务器必须先保存（`meridian server add`）。导入会拒绝哪些内容，见 [`fleet import`](/zh/cli-reference/#meridian-fleet)。
+
 ## 部署前检查
 
 不确定某台服务器是否可用？

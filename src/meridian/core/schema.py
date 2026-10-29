@@ -44,6 +44,7 @@ from meridian.core.command_inputs import (
 from meridian.core.deploy import DeployPlan, DeployPorts, DeployRequest, DeployResult
 from meridian.core.events import EVENT_TYPES
 from meridian.core.fleet import FleetInventory, FleetStatus, NodeListResult, RelayListResult
+from meridian.core.fleet_document import FleetExportResult, FleetImportResult, IntentChange
 from meridian.core.health import HealthCheckResult
 from meridian.core.models import (
     CoreModel,
@@ -357,6 +358,21 @@ _, _, FleetInventoryOutputEnvelope = _make_command_envelope(
     doc="Envelope schema for `meridian fleet inventory --json`.",
 )
 
+_, _, FleetExportOutputEnvelope = _make_command_envelope(
+    "FleetExport",
+    "fleet.export",
+    FleetExportResult,
+    doc="Envelope schema for `meridian fleet export --json`.",
+)
+
+_, _, FleetImportOutputEnvelope = _make_command_envelope(
+    "FleetImport",
+    "fleet.import",
+    FleetImportResult,
+    success_statuses=Literal["ok", "changed", "no_changes"],
+    doc="Envelope schema for `meridian fleet import --json`.",
+)
+
 _, _, ClientListOutputEnvelope = _make_command_envelope(
     "ClientList",
     "client.list",
@@ -537,6 +553,8 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "verification-target": VerificationTarget,
     "fleet-status-envelope": FleetStatusOutputEnvelope,
     "fleet-inventory-envelope": FleetInventoryOutputEnvelope,
+    "fleet-export-envelope": FleetExportOutputEnvelope,
+    "fleet-import-envelope": FleetImportOutputEnvelope,
     "event": Event,
     "error": ErrorModel,
     "operation": OperationEnvelope,
@@ -592,6 +610,9 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "compiled-plan-result": CompiledPlanResult,
     "fleet-status": FleetStatus,
     "fleet-inventory": FleetInventory,
+    "fleet-export": FleetExportResult,
+    "fleet-import": FleetImportResult,
+    "intent-change": IntentChange,
     "node-list": NodeListResult,
     "relay-list": RelayListResult,
     "route-list": RouteListResult,
