@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 
 from meridian.cli import app
 from meridian.cluster import (
+    ActionCheckpoint,
     ClusterConfig,
     ManagedResourceBinding,
     PanelConfig,
@@ -23,6 +24,7 @@ from meridian.cluster import (
 from meridian.compiler import compile_topology
 from meridian.compiler.errors import TopologyCompileError
 from meridian.control.models import UserImportBatch, UserImportResult
+from meridian.core.errors import LocalStateError
 from meridian.core.topology import SetupIntent, TransparentRelayIntent
 from meridian.host_runtime import NODE_DIR
 from meridian.migrate import MigrationError
@@ -139,6 +141,7 @@ class Fleet:
         self.control.when("pg_dump", stdout=f"{hashlib.sha256(DUMP).hexdigest()}\nbackup-done\n")
         self.control.when("base64 /var/backups/", stdout=base64.encodebytes(DUMP).decode())
         self.control.when("panel.env", stdout="APP_SECRET=secret-for-tests\n")
+        self.control.when("uname -m", stdout="x86_64\n")
         self.relay = MockConnection()
         self.installs: list[str] = []
         self.imports: list[UserImportBatch] = []
@@ -147,6 +150,9 @@ class Fleet:
         monkeypatch.setattr("meridian.migrate.flow.install_beside_panel", self._install)
         monkeypatch.setattr("meridian.migrate.flow.import_over_ssh", self._import)
         monkeypatch.setattr("meridian.migrate.flow.verify_control_service", self._verify)
+        self.agent_archs: list[str] = []
+        self.agent_built = True
+        monkeypatch.setattr("meridian.migrate.flow.agent_binary", self._agent_binary)
         self.changed_link = ""
 
     def migrator(self) -> ControlMigrator:
@@ -165,6 +171,11 @@ class Fleet:
         # The service bootstrap saves its URL where the panel's was, without the trailing slash.
         cluster.panel.url = cluster.panel.url.rstrip("/")
         cluster.save()
+
+    def _agent_binary(self, arch: str) -> None:
+        self.agent_archs.append(arch)
+        if not self.agent_built:
+            raise LocalStateError(f"Meridian's node agent has no build for {arch} yet.", category="user")
 
     def _install(self, _conn: Any, cluster: ClusterConfig, token: str) -> None:
         assert cluster.panel.api_token == "remnawave-api-token", "the panel keeps its token until the cut-over"
@@ -333,6 +344,41 @@ def test_a_topology_the_meridian_backend_refuses_is_refused_before_anything_chan
 
     with pytest.raises(TopologyCompileError, match="client IP forwarding"):
         ControlMigrator(ClusterConfig.load(), fleet.registry, connection_builder=_never_dial).review()
+
+
+def test_an_unresolved_earlier_apply_is_refused_before_anything_stops(fleet: Fleet) -> None:
+    cluster = ClusterConfig.load()
+    cluster.pending_plan_hash, cluster.pending_generation = "f" * 64, 2
+    cluster.action_checkpoints["node@2"] = ActionCheckpoint(
+        idempotency_key="node@2", resource_id="node", generation=2, status="unknown"
+    )
+    cluster.save()
+
+    with pytest.raises(MigrationError, match="last apply did not finish") as error:
+        fleet.migrator().review()
+
+    assert "meridian apply" in (error.value.hint or "")
+    assert not any("docker" in call for call in fleet.control.calls)
+
+
+def test_a_server_with_no_agent_build_is_refused_before_anything_stops(fleet: Fleet) -> None:
+    fleet.agent_built = False
+
+    with pytest.raises(LocalStateError, match="no build for x86_64"):
+        fleet.migrator().review()
+
+    assert not any("docker" in call for call in fleet.control.calls)
+
+
+def test_a_resumed_cut_over_skips_the_checks_the_apply_itself_settles(fleet: Fleet) -> None:
+    fleet.fail_apply = True
+    with pytest.raises(MigrationError):
+        _run(fleet)
+    fleet.agent_built, fleet.fail_apply = False, False
+
+    _run(fleet)
+
+    assert fleet.agent_archs == ["x86_64"]
 
 
 def _command_migrator(fleet: Fleet, monkeypatch: pytest.MonkeyPatch) -> list[str]:

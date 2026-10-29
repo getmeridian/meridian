@@ -22,6 +22,8 @@ from pathlib import Path
 
 from meridian.cluster import ClusterConfig, ControlMigration, ManagedResourceBinding, MigrationStep
 from meridian.compiler.meridian_backend import validate_meridian_backend
+from meridian.compiler.models import AgentRuntimePayload, ResourcePlan
+from meridian.control_artifacts import agent_binary
 from meridian.core.errors import LocalStateError
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
@@ -39,6 +41,8 @@ from meridian.migrate.cutover import (
 from meridian.migrate.service_import import import_over_ssh, install_beside_panel
 from meridian.migrate.users import DROPPED_PANEL_STATE, CarriedUsers, carry_users
 from meridian.reconciler.fence import local_fence_view
+from meridian.reconciler.resource_executor import refuse_unresolved_pending_plan
+from meridian.reconciler.resources import PendingPlanConflictError
 from meridian.remnawave import MeridianPanel
 from meridian.resolve import connection_for_entry
 from meridian.servers import ServerEntry, ServerRegistry
@@ -135,6 +139,10 @@ class ControlMigrator:
         setup = SetupRuntime(self._registry, cluster_loader=lambda: self.cluster).review(
             SetupDraft.from_intent(flipped), cluster=self.cluster
         )
+        if migration is None or not migration.reached("cut_over"):
+            # What would otherwise refuse the apply only after the panel and its nodes are gone.
+            self._refuse_pending_plan(setup.plan)
+            self._check_agent_builds(setup.plan)
         carried: CarriedUsers | None = None
         if migration is None or not migration.reached("imported"):
             SSHApplyFence(self._control_connection(flipped)).ensure(local_fence_view(self.cluster))
@@ -264,6 +272,34 @@ class ControlMigrator:
         )
 
     # -- reading and connecting ------------------------------------------------------------
+
+    def _refuse_pending_plan(self, plan: ResourcePlan) -> None:
+        try:
+            refuse_unresolved_pending_plan(plan, self.cluster)
+        except PendingPlanConflictError as exc:
+            raise MigrationError(
+                f"The last apply did not finish: {exc}",
+                hint="Run `meridian apply` until it converges, then `meridian migrate`.",
+                category="user",
+            ) from exc
+
+    def _check_agent_builds(self, plan: ResourcePlan) -> None:
+        """Every server that will run an agent has a build of it here, read before anything stops."""
+        payloads = [resource.payload for resource in plan.resources]
+        servers = sorted({payload.server_ref for payload in payloads if isinstance(payload, AgentRuntimePayload)})
+        checked: set[str] = set()
+        for server_ref in servers:
+            result = self._connection(server_ref).run("uname -m", timeout=30, operation_name="read the architecture")
+            if result.returncode != 0:
+                detail = (result.stderr or result.stdout).strip()[:200] or f"exit {result.returncode}"
+                raise MigrationError(
+                    f"Could not read {server_ref}'s architecture: {detail}",
+                    hint="Check the server over SSH, then run `meridian migrate` again.",
+                )
+            arch = result.stdout.strip()
+            if arch not in checked:
+                agent_binary(arch)
+                checked.add(arch)
 
     def _read_users(self, intent: SetupIntent) -> CarriedUsers:
         panel = self._panel_factory(self.cluster.panel.url, self.cluster.panel.api_token)

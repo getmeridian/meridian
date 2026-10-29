@@ -278,6 +278,23 @@ def _retrying_observe(driver: ResourceDriver, stall: StallRetry, notice: StallNo
     return observe
 
 
+def refuse_unresolved_pending_plan(plan: ResourcePlan, cluster: ClusterConfig) -> None:
+    """Refuse to replace a pending plan while one of its actions has an unresolved remote outcome."""
+    if not cluster.pending_plan_hash or cluster.pending_plan_hash == plan.plan_hash:
+        return
+    ambiguous = [
+        checkpoint.resource_id
+        for checkpoint in cluster.action_checkpoints.values()
+        if checkpoint.generation == cluster.pending_generation and checkpoint.status in {"running", "unknown"}
+    ]
+    if ambiguous:
+        resources = ", ".join(sorted(ambiguous))
+        raise PendingPlanConflictError(
+            f"Cannot replace pending plan {cluster.pending_plan_hash[:12]}; "
+            f"remote outcome is unresolved for: {resources}."
+        )
+
+
 def validate_resource_plan_transition(
     plan: ResourcePlan,
     cluster: ClusterConfig,
@@ -287,19 +304,7 @@ def validate_resource_plan_transition(
     Callers persist the new intent right after this check, so every refusal
     must happen here rather than once execution starts.
     """
-    if cluster.pending_plan_hash and cluster.pending_plan_hash != plan.plan_hash:
-        ambiguous = [
-            checkpoint.resource_id
-            for checkpoint in cluster.action_checkpoints.values()
-            if checkpoint.generation == cluster.pending_generation and checkpoint.status in {"running", "unknown"}
-        ]
-        if ambiguous:
-            resources = ", ".join(sorted(ambiguous))
-            raise PendingPlanConflictError(
-                f"Cannot replace pending plan {cluster.pending_plan_hash[:12]}; "
-                f"remote outcome is unresolved for: {resources}."
-            )
-
+    refuse_unresolved_pending_plan(plan, cluster)
     blocked = unretirable(retired_bindings(plan, cluster))
     if blocked:
         raise UnsupportedResourceRetirementError(blocked)
