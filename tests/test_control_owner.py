@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
+import time as real_time
 from pathlib import Path
 
 import pytest
 
+from meridian.control import owner as owner_module
 from meridian.control import passwords
 from meridian.control.errors import ServiceError
-from meridian.control.login_limits import LockedOut, LoginLimiter
+from meridian.control.login_limits import ACCOUNT_FREE_FAILURES, LockedOut, LoginLimiter
 from meridian.control.owner import (
     ABSOLUTE_SECONDS,
     CONFIRM_SECONDS,
@@ -270,6 +273,42 @@ def test_login_locks_the_account_after_five_failures(owner: OwnerAuth) -> None:
             owner.login("wrong password!", "", source=SOURCE)
     with pytest.raises(LockedOut):
         owner.login(PASSWORD, "", source=SOURCE)  # even the right password waits
+
+
+def _at_once(count: int, guess) -> list[BaseException | None]:  # type: ignore[no-untyped-def]
+    """Run `guess` on `count` threads released together; each thread's exception or None."""
+    start = threading.Barrier(count)
+    outcomes: list[BaseException | None] = [None] * count
+
+    def run(index: int) -> None:
+        start.wait()
+        try:
+            guess()
+        except BaseException as exc:  # noqa: BLE001 - the outcome is the assertion
+            outcomes[index] = exc
+
+    threads = [threading.Thread(target=run, args=(index,)) for index in range(count)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+    return outcomes
+
+
+def test_concurrent_guesses_never_hash_past_the_lock(owner: OwnerAuth, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Checking the lock before a slow hash let every request already waiting pass it at once."""
+    set_up(owner)
+    hashed: list[str] = []
+
+    def slow_verify(password: str, stored: str) -> bool:
+        hashed.append(password)
+        real_time.sleep(0.02)
+        return verify_password(password, stored)
+
+    monkeypatch.setattr(owner_module, "verify_password", slow_verify)
+    outcomes = _at_once(20, lambda: owner.login("wrong password!", "", source=SOURCE))
+    assert len(hashed) == ACCOUNT_FREE_FAILURES
+    assert sum(isinstance(item, LockedOut) for item in outcomes) == 20 - ACCOUNT_FREE_FAILURES
 
 
 def test_totp_turns_on_only_with_a_matching_code_and_ends_other_sessions(owner: OwnerAuth, clock: Clock) -> None:

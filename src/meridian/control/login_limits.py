@@ -11,6 +11,11 @@ A key that failed `free_failures` times in a row is locked for a delay that doub
 with each further failure, up to `max_lock_seconds`. A locked key is refused before
 any password is hashed or code compared, so a lock is also cheap to enforce. Success
 clears the account's and the source's failures.
+
+Guesses at one account take turns (`turn`): the check, the slow hash, and the count
+happen while the turn is held, so concurrent requests cannot all pass the check
+before the first failure is counted. Hashing is one at a time anyway, so turns cost
+no throughput.
 """
 
 from __future__ import annotations
@@ -22,7 +27,8 @@ import secrets
 import threading
 import time
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 from meridian.control.errors import ServiceError
@@ -56,6 +62,26 @@ class LoginLimiter:
         self._key = secrets.token_bytes(32)
         self._lock = threading.Lock()
         self._failures: OrderedDict[str, _Failures] = OrderedDict()
+        # One turn lock per account with a guess in progress or waiting, and how many hold or await it.
+        self._turns: dict[str, tuple[threading.Lock, int]] = {}
+
+    @contextmanager
+    def turn(self, account: str, source: str) -> Iterator[None]:
+        """Wait for the account's turn, then refuse while locked; count the guess before the block ends."""
+        with self._lock:
+            lock, users = self._turns.get(account, (threading.Lock(), 0))
+            self._turns[account] = (lock, users + 1)
+        try:
+            with lock:
+                self.check(account, source)
+                yield
+        finally:
+            with self._lock:
+                lock, users = self._turns[account]
+                if users == 1:
+                    del self._turns[account]
+                else:
+                    self._turns[account] = (lock, users - 1)
 
     def check(self, account: str, source: str) -> None:
         """Refuse with 429 and the wait while either key is locked."""

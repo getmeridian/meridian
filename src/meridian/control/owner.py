@@ -137,11 +137,11 @@ class OwnerAuth:
 
     def check_setup_link(self, token: str, *, source: str) -> str:
         """The purpose of a live link, without spending it."""
-        self.limiter.check(SETUP_ACCOUNT, source)
-        row = self._live_link(token)
-        if row is None:
-            self.limiter.failed(SETUP_ACCOUNT, source)
-            raise _dead_link()
+        with self.limiter.turn(SETUP_ACCOUNT, source):
+            row = self._live_link(token)
+            if row is None:
+                self.limiter.failed(SETUP_ACCOUNT, source)
+                raise _dead_link()
         return str(row["purpose"])
 
     def complete_setup(self, token: str, password: str, *, source: str) -> OwnerSession:
@@ -191,23 +191,23 @@ class OwnerAuth:
 
     def _verify(self, password: str, code: str, *, source: str) -> None:
         """Check password and code together; any failure counts once and reads the same."""
-        self.limiter.check(OWNER_ACCOUNT, source)
-        row = self._owner()
-        if row is None:
-            raise ServiceError("setup_required", "The web UI has no owner yet; run `meridian panel`.", 409)
-        password_ok = verify_password(password, str(row["password_hash"]))
-        with self._store.transaction():
-            owner = self._owner()
-            secret = owner["totp_secret"] if owner is not None else None
-            step = None
-            if owner is not None and secret:
-                step = totp_match(str(secret), code, now=self._clock(), last_step=owner["totp_last_step"])
-            if not password_ok or (secret and step is None):
-                self.limiter.failed(OWNER_ACCOUNT, source)
-                raise wrong_credentials()
-            if step is not None:
-                self._store.db.execute("UPDATE ui_owner SET totp_last_step = ? WHERE id = 1", (step,))
-        self.limiter.succeeded(OWNER_ACCOUNT, source)
+        with self.limiter.turn(OWNER_ACCOUNT, source):
+            row = self._owner()
+            if row is None:
+                raise ServiceError("setup_required", "The web UI has no owner yet; run `meridian panel`.", 409)
+            password_ok = verify_password(password, str(row["password_hash"]))
+            with self._store.transaction():
+                owner = self._owner()
+                secret = owner["totp_secret"] if owner is not None else None
+                step = None
+                if owner is not None and secret:
+                    step = totp_match(str(secret), code, now=self._clock(), last_step=owner["totp_last_step"])
+                if not password_ok or (secret and step is None):
+                    self.limiter.failed(OWNER_ACCOUNT, source)
+                    raise wrong_credentials()
+                if step is not None:
+                    self._store.db.execute("UPDATE ui_owner SET totp_last_step = ? WHERE id = 1", (step,))
+            self.limiter.succeeded(OWNER_ACCOUNT, source)
 
     # -- sessions ----------------------------------------------------------------------
 
@@ -298,8 +298,7 @@ class OwnerAuth:
     def enable_totp(self, session: OwnerSession, code: str, *, source: str) -> None:
         """Turn TOTP on once a code from the pending secret matches; other sessions end."""
         self.require_recent(session)
-        self.limiter.check(OWNER_ACCOUNT, source)
-        with self._store.transaction():
+        with self.limiter.turn(OWNER_ACCOUNT, source), self._store.transaction():
             owner = self._owner()
             pending = owner["totp_pending"] if owner is not None else None
             if not pending:
@@ -313,7 +312,7 @@ class OwnerAuth:
                 (step,),
             )
             self._store.db.execute("DELETE FROM ui_sessions WHERE session_id != ?", (session.session_id,))
-        self.limiter.succeeded(OWNER_ACCOUNT, source)
+            self.limiter.succeeded(OWNER_ACCOUNT, source)
 
     def disable_totp(self, session: OwnerSession) -> None:
         self.require_recent(session)

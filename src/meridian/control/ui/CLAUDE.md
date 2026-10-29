@@ -16,6 +16,7 @@
 ## Pitfalls
 - The session cookie is scoped to `ServiceConfig.public_path` (the bootstrap writes it); without one sign-in is refused (`ui_unconfigured`), since a `/` cookie would ride every subscription request.
 - The login limiter keys sources on the TCP peer only, in memory; behind nginx every browser is 127.0.0.1, so the account bucket binds first. Never trust a forwarded-address header.
+- Judge every guess inside `LoginLimiter.turn()` (check, hash, count) — checking the lock before the slow hash let every concurrent request pass it before the first failure counted.
 - A setup link travels in the URL fragment (never sent to nginx) and `auth.js` strips it with `history.replaceState` before anything else renders.
 - An owner session is full admin; re-check the password (and code) before anything that hands out a credential (`OWNER_STEP_UP`), and keep the `ui_*` tables out of snapshots.
 - The fleet title is intent-owned today: `ServiceSettingsDriver` puts the deployer's back on the next apply, which the Settings screen says.
