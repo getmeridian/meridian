@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from meridian.core.agent_desired import AgentResource
 from meridian.core.agent_types import (
@@ -134,7 +134,9 @@ class UserRecord(CoreModel):
     traffic_limit_strategy: LimitStrategy = "no_reset"
     traffic_reset_at: Timestamp | None = Field(default=None, description="When the current traffic period began.")
     used_traffic_bytes: int = Field(default=0, ge=0, description="Traffic since the period began.")
-    lifetime_traffic_bytes: int = Field(default=0, ge=0)
+    lifetime_traffic_bytes: int = Field(
+        default=0, ge=0, description="What agents counted plus what an import carried in from before."
+    )
     online_at: Timestamp | None = Field(default=None, description="When an agent last counted the user's traffic.")
 
 
@@ -145,6 +147,50 @@ class UserUpdate(CoreModel):
     expire_at: Timestamp | None = None
     traffic_limit_bytes: int | None = Field(default=None, ge=0)
     traffic_limit_strategy: LimitStrategy | None = None
+
+
+SUB_TOKEN_PATTERN = r"^[A-Za-z0-9_-]{16,64}$"
+
+
+class UserImport(CoreModel):
+    """One user carried over from another control plane (`meridian migrate`), credentials and usage included.
+
+    The UUID and subscription token keep every link the user already has working.
+    `used_traffic_bytes` is the use of the current traffic period and counts toward
+    the limit; `lifetime_traffic_bytes` (never below it) is everything ever counted.
+    `traffic_reset_at` is when the source last reset the period, if it knows.
+    """
+
+    username: str = Field(pattern=r"^[A-Za-z0-9_.-]{1,64}$")
+    uuid: str = Field(pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+    sub_token: str = Field(pattern=SUB_TOKEN_PATTERN)
+    status: UserStatus = "active"
+    expire_at: Timestamp | None = None
+    traffic_limit_bytes: Count = 0
+    traffic_limit_strategy: LimitStrategy = "no_reset"
+    used_traffic_bytes: Count = 0
+    lifetime_traffic_bytes: Count = 0
+    traffic_reset_at: Timestamp | None = None
+    created_at: Timestamp | None = None
+
+
+class UserImportBatch(CoreModel):
+    """Users imported in one transaction: all of them or none."""
+
+    users: list[UserImport] = Field(max_length=10_000)
+
+    @model_validator(mode="after")
+    def _unique(self) -> UserImportBatch:
+        for field_name in ("username", "uuid", "sub_token"):
+            values = [str(getattr(user, field_name)).lower() for user in self.users]
+            if len(values) != len(set(values)):
+                raise ValueError(f"two imported users share a {field_name}")
+        return self
+
+
+class UserImportResult(CoreModel):
+    created: list[str] = Field(description="Users the import created.")
+    unchanged: list[str] = Field(description="Users that already existed with the same credentials; kept as they are.")
 
 
 class ServiceSettings(CoreModel):

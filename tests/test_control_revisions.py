@@ -197,6 +197,7 @@ def test_a_version_four_database_gains_revisions_and_the_fence(tmp_path: Path) -
     db = sqlite3.connect(path)
     db.execute("DROP TABLE revisions")
     db.execute("DROP TABLE apply_fence")
+    db.execute("ALTER TABLE users DROP COLUMN traffic_carried_bytes")  # added in version 6
     db.execute("UPDATE meta SET value = '4' WHERE key = 'schema_version'")
     db.commit()
     db.close()
