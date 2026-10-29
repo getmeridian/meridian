@@ -16,7 +16,7 @@ import time
 import uuid as uuid_module
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -27,12 +27,14 @@ from meridian.control.formats.selector import SUFFIX_FORMATS, select_format
 from meridian.control.models import (
     ClientEndpoint,
     EnrollmentGrant,
+    LimitStrategy,
     ManagedInbound,
     NodeSpec,
     NodeStatus,
     ServiceHealth,
     ServiceSettings,
     UserRecord,
+    UserStatus,
     UserUpdate,
     users_resource_id,
 )
@@ -45,7 +47,7 @@ from meridian.core.agent_protocol import ObservedStateReport, PollRequest
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MAX_WAIT_SECONDS = 55
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -72,7 +74,9 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TEXT NOT NULL,
     expire_at TEXT,
     traffic_limit_bytes INTEGER NOT NULL DEFAULT 0,
-    traffic_limit_strategy TEXT NOT NULL DEFAULT 'no_reset'
+    traffic_limit_strategy TEXT NOT NULL DEFAULT 'no_reset',
+    traffic_offset_bytes INTEGER NOT NULL DEFAULT 0,
+    traffic_reset_at TEXT
 );
 CREATE TABLE IF NOT EXISTS endpoints (endpoint_id TEXT PRIMARY KEY, body TEXT NOT NULL);
 """
@@ -83,9 +87,30 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "ALTER TABLE users ADD COLUMN traffic_limit_bytes INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE users ADD COLUMN traffic_limit_strategy TEXT NOT NULL DEFAULT 'no_reset'",
     ),
+    (
+        "ALTER TABLE users ADD COLUMN traffic_offset_bytes INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN traffic_reset_at TEXT",
+    ),
 )
-_USER_COLUMNS = (
-    "username, user_id, uuid, sub_token, status, created_at, expire_at, traffic_limit_bytes, traffic_limit_strategy"
+_USER_FIELDS = (
+    "username",
+    "user_id",
+    "uuid",
+    "sub_token",
+    "status",
+    "created_at",
+    "expire_at",
+    "traffic_limit_bytes",
+    "traffic_limit_strategy",
+    "traffic_reset_at",
+)
+# A user's stored fields plus what the traffic ledger counted for them: `used` is
+# the growth since the last reset (lifetime minus the offset the reset recorded).
+_USER_SELECT = (
+    "SELECT "
+    + ", ".join(f"u.{name}" for name in _USER_FIELDS)
+    + ", COALESCE(t.uplink_bytes + t.downlink_bytes, 0) AS lifetime, u.traffic_offset_bytes, t.last_seen_at"
+    " FROM users u LEFT JOIN traffic_totals t ON t.user_id = u.user_id"
 )
 
 
@@ -99,6 +124,8 @@ class ControlService:
         self._changed = self._store.changed
         self._db = self._store.db
         self._store.create(_SCHEMA)
+        # Users read their traffic from the ledger's table, so it exists before any user query.
+        self.traffic = TrafficLedger(self._store)
         with self._transaction():
             stored = self._meta("fleet_id")
             if stored and stored != fleet_id:
@@ -111,7 +138,6 @@ class ControlService:
                 self._set_meta("profile_title", "Meridian")
         self.fleet_id = fleet_id
         self.authority = NodeAuthority(self._store, fleet_id, clock=clock)
-        self.traffic = TrafficLedger(self._store)
         with self._transaction():
             # Documents signed by an earlier signing certificate are signed again.
             self._compose_all()
@@ -263,7 +289,7 @@ class ControlService:
             return self._require_user(username)
 
     def update_user(self, username: str, update: UserUpdate) -> UserRecord:
-        """Apply the operator's change; extending an expired user's expiry makes it active again."""
+        """Apply the operator's change; extending an expiry or raising a limit makes the user active again."""
         with self._transaction():
             user = self._require_user(username)
             changes = update.model_dump(include=update.model_fields_set)
@@ -272,9 +298,8 @@ class ControlService:
             for field in ("traffic_limit_bytes", "traffic_limit_strategy"):
                 if field in changes and changes[field] is None:
                     del changes[field]
+            # Enforcement below turns an expired or limited user active again once the change lifts it.
             merged = user.model_copy(update=changes)
-            if merged.status == "expired" and "expire_at" in changes and not _expired(merged, utc_now()):
-                merged = merged.model_copy(update={"status": "active"})
             self._db.execute(
                 "UPDATE users SET status = ?, expire_at = ?, traffic_limit_bytes = ?, traffic_limit_strategy = ? "
                 "WHERE username = ?",
@@ -301,8 +326,16 @@ class ControlService:
             self._compose_all()
             return self._require_user(username)
 
+    def reset_user_traffic(self, username: str) -> UserRecord:
+        """Start the user's traffic period now; a user limited by it becomes active again."""
+        with self._transaction():
+            self._reset_traffic(self._require_user(username), utc_now())
+            self._enforce(utc_now())
+            self._compose_all()
+            return self._require_user(username)
+
     def enforce(self, now: str | None = None) -> list[str]:
-        """Expire active users whose `expire_at` passed; return who changed."""
+        """Apply expiry, traffic limits, and periodic resets; return who changed status."""
         with self._transaction():
             changed = self._enforce(now or utc_now())
             if changed:
@@ -311,12 +344,12 @@ class ControlService:
 
     def get_user(self, username: str) -> UserRecord | None:
         with self._lock:
-            row = self._db.execute(f"SELECT {_USER_COLUMNS} FROM users WHERE username = ?", (username,)).fetchone()
+            row = self._db.execute(f"{_USER_SELECT} WHERE u.username = ?", (username,)).fetchone()
         return _user(row) if row else None
 
     def list_users(self) -> list[UserRecord]:
         with self._lock:
-            rows = self._db.execute(f"SELECT {_USER_COLUMNS} FROM users ORDER BY username").fetchall()
+            rows = self._db.execute(f"{_USER_SELECT} ORDER BY u.username").fetchall()
         return [_user(row) for row in rows]
 
     def delete_user(self, username: str) -> None:
@@ -331,10 +364,25 @@ class ControlService:
         return user
 
     def _enforce(self, now: str) -> list[str]:
-        expired = [user.username for user in self.list_users() if user.status == "active" and _expired(user, now)]
-        for username in expired:
-            self._db.execute("UPDATE users SET status = 'expired' WHERE username = ?", (username,))
-        return expired
+        changed: list[str] = []
+        for user in self.list_users():
+            start = period_start(user.traffic_limit_strategy, datetime.fromisoformat(now))
+            if start is not None and (
+                user.traffic_reset_at is None or datetime.fromisoformat(user.traffic_reset_at) < start
+            ):
+                self._reset_traffic(user, now)
+                user = self._require_user(user.username)
+            status = _enforced_status(user, now)
+            if status != user.status:
+                self._db.execute("UPDATE users SET status = ? WHERE username = ?", (status, user.username))
+                changed.append(user.username)
+        return changed
+
+    def _reset_traffic(self, user: UserRecord, now: str) -> None:
+        self._db.execute(
+            "UPDATE users SET traffic_offset_bytes = ?, traffic_reset_at = ? WHERE username = ?",
+            (user.lifetime_traffic_bytes, now, user.username),
+        )
 
     def put_endpoint(self, endpoint_id: str, endpoint: ClientEndpoint) -> ClientEndpoint:
         with self._transaction():
@@ -358,7 +406,7 @@ class ControlService:
     ) -> SubscriptionResponse:
         """Answer a subscription request: the document a suffix names, else the one the app reads."""
         with self._lock:
-            row = self._db.execute(f"SELECT {_USER_COLUMNS} FROM users WHERE sub_token = ?", (sub_token,)).fetchone()
+            row = self._db.execute(f"{_USER_SELECT} WHERE u.sub_token = ?", (sub_token,)).fetchone()
             bodies = [item[0] for item in self._db.execute("SELECT body FROM endpoints").fetchall()]
             settings = self.settings()
         if row is None:
@@ -370,7 +418,9 @@ class ControlService:
             short_id=record.sub_token,
             status=record.status,
             expires_at=datetime.fromisoformat(record.expire_at) if record.expire_at else None,
+            used_bytes=record.used_traffic_bytes,
             limit_bytes=record.traffic_limit_bytes,
+            lifetime_used_bytes=record.lifetime_traffic_bytes,
         )
         endpoints = [ClientEndpoint.model_validate_json(body) for body in bodies]
         document = SUFFIX_FORMATS[suffix] if suffix else select_format(user_agent, accept)
@@ -485,8 +535,38 @@ def _users_resource(inbound: ManagedInbound, users: list[UserRecord], config_id:
 
 
 def _user(row: Any) -> UserRecord:
-    names = [column.strip() for column in _USER_COLUMNS.split(",")]
-    return UserRecord.model_validate(dict(zip(names, tuple(row), strict=True)))
+    *stored, lifetime, offset, online_at = tuple(row)
+    return UserRecord.model_validate(
+        {
+            **dict(zip(_USER_FIELDS, stored, strict=True)),
+            "lifetime_traffic_bytes": lifetime,
+            # A ledger that lost totals (a rebuilt database) never shows negative use.
+            "used_traffic_bytes": max(0, lifetime - offset),
+            "online_at": online_at,
+        }
+    )
+
+
+def _enforced_status(user: UserRecord, now: str) -> UserStatus:
+    """The status enforcement gives a user; `disabled` is the operator's and never changes."""
+    if user.status == "disabled":
+        return "disabled"
+    if _expired(user, now):
+        return "expired"
+    over = user.traffic_limit_bytes > 0 and user.used_traffic_bytes >= user.traffic_limit_bytes
+    return "limited" if over else "active"
+
+
+def period_start(strategy: LimitStrategy, now: datetime) -> datetime | None:
+    """The start of the traffic period *now* falls in (UTC), or None when traffic never resets."""
+    midnight = now.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    if strategy == "day":
+        return midnight
+    if strategy == "week":
+        return midnight - timedelta(days=midnight.weekday())
+    if strategy == "month":
+        return midnight.replace(day=1)
+    return None
 
 
 def _expired(user: UserRecord, now: str) -> bool:

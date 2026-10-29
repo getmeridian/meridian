@@ -214,6 +214,9 @@ class _Handler(BaseHTTPRequestHandler):
     def reissue_user(self, match: re.Match[str]) -> Any:
         return self._admin().reissue_user(match[1])
 
+    def reset_user_traffic(self, match: re.Match[str]) -> Any:
+        return self._admin().reset_user_traffic(match[1])
+
     def delete_user(self, match: re.Match[str]) -> Any:
         self._admin().delete_user(match[1])
         return {"deleted": match[1]}
@@ -296,6 +299,7 @@ _ROUTES: list[Route] = [
     ("PUT", re.compile(rf"/api/users/{_USERNAME}"), _Handler.put_user),
     ("PATCH", re.compile(rf"/api/users/{_USERNAME}"), _Handler.update_user),
     ("POST", re.compile(rf"/api/users/{_USERNAME}/reissue"), _Handler.reissue_user),
+    ("POST", re.compile(rf"/api/users/{_USERNAME}/reset-traffic"), _Handler.reset_user_traffic),
     ("DELETE", re.compile(rf"/api/users/{_USERNAME}"), _Handler.delete_user),
     ("GET", re.compile(rf"/api/endpoints/{_NAME}"), _Handler.get_endpoint),
     ("PUT", re.compile(rf"/api/endpoints/{_NAME}"), _Handler.put_endpoint),

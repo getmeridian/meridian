@@ -114,7 +114,8 @@ class UserRecord(CoreModel):
     """One access user as the service stores it.
 
     The operator sets `active` or `disabled`; the service's enforcement turns an
-    active user `expired` once `expire_at` passes and `limited` at the traffic limit.
+    active user `expired` once `expire_at` passes and `limited` at the traffic limit,
+    and back once a change or a new traffic period lifts it.
     """
 
     username: str
@@ -126,6 +127,10 @@ class UserRecord(CoreModel):
     expire_at: Timestamp | None = None
     traffic_limit_bytes: int = Field(default=0, ge=0, description="0 means unlimited.")
     traffic_limit_strategy: LimitStrategy = "no_reset"
+    traffic_reset_at: Timestamp | None = Field(default=None, description="When the current traffic period began.")
+    used_traffic_bytes: int = Field(default=0, ge=0, description="Traffic since the period began.")
+    lifetime_traffic_bytes: int = Field(default=0, ge=0)
+    online_at: Timestamp | None = Field(default=None, description="When an agent last counted the user's traffic.")
 
 
 class UserUpdate(CoreModel):

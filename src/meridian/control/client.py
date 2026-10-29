@@ -115,6 +115,9 @@ class ControlClient:
     def reissue_user(self, username: str) -> UserRecord:
         return UserRecord.model_validate(self._call("POST", f"api/users/{_segment(username)}/reissue", {}))
 
+    def reset_user_traffic(self, username: str) -> UserRecord:
+        return UserRecord.model_validate(self._call("POST", f"api/users/{_segment(username)}/reset-traffic", {}))
+
     def delete_user(self, username: str) -> None:
         self._call("DELETE", f"api/users/{_segment(username)}")
 

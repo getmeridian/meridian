@@ -88,8 +88,10 @@ class ServiceAccessPanel:
             username=record.username,
             vless_uuid=record.uuid,
             status=record.status.upper(),
+            used_traffic_bytes=record.used_traffic_bytes,
             traffic_limit_bytes=record.traffic_limit_bytes,
             created_at=record.created_at,
+            online_at=record.online_at or "",
         )
 
 

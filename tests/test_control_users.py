@@ -9,6 +9,7 @@ import pytest
 
 from meridian.control.models import NodeSpec, UserUpdate, users_resource_id
 from meridian.control.service import ControlService, ServiceError
+from meridian.core.agent_protocol import StatsReport, UserTraffic
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
 TAG = "meridian-main-reality"
@@ -170,3 +171,82 @@ def test_subscription_userinfo_carries_the_users_limit_and_expiry(service: Contr
 
     assert "total=5000000000" in info
     assert "expire=1893456000" in info
+
+
+EPOCH = "6a1f0c2e-3b4d-4e5f-8a9b-0c1d2e3f4a5b"
+
+
+def _count(service: ControlService, user_id: str, total: int, seq: int) -> None:
+    """One agent report of *total* cumulative bytes (half up, half down) for one user."""
+    report = StatsReport(
+        counter_epoch=EPOCH,
+        seq=seq,
+        collected_at="2026-10-29T12:00:00Z",
+        users=[UserTraffic(user_id=user_id, uplink_bytes=total // 2, downlink_bytes=total - total // 2)],
+    )
+    service.traffic.record("main", report)
+
+
+def test_a_user_reaching_their_limit_is_limited_and_leaves_node_documents(service: ControlService) -> None:
+    _with_node(service)
+    alice = service.put_user("alice")
+    service.update_user("alice", UserUpdate(traffic_limit_bytes=1000))
+
+    _count(service, alice.user_id, 999, seq=1)
+    assert service.enforce() == []
+    _count(service, alice.user_id, 1000, seq=2)
+
+    assert service.enforce() == ["alice"]
+    assert service.get_user("alice").status == "limited"  # type: ignore[union-attr]
+    assert _delivered(service) == []
+
+
+def test_raising_the_limit_or_resetting_traffic_makes_a_limited_user_active(service: ControlService) -> None:
+    alice = service.put_user("alice")
+    service.update_user("alice", UserUpdate(traffic_limit_bytes=1000))
+    _count(service, alice.user_id, 1500, seq=1)
+    service.enforce()
+
+    assert service.update_user("alice", UserUpdate(traffic_limit_bytes=2000)).status == "active"
+    service.update_user("alice", UserUpdate(traffic_limit_bytes=1000))
+    reset = service.reset_user_traffic("alice")
+
+    assert (reset.status, reset.used_traffic_bytes, reset.lifetime_traffic_bytes) == ("active", 0, 1500)
+
+
+@pytest.mark.parametrize(
+    ("strategy", "inside", "next_period"),
+    [
+        ("day", "2026-10-29T23:59:59Z", "2026-10-30T00:00:00Z"),
+        ("week", "2026-11-01T23:59:59Z", "2026-11-02T00:00:00Z"),
+        ("month", "2026-11-30T23:59:59Z", "2026-12-01T00:00:00Z"),
+    ],
+    ids=["day", "week-starts-monday", "month"],
+)
+def test_a_new_traffic_period_resets_use(service: ControlService, strategy: str, inside: str, next_period: str) -> None:
+    alice = service.put_user("alice")
+    service.update_user("alice", UserUpdate(traffic_limit_bytes=1000, traffic_limit_strategy=strategy))  # type: ignore[arg-type]
+    service.enforce(inside.replace("23:59:59", "00:00:01"))
+    _count(service, alice.user_id, 1200, seq=1)
+
+    assert service.enforce(inside) == ["alice"]
+    assert service.enforce(next_period) == ["alice"]
+    assert service.get_user("alice").used_traffic_bytes == 0  # type: ignore[union-attr]
+
+
+def test_traffic_without_a_reset_strategy_accumulates(service: ControlService) -> None:
+    alice = service.put_user("alice")
+    _count(service, alice.user_id, 1200, seq=1)
+    service.enforce("2999-01-01T00:00:00Z")
+
+    assert service.get_user("alice").used_traffic_bytes == 1200  # type: ignore[union-attr]
+
+
+def test_subscription_userinfo_reports_the_users_traffic(service: ControlService) -> None:
+    alice = service.put_user("alice")
+    _count(service, alice.user_id, 3001, seq=1)
+
+    info = service.subscription(alice.sub_token).headers["subscription-userinfo"]
+
+    # Like the panel, the header carries all use as download.
+    assert "upload=0; download=3001" in info
