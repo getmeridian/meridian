@@ -212,7 +212,10 @@ var ROUTER_DOCS = 'https://getmeridian.org/{lang}/routers/';
 function appPlatforms(a) {
   if (a.platforms) return a.platforms;
   /* Older config.json entries carry only a display label */
-  return a.platform === 'All platforms' ? ALL_PLATFORMS : [a.platform];
+  var legacy = { 'All platforms': ALL_PLATFORMS, 'Desktop': ['Windows', 'macOS', 'Linux'],
+    'Android, desktop': ['Android', 'Windows', 'macOS', 'Linux'],
+    'iOS, Android': ['iOS', 'Android'], 'iOS, Android, macOS': ['iOS', 'Android', 'macOS'] };
+  return Object.prototype.hasOwnProperty.call(legacy, a.platform) ? legacy[a.platform] : [a.platform];
 }
 
 function appUrl(a, key) {
@@ -377,6 +380,72 @@ function isPersonalName(name) {
 /* Defense-in-depth for QR data injected into <img src> */
 var B64_RE = /^[A-Za-z0-9+/=]+$/;
 function isValidBase64(s) { return s && B64_RE.test(s); }
+
+function object(value) { return !!value && typeof value === 'object' && !Array.isArray(value); }
+function string(value, max, empty) { return typeof value === 'string' && (empty || value.length > 0) && value.length <= max; }
+function webUrl(value, httpsOnly) {
+  if (!string(value, 16384) || /[\u0000-\u001f\u007f]/.test(value)) return false;
+  try {
+    var url = new URL(value);
+    return !url.username && !url.password && (url.protocol === 'https:' || (!httpsOnly && url.protocol === 'http:'));
+  } catch (e) { return false; }
+}
+function imageSource(value) {
+  if (!string(value, 2 * 1024 * 1024)) return false;
+  if (/^data:image\/(png|jpeg|webp|gif|svg\+xml);base64,[A-Za-z0-9+/]+={0,2}$/.test(value)) return true;
+  try {
+    var url = new URL(value, location.href);
+    return url.origin === location.origin && !url.username && !url.password && !url.search && !url.hash &&
+      /\/pwa\/[a-z0-9-]+\.(svg|webp|png)$/.test(url.pathname);
+  } catch (e) { return false; }
+}
+function platformList(list) {
+  return Array.isArray(list) && list.length > 0 && list.length <= 5 && list.every(function(key, i) {
+    return ALL_PLATFORMS.indexOf(key) !== -1 && list.indexOf(key) === i;
+  });
+}
+function importTemplate(value) {
+  if (!string(value, 512) || /[\u0000-\u001f\u007f]/.test(value)) return false;
+  var schemes = ['happ', 'flclashx', 'clash', 'throne', 'sub', 'streisand', 'v2raytun', 'v2rayng',
+    'sn', 'flclash', 'sing-box', 'hiddify', 'karing', 'v2box', 'stash'];
+  var scheme = /^([a-z][a-z0-9+.-]*):\/\//.exec(value);
+  return !!scheme && schemes.indexOf(scheme[1]) !== -1 && /\{url(?:_raw|_b64)?\}/.test(value) &&
+    !/[{}]/.test(value.replace(/\{(?:url_raw|url_b64|url|name)\}/g, ''));
+}
+function validApps(apps) {
+  if (!Array.isArray(apps) || !apps.length || apps.length > 64) return false;
+  var names = [];
+  return apps.every(function(app) {
+    if (!object(app) || !string(app.name, 80) || names.indexOf(app.name) !== -1 || !string(app.platform, 80) || !webUrl(app.url, true)) return false;
+    names.push(app.name);
+    var platforms = appPlatforms(app);
+    if (!platformList(platforms)) return false;
+    if (app.recommended !== undefined && (!platformList(app.recommended) || !app.recommended.every(function(key) { return platforms.indexOf(key) !== -1; }))) return false;
+    if (app.urls !== undefined && (!object(app.urls) || !Object.keys(app.urls).every(function(key) {
+      return platforms.indexOf(key) !== -1 && webUrl(app.urls[key], true);
+    }))) return false;
+    if (app.deeplink !== undefined && !importTemplate(app.deeplink)) return false;
+    return app.icon === undefined || imageSource(app.icon);
+  });
+}
+function validCatalog(value) { return object(value) && value.version === 1 && validApps(value.apps); }
+function validConfig(config) {
+  if (!object(config) || config.version !== 1 || !Array.isArray(config.protocols) || config.protocols.length > 2048 || !validApps(config.apps)) return false;
+  var labels = ['client_name', 'server_name', 'server_ip', 'domain'];
+  if (!labels.every(function(key) { return config[key] === undefined || string(config[key], 256, true); })) return false;
+  if (config.generated_at !== undefined && (!string(config.generated_at, 40) || !isFinite(Date.parse(config.generated_at)))) return false;
+  if (config.subscription_url !== undefined && config.subscription_url !== '' && !webUrl(config.subscription_url, false)) return false;
+  if (config.server_icon !== undefined && (!string(config.server_icon, 2 * 1024 * 1024, true) ||
+      (config.server_icon.indexOf('data:') === 0 ? !imageSource(config.server_icon) : config.server_icon.length > 64))) return false;
+  if (config.color !== undefined && ['ocean', 'sunset', 'forest', 'lavender', 'rose', 'slate', ''].indexOf(config.color) === -1) return false;
+  if (config.subscription_qr_b64 !== undefined && !string(config.subscription_qr_b64, 1024 * 1024, true)) return false;
+  return config.protocols.every(function(proto) {
+    return object(proto) && string(proto.key, 40) && string(proto.label, 512, true) && string(proto.url, 16384) &&
+      /^(vless|hysteria2|hy2|vmess|ss|trojan):\/\//.test(proto.url) &&
+      (proto.qr_b64 === undefined || string(proto.qr_b64, 1024 * 1024, true)) &&
+      (proto.recommended === undefined || typeof proto.recommended === 'boolean');
+  });
+}
 
 var iosButtonIndex = 0;
 
@@ -868,10 +937,10 @@ function updatePageMeta(clientName, serverName) {
  * Utilities
  * ----------------------------------------------------------------------- */
 function escapeHtml(s) {
-  if (!s) return '';
-  var div = document.createElement('div');
-  div.appendChild(document.createTextNode(s));
-  return div.innerHTML;
+  /* Safe in both text nodes and quoted attributes. A text-node serializer
+     leaves quotes intact, which once allowed data-url to become attributes. */
+  return s === undefined || s === null ? '' : String(s).replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function capitalize(s) {
@@ -958,6 +1027,7 @@ function init() {
 
   var app = document.getElementById('app');
   var slowTimer = setTimeout(function() {
+    if (id !== initId) return;
     if (!app || app.querySelector('.load-slow')) return;
     var dict = currentLang && T[currentLang];
     var el = document.createElement('p');
@@ -977,15 +1047,15 @@ function init() {
     window._meridianConfig.apps = catalog.apps;
     updateSetup(window._meridianConfig);
   }
-  fetch('../pwa/apps.json', { signal: controller ? controller.signal : undefined })
+  fetch('../pwa/apps.json', { credentials: 'omit', redirect: 'error', signal: controller ? controller.signal : undefined })
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(value) {
       if (catalogDone || id !== initId) return;
       catalogDone = true; clearTimeout(catalogTimer);
-      if (value && value.apps && value.apps.length) { catalog = value; applyCatalog(); }
+      if (validCatalog(value)) { catalog = value; applyCatalog(); }
     }, function() { catalogDone = true; clearTimeout(catalogTimer); });
 
-  fetch('config.json')
+  fetch('config.json', { credentials: 'omit', redirect: 'error' })
     .then(function(r) {
       if (!r.ok) throw new Error('config.json fetch failed');
       return r.json();
@@ -993,6 +1063,7 @@ function init() {
     .then(function(config) {
       clearTimeout(slowTimer);
       if (id !== initId) return;
+      if (!validConfig(config)) throw new Error('config');
       window._meridianConfig = config;
       renderPage(config);
       configLoaded = true;

@@ -246,3 +246,63 @@ def test_catalog_timeout_ignores_late_answers_without_abort_support(page_data: d
         """,
         page_data,
     )
+
+
+@pytest.mark.parametrize("bad", ["version", "app", "installer", "icon", "scheme"])
+def test_bad_optional_catalog_keeps_valid_embedded_apps(page_data: dict[str, object], bad: str) -> None:
+    page_data["bad"] = bad
+    run_page(
+        """
+        if (data.bad === 'version') data.catalog.version = 2;
+        if (data.bad === 'app') data.catalog.apps = [null];
+        if (data.bad === 'installer') data.catalog.apps[0].urls.Android = 'javascript:alert(1)';
+        if (data.bad === 'icon') data.catalog.apps[0].icon = 'https://198.51.100.2/icon.svg';
+        if (data.bad === 'scheme') data.catalog.apps[0].deeplink = 'javascript:alert("{url}")';
+        const browser = createBrowser(data.config, data.catalog, { info: data.info }); await browser.start();
+        assert.ok(browser.document.querySelector('[data-import]'), 'malformed optional data must not break setup');
+        assert.equal(JSON.stringify(browser.context._meridianConfig.apps), JSON.stringify(data.config.apps), 'embedded catalog must survive invalid optional data');
+        assert.ok(!browser.document.querySelector('.load-error'));
+        """,
+        page_data,
+    )
+
+
+def test_unsupported_config_version_is_rejected_before_rendering(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        data.config.version = 2;
+        const browser = createBrowser(data.config, data.catalog, { info: data.info }); await browser.start();
+        assert.ok(browser.document.querySelector('.load-error'), 'unsupported configuration must fail before rendering');
+        assert.ok(!browser.document.querySelector('[data-import]'));
+        """,
+        page_data,
+    )
+
+
+def test_quoted_attributes_keep_user_text_literal(page_data: dict[str, object]) -> None:
+    page_data["quoted_url"] = "https://198.51.100.1/sub/demo?q=\" onfocus=\"alert(1)&other='test'"
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog);
+        const value = data.quoted_url;
+        browser.document.getElementById('app').innerHTML = browser.context.page.renderSubUrl(value);
+        const button = browser.document.querySelector('.sub-url');
+        assert.equal(button.getAttribute('data-url'), value, 'quotes must remain part of the attribute value');
+        assert.ok(!button.hasAttribute('onfocus'));
+        const app = { ...data.config.apps[0], name: 'demo" data-injected="yes' };
+        browser.document.getElementById('app').innerHTML = browser.context.page.renderAppRow(app, 'Android');
+        assert.ok(!browser.document.querySelector('[data-injected]'));
+        """,
+        page_data,
+    )
+
+
+def test_legacy_catalog_platform_labels_remain_usable(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        for (const app of data.config.apps) { delete app.platforms; delete app.recommended; }
+        const browser = createBrowser(data.config, null, { info: data.info }); await browser.start();
+        assert.ok(browser.document.querySelector('[data-import]'), 'older embedded catalogs must still render');
+        """,
+        page_data,
+    )
