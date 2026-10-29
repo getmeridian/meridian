@@ -298,6 +298,11 @@ jobs:
           cache: pnpm
           cache-dependency-path: website/pnpm-lock.yaml
 
+      # Both static musl netagent builds go into agent/dist, which the build hook packages;
+      # `verify_package_assets.py --release` refuses a wheel without them.
+      - name: Build node agent
+        run: make agent
+
       - name: Build package
         run: |
           pip install hatchling build

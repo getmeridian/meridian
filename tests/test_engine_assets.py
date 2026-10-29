@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import sys
 import tomllib
 from pathlib import Path
@@ -193,6 +194,13 @@ def test_verify_wheel_assets_requires_the_ai_reference_only_for_a_release(tmp_pa
     with ZipFile(wheel, "w") as archive:
         archive.writestr("meridian/studio_assets/studio/index.html", "<!doctype html>")
         archive.writestr("meridian/data/agents.md", "# Meridian for AI agents")
+        for (
+            build
+        ) in verify_package_assets.AGENT_BUILDS:  # a release also needs the agent (tests/test_agent_packaging.py)
+            path = verify_package_assets.AGENT_PREFIX + build
+            archive.writestr(path, b"agent")
+            archive.writestr(path + ".sha256", hashlib.sha256(b"agent").hexdigest())
+            archive.writestr(path + ".version", "0.2.1")
 
     verify_wheel_assets(wheel)
     with pytest.raises(ValueError, match="missing packaged assets: meridian/data/ai-reference.md"):

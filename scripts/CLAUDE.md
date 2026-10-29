@@ -10,6 +10,8 @@
 
 **Conditional Studio packaging** — `hatch_build.py` bundles, when `website/dist` exists (so clean source installs work), only the Studio page's closure: `studio/` plus every file its HTML, CSS `url()`, and JS imports reach, and the font licenses whenever a font rides along. `verify_package_assets.py` checks the page is there and nothing outside the Engine's served roots rides along; `--release` (publish-pypi) also requires the generated AI reference. The sdist is an allowlist (`only-include` in `pyproject.toml`): the package, this hook, `VERSION`, and `CHANGELOG.md`.
 
+**Bundled node agent** — the same hook packages each `agent/dist/netagent-<target>` build `make agent` wrote, with its `.sha256` and `.version`, as `meridian/agent_dist/` (the sdist carries them under `src/meridian/agent_dist/`, so a wheel built from it keeps them and needs no Rust); `verify_package_assets.py --release` and `--agent-only` require both builds and check their digests. Wheels stay `py3-none-any`: the binaries run on remote hosts.
+
 ## What's done well
 
 - `subset_fonts.py` rebuilds the website's WOFF2 subsets from the upstream font releases (instanced axes, per-script `unicode-range` files; network, never CI); keep its ranges equal to `website/src/styles/fonts.css`.

@@ -4,7 +4,7 @@
 
 **Two-stage pipeline** — CI validates on every push/PR. Release triggers only on CI success on main via `workflow_run`. Prevents accidental releases from failed builds.
 
-**CI jobs**: Python Tests (3.11–3.14 matrix), Lint (plus the never-failing dead-code report as PR annotations), Type Check, Validate (PWA rendering + app metadata + VERSION + CHANGELOG + public CLI docs), Shell (shellcheck), Agent (cargo fmt, clippy, and tests, with uv for the real-service round trip), System Lab (multi-node Docker deploy), Website Build.
+**CI jobs**: Python Tests (3.11–3.14 matrix), Lint (plus the never-failing dead-code report as PR annotations), Type Check, Validate (PWA rendering + app metadata + VERSION + CHANGELOG + public CLI docs), Shell (shellcheck), Agent (cargo fmt, clippy, and tests, with uv for the real-service round trip; then `make agent` and a wheel built with both musl builds, checked by `verify_package_assets.py --agent-only`), System Lab (multi-node Docker deploy), Website Build.
 
 **System Lab only where it matters** — the `changes` job diffs the PR (or push) and runs System Lab only when runtime code (`src/meridian` minus Markdown and locale catalogs), `tests/systemlab`, dependencies, or `ci.yml` change; a skipped job still satisfies required checks and Release. `workflow_dispatch` always runs it. Widen the path list when the lab starts depending on something new.
 
@@ -38,4 +38,5 @@
 - **`workflow_run` uses main's copy of `release.yml`** — a branch whose packaging differs (e.g., a beta line) releases through its tag trigger; a pre-release VERSION never ships as stable (the main job skips `X.Y.ZbN`, only its tag publishes it).
 - **Stable release type ignores beta tags** — `git describe` excludes `a`/`b`/`rc` tags, or 4.0.0 after 4.0.0b2 would be titled a patch.
 - **Expressions reach shell through `env:`** — never inline `${{ }}` in a `run:` script (code scanning flags it as injection); CI's token is read-only.
+- **publish-pypi builds the agent before the wheel** — `make agent` fills `agent/dist`, which the build hook packages; `--release` refuses a wheel missing either musl build or whose digest file disagrees (a wheel without it cannot deploy a control-service fleet).
 - **System lab timeout 45min** — Remnawave image pulls inside nested Docker are slow. Timeout is generous to accommodate cold caches.

@@ -190,6 +190,14 @@ jobs:
       - name: Tests
         run: cargo test --locked
 
+      # The wheel carries both static musl builds; publish-pypi builds them the same way.
+      - name: Build musl binaries and check the wheel carries them
+        working-directory: .
+        run: |
+          make agent
+          uv build --wheel --out-dir "$RUNNER_TEMP/wheel"
+          uv run python scripts/verify_package_assets.py --agent-only "$RUNNER_TEMP"/wheel/*.whl
+
   # System Lab costs ~15 minutes of nested Docker, so it runs only when a change can
   # alter what a real deploy does: runtime code, the lab itself, dependencies, or CI.
   # Docs, website, contracts, and other tests skip it; a manual dispatch always runs it.

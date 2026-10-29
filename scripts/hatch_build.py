@@ -1,4 +1,4 @@
-"""Conditionally bundle the built Studio page in Python distributions."""
+"""Conditionally bundle the built Studio page and the node agent builds in Python distributions."""
 
 from __future__ import annotations
 
@@ -17,6 +17,27 @@ _DESTINATIONS = {
 _HTML_REF = re.compile(r"""\b(?:src|href)\s*=\s*["'](/(?!/)[^"'#?]*)""")
 _CSS_REF = re.compile(r"""url\(\s*["']?(/(?!/)[^"')#?]+)""")
 _JS_REF = re.compile(r"""(?:\bfrom\s*|\bimport\s*\(?\s*)["']((?:\.{1,2}/|/(?!/))[^"']+)["']""")
+
+
+# `make agent` writes each static musl build with its sha256 and version beside it in agent/dist;
+# the package reads them as meridian/agent_dist (meridian.control_artifacts.PACKAGED_AGENT_DIR).
+_AGENT_DESTINATIONS = {
+    "wheel": "meridian/agent_dist",
+    "sdist": "src/meridian/agent_dist",
+}
+AGENT_BUILDS = ("netagent-x86_64-unknown-linux-musl", "netagent-aarch64-unknown-linux-musl")
+AGENT_SIDECARS = (".sha256", ".version")
+
+
+def agent_build_files(dist: Path) -> list[str]:
+    """The agent builds present in `dist` (each with its sidecars), so a source build without Rust still works."""
+    return [
+        name + suffix
+        for name in AGENT_BUILDS
+        if (dist / name).is_file()
+        for suffix in ("", *AGENT_SIDECARS)
+        if (dist / (name + suffix)).is_file()
+    ]
 
 
 class StudioAssetError(ValueError):
@@ -86,10 +107,14 @@ class CustomBuildHook(BuildHookInterface):
         if destination is None:
             return
 
+        force_include = build_data.setdefault("force_include", {})
+        agent_destination = _AGENT_DESTINATIONS[self.target_name]
+        for relative in agent_build_files(Path(self.root, "agent", "dist")):
+            force_include[str(Path(self.root, "agent", "dist", relative))] = f"{agent_destination}/{relative}"
+
         studio_dist = Path(self.root, "website", "dist")
         if not (studio_dist / "studio" / "index.html").is_file():
             return
 
-        force_include = build_data.setdefault("force_include", {})
         for relative in studio_asset_closure(studio_dist):
             force_include[str(studio_dist / relative)] = f"{destination}/{relative}"

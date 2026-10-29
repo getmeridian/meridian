@@ -1,8 +1,9 @@
-"""Verify that a built Meridian wheel contains the Studio page, only its files, and the agent guide."""
+"""Verify that a built Meridian wheel contains the Studio page, only its files, the agent guide, and the node agent."""
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -17,15 +18,26 @@ _STUDIO_PREFIX = "meridian/studio_assets/"
 # The directories the Engine serves; mirrors meridian.engine.assets.STUDIO_ASSET_ROOTS
 # (this script runs without Meridian installed, and a test keeps the two equal).
 STUDIO_ASSET_ROOTS = ("studio", "_astro", "fonts", "img")
+# Both static musl builds of the node agent, each beside its sha256 and version files; mirrors
+# scripts/hatch_build.AGENT_BUILDS and meridian.control_artifacts.AGENT_TARGETS (a test keeps them equal).
+AGENT_PREFIX = "meridian/agent_dist/"
+AGENT_BUILDS = ("netagent-x86_64-unknown-linux-musl", "netagent-aarch64-unknown-linux-musl")
 
 
-def verify_wheel_assets(wheel: Path, *, release: bool = False) -> None:
-    """Raise ValueError when required assets are absent or unused website files ride along."""
+def verify_wheel_assets(wheel: Path, *, release: bool = False, studio: bool = True, agent: bool = False) -> None:
+    """Raise ValueError when required assets are absent or unused website files ride along.
+
+    A release needs everything; `agent` alone checks the node agent builds (CI's agent job has no website).
+    """
     if not wheel.is_file():
         raise ValueError(f"Wheel does not exist: {wheel}")
 
     with ZipFile(wheel) as archive:
         names = set(archive.namelist())
+        if agent or release:
+            verify_agent_builds(archive)
+    if not studio and not release:
+        return
     missing = sorted((_REQUIRED_ASSETS | (_RELEASE_ASSETS if release else set())) - names)
     if missing:
         raise ValueError(f"Wheel is missing packaged assets: {', '.join(missing)}")
@@ -40,17 +52,36 @@ def verify_wheel_assets(wheel: Path, *, release: bool = False) -> None:
         raise ValueError(f"Wheel ships website files the Studio Engine never serves: {shown}")
 
 
+def verify_agent_builds(archive: ZipFile) -> None:
+    """Raise ValueError unless every agent build is in the wheel with a matching sha256 and a version."""
+    names = set(archive.namelist())
+    for build in AGENT_BUILDS:
+        path = AGENT_PREFIX + build
+        missing = [name for name in (path, path + ".sha256", path + ".version") if name not in names]
+        if missing:
+            raise ValueError(f"Wheel is missing the node agent: {', '.join(missing)}")
+        digest = hashlib.sha256(archive.read(path)).hexdigest()
+        expected = archive.read(path + ".sha256").decode("utf-8").strip()
+        if digest != expected:
+            raise ValueError(f"{path} does not match its sha256 file ({digest} != {expected})")
+        if not archive.read(path + ".version").decode("utf-8").strip():
+            raise ValueError(f"{path}.version is empty")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("wheels", type=Path, nargs="+")
-    parser.add_argument("--release", action="store_true", help="also require the generated AI reference")
+    parser.add_argument(
+        "--release", action="store_true", help="also require the generated AI reference and the node agent builds"
+    )
+    parser.add_argument("--agent-only", action="store_true", help="check only the node agent builds")
     args = parser.parse_args()
     for wheel in args.wheels:
         try:
-            verify_wheel_assets(wheel, release=args.release)
+            verify_wheel_assets(wheel, release=args.release, studio=not args.agent_only, agent=args.agent_only)
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
-        print(f"OK: Studio assets bundled in {wheel}")  # noqa: T201
+        print(f"OK: packaged assets verified in {wheel}")  # noqa: T201
 
 
 if __name__ == "__main__":

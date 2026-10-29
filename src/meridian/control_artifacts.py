@@ -1,7 +1,8 @@
 """What the deployer installs for Meridian's own control plane: the service package and the node agent.
 
 A release installs `meridian-vpn==<this version>` from PyPI on the control
-server and the agent binary its release publishes. A development checkout
+server and uploads the agent builds its wheel carries (`meridian/agent_dist/`,
+both musl targets with their sha256 and version files). A development checkout
 (an editable install) builds and uploads its own wheel and uses the agent
 that `make agent` built, so unreleased code can be tested on a real server.
 """
@@ -23,6 +24,8 @@ from meridian import __version__
 from meridian.core.errors import LocalStateError
 
 AGENT_TARGETS = {"x86_64": "x86_64-unknown-linux-musl"}
+# Where a built wheel carries the agent builds (scripts/hatch_build.py copies them from agent/dist).
+PACKAGED_AGENT_DIR = Path(__file__).resolve().parent / "agent_dist"
 
 
 @dataclass(frozen=True)
@@ -106,19 +109,29 @@ def service_package() -> ServicePackage:
 
 
 def agent_binary(arch: str) -> AgentBinary:
-    """The node agent for one machine architecture (`uname -m`)."""
+    """The node agent for one machine architecture (`uname -m`), checked against its sha256 file."""
     target = AGENT_TARGETS.get(arch)
     if target is None:
+        supported = ", ".join(sorted(AGENT_TARGETS))
         raise LocalStateError(
-            f"Meridian's node agent has no build for {arch} yet.",
-            hint="Use an x86_64 server for the control-service preview.",
+            f"Meridian's node agent has no build for {arch or 'this architecture'}.",
+            hint=f"Use a server with one of: {supported}.",
             category="user",
         )
     path = _agent_path(target)
     if path is None or not path.is_file():
         raise _missing_agent()
     data = path.read_bytes()
-    return AgentBinary(data=data, sha256=hashlib.sha256(data).hexdigest(), version=_build_version(path))
+    digest = hashlib.sha256(data).hexdigest()
+    expected = _sidecar(path, ".sha256")
+    # A packaged build always carries its digest; a checkout's or an override's is checked when present.
+    if (expected or path.is_relative_to(PACKAGED_AGENT_DIR)) and expected != digest:
+        raise LocalStateError(
+            f"The node agent build {path.name} does not match its sha256 file.",
+            hint="Reinstall Meridian (`meridian update`), or rebuild it with `make agent` in a checkout.",
+            category="system",
+        )
+    return AgentBinary(data=data, sha256=digest, version=_build_version(path))
 
 
 def require_agent_build() -> None:
@@ -128,10 +141,10 @@ def require_agent_build() -> None:
 
 
 def _missing_agent() -> LocalStateError:
-    # Wheels carry no agent yet; only a checkout's `make agent` or MERIDIAN_AGENT_BINARY provides one.
+    # Released wheels carry both builds; only a source install or a checkout without `make agent` lacks them.
     return LocalStateError(
         "The node agent binary is missing.",
-        hint="Build it with `make agent` in the repository, or point MERIDIAN_AGENT_BINARY at one.",
+        hint="Install Meridian from PyPI, run `make agent` in a checkout, or point MERIDIAN_AGENT_BINARY at one.",
         category="user",
     )
 
@@ -146,16 +159,24 @@ def agent_version() -> str:
 
 
 def _agent_path(target: str) -> Path | None:
+    """MERIDIAN_AGENT_BINARY, else the wheel's packaged build, else an editable checkout's `agent/dist`."""
     override = os.environ.get("MERIDIAN_AGENT_BINARY", "")
     if override:
         return Path(override)
+    packaged = PACKAGED_AGENT_DIR / f"netagent-{target}"
+    if packaged.is_file():
+        return packaged
     checkout = source_checkout()
     return checkout / "agent" / "dist" / f"netagent-{target}" if checkout else None
 
 
 def _build_version(binary: Path) -> str:
     """`make agent` writes the crate version beside each binary as `<binary>.version`."""
+    return _sidecar(binary, ".version")
+
+
+def _sidecar(binary: Path, suffix: str) -> str:
     try:
-        return binary.with_name(binary.name + ".version").read_text(encoding="utf-8").strip()
+        return binary.with_name(binary.name + suffix).read_text(encoding="utf-8").strip()
     except OSError:
         return ""
