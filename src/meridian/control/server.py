@@ -23,7 +23,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, TypeVar
-from urllib.parse import unquote
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from pydantic import BaseModel, ValidationError
 
@@ -41,6 +41,7 @@ from meridian.control.models import (
     DeployerStateDeposit,
     DeviceKeyCreate,
     NodeSpec,
+    PrivacySettings,
     RecoveryKeyUpdate,
     RevisionProposal,
     RevisionResult,
@@ -317,6 +318,18 @@ class _Handler(BaseHTTPRequestHandler):
     def put_settings(self, _match: re.Match[str]) -> Any:
         return self._service.put_settings(self._model(ServiceSettings))
 
+    def get_privacy(self, _match: re.Match[str]) -> Any:
+        return self._service.privacy_state()
+
+    def put_privacy(self, _match: re.Match[str]) -> Any:
+        settings = self._model(PrivacySettings)
+        session = self.owner_session
+        recent = (
+            self._service.conditions(lambda: self._service.owner.hold_recent(session)) if session else nullcontext()
+        )
+        with recent:
+            return self._service.set_privacy(settings, author=self._service.tokens.actor(self._caller()).name)
+
     def get_node(self, match: re.Match[str]) -> Any:
         return self._service.node_status(match[1])
 
@@ -339,6 +352,18 @@ class _Handler(BaseHTTPRequestHandler):
 
     def traffic(self, _match: re.Match[str]) -> Any:
         return self._service.traffic.summary()
+
+    def daily_traffic(self, _match: re.Match[str]) -> Any:
+        return self._service.traffic.daily(days=self._history_days())
+
+    def user_usage(self, match: re.Match[str]) -> Any:
+        return self._service.traffic.user_usage(match[1], days=self._history_days())
+
+    def _history_days(self) -> int:
+        values = parse_qs(urlsplit(self.path).query, keep_blank_values=True).get("days", ["30"])
+        if len(values) != 1 or not re.fullmatch(r"[0-9]{1,3}", values[0]) or not 1 <= int(values[0]) <= 730:
+            raise ServiceError("invalid_request", "days must be one integer between 1 and 730.", 400)
+        return int(values[0])
 
     def list_users(self, _match: re.Match[str]) -> Any:
         return {"users": [self._visible(user).model_dump(mode="json") for user in self._service.list_users()]}
@@ -557,17 +582,21 @@ ROUTES: list[Route] = [
     ("GET", re.compile(r"/api/health"), "read", _Handler.health),
     ("GET", re.compile(r"/api/settings"), "read", _Handler.get_settings),
     ("PUT", re.compile(r"/api/settings"), WRITE, _Handler.put_settings),
+    ("GET", re.compile(r"/api/privacy"), "read", _Handler.get_privacy),
+    ("PUT", re.compile(r"/api/privacy"), WRITE, _Handler.put_privacy),
     ("GET", re.compile(rf"/api/nodes/{_NODE}"), "read", _Handler.get_node),
     ("PUT", re.compile(rf"/api/nodes/{_NODE}"), WRITE, _Handler.put_node),
     ("DELETE", re.compile(rf"/api/nodes/{_NODE}"), WRITE, _Handler.delete_node),
     ("POST", re.compile(rf"/api/nodes/{_NODE}/enrollment"), "admin", _Handler.grant_enrollment),
     ("GET", re.compile(r"/api/ca"), "read", _Handler.fleet_authority),
     ("GET", re.compile(r"/api/traffic"), "read", _Handler.traffic),
+    ("GET", re.compile(r"/api/traffic/daily"), "read", _Handler.daily_traffic),
     ("GET", re.compile(r"/api/users"), "read", _Handler.list_users),
     ("POST", re.compile(r"/api/users"), WRITE, _Handler.create_user),
     # Credentials go in as well as out: importing users (`meridian migrate`) is the root of applying.
     ("POST", re.compile(r"/api/import/users"), "admin", _Handler.import_users),
     ("GET", re.compile(rf"/api/users/{_USERNAME}"), "read", _Handler.get_user),
+    ("GET", re.compile(rf"/api/users/{_USERNAME}/usage"), "read", _Handler.user_usage),
     ("PUT", re.compile(rf"/api/users/{_USERNAME}"), WRITE, _Handler.put_user),
     ("PATCH", re.compile(rf"/api/users/{_USERNAME}"), WRITE, _Handler.update_user),
     ("POST", re.compile(rf"/api/users/{_USERNAME}/reissue"), WRITE, _Handler.reissue_user),
@@ -607,8 +636,8 @@ ROUTES: list[Route] = [
 
 # The web UI's routes (`ui_routes.py`) live in their own block; `/api` routes come first.
 ALL_ROUTES: list[Route] = [*ROUTES, *UI_ROUTES]
-# What a web owner may do only after confirming their password again within minutes: mint a credential.
-OWNER_STEP_UP: frozenset[Callable[..., Any]] = frozenset({_Handler.create_token})
+# Sensitive owner changes need a recent password confirmation, held again in the write's transaction.
+OWNER_STEP_UP: frozenset[Callable[..., Any]] = frozenset({_Handler.create_token, _Handler.put_privacy})
 # The only routes an owner session reaches: what the console's screens call ("people edit, the rest
 # view"). Everything else — node, endpoint, and fence writes, revisions, enrollment, user import,
 # backups — is the deployer's CLI or an API token, so a borrowed browser cannot reshape the fleet or
@@ -616,6 +645,10 @@ OWNER_STEP_UP: frozenset[Callable[..., Any]] = frozenset({_Handler.create_token}
 OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
     {
         _Handler.get_settings,
+        _Handler.get_privacy,
+        _Handler.put_privacy,
+        _Handler.user_usage,
+        _Handler.daily_traffic,
         _Handler.list_users,
         _Handler.get_user,
         _Handler.create_user,

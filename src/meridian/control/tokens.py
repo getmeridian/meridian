@@ -23,7 +23,15 @@ from dataclasses import dataclass
 
 from meridian.control.enrollment import token_sha256
 from meridian.control.errors import ServiceError
-from meridian.control.models import IssuedToken, TokenCreate, TokenList, TokenRecord, TokenScope, scope_covers
+from meridian.control.models import (
+    IssuedToken,
+    RevisionActor,
+    TokenCreate,
+    TokenList,
+    TokenRecord,
+    TokenScope,
+    scope_covers,
+)
 from meridian.control.store import Store
 from meridian.control.times import format_timestamp, parse_timestamp
 
@@ -73,6 +81,11 @@ class TokenRegistry:
         self._store = store
         self._clock = clock
         store.create(API_TOKENS_TABLE)
+
+    def actor(self, caller: Caller) -> RevisionActor:
+        """The durable author of a change: the token's name, the web owner, or root."""
+        name = caller.name or "root" if caller.token_id is None else self.get(caller.token_id).name
+        return RevisionActor(token_id=caller.token_id, name=name)
 
     def authenticate(self, token: str) -> Caller:
         """The issued, unrevoked token `token` names; touches `last_used_at` at most once a minute."""

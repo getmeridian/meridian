@@ -6,10 +6,10 @@ these models are what the deployer stores and reads over `/api`.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from typing import Any, Literal
+from datetime import UTC, date, datetime
+from typing import Annotated, Any, Literal
 
-from pydantic import Field, model_validator
+from pydantic import BeforeValidator, Field, model_validator
 
 from meridian.core.agent_desired import AgentResource
 from meridian.core.agent_types import (
@@ -229,6 +229,84 @@ class ServiceSettings(CoreModel):
         description="Public base of subscriptions and connection pages (scheme, host, connection-page path), "
         "without a trailing slash; empty leaves out the links built from it.",
     )
+
+
+DeviceLimitLevel = Literal["off", "private", "full"]
+UsageHistoryLevel = Literal["off", "daily"]
+
+
+class PrivacySettings(CoreModel):
+    """Operator-owned privacy choices; reviewed applies never replace them."""
+
+    device_limits: DeviceLimitLevel = "off"
+    default_device_limit: int = Field(default=3, ge=1, le=100)
+    usage_history: UsageHistoryLevel = "off"
+    history_days: int = Field(default=90, ge=7, le=730)
+
+
+class PrivacyChange(CoreModel):
+    changed_at: Timestamp
+    author: str
+    before: PrivacySettings
+    after: PrivacySettings
+
+
+class PrivacyState(CoreModel):
+    settings: PrivacySettings
+    changes: list[PrivacyChange] = Field(max_length=50, description="Newest first, at most 50 changes.")
+
+
+class PrivacyDeletedRows(CoreModel):
+    """Rows removed by a privacy change; lifetime traffic totals are kept."""
+
+    devices: Count = 0
+    traffic_daily: Count = 0
+    node_traffic_daily: Count = 0
+
+
+class PrivacyUpdateResult(PrivacyState):
+    changed: bool
+    deleted: PrivacyDeletedRows = Field(default_factory=PrivacyDeletedRows)
+    rekeyed_devices: Count = Field(
+        default=0, description="Full device rows converted to fingerprints without metadata."
+    )
+
+
+UtcDay = Annotated[date, BeforeValidator(lambda value: date.fromisoformat(value) if isinstance(value, str) else value)]
+
+
+class UserTrafficDay(CoreModel):
+    day: UtcDay
+    uplink_bytes: Count
+    downlink_bytes: Count
+
+
+class UserUsage(CoreModel):
+    """UTC days, oldest first, including zero-use days; never reconstructed from lifetime totals."""
+
+    username: str
+    days: int = Field(ge=1, le=730, description="Days returned, including today; at most the retention cap.")
+    history_days: int = Field(ge=7, le=730)
+    daily: list[UserTrafficDay]
+
+
+class NodeTrafficDay(CoreModel):
+    day: UtcDay
+    bytes: Count
+
+
+class NodeDailyUsage(CoreModel):
+    node_id: str
+    daily: list[NodeTrafficDay]
+
+
+class TrafficDailySummary(CoreModel):
+    """Daily bytes across the fleet and by node, oldest first; includes retained use of removed nodes."""
+
+    days: int = Field(ge=1, le=730)
+    history_days: int = Field(ge=7, le=730)
+    daily: list[NodeTrafficDay]
+    nodes: list[NodeDailyUsage]
 
 
 class ServiceHealth(CoreModel):

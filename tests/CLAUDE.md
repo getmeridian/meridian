@@ -36,4 +36,5 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - **System-lab collection** — pure `tests/systemlab/test_*.py` tests run under normal pytest; Docker runs only through `make system-lab`.
 - **Wizard prompts read `/dev/tty`** — `CliRunner` input never reaches them; drive journeys with the label-matched scripted IO, and the real terminal path with `pexpect` (`test_setup_wizard_tty.py`).
 - **Stall retries keep their count, not their pauses** — an autouse fixture zeroes `stall_retry.STALL_DELAYS`, so a stubbed rc 124/255 observation runs five times; inject `StallRetry(delays=, sleep=)` to assert pauses.
+- **Privacy changes are transactional** — test downgrade/audit rollback, no-op writes, history-off gaps, UTC receipt days, owner step-up races, and enabled/off snapshot restoration.
 - **V4 command JSON** — validate compiled-resource plan/apply variants through their advertised envelopes, including terminal errors.

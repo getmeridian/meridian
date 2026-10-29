@@ -17,7 +17,7 @@ import pytest
 
 from meridian.control import passwords
 from meridian.control.enrollment import token_sha256
-from meridian.control.models import RevisionProposal, RevisionResult, ServiceSettings
+from meridian.control.models import PrivacySettings, RevisionProposal, RevisionResult, ServiceSettings
 from meridian.control.owner import CONFIRM_SECONDS
 from meridian.control.server import ControlServer
 from meridian.control.service import ControlService
@@ -312,6 +312,46 @@ def test_minting_a_token_needs_a_recent_confirmation(fleet: Fleet) -> None:
     assert fleet.ui("POST", "/auth/confirm", {"password": PASSWORD}).status == 200
     issued = fleet.ui("POST", "/api/tokens", {"name": "ci", "scope": "read"})
     assert issued.status == 200 and issued.body["token"].startswith("mrd_")
+
+
+def test_privacy_needs_owner_step_up_records_owner_and_allows_both_usage_views(fleet: Fleet) -> None:
+    fleet.set_up()
+    fleet.clock.now += CONFIRM_SECONDS + 1
+    settings = PrivacySettings(usage_history="daily").model_dump()
+    assert fleet.ui("GET", "/api/privacy").body == {"settings": PrivacySettings().model_dump(), "changes": []}
+    refused = fleet.ui("PUT", "/api/privacy", settings)
+    assert refused.status == 403 and refused.body["error"]["code"] == "reauth_required"
+    assert fleet.ui("POST", "/auth/confirm", {"password": PASSWORD}).status == 200
+    changed = fleet.ui("PUT", "/api/privacy", settings)
+    assert changed.status == 200 and changed.body["changes"][0]["author"] == "owner"
+    assert changed.body["changes"][0]["before"] == PrivacySettings().model_dump()
+    fleet.service.put_user("alice")
+    assert fleet.ui("GET", "/api/users/alice/usage?days=7").status == 200
+    assert fleet.ui("GET", "/api/traffic/daily?days=7").status == 200
+    assert fleet.ui("PUT", "/api/privacy", settings).body["changed"] is False
+
+
+@pytest.mark.parametrize("race", ["revoked", "confirmation-expired"])
+def test_privacy_holds_session_and_step_up_in_the_same_transaction_as_settings_and_audit(
+    fleet: Fleet,
+    monkeypatch: pytest.MonkeyPatch,
+    race: str,
+) -> None:
+    fleet.set_up()
+    service = fleet.service
+    set_privacy = service.set_privacy
+
+    def changed_meanwhile(settings: PrivacySettings, *, author: str) -> Any:
+        if race == "revoked":
+            service.owner.logout(service.owner.authenticate(fleet.cookie))
+        else:
+            fleet.clock.now += CONFIRM_SECONDS + 1
+        return set_privacy(settings, author=author)
+
+    monkeypatch.setattr(service, "set_privacy", changed_meanwhile)
+    refused = fleet.ui("PUT", "/api/privacy", PrivacySettings(usage_history="daily").model_dump())
+    assert refused.status == (401 if race == "revoked" else 403)
+    assert service.privacy_state().changes == [] and service.privacy() == PrivacySettings()
 
 
 @pytest.mark.parametrize(

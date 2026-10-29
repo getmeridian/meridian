@@ -17,7 +17,7 @@ import time
 import uuid as uuid_module
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -29,34 +29,36 @@ from meridian.control.formats.selector import SUFFIX_FORMATS, select_format
 from meridian.control.models import (
     ClientEndpoint,
     EnrollmentGrant,
-    LimitStrategy,
     ManagedInbound,
     NodeSpec,
     NodeStatus,
+    PrivacySettings,
+    PrivacyState,
+    PrivacyUpdateResult,
     ServiceHealth,
     ServiceSettings,
     UserCreate,
-    UserImport,
     UserImportBatch,
     UserImportResult,
     UserRecord,
-    UserStatus,
     UserUpdate,
     users_resource_id,
 )
 from meridian.control.owner import UI_TABLES, OwnerAuth
+from meridian.control.privacy import PRIVACY_TABLES, PrivacyLedger, read_privacy
 from meridian.control.revisions import APPLY_FENCE_TABLE, REVISIONS_TABLE, RevisionLedger
 from meridian.control.store import Store
 from meridian.control.subscriptions import SubscriptionResponse, render_subscription, unknown_subscription
 from meridian.control.times import utc_now
 from meridian.control.tokens import API_TOKENS_TABLE, TokenRegistry
-from meridian.control.traffic import PER_EPOCH_BASELINES, TrafficLedger
+from meridian.control.traffic import DAILY_TABLES, PER_EPOCH_BASELINES, TrafficLedger
+from meridian.control.user_policy import enforced_status, period_began, period_start, whole_seconds
 from meridian.core.agent_desired import DesiredNodeState
 from meridian.core.agent_protocol import ObservedStateReport, PollRequest, StatsAck, StatsReport
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 MAX_WAIT_SECONDS = 55
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -108,6 +110,8 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     # 7 -> 8: the web UI's owner, sessions, and setup links (`owner.py`).
     UI_TABLES,
     PER_EPOCH_BASELINES,
+    # 9 -> 10: operator-owned privacy settings and optional UTC daily usage.
+    (*PRIVACY_TABLES, *DAILY_TABLES),
 )
 # meta key prefix: the last revision a deleted node was signed at.
 _RETIRED_REVISION = "retired_revision:"
@@ -147,6 +151,7 @@ class ControlService:
         self._store.create(_SCHEMA)
         # Users read their traffic from the ledger's table, so it exists before any user query.
         self.traffic = TrafficLedger(self._store)
+        self.privacy_ledger = PrivacyLedger(self._store, clock=clock)
         with self._transaction():
             stored = self._meta("fleet_id")
             if stored and stored != fleet_id:
@@ -197,6 +202,15 @@ class ControlService:
         return ServiceSettings(
             profile_title=self._meta("profile_title") or "Meridian", public_url=self._meta("public_url") or ""
         )
+
+    def privacy(self) -> PrivacySettings:
+        return read_privacy(self._store)
+
+    def privacy_state(self) -> PrivacyState:
+        return self.privacy_ledger.state()
+
+    def set_privacy(self, settings: PrivacySettings, *, author: str) -> PrivacyUpdateResult:
+        return self.privacy_ledger.set(settings, author=author)
 
     # -- nodes ----------------------------------------------------------------------
 
@@ -417,11 +431,11 @@ class ControlService:
                     uuid,
                     sub_token,
                     item.status,
-                    _whole_seconds(item.created_at) or now,
-                    _whole_seconds(item.expire_at),
+                    whole_seconds(item.created_at) or now,
+                    whole_seconds(item.expire_at),
                     item.traffic_limit_bytes,
                     item.traffic_limit_strategy,
-                    _period_began(item, now),
+                    period_began(item, now),
                     carried,
                 )
                 if existing is None:
@@ -497,8 +511,10 @@ class ControlService:
 
     def enforce(self, now: str | None = None) -> list[str]:
         """Apply expiry, traffic limits, and periodic resets; return who changed status."""
+        moment = now or utc_now()
+        self.traffic.prune_history(moment)
         with self._transaction():
-            changed = self._enforce(now or utc_now())
+            changed = self._enforce(moment)
             if changed:
                 self._compose_all()
             return changed
@@ -516,7 +532,7 @@ class ControlService:
             known = {row[0] for row in self._db.execute("SELECT user_id FROM users")}
             report = report.model_copy(update={"users": [user for user in report.users if user.user_id in known]})
             changed = self._enforce(moment)
-            ack = self.traffic.count(node_id, report)
+            ack = self.traffic.count(node_id, report, now=moment)
             if [*changed, *self._enforce(moment)]:
                 self._compose_all()
         return ack
@@ -533,6 +549,9 @@ class ControlService:
 
     def delete_user(self, username: str) -> None:
         with self._transaction():
+            user = self.get_user(username)
+            if user is not None:
+                self._db.execute("DELETE FROM traffic_daily WHERE user_id = ?", (user.user_id,))
             self._db.execute("DELETE FROM users WHERE username = ?", (username,))
             self._compose_all()
 
@@ -551,7 +570,7 @@ class ControlService:
             ):
                 self._reset_traffic(user, now)
                 user = self._require_user(user.username)
-            status = _enforced_status(user, now)
+            status = enforced_status(user, now)
             if status != user.status:
                 self._db.execute("UPDATE users SET status = ? WHERE username = ?", (status, user.username))
                 changed.append(user.username)
@@ -728,51 +747,3 @@ def _user(row: Any) -> UserRecord:
             "online_at": online_at,
         }
     )
-
-
-def _enforced_status(user: UserRecord, now: str) -> UserStatus:
-    """The status enforcement gives a user; `disabled` is the operator's and never changes."""
-    if user.status == "disabled":
-        return "disabled"
-    if _expired(user, now):
-        return "expired"
-    over = user.traffic_limit_bytes > 0 and user.used_traffic_bytes >= user.traffic_limit_bytes
-    return "limited" if over else "active"
-
-
-def period_start(strategy: LimitStrategy, now: datetime) -> datetime | None:
-    """The start of the traffic period *now* falls in (UTC), or None when traffic never resets."""
-    midnight = now.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    if strategy == "day":
-        return midnight
-    if strategy == "week":
-        return midnight - timedelta(days=midnight.weekday())
-    if strategy == "month":
-        return midnight.replace(day=1)
-    return None
-
-
-def _whole_seconds(timestamp: str | None) -> str | None:
-    """A protocol timestamp without its fraction, as the service writes every time."""
-    return f"{timestamp[:19]}Z" if timestamp else None
-
-
-def _period_began(item: UserImport, now: str) -> str | None:
-    """When an imported user's current traffic period began.
-
-    The source's last reset is kept only inside the current period: an older one would
-    make the next enforcement reset the imported use at once. Otherwise the period runs
-    on from the import with the use the source counted, until its next boundary.
-    """
-    reset_at = _whole_seconds(item.traffic_reset_at)
-    start = period_start(item.traffic_limit_strategy, datetime.fromisoformat(now))
-    if start is None:
-        return reset_at
-    if reset_at is not None and datetime.fromisoformat(reset_at) >= start:
-        return reset_at
-    return now
-
-
-def _expired(user: UserRecord, now: str) -> bool:
-    # Parse, never compare strings: a fractional "…:00.5Z" sorts before "…:00Z".
-    return user.expire_at is not None and datetime.fromisoformat(user.expire_at) <= datetime.fromisoformat(now)

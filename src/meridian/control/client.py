@@ -24,6 +24,9 @@ from meridian.control.models import (
     NodeSpec,
     NodeStatus,
     OwnerStatus,
+    PrivacySettings,
+    PrivacyState,
+    PrivacyUpdateResult,
     RecoveryKeyState,
     RecoveryKeyUpdate,
     RevisionList,
@@ -39,11 +42,13 @@ from meridian.control.models import (
     TokenList,
     TokenRecord,
     TokenScope,
+    TrafficDailySummary,
     TrafficSummary,
     UserImportBatch,
     UserImportResult,
     UserRecord,
     UserUpdate,
+    UserUsage,
 )
 from meridian.core.errors import MeridianError
 
@@ -81,6 +86,10 @@ class ControlServiceNotFound(ControlServiceError):
 
 class ControlServiceConflict(ControlServiceError):
     """The request lost a race or does not fit the object's state (HTTP 409)."""
+
+
+class ControlServiceHistoryOff(ControlServiceConflict):
+    """Daily usage was requested while the operator keeps history off."""
 
 
 class ControlServiceAuthError(ControlServiceError):
@@ -133,6 +142,12 @@ class ControlClient:
     def put_settings(self, settings: ServiceSettings) -> ServiceSettings:
         return ServiceSettings.model_validate(self._call("PUT", "api/settings", settings.model_dump(mode="json")))
 
+    def privacy(self) -> PrivacyState:
+        return PrivacyState.model_validate(self._call("GET", "api/privacy"))
+
+    def set_privacy(self, settings: PrivacySettings) -> PrivacyUpdateResult:
+        return PrivacyUpdateResult.model_validate(self._call("PUT", "api/privacy", settings.model_dump(mode="json")))
+
     def node(self, node_id: str) -> NodeStatus | None:
         try:
             return NodeStatus.model_validate(self._call("GET", f"api/nodes/{_segment(node_id)}"))
@@ -155,6 +170,12 @@ class ControlClient:
 
     def traffic(self) -> TrafficSummary:
         return TrafficSummary.model_validate(self._call("GET", "api/traffic"))
+
+    def user_usage(self, username: str, *, days: int = 30) -> UserUsage:
+        return UserUsage.model_validate(self._call("GET", f"api/users/{_segment(username)}/usage?days={days}"))
+
+    def daily_traffic(self, *, days: int = 30) -> TrafficDailySummary:
+        return TrafficDailySummary.model_validate(self._call("GET", f"api/traffic/daily?days={days}"))
 
     def get_user(self, username: str) -> UserRecord | None:
         try:
@@ -299,6 +320,12 @@ class ControlClient:
         if response.status_code == 404:
             raise ControlServiceNotFound(_message(response), category="user")
         if response.status_code == 409:
+            if _error_body(response).get("code") == "history_off":
+                raise ControlServiceHistoryOff(
+                    _message(response),
+                    hint="Enable daily history with: meridian privacy set --history daily --yes.",
+                    category="user",
+                )
             raise ControlServiceConflict(_message(response), category="user")
         if response.status_code == 403:
             raise ControlServiceScopeError(
@@ -347,8 +374,13 @@ def _segment(value: str) -> str:
 
 
 def _message(response: httpx.Response) -> str:
+    return str(_error_body(response).get("message") or f"HTTP {response.status_code}")
+
+
+def _error_body(response: httpx.Response) -> dict[str, Any]:
     try:
-        error = response.json().get("error", {})
+        body = response.json()
     except ValueError:
-        return f"HTTP {response.status_code}"
-    return str(error.get("message") or f"HTTP {response.status_code}")
+        return {}
+    error = body.get("error") if isinstance(body, dict) else None
+    return error if isinstance(error, dict) else {}

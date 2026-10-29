@@ -1,6 +1,6 @@
 # src/meridian — Python CLI package
 ## Design decisions
-**Cluster config** — one hidden Schema V4 `cluster.yml` holds topology intent, bindings, allocations, and checkpoints (`cluster.py` model, `cluster_persistence.py` YAML); users live in the control service.
+**Cluster config** — one hidden Schema V4 `cluster.yml` holds topology intent, bindings, allocations, and checkpoints (`cluster.py` model, `cluster_persistence.py` YAML); users and operator-owned privacy live in the control service.
 **Service access** — `control/client.py` speaks HTTPS from the deployer's machine to nginx's secret path on 443 with the admin token; no SSH tunnel. `remnawave/` keeps only migrate's `RemnawaveReader`, the `User`/`Node`/`Host` shapes the access adapters return, and the error types they raise.
 **SSH abstraction** — `ServerConnection` runs locally or over SSH (non-root adds `sudo -n`); `conn.run()` returns `CommandResult`, `ssh_transfer.py` moves files, and the `SSHUI` callbacks (`ssh_auth.py`) keep Rich out of transport. Keepalives end a silent connection in ~15s, and a timeout or exit 255 drops the ControlMaster (`reset_multiplex()`) so the next command redials.
 **One key bootstrap** — `ssh_keys.py` owns Meridian's key pair, the `authorized_keys` install, and the key-login check for Engine and CLI alike; `resolve.install_meridian_key()` is the CLI's one-time-password path.

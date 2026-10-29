@@ -27,6 +27,7 @@ from meridian.control.models import (
     DeviceKeyCreate,
     DeviceKeyList,
     DeviceKeyRecord,
+    PrivacySettings,
     RecoveryKeyState,
     RecoveryKeyUpdate,
 )
@@ -61,16 +62,23 @@ _DEPLOYER = "deployer_state"
 _COLUMNS = "device_id, name, public_key, created_at, revoked_at"
 
 
-def strip_unsnapshotted(db: sqlite3.Connection) -> None:
+def strip_unsnapshotted(db: sqlite3.Connection, *, restoring: bool = False) -> None:
     """Empty every `NOT_SNAPSHOTTED` table `db` has; a snapshot from an older schema may lack some.
 
     The web owner's tables arrived in schema 8, so a schema-7 snapshot has none of
     them, and a restore strips the database before its migrations run.
     """
     present = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
-    for table in NOT_SNAPSHOTTED:
+    row = db.execute("SELECT settings FROM privacy WHERE id = 1").fetchone() if "privacy" in present else None
+    privacy = PrivacySettings.model_validate_json(row[0]) if row else PrivacySettings()
+    volatile = list(NOT_SNAPSHOTTED)
+    if privacy.device_limits == "off" or (restoring and privacy.device_limits == "private"):
+        volatile.append("devices")
+    if privacy.usage_history == "off":
+        volatile.extend(("traffic_daily", "node_traffic_daily"))
+    for table in volatile:
         if table in present:
-            db.execute(f"DELETE FROM {table}")  # a name from the constant above, never input
+            db.execute(f"DELETE FROM {table}")  # a table named above, never input
 
 
 class BackupLedger:

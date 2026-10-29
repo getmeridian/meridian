@@ -26,6 +26,17 @@ that dials out to it.
   IP limits).
 
 ### Control service
+- **Privacy settings** — device limits and usage history default to off.
+  `meridian privacy show|set` and Settings → Privacy disclose what each level
+  stores and what a seized control server reveals. Changes record the author,
+  time, and before/after settings; lowering levels removes their records in
+  the same transaction. Console changes require owner step-up. Applies leave
+  privacy settings alone.
+- **Optional daily usage** — per-person upload/download and per-server byte
+  totals per UTC day, with 90-day retention by default (7–730 days). Retried
+  reports count once and traffic from while history was off is not backfilled.
+  `client usage`, seven days in `client show`, and `fleet usage` provide tables;
+  the console has person and server charts in all four locales.
 - **One service on the control server** (`ctld`, running `meridian serve`)
   keeps users, traffic, and applied revisions in one SQLite file, serves every
   subscription format, and logs no requests. It sits behind nginx on a
@@ -44,6 +55,9 @@ that dials out to it.
   author, status, and plan hash. The apply lease now lives in the service.
 
 ### Backups and restore
+- Privacy settings and their change log ride snapshots; device and daily
+  records ride them only when their level is on. Private device records clear
+  after restore because the fleet fingerprint key is never snapshotted.
 - **Encrypted snapshots after every change** — each machine that manages the
   fleet pulls a snapshot of the control service into `snapshots/`, sealed to
   its own key and to a recovery key deploy shows once. `meridian backup pull`,

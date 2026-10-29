@@ -41,8 +41,6 @@ from meridian.control.tokens import Caller, TokenRegistry
 from meridian.core.agent_types import canonical_sha256
 from meridian.core.redaction import is_sensitive_key
 
-ROOT_AUTHOR = "root"
-
 REVISIONS_TABLE = """CREATE TABLE IF NOT EXISTS revisions (
     number INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at TEXT NOT NULL,
@@ -116,7 +114,7 @@ class RevisionLedger:
             raise ServiceError(
                 "invalid_request", "The intent carries secret-shaped fields: " + ", ".join(leaked[:5]), 400
             )
-        author = self._actor(caller)
+        author = self._tokens.actor(caller)
         with self._store.transaction():
             cursor = self._store.db.execute(
                 "INSERT INTO revisions (created_at, author_token_id, author_name, intent, intent_sha256, plan_hash,"
@@ -136,7 +134,7 @@ class RevisionLedger:
 
     def approve(self, number: int, *, caller: Caller) -> RevisionRecord:
         """Approve a proposed revision; its own proposer may do so only with an `admin` token."""
-        approver = self._actor(caller)
+        approver = self._tokens.actor(caller)
         with self._store.transaction():
             row = self._require(number)
             if row["status"] != "proposed":
@@ -204,11 +202,6 @@ class RevisionLedger:
             return ApplyFenceState(fleet_id=self._fleet_id, version=current.version + 1, record=record)
 
     # -- helpers --------------------------------------------------------------------
-
-    def _actor(self, caller: Caller) -> RevisionActor:
-        if caller.token_id is None:
-            return RevisionActor(token_id=None, name=caller.name or ROOT_AUTHOR)
-        return RevisionActor(token_id=caller.token_id, name=self._tokens.get(caller.token_id).name)
 
     def _require(self, number: int) -> sqlite3.Row:
         row = self._store.row("SELECT status, author_token_id FROM revisions WHERE number = ?", (number,))

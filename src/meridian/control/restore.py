@@ -74,7 +74,7 @@ def stage_restored_database(
             with store.transaction():
                 epoch = max(store.fleet_epoch, minimum_epoch) + 1
                 store.set_meta("fleet_epoch", str(epoch))
-                strip_unsnapshotted(store.db)  # before migrations: an older snapshot lacks newer tables
+                strip_unsnapshotted(store.db, restoring=True)  # private fingerprints need the newly generated fleet key
                 store.db.execute(
                     "UPDATE node_certificates SET revoked_at = ? WHERE revoked_at IS NULL", (int(clock()),)
                 )
