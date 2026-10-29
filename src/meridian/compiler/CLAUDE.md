@@ -18,6 +18,7 @@
 - Routing gateway bridges use dedicated service Users and source-restricted firewall rules.
 - **Fingerprints never mix in a health-checked group** — copies carry `ALT_FINGERPRINT_TAG` and get their own Xray balancer and Mihomo `exclude-filter` (TSPU escalates when one changes); sing-box skips them.
 ## Pitfalls
+- **The Meridian backend drops only the node-API rule itself** — match its server, port, and control-server source; matching the port alone dropped a relay hop listening on 3010.
 - **A relay's endpoint takes keys from the exit behind it** — resolve `workload_ref` through the Host's `node_ref` runtime, never `owner_ref` (the relay).
 - Xray sniffs BitTorrent with `enabled: true`; never add it to `destOverride` (invalid). Keep its DIRECT rule before the VPN catch-all but after UDP/443 blocking; UDP DHT/uTP and encrypted peers are not reliably bypassed.
 - **The control bootstrap depends on its public 80/443 rules** — ACME HTTP-01 runs inside it.

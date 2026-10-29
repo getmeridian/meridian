@@ -314,6 +314,22 @@ def test_relay_endpoint_takes_its_keys_from_the_exit_and_its_address_from_the_re
     assert any(item.payload.kind == "realm_hop" for item in plan.resources)
 
 
+def test_a_relay_hop_on_the_node_api_port_keeps_its_firewall_rule() -> None:
+    """Only the node API rule goes: the same port from another hop, on another server, is a relay's."""
+    chain = TransparentRelayIntent(
+        id="r1", hop_server_refs=["srv-r", "srv-s"], exit_ref="main", protocol_path_ref="main-reality", listen_port=3010
+    )
+    plan = compile_topology(_intent(transparent_relays=[chain]))
+    restricted = {
+        (item.payload.server_ref, item.payload.port, tuple(item.payload.source_server_refs))  # type: ignore[union-attr]
+        for item in plan.resources
+        if item.payload.kind == "firewall_rule" and item.payload.source_server_refs  # type: ignore[union-attr]
+    }
+
+    assert ("srv-s", 3010, ("srv-r",)) in restricted
+    assert ("srv-a", 3010, ("srv-a",)) not in restricted
+
+
 def test_default_backend_stays_out_of_saved_intent() -> None:
     """Existing cluster.yml files and contracts never see the hidden switch."""
     remnawave = single_server_intent(None, server_ref="srv-a")

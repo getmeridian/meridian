@@ -205,8 +205,22 @@ def _panel_only(payload: ResourcePayload, old: dict[str, CompiledResource]) -> b
     if payload.kind in {"internal_squad", "external_squad", "subscription_template", "probe", "service_user"}:
         return True
     if isinstance(payload, FirewallRulePayload):
-        node_ports = {item.payload.api_port for item in old.values() if isinstance(item.payload, NodeRuntimePayload)}
-        return bool(payload.source_server_refs) and payload.port in node_ports
+        # Exactly a node's API rule: its server and port, opened to the control server alone. A relay
+        # hop listening on the same port elsewhere, or from another hop, keeps its rule.
+        control = {
+            item.payload.server_ref for item in old.values() if isinstance(item.payload, ControlPlaneRuntimePayload)
+        }
+        node_apis = {
+            (item.payload.server_ref, item.payload.api_port)
+            for item in old.values()
+            if isinstance(item.payload, NodeRuntimePayload)
+        }
+        return (
+            payload.transport == "tcp"
+            and (payload.server_ref, payload.port) in node_apis
+            and len(payload.source_server_refs) == 1
+            and payload.source_server_refs[0] in control
+        )
     return False
 
 
