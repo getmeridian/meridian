@@ -499,6 +499,9 @@ class ControlService:
         """
         moment = now or utc_now()
         with self._transaction():
+            # Counters of a user the service never had would only grow the database.
+            known = {row[0] for row in self._db.execute("SELECT user_id FROM users")}
+            report = report.model_copy(update={"users": [user for user in report.users if user.user_id in known]})
             changed = self._enforce(moment)
             ack = self.traffic.count(node_id, report)
             if [*changed, *self._enforce(moment)]:

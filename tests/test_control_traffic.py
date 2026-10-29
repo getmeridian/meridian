@@ -9,7 +9,7 @@ import pytest
 
 from meridian.control.errors import ServiceError
 from meridian.control.service import ControlService
-from meridian.control.traffic import KEPT_EPOCHS
+from meridian.control.traffic import KEPT_EPOCHS, REMEMBERED_RETIRED_EPOCHS
 from meridian.core.agent_protocol import StatsReport
 from tests.support.agent_node import FLEET_ID
 
@@ -90,6 +90,28 @@ def test_only_the_most_recent_epochs_keep_baselines_and_older_ones_never_count_a
 
     assert replay.acked_seq == 2
     assert _totals(service)["alice"] == (KEPT_EPOCHS + 1, 0)
+
+
+def test_counters_of_users_the_service_never_had_are_dropped(service: ControlService) -> None:
+    """A node could otherwise fill control.db with made-up user IDs; known users still count."""
+    report = _report(service, EPOCH_A, 1, alice=(10, 20))
+    forged = report.model_copy(
+        update={"users": [*report.users, *(user.model_copy(update={"user_id": "u0ghost"}) for user in report.users)]}
+    )
+
+    service.record_stats("main", forged)
+
+    assert _totals(service)["alice"] == (10, 20)
+    rows = service.traffic._store.rows("SELECT user_id FROM traffic_counters", ())
+    assert [row["user_id"] for row in rows] == [report.users[0].user_id]
+
+
+def test_a_node_that_keeps_rotating_epochs_is_remembered_only_so_far(service: ControlService) -> None:
+    for index in range(KEPT_EPOCHS + REMEMBERED_RETIRED_EPOCHS + 5):
+        service.traffic.record("main", _report(service, f"{index:08x}-6c1d-4e8b-9a7f-2b5d4c3e1f00", 1, alice=(1, 0)))
+
+    rows = service.traffic._store.rows("SELECT COUNT(*) AS n FROM traffic_retired_epochs", ())
+    assert rows[0]["n"] == REMEMBERED_RETIRED_EPOCHS
 
 
 def test_a_version_eight_database_keeps_each_nodes_live_baselines(tmp_path: Path) -> None:

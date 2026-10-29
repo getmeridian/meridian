@@ -7,7 +7,8 @@ A new counter epoch starts from zero beside the others: epoch IDs are random,
 so a late report from an epoch the agent left (or one never seen) is counted
 against its own baselines and never retires the live one. Only the
 `KEPT_EPOCHS` most recently reported epochs keep baselines; older ones are
-retired and never count again. Baselines outlive node deletion: a re-added
+retired and never count again (the newest `REMEMBERED_RETIRED_EPOCHS` of
+them per node are remembered). Baselines outlive node deletion: a re-added
 node whose agent kept its counter store must not count its totals twice.
 Nothing here records where a client connected from.
 """
@@ -64,6 +65,8 @@ PER_EPOCH_BASELINES: tuple[str, ...] = (
 )
 # Epochs per node that keep baselines: the live one plus a few a late report may still name.
 KEPT_EPOCHS = 3
+# Retired epochs remembered per node, so a node that keeps rotating cannot grow the table without bound.
+REMEMBERED_RETIRED_EPOCHS = 64
 
 
 class TrafficLedger:
@@ -146,6 +149,12 @@ class TrafficLedger:
             db.execute("INSERT OR IGNORE INTO traffic_retired_epochs VALUES (?, ?)", (node_id, epoch))
             db.execute("DELETE FROM traffic_counters WHERE node_id = ? AND counter_epoch = ?", (node_id, epoch))
             db.execute("DELETE FROM traffic_reports WHERE node_id = ? AND counter_epoch = ?", (node_id, epoch))
+        if stale:
+            db.execute(
+                "DELETE FROM traffic_retired_epochs WHERE node_id = ? AND rowid NOT IN"
+                " (SELECT rowid FROM traffic_retired_epochs WHERE node_id = ? ORDER BY rowid DESC LIMIT ?)",
+                (node_id, node_id, REMEMBERED_RETIRED_EPOCHS),
+            )
 
     def node_totals(self) -> dict[str, int]:
         """Bytes each node counted in its current counter epoch (an agent that lost its counter store starts over)."""
