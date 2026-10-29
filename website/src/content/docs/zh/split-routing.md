@@ -37,6 +37,7 @@ Meridian 在其下发的 **Xray JSON** 和 **Mihomo** 订阅中内置了分流�
 ### 规则从哪里来
 
 控制服务根据你已审核的拓扑生成每一份 Xray JSON、Mihomo 和 sing-box 订阅：其中包含多个出口与中继之间的自动回退配置以及上述分流规则。没有需要手动编辑的模板。要改变流量走向，请在出口上使用 [`meridian route`](/zh/cli-reference/#meridian-route)，或使用[路由网关](#通过路由网关)的路由规则。
+
 ## 两层机制如何配合
 
 | 层级 | 作用 | 防范的问题 |

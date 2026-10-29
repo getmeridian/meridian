@@ -91,6 +91,7 @@ meridian restore --to 198.51.100.30
 - **另一台机器**：在没有该集群的机器上，把快照文件复制过去，运行 `meridian restore --to NEW_IP --snapshot FILE --recovery-key`，在提示时粘贴恢复密钥。快照中带有集群自己的文件；那台机器仍需要能通过 SSH 访问新服务器和你的出口。
 
 恢复密钥只在首次部署结束时显示一次；`meridian backup recovery-key` 可以生成新的。请离线保存，远离管理集群的机器。参见 [`meridian restore`](/zh/cli-reference/#meridian-restore)。
+
 ## 从多台机器管理
 
 Meridian 了解的关于集群的所有内容都保存在部署时所用机器的 `~/.config/meridian/` 中。要从第二台机器管理集群，请将该目录复制过去，但不要复制 `device.key` 和 `snapshots/`，这样第二台机器会在第一次变更时得到自己的备份密钥。在其他机器上每次做出更改后，再同步更新该目录。`meridian backup devices` 列出接收快照的机器，`meridian backup revoke` 可以移除你不再使用的机器。

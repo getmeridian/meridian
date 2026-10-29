@@ -102,6 +102,7 @@ description: 常见问题、解决方案和诊断工具。
 ### 从 Remnawave 迁移中止
 
 `meridian migrate` 在每一步之后都会保存进度。修复报告的原因后再次运行即可：它会从中断处继续，已完成的迁移不会再做任何事。在任何改动之前，面板数据库都会先备份到 `~/.config/meridian/backups/` 和控制服务器上的 `/var/backups/meridian-migration/`。如果应用之后链接检查失败，Remnawave 会保留在原处（处于停止状态），命令也会说明这一点：这是一个 bug，请附上 `meridian doctor` 的输出[提交 issue](https://github.com/getmeridian/meridian/issues)。
+
 ### SSH 连接错误
 
 手动测试 SSH：`ssh root@SERVER_IP`。请确保已配置密钥登录。如果不是 `root` 用户，请加上 `--user` 标志。如果服务器只接受密码，请在终端中不带 `--yes` 运行 `meridian deploy` 让它自动安装密钥（见[仅密码登录的服务器](/zh/deploy/#仅密码登录的服务器)），或者先运行一次 `ssh-copy-id root@SERVER_IP`。
@@ -111,6 +112,7 @@ description: 常见问题、解决方案和诊断工具。
 查看日志：`meridian logs IP -c node -n 50` 会显示 agent（`netagent`）和 Xray（`netcore`）。常见原因包括宿主机端口冲突（Xray 直接绑定拓扑中的端口，这些端口必须空闲），或出口无法通过 TCP 443 访问控制服务器（agent 会主动连接它；请检查服务商的出站防火墙）。
 
 **修复：** 运行 `meridian check IP` 并按提示修复，然后运行 `meridian apply`：它会为丢失身份的 agent 重新注册，并升级运行旧构建的 agent。`meridian fleet status` 会显示每个 agent 是否在线、是否已应用当前配置；控制台的 **Servers** 页面也显示同样的信息。
+
 ### 磁盘空间不足
 
 可用空间不足 2GB。请清理空间：`journalctl --vacuum-time=1d`、`apt-get clean`，并检查 `/var/log/`。
