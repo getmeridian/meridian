@@ -14,9 +14,10 @@ MEM=${2:?usage: small_vps.sh IP MEMORY [--swap SIZE]}
 SWAP=""
 [[ ${3:-} == --swap ]] && SWAP=${4:?--swap needs a size such as 2G}
 
-ssh -o BatchMode=yes "root@$IP" bash -s -- "$MEM" "$SWAP" <<'REMOTE'
+# ssh joins its arguments into one remote command line, so quote them for that shell.
+ssh -o BatchMode=yes "root@$IP" "bash -s -- $(printf '%q ' "$MEM" "$SWAP")" <<'REMOTE'
 set -euo pipefail
-mem=$1 swap=${2:-}  # ssh drops an empty argument
+mem=$1 swap=${2:-}
 rm -f /etc/apt/apt.conf.d/00InstallRecommends
 if ! grep -q "mem=$mem maxcpus=1" /etc/default/grub; then
   sed -i -E 's/ ?mem=[0-9]+[MG] maxcpus=1//; s/^GRUB_CMDLINE_LINUX_DEFAULT="/&mem='"$mem"' maxcpus=1 /' /etc/default/grub

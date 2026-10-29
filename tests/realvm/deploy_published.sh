@@ -12,9 +12,10 @@ VERSION=${2:?usage: deploy_published.sh IP VERSION [DEPLOY_ARGS...]}
 shift 2
 ARGS=$(printf '%q ' "$@")
 
-ssh -o BatchMode=yes "root@$IP" bash -s -- "$VERSION" "$ARGS" <<'REMOTE'
+# ssh joins its arguments into one remote command line, so quote them for that shell.
+ssh -o BatchMode=yes "root@$IP" "bash -s -- $(printf '%q ' "$VERSION" "$ARGS")" <<'REMOTE'
 set -uo pipefail
-version=$1 args=${2:-}  # ssh drops an empty argument
+version=$1 args=${2:-}
 export PATH=/root/.local/bin:$PATH
 command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1
 uv tool install -q --force "meridian-vpn==$version"
