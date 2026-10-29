@@ -23,5 +23,6 @@
 - **Never read the recovery key from argv** — shell history and `ps` keep it; `--recovery-key` asks with a hidden prompt or reads one line of stdin.
 - **Checkpoint before deleting what a rerun needs** — the staged database goes only after `loaded` is saved; deleted first, a failed save left a rerun uploading a file that no longer existed.
 - **Restore above every epoch the agents may hold** — they keep the highest epoch they accepted and refuse less; an epoch-1 snapshot restored as 2 after an earlier restore reached 3, so no agent connected. `_highest_known_epoch()` reads the last restore and saved snapshots.
+- **An unfinished restore never travels** — deposits and adopted snapshot copies keep only a `done` record (`finished_restore()`); a snapshot pulled mid-restore once held a fresh context to the dead target.
 - **Refuse at review what the apply would refuse** — restore uploads and installs before its apply, so `review()` runs `refuse_servers_claimed_elsewhere()` itself; left to the apply, a server another context held was already changed.
 - **An unread fleet identity is not an empty server** — `upload_database()` refuses when reading `/etc/ctld/config.json` fails or it doesn't parse; an SSH 255 read as "no fleet" and the upload went ahead.

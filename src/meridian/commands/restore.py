@@ -19,7 +19,7 @@ from rich.markup import escape
 from meridian import config
 from meridian.backup import BackupError
 from meridian.backup.keys import load_device_key, write_private
-from meridian.backup.pull import saved_snapshots
+from meridian.backup.pull import finished_restore, saved_snapshots
 from meridian.backup.restore import ControlRestorer, RestoreOutcome, RestoreReview, RestoreSource
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import apply_reviewed_intent, load_cluster, persist_reviewed_apply
@@ -165,6 +165,8 @@ def _fleet_state(cluster: ClusterConfig, snapshot: Snapshot | None) -> ClusterCo
     restored = load_cluster()
     if restored.fleet_id != snapshot.header.fleet_id:
         raise BackupError("The snapshot's fleet files name another fleet.", category="bug")
+    # Snapshots from before deposits dropped it may carry the depositing machine's unfinished restore.
+    restored.control_restore = finished_restore(restored.control_restore)
     return restored
 
 

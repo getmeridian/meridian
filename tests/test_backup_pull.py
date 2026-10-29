@@ -169,3 +169,15 @@ def test_deploy_shows_a_new_recovery_key_once(fleet: ClusterConfig, capsys: pyte
     with ControlClient(fleet.panel.url, ADMIN_TOKEN) as client:
         assert client.recovery_key().public_key
     assert "AGE-SECRET-KEY" not in config.CLUSTER_CONFIG.read_text(encoding="utf-8")
+
+
+def test_an_unfinished_restore_stays_on_this_machine(fleet: ClusterConfig) -> None:
+    """Carried into a fresh context, it would hold that context to a target that may be gone."""
+    from meridian.backup.pull import deployer_state
+    from meridian.cluster import ControlRestore
+
+    fleet.control_restore = ControlRestore(step="loaded", to_server_ref="srv-gone", fleet_epoch=2)
+    assert "control_restore" not in yaml.safe_load(deployer_state(fleet).cluster_yml)
+
+    fleet.control_restore = ControlRestore(step="done", to_server_ref="srv-new", fleet_epoch=2)
+    assert yaml.safe_load(deployer_state(fleet).cluster_yml)["control_restore"]["fleet_epoch"] == 2

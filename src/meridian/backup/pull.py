@@ -14,7 +14,7 @@ from pathlib import Path
 from meridian import config
 from meridian.backup import BackupError
 from meridian.backup.keys import create_device_key, device_name, load_device_key, snapshots_dir, write_private
-from meridian.cluster import ClusterConfig
+from meridian.cluster import ClusterConfig, ControlRestore
 from meridian.cluster_persistence import dump_cluster
 from meridian.control.client import ControlClient, ControlServiceConflict
 from meridian.control.models import DeployerStateDeposit
@@ -71,9 +71,14 @@ def pull_snapshot(cluster: ClusterConfig, *, name: str = "") -> PulledSnapshot:
 
 
 def deployer_state(cluster: ClusterConfig) -> DeployerStateDeposit:
-    """This machine's fleet files, without the admin token a restore replaces anyway."""
+    """This machine's fleet files, without the admin token a restore replaces anyway.
+
+    An unfinished restore is this machine's progress, not the fleet's: carried into a fresh
+    context, it would hold that context to a target server that may be gone.
+    """
     copy = cluster.clone()
     copy.panel.api_token = ""
+    copy.control_restore = finished_restore(copy.control_restore)
     try:
         servers = config.SERVER_PROFILES_FILE.read_text(encoding="utf-8")
     except FileNotFoundError:
@@ -81,6 +86,11 @@ def deployer_state(cluster: ClusterConfig) -> DeployerStateDeposit:
     return DeployerStateDeposit(
         cluster_yml=dump_cluster(copy), servers_json=servers or "[]", generation=cluster.active_generation
     )
+
+
+def finished_restore(restore: ControlRestore | None) -> ControlRestore | None:
+    """A restore record worth carrying to another machine: only a finished one (its epoch still counts)."""
+    return restore if restore is not None and restore.step == "done" else None
 
 
 def save_snapshot(blob: bytes, header: SnapshotHeader) -> Path:

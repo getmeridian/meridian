@@ -438,3 +438,28 @@ def test_an_older_snapshot_restores_above_the_newest_epoch_this_machine_has_seen
     assert review.next_epoch == 4 and outcome.fleet_epoch == 4
     with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
         assert client.health().fleet_epoch == 4
+
+
+def test_an_empty_context_drops_an_unfinished_restore_an_older_snapshot_carried(
+    fleet: tuple[ClusterConfig, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from meridian.cluster import ControlRestore
+    from meridian.cluster_persistence import dump_cluster
+    from meridian.commands import restore as restore_command
+    from meridian.control.models import DeployerState
+
+    cluster, snapshot = fleet
+    source = _source(snapshot)
+    carried = cluster.clone()
+    carried.panel.api_token = ""
+    carried.control_restore = ControlRestore(step="loaded", to_server_ref="srv-gone", fleet_epoch=2)
+    deposit = DeployerState(
+        cluster_yml=dump_cluster(carried), servers_json="[]", generation=2, deposited_at="2026-10-29T12:00:00Z"
+    )
+    monkeypatch.setattr(restore_command, "read_deployer_state", lambda database: deposit)
+    config.CLUSTER_CONFIG.unlink()
+    config.SERVER_PROFILES_FILE.unlink()
+
+    restored = restore_command._fleet_state(ClusterConfig(), source.snapshot)
+
+    assert restored.control_restore is None
