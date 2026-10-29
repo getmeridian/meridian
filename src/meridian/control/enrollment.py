@@ -295,6 +295,15 @@ class NodeAuthority:
     def renew(self, session: Session, request: RenewRequest) -> RenewResponse:
         """Certify a fresh node key; the session's certificate stays valid until it expires."""
         with self._store.transaction():
+            # Checked again under the write lock: an enrollment since `authenticate` revoked this certificate.
+            row = self._store.row(
+                "SELECT revoked_at FROM node_certificates WHERE sha256 = ? AND node_id = ?",
+                (session.certificate_sha256, session.node_id),
+            )
+            if row is None or row["revoked_at"] is not None:
+                raise agent_error("credential_revoked", "The node certificate is revoked; enroll again over SSH.")
+            if session.expires_at <= self._clock():
+                raise agent_error("credential_expired", "The session expired; send hello.")
             issued = self._issue(session.node_id, request.csr_pem, self._now())
         return RenewResponse(certificate_pem=issued.pem, certificate_expires_at=_stamp(issued.not_after))
 

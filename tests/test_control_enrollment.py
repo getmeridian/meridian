@@ -295,6 +295,17 @@ def test_renew_certifies_a_fresh_key_and_the_old_certificate_stays_valid(service
     _refused("unauthenticated", lambda: _hello(service, previous, clock))  # another key cannot use it
 
 
+def test_renew_refuses_a_session_an_enrollment_revoked_after_it_authenticated(
+    service: ControlService, clock: Clock
+) -> None:
+    node = FakeNode()
+    _enroll(service, node)
+    session = service.authority.authenticate(_hello(service, node, clock).session_token)
+    _enroll(service, FakeNode())  # re-enrolls "main" between the renewal's authentication and its write
+
+    _refused("credential_revoked", lambda: service.authority.renew(session, RenewRequest(csr_pem=csr_pem(node.key))))
+
+
 def test_renew_after_comes_from_the_node_certificate(service: ControlService, clock: Clock) -> None:
     node = FakeNode()
     _enroll(service, node)
