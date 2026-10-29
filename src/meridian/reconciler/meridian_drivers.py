@@ -10,6 +10,7 @@ reports the current document applied with no failed resource.
 from __future__ import annotations
 
 import json
+import shlex
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -31,7 +32,15 @@ from meridian.control.models import ClientEndpoint, NodeSpec, NodeStatus, Servic
 from meridian.control_artifacts import AgentBinary
 from meridian.core.agent_protocol import AgentBootstrap
 from meridian.core.agent_types import AGENT_PROTOCOL, canonical_sha256
-from meridian.host_runtime import AGENT_BINARY, AGENT_BOOTSTRAP, AGENT_STATE_DIR, AGENT_UNIT
+from meridian.host_runtime import (
+    AGENT_BINARY,
+    AGENT_BOOTSTRAP,
+    AGENT_CONFIG_DIR,
+    AGENT_LIB_DIR,
+    AGENT_STATE_DIR,
+    AGENT_UNIT,
+    CORE_UNIT,
+)
 from meridian.reconciler.agent_spec import build_node_spec
 from meridian.reconciler.resources import (
     ResourceAction,
@@ -229,14 +238,40 @@ class AgentRuntimeDriver:
         return False
 
     def retire(self, binding: ManagedResourceBinding) -> None:
+        """Stop the agent and the core it runs, and delete both with their keys and state.
+
+        A plan that still runs an agent on the server (an exit renamed in place) keeps it;
+        the old binding is only forgotten. WARP stays, as on panel nodes.
+        """
         if not binding.server_ref:
             return
+        if any(
+            isinstance(resource.payload, AgentRuntimePayload) and resource.payload.server_ref == binding.server_ref
+            for resource in self.context.plan.resources
+        ):
+            return
         conn = self.context.connection_for(binding.server_ref)
-        conn.run(f"systemctl disable --now {AGENT_UNIT} >/dev/null 2>&1 || true", timeout=60)
-        conn.run(
-            f"rm -f /etc/systemd/system/{AGENT_UNIT} {AGENT_BINARY} {AGENT_BOOTSTRAP} && systemctl daemon-reload",
-            timeout=30,
+        units = f"{AGENT_UNIT} {CORE_UNIT}"
+        # One unit per systemctl call: a multi-unit `disable --now` stops nothing when one is missing.
+        stop_each = f'for unit in {units}; do systemctl disable --now "$unit" >/dev/null 2>&1; done;'
+        paths = " ".join(
+            shlex.quote(path)
+            for path in (
+                f"/etc/systemd/system/{AGENT_UNIT}",
+                f"/etc/systemd/system/{CORE_UNIT}",
+                AGENT_BINARY,
+                AGENT_CONFIG_DIR,
+                AGENT_LIB_DIR,
+                AGENT_STATE_DIR,
+            )
         )
+        result = conn.run(
+            f"{stop_each} rm -rf {paths} && systemctl daemon-reload && {stop_each}"
+            f" ! systemctl is-active --quiet {AGENT_UNIT} && ! systemctl is-active --quiet {CORE_UNIT}",
+            timeout=60,
+        )
+        if result.returncode != 0:
+            raise ResourceReconcileError(f"The node agent on {binding.server_ref} is still running after removal.")
 
     def _identity(self, payload: AgentRuntimePayload, ca_sha256: str) -> dict[str, Any]:
         return {

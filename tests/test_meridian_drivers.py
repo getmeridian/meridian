@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
-from meridian.cluster import ClusterConfig
+from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler import compile_topology
 from meridian.compiler.models import ResourcePlan
 from meridian.control.models import (
@@ -34,7 +34,14 @@ from meridian.control_artifacts import AgentBinary
 from meridian.core.agent_protocol import AgentBootstrap
 from meridian.core.agent_types import NodeStateRef, canonical_sha256
 from meridian.core.topology import EgressOverrideIntent
-from meridian.host_runtime import AGENT_BINARY, AGENT_BOOTSTRAP
+from meridian.host_runtime import (
+    AGENT_BINARY,
+    AGENT_BOOTSTRAP,
+    AGENT_CONFIG_DIR,
+    AGENT_LIB_DIR,
+    AGENT_STATE_DIR,
+    CORE_UNIT,
+)
 from meridian.reconciler import meridian_drivers
 from meridian.reconciler.meridian_drivers import MeridianDriverContext, build_meridian_drivers
 from meridian.reconciler.resources import (
@@ -463,3 +470,33 @@ def test_rendered_exit_and_gateway_configs_pass_xray_test(xray_binary: Path, tmp
             timeout=30,
         )
         assert result.returncode == 0, f"{node_id}: {result.stdout}{result.stderr}"
+
+
+def _agent_binding(server_ref: str) -> ManagedResourceBinding:
+    return ManagedResourceBinding(
+        logical_id="agent:old", resource_kind="agent_runtime", remote_id="old", server_ref=server_ref
+    )
+
+
+@pytest.mark.parametrize(("rc", "retires"), [(0, True), (1, False)], ids=["stopped", "still-running"])
+def test_retiring_an_agent_stops_and_deletes_its_core_too(plan: ResourcePlan, rc: int, retires: bool) -> None:
+    conn = MockConnection().when("systemctl daemon-reload", rc=rc)
+    drivers, _control, _cluster = _setup(plan, conn)
+
+    if retires:
+        drivers["agent_runtime"].retire(_agent_binding("srv-gone"))  # type: ignore[union-attr]
+    else:
+        with pytest.raises(ResourceReconcileError, match="still running"):
+            drivers["agent_runtime"].retire(_agent_binding("srv-gone"))  # type: ignore[union-attr]
+
+    (command,) = conn.calls
+    assert all(part in command for part in (CORE_UNIT, AGENT_LIB_DIR, AGENT_CONFIG_DIR, AGENT_STATE_DIR))
+
+
+def test_an_agent_the_plan_still_runs_on_that_server_is_only_forgotten(plan: ResourcePlan) -> None:
+    conn = MockConnection()
+    drivers, _control, _cluster = _setup(plan, conn)
+
+    drivers["agent_runtime"].retire(_agent_binding("srv-a"))  # type: ignore[union-attr]
+
+    assert conn.calls == []
