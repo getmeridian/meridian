@@ -72,3 +72,19 @@ def _offline_registry_country(monkeypatch: pytest.MonkeyPatch) -> None:
         raise httpx.ConnectError(f"tests are offline: {request.url}")
 
     monkeypatch.setattr("meridian.registry_country.DEFAULT_TRANSPORT", httpx.MockTransport(refuse))
+
+
+@pytest.fixture(scope="session")
+def xray_binary() -> Path:
+    """The pinned Xray from `MERIDIAN_TEST_XRAY` (CI supplies it), its geodata files beside it."""
+    import subprocess
+
+    from meridian.config import XRAY_VERSION
+
+    configured = os.environ.get("MERIDIAN_TEST_XRAY")
+    if not configured:
+        pytest.skip("set MERIDIAN_TEST_XRAY to run real Xray tests")
+    binary = Path(configured).resolve()
+    version = subprocess.run([str(binary), "version"], capture_output=True, text=True, check=True, timeout=10)
+    assert version.stdout.startswith(f"Xray {XRAY_VERSION} "), version.stdout
+    return binary

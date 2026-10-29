@@ -5,8 +5,10 @@ from __future__ import annotations
 import pytest
 
 from meridian.compiler import compile_topology
+from meridian.compiler.deployment import deployment_server_refs
 from meridian.compiler.errors import TopologyCompileError
 from meridian.compiler.models import (
+    AgentRuntimePayload,
     CertificatePayload,
     ClientEndpointPayload,
     ControlServicePayload,
@@ -15,9 +17,10 @@ from meridian.compiler.models import (
 )
 from meridian.core.deploy import DeployRequest
 from meridian.core.errors import LocalStateError
-from meridian.core.topology import EgressOverrideIntent, ExitIntent, TransparentRelayIntent
+from meridian.core.topology import EgressOverrideIntent, ExitIntent, RoutingGatewayIntent, TransparentRelayIntent
 from meridian.setup.default_paths import default_exit_paths
 from meridian.setup.single_server import request_intent, single_server_intent
+from tests.support.topology import GATEWAY_SERVERS, gateway_fleet_intent
 
 ADDRESS = "198.51.100.10"
 DOMAIN = "vpn.example.com"
@@ -91,18 +94,43 @@ def _second_exit() -> ExitIntent:
     return ExitIntent(id="de", server_ref="srv-b", paths=default_exit_paths("de", address="198.51.100.20"))
 
 
+def test_meridian_backend_refuses_client_ip_forwarding() -> None:
+    """It changes the PROXY protocol chain in front of every workload and needs its own review."""
+    with pytest.raises(TopologyCompileError, match="client IP forwarding"):
+        compile_topology(_intent(forward_client_ips=True))
+
+
+def _warp_exit(*, default: bool, overrides: tuple[str, ...] = ()) -> ExitIntent:
+    return _intent().exits[0].model_copy(update={"warp": default, "egress_overrides": _overrides(*overrides)})
+
+
 @pytest.mark.parametrize(
-    ("changes", "named"),
+    ("exit_", "outbound_tags", "rules"),
     [
-        ({"forward_client_ips": True}, "client IP forwarding"),
-        ({"exits": [_intent().exits[0].model_copy(update={"warp": True})]}, "WARP"),
-        ({"exits": [_intent().exits[0].model_copy(update={"egress_overrides": _overrides("warp")})]}, "WARP"),
+        (_warp_exit(default=True), ["warp"], []),
+        (_warp_exit(default=False, overrides=("warp",)), ["direct", "warp"], ["warp"]),
+        (_warp_exit(default=True, overrides=("direct", "block")), ["warp"], ["direct", "block"]),
     ],
-    ids=["client-ips", "warp", "warp-override"],
+    ids=["warp-default", "warp-override", "warp-default-with-overrides"],
 )
-def test_meridian_backend_refuses_what_the_service_cannot_run(changes: dict[str, object], named: str) -> None:
-    with pytest.raises(TopologyCompileError, match=named):
-        compile_topology(_intent(**changes))
+def test_warp_installs_with_the_agent_and_routes_in_the_workload(
+    exit_: ExitIntent, outbound_tags: list[str], rules: list[str]
+) -> None:
+    plan = compile_topology(_intent(exits=[exit_]))
+    agent = next(item.payload for item in plan.resources if isinstance(item.payload, AgentRuntimePayload))
+    workload = next(item.payload for item in plan.resources if isinstance(item.payload, NodeWorkloadPayload))
+
+    assert agent.warp is True
+    assert workload.profile.outbound_tags == outbound_tags
+    assert [rule.target_tag for rule in workload.profile.routing_rules] == rules
+
+
+def test_an_agent_without_warp_keeps_its_reviewed_hash() -> None:
+    """Existing fleets must not re-apply because the payload grew a field."""
+    plan = compile_topology(_intent())
+    agent = next(item.payload for item in plan.resources if isinstance(item.payload, AgentRuntimePayload))
+
+    assert "warp" not in agent.model_dump(mode="json")
 
 
 @pytest.mark.parametrize(
@@ -168,12 +196,39 @@ def test_control_service_readiness_requires_the_url_on_its_domain(host: str, obs
     assert bool(conn.calls) is observed  # only a matching URL goes on to read the attestation
 
 
-def test_meridian_backend_refuses_a_control_server_without_an_exit() -> None:
-    intent = _intent()
-    moved = intent.exits[0].model_copy(update={"server_ref": "srv-b"})
+def _control_only_fleet():
+    """The control server runs only the service: exit `de` behind a relay and a routing gateway."""
+    relay = TransparentRelayIntent(id="r1", hop_server_refs=["srv-r"], exit_ref="de", protocol_path_ref="de-reality")
+    gateway = RoutingGatewayIntent(id="gw", server_ref="srv-g", bridge_path_ref="de-reality")
+    return _intent(
+        exits=[_second_exit()], default_egress_ref="de", transparent_relays=[relay], routing_gateways=[gateway]
+    )
 
-    with pytest.raises(TopologyCompileError, match="control server without an exit"):
-        compile_topology(intent.model_copy(update={"exits": [moved]}))
+
+def _on_remnawave(intent):
+    return intent.model_copy(update={"control": intent.control.model_copy(update={"backend": "remnawave"})})
+
+
+def test_a_control_server_without_an_exit_runs_only_the_service() -> None:
+    """Its bootstrap and 443 stream match a panel-only server's: no Reality route, default backend ports."""
+    from meridian.setup.control_plane import bootstrap_profile_values
+
+    meridian = compile_topology(_control_only_fleet())
+    panel = compile_topology(_on_remnawave(_control_only_fleet()))
+
+    def control_stream(plan):
+        return next(
+            item.payload
+            for item in plan.resources
+            if isinstance(item.payload, NginxArtifactPayload) and item.payload.server_ref == "srv-a"
+        )
+
+    on_control = {
+        item.payload.kind for item in meridian.resources if getattr(item.payload, "server_ref", "") == "srv-a"
+    }
+    assert on_control == {"server_baseline", "firewall_rule", "control_service", "nginx_artifact"}
+    assert control_stream(meridian) == control_stream(panel)
+    assert bootstrap_profile_values(meridian) == bootstrap_profile_values(panel)
 
 
 def test_every_exit_gets_its_own_agent_and_workload() -> None:
@@ -190,6 +245,30 @@ def test_every_exit_gets_its_own_agent_and_workload() -> None:
         ("agent_runtime", "srv-b"),
         ("node_workload", "srv-b"),
     }
+
+
+def test_a_routing_gateway_is_an_agent_node_whose_workload_carries_its_routes() -> None:
+    plan = compile_topology(gateway_fleet_intent())
+    by_id = {item.logical_id: item for item in plan.resources}
+    gateway = by_id["workload:gw"]
+    profile = gateway.payload.profile  # type: ignore[union-attr]
+    panel_kinds = {"service_user", "routing_gateway", "egress_pool", "route_rule", "internal_squad", "probe"}
+
+    assert not {item.payload.kind for item in plan.resources} & panel_kinds
+    assert by_id["agent:gw"].payload.server_ref == "srv-g"  # type: ignore[union-attr]
+    # Each target exit's workload (and with it its keys and bridge) comes first.
+    assert {"agent:gw", "workload:main", "workload:de"} <= set(gateway.dependencies)
+    assert [edge.target_workload_ref for edge in profile.service_outbounds] == ["de", "main"]
+    assert [rule.route_id for rule in profile.routing_rules] == ["ads", "local", "video", "default"]
+    assert [balancer.pool_id for balancer in profile.egress_balancers] == ["both"]
+    entry = by_id["endpoint:gw:entry:direct"].payload
+    assert (entry.workload_ref, entry.address_server_ref) == ("gw", "srv-g")  # type: ignore[union-attr]
+    restricted = {
+        (item.payload.server_ref, tuple(item.payload.source_server_refs))  # type: ignore[union-attr]
+        for item in plan.resources
+        if item.payload.kind == "firewall_rule" and item.payload.source_server_refs  # type: ignore[union-attr]
+    }
+    assert restricted == {("srv-a", ("srv-g",)), ("srv-b", ("srv-g",))}  # the bridges; no node-API rule
 
 
 def test_relay_endpoint_takes_its_keys_from_the_exit_and_its_address_from_the_relay() -> None:
@@ -244,36 +323,57 @@ def _domain_fleet(sni: str):
     return build
 
 
+def _gateway_fleet():
+    """Both exits behind a routing gateway with a pool and ordered rules, plus a relay to `main`."""
+    return gateway_fleet_intent().model_copy(update={"transparent_relays": [_relay()]})
+
+
+def _warp_fleet():
+    """WARP as one exit's default egress and as another's per-destination override."""
+    fleet = _fleet()
+    main, de = fleet.exits
+    return fleet.model_copy(
+        update={
+            "exits": [
+                main.model_copy(update={"warp": True}),
+                de.model_copy(update={"egress_overrides": _overrides("warp", "direct")}),
+            ]
+        }
+    )
+
+
+SERVERS = {**GATEWAY_SERVERS, "srv-r": "198.51.100.30"}
+ROLES = {ADDRESS: "control", "198.51.100.20": "exit", "198.51.100.30": "relay", "198.51.100.40": "gateway"}
+PARITY_FLEETS = {
+    "ip": _fleet,
+    "domain": _domain_fleet(""),
+    "self-steal-on-domain": _domain_fleet(DOMAIN),
+    "self-steal-own-name": _domain_fleet("www.example.com"),
+    "control-domain": _control_domain_fleet,
+    "warp": _warp_fleet,
+    "gateway": _gateway_fleet,
+    "control-only": _control_only_fleet,
+}
+# The domain exit sits on the control server: its WSS and XHTTP routes are on the domain.
+DOMAIN_SHAPES = {"domain", "self-steal-on-domain", "self-steal-own-name", "control-domain"}
+
+
 @pytest.mark.parametrize(
-    ("fleet", "target"),
-    [
-        (fleet, target)
-        for fleet in (
-            _fleet,
-            _domain_fleet(""),
-            _domain_fleet(DOMAIN),
-            _domain_fleet("www.example.com"),
-            _control_domain_fleet,
-        )
-        for target in (ADDRESS, "198.51.100.20", "198.51.100.30")
-    ],
-    ids=[
-        f"{shape}-{role}"
-        for shape in ("ip", "domain", "self-steal-on-domain", "self-steal-own-name", "control-domain")
-        for role in ("control", "exit", "relay")
-    ],
+    ("shape", "target"),
+    [(shape, target) for shape in PARITY_FLEETS for target in ROLES],
+    ids=[f"{shape}-{role}" for shape in PARITY_FLEETS for role in ROLES.values()],
 )
-def test_verification_sees_a_control_service_fleet_like_a_panel_fleet(tmp_path, fleet, target: str) -> None:
+def test_verification_sees_a_control_service_fleet_like_a_panel_fleet(tmp_path, shape: str, target: str) -> None:
     """`meridian test` dropped route checks on a control-service fleet until it read client endpoints."""
     from meridian.cluster import ClusterConfig
     from meridian.servers import ServerEntry, ServerRegistry
     from meridian.verification import resolve_deployment_verification_context
 
     registry = ServerRegistry(tmp_path / "servers.json")
-    for ref, host in (("srv-a", ADDRESS), ("srv-b", "198.51.100.20"), ("srv-r", "198.51.100.30")):
+    for ref, host in SERVERS.items():
         registry.add(ServerEntry(host=host, user="root", id=ref))
-    meridian = fleet()
-    panel = meridian.model_copy(update={"control": meridian.control.model_copy(update={"backend": "remnawave"})})
+    meridian = PARITY_FLEETS[shape]()
+    panel = _on_remnawave(meridian)
 
     contexts = []
     for intent in (meridian, panel):
@@ -282,8 +382,9 @@ def test_verification_sees_a_control_service_fleet_like_a_panel_fleet(tmp_path, 
         contexts.append(resolve_deployment_verification_context(registry, target, cluster=cluster)[1])
 
     assert contexts[0] == contexts[1]
+    members = {SERVERS[ref] for ref in deployment_server_refs(meridian)}
     assert contexts[0].https_routes
-    # The domain exit sits on the control server: its WSS and XHTTP routes are on the domain.
-    assert ("wss" in contexts[0].protocols) == (fleet is not _fleet and target == ADDRESS)
-    assert (DOMAIN in contexts[0].domains) == (fleet is not _fleet and target == ADDRESS)
-    assert (PANEL in contexts[0].domains) == (fleet is _control_domain_fleet and target == ADDRESS)
+    assert (contexts[0].kind == "v4") == (target in members)
+    assert ("wss" in contexts[0].protocols) == (shape in DOMAIN_SHAPES and target == ADDRESS)
+    assert (DOMAIN in contexts[0].domains) == (shape in DOMAIN_SHAPES and target == ADDRESS)
+    assert (PANEL in contexts[0].domains) == (shape == "control-domain" and target == ADDRESS)

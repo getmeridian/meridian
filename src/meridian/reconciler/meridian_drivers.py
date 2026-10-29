@@ -43,9 +43,10 @@ from meridian.reconciler.resources import (
     payload_of,
     postcondition_key,
 )
+from meridian.reconciler.server_support import ensure_warp, warp_connected
 from meridian.reconciler.workloads import WorkloadStateManager
 from meridian.ssh import ServerConnection
-from meridian.xray_workload import salamander_password
+from meridian.xray_workload import ServiceRouteCredential, bridge_client_uuid, salamander_password
 
 # An agent polls at least every 35 s (25 s wait plus margin); twice that is "seen".
 AGENT_CONNECT_TIMEOUT = 90.0
@@ -95,6 +96,27 @@ class MeridianDriverContext:
             return None
         return next(iter(workload.reality_keys.values()))
 
+    def service_credentials(
+        self, profile: ConfigProfilePayload, generation: int
+    ) -> dict[str, ServiceRouteCredential] | None:
+        """A gateway's edge credentials, from each target exit's keys; None while one has none yet.
+
+        The exit renders the same derived ID as its bridge's only client (`agent_spec`), so no
+        service user, squad, or stored secret stands between them.
+        """
+        credentials: dict[str, ServiceRouteCredential] = {}
+        for edge in profile.service_outbounds:
+            keys = self.reality_keys(edge.target_workload_ref, generation)
+            if keys is None:
+                return None
+            credentials[edge.edge_id] = ServiceRouteCredential(
+                address=self.address(edge.target_server_ref),
+                vless_uuid=bridge_client_uuid(keys, edge.target_inbound_ref),
+                public_key=keys.public_key,
+                short_id=keys.short_id,
+            )
+        return credentials
+
 
 def build_meridian_drivers(context: MeridianDriverContext) -> ResourceDrivers:
     return {
@@ -109,6 +131,9 @@ def build_meridian_drivers(context: MeridianDriverContext) -> ResourceDrivers:
 class AgentRuntimeDriver:
     """Install the agent binary, write its bootstrap with a fresh enrollment token, and run it.
 
+    WARP, when the exit uses it, is installed over SSH first, exactly as on a panel node: it is
+    an apt package with its own daemon and registration, outside the agent's resource kinds.
+
     The agent generates its node key, enrolls with the token, and rewrites the
     bootstrap with the token nulled, so observation compares only the identity
     fields. Bare-IP control servers serve a Let's Encrypt IP certificate, so the
@@ -121,15 +146,20 @@ class AgentRuntimeDriver:
     def observe(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceObservation:
         payload = payload_of(action, AgentRuntimePayload)
         in_place, seen = self._inspect(payload)
+        if in_place and payload.warp:
+            in_place = warp_connected(action.resource.logical_id, self.context.connection_for(payload.server_ref))
         return _observation(action, exists=in_place, connected=in_place and seen, remote_id=payload.workload_ref)
 
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
         payload = payload_of(action, AgentRuntimePayload)
-        in_place, seen = self._inspect(payload)
-        if in_place and not seen and self._reconnects(payload):
-            # A service outage leaves a healthy agent unseen until its backoff ends; re-enrolling it is churn.
-            return ResourceApplyReceipt(remote_id=payload.workload_ref)
         conn = self.context.connection_for(payload.server_ref)
+        if payload.warp:
+            ensure_warp(conn, self.context.address(payload.server_ref))
+        in_place, seen = self._inspect(payload)
+        if in_place and (seen or self._reconnects(payload)):
+            # Only WARP needed repair, or a service outage left a healthy agent unseen until its
+            # backoff ends; re-enrolling it is churn.
+            return ResourceApplyReceipt(remote_id=payload.workload_ref)
         arch = _run(conn, "uname -m", "read the architecture").strip()
         binary = self.context.agent_binary(arch)
         _ok(conn.put_bytes(AGENT_BINARY, binary.data, mode="755", timeout=180), "upload the agent")
@@ -220,7 +250,7 @@ class AgentRuntimeDriver:
 
 
 class NodeWorkloadDriver:
-    """Store the exit's node spec in the service and wait until its agent applied it."""
+    """Store an exit's or gateway's node spec in the service and wait until its agent applied it."""
 
     def __init__(self, context: MeridianDriverContext) -> None:
         self.context = context
@@ -228,9 +258,10 @@ class NodeWorkloadDriver:
     def observe(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceObservation:
         payload = payload_of(action, NodeWorkloadPayload)
         keys = self.context.reality_keys(payload.workload_ref, action.generation)
-        if keys is None and _needs_keys(payload.profile):
+        credentials = self.context.service_credentials(payload.profile, action.generation)
+        if (keys is None and _needs_keys(payload.profile)) or credentials is None:
             return _observation(action, exists=False, connected=False, remote_id="")
-        spec = build_node_spec(payload.profile, keys)
+        spec = build_node_spec(payload.profile, keys, credentials)
         with self.context.client() as client:
             status = client.node(payload.workload_ref)
         stored = status is not None and status.spec_sha256 == _spec_hash(spec)
@@ -247,7 +278,13 @@ class NodeWorkloadDriver:
             server_ref=payload.server_ref,
         )
         keys = next(iter(workload.reality_keys.values()), None)
-        spec = build_node_spec(payload.profile, keys)
+        credentials = self.context.service_credentials(payload.profile, action.generation)
+        if credentials is None:
+            raise ResourceReconcileError(
+                f"Routing gateway {payload.workload_ref} dials an exit that has no Reality keys yet.",
+                hint="Apply the plan again; the exit workloads it routes to come first.",
+            )
+        spec = build_node_spec(payload.profile, keys, credentials)
         with self.context.client() as client:
             status = client.put_node(payload.workload_ref, spec)
             deadline = time.monotonic() + WORKLOAD_APPLY_TIMEOUT

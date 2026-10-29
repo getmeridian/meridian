@@ -33,7 +33,6 @@ from meridian.provision.runtime_migration import (
 )
 from meridian.provision.steps import ProvisionContext
 from meridian.provision.tls import IssueTLSCert
-from meridian.provision.warp import InstallWarp
 from meridian.reconciler import server_retirement as retirement
 from meridian.reconciler.resources import (
     ResourceAction,
@@ -50,7 +49,6 @@ from meridian.reconciler.server_evidence import (
     build_observation,
     docker_container_running,
     file_content_or_absent,
-    managed_command_output,
     negated_path_is_absent,
     port_is_listening,
     require_successful_evidence,
@@ -68,10 +66,12 @@ from meridian.reconciler.server_render import (
     render_nginx_artifact,
 )
 from meridian.reconciler.server_support import (
+    ensure_warp,
     raise_if_step_timeout,
     raise_if_timeout,
     restore_file,
     runtime_pin,
+    warp_connected,
 )
 from meridian.remnawave import MeridianPanel
 from meridian.remnawave.versions import effective_image
@@ -612,11 +612,7 @@ class NodeRuntimeDriver(retirement.NodeRuntimeRetirement):
         legacy = bool({"container", "dir"} & set(legacy_probe.stdout.split()))
         node_uuid = self.context.remote_id(payload.binding_ref, action.generation)
         node = self.context.panel.get_node(node_uuid) if node_uuid else None
-        warp_ok = True
-        if payload.warp:
-            warp = conn.run("warp-cli --accept-tos status 2>/dev/null", timeout=15)
-            warp_output = managed_command_output(logical_id, warp, "WARP status")
-            warp_ok = warp_output is not None and "Connected" in warp_output
+        warp_ok = warp_connected(logical_id, conn) if payload.warp else True
         exists = compose_content is not None
         connected = node is not None and node.is_connected
         matches = (
@@ -655,12 +651,7 @@ class NodeRuntimeDriver(retirement.NodeRuntimeRetirement):
         payload = _payload(action, NodeRuntimePayload)
         conn = self.context.connection(payload.server_ref)
         if payload.warp:
-            result = InstallWarp().run(
-                conn,
-                ProvisionContext(ip=self.context.address(payload.server_ref)),
-            )
-            if result.status == "failed":
-                raise ResourceReconcileError(f"Could not configure WARP: {result.detail}")
+            ensure_warp(conn, self.context.address(payload.server_ref))
         secret = self.context.node_secrets.get(payload.workload_ref, "")
         if not secret:
             secret = self.context.panel.get_node_secret_key()

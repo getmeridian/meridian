@@ -8,8 +8,10 @@ from meridian.compiler.models import (
     ResourcePlan,
 )
 from meridian.provision.ensure import ensure_file_content
-from meridian.provision.steps import StepResult
-from meridian.reconciler.resources import ResourceAction, UnknownResourceOutcome
+from meridian.provision.steps import ProvisionContext, StepResult
+from meridian.provision.warp import InstallWarp
+from meridian.reconciler.resources import ResourceAction, ResourceReconcileError, UnknownResourceOutcome
+from meridian.reconciler.server_evidence import managed_command_output
 from meridian.ssh import ServerConnection
 
 
@@ -50,3 +52,17 @@ def restore_file(conn: ServerConnection, path: str, previous_content: str | None
         conn.run(f"rm -f {shlex.quote(path)}", timeout=15)
         return
     ensure_file_content(conn, path, previous_content, mode="644", create_parent=True)
+
+
+def warp_connected(logical_id: str, conn: ServerConnection) -> bool:
+    """Whether WARP proxies egress; a missing `warp-cli` is absence, other failures unavailable evidence."""
+    status = conn.run("warp-cli --accept-tos status 2>/dev/null", timeout=15)
+    output = managed_command_output(logical_id, status, "WARP status")
+    return output is not None and "Connected" in output
+
+
+def ensure_warp(conn: ServerConnection, address: str) -> None:
+    """Install and connect WARP in proxy mode (one path for panel nodes and node agents)."""
+    result = InstallWarp().run(conn, ProvisionContext(ip=address))
+    if result.status == "failed":
+        raise ResourceReconcileError(f"Could not configure WARP: {result.detail}")
