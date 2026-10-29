@@ -19,7 +19,7 @@ from meridian.control.client import (
     ControlServiceScopeError,
 )
 from meridian.control.enrollment import token_sha256
-from meridian.control.models import ApplyFenceRecord, RevisionProposal, RevisionResult
+from meridian.control.models import ApplyFenceRecord, ApplyFenceSwap, RevisionProposal, RevisionResult
 from meridian.control.revisions import secret_paths
 from meridian.control.server import ControlServer
 from meridian.control.service import SCHEMA_VERSION, ControlService
@@ -201,6 +201,28 @@ def test_the_fence_swaps_only_from_the_version_read(fleet: Fleet) -> None:
         with pytest.raises(ControlServiceConflict, match="changed since it was read"):
             root.swap_fence(0, ApplyFenceRecord(fleet_id=FLEET_ID, lease_holder="desktop:2"))
         assert root.fence().record == leased.record
+
+
+def test_a_swap_answers_with_what_it_wrote_even_when_another_writer_follows_at_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ledger = ControlService(tmp_path / "control.db", fleet_id=FLEET_ID, version="4.0.0").revisions
+    read = ledger.fence
+    reads: list[int] = []
+
+    def read_then_let_another_writer_in() -> Any:
+        reads.append(1)
+        if len(reads) == 2:  # a read after the first swap committed: the second writer lands first
+            record = ApplyFenceRecord(fleet_id=FLEET_ID, generation=2)
+            ledger.swap_fence(ApplyFenceSwap(expected_version=1, record=record))
+        return read()
+
+    monkeypatch.setattr(ledger, "fence", read_then_let_another_writer_in)
+    mine = ledger.swap_fence(
+        ApplyFenceSwap(expected_version=0, record=ApplyFenceRecord(fleet_id=FLEET_ID, generation=1))
+    )
+
+    assert mine.version == 1 and mine.record is not None and mine.record.generation == 1
 
 
 def test_the_fence_refuses_another_fleet_and_an_unapplied_revision(fleet: Fleet) -> None:

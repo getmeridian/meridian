@@ -200,7 +200,8 @@ class RevisionLedger:
                 " ON CONFLICT(id) DO UPDATE SET version = excluded.version, record = excluded.record",
                 (current.version + 1, record.model_dump_json()),
             )
-        return self.fence()
+            # What this swap wrote: read after the commit, the answer could be the next writer's.
+            return ApplyFenceState(fleet_id=self._fleet_id, version=current.version + 1, record=record)
 
     # -- helpers --------------------------------------------------------------------
 
