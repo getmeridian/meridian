@@ -29,7 +29,10 @@ DocumentFormat = Literal["browser", "mihomo", "stash", "singbox", "xray-json", "
 SUFFIX_FORMATS: dict[str, DocumentFormat] = {
     "info": "browser",
     "json": "xray-json",
+    "v2ray-json": "xray-json",
     "mihomo": "mihomo",
+    "clash": "mihomo",
+    "stash": "stash",
     "singbox": "singbox",
 }
 

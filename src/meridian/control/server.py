@@ -80,6 +80,7 @@ _USERNAME = f"({USERNAME_PATTERN})"
 _TOKEN_ID = r"([0-9a-f]{12})"
 _REVISION = r"([1-9][0-9]{0,15})"
 _SUB_TOKEN = "(" + SUB_TOKEN_PATTERN.removeprefix("^").removesuffix("$") + ")"
+_SUB_SUFFIX = "|".join(re.escape(suffix) for suffix in SUFFIX_FORMATS)
 # Every write that changes what the fleet runs or who may use it needs `admin`: it is
 # part of applying a revision. Revisions themselves take `propose` (record one) and
 # `approve` (approve someone else's; `revisions.py`), and recording a revision's result
@@ -650,7 +651,7 @@ ROUTES: list[Route] = [
     ("POST", re.compile(r"/agent/v1/report"), None, _Handler.agent_report),
     ("POST", re.compile(r"/agent/v1/stats"), None, _Handler.agent_stats),
     ("GET", re.compile(r"/agent/v1/blobs/([0-9a-f]{64})"), None, _Handler.agent_blob),
-    ("GET", re.compile(rf"/sub/{_SUB_TOKEN}(?:/({'|'.join(SUFFIX_FORMATS)}))?"), None, _Handler.subscription),
+    ("GET", re.compile(rf"/sub/{_SUB_TOKEN}(?:/({_SUB_SUFFIX}))?"), None, _Handler.subscription),
 ]
 
 

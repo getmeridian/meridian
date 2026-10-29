@@ -26,6 +26,8 @@ that dials out to it.
   IP limits).
 
 ### Control service
+- Subscription links accept /v2ray-json, /stash, and /clash alongside the
+  existing explicit formats.
 - **Subscription status** — `/sub/<token>/info` returns account status and connection
   links for every client. Responses are not cached and support HEAD.
 - **Privacy settings** — device limits and usage history default to off.
