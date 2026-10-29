@@ -318,7 +318,6 @@ function buildReport(results) {
     'Time: ' + new Date().toISOString(),
     'Page: ' + PAGE_VERSION,
     'Language: ' + lang(),
-    'Browser: ' + navigator.userAgent,
   ];
   for (var i = 0; i < results.length; i++) {
     var r = results[i];

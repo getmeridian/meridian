@@ -75,6 +75,8 @@ that dials out to it.
   the snapshot and the recovery key, restore brings the fleet files back too.
 
 ### Changed
+- Failed copies of connection links or diagnostic reports offer localized
+  feedback and selectable text; diagnostic reports omit browser device data.
 - Connection pages validate configuration and app catalogs before rendering,
   retain embedded apps on malformed catalog data, and keep quotes in copied
   links and app names from becoming HTML attributes.

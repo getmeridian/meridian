@@ -158,5 +158,5 @@ function createBrowser(config, catalog, options = {}) {
   async function advance(ms) { time += ms; for (const [id, timer] of [...timers]) if (timer.at <= time && timers.delete(id)) timer.callback(); await flush(); }
   return { context, document, requests, storage, load, fire, flush, advance, start: async () => { fire('DOMContentLoaded'); await flush(); } };
 }
-function response(body, status = 200) { return { ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body === undefined ? body : JSON.parse(JSON.stringify(body))), text: () => Promise.resolve(String(body)) }; }
+function response(body, status = 200) { return { ok: status >= 200 && status < 300, status, headers: { get: () => null }, json: () => Promise.resolve(body === undefined ? body : JSON.parse(JSON.stringify(body))), text: () => Promise.resolve(String(body)) }; }
 module.exports = { createBrowser, response };

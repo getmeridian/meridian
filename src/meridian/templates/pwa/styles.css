@@ -362,3 +362,16 @@ svg{flex-shrink:0}
 .account-unverified,.import-status{color:var(--amber)}
 [data-import][aria-disabled="true"]{opacity:.45;cursor:not-allowed}
 @media (max-width:479px){.account-metrics{grid-template-columns:1fr;gap:12px}}
+
+/* Visible copy fallback, usable with a keyboard or a long press on a phone. */
+.copy-fallback{
+  position:fixed;inset-inline:12px;bottom:16px;z-index:20;max-width:640px;margin-inline:auto;
+  display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:16px;
+  background:var(--sf);border:1px solid var(--br2);border-radius:var(--r2);box-shadow:var(--shadow);
+  max-height:80vh;overflow:auto;
+}
+.copy-fallback p{font-size:.86rem;line-height:1.5;color:var(--tx2)}
+.copy-fallback textarea{
+  width:100%;padding:10px;resize:vertical;border:1px solid var(--br);border-radius:var(--r);
+  font: .8rem/1.5 ui-monospace,'SF Mono',monospace;color:var(--tx);background:var(--sf2);
+}

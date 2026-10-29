@@ -38,3 +38,4 @@ Server-hosted Progressive Web App and the only connection-page implementation.
 - **Account freshness is separate from reachability** — failed `/info` reads keep the last saved answer unverified; suspended accounts explain and dim import actions, and every `no-store` request bypasses the SW.
 - **Catalog `platform` is an English label** — the shared "All platforms" value renders through `data-t="apps.all"`; any other fixed label needs its own key, never raw text on a translated page.
 - **A locale switch must work without storage** — rendering uses the chosen language in memory; re-detecting it after a failed `localStorage` write reverts the choice.
+- **Clipboard failures need a selectable fallback** — catch missing APIs, throws, and rejected promises for URLs and reports; reports never include a browser fingerprint.

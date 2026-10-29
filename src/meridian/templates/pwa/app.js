@@ -7,6 +7,8 @@
  * ----------------------------------------------------------------------- */
 var T = {
   en: {
+    'copy.error': 'Could not copy automatically. Select the text below and copy it.',
+    'copy.text': 'Text to copy',
     'apps.desktop': 'Desktop',
     'apps.android.desktop': 'Android, desktop',
     'apps.ios.android': 'iOS, Android',
@@ -14,6 +16,8 @@ var T = {
     language: 'Language', close: 'Close', copy: 'Copy', 'qr.code': 'QR code',
   },
   ru: {
+    'copy.error': 'Не удалось скопировать автоматически. Выделите текст ниже и скопируйте его.',
+    'copy.text': 'Текст для копирования',
     'apps.desktop': 'Для компьютера',
     'apps.android.desktop': 'Android и компьютеры',
     'apps.ios.android': 'iOS и Android',
@@ -71,6 +75,8 @@ var T = {
     'open.short': 'Открыть',
   },
   fa: {
+    'copy.error': 'کپی خودکار ممکن نشد. متن زیر را انتخاب و کپی کنید.',
+    'copy.text': 'متن برای کپی',
     'apps.desktop': 'رایانه',
     'apps.android.desktop': 'اندروید و رایانه',
     'apps.ios.android': 'iOS و اندروید',
@@ -128,6 +134,8 @@ var T = {
     'open.short': 'باز کردن',
   },
   zh: {
+    'copy.error': '无法自动复制。请选择下方文本并手动复制。',
+    'copy.text': '待复制文本',
     'apps.desktop': '电脑',
     'apps.android.desktop': 'Android 和电脑',
     'apps.ios.android': 'iOS 和 Android',
@@ -259,11 +267,47 @@ function tryOpenIOS(index) {
 /* -----------------------------------------------------------------------
  * Clipboard + toast
  * ----------------------------------------------------------------------- */
-function copyToClipboard(text) {
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(showToast);
-  }
-  if ('vibrate' in navigator) navigator.vibrate(30);
+function copyToClipboard(value) {
+  function failed() { showCopyFallback(value); return false; }
+  if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') return Promise.resolve(failed());
+  try {
+    return Promise.resolve(navigator.clipboard.writeText(value)).then(function() {
+      var old = document.getElementById('copy-fallback');
+      if (old) old.remove();
+      showToast();
+      try { if (navigator.vibrate) navigator.vibrate(30); } catch (e) {}
+      return true;
+    }, failed);
+  } catch (e) { return Promise.resolve(failed()); }
+}
+
+var copyFallbackFocus = null;
+function showCopyFallback(value) {
+  var old = document.getElementById('copy-fallback');
+  if (old) old.remove();
+  copyFallbackFocus = document.activeElement;
+  var box = document.createElement('section');
+  box.id = 'copy-fallback'; box.className = 'copy-fallback';
+  var message = document.createElement('p');
+  message.setAttribute('role', 'alert'); message.setAttribute('data-t', 'copy.error');
+  message.textContent = text('copy.error'); box.appendChild(message);
+  var field = document.createElement('textarea');
+  field.value = value; field.setAttribute('readonly', ''); field.setAttribute('dir', 'ltr');
+  field.setAttribute('aria-label', text('copy.text')); field.setAttribute('data-t-aria', 'copy.text');
+  field.rows = value.indexOf('\n') !== -1 ? 8 : 3;
+  box.appendChild(field);
+  var close = document.createElement('button');
+  close.className = 'btn btn-ghost btn-sm'; close.setAttribute('data-action', 'dismiss-copy');
+  close.setAttribute('data-t', 'close'); close.textContent = text('close'); box.appendChild(close);
+  document.body.appendChild(box);
+  field.focus(); field.select();
+}
+
+function dismissCopyFallback() {
+  var box = document.getElementById('copy-fallback');
+  if (box) box.remove();
+  if (copyFallbackFocus && document.documentElement.contains(copyFallbackFocus)) copyFallbackFocus.focus();
+  copyFallbackFocus = null;
 }
 
 function showToast() {
@@ -990,6 +1034,8 @@ document.addEventListener('click', function(e) {
   if (action === 'copy') {
     var url = target.getAttribute('data-url');
     if (url) copyToClipboard(url);
+  } else if (action === 'dismiss-copy') {
+    dismissCopyFallback();
   } else if (action === 'toggle-qr') {
     toggleQr(target);
   } else if (action === 'share-page') {

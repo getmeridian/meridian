@@ -306,3 +306,56 @@ def test_legacy_catalog_platform_labels_remain_usable(page_data: dict[str, objec
         """,
         page_data,
     )
+
+
+@pytest.mark.parametrize("mode", ["missing", "rejected", "throws", "no_method"])
+def test_copy_failure_shows_localized_selectable_text(page_data: dict[str, object], mode: str) -> None:
+    page_data["mode"] = mode
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog, { storage: { 'meridian-lang': 'ru' }, info: data.info });
+        if (data.mode === 'rejected') browser.context.navigator.clipboard = { writeText: () => Promise.reject(new Error('denied')) };
+        if (data.mode === 'throws') browser.context.navigator.clipboard = { writeText() { throw new Error('denied'); } };
+        if (data.mode === 'no_method') browser.context.navigator.clipboard = {};
+        await browser.start();
+        browser.context.copyToClipboard(data.config.subscription_url); await browser.flush();
+        const fallback = browser.document.getElementById('copy-fallback');
+        assert.ok(fallback, 'copy failure must offer selectable text');
+        assert.match(fallback.textContent, /Не удалось скопировать/);
+        const field = fallback.querySelector('textarea');
+        assert.equal(field.value, data.config.subscription_url);
+        assert.ok(field.hasAttribute('readonly')); assert.ok(field.selected);
+        assert.ok(!browser.document.getElementById('toast').classList.contains('show'));
+        """,
+        page_data,
+    )
+
+
+def test_diagnostic_report_omits_device_data(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog);
+        browser.load('selfcheck.js', ['buildReport']);
+        const report = browser.context.page.buildReport([]);
+        assert.ok(!report.includes('Browser:'), 'diagnostics must not retain device data');
+        assert.ok(!report.includes(browser.context.navigator.userAgent));
+        """,
+        page_data,
+    )
+
+
+def test_diagnostic_copy_failure_uses_the_same_selectable_fallback(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog, { info: data.info }); await browser.start();
+        browser.fire('click', browser.document.querySelector('[data-action="selfcheck-run"]')); await browser.flush();
+        const copy = browser.document.querySelector('[data-action="selfcheck-copy"]');
+        assert.ok(copy, 'the completed self-check must offer a report');
+        browser.fire('click', copy); await browser.flush();
+        const field = browser.document.getElementById('copy-fallback');
+        assert.ok(field, 'report copy failure must offer selectable text');
+        assert.match(field.querySelector('textarea').value, /^Meridian connection self-check/);
+        assert.ok(!field.querySelector('textarea').value.includes('198.51.100.1'));
+        """,
+        page_data,
+    )
