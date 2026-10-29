@@ -29,6 +29,7 @@ from meridian.core.errors import ProvisioningError
 from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
 from meridian.host_runtime import CONTROL_SERVICE_STATE_DIR
+from meridian.node_deploy import panel_base_url
 from meridian.provision.ensure import ensure_file_content
 from meridian.reconciler.meridian_drivers import MeridianDriverContext, build_meridian_drivers
 from meridian.reconciler.resources import ResourceAction, ResourceDrivers, ResourceReconcileError
@@ -82,7 +83,7 @@ def bootstrap_control_service(
     reporter: Reporter | None = None,
     operation: OperationContext | None = None,
 ) -> None:
-    """Install nginx, the IP certificate, and the control service; save how to reach it."""
+    """Install nginx, the IP (or control-domain) certificate, and the control service; save how to reach it."""
     from meridian.provision import ProvisionContext, Provisioner, build_setup_steps
     from meridian.provision.control_service import ControlServiceInstall
 
@@ -99,7 +100,8 @@ def bootstrap_control_service(
     cluster.panel.secret_path = cluster.panel.secret_path or secrets.token_hex(12)
     cluster.panel.sub_path = cluster.panel.sub_path or secrets.token_hex(8)
     cluster.panel.api_token = cluster.panel.api_token or secrets.token_urlsafe(32)
-    cluster.panel.url = f"https://{entry.host}/{cluster.panel.secret_path}"
+    # Like the panel, the service answers on its domain once it has one; agents and links follow it.
+    cluster.panel.url = _service_url(entry, payload, cluster.panel.secret_path)
     cluster.save()
 
     ctx = ProvisionContext(
@@ -155,6 +157,9 @@ def control_service_ready(
         raise ResourceReconcileError(f"Control service observer received {payload.kind}.")
     if not cluster.panel.api_token or cluster.panel.server_ip != entry.host:
         return False
+    if cluster.panel.url != _service_url(entry, payload, cluster.panel.secret_path):
+        # A saved URL on the old name would hand agents and links a certificate that no longer matches.
+        return False
     attestation = connection.run(f"cat {_ATTESTATION_PATH} 2>/dev/null", timeout=15).stdout.strip()
     if attestation != _attestation(payload, plan):
         return False
@@ -191,6 +196,10 @@ class _Document:
     def __init__(self, url: str, content: str) -> None:
         self.url = url
         self.content = content
+
+
+def _service_url(entry: ServerEntry, payload: ControlServicePayload, secret_path: str) -> str:
+    return panel_base_url(entry.host, payload.public_hostname, secret_path).rstrip("/")
 
 
 def _attestation(payload: ControlServicePayload, plan: ResourcePlan) -> str:

@@ -44,8 +44,8 @@ SERVICE_SETTINGS_ID = "settings:service"
 def validate_meridian_backend(intent: SetupIntent) -> None:
     """Refuse what the control service cannot run yet.
 
-    Exits (bare-IP or domain, WSS, self-steal, direct/block egress overrides) and Realm
-    relays run; their nginx, certificates, and firewall rules are the shared server kinds.
+    Exits (bare-IP or domain, WSS, self-steal, direct/block egress overrides), Realm relays,
+    and a control domain run; their nginx, certificates, and firewall rules are shared server kinds.
     """
     unsupported = [
         name
@@ -53,7 +53,6 @@ def validate_meridian_backend(intent: SetupIntent) -> None:
             ("routing gateways", bool(intent.routing_gateways)),
             ("egress pools", bool(intent.egress_pools)),
             ("routes", bool(intent.routes)),
-            ("a control-plane domain", bool(intent.control.public_hostname)),
             ("client IP forwarding", intent.forward_client_ips),
             ("WARP", any(exit_.needs_warp for exit_ in intent.exits)),
         )

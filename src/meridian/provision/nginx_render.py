@@ -186,17 +186,21 @@ def render_nginx_http_config(
     nginx stream does SNI routing without TLS termination.
     nginx http handles TLS with certificates issued by acme.sh.
     """
-    wss_block = textwrap.dedent(f"""\
+    # The control service's bootstrap has no WSS listener; an empty path would render a
+    # second `location /` (and port 0), which fails `nginx -t`. Compiled artifacts own WSS.
+    wss_block = ""
+    if ws_path and wss_internal_port > 0:
+        wss_block = textwrap.dedent(f"""\
 
-        # --- VLESS+WSS Fallback (Cloudflare CDN path) ---
-        location /{ws_path} {{
-            proxy_pass http://127.0.0.1:{wss_internal_port};
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection $connection_upgrade;
-            proxy_read_timeout 360s;
-        }}
-    """).rstrip()
+            # --- VLESS+WSS Fallback (Cloudflare CDN path) ---
+            location /{ws_path} {{
+                proxy_pass http://127.0.0.1:{wss_internal_port};
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+                proxy_read_timeout 360s;
+            }}
+        """).rstrip()
 
     xhttp_block = ""
     xhttp_upstream = ""
