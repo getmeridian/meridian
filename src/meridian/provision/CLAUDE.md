@@ -41,4 +41,5 @@
 - **fail2ban reads sshd from the journal** — Debian 12 has no `auth.log`; `ConfigureFail2ban` writes `jail.d/sshd-journal.local` (needs `python3-systemd`) and re-checks the service after a pause.
 - **"Installed" means `install ok installed`** — `ServerFacts.installed_packages()` reads `${Status}`; `dpkg-query -W` also lists removed packages.
 - **Ubuntu and Debian both** — use `bind9-dnsutils` (Debian 13's `dnsutils` is virtual) and read the codename from `ServerFacts.os_release()`, not `lsb_release`.
+- **An unread install record stops the control-service install** — only an absent marker means a fresh server; read as empty, a lost reply let `uv tool install --force` downgrade a newer service.
 - **Generated file content stays off shell commands** — use `conn.put_text()`/`put_bytes()` with mode/owner/sensitive flags, not heredocs or `printf`.

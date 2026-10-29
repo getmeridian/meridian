@@ -139,3 +139,16 @@ def test_an_install_never_downgrades_a_newer_service(marker: str, refused: bool)
         conn.assert_not_called_with_pattern("tool install")
     else:
         conn.assert_called_with_pattern("tool install --force")
+
+
+@pytest.mark.parametrize("rc", [124, 255, 1], ids=["timed-out", "connection-lost", "unreadable"])
+def test_an_unread_install_record_never_forces_an_install(rc: int) -> None:
+    """It may name a newer service, which `uv tool install --force` would downgrade."""
+    conn = MockConnection()
+    conn.when("bin/uv --version", stdout=f"uv {UV_VERSION}\n")
+    conn.when(f"cat {INSTALLED_MARKER}", rc=rc, stderr="cat: Permission denied" if rc == 1 else "")
+
+    result = _install().run(conn, _ctx())
+
+    assert result.status == "failed" and "could not read which service package" in result.detail
+    conn.assert_not_called_with_pattern("tool install")

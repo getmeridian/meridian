@@ -129,7 +129,12 @@ class InstallControlService:
 
     def _package(self, conn: ServerConnection) -> str:
         package = self.install.package
-        marker = conn.run(f"cat {INSTALLED_MARKER} 2>/dev/null", timeout=15).stdout.strip()
+        read = conn.run(f"if [ -e {INSTALLED_MARKER} ]; then cat {INSTALLED_MARKER}; fi", timeout=15)
+        if read.returncode != 0:
+            # Unread, it could hide a newer service that `--force` would downgrade.
+            detail = (read.stderr or read.stdout).strip()[:200] or f"exit {read.returncode}"
+            return f"could not read which service package is installed: {detail}"
+        marker = read.stdout.strip()
         if marker == package.identity and conn.run(f"test -x {SERVICE_BINARY}", timeout=15).returncode == 0:
             return ""
         installed = package_version(marker)
