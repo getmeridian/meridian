@@ -143,7 +143,10 @@
       var keys = Object.keys(value);
       if (!keys.length) out[prefix || "·"] = Array.isArray(value) ? "[]" : "{}";
       keys.forEach(function (key) {
-        var next = Array.isArray(value) ? prefix + "[" + key + "]" : (prefix ? prefix + "." : "") + key;
+        // A key that is not a plain name is quoted, so {"a.b": 1} and {"a": {"b": 1}} never share a path.
+        var next = Array.isArray(value) ? prefix + "[" + key + "]"
+          : /^[A-Za-z_][A-Za-z0-9_-]*$/.test(key) ? (prefix ? prefix + "." : "") + key
+          : prefix + "[" + JSON.stringify(key) + "]";
         flatten(value[key], next, out);
       });
     } else {
