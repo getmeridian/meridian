@@ -58,6 +58,15 @@ def download_https(url: str, destination: BinaryIO, limit: int) -> None:
             destination.write(chunk)
 
 
+def served_hashes(spec: NodeSpec) -> set[str]:
+    """Every artifact `spec` lets its agents fetch from the service, mirrored or seeded."""
+    return {
+        resource.sha256
+        for resource in spec.resources
+        if isinstance(resource, BinaryPinResource) and SERVICE_SOURCE in resource.sources
+    }
+
+
 def spec_artifacts(spec: NodeSpec) -> list[Artifact]:
     """The artifacts of `spec` its agents may fetch from the service."""
     found: dict[str, Artifact] = {}

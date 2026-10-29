@@ -14,7 +14,7 @@ from typing import Any, BinaryIO
 
 import pytest
 
-from meridian.control.blobs import RETRY_SECONDS, Artifact, BlobStore, spec_artifacts
+from meridian.control.blobs import RETRY_SECONDS, Artifact, BlobStore, served_hashes, spec_artifacts
 from meridian.control.enrollment import token_sha256
 from meridian.control.models import NodeSpec
 from meridian.control.server import ControlServer
@@ -70,6 +70,12 @@ def _store(root: Path, upstream: Upstream, clock: Callable[[], float] = time.mon
 def test_only_pins_offering_the_service_source_are_mirrored_once_per_hash() -> None:
     assert spec_artifacts(_spec([URL])) == []
     assert spec_artifacts(_spec([URL, "service"])) == [Artifact(SHA, len(ARCHIVE), (URL,))]
+
+
+def test_a_seeded_service_only_pin_is_served_though_nothing_mirrors_it() -> None:
+    spec = _spec(["service"])
+
+    assert spec_artifacts(spec) == [] and served_hashes(spec) == {SHA}
 
 
 def test_a_wanted_artifact_is_verified_and_stored_under_its_hash(tmp_path: Path) -> None:

@@ -28,7 +28,7 @@ from pydantic import BaseModel, ValidationError
 
 from meridian import __version__
 from meridian.control import ui_routes
-from meridian.control.blobs import BlobStore, spec_artifacts
+from meridian.control.blobs import BlobStore, served_hashes, spec_artifacts
 from meridian.control.enrollment import Session, token_sha256
 from meridian.control.errors import ServiceError, agent_error
 from meridian.control.login_limits import LockedOut
@@ -503,7 +503,7 @@ class _Handler(BaseHTTPRequestHandler):
         blobs = self.server.blobs
         # Only an artifact of the session's own node: another node's pins are none of its business.
         spec = service.node_spec(session.node_id)
-        if blobs is None or spec is None or all(item.sha256 != match[1] for item in spec_artifacts(spec)):
+        if blobs is None or spec is None or match[1] not in served_hashes(spec):
             raise ServiceError("not_found", "Unknown blob.", 404)
         path = blobs.path(match[1])
         if path is None:
