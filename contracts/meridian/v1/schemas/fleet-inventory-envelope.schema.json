@@ -192,6 +192,7 @@
         "panel_status": {
           "enum": [
             "connected",
+            "failed",
             "disconnected",
             "disabled",
             "unknown"

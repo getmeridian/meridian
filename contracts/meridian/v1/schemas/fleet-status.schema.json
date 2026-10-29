@@ -78,6 +78,7 @@
         "status": {
           "enum": [
             "connected",
+            "failed",
             "disconnected",
             "disabled",
             "unknown"
@@ -193,6 +194,11 @@
         },
         "disconnected_nodes": {
           "title": "Disconnected Nodes",
+          "type": "integer"
+        },
+        "failed_nodes": {
+          "default": 0,
+          "title": "Failed Nodes",
           "type": "integer"
         },
         "health": {

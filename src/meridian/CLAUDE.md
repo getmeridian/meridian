@@ -24,6 +24,7 @@
 ## Pitfalls
 - **A handed-over fence.json is never a fallback** — once the service keeps the fence, an unreachable service is retried and refused; falling back to the file would let a stale copy apply around it.
 - **Server ownership compares canonical addresses and fails closed** — `refuse_servers_claimed_elsewhere()` matches `canonical_endpoint_address()` forms (`2001:db8::1` and its long spelling once passed as two machines), a context it cannot read refuses instead of being skipped, and active bindings claim their servers until retirement or forgetting (an intent edit alone once freed a server whose cleanup was still to run).
+- **A live agent that could not apply is a failed node** — `ServiceFleetPanel` sets `Node.apply_failed` from the report's `failed`, and `fleet status` degrades (exit 4); reading only `is_live()` once called it connected and healthy.
 - **Local state is fail-closed** — only missing `cluster.yml`/`servers.json` means fresh; malformed files need recovery, and `srv-*` IDs survive connection edits.
 - **Never hard-code the home in messages** — print `config.HOME_DISPLAY`; a literal `~/.meridian` sent 4.x users into 3.x's directory.
 - **Read paths as `config.NAME` at call time** — a module-level `from meridian.config import CLUSTER_CONFIG` keeps the fleet chosen at import and ignores `--context` (architecture-tested).

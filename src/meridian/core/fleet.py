@@ -13,7 +13,7 @@ from meridian.core.topology import ProtocolKind
 NodeRole = Literal["exit", "routing_gateway"]
 ServerRole = Literal["panel", "exit", "relay", "routing_gateway"]
 InventoryRole = Literal["panel+node", "node", "relay", "panel+routing_gateway", "routing_gateway"]
-NodeStatus = Literal["connected", "disconnected", "disabled", "unknown"]
+NodeStatus = Literal["connected", "failed", "disconnected", "disabled", "unknown"]
 RelayHealth = Literal["healthy", "unhealthy", "unknown"]
 SourceAvailability = Literal["available", "unavailable", "not_requested", "unknown"]
 FleetHealth = Literal["healthy", "degraded", "unknown"]
@@ -263,6 +263,7 @@ class FleetStatusSummary(CoreModel):
     nonactive_access_users: int
     connected_nodes: int
     disconnected_nodes: int
+    failed_nodes: int = 0
     disabled_nodes: int
     unknown_nodes: int
     unhealthy_relays: int
@@ -306,7 +307,8 @@ def node_api_status(api_node: ApiNodeLike | None) -> NodeStatus:
     if disabled is True:
         return "disabled"
     if connected is True:
-        return "connected"
+        # A control-service agent that polls but could not apply its document is no healthy node.
+        return "failed" if getattr(api_node, "apply_failed", False) is True else "connected"
     if connected is False or disabled is False:
         return "disconnected"
     return "unknown"
@@ -476,6 +478,7 @@ def build_fleet_status(
     disabled_users = sum(1 for status in user_statuses if status.upper() == "DISABLED")
     other_users = len(user_statuses) - active_users - disabled_users
     disconnected_nodes = sum(1 for node in nodes if node.status == "disconnected")
+    failed_nodes = sum(1 for node in nodes if node.status == "failed")
     disabled_nodes = sum(1 for node in nodes if node.status == "disabled")
     unknown_nodes = sum(1 for node in nodes if node.status == "unknown")
     unhealthy_relays = sum(1 for relay in relays if relay.health == "unhealthy")
@@ -488,7 +491,7 @@ def build_fleet_status(
     )
     # Disabled, limited, or expired clients are operator or panel decisions, not faults.
     health: FleetHealth
-    if disconnected_nodes > 0 or disabled_nodes > 0 or unhealthy_relays > 0 or missing_access_users > 0:
+    if disconnected_nodes or failed_nodes or disabled_nodes or unhealthy_relays or missing_access_users:
         health = "degraded"
     elif (
         not panel_healthy
@@ -514,6 +517,7 @@ def build_fleet_status(
         nonactive_access_users=nonactive_access_users,
         connected_nodes=sum(1 for node in nodes if node.status == "connected"),
         disconnected_nodes=disconnected_nodes,
+        failed_nodes=failed_nodes,
         disabled_nodes=disabled_nodes,
         unknown_nodes=unknown_nodes,
         unhealthy_relays=unhealthy_relays,

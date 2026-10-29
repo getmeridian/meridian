@@ -142,7 +142,10 @@ class ServiceFleetPanel(ServiceAccessPanel):
         for node_id in self._node_ids:
             status = _translated(partial(self._client.node, node_id))
             if status is not None:
-                nodes.append(Node(uuid=node_id, name=node_id, is_connected=status.is_live()))
+                live = status.is_live()
+                nodes.append(
+                    Node(uuid=node_id, name=node_id, is_connected=live, apply_failed=live and bool(status.failed))
+                )
         return nodes
 
     def list_hosts(self) -> list[Host]:

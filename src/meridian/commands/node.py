@@ -257,6 +257,8 @@ def _run_list(*, operation: OperationContext) -> None:
         if api_node:
             if api_node.is_disabled:
                 status_text = "[dim]disabled[/dim]"
+            elif api_node.is_connected and api_node.apply_failed:
+                status_text = "[red]failed[/red]"
             elif api_node.is_connected:
                 status_text = "[green]connected[/green]"
             else:

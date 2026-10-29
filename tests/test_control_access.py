@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -18,7 +19,7 @@ from meridian.control.client import (
     ControlServiceUncertain,
     add_mutation_listener,
 )
-from meridian.control.models import ClientEndpoint, NodeSpec
+from meridian.control.models import ClientEndpoint, NodeSpec, NodeStatus
 from meridian.control_access import ServiceAccessPanel, ServiceFleetPanel, access_panel, fleet_panel
 from meridian.remnawave import (
     XRAY_JSON_CLIENT_TYPE,
@@ -154,6 +155,28 @@ def test_fleet_panel_lists_only_registered_nodes_and_published_relays(url: str) 
     # Registered but never polled: listed, and not connected.
     assert [(node.uuid, node.is_connected) for node in nodes] == [("main", False)]
     assert [(host.uuid, host.is_disabled) for host in hosts] == [("relay-1:main-reality", False)]
+
+
+def test_fleet_panel_marks_a_live_agent_whose_apply_failed(monkeypatch: pytest.MonkeyPatch) -> None:
+    status = NodeStatus.model_validate(
+        {
+            "node_id": "main",
+            "fleet_epoch": 1,
+            "revision": 2,
+            "sha256": None,
+            "spec_sha256": None,
+            "applied": None,
+            "last_seen_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "agent_version": None,
+            "failed": ["unit:netcore"],
+        }
+    )
+    monkeypatch.setattr(ControlClient, "node", lambda _self, _node_id: status)
+
+    with ServiceFleetPanel("https://198.51.100.12/p/", ADMIN_TOKEN, node_ids=["main"], endpoint_ids=[]) as panel:
+        (node,) = panel.list_nodes()
+
+    assert (node.is_connected, node.apply_failed) == (True, True)
 
 
 def test_fleet_projection_names_service_nodes_and_relays_by_their_service_ids(servers_file: Path) -> None:

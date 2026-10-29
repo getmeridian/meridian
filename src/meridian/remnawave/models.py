@@ -86,6 +86,8 @@ class Node:
     port: int = 0
     is_connected: bool = False
     is_disabled: bool = False
+    # Set only by the control service: the agent reports but its last apply failed.
+    apply_failed: bool = False
     xray_version: str = ""
     traffic_used: int = 0
     country_code: str = ""

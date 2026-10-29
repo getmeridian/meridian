@@ -45,6 +45,7 @@ class ApiNode:
     is_disabled: bool = False
     xray_version: str = "25.12.1"
     traffic_used: int = 1024
+    apply_failed: bool = False
 
 
 @dataclass
@@ -428,6 +429,21 @@ def test_v4_missing_access_user_degrades_fleet_but_disabled_one_does_not(
     assert status.summary.missing_access_users == missing
     assert status.summary.nonactive_access_users == nonactive
     assert status.summary.health == health
+
+
+def test_an_agent_that_reports_but_could_not_apply_degrades_the_fleet() -> None:
+    topology = _topology(nodes=[_node("198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True)])
+
+    status = build_fleet_status(
+        topology,
+        panel_healthy=True,
+        api_nodes=[ApiNode(uuid="node-a", is_connected=True, apply_failed=True)],
+        api_users=[],
+        sources=FleetSources(panel="available", nodes="available", users="available", relays="not_requested"),
+    )
+
+    assert status.nodes[0].status == "failed"
+    assert (status.summary.health, status.summary.failed_nodes, status.summary.connected_nodes) == ("degraded", 1, 0)
 
 
 def test_status_marks_health_unknown_when_required_node_source_unavailable() -> None:

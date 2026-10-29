@@ -201,6 +201,8 @@ def _render_status(status: FleetStatus) -> None:
                 err_console.print(f"    {escape(node.ip)}  {label}{role}  [dim]disabled[/dim]")
             elif node.status == "disconnected":
                 err_console.print(f"    {escape(node.ip)}  {label}{role}  [red]DISCONNECTED[/red]")
+            elif node.status == "failed":
+                err_console.print(f"    {escape(node.ip)}  {label}{role}  [red]FAILED[/red] [dim]meridian check[/dim]")
             else:
                 err_console.print(f"    {escape(node.ip)}  {label}{role}  [dim]unknown[/dim]")
 
@@ -295,6 +297,7 @@ def _run_status(*, operation: OperationContext) -> int:
                         "unknown_relays": status.summary.unknown_relays,
                         "unknown_relay_hops": status.summary.unknown_relay_hops,
                         "disconnected_nodes": status.summary.disconnected_nodes,
+                        "failed_nodes": status.summary.failed_nodes,
                         "disabled_nodes": status.summary.disabled_nodes,
                         "unknown_nodes": status.summary.unknown_nodes,
                     },
