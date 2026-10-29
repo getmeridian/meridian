@@ -30,7 +30,7 @@
 - **Review keeps a control-service fleet on its backend** — the wizard re-asks roles without `backend` and intent files omit the default, so `review` takes it from the committed intent; otherwise re-running `setup` compiled a Remnawave plan for a service fleet.
 - **The control-service bootstrap needs an agent build first** — `require_agent_build()` refuses before provisioning (wheels ship no agent yet); found at the first agent install, it left a running service with no nodes.
 - Never add credential-shaped fields to `SetupDraft`.
-- **The fleet document never sets what it hides** — `fleet_document.py` writes server names for `srv-*` IDs and drops transport paths (shared tokens masked as secrets); import refuses a `path:` key and carries the saved path by exit and protocol.
+- **The fleet document never sets what it hides** — `fleet_document.py` writes server names for `srv-*` IDs and drops transport paths (shared tokens masked as secrets); import refuses a `path:` key and carries the saved path by exit and protocol. Anything read from the file before validation guards its own shape (`exits: 42` once crashed import with a TypeError and no JSON envelope).
 - Preserve relay `listen_port` and exit `egress_overrides` in both `SetupDraft.from_intent()` and `to_intent()` (and when the wizard re-asks roles); otherwise review silently drops them.
 - Do not skip stages; presentation adapters must call `SetupDraftService`.
 - Keep remote action checkpoints in typed cluster state, not `setup.json`.

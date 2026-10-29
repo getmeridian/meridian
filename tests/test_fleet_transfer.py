@@ -448,8 +448,20 @@ def test_import_refuses_edits_that_need_their_own_command(
         (lambda d: d.update(schema="meridian.fleet/v9"), "Unsupported fleet file schema"),
         (lambda d: d.update(colour="blue"), "does not describe a valid fleet"),
         (lambda d: d["access"].update(users=[]), "does not describe a valid fleet"),
+        (lambda d: d.update(exits=42), "does not describe a valid fleet"),
+        (lambda d: d["exits"][0].update(paths=42), "does not describe a valid fleet"),
+        (lambda d: d["exits"][0]["paths"][1].update(protocol=["xhttp"]), "does not describe a valid fleet"),
     ],
-    ids=["unknown-server", "transport-path", "schema", "unknown-field", "no-clients"],
+    ids=[
+        "unknown-server",
+        "transport-path",
+        "schema",
+        "unknown-field",
+        "no-clients",
+        "exits-not-a-list",
+        "paths-not-a-list",
+        "protocol-not-a-string",
+    ],
 )
 def test_document_refusals(registry: ServerRegistry, edit: Any, message: str) -> None:
     with pytest.raises(CoreInputError, match=message) as exc_info:

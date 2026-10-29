@@ -117,12 +117,16 @@ def intent_from_document(document: dict[str, Any], current: SetupIntent, registr
 def _carry_transport_paths(data: dict[str, Any], current: SetupIntent) -> None:
     """Give each XHTTP/WSS path its saved transport path (same exit, same protocol), else a new token."""
     exits: dict[str, ExitIntent] = {exit_.id: exit_ for exit_ in current.exits}
-    for exit_ in data.get("exits") or []:
+    # Any shape the file may hold: what is not a list, mapping, or string is left for validation to report.
+    listed = data.get("exits")
+    for exit_ in listed if isinstance(listed, list) else []:
         if not isinstance(exit_, dict):
             continue
         saved = exits.get(str(exit_.get("id", "")))
-        for path in exit_.get("paths") or []:
-            if not isinstance(path, dict) or path.get("protocol") not in _TOKEN_PATH_PROTOCOLS:
+        paths = exit_.get("paths")
+        for path in paths if isinstance(paths, list) else []:
+            protocol = path.get("protocol") if isinstance(path, dict) else None
+            if not isinstance(protocol, str) or protocol not in _TOKEN_PATH_PROTOCOLS:
                 continue
             previous = next(
                 (item for item in (saved.paths if saved else []) if item.protocol == path["protocol"]),
