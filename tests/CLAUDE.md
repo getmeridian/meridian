@@ -16,6 +16,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 | **System lab** | Real multi-node deploy via Docker: panel+node, relay, connection tests | `tests/systemlab/` |
 
 **Integration-level verification** — tests pin contracts (API returns X → we handle Y), not one test per function.
+**PWA behavior** — pytest runs plain JavaScript scenarios in Node against a small DOM/fetch/storage boundary, with no npm packages; browser layout is verified separately.
 **Xray routing runtime** — `MERIDIAN_TEST_XRAY=/path/to/xray uv run pytest tests/test_client_routes_runtime.py` runs real TCP/UDP packets against loopback outbounds. CI supplies the checksum-verified pinned binary on Python 3.12; ordinary local tests skip it unless opted in. The session `xray_binary` fixture (`conftest.py`) also runs `run -test` on composed agent configs (`test_meridian_drivers.py`). `MERIDIAN_TEST_MIHOMO` (+ `MERIDIAN_TEST_MIHOMO_GEODATA`) and `MERIDIAN_TEST_SINGBOX` likewise run `mihomo -t`/`sing-box check` on the control service's documents (`test_control_subscription_formats.py`).
 **MockConnection** — `conn.when("pattern", stdout=..., rc=0)` stubs SSH commands by substring; first match wins, unmatched commands succeed, so register only what differs.
 **`tmp_home`** isolates a pinned Meridian home (`MERIDIAN_HOME`) per test; **`servers_file`** is an isolated server-profile store; `test_contexts.py`'s `install` fixture unpins it to exercise contexts.
