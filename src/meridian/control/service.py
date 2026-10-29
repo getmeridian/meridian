@@ -50,13 +50,13 @@ from meridian.control.store import Store
 from meridian.control.subscriptions import SubscriptionResponse, render_subscription, unknown_subscription
 from meridian.control.times import utc_now
 from meridian.control.tokens import API_TOKENS_TABLE, TokenRegistry
-from meridian.control.traffic import TrafficLedger
+from meridian.control.traffic import PER_EPOCH_BASELINES, TrafficLedger
 from meridian.core.agent_desired import DesiredNodeState
 from meridian.core.agent_protocol import ObservedStateReport, PollRequest
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 MAX_WAIT_SECONDS = 55
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -107,6 +107,7 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE),
     # 7 -> 8: the web UI's owner, sessions, and setup links (`owner.py`).
     UI_TABLES,
+    PER_EPOCH_BASELINES,
 )
 # meta key prefix: the last revision a deleted node was signed at.
 _RETIRED_REVISION = "retired_revision:"

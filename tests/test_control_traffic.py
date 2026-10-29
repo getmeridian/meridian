@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import pytest
 
 from meridian.control.errors import ServiceError
 from meridian.control.service import ControlService
+from meridian.control.traffic import KEPT_EPOCHS
 from meridian.core.agent_protocol import StatsReport
 from tests.support.agent_node import FLEET_ID
 
@@ -55,13 +57,63 @@ def test_a_user_missing_from_a_report_keeps_its_total(service: ControlService) -
     assert _totals(service) == {"alice": (30, 40), "bob": (1, 2)}
 
 
-def test_a_new_counter_epoch_starts_from_zero_and_the_old_one_never_counts_again(service: ControlService) -> None:
+def test_a_new_counter_epoch_starts_from_zero_and_a_late_report_of_the_old_one_counts_only_its_growth(
+    service: ControlService,
+) -> None:
     service.traffic.record("main", _report(service, EPOCH_A, 5, alice=(100, 100)))
     service.traffic.record("main", _report(service, EPOCH_B, 1, alice=(10, 20)))
     late = service.traffic.record("main", _report(service, EPOCH_A, 6, alice=(500, 500)))
+    service.traffic.record("main", _report(service, EPOCH_B, 2, alice=(30, 40)))
 
     assert (late.counter_epoch, late.acked_seq) == (EPOCH_A, 6)
-    assert _totals(service)["alice"] == (110, 120)
+    assert _totals(service)["alice"] == (530, 540)
+
+
+def test_a_delayed_report_from_an_unseen_epoch_never_retires_the_live_one(service: ControlService) -> None:
+    service.traffic.record("main", _report(service, EPOCH_B, 1, alice=(10, 0)))
+    service.traffic.record("main", _report(service, EPOCH_A, 9, alice=(100, 0)))
+    service.traffic.record("main", _report(service, EPOCH_B, 2, alice=(1010, 0)))
+    service.traffic.record("main", _report(service, EPOCH_B, 3, alice=(2010, 0)))
+
+    assert _totals(service)["alice"] == (2110, 0)
+    assert service.traffic.node_totals() == {"main": 2010}
+
+
+def test_only_the_most_recent_epochs_keep_baselines_and_older_ones_never_count_again(
+    service: ControlService,
+) -> None:
+    epochs = [f"{index}c1d8a52-6c1d-4e8b-9a7f-2b5d4c3e1f00" for index in range(KEPT_EPOCHS + 1)]
+    for epoch in epochs:
+        service.traffic.record("main", _report(service, epoch, 1, alice=(1, 0)))
+
+    replay = service.traffic.record("main", _report(service, epochs[0], 2, alice=(500, 0)))
+
+    assert replay.acked_seq == 2
+    assert _totals(service)["alice"] == (KEPT_EPOCHS + 1, 0)
+
+
+def test_a_version_eight_database_keeps_each_nodes_live_baselines(tmp_path: Path) -> None:
+    path = tmp_path / "control.db"
+    service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
+    alice = service.put_user("alice").user_id
+    db = sqlite3.connect(path)
+    db.executescript(
+        "DROP TABLE traffic_reports; DROP TABLE traffic_counters;"
+        "CREATE TABLE traffic_reports (node_id TEXT PRIMARY KEY, counter_epoch TEXT NOT NULL, seq INTEGER NOT NULL);"
+        "CREATE TABLE traffic_counters (node_id TEXT NOT NULL, user_id TEXT NOT NULL, uplink_bytes INTEGER NOT NULL,"
+        " downlink_bytes INTEGER NOT NULL, PRIMARY KEY (node_id, user_id));"
+        f"INSERT INTO traffic_reports VALUES ('main', '{EPOCH_A}', 4);"
+        f"INSERT INTO traffic_counters VALUES ('main', '{alice}', 100, 200);"
+        f"INSERT INTO traffic_totals VALUES ('{alice}', 100, 200, NULL);"
+        "UPDATE meta SET value = '8' WHERE key = 'schema_version';"
+    )
+    db.close()
+
+    service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
+    assert service.traffic.record("main", _report(service, EPOCH_A, 4, alice=(100, 200))).acked_seq == 4
+    service.traffic.record("main", _report(service, EPOCH_A, 5, alice=(150, 260)))
+
+    assert _totals(service)["alice"] == (150, 260)
 
 
 def test_a_counter_that_goes_down_is_refused_without_counting_anything(service: ControlService) -> None:
