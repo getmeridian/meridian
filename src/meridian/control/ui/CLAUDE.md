@@ -22,4 +22,5 @@
 - An owner session is admin for what the console does; re-check the password (and code) before anything that hands out a credential (`OWNER_STEP_UP`), refuse it outright on CLI-only routes (`server.MACHINE_ONLY`: enrollment, user import, every backup route; a borrowed browser once could seal a snapshot to its own key), and keep the `ui_*` tables out of snapshots.
 - The fleet title is intent-owned today: `ServiceSettingsDriver` puts the deployer's back on the next apply, which the Settings screen says.
 - An unconfigured service shows its notice before a setup link's form, and `check_setup_link` refuses too; the form once took a password only for setup to answer `ui_unconfigured`.
+- `M.busy` ignores a `cancelled` step-up — closing the password check once showed a generic error.
 - Keep each script under 800 lines and every `M.t("…")` key in `en.json`; the asset tests read literal keys only.

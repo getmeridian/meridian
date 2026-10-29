@@ -252,6 +252,7 @@
     buttons.forEach(function (b) { b.disabled = true; });
     if (error) error.textContent = "";
     return Promise.resolve().then(work).catch(function (e) {
+      if (e && e.code === "cancelled") throw e; // the owner closed the password check: nothing failed
       if (error) error.textContent = M.errorText(e);
       else M.toast(M.errorText(e), "error");
       throw e;
