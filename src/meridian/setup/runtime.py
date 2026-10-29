@@ -460,7 +460,6 @@ class SetupRuntime:
                 persist=persist,
                 connections=connections,
                 addresses=addresses,
-                control_ref=control_payload(plan).server_ref,
             )
         )
         drivers["probe"] = ProbeDriver(

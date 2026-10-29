@@ -10,11 +10,13 @@ import httpx
 
 from meridian.control.models import (
     ClientEndpoint,
-    MintedToken,
+    EnrollmentGrant,
+    FleetAuthority,
     NodeSpec,
     NodeStatus,
     ServiceHealth,
     ServiceSettings,
+    TrafficSummary,
     UserRecord,
 )
 from meridian.core.errors import MeridianError
@@ -83,8 +85,15 @@ class ControlClient:
     def delete_node(self, node_id: str) -> None:
         self._call("DELETE", f"api/nodes/{_segment(node_id)}")
 
-    def mint_token(self, node_id: str) -> MintedToken:
-        return MintedToken.model_validate(self._call("POST", f"api/nodes/{_segment(node_id)}/token", {}))
+    def grant_enrollment(self, node_id: str) -> EnrollmentGrant:
+        """Mint the node's single-use enrollment token; an earlier unspent one stops working."""
+        return EnrollmentGrant.model_validate(self._call("POST", f"api/nodes/{_segment(node_id)}/enrollment", {}))
+
+    def fleet_authority(self) -> FleetAuthority:
+        return FleetAuthority.model_validate(self._call("GET", "api/ca"))
+
+    def traffic(self) -> TrafficSummary:
+        return TrafficSummary.model_validate(self._call("GET", "api/traffic"))
 
     def get_user(self, username: str) -> UserRecord | None:
         try:

@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "The file SSH bootstrap writes on a node before the agent first starts (mode 0600).\n\nThe enrollment token is single-use and short-lived; the agent deletes it from\nthis file once enrolled. `ca_sha256` pins the fleet's internal CA: the agent\naccepts only certificates chaining to that CA.",
+  "description": "The file SSH bootstrap writes on a node before the agent first starts (mode 0600).\n\nThe enrollment token is single-use and short-lived; once enrolled, the agent\nrewrites this file with `enrollment_token` and `token_expires_at` set to null.\nA file that carries a token asks for a fresh enrollment (a new node key), so\nSSH bootstrap re-enrolls a node by writing a new token. `ca_sha256` pins the\nfleet's internal CA: the agent accepts only certificates chaining to that CA.",
   "properties": {
     "ca_sha256": {
       "description": "SHA-256 of the internal CA certificate (DER).",
@@ -9,12 +9,20 @@
       "type": "string"
     },
     "enrollment_token": {
-      "description": "Opaque base64url token.",
-      "maxLength": 256,
-      "minLength": 32,
-      "pattern": "^[A-Za-z0-9_-]+$",
-      "title": "Enrollment Token",
-      "type": "string"
+      "anyOf": [
+        {
+          "description": "Opaque base64url token.",
+          "maxLength": 256,
+          "minLength": 32,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "One-time enrollment token; `null` once enrolled.",
+      "title": "Enrollment Token"
     },
     "fleet_id": {
       "description": "Fleet identifier: a lowercase UUID fixed when the fleet is created.",
@@ -58,11 +66,19 @@
       "title": "Tls Pin Sha256"
     },
     "token_expires_at": {
-      "description": "RFC 3339 timestamp in UTC, ending in Z.",
-      "maxLength": 40,
-      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
-      "title": "Token Expires At",
-      "type": "string"
+      "anyOf": [
+        {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "When the token expires; `null` once enrolled.",
+      "title": "Token Expires At"
     }
   },
   "required": [

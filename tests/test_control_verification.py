@@ -11,9 +11,10 @@ import pytest
 from meridian.cluster import ClusterConfig
 from meridian.connectivity import create_verification_panel, select_active_client, verification_panel_factory
 from meridian.control.client import ControlClient, ControlServiceAuthError
+from meridian.control.enrollment import token_sha256
 from meridian.control.models import ClientEndpoint
 from meridian.control.server import ControlServer
-from meridian.control.service import ControlService, token_sha256
+from meridian.control.service import ControlService
 from meridian.control_verification import ServiceVerificationPanel
 from meridian.remnawave import XRAY_JSON_CLIENT_TYPE, RemnawaveAuthError, RemnawaveNetworkError
 from meridian.setup.single_server import single_server_intent

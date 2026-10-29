@@ -84,9 +84,11 @@ ProtocolName = Annotated[
 class AgentBootstrap(AgentModel):
     """The file SSH bootstrap writes on a node before the agent first starts (mode 0600).
 
-    The enrollment token is single-use and short-lived; the agent deletes it from
-    this file once enrolled. `ca_sha256` pins the fleet's internal CA: the agent
-    accepts only certificates chaining to that CA.
+    The enrollment token is single-use and short-lived; once enrolled, the agent
+    rewrites this file with `enrollment_token` and `token_expires_at` set to null.
+    A file that carries a token asks for a fresh enrollment (a new node key), so
+    SSH bootstrap re-enrolls a node by writing a new token. `ca_sha256` pins the
+    fleet's internal CA: the agent accepts only certificates chaining to that CA.
     """
 
     protocol: AgentProtocol = AGENT_PROTOCOL
@@ -97,8 +99,8 @@ class AgentBootstrap(AgentModel):
     )
     fleet_id: FleetId
     node_id: NodeId
-    enrollment_token: OpaqueToken
-    token_expires_at: Timestamp
+    enrollment_token: OpaqueToken | None = Field(description="One-time enrollment token; `null` once enrolled.")
+    token_expires_at: Timestamp | None = Field(description="When the token expires; `null` once enrolled.")
     ca_sha256: Sha256Hex = Field(description="SHA-256 of the internal CA certificate (DER).")
     tls_pin_sha256: Sha256Hex | None = Field(
         description="SHA-256 of the service's TLS public key (SPKI) when 443 serves a self-signed certificate."
@@ -132,7 +134,11 @@ class EnrollResponse(AgentModel):
     certificate_expires_at: Timestamp
     ca_certificate_pem: CertificatePem = Field(description="The internal CA; must match the bootstrap `ca_sha256`.")
     service_certificate_pem: CertificatePem = Field(
-        description="Certificate of the service signing key that signs desired state and commands."
+        description=(
+            "Certificate of the service signing key that signs desired state and commands: issued by the CA, with "
+            "URI SAN `meridian-service://<fleet_id>`. The agent accepts no other certificate as the service's, so a "
+            "node certificate can never sign desired state."
+        )
     )
 
 
@@ -198,7 +204,7 @@ class HelloResponse(AgentModel):
     server_time: Timestamp
     poll: PollSettings
     renew_after: Timestamp = Field(description="Request a new node certificate (`renew`) after this time.")
-    service_certificate_pem: CertificatePem
+    service_certificate_pem: CertificatePem = Field(description="As in `EnrollResponse`; the agent re-checks it.")
 
 
 class RenewRequest(AgentModel):

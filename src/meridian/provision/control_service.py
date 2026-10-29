@@ -20,7 +20,6 @@ from meridian.host_runtime import (
     CONTROL_SERVICE_CONFIG,
     CONTROL_SERVICE_DIR,
     CONTROL_SERVICE_NAME,
-    CONTROL_SERVICE_PUBLIC_KEY,
     CONTROL_SERVICE_STATE_DIR,
     CONTROL_SERVICE_UNIT,
 )
@@ -173,10 +172,7 @@ class InstallControlService:
 
     def _ready(self, conn: ServerConnection) -> str:
         port = self.install.config.listen_port
-        probe = (
-            f"test -s {CONTROL_SERVICE_PUBLIC_KEY} && "
-            f"curl -s -o /dev/null -w '%{{http_code}}' http://127.0.0.1:{port}/api/health | grep -q 401"
-        )
+        probe = f"curl -s -o /dev/null -w '%{{http_code}}' http://127.0.0.1:{port}/api/health | grep -q 401"
         for _ in range(30):
             if conn.run(probe, timeout=15).returncode == 0:
                 return ""
