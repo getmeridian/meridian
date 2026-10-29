@@ -120,6 +120,21 @@ impl Claims {
     }
 }
 
+/// The host file a resource installs, if it installs one.
+fn installed_path(resource: &Resource) -> Option<&str> {
+    match &resource.spec {
+        Spec::File(spec) => Some(&spec.path),
+        Spec::XrayConfig(spec) => Some(&spec.path),
+        Spec::BinaryPin(spec) => Some(&spec.install_path),
+        _ => None,
+    }
+}
+
+/// Where the replaced version of `dest` waits until its unit runs the new one.
+fn kept_path(dest: &Path) -> PathBuf {
+    fsutil::temp_sibling(dest, "netagent-prev")
+}
+
 impl Engine<'_> {
     /// Converge `resources` and return one observation per resource.
     pub fn apply(
@@ -129,6 +144,7 @@ impl Engine<'_> {
         previous: &[ResourceObservation],
         now: &str,
     ) -> PassResult {
+        self.drop_kept(resources);
         let retained = self.retire(resources, ledger);
         let mut statuses: HashMap<String, &'static str> = HashMap::new();
         let mut changed = BTreeSet::new();
@@ -181,7 +197,7 @@ impl Engine<'_> {
                         &placed_users,
                         &changed,
                     ),
-                    Spec::Unit(spec) => self.apply_unit(spec, &changed, previous_entry),
+                    Spec::Unit(spec) => self.apply_unit(spec, resources, &changed, previous_entry),
                 }
             };
             let (status, error) = match outcome {
@@ -267,6 +283,7 @@ impl Engine<'_> {
             }
         }
         *ledger = next;
+        self.drop_kept(resources);
         let _ = fs::remove_dir_all(&self.cache_dir);
         let converged =
             unretired.is_empty() && observations.iter().all(|obs| obs.status == "applied");
@@ -276,6 +293,47 @@ impl Engine<'_> {
             unretired,
             changed,
         }
+    }
+
+    // ---- Previous versions ----------------------------------------------------
+
+    /// Keep the version `dest` holds before replacing it (a hard link: the replacement is a
+    /// rename), so a unit that will not start on the new one gets it back.
+    pub(crate) fn keep_previous(&self, dest: &Path) {
+        if !dest.is_file() {
+            return;
+        }
+        let kept = kept_path(dest);
+        let _ = fs::remove_file(&kept);
+        if let Err(err) = fs::hard_link(dest, &kept) {
+            debug!("cannot keep the previous {}: {err}", dest.display());
+        }
+    }
+
+    /// Previous versions only live for one pass.
+    fn drop_kept(&self, resources: &[Resource]) {
+        for path in resources.iter().filter_map(installed_path) {
+            let _ = fs::remove_file(kept_path(&host_path(&self.root, path)));
+        }
+    }
+
+    /// Put back what this pass replaced for `spec`'s `restart_on`; returns the resource IDs.
+    fn restore_kept(&self, spec: &UnitSpec, resources: &[Resource]) -> Vec<String> {
+        let mut restored = Vec::new();
+        for resource in resources.iter().filter(|r| spec.restart_on.contains(&r.id)) {
+            let Some(path) = installed_path(resource) else {
+                continue;
+            };
+            let dest = host_path(&self.root, path);
+            let kept = kept_path(&dest);
+            if kept.is_file() {
+                match fs::rename(&kept, &dest) {
+                    Ok(()) => restored.push(resource.id.clone()),
+                    Err(err) => info!("cannot restore the previous {path}: {err}"),
+                }
+            }
+        }
+        restored
     }
 
     // ---- Retirement ---------------------------------------------------------
@@ -406,6 +464,7 @@ impl Engine<'_> {
                 "content does not match size and sha256",
             ));
         }
+        self.keep_previous(&dest);
         fsutil::write_atomic(&dest, &content, mode, Some((uid, gid)))
             .map_err(|err| Failure::io(&err, "cannot write file"))?;
         if current.is_some() {
@@ -466,6 +525,7 @@ impl Engine<'_> {
             let _ = fs::remove_file(&tmp);
             return Err(failure);
         }
+        self.keep_previous(&dest);
         fsutil::commit(&tmp, &dest, mode, None)
             .map_err(|err| Failure::io(&err, "cannot install binary"))?;
         let installed =
@@ -577,12 +637,13 @@ impl Engine<'_> {
     fn apply_unit(
         &self,
         spec: &UnitSpec,
+        resources: &[Resource],
         changed: &BTreeSet<String>,
         previous: Option<&LedgerEntry>,
     ) -> Outcome {
         // An entry without an installed hash is a unit that did not finish last time.
         let owed = previous.is_some_and(|entry| entry.installed_sha256.is_none());
-        match self.try_unit(spec, changed, owed) {
+        match self.try_unit(spec, resources, changed, owed) {
             Ok(outcome) => outcome,
             Err(failure) => Outcome::Failed(failure),
         }
@@ -591,6 +652,7 @@ impl Engine<'_> {
     fn try_unit(
         &self,
         spec: &UnitSpec,
+        resources: &[Resource],
         changed: &BTreeSet<String>,
         owed: bool,
     ) -> Result<Outcome, Failure> {
@@ -627,10 +689,31 @@ impl Engine<'_> {
                 let now_active = self.query("is-active", &spec.name) == "active";
                 if ran.is_err() || !now_active {
                     let journal = self.journal_tail(&spec.name);
-                    return Err(service_failed(format!(
-                        "{} is not active after {verb}: {journal}",
-                        spec.name
-                    )));
+                    let mut message =
+                        format!("{} is not active after {verb}: {journal}", spec.name);
+                    // Passing `run -test` is not starting (a port may be taken): bring back
+                    // what ran before rather than leave the node without its core.
+                    let restored = self.restore_kept(spec, resources);
+                    if !restored.is_empty() {
+                        let again = self.systemctl(&["restart", &spec.name]);
+                        self.exec.sleep(self.settle);
+                        let back = again.is_ok() && self.query("is-active", &spec.name) == "active";
+                        let outcome = if back {
+                            "and it runs again"
+                        } else {
+                            "but it still does not run"
+                        };
+                        info!(
+                            "{} failed on the new {}; restored the previous version {outcome}",
+                            spec.name,
+                            restored.join(", ")
+                        );
+                        message.push_str(&format!(
+                            "; restored the previous {} {outcome}",
+                            restored.join(", ")
+                        ));
+                    }
+                    return Err(service_failed(message));
                 }
                 info!("{verb}ed {}", spec.name);
             }

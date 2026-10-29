@@ -86,6 +86,8 @@ pub struct FakeExec {
     pub calls: Mutex<Vec<String>>,
     pub units: Mutex<HashMap<String, UnitState>>,
     pub crashing: Mutex<HashSet<String>>,
+    /// Every unit dies on (re)start while this file contains this text (a taken port, say).
+    pub crash_when: Mutex<Option<(PathBuf, String)>>,
     /// Units `systemctl stop`/`restart` cannot touch (they keep running the old process).
     pub stuck: Mutex<HashSet<String>>,
     pub asset_dirs: Mutex<Vec<String>>,
@@ -174,7 +176,16 @@ impl Exec for FakeExec {
                         fail("", "Job for unit failed: timed out\n")
                     }
                     "start" | "restart" => {
-                        unit.active = !self.crashing.lock().unwrap().contains(&name);
+                        let poisoned =
+                            self.crash_when
+                                .lock()
+                                .unwrap()
+                                .as_ref()
+                                .is_some_and(|(path, text)| {
+                                    std::fs::read_to_string(path)
+                                        .is_ok_and(|body| body.contains(text))
+                                });
+                        unit.active = !poisoned && !self.crashing.lock().unwrap().contains(&name);
                         ok("")
                     }
                     "stop" if self.stuck.lock().unwrap().contains(&name) => {

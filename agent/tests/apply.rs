@@ -357,6 +357,34 @@ fn a_restart_that_failed_is_owed_until_it_succeeds() {
 }
 
 #[test]
+fn a_config_the_core_cannot_start_on_is_rolled_back() {
+    let mut host = Host::new(fetcher());
+    host.apply(&full_document(&[]));
+    let before = host.read("/etc/netagent/core.json");
+    let config = host.root.path().join("etc/netagent/core.json");
+    *host.exec.crash_when.lock().unwrap() = Some((config, "\"debug\"".into()));
+
+    // `run -test` accepts it, but the core dies on start.
+    let mut doc = full_document(&[]);
+    doc[5]["config"]["log"]["loglevel"] = json!("debug");
+    let pass = host.apply(&doc);
+    assert!(!pass.converged);
+    let message = &pass.observations[8].error.as_ref().unwrap().message;
+    assert!(
+        message.contains("restored the previous xray:config and it runs again"),
+        "{message}"
+    );
+    assert_eq!(host.read("/etc/netagent/core.json"), before);
+    assert!(host.exec.unit("netcore.service").active);
+    assert!(!host.exists("/etc/netagent/.core.json.netagent-prev"));
+
+    // The next pass tries the new config again.
+    *host.exec.crash_when.lock().unwrap() = None;
+    assert!(host.apply(&doc).converged);
+    assert_ne!(host.read("/etc/netagent/core.json"), before);
+}
+
+#[test]
 fn hysteria2_users_change_live_and_config_changes_restart() {
     let mut host = Host::new(fetcher());
     host.apply(&full_document(&[("u-a", UUID_A, "xtls-rprx-vision")]));

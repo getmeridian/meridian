@@ -269,6 +269,9 @@ impl Engine<'_> {
             },
             None => false,
         };
+        if !live_done {
+            self.keep_previous(&dest);
+        }
         fsutil::commit(&tmp, &dest, 0o600, None)
             .map_err(|err| Failure::io(&err, "cannot install config"))?;
         placed.extend(users.iter().map(|(u, _)| u.id().to_string()));
