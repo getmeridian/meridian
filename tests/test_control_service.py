@@ -170,6 +170,35 @@ def test_a_waiting_poll_wakes_when_the_document_changes(service: ControlService)
     assert result["desired"]["revision"] == 2
 
 
+def test_a_poll_whose_session_ended_while_it_waited_gets_no_document(service: ControlService) -> None:
+    """A node re-enrolled while its old session waited would otherwise hand that session the new document."""
+    service.put_node_spec("main", _spec())
+    status = service.node_status("main")
+    have = NodeStateRef(fleet_epoch=1, revision=1, sha256=status.sha256 or "")
+    revoked = threading.Event()
+
+    def recheck() -> None:
+        if revoked.is_set():
+            raise ServiceError("unauthorized", "The session is no longer valid.", 401)
+
+    outcome: list[BaseException | dict[str, Any]] = []
+
+    def wait() -> None:
+        try:
+            outcome.append(service.poll("main", PollRequest(have=have, wait_seconds=30), recheck=recheck))
+        except ServiceError as exc:
+            outcome.append(exc)
+
+    waiter = threading.Thread(target=wait)
+    waiter.start()
+    time.sleep(0.2)
+    revoked.set()
+    service.put_user("alice")
+    waiter.join(timeout=5)
+
+    assert isinstance(outcome[0], ServiceError) and outcome[0].status == 401
+
+
 def test_report_records_the_applied_revision_and_failures(service: ControlService) -> None:
     service.put_node_spec("main", _spec())
     document = _document(service)

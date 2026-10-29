@@ -501,7 +501,13 @@ class _Handler(BaseHTTPRequestHandler):
         service, session = self._session()
         # Answer before the session expires, so the agent's next request is a fresh hello.
         remaining = session.expires_at - time.time() - 5
-        return service.poll(session.node_id, self._model(PollRequest), max_wait=remaining)
+        token = self._bearer()
+        return service.poll(
+            session.node_id,
+            self._model(PollRequest),
+            max_wait=remaining,
+            recheck=lambda: service.authority.authenticate(token),
+        )
 
     def agent_report(self, _match: re.Match[str]) -> Any:
         service, session = self._session()

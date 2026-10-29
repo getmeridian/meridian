@@ -280,8 +280,19 @@ class ControlService:
         rows = self._store.rows("SELECT node_id FROM nodes ORDER BY node_id")
         return [self.node_status(str(row["node_id"])) for row in rows]
 
-    def poll(self, node_id: str, request: PollRequest, *, max_wait: float = MAX_WAIT_SECONDS) -> dict[str, Any]:
-        """Wait up to `wait_seconds` (at most `max_wait`) for a document newer than `have`; return the response."""
+    def poll(
+        self,
+        node_id: str,
+        request: PollRequest,
+        *,
+        max_wait: float = MAX_WAIT_SECONDS,
+        recheck: Callable[[], object] | None = None,
+    ) -> dict[str, Any]:
+        """Wait up to `wait_seconds` (at most `max_wait`) for a document newer than `have`; return the response.
+
+        `recheck` raises when the caller's session no longer holds: a node re-enrolled or
+        deleted while its old session waited must not be handed the new document.
+        """
         deadline = time.monotonic() + max(0.0, min(request.wait_seconds, MAX_WAIT_SECONDS, max_wait))
         with self._changed:
             self._touch(node_id)
@@ -289,6 +300,8 @@ class ControlService:
                 row = self._node(node_id)
                 document = row["document"] if row is not None else None
                 if row is not None and document and _differs(request.have, self.fleet_epoch, row):
+                    if recheck is not None:
+                        recheck()
                     desired: Any = json.loads(document)
                     break
                 remaining = deadline - time.monotonic()
