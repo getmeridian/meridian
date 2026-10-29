@@ -173,6 +173,29 @@ def move_exit_in_intent(
     return _validated(payload)
 
 
+def move_control_server_in_intent(
+    intent: SetupIntent, server_ref: str, *, old_address: str = "", new_address: str = ""
+) -> SetupIntent:
+    """Return validated intent with the control plane, and every exit beside it, on another server.
+
+    A relay hop or routing gateway on the old control server cannot move with it yet.
+    """
+    old = intent.control.server_ref
+    if old == server_ref:
+        return intent
+    stuck = [gateway.id for gateway in intent.routing_gateways if gateway.server_ref == old]
+    stuck += [relay.id for relay in intent.transparent_relays if old in relay.hop_server_refs]
+    if stuck:
+        raise ValueError(f"the control server also runs {', '.join(sorted(stuck))}, which cannot move with it")
+    moved = intent
+    for exit_ in intent.exits:
+        if exit_.server_ref == old:
+            moved = move_exit_in_intent(moved, exit_.id, server_ref, old_address=old_address, new_address=new_address)
+    payload = moved.model_dump(mode="json")
+    payload["control"]["server_ref"] = server_ref
+    return _validated(payload)
+
+
 def remove_routing_gateway_from_intent(intent: SetupIntent, gateway_id: str) -> SetupIntent:
     """Return validated intent without one routing gateway and the rules scoped to it."""
     if not any(gateway.id == gateway_id for gateway in intent.routing_gateways):

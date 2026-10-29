@@ -26,6 +26,7 @@ from meridian.branding import normalize_icon
 from meridian.cluster import BrandingConfig, ClusterConfig
 from meridian.commands._helpers import ReviewedApplyPersistenceError, persist_reviewed_apply
 from meridian.commands.apply_progress import apply_progress
+from meridian.commands.backup import offer_recovery_key
 from meridian.commands.client_handoff import print_handoff_links
 from meridian.commands.port_check import check_ports
 from meridian.commands.resolve import ensure_server_connection, resolve_server
@@ -340,6 +341,7 @@ def _execute(
 
     cluster = ClusterConfig.load()
     _print_success(resolved.ip, cluster, request, links)
+    offer_recovery_key(cluster)
     exit_ = next(item for item in intent.exits if item.server_ref == entry.id)
     reality = next(path for path in exit_.paths if path.protocol == "reality")
     return DeployResult(

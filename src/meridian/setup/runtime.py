@@ -84,14 +84,12 @@ from meridian.servers import ServerEntry, ServerRegistry
 from meridian.service_fence import ControlServiceFence, RevisionDraft
 from meridian.setup.control_plane import (
     bootstrap_control_plane,
-    bootstrap_profile_values,
     control_payload,
     control_runtime_ready,
-    plan_harden,
     write_control_runtime_attestation,
 )
 from meridian.setup.control_service import (
-    bootstrap_control_service,
+    bootstrap_reviewed_control_service,
     control_service_ready,
     meridian_drivers,
     verify_control_service,
@@ -349,16 +347,12 @@ class SetupRuntime:
 
         def bootstrap_control(action: ResourceAction) -> None:
             if isinstance(control, ControlServicePayload):
-                ports, reality_sni = bootstrap_profile_values(review.plan)
-                bootstrap_control_service(
+                bootstrap_reviewed_control_service(
                     control,
                     review.plan,
                     cluster,
                     control_entry,
                     connections[control.server_ref],
-                    harden=plan_harden(review.plan, control.server_ref),
-                    reality_port=ports["reality"],
-                    reality_sni=reality_sni,
                     cancellation=self._cancellation,
                     reporter=self._reporter,
                     operation=self._operation,

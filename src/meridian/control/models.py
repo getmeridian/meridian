@@ -360,3 +360,54 @@ class ServiceConfig(CoreModel):
     listen_host: str = "127.0.0.1"
     listen_port: int = Field(default=3000, ge=1, le=65535)
     state_dir: str = "/var/lib/ctld"
+
+
+# -- backups (`backups.py`) -------------------------------------------------------------
+
+AGE_PUBLIC_KEY = r"^age1[02-9ac-hj-np-z]{58}$"
+
+
+class DeviceKeyCreate(CoreModel):
+    """Register a device's backup key: snapshots are sealed to it from the next one on."""
+
+    name: str = Field(min_length=1, max_length=64, pattern=r"^[^\x00-\x1f\x7f]+$")
+    public_key: str = Field(pattern=AGE_PUBLIC_KEY, description="The device's X25519 key in age's `age1...` form.")
+
+
+class DeviceKeyRecord(CoreModel):
+    id: str = Field(pattern=r"^[0-9a-f]{12}$")
+    name: str
+    public_key: str = Field(pattern=AGE_PUBLIC_KEY)
+    created_at: Timestamp
+    revoked_at: Timestamp | None = None
+
+
+class DeviceKeyList(CoreModel):
+    devices: list[DeviceKeyRecord]
+
+
+class RecoveryKeyUpdate(CoreModel):
+    """Replace the fleet's recovery key; the service only ever holds its public half."""
+
+    public_key: str = Field(pattern=AGE_PUBLIC_KEY)
+
+
+class RecoveryKeyState(CoreModel):
+    public_key: str | None = Field(default=None, pattern=AGE_PUBLIC_KEY)
+    set_at: Timestamp | None = None
+
+
+class DeployerStateDeposit(CoreModel):
+    """The deployer's own fleet files, kept so a snapshot alone can rebuild the fleet.
+
+    `cluster_yml` carries no admin token (a restore mints a new one); `servers_json` is the
+    server shelf as the deployer saved it.
+    """
+
+    cluster_yml: str = Field(min_length=1, max_length=2 * 1024 * 1024)
+    servers_json: str = Field(min_length=1, max_length=1024 * 1024)
+    generation: int = Field(ge=0, description="The deposited cluster.yml's committed generation.")
+
+
+class DeployerState(DeployerStateDeposit):
+    deposited_at: Timestamp

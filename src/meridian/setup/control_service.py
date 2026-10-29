@@ -145,6 +145,36 @@ def bootstrap_control_service(
         raise ResourceReconcileError(f"Could not attest the control service: {written.detail}")
 
 
+def bootstrap_reviewed_control_service(
+    payload: ControlServicePayload,
+    plan: ResourcePlan,
+    cluster: ClusterConfig,
+    entry: ServerEntry,
+    connection: ServerConnection,
+    *,
+    cancellation: CancellationToken | None = None,
+    reporter: Reporter | None = None,
+    operation: OperationContext | None = None,
+) -> None:
+    """`bootstrap_control_service()` with the values a reviewed plan gives it (apply and restore)."""
+    from meridian.setup.control_plane import bootstrap_profile_values, plan_harden
+
+    ports, reality_sni = bootstrap_profile_values(plan)
+    bootstrap_control_service(
+        payload,
+        plan,
+        cluster,
+        entry,
+        connection,
+        harden=plan_harden(plan, payload.server_ref),
+        reality_port=ports["reality"],
+        reality_sni=reality_sni,
+        cancellation=cancellation,
+        reporter=reporter,
+        operation=operation,
+    )
+
+
 def control_service_ready(
     action: ResourceAction,
     plan: ResourcePlan,

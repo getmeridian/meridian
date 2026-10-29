@@ -36,6 +36,13 @@ _UV_ENV = (
     "UV_PYTHON_PREFERENCE=only-managed"
 )
 
+# The service's system user and its private state directory; `meridian restore` loads a database into it.
+SERVICE_USER_COMMAND = (
+    f"id -u {CONTROL_SERVICE_NAME} >/dev/null 2>&1 || useradd --system --home-dir "
+    f"{CONTROL_SERVICE_STATE_DIR} --shell /usr/sbin/nologin {CONTROL_SERVICE_NAME}; "
+    f"install -d -m 750 -o {CONTROL_SERVICE_NAME} -g {CONTROL_SERVICE_NAME} {CONTROL_SERVICE_STATE_DIR}"
+)
+
 
 @dataclass(frozen=True)
 class ControlServiceInstall:
@@ -112,12 +119,7 @@ class InstallControlService:
         return "" if result.returncode == 0 else f"could not install uv {UV_VERSION}: {result.stderr.strip()[:200]}"
 
     def _user(self, conn: ServerConnection) -> str:
-        result = conn.run(
-            f"id -u {CONTROL_SERVICE_NAME} >/dev/null 2>&1 || useradd --system --home-dir "
-            f"{CONTROL_SERVICE_STATE_DIR} --shell /usr/sbin/nologin {CONTROL_SERVICE_NAME}; "
-            f"install -d -m 750 -o {CONTROL_SERVICE_NAME} -g {CONTROL_SERVICE_NAME} {CONTROL_SERVICE_STATE_DIR}",
-            timeout=30,
-        )
+        result = conn.run(SERVICE_USER_COMMAND, timeout=30)
         return "" if result.returncode == 0 else f"could not create the service user: {result.stderr.strip()[:200]}"
 
     def _package(self, conn: ServerConnection) -> str:

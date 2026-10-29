@@ -21,6 +21,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE, BackupLedger
 from meridian.control.enrollment import NodeAuthority
 from meridian.control.errors import ServiceError
 from meridian.control.formats.entries import SubscriptionUser
@@ -53,7 +54,7 @@ from meridian.core.agent_protocol import ObservedStateReport, PollRequest
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 MAX_WAIT_SECONDS = 55
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -101,6 +102,7 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (API_TOKENS_TABLE,),
     (REVISIONS_TABLE, APPLY_FENCE_TABLE),
     ("ALTER TABLE users ADD COLUMN traffic_carried_bytes INTEGER NOT NULL DEFAULT 0",),
+    (BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE),
 )
 _USER_FIELDS = (
     "username",
@@ -152,6 +154,7 @@ class ControlService:
         self.authority = NodeAuthority(self._store, fleet_id, clock=clock)
         self.tokens = TokenRegistry(self._store, clock=clock)
         self.revisions = RevisionLedger(self._store, self.tokens, fleet_id, clock=clock)
+        self.backups = BackupLedger(self._store, clock=clock)
         with self._transaction():
             # Documents signed by an earlier signing certificate are signed again.
             self._compose_all()
@@ -161,6 +164,13 @@ class ControlService:
     @property
     def fleet_epoch(self) -> int:
         return self._store.fleet_epoch
+
+    def close(self) -> None:
+        self._store.close()
+
+    def snapshot(self) -> bytes:
+        """This service's state, encrypted to every registered backup key (`backups.py`)."""
+        return self.backups.snapshot(fleet_id=self.fleet_id, fleet_epoch=self.fleet_epoch, version=self._version)
 
     def health(self) -> ServiceHealth:
         return ServiceHealth(version=self._version, fleet_id=self.fleet_id, fleet_epoch=self.fleet_epoch)
@@ -510,8 +520,10 @@ class ControlService:
         spec = NodeSpec.model_validate_json(row["spec"])
         resources = _with_users(spec, self.list_users())
         resources_sha = canonical_sha256(resources)
-        signed_by = json.loads(row["document"])["signature"]["key_id"] if row["document"] else None
-        if resources_sha == row["doc_sha256"] and signed_by == self.authority.service_key_id:
+        held = json.loads(row["document"]) if row["document"] else None
+        signed = (held["signature"]["key_id"], held["fleet_epoch"]) if held else None
+        # A restore bumps the epoch: the same resources are signed again under it.
+        if resources_sha == row["doc_sha256"] and signed == (self.authority.service_key_id, self.fleet_epoch):
             return
         revision = (row["revision"] or 0) + 1
         document: dict[str, Any] = {

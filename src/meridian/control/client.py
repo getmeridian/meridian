@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from types import TracebackType
 from typing import Any
 from urllib.parse import quote
@@ -13,11 +14,17 @@ from meridian.control.models import (
     ApplyFenceState,
     ApplyFenceSwap,
     ClientEndpoint,
+    DeployerStateDeposit,
+    DeviceKeyCreate,
+    DeviceKeyList,
+    DeviceKeyRecord,
     EnrollmentGrant,
     FleetAuthority,
     IssuedToken,
     NodeSpec,
     NodeStatus,
+    RecoveryKeyState,
+    RecoveryKeyUpdate,
     RevisionList,
     RevisionProposal,
     RevisionRecord,
@@ -38,6 +45,21 @@ from meridian.control.models import (
 from meridian.core.errors import MeridianError
 
 _GATEWAY_FAILURES = frozenset({502, 503, 504})
+# Told the service URL after every request that changed the service's state, so the CLI
+# can pull one fresh snapshot once a command is done (`meridian.backup.hook`).
+MutationListener = Callable[[str], None]
+_mutation_listeners: list[MutationListener] = []
+
+
+def add_mutation_listener(listener: MutationListener) -> Callable[[], None]:
+    """Call `listener(url)` after each successful write; returns the function that stops it."""
+    _mutation_listeners.append(listener)
+
+    def remove() -> None:
+        if listener in _mutation_listeners:
+            _mutation_listeners.remove(listener)
+
+    return remove
 
 
 class ControlServiceError(MeridianError):
@@ -63,7 +85,11 @@ class ControlServiceScopeError(ControlServiceAuthError):
 class ControlClient:
     """Typed calls to one control service; `url` includes the secret path."""
 
-    def __init__(self, url: str, token: str, *, timeout: float = 20.0, verify: bool | str = True) -> None:
+    def __init__(
+        self, url: str, token: str, *, timeout: float = 20.0, verify: bool | str = True, report_mutations: bool = True
+    ) -> None:
+        self.url = url.rstrip("/")
+        self._report_mutations = report_mutations
         self._client = httpx.Client(
             base_url=url.rstrip("/") + "/",
             headers={"Authorization": f"Bearer {token}"},
@@ -204,6 +230,31 @@ class ControlClient:
         body = ApplyFenceSwap(expected_version=expected_version, record=record).model_dump(mode="json")
         return ApplyFenceState.model_validate(self._call("PUT", "api/fence", body))
 
+    def device_keys(self) -> list[DeviceKeyRecord]:
+        return DeviceKeyList.model_validate(self._call("GET", "api/backup/devices")).devices
+
+    def register_device_key(self, name: str, public_key: str) -> DeviceKeyRecord:
+        body = DeviceKeyCreate(name=name, public_key=public_key).model_dump(mode="json")
+        return DeviceKeyRecord.model_validate(self._call("POST", "api/backup/devices", body))
+
+    def revoke_device_key(self, device_id: str) -> DeviceKeyRecord:
+        return DeviceKeyRecord.model_validate(self._call("DELETE", f"api/backup/devices/{_segment(device_id)}"))
+
+    def recovery_key(self) -> RecoveryKeyState:
+        return RecoveryKeyState.model_validate(self._call("GET", "api/backup/recovery-key"))
+
+    def set_recovery_key(self, public_key: str) -> RecoveryKeyState:
+        body = RecoveryKeyUpdate(public_key=public_key).model_dump(mode="json")
+        return RecoveryKeyState.model_validate(self._call("PUT", "api/backup/recovery-key", body))
+
+    def deposit_deployer_state(self, deposit: DeployerStateDeposit) -> None:
+        """Keep the deployer's fleet files in the service, so the next snapshot carries them."""
+        self._call("PUT", "api/backup/deployer-state", deposit.model_dump(mode="json"))
+
+    def snapshot(self) -> bytes:
+        """The newest snapshot, sealed to every registered backup key (`control.snapshot`)."""
+        return self._request("GET", "api/backup/snapshot").content
+
     def fetch_subscription(self, sub_token: str, *, document: str = "") -> str:
         """Fetch a subscription the way a client app does (the `/sub` route, no admin token needed)."""
         path = f"sub/{_segment(sub_token)}" + (f"/{document}" if document else "")
@@ -252,6 +303,9 @@ class ControlClient:
                 f"Control service error: {_message(response)}",
                 category="system" if response.status_code >= 500 else "user",
             )
+        if method != "GET" and self._report_mutations:
+            for listener in list(_mutation_listeners):
+                listener(self.url)
         return response
 
 

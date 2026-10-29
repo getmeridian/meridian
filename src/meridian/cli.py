@@ -11,6 +11,7 @@ from typer.core import TyperGroup
 
 from meridian import __version__
 from meridian import cli_types as click
+from meridian.cli_backup import backup_app, restore_cmd
 from meridian.cli_catalog import command_path, requested_context, requests_machine_output, supports_json
 from meridian.cli_groups import (
     api_app,
@@ -177,6 +178,8 @@ app.add_typer(fleet_app, name="fleet", rich_help_panel=SERVERS)
 app.add_typer(context_app, name="context", rich_help_panel=SERVERS)
 app.add_typer(api_app, name="api", rich_help_panel=ADVANCED)
 app.add_typer(dev_app, name="dev", hidden=True)
+app.add_typer(backup_app, name="backup", hidden=True)
+app.command("restore", hidden=True)(restore_cmd)
 
 
 @app.callback(invoke_without_command=True)
@@ -267,6 +270,10 @@ def main_callback(
         i18n.set_locale(i18n.explicit_locale() or i18n.system_locale())
     # `serve` is a daemon: its journal gets no banner, and the server never phones out for updates.
     daemon = ctx.invoked_subcommand == "serve"
+    if not daemon:
+        from meridian.commands.backup import pull_after_mutations
+
+        pull_after_mutations(ctx.call_on_close)  # every change to a service fleet ends with a fresh snapshot
     if not machine_output and not daemon and not (invocation is not None and invocation.help_requested):
         banner(__version__)
 

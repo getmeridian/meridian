@@ -25,6 +25,10 @@ class Store:
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA foreign_keys=ON")
 
+    def close(self) -> None:
+        with self.lock:
+            self.db.close()
+
     def create(self, schema: str) -> None:
         """Create tables; `executescript()` commits on its own, so never call it inside `transaction()`."""
         with self.lock:
