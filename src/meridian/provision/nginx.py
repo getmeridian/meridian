@@ -11,7 +11,7 @@ import shlex
 
 from meridian.config import ACME_SH_SHA256, ACME_SH_VERSION, REMNAWAVE_PANEL_PORT, REMNAWAVE_SUBSCRIPTION_PAGE_PORT
 from meridian.provision.apt_keys import verify_apt_key
-from meridian.provision.ensure import resolve_ctx
+from meridian.provision.ensure import apt_failure, apt_lock_held, resolve_ctx, run_apt
 from meridian.provision.nginx_render import (
     render_nginx_http_config,
     render_nginx_ip_config,
@@ -89,10 +89,9 @@ class InstallNginx:
                 needs_official_repo = True
         else:
             # Not installed — try distro repo first, upgrade if too old
-            result = conn.run(
-                f"DEBIAN_FRONTEND=noninteractive apt-get install -y {_APT_KEEP_CONFIG} nginx",
-                timeout=180,
-            )
+            result = run_apt(conn, f"apt-get install -y {_APT_KEEP_CONFIG} nginx", timeout=180)
+            if result.returncode != 0 and apt_lock_held(result):
+                return StepResult(name=self.name, status="failed", detail=apt_failure(result))
             if result.returncode != 0:
                 # Distro install failed — fall through to official repo
                 needs_official_repo = True
@@ -113,11 +112,12 @@ class InstallNginx:
             distro_codename = codename.stdout.strip() if codename.returncode == 0 else "jammy"
 
             # Remove conflicting distro packages before official repo install
-            conn.run(
-                "DEBIAN_FRONTEND=noninteractive apt-get remove -y"
-                " nginx-common nginx-core nginx-full 'libnginx-mod-*' 2>/dev/null; true",
-                timeout=120,
+            # Absent packages fail the removal; only a held lock matters here.
+            removed = run_apt(
+                conn, "apt-get remove -y nginx-common nginx-core nginx-full 'libnginx-mod-*'", timeout=120
             )
+            if apt_lock_held(removed):
+                return StepResult(name=self.name, status="failed", detail=apt_failure(removed))
 
             # Ensure keyrings directory exists (missing on Ubuntu < 22.04)
             conn.run("mkdir -p /etc/apt/keyrings && chmod 755 /etc/apt/keyrings", timeout=15)
@@ -160,16 +160,12 @@ class InstallNginx:
                 timeout=15,
             )
 
-            result = conn.run(
-                "DEBIAN_FRONTEND=noninteractive apt-get update -qq"
-                f" && DEBIAN_FRONTEND=noninteractive apt-get install -y {_APT_KEEP_CONFIG} nginx",
-                timeout=180,
-            )
+            result = run_apt(conn, f"apt-get update -qq && apt-get install -y {_APT_KEEP_CONFIG} nginx", timeout=180)
             if result.returncode != 0:
                 return StepResult(
                     name=self.name,
                     status="failed",
-                    detail=f"Failed to install nginx from official repo: {result.stderr.strip()[:200]}",
+                    detail=f"Failed to install nginx from official repo: {apt_failure(result)}",
                 )
 
             changed = True
@@ -184,10 +180,10 @@ class InstallNginx:
             conn.run(_ENSURE_SITES_INCLUDE, timeout=15)
 
         # -- Ensure stream module is available --
-        conn.run(
-            "DEBIAN_FRONTEND=noninteractive apt-get install -y -qq libnginx-mod-stream 2>/dev/null; true",
-            timeout=120,
-        )
+        # nginx.org builds have stream built in and no such package; the check below decides.
+        stream = run_apt(conn, "apt-get install -y -qq libnginx-mod-stream", timeout=120)
+        if apt_lock_held(stream):
+            return StepResult(name=self.name, status="failed", detail=apt_failure(stream))
         check = conn.run(
             "test -f /usr/lib/nginx/modules/ngx_stream_module.so || nginx -V 2>&1 | grep -q 'with-stream '",
             timeout=15,

@@ -25,6 +25,8 @@
 - **Never `return 444` in HTTPS blocks** — use 403/404 (less fingerprintable).
 - **Legacy stream config yields to V4** — `ConfigureNginx` skips `stream.d/meridian.conf` once a `meridian-v4-*` stream file listens on 443, or `nginx -t` fails on a duplicate listener.
 - **Panel data is the directory, never a named volume** — PostgreSQL uses the `./data` bind mount and the Compose `name:` is pinned; `runtime_migration.py` moves `/opt/remnawave` by one rename after stopping the old stack, refusing mounts or two directories first.
+- **Compose failures keep their end** — `compose_error()` drops progress lines and keeps the tail, and `collect_stack_diagnostics()` adds each container's state, exit code, OOM flag, restarts, health, kernel OOM kills, and the newest log lines; the first 200 characters only ever said "Network … Creating".
+- **Every apt-get goes through `ensure.run_apt()`** — it waits up to 5 minutes while unattended-upgrades or cloud-init holds the lock, and `apt_failure()` names the holder; never `2>/dev/null` apt, or a lock reads as an ordinary failure (the nginx install then fell through to the nginx.org path).
 - **`docker compose restart` keeps the old environment** — after an `env_file` change, `up -d --no-deps --force-recreate`.
 - **Teardown never removes the `meridian` CLI** — an operator-installed copy is how they redeploy.
 - **Teardown keeps what may predate Meridian** — fail2ban stays on (host hardening, like SSH settings), and nginx is stopped only when no operator config remains.

@@ -11,7 +11,7 @@ import shlex
 
 from meridian.facts import ServerFacts
 from meridian.provision.apt_keys import verify_apt_key
-from meridian.provision.ensure import ensure_service_running
+from meridian.provision.ensure import apt_failure, ensure_service_running, run_apt
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.ssh import ServerConnection
 
@@ -41,11 +41,7 @@ class InstallDocker:
             # Ensure compose plugin is available (docker.io from distro
             # doesn't include it; docker-ce does but might be missing)
             if not docker_state.compose_available:
-                conn.run(
-                    "apt-get update -qq && apt-get install -y -qq docker-compose-plugin 2>/dev/null; true",
-                    timeout=120,
-                    env={"DEBIAN_FRONTEND": "noninteractive"},
-                )
+                run_apt(conn, "apt-get update -qq && apt-get install -y -qq docker-compose-plugin", timeout=120)
                 # Verify it's now available
                 recheck = conn.run("docker compose version", timeout=15)
                 if recheck.returncode != 0:
@@ -75,11 +71,7 @@ class InstallDocker:
             # Verify compose plugin (might be missing if manually removed)
             compose_check = conn.run("docker compose version", timeout=15)
             if compose_check.returncode != 0:
-                conn.run(
-                    "apt-get install -y -qq docker-compose-plugin 2>/dev/null; true",
-                    timeout=120,
-                    env={"DEBIAN_FRONTEND": "noninteractive"},
-                )
+                run_apt(conn, "apt-get install -y -qq docker-compose-plugin", timeout=120)
             return StepResult(
                 name=self.name,
                 status="ok",
@@ -89,23 +81,15 @@ class InstallDocker:
         # Remove conflicting packages (only when docker-ce is NOT installed)
         if not docker_ce_installed:
             pkg_list = " ".join(_CONFLICTING_PACKAGES)
-            conn.run(
-                f"apt-get remove -y {pkg_list} 2>/dev/null",
-                timeout=120,
-                env={"DEBIAN_FRONTEND": "noninteractive"},
-            )
+            run_apt(conn, f"apt-get remove -y {pkg_list}", timeout=120)
 
         # Install prerequisites
-        result = conn.run(
-            "apt-get install -y -qq ca-certificates curl gnupg",
-            timeout=120,
-            env={"DEBIAN_FRONTEND": "noninteractive"},
-        )
+        result = run_apt(conn, "apt-get install -y -qq ca-certificates curl gnupg", timeout=120)
         if result.returncode != 0:
             return StepResult(
                 name=self.name,
                 status="failed",
-                detail=f"prerequisite install failed: {result.stderr.strip()[:200]}",
+                detail=f"prerequisite install failed: {apt_failure(result)}",
             )
 
         # Create keyrings directory
@@ -149,10 +133,10 @@ class InstallDocker:
             )
 
         # Install Docker CE
-        result = conn.run(
+        result = run_apt(
+            conn,
             "apt-get update -qq && apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin",
             timeout=300,
-            env={"DEBIAN_FRONTEND": "noninteractive"},
         )
         if result.returncode != 0:
             stderr = result.stderr.strip()
@@ -168,7 +152,7 @@ class InstallDocker:
             return StepResult(
                 name=self.name,
                 status="failed",
-                detail=f"docker-ce install failed: {stderr[:200]}",
+                detail=f"docker-ce install failed: {apt_failure(result)}",
             )
 
         # Ensure Docker service is started and enabled

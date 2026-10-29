@@ -200,7 +200,7 @@ class InstallPackages:
             return StepResult(
                 name=self.name,
                 status="failed",
-                detail=f"apt failed: {stderr[:200]}",
+                detail=f"apt failed: {stderr}",
             )
 
         return StepResult(name=self.name, status="changed" if result.changed else "ok", detail=result.detail)
