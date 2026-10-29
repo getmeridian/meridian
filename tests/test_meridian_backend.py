@@ -9,7 +9,8 @@ from meridian.compiler.errors import TopologyCompileError
 from meridian.compiler.models import CertificatePayload, NodeWorkloadPayload
 from meridian.core.deploy import DeployRequest
 from meridian.core.errors import LocalStateError
-from meridian.core.topology import ExitIntent, TransparentRelayIntent
+from meridian.core.topology import ControlPlaneIntent, ExitIntent, TransparentRelayIntent
+from meridian.setup.default_paths import default_exit_paths
 from meridian.setup.single_server import request_intent, single_server_intent
 
 ADDRESS = "198.51.100.10"
@@ -52,34 +53,66 @@ def test_meridian_baseline_skips_docker() -> None:
     assert baseline.payload.install_docker is False  # type: ignore[union-attr]
 
 
+def _relay() -> TransparentRelayIntent:
+    return TransparentRelayIntent(id="r1", hop_server_refs=["srv-r"], exit_ref="main", protocol_path_ref="main-reality")
+
+
+def _second_exit() -> ExitIntent:
+    return ExitIntent(id="de", server_ref="srv-b", paths=default_exit_paths("de", address="198.51.100.20"))
+
+
 @pytest.mark.parametrize(
     ("changes", "named"),
     [
         ({"forward_client_ips": True}, "client IP forwarding"),
         (
             {
-                "transparent_relays": [
-                    TransparentRelayIntent(
-                        id="r1", hop_server_refs=["srv-r"], exit_ref="main", protocol_path_ref="main-reality"
-                    )
-                ]
+                "control": ControlPlaneIntent(
+                    server_ref="srv-a", public_hostname="panel.example.com", backend="meridian"
+                )
             },
-            "transparent relays",
+            "control-plane domain",
         ),
     ],
-    ids=["client-ips", "relay"],
+    ids=["client-ips", "control-domain"],
 )
-def test_meridian_backend_refuses_what_the_skeleton_cannot_run(changes: dict[str, object], named: str) -> None:
+def test_meridian_backend_refuses_what_the_service_cannot_run(changes: dict[str, object], named: str) -> None:
     with pytest.raises(TopologyCompileError, match=named):
         compile_topology(_intent(**changes))
 
 
-def test_meridian_backend_refuses_an_exit_off_the_control_server() -> None:
+def test_meridian_backend_refuses_a_control_server_without_an_exit() -> None:
     intent = _intent()
-    moved = ExitIntent.model_validate({**intent.exits[0].model_dump(), "server_ref": "srv-b"})
+    moved = intent.exits[0].model_copy(update={"server_ref": "srv-b"})
 
-    with pytest.raises(TopologyCompileError, match="one on the control server"):
+    with pytest.raises(TopologyCompileError, match="control server without an exit"):
         compile_topology(intent.model_copy(update={"exits": [moved]}))
+
+
+def test_every_exit_gets_its_own_agent_and_workload() -> None:
+    plan = compile_topology(_intent(exits=[*_intent().exits, _second_exit()]))
+    placed = {
+        (item.payload.kind, item.payload.server_ref)
+        for item in plan.resources
+        if item.payload.kind in {"agent_runtime", "node_workload"}
+    }  # type: ignore[union-attr]
+
+    assert placed == {
+        ("agent_runtime", "srv-a"),
+        ("node_workload", "srv-a"),
+        ("agent_runtime", "srv-b"),
+        ("node_workload", "srv-b"),
+    }
+
+
+def test_relay_endpoint_takes_its_keys_from_the_exit_and_its_address_from_the_relay() -> None:
+    plan = compile_topology(_intent(transparent_relays=[_relay()]))
+    relay = next(item for item in plan.resources if item.logical_id == "endpoint:r1:main-reality")
+
+    assert relay.payload.workload_ref == "main"  # type: ignore[union-attr]
+    assert relay.payload.address_server_ref == "srv-r"  # type: ignore[union-attr]
+    assert "workload:main" in relay.dependencies
+    assert any(item.payload.kind == "realm_hop" for item in plan.resources)
 
 
 def test_default_backend_stays_out_of_saved_intent() -> None:

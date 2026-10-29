@@ -42,11 +42,10 @@ SERVICE_SETTINGS_ID = "settings:service"
 
 
 def validate_meridian_backend(intent: SetupIntent) -> None:
-    """Refuse what the skeleton cannot run yet: it is one exit on the control server."""
+    """Refuse what the control service cannot run yet: exits and Realm relays over bare IPs only."""
     unsupported = [
         name
         for name, present in (
-            ("transparent relays", bool(intent.transparent_relays)),
             ("routing gateways", bool(intent.routing_gateways)),
             ("egress pools", bool(intent.egress_pools)),
             ("routes", bool(intent.routes)),
@@ -59,8 +58,9 @@ def validate_meridian_backend(intent: SetupIntent) -> None:
         )
         if present
     ]
-    if len(intent.exits) != 1 or intent.exits[0].server_ref != intent.control.server_ref:
-        unsupported.append("exits other than one on the control server")
+    if not any(exit_.server_ref == intent.control.server_ref for exit_ in intent.exits):
+        # The control bootstrap takes its nginx Reality route from the exit beside it.
+        unsupported.append("a control server without an exit")
     if unsupported:
         raise TopologyCompileError("Meridian's control service does not support " + ", ".join(unsupported) + " yet.")
 
@@ -134,7 +134,8 @@ def to_meridian_backend(builder: PlanBuilder) -> PlanBuilder:
                 "endpoint:" + logical_id.removeprefix("host:"),
                 ClientEndpointPayload(
                     owner_ref=payload.owner_ref,
-                    workload_ref=payload.owner_ref,
+                    # A relay owns its Host, but the keys belong to the exit whose node serves it.
+                    workload_ref=_workload_of(payload, old),
                     remark=payload.remark,
                     protocol=payload.protocol,
                     address_server_ref=payload.address_server_ref,
@@ -209,6 +210,13 @@ def _panel_only(payload: ResourcePayload, old: dict[str, CompiledResource]) -> b
         node_ports = {item.payload.api_port for item in old.values() if isinstance(item.payload, NodeRuntimePayload)}
         return bool(payload.source_server_refs) and payload.port in node_ports
     return False
+
+
+def _workload_of(host: HostPayload, old: dict[str, CompiledResource]) -> str:
+    runtime = old[host.node_ref].payload
+    if not isinstance(runtime, NodeRuntimePayload):
+        raise TopologyCompileError(f"Host {host.remark!r} is not served by an exit node.")
+    return runtime.workload_ref
 
 
 def _rewrite(dependencies: list[str], renamed: dict[str, str | None], owner: str) -> list[str]:
