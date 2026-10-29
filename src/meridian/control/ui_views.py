@@ -32,6 +32,15 @@ def applied_intent(service: ControlService) -> tuple[int | None, dict[str, Any]]
     return None, {}
 
 
+def declared_users(intent: dict[str, Any]) -> list[str]:
+    """The people an applied intent declares: the deployer's CLI owns their existence and links."""
+    return [str(name) for name in _access(intent).get("users", []) if isinstance(name, str)]
+
+
+def is_declared(service: ControlService, username: str) -> bool:
+    return username in declared_users(applied_intent(service)[1])
+
+
 def fleet_view(service: ControlService) -> FleetView:
     number, intent = applied_intent(service)
     roles: dict[str, tuple[Literal["exit", "gateway", "node"], str]] = {}
@@ -39,9 +48,8 @@ def fleet_view(service: ControlService) -> FleetView:
         roles[str(exit_.get("id", ""))] = ("exit", str(exit_.get("region") or ""))
     for gateway in _items(intent, "routing_gateways"):
         roles[str(gateway.get("id", ""))] = ("gateway", str(gateway.get("region") or ""))
-    access = _access(intent)
-    declared = [str(name) for name in access.get("users", []) if isinstance(name, str)]
-    names = access.get("display_names", {})
+    declared = declared_users(intent)
+    names = _access(intent).get("display_names", {})
     display_names = {str(k): str(v) for k, v in names.items()} if isinstance(names, dict) else {}
     traffic = service.traffic.node_totals()
     servers: list[ServerView] = []
@@ -82,14 +90,14 @@ def share_view(service: ControlService, username: str) -> ShareView:
     user = service.get_user(username)
     if user is None:
         raise ServiceError("not_found", "Unknown user.", 404)
+    declared = is_declared(service, username)
     base = service.settings().public_url
     if not base:
-        return ShareView(username=username, subscription_url="", page_url="", qr_svg="")
+        return ShareView(username=username, declared=declared, subscription_url="", page_url="", qr_svg="")
     subscription = f"{base}/sub/{user.sub_token}"
-    _, intent = applied_intent(service)
-    declared = username in _access(intent).get("users", [])
     return ShareView(
         username=username,
+        declared=declared,
         subscription_url=subscription,
         page_url=f"{base}/{user.uuid}/" if declared else "",
         qr_svg=qr_data_uri(subscription),

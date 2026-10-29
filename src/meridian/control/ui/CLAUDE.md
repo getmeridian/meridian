@@ -4,7 +4,7 @@
 - **Served by the service, under the secret path** — `ui_routes.py` serves `index.html` at `/` and these files at `/ui/<name>`; the API lives in the same process, so there is no CORS, no build step, and no outside request (system fonts, a local icon, QR codes are SVG data URIs from `segno`).
 - **Vanilla JS on one namespace** — `boot.js` sets theme and direction before paint; `core.js` owns `M.h` (the only DOM builder), `M.api`, dialogs, and formatting; each screen file adds `M.screens.*`; `app.js` runs the state machine (setup link → no owner → sign in → shell).
 - **The console changes only what the service owns** — People (add, link and QR, enable/disable, expiry, limits and reset strategy, reset traffic, reissue, remove), API tokens (secret shown once, revoke), and the fleet title. Servers and Revisions are read-only, and topology screens print the `meridian` command instead of offering a button.
-- **People the deployer declared stay the deployer's** — `ui_views.fleet_view` marks users in the latest revision's intent; removing one shows `meridian client remove NAME` (an apply would recreate them), and only they have a connection page.
+- **People the deployer declared stay the deployer's** — users in the last applied revision's intent (`ui_views.is_declared`, `declared` on each share view, `declared_users` on the fleet view); only they have a connection page. Removing one or issuing a new link shows `meridian client remove|reissue NAME`, and the service refuses both to an owner session (`declared_user`); API tokens stay allowed.
 - **Same locale approach as the PWA** — `locales/{en,ru,fa,zh}.json`, English fallback, `fa` sets `dir="rtl"`; numbers and sizes are bidi-isolated.
 - **Passkeys are a seam** — `PasskeyState` reports `no_domain` on a bare IP and `not_built` otherwise; py_webauthn would add pyOpenSSL, pyasn1, and cbor2 to every CLI install, and attestation is never parsed by hand.
 
@@ -25,4 +25,5 @@
 - `M.busy` ignores a `cancelled` step-up — closing the password check once showed a generic error.
 - Treat page input as hostile: decode the hash through `M.route()`'s guard (a bare `%` threw at boot, and retry reloaded the same hash) and read name maps with `M.has()` (a person named `toString` broke People).
 - Adding a person sends the limits PATCH for any reset period but `no_reset`, byte limit or not; it once skipped it and the person kept `no_reset` whatever the form said.
+- Judge "declared" from the person's own share view, never only the fleet list fetched at boot — a console reissue once moved a declared person's UUID while their page stayed under the old one (the service cannot write `/var/www/private/`), and a stale list offered Remove.
 - Keep each script under 800 lines and every `M.t("…")` key in `en.json`; the asset tests read literal keys only.

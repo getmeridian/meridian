@@ -88,10 +88,14 @@
       search,
       list,
     ]);
-    M.api("GET", "api/users").then(function (data) {
-      users = data.users || [];
-      draw();
-    }, function (e) { M.mount(list, h("div", { class: "notice notice-err", text: M.errorText(e) })); });
+    // The fleet view comes again with the list: who is declared changes whenever the deployer applies.
+    Promise.all([M.api("GET", "api/users"), M.api("GET", "ui/api/fleet").then(function (fleet) {
+      M.state.fleet = fleet;
+    }, function () { /* keep the last fleet view; the person screen and the service decide */ })])
+      .then(function (results) {
+        users = results[0].users || [];
+        draw();
+      }, function (e) { M.mount(list, h("div", { class: "notice notice-err", text: M.errorText(e) })); });
   };
 
   /* Limits as a form block, shared by "add" and the person screen. */

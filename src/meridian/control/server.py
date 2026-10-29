@@ -54,6 +54,7 @@ from meridian.control.service import ControlService
 from meridian.control.times import utc_now
 from meridian.control.tokens import ROOT, WEB_OWNER, Caller, unauthenticated
 from meridian.control.ui_routes import UI_ROUTES, UiContext, owner_session
+from meridian.control.ui_views import is_declared
 from meridian.core.agent_http import AGENT_HTTP_SURFACE
 from meridian.core.agent_protocol import EnrollRequest, ObservedStateReport, PollRequest, RenewRequest, StatsReport
 
@@ -323,14 +324,27 @@ class _Handler(BaseHTTPRequestHandler):
         return self._service.update_user(match[1], self._model(UserUpdate))
 
     def reissue_user(self, match: re.Match[str]) -> Any:
+        self._refuse_declared(match[1], "meridian client reissue")
         return self._service.reissue_user(match[1])
 
     def reset_user_traffic(self, match: re.Match[str]) -> Any:
         return self._service.reset_user_traffic(match[1])
 
     def delete_user(self, match: re.Match[str]) -> Any:
+        self._refuse_declared(match[1], "meridian client remove")
         self._service.delete_user(match[1])
         return {"deleted": match[1]}
+
+    def _refuse_declared(self, username: str, command: str) -> None:
+        """A person the deployer declared is the CLI's to remove or relink: only it moves their connection page.
+
+        An API token (the CLI itself, or a script acting for the deployer) stays allowed;
+        the web owner is told the command instead.
+        """
+        if self.owner_session is not None and is_declared(self._service, username):
+            raise ServiceError(
+                "declared_user", f"The fleet file declares {username}; run `{command} {username}` instead.", 409
+            )
 
     def get_endpoint(self, match: re.Match[str]) -> Any:
         endpoint = self._service.get_endpoint(match[1])

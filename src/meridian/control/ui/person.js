@@ -41,7 +41,7 @@
         M.statusPill(user.status)),
       shareCard(share),
       h("div", { class: "cards" }, usageCard(user), accessCard(user)),
-      dangerCard(user),
+      dangerCard(user, share.declared),
     ]);
   }
 
@@ -125,15 +125,17 @@
       form);
   }
 
-  function dangerCard(user) {
+  /* `declared` comes with this person's share view, fresh from the service: the CLI moves a declared
+   * person's connection page with their link, so a new link and removal are its commands. */
+  function dangerCard(user, declared) {
     var name = user.username;
-    var declared = M.isDeclared(name);
     return h("section", { class: "card card-danger" },
       h("h2", { text: M.t("person.danger") }),
       h("div", { class: "danger-row" },
         h("div", {}, h("p", { class: "strong", text: M.t("person.reissue") }),
-          h("p", { class: "muted small", text: M.t("person.reissue_text") })),
-        h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
+          h("p", { class: "muted small", text: M.t(declared ? "person.reissue_declared" : "person.reissue_text") }),
+          declared ? M.command("meridian client reissue " + name) : null),
+        declared ? null : h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
           M.confirm(M.t("person.reissue_title"), M.t("person.reissue_confirm"), M.t("person.reissue"), true)
             .then(function (ok) {
               if (ok) act(name, function () { return M.api("POST", path(name, "/reissue"), {}); }, "person.reissued_toast");

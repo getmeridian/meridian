@@ -152,6 +152,7 @@
   "person.danger": "Links and removal",
   "person.reissue": "Issue a new link",
   "person.reissue_text": "For a link that leaked. The old link and QR code stop working at once.",
+  "person.reissue_declared": "Your fleet file lists this person, and their connection page moves with the link. Issue it on your computer:",
   "person.reissue_title": "Issue a new link?",
   "person.reissue_confirm": "The current link stops working at once. You'll need to send the new one.",
   "person.reissued_toast": "New link issued. Send it to them.",
@@ -274,5 +275,6 @@
   "error.insufficient_scope": "This needs more access than you have.",
   "error.invalid_request": "Some of the values aren't valid.",
   "error.conflict": "Something changed meanwhile. Reload and try again.",
+  "error.declared_user": "Your fleet file lists this person. Change them with meridian on your computer.",
   "error.internal": "The control service hit an error. Try again."
 }

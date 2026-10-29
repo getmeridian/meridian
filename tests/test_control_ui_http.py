@@ -316,15 +316,21 @@ def test_repeated_wrong_passwords_answer_429_with_retry_after(fleet: Fleet) -> N
 # -- views ---------------------------------------------------------------------------------------
 
 
+def _declare(service: ControlService, *names: str) -> int:
+    """Record an applied revision whose intent declares `names`, as the deployer's apply does."""
+    proposal = RevisionProposal(intent={"access": {"users": list(names)}}, plan_hash="1" * 64, review_hash="2" * 64)
+    number = service.revisions.propose(proposal, caller=ROOT).number
+    service.revisions.approve(number, caller=ROOT)
+    service.revisions.record_result(number, RevisionResult(status="applied"))
+    return number
+
+
 def test_share_links_need_admin_and_pages_only_for_declared_people(fleet: Fleet) -> None:
     service = fleet.service
     service.put_settings(ServiceSettings(profile_title="Meridian", public_url="https://198.51.100.7/c0nn"))
     for name in ("alice", "bob"):
         service.put_user(name)
-    proposal = RevisionProposal(intent={"access": {"users": ["alice"]}}, plan_hash="1" * 64, review_hash="2" * 64)
-    number = service.revisions.propose(proposal, caller=ROOT).number
-    service.revisions.approve(number, caller=ROOT)
-    service.revisions.record_result(number, RevisionResult(status="applied"))
+    number = _declare(service, "alice")
     read = fleet.call("POST", "/api/tokens", {"name": "viewer", "scope": "read"}, bearer=ADMIN_TOKEN).body["token"]
     assert fleet.call("GET", "/ui/api/people/alice/share", bearer=read).status == 403
     alice = fleet.call("GET", "/ui/api/people/alice/share", bearer=ADMIN_TOKEN).body
@@ -333,7 +339,9 @@ def test_share_links_need_admin_and_pages_only_for_declared_people(fleet: Fleet)
     assert alice["subscription_url"] == f"https://198.51.100.7/c0nn/sub/{user.sub_token}"
     assert alice["page_url"] == f"https://198.51.100.7/c0nn/{user.uuid}/"
     assert alice["qr_svg"].startswith("data:image/svg+xml")
-    assert fleet.call("GET", "/ui/api/people/bob/share", bearer=ADMIN_TOKEN).body["page_url"] == ""
+    assert alice["declared"] is True
+    bob = fleet.call("GET", "/ui/api/people/bob/share", bearer=ADMIN_TOKEN).body
+    assert bob["page_url"] == "" and bob["declared"] is False
     view = fleet.call("GET", "/ui/api/fleet", bearer=read).body
     assert view["declared_users"] == ["alice"] and view["intent_revision"] == number
 
@@ -390,3 +398,24 @@ def test_every_shipped_asset_is_reachable(fleet: Fleet) -> None:
         relative = path.relative_to(UI_DIR).as_posix()
         if path.is_file() and path.suffix in (".js", ".css", ".svg", ".json"):
             assert fleet.call("GET", f"/ui/{relative}").status == 200, relative
+
+
+def test_declared_people_are_the_clis_to_remove_or_relink(fleet: Fleet) -> None:
+    """The CLI moves a declared person's page under the new UUID; a console reissue left it at the old one."""
+    fleet.set_up()
+    service = fleet.service
+    for name in ("alice", "bob"):
+        service.put_user(name)
+    _declare(service, "alice")
+    before = service.get_user("alice")
+    assert before is not None
+    for method, path in (("POST", "/api/users/alice/reissue"), ("DELETE", "/api/users/alice")):
+        refused = fleet.ui(method, path, {} if method == "POST" else None)
+        assert refused.status == 409 and refused.body["error"]["code"] == "declared_user", path
+    after = service.get_user("alice")
+    assert after is not None and after.uuid == before.uuid
+    assert fleet.ui("GET", "/ui/api/people/alice/share").body["declared"] is True
+    assert fleet.ui("POST", "/api/users/bob/reissue", {}).status == 200  # the console's own people stay its own
+    assert fleet.ui("DELETE", "/api/users/bob").status == 200
+    assert fleet.call("POST", "/api/users/alice/reissue", {}, bearer=ADMIN_TOKEN).status == 200  # the CLI may
+    assert fleet.call("DELETE", "/api/users/alice", bearer=ADMIN_TOKEN).status == 200
