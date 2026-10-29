@@ -23,7 +23,8 @@ export const commandCatalog = {
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json",
-        "--include-schemas"
+        "--include-schemas",
+        "--context"
       ],
       "outcomes": [
         {
@@ -79,7 +80,8 @@ export const commandCatalog = {
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--envelope",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -134,7 +136,8 @@ export const commandCatalog = {
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json",
-        "--include-schemas"
+        "--include-schemas",
+        "--context"
       ],
       "outcomes": [
         {
@@ -189,7 +192,8 @@ export const commandCatalog = {
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -243,7 +247,9 @@ export const commandCatalog = {
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--yes",
-        "--json"
+        "--forget-unreachable",
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -310,7 +316,8 @@ export const commandCatalog = {
         "--user",
         "--ssh-port",
         "--ai",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -365,14 +372,18 @@ export const commandCatalog = {
         "0": "all requested clients were added",
         "1": "unexpected Meridian bug",
         "2": "invalid input or client conflict",
-        "3": "clients were added with failed requests or incomplete page/local-state follow-up; system or panel failure",
+        "3": "clients were added with failed requests or incomplete page, limits, or local-state follow-up; system or panel failure",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
+        "--limit",
+        "--reset",
+        "--expires",
         "--json",
-        "--yes"
+        "--yes",
+        "--context"
       ],
       "outcomes": [
         {
@@ -384,7 +395,7 @@ export const commandCatalog = {
         {
           "category": "none",
           "exit_code": 3,
-          "meaning": "clients were added with failed requests or incomplete page/local-state follow-up",
+          "meaning": "clients were added with failed requests or incomplete page, limits, or local-state follow-up",
           "status": "ok"
         },
         {
@@ -433,7 +444,8 @@ export const commandCatalog = {
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -488,7 +500,8 @@ export const commandCatalog = {
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -542,7 +555,8 @@ export const commandCatalog = {
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -598,7 +612,8 @@ export const commandCatalog = {
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--yes",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -660,7 +675,8 @@ export const commandCatalog = {
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--yes",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -679,6 +695,121 @@ export const commandCatalog = {
           "category": "user",
           "exit_code": 2,
           "meaning": "client not found or input error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or panel failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "reset-traffic",
+        "NAME"
+      ],
+      "command": "client.reset-traffic",
+      "data_schema": "client-limits",
+      "description": "Start a client's used traffic from zero; a client cut off by their limit connects again",
+      "envelope_schema": "client-reset-traffic-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "client traffic was reset",
+        "1": "unexpected Meridian bug",
+        "2": "client not found or input error",
+        "3": "system or panel failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "client traffic was reset",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "client not found or input error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or panel failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "set",
+        "NAME"
+      ],
+      "command": "client.set",
+      "data_schema": "client-limits",
+      "description": "Change a client's traffic limit, reset period, or expiry",
+      "envelope_schema": "client-set-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "client limits were changed",
+        "1": "unexpected Meridian bug",
+        "2": "client not found, nothing to change, or an invalid size, period, or date",
+        "3": "system or panel failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--limit",
+        "--reset",
+        "--expires",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "client limits were changed",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "client not found, nothing to change, or an invalid size, period, or date",
           "status": "failed"
         },
         {
@@ -722,7 +853,8 @@ export const commandCatalog = {
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json",
-        "--repair-page"
+        "--repair-page",
+        "--context"
       ],
       "outcomes": [
         {
@@ -757,6 +889,53 @@ export const commandCatalog = {
         }
       ],
       "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "context",
+        "list"
+      ],
+      "command": "context.list",
+      "data_schema": "context-list",
+      "description": "List your fleets, marking the current one with *",
+      "envelope_schema": "context-list-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "contexts were listed from local state",
+        "1": "unexpected Meridian bug",
+        "2": "context or local-state error",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "contexts were listed from local state",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "context or local-state error",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
       "statuses": [
         "ok",
         "failed"
@@ -809,7 +988,9 @@ export const commandCatalog = {
         "--events",
         "--request",
         "--dry-run",
-        "--cancel-file"
+        "--cancel-file",
+        "--control",
+        "--context"
       ],
       "outcomes": [
         {
@@ -877,7 +1058,8 @@ export const commandCatalog = {
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -938,7 +1120,8 @@ export const commandCatalog = {
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1004,7 +1187,8 @@ export const commandCatalog = {
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1063,7 +1247,8 @@ export const commandCatalog = {
       "failure_data_schema": "plan-failure",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1127,7 +1312,8 @@ export const commandCatalog = {
       "machine_flags": [
         "--sni",
         "--timeout",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1188,7 +1374,8 @@ export const commandCatalog = {
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--exit",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1233,7 +1420,7 @@ export const commandCatalog = {
         "route",
         "add",
         "EXIT",
-        "VALUE..."
+        "[VALUE...]"
       ],
       "command": "route.add",
       "data_schema": "route-mutation",
@@ -1251,8 +1438,10 @@ export const commandCatalog = {
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--via",
+        "--preset",
         "--name",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1306,7 +1495,8 @@ export const commandCatalog = {
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1357,7 +1547,8 @@ export const commandCatalog = {
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--yes",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1418,7 +1609,8 @@ export const commandCatalog = {
         "--basic",
         "--probe",
         "--timeout",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {

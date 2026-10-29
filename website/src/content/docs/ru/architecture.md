@@ -145,3 +145,5 @@ Backend-порты Xray достигаются через nginx; UFW блоки�
 - `~/.config/meridian/cache/` — кэш проверки обновлений
 
 Каталог следует `$XDG_CONFIG_HOME`, если эта переменная задана, а `MERIDIAN_HOME` переопределяет его. Пока `~/.config/meridian/` не существует, Meridian также использует `~/.meridian-v4/` или `~/.meridian/`, если в одном из них лежат ваши серверы (в нём есть `servers.json`). Состояние Meridian 3.x в `~/.meridian/` никогда не затрагивается.
+
+На одном компьютере можно держать несколько наборов серверов как контексты (`meridian context`). Этот каталог — контекст `default`; другой контекст хранит свои `cluster.yml`, его резервную копию, `servers.json` и `setup.json` в `contexts/NAME/`, а SSH-ключ, кэш проверки обновлений, выбор языка и локальный Xray остаются общими. Контекст выбирают `--context`, затем `MERIDIAN_CONTEXT`, затем сохранённый `current-context`; `MERIDIAN_HOME` закрепляет один набор.

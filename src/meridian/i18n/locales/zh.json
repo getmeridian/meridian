@@ -258,5 +258,21 @@
   "sni.failed": "{subject} 的伪装 SNI 更改未能完成",
   "sni.failed_hint": "拓扑已使用 {sni}；排除原因后重新运行 `meridian apply`。",
   "sni.changed": "{subject} 的伪装 SNI 现在是 {sni}",
-  "sni.check_it": "检查：meridian test（加 --probe 查看审查方视角）"
+  "sni.check_it": "检查：meridian test（加 --probe 查看审查方视角）",
+  "context.creating": "新上下文 {name}：本次运行会在其中建立服务器组。切换过去：`meridian context use {name}`。",
+  "context.empty": "还没有服务器",
+  "context.unreadable": "本地文件需要修复",
+  "context.pinned": "MERIDIAN_HOME 把一组服务器固定在 {path}；取消该变量即可使用上下文。",
+  "context.exit_one": "{count} 个出口",
+  "context.exit_many": "{count} 个出口",
+  "context.relay_one": "{count} 个中继",
+  "context.relay_many": "{count} 个中继",
+  "context.gateway_one": "{count} 个路由网关",
+  "context.gateway_many": "{count} 个路由网关",
+  "context.switched": "现在操作 {name}",
+  "context.env_override": "{env} 设为 {name}，在当前 shell 中仍然优先",
+  "context.renamed": "已将上下文 {old} 重命名为 {new}",
+  "context.remove_confirm": "{name} 仍有 {count} 台服务器。只删除本机保存的副本吗？服务器会继续运行，但本机将无法再管理它们。",
+  "context.remove_confirm_unreadable": "无法读取 {name} 的文件，它可能仍有服务器。只删除本机保存的副本吗？服务器会继续运行。",
+  "context.removed": "已删除上下文 {name}；其服务器未受影响"
 }

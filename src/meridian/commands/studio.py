@@ -10,6 +10,7 @@ from pathlib import Path
 
 import uvicorn
 
+from meridian import config
 from meridian.console import err_console, fail, info, ok, warn
 from meridian.engine.api import create_engine_app
 from meridian.engine.assets import resolve_studio_assets
@@ -43,6 +44,9 @@ def run(port: int | None = None, *, assets_dir: str = "", no_open: bool = False)
     url = studio_url(host, resolved_port, session_key)
 
     info(f"Serving Studio assets from {assets}")
+    if not config.PINNED_HOME:
+        # Fixed at launch: Studio's deploys pass --context, so `context use` elsewhere never moves them.
+        info(f"Fleet: context {config.CONTEXT} ({config.HOME_DISPLAY})")
     ok("Meridian Studio is running. Open this address:")
     # soft_wrap keeps the long key on one line, so copying it from the terminal works.
     err_console.print(f"    {url}", soft_wrap=True, markup=False, highlight=False)

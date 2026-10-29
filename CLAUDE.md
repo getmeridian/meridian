@@ -21,6 +21,7 @@ Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
 - **Server stack:** nginx (stream SNI routing, HTTP TLS, reverse proxy), acme.sh, Xray (VLESS+Reality, XHTTP, Hysteria2 over UDP), and Remnawave (panel, node, PostgreSQL, Valkey, subscription page), all pinned.
 - **Domain mode:** XHTTP moves onto the domain and WSS is added, both able to ride Cloudflare's CDN.
 - **Roles:** relays are L4 TCP forwarders (Realm); one server can hold several roles, such as relay and exit.
+- **Contexts:** one machine keeps several fleets (`meridian context`); the home is the `default` one, others live in `contexts/NAME/`, and the SSH key is shared.
 - **Plan and apply:** every fleet is a reviewed `topology_intent` in `cluster.yml`; `meridian plan` / `apply` compile it and reconcile resource drivers.
 - **Website and Studio:** Astro, with docs on Starlight (every page also served as Markdown for agents). Static Studio consumes generated contracts; executable Studio runs through a localhost-only Engine (`meridian studio`) for server onboarding, deploy dry-runs, and deploys.
 - **Real-VM harness:** optional, local-only, in `tests/realvm/`.

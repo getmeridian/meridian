@@ -258,5 +258,21 @@
   "sni.failed": "The camouflage SNI change of {subject} did not converge",
   "sni.failed_hint": "The topology already uses {sni}; fix the cause and rerun `meridian apply`.",
   "sni.changed": "The camouflage SNI of {subject} is now {sni}",
-  "sni.check_it": "Check it: meridian test (add --probe for what a censor sees)"
+  "sni.check_it": "Check it: meridian test (add --probe for what a censor sees)",
+  "context.creating": "New context {name}: this run starts its fleet. Switch to it with `meridian context use {name}`.",
+  "context.empty": "no servers yet",
+  "context.unreadable": "local files need repair",
+  "context.pinned": "MERIDIAN_HOME keeps one fleet in {path}; unset it to use contexts.",
+  "context.exit_one": "{count} exit",
+  "context.exit_many": "{count} exits",
+  "context.relay_one": "{count} relay",
+  "context.relay_many": "{count} relays",
+  "context.gateway_one": "{count} routing gateway",
+  "context.gateway_many": "{count} routing gateways",
+  "context.switched": "Now working on {name}",
+  "context.env_override": "{env} is set to {name}, which still wins in this shell",
+  "context.renamed": "Renamed context {old} to {new}",
+  "context.remove_confirm": "{name} still has {count} server(s). Delete only this machine's copy of its fleet? The servers keep running, but this machine can no longer manage them.",
+  "context.remove_confirm_unreadable": "{name}'s files cannot be read, so it may still have servers. Delete only this machine's copy? The servers keep running.",
+  "context.removed": "Removed context {name}; its servers were not touched"
 }

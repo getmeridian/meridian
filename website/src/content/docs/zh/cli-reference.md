@@ -274,6 +274,35 @@ meridian fleet upgrade [--tested] [--yes]
 
 **`fleet upgrade`** — 无需等待 Meridian 更新，即可将 Remnawave 升级到最新版本。它会向 Docker Hub 查询当前 Meridian 版本所支持主版本内最新的后端、节点和订阅页面版本（跳过预发布版和其他主版本），按多架构摘要固定每个镜像，并将选择保存到 `cluster.yml`，供之后的 `apply` 沿用；后续 Meridian 版本若带有更新的固定版本，则会自动接管。`--tested` 仅使用当前 Meridian 版本测试过的版本。PostgreSQL 和 Valkey 始终保持在 Meridian 的固定版本上。如果集群中有中继，它对 Realm 也会执行同样操作：选用 GitHub 上已测试主版本内的最新版本，并记录 GitHub 为每个压缩包发布的 sha256，每个中继在安装前都会校验。随后它通过 SSH 只读执行 `docker inspect`，读取每台服务器上运行的后端、订阅页面、PostgreSQL、Valkey 和节点镜像，并将每项显示为 `current`、`upgrade`、`install` 或保留。版本策略与 `setup` 一致：你自行选择的更新版本标签或浮动标签（`latest`、`3`）会保留并报告，绝不降级。PostgreSQL 主版本绝不会原地升级——旧主版本会继续运行，命令会说明所需的导出与恢复步骤。在你确认后，它会应用审核后的计划并在每台服务器上运行 `meridian check`。如果某台服务器的镜像无法读取，命令会在做任何改动前以退出码 `3` 停止；如果 `apply` 已收敛但某台服务器仍在运行旧镜像，同样以 `3` 退出。
 
+### meridian context
+
+在一台电脑上保存多组互相独立的服务器（例如一组给家人、一组用于工作），并选择命令作用于哪一组。
+
+```
+meridian context list [--json]
+meridian context use NAME
+meridian context rename OLD NEW
+meridian context remove NAME [--yes]
+```
+
+| 标志 | 默认值 | 说明 |
+|------|---------|-------------|
+| `--json` | | `context list`：输出 `meridian.output/v1` 信封 |
+| `--yes`, `-y` | | `context remove`：不经询问删除仍有服务器的上下文 |
+
+**`context list`** — 列出每个上下文的控制服务器以及出口、中继和路由网关的数量，只读取本机保存的信息；`*` 标记当前上下文：
+
+```
+  * default   198.51.100.10    2 exits, 1 relay
+    family    198.51.100.40    1 exit
+```
+
+**`context use`** — 让之后的所有命令都作用于 NAME。`meridian deploy IP --context NAME` 会创建新上下文，任何命令都可以加 `--context NAME` 临时操作另一组服务器。
+
+**`context rename`** — 重命名上下文，不影响其服务器。
+
+**`context remove`** — 只删除本机上该上下文的文件，从不连接服务器：服务器继续运行，但本机将无法再管理它们。它拒绝删除当前上下文；如果该组仍有服务器，会先询问（`--yes` 跳过询问）。`default` 上下文就是 Meridian 的主目录本身，因此既不能重命名也不能删除。
+
 ### meridian check
 
 检查服务器健康状态，或检查一台新服务器能否运行 Meridian。检查项取决于服务器在集群中的角色：
@@ -465,6 +494,7 @@ meridian help [agents | COMMAND...]
 | `--version`, `-v` | 显示 CLI 版本并退出 |
 | `--verbose` | 启用调试日志 |
 | `--quiet`, `-q` | 压制进度输出 |
+| `--context NAME` | 操作另一组服务器（[meridian context](#meridian-context)）；默认：`MERIDIAN_CONTEXT`，否则为当前上下文。也可以写在命令之后，如 `meridian deploy 203.0.113.5 --context work` |
 | `--lang CODE` | 设置向导的语言：`en`、`ru`、`fa` 或 `zh`（默认：已保存的选择，否则询问） |
 | `--json` | 从支持它的命令请求 JSON 信封；其他命令明确失败 |
 | `--install-completion` | 为当前 shell 安装补全 |

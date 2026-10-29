@@ -18,7 +18,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 **Integration-level verification** — tests pin contracts (API returns X → we handle Y), not one test per function.
 **Xray routing runtime** — `MERIDIAN_TEST_XRAY=/path/to/xray uv run pytest tests/test_client_routes_runtime.py` runs real TCP/UDP packets against loopback outbounds. CI supplies the checksum-verified pinned binary on Python 3.12; ordinary local tests skip it unless opted in. `MERIDIAN_TEST_MIHOMO` (+ `MERIDIAN_TEST_MIHOMO_GEODATA`) and `MERIDIAN_TEST_SINGBOX` likewise run `mihomo -t`/`sing-box check` on the control service's documents (`test_control_subscription_formats.py`).
 **MockConnection** — `conn.when("pattern", stdout=..., rc=0)` stubs SSH commands by substring; first match wins, unmatched commands succeed, so register only what differs.
-**`tmp_home`** isolates the Meridian home (`MERIDIAN_HOME`) per test; **`servers_file`** is an isolated server-profile store.
+**`tmp_home`** isolates a pinned Meridian home (`MERIDIAN_HOME`) per test; **`servers_file`** is an isolated server-profile store; `test_contexts.py`'s `install` fixture unpins it to exercise contexts.
 **Shared doubles and builders live in `tests/support/`** — `mock_connection.py`, `CaptureReporter`, `CancellationFlag`, `fence_host.py` (an SSH fence.json double), `control_service.py` (`serve_control`: a real loopback control service), and `topology.py` (`single_exit_intent`, `resource_plan`, `firewall_resource`, `panel_mock`). Search there before writing a local intent, plan, or panel builder.
 
 ## What's done well
@@ -29,7 +29,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - **RFC 5737 IPs** — always `198.51.100.x` for test data, never real IPs.
 
 ## Pitfalls
-- **`tmp_home` must patch both** — env var AND `meridian.config` attributes.
+- **`tmp_home` must patch both** — env var AND `meridian.config` attributes; patch `meridian.config.NAME`, never a command module's copy (there are none).
 - **MockConnection substring matching** — `when("grep", rc=1)` matches ANY command containing "grep". Use specific patterns.
 - **Don't restate registries** — a test that copies a constant, catalog, or schema list fails on every legitimate edit; assert behaviour or let the contract drift check do it.
 - **`make dead-code` flags production code only tests use** — keep system-lab-only helpers in `tests/systemlab/subscription_client.py`.

@@ -21,7 +21,8 @@
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json",
-        "--include-schemas"
+        "--include-schemas",
+        "--context"
       ],
       "outcomes": [
         {
@@ -77,7 +78,8 @@
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--envelope",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -132,7 +134,8 @@
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json",
-        "--include-schemas"
+        "--include-schemas",
+        "--context"
       ],
       "outcomes": [
         {
@@ -187,7 +190,8 @@
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -242,7 +246,8 @@
       "machine_flags": [
         "--yes",
         "--forget-unreachable",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -309,7 +314,8 @@
         "--user",
         "--ssh-port",
         "--ai",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -374,7 +380,8 @@
         "--reset",
         "--expires",
         "--json",
-        "--yes"
+        "--yes",
+        "--context"
       ],
       "outcomes": [
         {
@@ -435,7 +442,8 @@
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -490,7 +498,8 @@
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -544,7 +553,8 @@
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -600,7 +610,8 @@
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--yes",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -662,7 +673,8 @@
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--yes",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -723,7 +735,8 @@
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -781,7 +794,8 @@
         "--limit",
         "--reset",
         "--expires",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -837,7 +851,8 @@
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json",
-        "--repair-page"
+        "--repair-page",
+        "--context"
       ],
       "outcomes": [
         {
@@ -872,6 +887,53 @@
         }
       ],
       "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "context",
+        "list"
+      ],
+      "command": "context.list",
+      "data_schema": "context-list",
+      "description": "List your fleets, marking the current one with *",
+      "envelope_schema": "context-list-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "contexts were listed from local state",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "context or local-state error"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "contexts were listed from local state",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "context or local-state error",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
       "statuses": [
         "ok",
         "failed"
@@ -925,7 +987,8 @@
         "--request",
         "--dry-run",
         "--cancel-file",
-        "--control"
+        "--control",
+        "--context"
       ],
       "outcomes": [
         {
@@ -993,7 +1056,8 @@
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1054,7 +1118,8 @@
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1120,7 +1185,8 @@
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1179,7 +1245,8 @@
       "failure_data_schema": "plan-failure",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1243,7 +1310,8 @@
       "machine_flags": [
         "--sni",
         "--timeout",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1304,7 +1372,8 @@
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--exit",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1369,7 +1438,8 @@
         "--via",
         "--preset",
         "--name",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1423,7 +1493,8 @@
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1474,7 +1545,8 @@
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--yes",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {
@@ -1535,7 +1607,8 @@
         "--basic",
         "--probe",
         "--timeout",
-        "--json"
+        "--json",
+        "--context"
       ],
       "outcomes": [
         {

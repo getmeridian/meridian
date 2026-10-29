@@ -274,6 +274,35 @@ meridian fleet upgrade [--tested] [--yes]
 
 **`fleet upgrade`** — moves Remnawave to its newest release without waiting for a Meridian update. It asks Docker Hub for the newest backend, node, and subscription page releases within the major this Meridian release supports (pre-releases and other majors are skipped), pins each by its multi-arch digest, and saves the choice in `cluster.yml` so later applies keep it. A newer pin in a later Meridian release takes over again. `--tested` sticks to the versions this release was tested with. PostgreSQL and Valkey always stay on Meridian's pins. With relays in the fleet it does the same for Realm: GitHub's newest release in the tested major, recorded with the sha256 GitHub publishes for each archive, which every relay checks before installing. It then reads the backend, subscription page, PostgreSQL, Valkey, and node images each server runs (read-only `docker inspect` over SSH) and shows each one as `current`, `upgrade`, `install`, or kept. The version policy is the one setup uses: a newer version tag or a floating tag (`latest`, `3`) you chose is kept and reported, never downgraded. A PostgreSQL major is never moved in place — the old major keeps running and the command explains the dump-and-restore it needs. After you confirm, it applies the reviewed plan and runs `meridian check` on every server. A server whose images cannot be read stops the command with exit `3` before anything changes; if the apply converges but a server still runs an old image, it exits `3` too.
 
+### meridian context
+
+Keep several separate fleets on one machine, for example one for family and one for work, and choose which one commands work on.
+
+```
+meridian context list [--json]
+meridian context use NAME
+meridian context rename OLD NEW
+meridian context remove NAME [--yes]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--json` | | `context list`: emit a `meridian.output/v1` envelope |
+| `--yes`, `-y` | | `context remove`: remove a context whose fleet still has servers without asking |
+
+**`context list`** — every context with its control server and how many exits, relays, and routing gateways it has, read from this machine only; `*` marks the current one:
+
+```
+  * default   198.51.100.10    2 exits, 1 relay
+    family    198.51.100.40    1 exit
+```
+
+**`context use`** — makes NAME the fleet every later command works on. `meridian deploy IP --context NAME` creates a new context, and any command takes `--context NAME` to work on another fleet once.
+
+**`context rename`** — renames a context; its fleet and servers are untouched.
+
+**`context remove`** — deletes the context's files from this machine and never contacts a server: the servers keep running, but this machine can no longer manage them. It refuses the current context, and while the fleet still has servers it asks first (`--yes` skips the question). The `default` context is Meridian's home directory itself, so it can be neither renamed nor removed.
+
 ### meridian check
 
 Check a server's health, or whether a new server can run Meridian. What runs depends on the server's role in your fleet:
@@ -465,6 +494,7 @@ Global options go before the command, for example `meridian --quiet doctor`. Com
 | `--version`, `-v` | Show the CLI version and exit |
 | `--verbose` | Enable debug logging |
 | `--quiet`, `-q` | Suppress progress output |
+| `--context NAME` | Work on another fleet ([meridian context](#meridian-context)); default: `MERIDIAN_CONTEXT`, else the current context. Also accepted after the command, as in `meridian deploy 203.0.113.5 --context work` |
 | `--lang CODE` | Language for the setup wizard: `en`, `ru`, `fa`, or `zh` (default: saved choice, else asked) |
 | `--json` | Request a JSON envelope from a command that supports it; other commands fail explicitly |
 | `--install-completion` | Install shell completion for the current shell |

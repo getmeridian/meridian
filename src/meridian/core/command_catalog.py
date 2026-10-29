@@ -253,6 +253,14 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
     "server.add": None,
     "server.list": None,
     "server.remove": None,
+    "context.list": CommandOutput(
+        data_schema="context-list",
+        outcomes=[_ok("contexts were listed from local state"), _user("context or local-state error"), _BUG],
+        stability="preview",
+    ),
+    "context.use": None,
+    "context.rename": None,
+    "context.remove": None,
     "check": CommandOutput(
         data_schema="check", failure_data_schema="check-failure", outcomes=_verification("check"), stability="stable"
     ),

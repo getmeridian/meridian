@@ -96,6 +96,19 @@ meridian setup
 
 你也可以用 `meridian node add` 和 `meridian relay add` 逐步扩展集群。每次变更都会经过同一套已审核拓扑：`meridian plan` 显示将要发生的变更，`meridian apply` 执行变更。
 
+## 分开管理多组服务器
+
+如果要把服务器分开管理（例如一组给家人、一组用于工作），就为每组建立一个上下文。第一次向新上下文部署时会自动创建它；`context use` 把它设为当前上下文，`--context` 让单条命令作用于另一组：
+
+```
+meridian deploy 203.0.113.5 --context work
+meridian context list
+meridian context use work
+meridian --context default client list
+```
+
+你的第一组服务器就是 `default` 上下文，仍保存在 `~/.config/meridian/`；其他每个上下文都在 `~/.config/meridian/contexts/NAME/` 中保存自己的 `cluster.yml` 和已保存服务器。Meridian 的 SSH 密钥是共用的，同一台服务器同一时间只属于一组。`MERIDIAN_CONTEXT=NAME` 为当前 shell 选择上下文；`MERIDIAN_HOME` 固定使用单独一组并关闭上下文功能。详见 [meridian context](/zh/cli-reference/#meridian-context)。
+
 ## 后续步骤
 
 - [部署指南](/zh/deploy/) — 所有部署选项、伪装目标、重新部署

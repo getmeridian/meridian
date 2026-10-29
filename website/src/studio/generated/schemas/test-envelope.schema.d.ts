@@ -33,6 +33,9 @@ export type Passed = number;
 export type Skipped = number;
 export type Warnings = number;
 export type ExitCode = 0 | 3 | 4;
+export type Code1 = "replace_exit" | "control_unreachable";
+export type Command1 = string;
+export type Exit = string;
 export type Scope = "basic" | "full";
 export type Requested = string;
 export type ResolvedIp = string;
@@ -63,13 +66,13 @@ export type Status2 = "ok";
 export type Changed = boolean;
 export type Text = string;
 export type Category = "user" | "system" | "bug" | "cancelled";
-export type Code1 = string;
+export type Code2 = string;
 export type ExitCode3 = number;
 export type Hint = string;
 export type Message1 = string;
 export type Retryable = boolean;
 export type Warnings1 = MeridianError[];
-export type Command1 = "test";
+export type Command2 = "test";
 export type Data1 = TestResult | FleetTestResult | EmptyData;
 export type DurationMs2 = number;
 /**
@@ -107,6 +110,7 @@ export interface TestResult {
   context?: VerificationContext;
   counts: VerificationCounts;
   exit_code: ExitCode;
+  recovery?: RecoveryHint | null;
   scope?: Scope;
   target: VerificationTarget;
   transports?: Transports;
@@ -150,6 +154,17 @@ export interface VerificationCounts {
   passed: Passed;
   skipped: Skipped;
   warnings: Warnings;
+}
+/**
+ * Next step when nothing on an exit's server answers from the deployer's network.
+ *
+ * ``replace_exit`` carries the ``node replace`` command for that exit;
+ * ``control_unreachable`` has none, because the control server cannot move.
+ */
+export interface RecoveryHint {
+  code: Code1;
+  command?: Command1;
+  exit: Exit;
 }
 /**
  * Requested and resolved identity of one verification target.
@@ -197,7 +212,7 @@ export interface Counts {
 export interface MeridianError {
   category: Category;
   cause?: Cause;
-  code: Code1;
+  code: Code2;
   details?: Details;
   exit_code?: ExitCode3;
   hint?: Hint;
@@ -211,7 +226,7 @@ export interface Details {
   [k: string]: unknown;
 }
 export interface _TestTerminalEnvelope {
-  command: Command1;
+  command: Command2;
   data: Data1;
   duration_ms: DurationMs2;
   errors: Errors1;

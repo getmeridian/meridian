@@ -96,6 +96,15 @@ def requests_machine_output(ctx: click.Context, name: str, command: click.Comman
     )
 
 
+def requested_context(ctx: click.Context, name: str, command: click.Command, args: list[str]) -> str:
+    """The `--context` value given after the command, parsed leniently before the root callback runs."""
+    from meridian.cli_options import LEAF_CONTEXT
+
+    ctx.meta.pop(LEAF_CONTEXT, None)
+    command.make_context(name, list(args), parent=ctx, resilient_parsing=True)
+    return str(ctx.meta.pop(LEAF_CONTEXT, "") or "")
+
+
 def command_argv(path: str, command: click.Command) -> list[str]:
     """The command path plus its arguments: `NAME`, `NAME...` when repeated, `[NAME]` when optional."""
     argv = path.split(".")

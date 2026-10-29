@@ -145,3 +145,5 @@ Servers deployed by a 4.0 beta ran these as `remnawave*` from `/opt/remnawave` a
 - `~/.config/meridian/cache/` — update-check cache
 
 The directory follows `$XDG_CONFIG_HOME` when it is set, and `MERIDIAN_HOME` overrides it. While `~/.config/meridian/` doesn't exist, Meridian also uses `~/.meridian-v4/` or `~/.meridian/` when either holds a fleet (it has a `servers.json`). Meridian 3.x state in `~/.meridian/` is never touched.
+
+Several fleets can share one machine as contexts (`meridian context`). That directory is the `default` context; another context keeps its own `cluster.yml`, backup, `servers.json`, and `setup.json` in `contexts/NAME/`, while the SSH key, the update-check cache, the language choice, and the local Xray runtime stay shared. `--context`, then `MERIDIAN_CONTEXT`, then the saved `current-context` choose one; `MERIDIAN_HOME` pins a single fleet.

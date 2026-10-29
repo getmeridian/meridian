@@ -12,6 +12,7 @@ from typing import Any, cast
 
 from pydantic import ValidationError
 
+from meridian import config
 from meridian.adapters.cancellation import FileCancellationToken
 from meridian.core.cancellation import OperationCancellation, OperationCancelledError
 from meridian.core.deploy import DeployRequest, DeployResult
@@ -46,6 +47,8 @@ def run_deploy_process(request: DeployRequest, operation: DeployOperationHandle)
                 "--events=jsonl",
                 "--cancel-file",
                 str(cancel_token.path),
+                # The fleet Studio serves, even if `context use` changes the current one meanwhile.
+                *(() if config.PINNED_HOME else ("--context", config.CONTEXT)),
             ],
             stderr=subprocess.PIPE,
             stdout=subprocess.PIPE,
