@@ -104,6 +104,9 @@ run already uploaded), the VMs' pinned host keys, an `ssh_config` with
 - `deploy_published.sh IP VERSION [ARGS...]` — installs a released
   `meridian-vpn` on the VM and runs `meridian deploy local ARGS... --yes`
   there, as a tester would; the transcript stays in `/root/deploy.log`.
+- `client_probe.py fetch SUB_URL FILE` / `connect FILE` — saves a
+  subscription's Xray JSON, then connects through each config with a local
+  Xray, as a phone would; outage drills fetch before the control service stops.
 - `redact.sed` — `sed -E -f tests/realvm/redact.sed` masks addresses, tokens,
   keys, and hostnames before lab output is pasted anywhere.
 
