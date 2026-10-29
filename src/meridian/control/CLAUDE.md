@@ -26,7 +26,7 @@
 - A proposal whose intent has a secret-shaped key or value (`secret_paths()`, keys per `core.redaction`) is refused, never stored; so is one whose `access` block is malformed (the console reads `access.users` on every person screen, and a `null` there broke them all).
 
 ## Pitfalls
-- nginx answers 502/503/504 for a stopped or hung service — `ControlClient` raises those as retryable unreachable errors; as plain refusals, a stopped ctld failed the fence at once with "refused: HTTP 502".
+- nginx answers 502/503/504 for a stopped or hung service — `ControlClient` raises those as retryable unreachable errors; as plain refusals, a stopped ctld failed the fence at once with "refused: HTTP 502". A write the backup hook counts as maybe-committed (a lost reply, any 5xx) raises `ControlServiceUncertain`, which Meridian drivers turn into `UnknownResourceOutcome`.
 - `serve` is a daemon: the root callback skips the beta banner and the update check for it (it once printed the banner into journald and phoned out on every start).
 - Decode the path before routing — `ControlClient` percent-encodes IDs, so `:` in endpoint IDs arrives as `%3A` and every endpoint PUT 404'd; node routes match only topology IDs (`_NODE`), or a grant stored `main:exit` before its response refused it and broke the fleet view.
 - Compare timestamps parsed, never as strings — the contract allows fractional seconds, and `…:00.5Z` sorts before `…:00Z`.

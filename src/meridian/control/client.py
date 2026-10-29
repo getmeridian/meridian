@@ -71,6 +71,10 @@ class ControlServiceError(MeridianError):
     """The control service refused a request or could not be reached."""
 
 
+class ControlServiceUncertain(ControlServiceError):
+    """A write that may have reached the service failed without an answer: it may have taken effect."""
+
+
 class ControlServiceNotFound(ControlServiceError):
     """The requested object does not exist."""
 
@@ -282,9 +286,11 @@ class ControlClient:
         try:
             response = self._client.request(method, path, json=body)
         except httpx.RequestError as exc:
+            lost = ControlServiceError
             if not isinstance(exc, _NEVER_SENT):
                 self._reported(method)  # the write may have committed before its reply was lost
-            raise ControlServiceError(
+                lost = self._failure(method)
+            raise lost(
                 f"Could not reach the control service: {type(exc).__name__}",
                 hint="Check that the control server answers on 443, then retry.",
                 category="system",
@@ -310,19 +316,24 @@ class ControlClient:
             self._reported(method)  # a gateway timeout or a crash after the commit: perhaps changed
         if response.status_code in _GATEWAY_FAILURES:
             # nginx answers for a stopped or hung service: unreachable, not a refusal.
-            raise ControlServiceError(
+            raise self._failure(method)(
                 f"The control service did not answer (HTTP {response.status_code} from the control server's proxy).",
                 hint="Check the service: meridian check; on the server, systemctl status ctld.",
                 category="system",
                 retryable=True,
             )
         if response.status_code >= 400:
-            raise ControlServiceError(
+            raise (self._failure(method) if response.status_code >= 500 else ControlServiceError)(
                 f"Control service error: {_message(response)}",
                 category="system" if response.status_code >= 500 else "user",
             )
         self._reported(method)
         return response
+
+    @staticmethod
+    def _failure(method: str) -> type[ControlServiceError]:
+        """What a request that may have reached the service raises: a write may have taken effect."""
+        return ControlServiceUncertain if method != "GET" else ControlServiceError
 
     def _reported(self, method: str) -> None:
         """Tell listeners this write changed, or may have changed, the service's state."""

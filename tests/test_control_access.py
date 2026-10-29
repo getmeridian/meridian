@@ -11,7 +11,13 @@ import pytest
 from meridian.adapters.cluster import topology_from_cluster
 from meridian.cluster import ClusterConfig
 from meridian.connectivity import create_verification_panel, select_active_client, verification_panel_factory
-from meridian.control.client import ControlClient, ControlServiceAuthError, ControlServiceError
+from meridian.control.client import (
+    ControlClient,
+    ControlServiceAuthError,
+    ControlServiceError,
+    ControlServiceUncertain,
+    add_mutation_listener,
+)
 from meridian.control.models import ClientEndpoint, NodeSpec
 from meridian.control_access import ServiceAccessPanel, ServiceFleetPanel, access_panel, fleet_panel
 from meridian.remnawave import (
@@ -204,3 +210,50 @@ def test_a_proxy_answering_for_a_stopped_service_is_unreachable_not_a_refusal(st
 
     assert (error.value.retryable, error.value.category) == (True, "system")
     assert "did not answer" in str(error.value)
+
+
+def _raising(error: Exception) -> httpx.MockTransport:
+    def handle(request: httpx.Request) -> httpx.Response:
+        raise error
+
+    return httpx.MockTransport(handle)
+
+
+@pytest.mark.parametrize(
+    ("method", "transport", "uncertain"),
+    [
+        ("PUT", _raising(httpx.ReadTimeout("lost")), True),
+        ("PUT", _raising(httpx.RemoteProtocolError("closed")), True),
+        ("PUT", httpx.MockTransport(lambda _request: httpx.Response(504)), True),
+        ("PUT", httpx.MockTransport(lambda _request: httpx.Response(502)), True),
+        ("PUT", httpx.MockTransport(lambda _request: httpx.Response(500)), True),
+        ("PUT", _raising(httpx.ConnectError("refused")), False),
+        ("PUT", httpx.MockTransport(lambda _request: httpx.Response(409)), False),
+        ("GET", _raising(httpx.ReadTimeout("lost")), False),
+    ],
+    ids=[
+        "write-reply-lost",
+        "write-closed",
+        "write-proxy-timeout",
+        "write-bad-gateway",
+        "write-crashed",
+        "never-sent",
+        "refused",
+        "read",
+    ],
+)
+def test_a_write_that_may_have_landed_is_uncertain_exactly_when_it_is_reported(
+    method: str, transport: httpx.MockTransport, uncertain: bool
+) -> None:
+    """The service may have committed it: the reconciler observes, and the backup pulls a snapshot."""
+    client = ControlClient("https://198.51.100.10/secret", ADMIN_TOKEN)
+    client._client = httpx.Client(base_url="https://198.51.100.10/secret/", transport=transport)
+    reported: list[str] = []
+    stop = add_mutation_listener(reported.append)
+
+    with client, pytest.raises(ControlServiceError) as error:
+        client._call(method, "api/users/alice", {} if method == "PUT" else None)
+    stop()
+
+    assert isinstance(error.value, ControlServiceUncertain) is uncertain
+    assert bool(reported) is uncertain

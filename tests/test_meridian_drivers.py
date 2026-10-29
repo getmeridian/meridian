@@ -22,6 +22,7 @@ from cryptography.x509.oid import NameOID
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler import compile_topology
 from meridian.compiler.models import ResourcePlan
+from meridian.control.client import ControlServiceError, ControlServiceUncertain
 from meridian.control.models import (
     ClientEndpoint,
     EnrollmentGrant,
@@ -30,7 +31,6 @@ from meridian.control.models import (
     NodeStatus,
     ServiceSettings,
 )
-from meridian.control.client import ControlServiceError
 from meridian.control_artifacts import AgentBinary
 from meridian.core.agent_protocol import AgentBootstrap
 from meridian.core.agent_types import NodeStateRef, canonical_sha256
@@ -194,6 +194,39 @@ def test_workload_refuses_a_first_document_the_agent_failed(plan: ResourcePlan) 
 
     with pytest.raises(ResourceReconcileError, match="xray rejected the config"):
         drivers["node_workload"].apply(_action(plan, "workload:main"), None)
+
+
+class _CommittedLostReply(FakeControl):
+    """The service stores every write, then the reply never arrives."""
+
+    def put_node(self, node_id: str, spec: NodeSpec) -> NodeStatus:
+        super().put_node(node_id, spec)
+        raise ControlServiceUncertain("Could not reach the control service: ReadTimeout", retryable=True)
+
+    def put_user(self, username: str) -> None:
+        self.users.add(username)
+        raise ControlServiceUncertain("Could not reach the control service: ReadTimeout", retryable=True)
+
+
+@pytest.mark.parametrize("logical_id", ["workload:main", "account:default"], ids=["node-spec", "user"])
+def test_a_write_whose_reply_was_lost_is_an_unknown_outcome(plan: ResourcePlan, logical_id: str) -> None:
+    """A definite failure would let another plan replace this one before anyone looked."""
+    drivers, _control, _cluster = _setup(plan, control=_CommittedLostReply())
+    action = _action(plan, logical_id)
+
+    with pytest.raises(UnknownResourceOutcome, match="may have taken effect"):
+        drivers[action.resource.payload.kind].apply(action, None)
+
+
+def test_an_agent_install_that_lost_the_server_is_an_unknown_outcome(plan: ResourcePlan) -> None:
+    conn = MockConnection()
+    conn.when("uname -m", stdout="x86_64\n")
+    conn.when("systemctl is-active", stdout="inactive\n", rc=3)
+    conn.when("systemctl restart", rc=255)
+    drivers, _control, _cluster = _setup(plan, conn)
+
+    with pytest.raises(UnknownResourceOutcome, match="Lost the server"):
+        drivers["agent_runtime"].apply(_action(plan, "agent:main"), None)
 
 
 def test_reality_endpoint_publishes_the_workload_public_identity(plan: ResourcePlan) -> None:

@@ -9,6 +9,7 @@ reports the current document applied with no failed resource.
 
 from __future__ import annotations
 
+import functools
 import json
 import shlex
 import time
@@ -27,7 +28,7 @@ from meridian.compiler.models import (
     ResourcePlan,
     ServiceSettingsPayload,
 )
-from meridian.control.client import ControlClient
+from meridian.control.client import ControlClient, ControlServiceUncertain
 from meridian.control.models import ClientEndpoint, NodeSpec, NodeStatus, ServiceSettings
 from meridian.control_artifacts import AgentBinary
 from meridian.core.agent_protocol import AgentBootstrap
@@ -138,6 +139,22 @@ class MeridianDriverContext:
         return credentials
 
 
+ApplyMethod = Callable[[Any, ResourceAction, ManagedResourceBinding | None], ResourceApplyReceipt]
+
+
+def _uncertain_writes_are_unknown(apply: ApplyMethod) -> ApplyMethod:
+    """A write whose reply was lost may have taken effect: the executor must observe before retrying."""
+
+    @functools.wraps(apply)
+    def checked(driver: Any, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
+        try:
+            return apply(driver, action, binding)
+        except ControlServiceUncertain as exc:
+            raise UnknownResourceOutcome(f"{exc} The write may have taken effect; observation is required.") from exc
+
+    return checked
+
+
 def build_meridian_drivers(context: MeridianDriverContext) -> ResourceDrivers:
     return {
         "agent_runtime": AgentRuntimeDriver(context),
@@ -195,6 +212,7 @@ class AgentRuntimeDriver:
             action, exists=in_place, connected=in_place and inspection.live, remote_id=payload.workload_ref
         )
 
+    @_uncertain_writes_are_unknown
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
         payload = payload_of(action, AgentRuntimePayload)
         conn = self.context.connection_for(payload.server_ref)
@@ -235,8 +253,6 @@ class AgentRuntimeDriver:
                 f"systemctl enable {AGENT_UNIT} >/dev/null 2>&1 && systemctl restart {AGENT_UNIT}",
                 timeout=60,
             )
-            if result.returncode == 124:
-                raise UnknownResourceOutcome(f"Timed out starting {AGENT_UNIT}; observation is required.")
             _ok(result, f"start {AGENT_UNIT}")
             deadline = time.monotonic() + AGENT_CONNECT_TIMEOUT
             while True:
@@ -394,6 +410,7 @@ class NodeWorkloadDriver:
             action, exists=stored, connected=stored and _applied(status), remote_id=payload.workload_ref
         )
 
+    @_uncertain_writes_are_unknown
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
         payload = payload_of(action, NodeWorkloadPayload)
         workload = self.context.workloads.ensure(
@@ -452,6 +469,7 @@ class ClientEndpointDriver:
         exists = expected is not None and current == expected
         return _observation(action, exists=exists, connected=False, remote_id=_service_id(action.resource.logical_id))
 
+    @_uncertain_writes_are_unknown
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
         payload = payload_of(action, ClientEndpointPayload)
         endpoint = self._endpoint(payload, action.generation)
@@ -502,6 +520,7 @@ class ControlUserDriver:
             user = client.get_user(payload.username)
         return _observation(action, exists=user is not None, connected=False, remote_id=payload.username)
 
+    @_uncertain_writes_are_unknown
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
         payload = payload_of(action, ControlUserPayload)
         with self.context.client() as client:
@@ -525,6 +544,7 @@ class ServiceSettingsDriver:
             current = client.settings()
         return _observation(action, exists=current == self._settings(action), connected=False, remote_id="settings")
 
+    @_uncertain_writes_are_unknown
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
         with self.context.client() as client:
             client.put_settings(self._settings(action))
@@ -604,7 +624,7 @@ def _run(conn: ServerConnection, command: str, what: str) -> str:
 
 
 def _ok(result: Any, what: str) -> None:
-    if result.returncode == 124:
-        raise UnknownResourceOutcome(f"Timed out while trying to {what}; observation is required.")
+    if result.returncode in (124, 255):
+        raise UnknownResourceOutcome(f"Lost the server while trying to {what}; observation is required.")
     if result.returncode != 0:
         raise ResourceReconcileError(f"Could not {what}: {result.stderr.strip()[:200]}")
