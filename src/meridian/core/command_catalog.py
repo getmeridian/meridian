@@ -120,7 +120,10 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         data_schema="client-add",
         outcomes=[
             _ok("all requested clients were added"),
-            _ok("clients were added with failed requests or incomplete page/local-state follow-up", exit_code=3),
+            _ok(
+                "clients were added with failed requests or incomplete page, limits, or local-state follow-up",
+                exit_code=3,
+            ),
             _user("invalid input or client conflict"),
             *_PANEL_FAILURES,
         ],
@@ -138,6 +141,20 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
     ),
     "client.list": CommandOutput(
         data_schema="client-list", outcomes=[_ok("client list was collected"), *_FAILURES], stability="stable"
+    ),
+    "client.set": CommandOutput(
+        data_schema="client-limits",
+        outcomes=[
+            _ok("client limits were changed"),
+            _user("client not found, nothing to change, or an invalid size, period, or date"),
+            *_PANEL_FAILURES,
+        ],
+        stability="stable",
+    ),
+    "client.reset-traffic": CommandOutput(
+        data_schema="client-limits",
+        outcomes=[_ok("client traffic was reset"), _user("client not found or input error"), *_PANEL_FAILURES],
+        stability="stable",
     ),
     "client.remove": CommandOutput(
         data_schema="client-remove",

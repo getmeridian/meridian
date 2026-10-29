@@ -102,9 +102,11 @@ JSON `data` 包含 `plan_hash`、`generation` 和 `actions[]` 带 `status: "conv
 管理连接的人。
 
 ```
-meridian client add NAME [NAME...] [--json]
+meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--json]
 meridian client show NAME [--repair-page] [--json]
 meridian client list [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--json]
+meridian client reset-traffic NAME [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
 meridian client reissue NAME [--yes] [--json]
@@ -115,13 +117,20 @@ meridian client remove NAME [--yes] [--json]
 |------|---------|-------------|
 | `--json` | | 将结果作为 `meridian.output/v1` 信封发出（所有客户端命令） |
 | `--repair-page` | | 重新发布客户端的连接页面（`client show`） |
+| `--limit SIZE` | 无 | 流量限额（`client add`、`client set`）：`500MB`、`50GB`、`1.5TB`；`none` 或 `0` 取消限额。单位按二进制计算（1 GB = 1024³ 字节），与面板一致 |
+| `--reset PERIOD` | never | 已用流量何时从零重新计算：`day`、`week`、`month` 或 `never`，按自然日、周、月 |
+| `--expires DATE` | never | 访问何时结束：`YYYY-MM-DD`（当天结束时，UTC）、ISO 时间如 `2026-12-31T18:00:00+03:00`（不带时区偏移的时间按 UTC 计），或 `never`。必须是将来的时间 |
 | `--yes`, `-y` | | 确认 `client reissue` 或 `client remove`；`--json` 需要 |
 
-**`client add`** — 添加一个或多个人到拓扑，应用它，并为每个人打印连接页面和订阅 URL。页面从他们的真实订阅构建，所以中继和 Hysteria2 在存在时显示。拓扑中已有的或面板中已存在的名称被拒绝。名称可以使用任何文字（`client add Биба 王小明`）：页面和输出按输入原样显示名称，而面板只接受拉丁字母、数字、`-` 和 `_`，会得到音译后的用户名（`biba`、`wangxiaoming`）。其他 client 命令接受任一形式。如果客户端的订阅链接无法构建，客户端仍被添加命令退出 `3`；仅缺失连接页面是警告（用 `client show --repair-page` 修复）。
+**`client add`** — 添加一个或多个人到拓扑，应用它，并为每个人打印连接页面和订阅 URL。页面从他们的真实订阅构建，所以中继和 Hysteria2 在存在时显示。拓扑中已有的或面板中已存在的名称被拒绝。名称可以使用任何文字（`client add Биба 王小明`）：页面和输出按输入原样显示名称，而面板只接受拉丁字母、数字、`-` 和 `_`，会得到音译后的用户名（`biba`、`wangxiaoming`）。其他 client 命令接受任一形式。如果客户端的订阅链接无法构建，客户端仍被添加命令退出 `3`；仅缺失连接页面是警告（用 `client show --repair-page` 修复）。`--limit`、`--reset` 和 `--expires` 会在客户端创建后，为每个添加的名称设置与 `client set` 相同的限制；如果设置失败，客户端仍会被添加，命令给出警告并以 `3` 退出。
 
-**`client show`** — 打印连接页面、订阅 URL、状态、流量和最后看到时间。`--repair-page` 重新发布缺失的页面；如果失败，链接仍显示带警告和退出 `3`。
+**`client show`** — 打印连接页面、订阅 URL、状态、相对限额的流量及其重置周期、到期时间和最后在线时间。`--repair-page` 重新发布缺失的页面；如果失败，链接仍显示带警告和退出 `3`。
 
-**`client list`** — 列出客户端带状态、流量、创建时间和最后看到。带 `--json`，返回 `data.summary` 计数和 `data.clients[]`。
+**`client list`** — 列出客户端及其状态、流量、到期时间和最后在线时间。带 `--json`，返回 `data.summary` 计数和 `data.clients[]`。
+
+**`client set`** — 修改客户端的流量限额、重置周期或到期时间；只修改你传入的选项，至少需要一个。因限额或到期被停用的客户端（状态 `limited` 或 `expired`），只要新的值允许，就能重新连接。修改立即生效，应用永远不会改动它们。无效的值会在 Meridian 连接任何地方之前以 `2` 退出。带 `--json` 时，在 `data.client` 中返回面板当前的客户端信息，包括 `traffic_limit_bytes`、`traffic_reset` 和 `expires_at`（为空表示永不到期）。
+
+**`client reset-traffic`** — 让客户端的已用流量从零开始计算，与进入新周期相同；因限额被停用的客户端可以重新连接。
 
 **`client enable` / `client disable`** — 立即恢复或暂停客户端。禁用持续到你运行 `client enable`；应用（包括重新部署和 `client add`、`node add`、`relay add`）保持客户端的状态不变。
 

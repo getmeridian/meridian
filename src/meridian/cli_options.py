@@ -37,6 +37,34 @@ SELF_STEAL_HELP = (
     "its certificate and answers probes itself. Point a DNS-only A record at the server first"
 )
 SelfSteal = Annotated[bool, typer.Option("--self-steal", help=SELF_STEAL_HELP)]
+# Strings so bad values reach `core.client_limits` and keep the JSON error envelope.
+TrafficLimit = Annotated[
+    str | None,
+    typer.Option(
+        "--limit",
+        metavar="SIZE",
+        help="Traffic limit, such as 500MB, 50GB, or 1.5TB; none removes it",
+        show_default=False,
+    ),
+]
+TrafficResetPeriod = Annotated[
+    str | None,
+    typer.Option(
+        "--reset",
+        metavar="PERIOD",
+        help="When used traffic starts again from zero: day, week, month, or never",
+        show_default=False,
+    ),
+]
+Expires = Annotated[
+    str | None,
+    typer.Option(
+        "--expires",
+        metavar="DATE",
+        help="Cut access off after DATE (YYYY-MM-DD, the end of that day UTC, or an ISO time); never removes it",
+        show_default=False,
+    ),
+]
 
 
 def enable_json_output(ctx: typer.Context, value: object) -> object:

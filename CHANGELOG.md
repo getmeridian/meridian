@@ -249,6 +249,15 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   on the server first and is never repeated blindly.
 
 ### Sharing
+- **Traffic limits and expiry from the CLI** — `meridian client set alice
+  --limit 50GB --reset month --expires 2026-12-31` gives a client an
+  allowance, a reset period, and an end date (`--limit none` and
+  `--expires never` lift them); `client add` takes the same options, and
+  `client reset-traffic` refills the allowance at once. `client show` prints
+  "12.4 GB / 50 GB (resets monthly)" and the expiry, `client list` gains an
+  Expires column, and applies leave all of it alone. Sizes are binary
+  (1 GB = 1024³ bytes, as the panel counts), and a bare date lasts to the end
+  of that day, UTC.
 - **`meridian client reissue NAME` replaces a leaked link** — Remnawave issues
   the client a new subscription ID and new keys, so the old subscription URL,
   connection page, and links stop working; Meridian deletes the old page,
@@ -286,8 +295,9 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   `profile-update-interval`, so Happ, Clash Verge, and other apps that read it
   pick up new exits and relays within hours. Meridian keeps the header set in
   the panel; other response headers you add stay yours.
-- `meridian client add|show|list|remove|enable|disable`. `client remove` deletes
-  the user and their page; links stop working immediately.
+- `meridian client add|show|list|set|reset-traffic|remove|enable|disable`.
+  `client remove` deletes the user and their page; links stop working
+  immediately.
 - **Connection pages recommend apps per platform** — Happ first, then
   FlClashX and Clash Mi (plus Throne on desktop), with a link to the router
   guide and a note on subscription refresh and app updates. v2rayNG and

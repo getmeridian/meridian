@@ -55,6 +55,11 @@ meridian deploy 198.51.100.10 --dry-run --json
 # Give a person access and get their connection page
 meridian client add alice --json
 
+# Give them 50 GB a month until the end of 2026; later lift both, or refill the month now
+meridian client set alice --limit 50GB --reset month --expires 2026-12-31 --json
+meridian client set alice --limit none --expires never --json
+meridian client reset-traffic alice --json
+
 # A link leaked: replace it (the old page and subscription stop working)
 meridian client reissue alice --yes --json
 

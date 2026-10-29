@@ -43,7 +43,7 @@ meridian client add alice bob charlie
 meridian client show alice
 ```
 
-这会打印连接页面和订阅 URL，以及状态、已用流量和客户端最近在线时间。如果连接页面缺失（例如上传失败），可以重新发布：
+这会打印连接页面和订阅 URL，以及状态、已用流量、到期时间和客户端最近在线时间。如果连接页面缺失（例如上传失败），可以重新发布：
 
 ```
 meridian client show alice --repair-page
@@ -55,7 +55,42 @@ meridian client show alice --repair-page
 meridian client list
 ```
 
-显示所有客户端的状态、流量、创建时间和最近在线时间。
+显示所有客户端的状态、流量、到期时间和最近在线时间。
+
+## 流量限额和到期时间
+
+给客户端设置每月流量额度和结束日期：
+
+```
+meridian client set alice --limit 50GB --reset month --expires 2026-12-31
+```
+
+添加客户端时也可以使用这些选项（`meridian client add alice --limit 50GB --reset month`）。之后只会修改你传入的选项：
+
+```
+meridian client set alice --expires 2027-06-30
+meridian client set alice --limit none --expires never
+```
+
+- `--limit` 接受 `500MB`、`50GB` 或 `1.5TB` 这样的大小（1 GB 为 1024³ 字节，与面板一致）；`none` 取消限额。
+- `--reset` 每天（`day`）、每周（`week`）或每月（`month`）把已用流量清零；`never` 表示一直累计。
+- `--expires` 接受日期（访问在当天结束时终止，按 UTC）、ISO 时间如 `2026-12-31T18:00:00+03:00`，或 `never`。
+
+用完额度的客户端显示为 `limited`，过了到期时间的显示为 `expired`。在下一次重置之前，或在你提高限额、推迟日期之前，他们都无法连接。要立即恢复额度：
+
+```
+meridian client reset-traffic alice
+```
+
+`client show` 会显示当前情况：
+
+```
+  状态     ● active
+  流量     12.4 GB / 50 GB (每月重置)
+  到期     2026-12-31
+```
+
+应用、重新部署和服务器变更都不会改动客户端的限额和到期时间。
 
 ## 暂停和恢复客户端
 

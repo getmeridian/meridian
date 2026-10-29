@@ -102,9 +102,11 @@ Removals are applied too: whatever left the topology (users, protocol paths, exi
 Manage the people who connect.
 
 ```
-meridian client add NAME [NAME...] [--json]
+meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--json]
 meridian client show NAME [--repair-page] [--json]
 meridian client list [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--json]
+meridian client reset-traffic NAME [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
 meridian client reissue NAME [--yes] [--json]
@@ -115,13 +117,20 @@ meridian client remove NAME [--yes] [--json]
 |------|---------|-------------|
 | `--json` | | Emit the result as a `meridian.output/v1` envelope (all client commands) |
 | `--repair-page` | | Republish the client's connection page (`client show`) |
+| `--limit SIZE` | none | Traffic limit (`client add`, `client set`): `500MB`, `50GB`, `1.5TB`; `none` or `0` removes it. Units are binary (1 GB = 1024³ bytes), as the panel counts |
+| `--reset PERIOD` | never | When used traffic starts again from zero: `day`, `week`, `month`, or `never`, by calendar day, week, or month |
+| `--expires DATE` | never | When access ends: `YYYY-MM-DD` (the end of that day, UTC), an ISO time such as `2026-12-31T18:00:00+03:00` (a time without an offset is UTC), or `never`. Must be in the future |
 | `--yes`, `-y` | | Confirm `client reissue` or `client remove`; required with `--json` |
 
-**`client add`** — adds one or more people to the topology, applies it, and prints each person's connection page and subscription URL. The page is built from their real subscription, so relays and Hysteria2 appear when present. Names already in the topology or already present in the panel are refused. Names can be in any script (`client add Биба 王小明`): pages and output show them as typed, while the panel, which accepts only Latin letters, digits, `-`, and `_`, gets a transliterated username (`biba`, `wangxiaoming`). Other client commands accept either form. If a client's subscription link can't be built, the client is still added and the command exits `3`; a missing connection page alone is a warning (repair it with `client show --repair-page`).
+**`client add`** — adds one or more people to the topology, applies it, and prints each person's connection page and subscription URL. The page is built from their real subscription, so relays and Hysteria2 appear when present. Names already in the topology or already present in the panel are refused. Names can be in any script (`client add Биба 王小明`): pages and output show them as typed, while the panel, which accepts only Latin letters, digits, `-`, and `_`, gets a transliterated username (`biba`, `wangxiaoming`). Other client commands accept either form. If a client's subscription link can't be built, the client is still added and the command exits `3`; a missing connection page alone is a warning (repair it with `client show --repair-page`). `--limit`, `--reset`, and `--expires` give every added name the same limits as `client set`, once the clients exist; if that fails, the clients are still added, and the command warns and exits `3`.
 
-**`client show`** — prints the connection page, subscription URL, status, traffic, and last-seen time. `--repair-page` republishes a missing page; if that fails, the links are still shown with a warning and exit `3`.
+**`client show`** — prints the connection page, subscription URL, status, traffic against the limit with its reset period, expiry, and last-seen time. `--repair-page` republishes a missing page; if that fails, the links are still shown with a warning and exit `3`.
 
-**`client list`** — lists clients with status, traffic, creation time, and last seen. With `--json`, returns `data.summary` counts and `data.clients[]`.
+**`client list`** — lists clients with status, traffic, expiry, and last seen. With `--json`, returns `data.summary` counts and `data.clients[]`.
+
+**`client set`** — changes a client's traffic limit, reset period, or expiry; only the options you pass change, and at least one is required. A client their limit or expiry has cut off (status `limited` or `expired`) can connect again as soon as the new values allow it. Changes take effect at once, and applies never touch them. A bad value exits `2` before Meridian connects anywhere. With `--json`, returns the client as the panel now has it in `data.client`, including `traffic_limit_bytes`, `traffic_reset`, and `expires_at` (empty means never).
+
+**`client reset-traffic`** — starts the client's used traffic from zero, as a new period would; a client their limit has cut off can connect again.
 
 **`client enable` / `client disable`** — resume or suspend a client immediately. A disable lasts until you run `client enable`; applies (including redeploys and `client add`, `node add`, `relay add`) leave a client's status alone.
 
