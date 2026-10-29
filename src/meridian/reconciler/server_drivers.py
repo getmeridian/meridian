@@ -162,6 +162,9 @@ class ServerBaselineDriver:
         attestation = baseline_attestation(action, self.context.plan, payload.server_ref)
         marker_ok = marker_content == f"{attestation}\n"
         matches = marker_ok and all(outcomes.values())
+        mismatches = [f"baseline check '{name}' fails" for name, ok in outcomes.items() if not ok]
+        if not marker_ok:
+            mismatches.append("the attestation is missing" if marker_content is None else "the attestation is stale")
         return build_observation(
             action,
             remote_id=payload.server_ref,
@@ -172,6 +175,7 @@ class ServerBaselineDriver:
                 "checks": outcomes,
             },
             satisfied={"exists"} if matches else set(),
+            mismatches=mismatches,
         )
 
     def apply(
@@ -327,6 +331,9 @@ class CertificateDriver(retirement.CertificateRetirement):
         valid = assertion_matches(action.resource.logical_id, result, "certificate validation")
         san = f"IP Address:{payload.hostname}" if is_ip(payload.hostname) else f"DNS:{payload.hostname}"
         matches = valid and san in result.stdout
+        mismatches = [] if valid else ["the certificate expires within a day"]
+        if san not in result.stdout:
+            mismatches.append(f"the certificate does not name {payload.hostname}")
         return build_observation(
             action,
             remote_id=certificate_path,
@@ -334,6 +341,7 @@ class CertificateDriver(retirement.CertificateRetirement):
             matches=matches,
             projection={"certificate": result.stdout},
             satisfied={"exists"},
+            mismatches=mismatches,
         )
 
     def apply(

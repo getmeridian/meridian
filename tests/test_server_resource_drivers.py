@@ -41,7 +41,7 @@ from meridian.reconciler.server_drivers import (
     ServerBaselineDriver,
     ServerDriverContext,
 )
-from meridian.reconciler.server_evidence import baseline_attestation, listener_wait_command
+from meridian.reconciler.server_evidence import baseline_attestation, content_mismatch, listener_wait_command
 from meridian.reconciler.server_render import artifact_token, nginx_artifact_path, render_nginx_artifact
 from meridian.ssh import ServerConnection
 from tests.support.mock_connection import MockConnection
@@ -730,3 +730,21 @@ def test_node_runtime_accepts_another_spelling_of_the_pinned_digest() -> None:
     driver, action = _node_runtime_with_compose(f"docker.io/{pin.repository}@{pin.digest}")
 
     assert observation_converges(action, driver.observe(action, None))
+
+
+@pytest.mark.parametrize(
+    ("observed", "reason"),
+    [
+        (None, "the file is missing"),
+        ("a\nb\n", ""),
+        ("a\r\nb\r\n", "only in line endings or a trailing newline"),
+        ("a\nb", "only in line endings or a trailing newline"),
+        ("a\n", "from line 2 (1 lines on the server, 2 reviewed)"),
+        ("a\nb\nc\n", "from line 3 (3 lines on the server, 2 reviewed)"),
+        ("a\nX\n", "from line 2 (2 lines on the server, 2 reviewed)"),
+    ],
+    ids=["missing", "same", "crlf", "no-final-newline", "shorter", "longer", "edited"],
+)
+def test_content_mismatch_says_where_without_quoting(observed: str | None, reason: str) -> None:
+    found = content_mismatch("the file", observed, "a\nb\n")
+    assert found.endswith(reason) and (found == "") == (reason == "")
