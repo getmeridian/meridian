@@ -359,3 +359,24 @@ def test_a_copy_without_the_services_credentials_is_refused_once_the_service_kee
     with pytest.raises(FleetFenceError, match="cannot reach it") as refused:
         _fence(host, _cluster()).acquire(_local(generation=0, plan_hash="", fresh=True))
     assert refused.value.category == "user"
+
+
+def test_an_older_service_without_the_fence_route_keeps_fence_json_until_it_is_upgraded(service: Service) -> None:
+    from meridian.control.client import ControlServiceNotFound
+
+    class _OlderService(ControlClient):
+        def fence(self) -> Any:
+            raise ControlServiceNotFound("Not found.", category="user")
+
+    host, cluster = FenceHost(), _cluster(service.url)
+    _seed_fence_json(host)
+    fence = _fence(host, cluster)
+    fence._client_factory = lambda timeout: _OlderService(service.url, _TOKEN)
+
+    fence.acquire(_local())
+    fence.commit(8, _NEW)
+
+    assert host.record()["generation"] == 8 and host.record()["lease_holder"] == ""
+    # The apply reinstalled the service; it records the revision, and the next apply adopts fence.json.
+    assert _revisions(service) == [(1, "applied")]
+    assert service.service.revisions.fence().version == 0
