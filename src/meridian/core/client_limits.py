@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from datetime import UTC, date, datetime, time
+from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Literal
 
 from pydantic import Field
@@ -27,6 +28,8 @@ TRAFFIC_RESETS: tuple[TrafficReset, ...] = ("never", "day", "week", "month")
 NEVER_EXPIRES_YEAR = 2099
 
 _UNITS = {"b": 1, "kb": 1024, "mb": 1024**2, "gb": 1024**3, "tb": 1024**4}
+# The control service keeps limits in a SQLite INTEGER: a signed 64-bit value.
+MAX_TRAFFIC_LIMIT_BYTES = 2**63 - 1
 _SIZE_RE = re.compile(r"^(\d+(?:\.\d+)?)\s*([kmgt]?i?b)$")
 _UNLIMITED = frozenset({"0", "none", "unlimited", "off"})
 _NEVER = frozenset({"never", "none", "off"})
@@ -90,7 +93,13 @@ def parse_traffic_limit(text: str) -> int:
             hint="Use a number with a unit, such as 500MB, 50GB, or 1.5TB, or `none` for no limit.",
         )
     number, unit = match.groups()
-    size = round(float(number) * _UNITS[unit.replace("i", "")])
+    # Decimal, not float: a long digit string would become infinity, and round() then raises.
+    size = int((Decimal(number) * _UNITS[unit.replace("i", "")]).to_integral_value(rounding=ROUND_HALF_EVEN))
+    if size > MAX_TRAFFIC_LIMIT_BYTES:
+        raise ClientLimitError(
+            f"Traffic limit '{text}' is too large",
+            hint=f"Use at most {MAX_TRAFFIC_LIMIT_BYTES // _UNITS['tb']}TB, or `none` for no limit.",
+        )
     if size < 1:
         raise ClientLimitError(
             f"Traffic limit '{text}' is too small",

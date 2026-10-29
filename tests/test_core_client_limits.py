@@ -48,8 +48,22 @@ FUTURE_DAY = "2031-12-31"
         ("none", 0),
         ("unlimited", 0),
         ("0", 0),
+        ("8388607TB", 8388607 * 1024**4),
     ],
-    ids=["gb", "lowercase", "space", "gib", "mb", "fraction", "kb", "persian-digits", "none", "unlimited", "zero"],
+    ids=[
+        "gb",
+        "lowercase",
+        "space",
+        "gib",
+        "mb",
+        "fraction",
+        "kb",
+        "persian-digits",
+        "none",
+        "unlimited",
+        "zero",
+        "largest-terabytes",
+    ],
 )
 def test_traffic_limit_parses_binary_sizes(text: str, expected: int) -> None:
     assert parse_traffic_limit(text) == expected
@@ -57,8 +71,18 @@ def test_traffic_limit_parses_binary_sizes(text: str, expected: int) -> None:
 
 @pytest.mark.parametrize(
     "text",
-    ["50", "50XB", "GB", "-5GB", "fifty GB", "0.0000001KB", ""],
-    ids=["no-unit", "bad-unit", "no-number", "negative", "words", "rounds-to-zero", "empty"],
+    ["50", "50XB", "GB", "-5GB", "fifty GB", "0.0000001KB", "", "1" * 400 + "GB", "8388608TB"],
+    ids=[
+        "no-unit",
+        "bad-unit",
+        "no-number",
+        "negative",
+        "words",
+        "rounds-to-zero",
+        "empty",
+        "beyond-float",
+        "beyond-int64",
+    ],
 )
 def test_traffic_limit_refuses_what_is_not_a_size(text: str) -> None:
     with pytest.raises(ClientLimitError) as exc_info:
