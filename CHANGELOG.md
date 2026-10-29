@@ -26,6 +26,8 @@ that dials out to it.
   IP limits).
 
 ### Control service
+- **Subscription status** — `/sub/<token>/info` returns account status and connection
+  links for every client. Responses are not cached and support HEAD.
 - **Privacy settings** — device limits and usage history default to off.
   `meridian privacy show|set` and Settings → Privacy disclose what each level
   stores and what a seized control server reveals. Changes record the author,

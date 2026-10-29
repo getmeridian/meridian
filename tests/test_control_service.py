@@ -20,6 +20,7 @@ from meridian.control.models import (
     ClientEndpoint,
     ManagedInbound,
     NodeSpec,
+    PrivacySettings,
     ServiceSettings,
     UserImport,
     UserImportBatch,
@@ -362,6 +363,59 @@ def test_subscription_route_passes_the_request_to_the_renderer(
     assert status == 200 and served["content-type"].startswith(content_type)
     assert marker in body if marker else base64.b64decode(body).decode().startswith("vless://")
     assert served["cache-control"] == "no-store" and "referrer-policy" not in served
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"User-Agent": "Happ/3.2.1", "Accept": "application/json"},
+        {"User-Agent": "Stash/3.2.0", "Accept": "text/yaml"},
+        {"User-Agent": "SFA/1.12.9", "Accept": "*/*"},
+        {"User-Agent": "", "Accept": "*/*"},
+        {"User-Agent": "Mozilla/5.0", "Accept": "text/html"},
+    ],
+    ids=["xray", "stash", "singbox", "empty-ua", "browser"],
+)
+@pytest.mark.parametrize("method", ["GET", "HEAD"])
+def test_subscription_info_ignores_format_negotiation(
+    http: str, service: ControlService, headers: dict[str, str], method: str
+) -> None:
+    user = service.put_user("person")
+    service.put_endpoint("main", _endpoints()[0])
+    expected = service.subscription(user.sub_token, accept="text/html")
+
+    status, body, served = _fetch(f"{http}/sub/{user.sub_token}/info", headers, method=method)
+
+    assert status == 200
+    assert served["content-type"] == expected.content_type
+    assert served["cache-control"] == "no-store"
+    assert served["x-robots-tag"] == expected.headers["x-robots-tag"]
+    assert served["x-content-type-options"] == "nosniff"
+    assert served["content-length"] == str(len(expected.body.encode("utf-8")))
+    assert json.loads(body) == json.loads(expected.body) if method == "GET" else body == ""
+
+
+@pytest.mark.parametrize("method", ["GET", "HEAD"])
+def test_unknown_subscription_info_matches_an_unknown_subscription(http: str, method: str) -> None:
+    expected = _fetch(f"{http}/sub/{'x' * 24}", {}, method=method)
+    actual = _fetch(f"{http}/sub/{'x' * 24}/info", {"User-Agent": "Happ/3.2.1"}, method=method)
+    assert actual[:2] == expected[:2]
+    for header in ("content-type", "content-length", "cache-control", "x-robots-tag"):
+        assert actual[2][header] == expected[2][header]
+
+
+@pytest.mark.parametrize("level", ["private", "full"])
+def test_subscription_info_never_registers_a_device(service: ControlService, level: str) -> None:
+    service.set_privacy(PrivacySettings(device_limits=level), author="operator")  # type: ignore[arg-type]
+    user = service.put_user("person")
+
+    response = service.subscription(
+        user.sub_token, "info", user_agent="v2RayTun/1.0", device_headers={"x-hwid": "device-00000001"}
+    )
+
+    assert json.loads(response.body)["isFound"] is True
+    assert service.user_devices(user.username).count == 0
+    assert not any(header.startswith("x-hwid") for header in response.headers)
 
 
 @pytest.mark.parametrize("path", [f"/sub/{'x' * 24}", "/sub/", "/sub/short", f"/sub/{'x' * 24}/clash"])

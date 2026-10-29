@@ -19,6 +19,7 @@
 - **Retirement after convergence** — `retirement.py` removes vanished bindings, committed ones and what an uncommitted apply installed (newer than the active generation), dependents-first (`RETIREMENT_ORDER`) only after the whole plan succeeds; a failed rank stops later ranks and leaves the generation uncommitted. `validate_resource_plan_transition` refuses only teardown-owned kinds.
 - **Forget-only kinds are explicit** — `FORGET_ONLY` names kinds whose state lives in their Profile, is read-only, or must never be reverted; every other retirable kind needs a driver `retire()` or retirement fails closed.
 - **Reviewed render contract** — bump the `render_contract.py` manifest whenever deployed bytes or commands change.
+- Control subscription delivery has its own renderer stamp, so a delivery fix also refreshes the deployed control service.
 
 ## Pitfalls
 
