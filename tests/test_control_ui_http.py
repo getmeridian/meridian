@@ -257,6 +257,31 @@ def test_minting_a_token_needs_a_recent_confirmation(fleet: Fleet) -> None:
     assert issued.status == 200 and issued.body["token"].startswith("mrd_")
 
 
+@pytest.mark.parametrize(
+    ("method", "path", "body"),
+    [
+        ("POST", "/api/nodes/main/enrollment", {}),
+        ("POST", "/api/import/users", {"users": []}),
+        ("GET", "/api/backup/devices", None),
+        ("POST", "/api/backup/devices", {"name": "thief", "public_key": "age1x"}),
+        ("DELETE", "/api/backup/devices/0123456789ab", None),
+        ("GET", "/api/backup/recovery-key", None),
+        ("PUT", "/api/backup/recovery-key", {"public_key": "age1x"}),
+        ("PUT", "/api/backup/deployer-state", {}),
+        ("GET", "/api/backup/snapshot", None),
+    ],
+    ids=lambda value: value if isinstance(value, str) and value.startswith("/") else None,
+)
+def test_a_session_never_reaches_cli_only_routes_even_just_confirmed(
+    fleet: Fleet, method: str, path: str, body: Any
+) -> None:
+    """A borrowed browser could seal a snapshot to its own key or enroll a rogue node; the console calls neither."""
+    fleet.set_up()  # signed in this second: step-up would pass
+    refused = fleet.ui(method, path, body)
+    assert refused.status == 403 and refused.body["error"]["code"] == "insufficient_scope"
+    assert fleet.call(method, path, body, bearer=ADMIN_TOKEN).status != 403
+
+
 def test_logout_clears_the_cookie_and_ends_the_session(fleet: Fleet) -> None:
     fleet.set_up()
     reply = fleet.ui("POST", "/auth/logout", {})

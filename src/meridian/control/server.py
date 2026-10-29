@@ -136,8 +136,10 @@ class _Handler(BaseHTTPRequestHandler):
                 if match and route_method == method:
                     if scope is not None:
                         self.caller = self._authorize(scope)
-                        if self.owner_session is not None and handler in OWNER_STEP_UP:
-                            self._service.owner.require_recent(self.owner_session)
+                        if self.owner_session is not None:
+                            _owner_may(handler)
+                            if handler in OWNER_STEP_UP:
+                                self._service.owner.require_recent(self.owner_session)
                     result = handler(self, match)
                     if result is not None:
                         self._json(200, result)
@@ -524,6 +526,29 @@ ROUTES: list[Route] = [
 ALL_ROUTES: list[Route] = [*ROUTES, *UI_ROUTES]
 # What a web owner may do only after confirming their password again within minutes: mint a credential.
 OWNER_STEP_UP: frozenset[Callable[..., Any]] = frozenset({_Handler.create_token})
+# Routes only the deployer's CLI (or an API token) calls, never the console: credentials an agent or
+# a backup device holds, users imported with their credentials, and snapshots that carry every one.
+# An owner session is refused outright, step-up or not, so a borrowed browser cannot reach them.
+MACHINE_ONLY: frozenset[Callable[..., Any]] = frozenset(
+    {
+        _Handler.grant_enrollment,
+        _Handler.import_users,
+        _Handler.list_device_keys,
+        _Handler.register_device_key,
+        _Handler.revoke_device_key,
+        _Handler.get_recovery_key,
+        _Handler.put_recovery_key,
+        _Handler.deposit_deployer_state,
+        _Handler.snapshot,
+    }
+)
+
+
+def _owner_may(handler: Callable[..., Any]) -> None:
+    if handler in MACHINE_ONLY:
+        raise ServiceError(
+            "insufficient_scope", "Only the meridian CLI or an API token does this; the console never needs it.", 403
+        )
 
 
 def _validation_message(exc: ValidationError) -> str:

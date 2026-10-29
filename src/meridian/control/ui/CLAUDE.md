@@ -19,6 +19,6 @@
 - Judge every guess inside `LoginLimiter.turn()` (check, hash, count) — checking the lock before the slow hash let every concurrent request pass it before the first failure counted.
 - Write what a password check grants (a session, `confirmed_at`, a new password) in the same transaction that re-reads the hash it was compared with and the session it acts for — the scrypt runs unlocked, so a reset or sign-out in between once still let the old password or an ended session through.
 - A setup link travels in the URL fragment (never sent to nginx) and `auth.js` strips it with `history.replaceState` before anything else renders.
-- An owner session is full admin; re-check the password (and code) before anything that hands out a credential (`OWNER_STEP_UP`), and keep the `ui_*` tables out of snapshots.
+- An owner session is admin for what the console does; re-check the password (and code) before anything that hands out a credential (`OWNER_STEP_UP`), refuse it outright on CLI-only routes (`server.MACHINE_ONLY`: enrollment, user import, every backup route; a borrowed browser once could seal a snapshot to its own key), and keep the `ui_*` tables out of snapshots.
 - The fleet title is intent-owned today: `ServiceSettingsDriver` puts the deployer's back on the next apply, which the Settings screen says.
 - Keep each script under 800 lines and every `M.t("…")` key in `en.json`; the asset tests read literal keys only.
