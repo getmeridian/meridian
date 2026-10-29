@@ -44,6 +44,7 @@ from meridian.handoff import HandoffLinks
 from meridian.host_runtime import CONTROL_SERVICE_CONFIG, CONTROL_SERVICE_STATE_DIR, CONTROL_SERVICE_UNIT
 from meridian.provision.control_service import SERVICE_USER_COMMAND
 from meridian.provision.ensure import ensure_packages, ensure_ufw_rule
+from meridian.reconciler.fence import FenceRecord
 from meridian.reconciler.retirement import forget_server
 from meridian.reconciler.server_render import render_firewall_rules
 from meridian.resolve import connection_for_entry
@@ -52,6 +53,7 @@ from meridian.setup.control_plane import control_payload
 from meridian.setup.editor import move_control_server_in_intent
 from meridian.setup.runtime import SetupReview, SetupRuntime
 from meridian.ssh import ServerConnection
+from meridian.state_fence import SSHApplyFence, handed_over
 
 STAGING_DIR = "restore"
 REMOTE_DATABASE = f"{CONTROL_SERVICE_STATE_DIR}/control.db"
@@ -259,6 +261,7 @@ class ControlRestorer:
             self._on_step(f"Loading the restored state onto {target}")
             staged_path = Path(restore.staged_database)
             upload_database(conn, staged_path, restore.staged_sha256, fleet_id=self.cluster.fleet_id)
+            hand_fence_to_service(conn, self.cluster)
             restore.staged_database = ""
             # Saved before the file goes: a failed save reruns the upload, which needs it.
             self._checkpoint(restore, "loaded")
@@ -395,6 +398,21 @@ def upload_database(conn: ServerConnection, path: Path, sha256: str, *, fleet_id
             "The restored database did not arrive intact on the new server.",
             hint="Run the same `meridian restore` again; it continues from here.",
             retryable=True,
+        )
+
+
+def hand_fence_to_service(conn: ServerConnection, cluster: ClusterConfig) -> None:
+    """Mark the new server's fence.json handed over: the restored service keeps the fleet's fence.
+
+    Applies read fence.json only when the service does not answer; a missing file would read as
+    a fleet whose service never came up and let an outage-time apply take the lease over SSH.
+    """
+    fence = SSHApplyFence(conn)
+    if not handed_over(fence.read()):
+        fence.hand_over(
+            FenceRecord(
+                fleet_id=cluster.fleet_id, generation=cluster.active_generation, plan_hash=cluster.active_plan_hash
+            )
         )
 
 

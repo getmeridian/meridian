@@ -20,6 +20,7 @@
 - **A copy behind the snapshot's deposited generation must not restore** — its intent would retire what newer applies added; it is sent to a fresh context, which takes the snapshot's copy.
 - **Refuse while the old control server answers** — two services at once split the fleet; only `--force` overrides it.
 - **Open the control service's firewall rules before its bootstrap** — restore installs before the plan runs, so a fresh server's SSH-only UFW kept port 80 closed and the ACME challenge timed out; `open_control_ports()` installs ufw (stock Debian has none) and applies the rules `control:service` depends on.
+- **Mark the new server's fence.json handed over on load** — the snapshot carries the fence, but a missing file reads as a service that never came up, so an apply during an outage took the lease over SSH around it.
 - **Never read the recovery key from argv** — shell history and `ps` keep it; `--recovery-key` asks with a hidden prompt or reads one line of stdin.
 - **Checkpoint before deleting what a rerun needs** — the staged database goes only after `loaded` is saved; deleted first, a failed save left a rerun uploading a file that no longer existed.
 - **Restore above every epoch the agents may hold** — they keep the highest epoch they accepted and refuse less; an epoch-1 snapshot restored as 2 after an earlier restore reached 3, so no agent connected. `_highest_known_epoch()` reads the last restore and saved snapshots.

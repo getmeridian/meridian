@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import socket
 import threading
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -16,7 +17,7 @@ from meridian.backup import BackupError
 from meridian.backup import restore as restore_steps
 from meridian.backup.keys import load_device_key
 from meridian.backup.pull import pull_snapshot
-from meridian.backup.restore import ControlRestorer, RestoreSource, upload_database
+from meridian.backup.restore import ControlRestorer, RestoreSource, hand_fence_to_service, upload_database
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.control.client import ControlClient
 from meridian.control.enrollment import token_sha256
@@ -26,9 +27,13 @@ from meridian.control.snapshot import decrypt_snapshot
 from meridian.core.topology import SetupIntent
 from meridian.handoff import HandoffLinks
 from meridian.node_deploy import panel_base_url
+from meridian.reconciler.fence import FleetFenceError, LocalFenceView
 from meridian.servers import ServerEntry, ServerRegistry
+from meridian.service_fence import ControlServiceFence
 from meridian.setup.single_server import single_server_intent
+from meridian.state_fence import SERVICE_HOLDER
 from tests.support.control_service import ADMIN_TOKEN, FLEET_ID, serve_control
+from tests.support.fence_host import FenceHost
 from tests.support.mock_connection import MockConnection
 
 OLD, NEW = "198.51.100.12", "198.51.100.13"
@@ -41,6 +46,7 @@ class NewServer:
 
     root: Path
     uploads: int = 0
+    fence_marks: list[Any] = field(default_factory=list)
     applies: list[SetupIntent] = field(default_factory=list)
     fail_apply: bool = False
     server: ControlServer | None = None
@@ -74,6 +80,7 @@ def new_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[NewS
     root.mkdir()
     server = NewServer(root)
     monkeypatch.setattr(restore_steps, "upload_database", server.upload)
+    monkeypatch.setattr(restore_steps, "hand_fence_to_service", lambda conn, cluster: server.fence_marks.append(conn))
     monkeypatch.setattr(restore_steps, "install_service", server.install)
     monkeypatch.setattr(restore_steps, "ssh_answers", lambda entry: False)
     monkeypatch.setattr(
@@ -327,6 +334,26 @@ def test_a_damaged_upload_is_refused(tmp_path: Path) -> None:
 
     with pytest.raises(BackupError, match="intact"):
         upload_database(conn, database, digest, fleet_id=FLEET_ID)  # type: ignore[arg-type]
+
+
+def test_a_restored_server_keeps_its_fence_in_the_service_even_while_it_is_down() -> None:
+    """A missing fence.json reads as a fleet whose service never came up, and apply would take the lease over SSH."""
+    host = FenceHost()
+    cluster = ClusterConfig(fleet_id=FLEET_ID, active_generation=9, active_plan_hash="e" * 64)
+
+    hand_fence_to_service(host, cluster)  # type: ignore[arg-type]
+    hand_fence_to_service(host, cluster)  # type: ignore[arg-type]
+
+    assert host.swaps == 1
+    assert host.record()["lease_holder"] == SERVICE_HOLDER and host.record()["generation"] == 9
+    with socket.socket() as probe:  # a port nothing listens on: the restored service is down
+        probe.bind(("127.0.0.1", 0))
+        cluster.panel.url = f"http://127.0.0.1:{probe.getsockname()[1]}"
+    cluster.panel.api_token = ADMIN_TOKEN
+    stale = LocalFenceView(fleet_id=FLEET_ID, active_generation=8, active_plan_hash="a" * 64, fresh=False)
+    fence = ControlServiceFence(host, cluster, holder="laptop:1")  # type: ignore[arg-type]
+    with pytest.raises(FleetFenceError, match="does not answer"):
+        fence.acquire(stale)
 
 
 # -- the command's local fleet state ------------------------------------------------------------
