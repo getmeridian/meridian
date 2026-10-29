@@ -7,6 +7,7 @@ Server-hosted PWA; Meridian's only connection-page implementation.
 **Runtime config** — fetch `config.json`; keep the canonical subscription URL, never rebuild it. Shared assets deploy under `/pwa/`, client shells/config under `/{uuid}/`.
 **Support page** — `support.html#<short id>` reads the person's own subscription for their VLESS/Hysteria2 UUID (or Xray JSON) and redirects to their page; the id stays out of request paths and logs.
 **Security** — guard versions, shapes, bounds, import schemes, and image sources; escape text and attribute quotes. QR base64 is validated, and deep links never enter inline JS.
+**No indexing** — shell robots metadata and the connection-page nginx header both say `noindex, nofollow, noarchive`.
 **Catalog** — render embedded apps immediately, applying valid shared `apps.json` within 5 seconds. Replace only setup, preserving platform, app, focus, text selection, and disclosures.
 **Account** — same-origin `/info` on open, return, and refresh; save only status, traffic, expiry, days left, and check time. The saved answer is unverified until checked again, independently of reachability.
 **Three-step setup** — native platform/app pickers drive install, import, and localized plain-text Connect records. Manual import includes a selectable URL and the app's menu path; Clash desktop guides include TUN. Choices stay in memory.

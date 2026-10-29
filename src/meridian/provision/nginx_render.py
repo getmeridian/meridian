@@ -336,6 +336,12 @@ def render_nginx_server_block(
             default      "";
         }}
 
+        # Scoped to connection pages; the map follows the cache-header pattern.
+        map $uri $meridian_robots {{
+            ~^/{info_page_path}/  "noindex, nofollow, noarchive";
+            default              "";
+        }}
+
         # WebSocket upgrade: only set Connection: upgrade when client sends Upgrade header
         map $http_upgrade $connection_upgrade {{
             default upgrade;
@@ -398,6 +404,7 @@ def render_nginx_server_block(
 
                 add_header Cache-Control $meridian_cache always;
                 add_header Service-Worker-Allowed $meridian_sw always;
+                add_header X-Robots-Tag $meridian_robots always;
                 add_header Content-Security-Policy "{csp}" always;
                 add_header X-Content-Type-Options "nosniff" always;
                 add_header X-Frame-Options "DENY" always;

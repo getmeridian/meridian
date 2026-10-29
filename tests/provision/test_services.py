@@ -57,6 +57,12 @@ CONFIGS = {
 
 _SECURITY_HEADERS = ("X-Frame-Options", "X-Content-Type-Options", "Referrer-Policy")
 _PWA_CACHE = ("$meridian_cache", "max-age=86400", "$meridian_sw", "Service-Worker-Allowed", "stats/")
+_PWA_ROBOTS = (
+    "map $uri $meridian_robots",
+    "~^/connect/",
+    '"noindex, nofollow, noarchive"',
+    "add_header X-Robots-Tag $meridian_robots always;",
+)
 # Connection pages need alias: it strips the location prefix.
 _CONNECTION_PAGES = ("location /connect/", "alias /var/www/private/")
 # Missing h2 ALPN is a fingerprinting vector.
@@ -97,6 +103,7 @@ PRESENT = {
         "default-src 'self'",
         *_SECURITY_HEADERS,
         *_PWA_CACHE,
+        *_PWA_ROBOTS,
         *_CONNECTION_PAGES,
         *_HTTP2,
         *_NGINX_ERRORS,
@@ -110,6 +117,7 @@ PRESENT = {
         "$host$request_uri",
         *_SECURITY_HEADERS,
         *_PWA_CACHE,
+        *_PWA_ROBOTS,
         *_CONNECTION_PAGES,
         *_HTTP2,
         "return 403",

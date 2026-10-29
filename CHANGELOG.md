@@ -75,6 +75,8 @@ that dials out to it.
   the snapshot and the recovery key, restore brings the fleet files back too.
 
 ### Changed
+- Connection-page shells and their nginx location send noindex, nofollow,
+  and noarchive directives while retaining the existing security headers.
 - Long connection lists start with three entries and an accessible “Show all”
   toggle; every connection remains available in its original order, and
   suspended accounts also dim individual import actions.

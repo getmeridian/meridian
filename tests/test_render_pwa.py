@@ -93,6 +93,9 @@ class TestRenderConfigJson:
 
 
 class TestRenderPWAShell:
+    def test_robots_meta_keeps_personal_pages_out_of_indexes(self) -> None:
+        assert '<meta name="robots" content="noindex, nofollow, noarchive">' in render_pwa_shell()
+
     def test_has_manifest_link(self) -> None:
         html = render_pwa_shell(client_name="test")
         assert 'rel="manifest"' in html
