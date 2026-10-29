@@ -145,3 +145,61 @@ def test_account_unlimited_and_no_expiry_are_not_zero_or_a_sentinel_date(page_da
         page_data,
     )
 
+
+def test_switching_from_persian_to_english_resets_direction_even_without_storage(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog, { info: data.info }); await browser.start();
+        browser.context.page.switchLang('fa');
+        assert.equal(browser.document.documentElement.dir, 'rtl');
+        browser.context.page.switchLang('en');
+        assert.equal(browser.document.documentElement.lang, 'en');
+        assert.equal(browser.document.documentElement.dir, 'ltr', 'English must restore LTR');
+        browser.context.localStorage.setItem = () => { throw new Error('storage blocked'); };
+        browser.context.page.switchLang('ru');
+        assert.equal(browser.document.documentElement.lang, 'ru', 'a preference must work without localStorage');
+        """,
+        page_data,
+    )
+
+
+def test_load_error_uses_saved_language_before_config_arrives(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog, {
+          storage: { 'meridian-lang': 'fa' }, fetch: () => Promise.reject(new Error('offline'))
+        });
+        await browser.start();
+        assert.equal(browser.document.documentElement.lang, 'fa');
+        assert.equal(browser.document.documentElement.dir, 'rtl');
+        assert.match(browser.document.getElementById('app').textContent, /بارگذاری/);
+        """,
+        page_data,
+    )
+
+
+def test_fixed_catalog_labels_and_accessible_actions_follow_language(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog, { storage: { 'meridian-lang': 'ru' }, info: data.info });
+        await browser.start();
+        assert.ok(!browser.document.getElementById('app').textContent.includes('Android, desktop'));
+        assert.equal(browser.document.querySelector('.lang-bar').getAttribute('aria-label'), 'Язык');
+        assert.equal(browser.document.querySelector('.install-dismiss').getAttribute('aria-label'), 'Закрыть');
+        """,
+        page_data,
+    )
+
+
+def test_support_page_honors_saved_language(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog, { storage: { 'meridian-lang': 'fa' }, language: 'en' });
+        browser.document.body.innerHTML = '<h1 id="title"></h1><p id="status"></p>';
+        browser.load('support.js');
+        assert.equal(browser.document.documentElement.lang, 'fa');
+        assert.equal(browser.document.documentElement.dir, 'rtl');
+        assert.match(browser.document.getElementById('status').textContent, /صفحه/);
+        """,
+        page_data,
+    )

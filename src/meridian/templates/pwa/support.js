@@ -15,9 +15,15 @@
     zh: ['连接设置', '正在打开您的连接页面…', '连接页面不可用。请联系向您分享此连接的人。']
   };
   var lang = (navigator.language || '').slice(0, 2);
+  try {
+    var saved = localStorage.getItem('meridian-lang');
+    if (TEXT[saved]) lang = saved;
+  } catch (e) {}
+  if (!TEXT[lang]) lang = 'en';
   var text = TEXT[lang] || TEXT.en;
-  if (TEXT[lang]) document.documentElement.lang = lang;
+  document.documentElement.lang = lang;
   document.documentElement.dir = lang === 'fa' ? 'rtl' : 'ltr';
+  document.title = text[0];
   document.getElementById('title').textContent = text[0];
   var status = document.getElementById('status');
   status.textContent = text[1];

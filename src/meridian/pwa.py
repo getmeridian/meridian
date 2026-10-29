@@ -41,7 +41,7 @@ _STATIC_FILES = (
     "support.js",
 )
 # Assets whose bytes feed the service worker's cache version.
-_VERSIONED_ASSETS = ("app.js", "account.js", "selfcheck.js", "styles.css", "apps.json")
+_VERSIONED_ASSETS = ("app.js", "account.js", "selfcheck.js", "support.js", "styles.css", "apps.json")
 # Placeholder in sw.js (cache name) and selfcheck.js (reported page version).
 _VERSION_PLACEHOLDER = b"'pwa-v1'"
 

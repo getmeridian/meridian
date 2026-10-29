@@ -75,6 +75,9 @@ that dials out to it.
   the snapshot and the recovery key, restore brings the fleet files back too.
 
 ### Changed
+- Connection pages reset text direction when switching languages, translate
+  setup and accessibility labels, and use the saved language on errors and
+  support pages.
 - Connection pages show account status, current and lifetime traffic, expiry,
   and freshness in all four languages, with a clearly marked offline answer
   and an explanation when an account cannot connect.

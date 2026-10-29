@@ -6,7 +6,19 @@
  * i18n translations (English is the markup default)
  * ----------------------------------------------------------------------- */
 var T = {
+  en: {
+    'apps.desktop': 'Desktop',
+    'apps.android.desktop': 'Android, desktop',
+    'apps.ios.android': 'iOS, Android',
+    'apps.ios.android.macos': 'iOS, Android, macOS',
+    language: 'Language', close: 'Close', copy: 'Copy', 'qr.code': 'QR code',
+  },
   ru: {
+    'apps.desktop': 'Для компьютера',
+    'apps.android.desktop': 'Android и компьютеры',
+    'apps.ios.android': 'iOS и Android',
+    'apps.ios.android.macos': 'iOS, Android и macOS',
+    language: 'Язык', close: 'Закрыть', copy: 'Скопировать', 'qr.code': 'QR-код',
     'primary.rec': 'Рекомендовано',
     clock: 'Синхронизация часов',
     'clock.desc': 'Часы устройства отстают. При неверных часах подключение может не работать. Откройте Настройки > Дата и время > включите «Автоматически».',
@@ -59,6 +71,11 @@ var T = {
     'open.short': 'Открыть',
   },
   fa: {
+    'apps.desktop': 'رایانه',
+    'apps.android.desktop': 'اندروید و رایانه',
+    'apps.ios.android': 'iOS و اندروید',
+    'apps.ios.android.macos': 'iOS، اندروید و macOS',
+    language: 'زبان', close: 'بستن', copy: 'کپی', 'qr.code': 'کد QR',
     'primary.rec': 'پیشنهادی',
     clock: 'همگام\u200Cسازی ساعت',
     'clock.desc': 'ساعت دستگاه عقب است. با ساعت نادرست ممکن است اتصال برقرار نشود. به تنظیمات > تاریخ و ساعت > \u00ABتنظیم خودکار\u00BB بروید.',
@@ -111,6 +128,11 @@ var T = {
     'open.short': 'باز کردن',
   },
   zh: {
+    'apps.desktop': '电脑',
+    'apps.android.desktop': 'Android 和电脑',
+    'apps.ios.android': 'iOS 和 Android',
+    'apps.ios.android.macos': 'iOS、Android 和 macOS',
+    language: '语言', close: '关闭', copy: '复制', 'qr.code': '二维码',
     'primary.rec': '推荐',
     clock: '时钟同步',
     'clock.desc': '设备时钟慢了。时钟不准可能导致连接失败。前往设置 > 日期与时间 > 启用“自动设置”。',
@@ -433,7 +455,7 @@ function renderPage(config) {
   html += '<div class="install-banner" id="install-banner">';
   html += '<div class="install-banner-text"><strong data-t="install.title">Install this app</strong><span data-t="install.offline">Access your connection offline</span></div>';
   html += '<button class="btn btn-primary btn-sm" data-action="install" data-t="install.btn">Install</button>';
-  html += '<button class="install-dismiss" data-action="dismiss" aria-label="Close">&times;</button>';
+  html += '<button class="install-dismiss" data-action="dismiss" data-t-aria="close" aria-label="Close">&times;</button>';
   html += '</div>';
 
   /* iOS "Open" falls back to the first recommended iOS app */
@@ -446,7 +468,7 @@ function renderPage(config) {
   html += '<div class="panels">';
   html += renderConnections(config, platform, !subUrl);
   html += renderTrouble();
-  var routerHref = ROUTER_DOCS.replace('{lang}', detectLang() || 'en');
+  var routerHref = ROUTER_DOCS.replace('{lang}', currentLang);
   html += '<a class="panel panel-link" href="' + escapeHtml(routerHref) + '" target="_blank" rel="noopener">';
   html += '<span class="panel-icon">' + ICON_ROUTER + '</span>';
   html += '<span class="panel-text"><strong data-t="router">Router</strong>';
@@ -473,7 +495,7 @@ function renderPage(config) {
 }
 
 function renderTopBar() {
-  var html = '<div class="topbar"><div class="lang-bar" role="group" aria-label="Language">';
+  var html = '<div class="topbar"><div class="lang-bar" role="group" data-t-aria="language" aria-label="Language">';
   var langs = [['en', 'EN'], ['ru', 'RU'], ['fa', 'FA'], ['zh', '中文']];
   var titles = { en: 'English', ru: 'Русский', fa: 'فارسی', zh: '中文' };
   for (var i = 0; i < langs.length; i++) {
@@ -551,9 +573,10 @@ function renderAppRow(a, key) {
   var html = '<a class="app-row" href="' + escapeHtml(appUrl(a, key)) + '" target="_blank" rel="noopener">';
   html += renderAppMark(a, 40);
   html += '<span class="app-row-text"><strong>' + escapeHtml(a.name) + '</strong>';
-  html += a.platform === 'All platforms'
-    ? '<span data-t="apps.all">All platforms</span></span>'
-    : '<span>' + escapeHtml(a.platform) + '</span></span>';
+  var labels = { 'All platforms': 'apps.all', 'Desktop': 'apps.desktop',
+    'Android, desktop': 'apps.android.desktop', 'iOS, Android': 'apps.ios.android',
+    'iOS, Android, macOS': 'apps.ios.android.macos' };
+  html += '<span>' + escapeHtml(labels[a.platform] ? text(labels[a.platform], a.platform) : a.platform) + '</span></span>';
   html += '<span class="app-row-get" data-t="app.get">Get</span>';
   return html + '</a>';
 }
@@ -577,7 +600,7 @@ function renderSubUrl(subUrl) {
 }
 
 function renderQr(b64, cls) {
-  return '<div class="qr ' + cls + '"><img src="data:image/png;base64,' + b64 + '" alt="QR code" width="200" height="200"></div>';
+  return '<div class="qr ' + cls + '"><img src="data:image/png;base64,' + b64 + '" data-t-alt="qr.code" alt="QR code" width="200" height="200"></div>';
 }
 
 function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
@@ -676,8 +699,8 @@ function renderConnection(proto, platform) {
   } else {
     html += '<a href="' + url + '" class="btn btn-soft btn-sm" data-t="open.short">Open</a>';
   }
-  html += '<button class="btn btn-ghost btn-icon" data-action="copy" data-url="' + url + '" aria-label="Copy">' + ICON_COPY + '</button>';
-  if (hasQr) html += '<button class="btn btn-ghost btn-icon" data-action="toggle-qr" aria-expanded="false" aria-label="QR">' + ICON_QR + '</button>';
+  html += '<button class="btn btn-ghost btn-icon" data-action="copy" data-url="' + url + '" data-t-aria="copy" aria-label="Copy">' + ICON_COPY + '</button>';
+  if (hasQr) html += '<button class="btn btn-ghost btn-icon" data-action="toggle-qr" data-t-aria="qr.code" aria-expanded="false" aria-label="QR code">' + ICON_QR + '</button>';
   html += '</div></div>';
   if (hasQr) html += '<div class="conn-qr" hidden>' + renderQr(proto.qr_b64, 'qr-inline') + '</div>';
   return html + '</div>';
@@ -736,13 +759,26 @@ function toggleQr(button) {
 var currentLang = null;
 
 function switchLang(lang) {
+  if (lang !== 'en' && !T[lang]) return;
   currentLang = lang;
+  setDocumentLanguage();
   try { localStorage.setItem('meridian-lang', lang); } catch (e) {}
   /* Re-render the entire page — English text is baked into renderPage(),
      so we can't just swap data-t values; we need a full rebuild. */
   if (window._meridianConfig) {
     renderPage(window._meridianConfig);
+  } else {
+    init();
   }
+}
+
+function text(key, fallback) {
+  return (T[currentLang] && T[currentLang][key]) || T.en[key] || fallback || key;
+}
+
+function setDocumentLanguage() {
+  document.documentElement.lang = currentLang || 'en';
+  document.documentElement.dir = currentLang === 'fa' ? 'rtl' : 'ltr';
 }
 
 function detectLang() {
@@ -764,11 +800,9 @@ function highlightActiveLang() {
 }
 
 function applyI18n(clientName, serverName) {
-  currentLang = detectLang();
-  fillPlaces(currentLang || 'en');
-  if (!currentLang) { currentLang = 'en'; highlightActiveLang(); updatePageMeta(clientName, serverName); return; }
-  var dict = T[currentLang];
-  if (!dict) { highlightActiveLang(); updatePageMeta(clientName, serverName); return; }
+  setDocumentLanguage();
+  fillPlaces(currentLang);
+  var dict = T[currentLang] || {};
   document.querySelectorAll('[data-t]').forEach(function(el) {
     var k = el.dataset.t;
     var v = dict[k];
@@ -781,7 +815,12 @@ function applyI18n(clientName, serverName) {
       el.textContent = v;
     }
   });
-  document.documentElement.dir = currentLang === 'fa' ? 'rtl' : 'ltr';
+  document.querySelectorAll('[data-t-aria]').forEach(function(el) {
+    el.setAttribute('aria-label', text(el.dataset.tAria));
+  });
+  document.querySelectorAll('[data-t-alt]').forEach(function(el) {
+    el.setAttribute('alt', text(el.dataset.tAlt));
+  });
   highlightActiveLang();
   updatePageMeta(clientName, serverName);
 }
@@ -938,6 +977,9 @@ function init() {
     });
 }
 
+/* Choose the locale before a slow-load message or a fetch error can render. */
+currentLang = detectLang() || 'en';
+setDocumentLanguage();
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {

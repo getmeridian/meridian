@@ -12,7 +12,7 @@ Server-hosted Progressive Web App and the only connection-page implementation.
 **App catalog** — `_PWA_APPS` entries carry `platforms` (where it runs) and `recommended` (where the page features it), in recommendation order. The page reads the shared, icon-bearing `pwa/apps.json` and falls back to `config.apps`, so catalog edits reach old pages with the next asset upload.
 **Self-check** — `selfcheck.js` (injected by `app.js`, so older shells get it) runs from the visitor's network: clock vs the server `Date` header, a stream of the 96 KB `probe.bin` (freeze window and timeouts mirror `diagnostics/blocking.py`), and the subscription's HTTP status. "Copy report" yields English text without links, hostnames, or UUIDs.
 **Account information** — `account.js` reads same-origin subscription `/info` on open, return, and refresh; its saved projection holds status, traffic, expiry, and check time only, and is labelled unverified until checked again.
-**i18n** — the website's asymmetric model (`website/src/i18n/CLAUDE.md`): English HTML, `data-t` swaps, and a full `renderPage()` to return to English.
+**i18n** — English HTML with `data-t` swaps; choose the saved locale before loading, always set lang/dir, and rebuild to return to English. Support follows the same preference.
 **Two-step setup card** — step 1 lists the platform's recommended apps, step 2 their "Add to" deep links; the subscription QR sits beside them on desktop and folds away on phones. Everything else is quiet panels: all connections, "Not connecting?", router guide.
 
 ## What's done well
@@ -35,3 +35,4 @@ Server-hosted Progressive Web App and the only connection-page implementation.
 - **Never put `data-t` on data** — a translated key replaces the element's whole text, remark included.
 - **Account freshness is separate from reachability** — failed `/info` reads keep the last saved answer unverified; suspended accounts explain and dim import actions, and every `no-store` request bypasses the SW.
 - **Catalog `platform` is an English label** — the shared "All platforms" value renders through `data-t="apps.all"`; any other fixed label needs its own key, never raw text on a translated page.
+- **A locale switch must work without storage** — rendering uses the chosen language in memory; re-detecting it after a failed `localStorage` write reverts the choice.
