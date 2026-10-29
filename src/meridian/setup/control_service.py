@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 import uuid
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Mapping
 
 from meridian.cluster import ClusterConfig
 from meridian.compiler.models import (
@@ -28,7 +28,6 @@ from meridian.core.cancellation import CancellationToken
 from meridian.core.errors import ProvisioningError
 from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
-from meridian.handoff import HandoffLinks
 from meridian.host_runtime import CONTROL_SERVICE_STATE_DIR
 from meridian.provision.ensure import ensure_file_content
 from meridian.reconciler.meridian_drivers import MeridianDriverContext, build_meridian_drivers
@@ -186,19 +185,6 @@ def verify_control_service(plan: ResourcePlan, cluster: ClusterConfig) -> tuple[
                 raise ResourceReconcileError(f"Canonical subscription for {item.payload.username!r} is invalid.")
             urls[item.payload.username] = cluster.panel.subscription_url(user.sub_token)
     return version, len(nodes), urls
-
-
-def control_service_handoff(cluster: ClusterConfig, usernames: Iterable[str]) -> list[HandoffLinks]:
-    """Subscription links for verified users; the skeleton publishes no connection pages yet."""
-    with control_client(cluster) as client:
-        results: list[HandoffLinks] = []
-        for name in usernames:
-            user = client.get_user(name)
-            if user is None:
-                results.append(HandoffLinks(name, error="the user does not exist in the control service"))
-                continue
-            results.append(HandoffLinks(name, subscription_url=cluster.panel.subscription_url(user.sub_token)))
-    return results
 
 
 class _Document:

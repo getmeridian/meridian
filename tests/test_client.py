@@ -79,7 +79,7 @@ def _cli(
         with ExitStack() as stack:
             stack.enter_context(patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster))
             panel_cls = stack.enter_context(
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel or _make_panel_mock())
+                patch("meridian.control_access.MeridianPanel", return_value=panel or _make_panel_mock())
             )
             if runtime is not None:
                 stack.enter_context(patch("meridian.setup.runtime.SetupRuntime", return_value=runtime))

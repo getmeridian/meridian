@@ -10,11 +10,12 @@ from meridian.cluster import ClusterConfig
 from meridian.commands._validation import validate_command_input
 from meridian.commands.client_state import persist_client_state
 from meridian.console import err_console, fail
+from meridian.control_access import AccessPanel
 from meridian.core.clients import PanelUserLike
 from meridian.core.command_inputs import ClientNameRequest
 from meridian.core.inputs import validate_access_username_value, validate_display_name_value
 from meridian.core.topology import assign_access_usernames
-from meridian.remnawave import MeridianPanel, RemnawaveError, User
+from meridian.remnawave import RemnawaveError, User
 from meridian.ssh import SSHError
 
 
@@ -79,7 +80,7 @@ def new_client_usernames(cluster: ClusterConfig, names: list[str]) -> tuple[list
     return usernames, {user: name for user, name in zip(usernames, names, strict=True) if user != name}
 
 
-def get_user_or_fail(panel: MeridianPanel, name: str, *, action: str) -> User | None:
+def get_user_or_fail(panel: AccessPanel, name: str, *, action: str) -> User | None:
     """Read one user while preserving typed CLI failure semantics."""
     try:
         return panel.get_user(name)

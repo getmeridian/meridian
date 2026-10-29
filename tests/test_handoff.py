@@ -116,7 +116,7 @@ def test_published_pages_are_recorded_so_later_reads_show_the_link(tmp_home, mon
         get_user=lambda _name: _user(),
         fetch_subscription=lambda _short: SimpleNamespace(content=_subscription()),
     )
-    monkeypatch.setattr(handoff, "MeridianPanel", lambda *_args: nullcontext(panel))
+    monkeypatch.setattr(handoff, "access_panel", lambda _cluster: nullcontext(panel))
     monkeypatch.setattr(handoff, "control_connection", lambda _cluster: nullcontext(MockConnection()))
 
     links = handoff.publish_connection_pages(cluster, ["alice"])

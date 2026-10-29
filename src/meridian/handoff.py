@@ -14,9 +14,10 @@ from dataclasses import dataclass
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from meridian.cluster import ClusterConfig, ClusterConfigExternallyModifiedError
+from meridian.control_access import AccessPanel, access_panel
 from meridian.core.clients import PanelUserLike
 from meridian.models import ProtocolURL
-from meridian.remnawave import MeridianPanel, RemnawaveError, User
+from meridian.remnawave import RemnawaveError, User
 from meridian.ssh import ServerConnection
 
 logger = logging.getLogger("meridian.handoff")
@@ -98,7 +99,7 @@ def exit_countries(cluster: ClusterConfig) -> list[str]:
 
 def publish_connection_page(
     cluster: ClusterConfig,
-    panel: MeridianPanel,
+    panel: AccessPanel,
     conn: ServerConnection,
     user: User,
 ) -> HandoffLinks:
@@ -185,14 +186,14 @@ def publish_connection_pages(cluster: ClusterConfig, usernames: Iterable[str]) -
     if not names:
         return []
     with (
-        MeridianPanel(cluster.panel.url, cluster.panel.api_token) as panel,
+        access_panel(cluster) as panel,
         control_connection(cluster) as conn,
     ):
         results: list[HandoffLinks] = []
         for name in names:
             user = panel.get_user(name)
             if user is None:
-                results.append(HandoffLinks(name, error="the user does not exist in Remnawave"))
+                results.append(HandoffLinks(name, error="the user does not exist in the control plane"))
                 continue
             results.append(publish_connection_page(cluster, panel, conn, user))
     if any(links.page_url for links in results):

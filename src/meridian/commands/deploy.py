@@ -573,7 +573,7 @@ def _print_success(server_ip: str, cluster: ClusterConfig, request: DeployReques
     err_console.print()
     line()
     err_console.print(f"\n  [dim]Redeploy with the same settings:  {_redeploy_command(server_ip, request)}[/dim]")
-    if cluster.panel.url and request.control == "remnawave":
+    if cluster.panel.url and not cluster.runs_control_service:
         err_console.print(f"  [dim]Remnawave panel (advanced):        {cluster.panel.display_url}[/dim]")
     err_console.print()
 

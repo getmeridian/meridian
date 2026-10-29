@@ -392,6 +392,11 @@ class ClusterConfig:
         backup_cluster(path)
 
     @property
+    def runs_control_service(self) -> bool:
+        """True when Meridian's own control service, not Remnawave, holds this fleet's users (#95)."""
+        return self.topology_intent is not None and self.topology_intent.control.backend == "meridian"
+
+    @property
     def is_configured(self) -> bool:
         """Whether the cluster has a panel configured."""
         return bool(self.panel.url and self.panel.api_token)

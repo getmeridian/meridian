@@ -97,11 +97,10 @@ def create_verification_panel(url: str, token: str, timeout: float) -> MeridianP
 
 def verification_panel_factory(cluster: ClusterConfig) -> PanelFactory:
     """The fleet's control backend: Remnawave, or Meridian's own control service."""
-    intent = cluster.topology_intent
-    if intent is not None and intent.control.backend == "meridian":
-        from meridian.control_verification import ServiceVerificationPanel
+    if cluster.runs_control_service:
+        from meridian.control_access import ServiceAccessPanel
 
-        return ServiceVerificationPanel
+        return ServiceAccessPanel
     return create_verification_panel
 
 

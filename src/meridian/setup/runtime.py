@@ -90,7 +90,6 @@ from meridian.setup.control_plane import (
 )
 from meridian.setup.control_service import (
     bootstrap_control_service,
-    control_service_handoff,
     control_service_ready,
     meridian_drivers,
     verify_control_service,
@@ -553,10 +552,7 @@ class SetupRuntime:
 
     def publish_handoff(self, usernames: Sequence[str]) -> list[HandoffLinks]:
         """Publish connection pages for verified users and return their links."""
-        cluster = self._cluster_loader()
-        if cluster.topology_intent is not None and cluster.topology_intent.control.backend == "meridian":
-            return control_service_handoff(cluster, usernames)
-        return publish_connection_pages(cluster, usernames)
+        return publish_connection_pages(self._cluster_loader(), usernames)
 
     def _retirement_entries(
         self,

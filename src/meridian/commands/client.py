@@ -11,7 +11,7 @@ import typer
 from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
-from meridian.commands._helpers import format_traffic, load_topology_cluster, make_panel, require_intent
+from meridian.commands._helpers import format_traffic, load_topology_cluster, require_intent
 from meridian.commands.client_handoff import (
     format_status,
     get_user_or_fail,
@@ -28,6 +28,7 @@ from meridian.commands.client_state import (
 )
 from meridian.commands.client_v4 import run_add_v4, run_remove_v4
 from meridian.console import confirm, err_console, error_context, fail, is_json_mode, ok, warn
+from meridian.control_access import access_panel
 from meridian.core.clients import PanelUserLike, build_client_reissue_result, build_client_status_result
 from meridian.core.fleet import public_url
 from meridian.core.models import ErrorModel, Summary
@@ -96,7 +97,7 @@ def _show(*, name: str, repair_page: bool, operation: OperationContext) -> None:
 
     try:
         result = collect_client_show(
-            make_panel(cluster),
+            access_panel(cluster),
             name,
             build_share_url=share_url,
             build_subscription_url=cluster.panel.subscription_url,
@@ -165,7 +166,7 @@ def _show(*, name: str, repair_page: bool, operation: OperationContext) -> None:
         err_console.print(f"  [bold]Last seen[/bold] {escape(detail.last_seen)}")
 
     err_console.print()
-    if cluster.panel.url:
+    if cluster.panel.url and not cluster.runs_control_service:
         err_console.print(f"  [dim]Remnawave panel:   {escape(public_url(cluster.panel.display_url))}[/dim]")
     err_console.print("  [dim]View all clients:  meridian client list[/dim]")
     err_console.print()
@@ -187,7 +188,7 @@ def _list(*, operation: OperationContext) -> None:
 
     cluster = load_topology_cluster()
     try:
-        result = collect_client_list(make_panel(cluster), allowed_usernames=_access_users(cluster))
+        result = collect_client_list(access_panel(cluster), allowed_usernames=_access_users(cluster))
     except RemnawaveError as e:
         fail(
             f"Could not list clients: {e}",
@@ -290,7 +291,7 @@ def run_reissue(name: str, yes: bool = False) -> None:
 
 
 def _reissue(cluster: ClusterConfig, name: str, shown: str, operation: OperationContext) -> None:
-    with make_panel(cluster) as panel:
+    with access_panel(cluster) as panel:
         user = get_user_or_fail(panel, name, action="load")
         if user is None:
             fail(
@@ -393,7 +394,7 @@ def _set_enabled(name: str, action: Literal["enable", "disable"]) -> None:
         name = resolve_client_name(cluster, name)
         validate_client_name(name)
         require_access_user(cluster, name)
-        with make_panel(cluster) as panel:
+        with access_panel(cluster) as panel:
             client = get_user_or_fail(panel, name, action="load")
             if client is None:
                 fail(

@@ -12,13 +12,13 @@ from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import (
     ReviewedApplyPersistenceError,
     apply_reviewed_intent,
-    make_panel,
     persist_reviewed_apply,
     require_intent,
 )
 from meridian.commands.client_handoff import get_user_or_fail, print_handoff_links
 from meridian.commands.client_state import build_client_persistence_warning
 from meridian.console import err_console, fail, is_json_mode, ok, warn
+from meridian.control_access import access_panel
 from meridian.core.clients import build_client_add_result, build_client_remove_result
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -50,7 +50,7 @@ def run_add_v4(
             hint_type="user",
         )
 
-    panel = make_panel(cluster)
+    panel = access_panel(cluster)
     with panel:
         for name in names:
             if get_user_or_fail(panel, name, action="check") is not None:
@@ -71,7 +71,7 @@ def run_add_v4(
     )
 
     succeeded: list[tuple[str, User]] = []
-    with make_panel(cluster) as refreshed_panel:
+    with access_panel(cluster) as refreshed_panel:
         for name in names:
             user = get_user_or_fail(refreshed_panel, name, action="verify")
             if user is None:
@@ -139,7 +139,7 @@ def _report_state_failure(
     reason = redact_string(str(exc.__cause__ or exc))
     observed: list[tuple[str, User]] = []
     try:
-        with make_panel(cluster) as panel:
+        with access_panel(cluster) as panel:
             for name in names:
                 user = panel.get_user(name)
                 if user is not None:
@@ -196,7 +196,7 @@ def run_remove_v4(name: str, cluster: ClusterConfig, operation: OperationContext
     if not yes and not confirm(f"Remove client '{name}'? Their links stop working immediately."):
         raise typer.Exit(1)
 
-    with make_panel(cluster) as panel:
+    with access_panel(cluster) as panel:
         user = get_user_or_fail(panel, name, action="load")
     apply_reviewed_intent(
         cluster,
