@@ -7,7 +7,7 @@ description: Complete reference for all Meridian CLI commands and flags.
 
 ### meridian deploy
 
-Deploy one server and get a shareable connection link. The server becomes both the control server (Remnawave panel) and an exit. Deploy builds the same reviewed topology as `meridian setup`, applies it with checkpoints, verifies real traffic through the delivered subscription, and prints a connection page and subscription URL. Re-running the same command resumes an interrupted deploy or redeploys, keeping paths, keys, and users.
+Deploy one server and get a shareable connection link. The server becomes both the control server (running Meridian's control service) and an exit. Deploy builds the same reviewed topology as `meridian setup`, applies it with checkpoints, verifies real traffic through the delivered subscription, and prints a connection page and subscription URL. Re-running the same command resumes an interrupted deploy or redeploys, keeping paths, keys, and users. The first deploy of a fleet ends by showing its recovery key once (see [meridian backup](#meridian-backup)).
 
 ```
 meridian deploy [SERVER] [flags]
@@ -16,7 +16,7 @@ meridian deploy [SERVER] [flags]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--sni HOST` | (auto) | Camouflage target. Without it, a first deploy tries sites in the server's own subnet, then `www.google.com`, `dl.google.com`, `www.cloudflare.com`, and uses the first that carries traffic; a redeploy keeps the saved target. An explicit `--sni` is never swapped |
-| `--domain DOMAIN` | (none) | Your domain: XHTTP moves onto it and WSS is added, both through Cloudflare's CDN (XHTTP works without one, on the IP). The panel and connection pages stay on the IP certificate |
+| `--domain DOMAIN` | (none) | Your domain: XHTTP moves onto it and WSS is added, both through Cloudflare's CDN (XHTTP works without one, on the IP). The control service and connection pages stay on the IP certificate |
 | `--self-steal` | off | Camouflage with your own domain (`--sni`, else `--domain`), pointed at the server with a DNS-only record: Meridian issues its Let's Encrypt certificate and the server answers probes itself, with nginx's stock 404. Deploy first checks where the name resolves: it stops when it doesn't resolve and warns when it points elsewhere. A redeploy keeps it; a new `--sni` without the flag goes back to a borrowed site |
 | `--hysteria2/--no-hysteria2` | on | Offer Hysteria2 on UDP/443, disguised with salamander, as the last fallback. Uses the domain's certificate, or the IP certificate without one |
 | `--fingerprint NAME` | chrome | TLS fingerprint clients present on Reality, XHTTP, and WSS (`chrome`, `firefox`, `safari`, `ios`, `android`, `edge`, `random`, `randomized`). Change it if your region starts flagging the current one; a redeploy keeps the saved value |
@@ -29,15 +29,14 @@ meridian deploy [SERVER] [flags]
 | `--harden / --no-harden` | on | SSH key-only login, fail2ban, and UFW firewall. `--no-harden` is for servers shared with other services |
 | `--warp / --no-warp` | off | Send outgoing traffic through Cloudflare WARP |
 | `--geo-block` / `--no-geo-block` | on | Refuse Russian domains and IPs (`geosite:category-ru` + `geoip:ru`) at the exit. Xray JSON and Mihomo subscriptions already send them directly from the device |
-| `--client-ips / --no-client-ips` | off | Pass each client's real IP to Xray and the panel, for Remnawave per-user IP limits and connection logs. Off, every TCP connection appears to come from the server itself |
-| `--country CC` | address registry | Two-letter country shown in connection names and as the panel's node flag. Without it, a first deploy asks the server address's Regional Internet Registry (via IANA's RDAP bootstrap, no geo-IP service); a redeploy keeps the saved country |
+| `--country CC` | address registry | Two-letter country shown in connection names and on the console's server list. Without it, a first deploy asks the server address's Regional Internet Registry (via IANA's RDAP bootstrap, no geo-IP service); a redeploy keeps the saved country |
 | `--yes` | | Skip confirmation prompts |
 | `--json` | | Emit the final deploy result as a `meridian.output/v1` envelope |
 | `--events=jsonl` | | Stream typed progress events as JSONL on stderr |
 | `--request FILE` | | Read a `deploy-request` JSON payload from a file; use `-` for stdin |
 | `--dry-run` | | Compile and preview the deploy without SSH or local changes |
 
-Without an IP, deploy asks for one. `local` deploys on the machine you are running on. Deploy only redeploys a server that is already an exit in your fleet; add other servers with `meridian node add`. Running it again with different flags updates that exit to match (for example, adding or dropping `--domain` or `--no-hysteria2`) while keeping your other exits, relays, gateways, and clients.
+Without an IP, deploy asks for one. `local` deploys on the machine you are running on. Deploy only redeploys a server that is already an exit in your fleet; add other servers with `meridian node add`. On a fleet that still runs the Remnawave panel, deploy offers to run [`meridian migrate`](#meridian-migrate) first. Running it again with different flags updates that exit to match (for example, adding or dropping `--domain` or `--no-hysteria2`) while keeping your other exits, relays, gateways, and clients.
 
 **Machine/UI flow**: `meridian api workflow deploy --json` returns a renderable wizard contract. A UI collects those fields, validates them against `deploy-request`, then runs `meridian deploy --request deploy.json --json --events=jsonl`. Machine deploys are non-interactive: the request must contain `yes: true` after the user confirms. `--dry-run --json` returns `deploy-plan` under `data`, so a UI can preview the mode, ports, and generated paths before opening SSH.
 
@@ -59,7 +58,7 @@ The first question is the language (English, Русский, فارسی, 中文)
 
 ### meridian plan
 
-Show what `meridian apply` would change, comparing the topology in `~/.config/meridian/cluster.yml` with the live servers and panel. Nothing is changed.
+Show what `meridian apply` would change, comparing the topology in `~/.config/meridian/cluster.yml` with the live servers and the control service. Nothing is changed.
 
 ```
 meridian plan [--json]
@@ -75,7 +74,7 @@ The output shows the plan hash, resource counts by kind, and any resources that 
 - `0` — converged, nothing to do
 - `1` — nothing to plan (no fleet yet, or unusable local state)
 - `2` — changes pending (run `meridian apply`)
-- `3` — required evidence (panel, SSH, local state) was unavailable
+- `3` — required evidence (the control service, SSH, local state) was unavailable
 
 Don't edit the topology in `cluster.yml` by hand. Change it with `meridian setup`, `deploy`, `client add`, `node add`, or `relay add`.
 
@@ -95,7 +94,9 @@ meridian apply [--yes] [--forget-unreachable] [--json]
 
 JSON `data` contains `plan_hash`, `generation`, and `actions[]` with `status: "converged" | "applied" | "failed" | "unknown" | "skipped"`. JSON mode never prompts: without `--yes` it returns `MERIDIAN_CONFIRMATION_REQUIRED` with the plan hash and exits `2`. A failed resource exits `3`; fix the cause and run apply again. If local state cannot be saved after remote changes, apply exits `3` and says so; repair `~/.config/meridian` permissions, then run `plan` and `apply` again.
 
-Removals are applied too: whatever left the topology (users, protocol paths, exits, relays, routing gateways) is deleted after everything still in the plan has converged, and `plan` lists it first. The control server leaves only with `meridian teardown`.
+Removals are applied too: whatever left the topology (users, protocol paths, exits, relays, routing gateways) is deleted after everything still in the plan has converged, and `plan` lists it first. The control server leaves only with `meridian teardown`, or moves with `meridian restore`.
+
+Every apply is recorded in the control service as a revision (see `meridian fleet history`), and holds a lease there while it runs, so two machines never apply at once.
 
 ### meridian client
 
@@ -117,26 +118,26 @@ meridian client remove NAME [--yes] [--json]
 |------|---------|-------------|
 | `--json` | | Emit the result as a `meridian.output/v1` envelope (all client commands) |
 | `--repair-page` | | Republish the client's connection page (`client show`) |
-| `--limit SIZE` | none | Traffic limit (`client add`, `client set`): `500MB`, `50GB`, `1.5TB`; `none` or `0` removes it. Units are binary (1 GB = 1024³ bytes), as the panel counts |
+| `--limit SIZE` | none | Traffic limit (`client add`, `client set`): `500MB`, `50GB`, `1.5TB`; `none` or `0` removes it. Units are binary (1 GB = 1024³ bytes), as the control service counts |
 | `--reset PERIOD` | never | When used traffic starts again from zero: `day`, `week`, `month`, or `never`, by calendar day, week, or month |
 | `--expires DATE` | never | When access ends: `YYYY-MM-DD` (the end of that day, UTC), an ISO time such as `2026-12-31T18:00:00+03:00` (a time without an offset is UTC), or `never`. Must be in the future |
 | `--yes`, `-y` | | Confirm `client reissue` or `client remove`; required with `--json` |
 
-**`client add`** — adds one or more people to the topology, applies it, and prints each person's connection page and subscription URL. The page is built from their real subscription, so relays and Hysteria2 appear when present. Names already in the topology or already present in the panel are refused. Names can be in any script (`client add Биба 王小明`): pages and output show them as typed, while the panel, which accepts only Latin letters, digits, `-`, and `_`, gets a transliterated username (`biba`, `wangxiaoming`). Other client commands accept either form. If a client's subscription link can't be built, the client is still added and the command exits `3`; a missing connection page alone is a warning (repair it with `client show --repair-page`). `--limit`, `--reset`, and `--expires` give every added name the same limits as `client set`, once the clients exist; if that fails, the clients are still added, and the command warns and exits `3`.
+**`client add`** — adds one or more people to the topology, applies it, and prints each person's connection page and subscription URL. The page is built from their real subscription, so relays and Hysteria2 appear when present. Names already in the topology or already present in the control service are refused. Names can be in any script (`client add Биба 王小明`): pages and output show them as typed, while the control service, which accepts only Latin letters, digits, `.`, `-`, and `_`, gets a transliterated username (`biba`, `wangxiaoming`). Other client commands accept either form. If a client's subscription link can't be built, the client is still added and the command exits `3`; a missing connection page alone is a warning (repair it with `client show --repair-page`). `--limit`, `--reset`, and `--expires` give every added name the same limits as `client set`, once the clients exist; if that fails, the clients are still added, and the command warns and exits `3`.
 
 **`client show`** — prints the connection page, subscription URL, status, traffic against the limit with its reset period, expiry, and last-seen time. `--repair-page` republishes a missing page; if that fails, the links are still shown with a warning and exit `3`.
 
-**`client list`** — lists clients with status, traffic, expiry, and last seen. With `--json`, returns `data.summary` counts and `data.clients[]`.
+**`client list`** — lists clients with status, traffic, expiry, and last seen, including people added in the web console (`declared: false` in JSON). With `--json`, returns `data.summary` counts and `data.clients[]`.
 
-**`client set`** — changes a client's traffic limit, reset period, or expiry; only the options you pass change, and at least one is required. A client their limit or expiry has cut off (status `limited` or `expired`) can connect again as soon as the new values allow it. Changes take effect at once, and applies never touch them. A bad value exits `2` before Meridian connects anywhere. With `--json`, returns the client as the panel now has it in `data.client`, including `traffic_limit_bytes`, `traffic_reset`, and `expires_at` (empty means never).
+**`client set`** — changes a client's traffic limit, reset period, or expiry; only the options you pass change, and at least one is required. A client their limit or expiry has cut off (status `limited` or `expired`) can connect again as soon as the new values allow it. Changes take effect at once, and applies never touch them. A bad value exits `2` before Meridian connects anywhere. With `--json`, returns the client as the control service now has it in `data.client`, including `traffic_limit_bytes`, `traffic_reset`, and `expires_at` (empty means never).
 
 **`client reset-traffic`** — starts the client's used traffic from zero, as a new period would; a client their limit has cut off can connect again.
 
 **`client enable` / `client disable`** — resume or suspend a client immediately. A disable lasts until you run `client enable`; applies (including redeploys and `client add`, `node add`, `relay add`) leave a client's status alone.
 
-**`client reissue`** — replaces a client's links after a leak. Remnawave issues a new subscription ID and new keys, so the old subscription URL, connection page, and links stop working. Meridian deletes the old page first, then publishes the new one and prints the new links. Status, limits, expiry, and the HWID device limit stay as set in the panel; delete devices you don't recognize there. Asks for confirmation unless `--yes`, and refuses names that aren't your clients. If the new page can't be published, the links are still shown with a warning and exit `3` (repair it with `client show --repair-page`).
+**`client reissue`** — replaces a client's links after a leak. The control service issues a new subscription ID and new keys, so the old subscription URL, connection page, and links stop working. Meridian deletes the old page first, then publishes the new one and prints the new links. Status, limits, and expiry stay as set. Asks for confirmation unless `--yes`, and refuses names that aren't your clients. If the new page can't be published, the links are still shown with a warning and exit `3` (repair it with `client show --repair-page`).
 
-**`client remove`** — removes the client from the topology, deletes the panel user and their connection page. Asks for confirmation unless `--yes`. The last client cannot be removed. Don't delete users in the panel directly; Meridian recreates any client still in the topology on the next apply.
+**`client remove`** — removes the client from the topology, deletes their account in the control service and their connection page. Asks for confirmation unless `--yes`. The last client cannot be removed. People added in the web console are removed there.
 
 ### meridian server
 
@@ -184,13 +185,13 @@ meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 | `--force` | | `node remove`: also remove the relay chains that route to this exit |
 | `--json` | | Emit `node list` as a `meridian.output/v1` envelope |
 
-**`node add`** — connects over SSH, adds the server as an exit in your topology, and applies the reviewed plan (hardening, Docker, Xray, panel registration). Existing clients receive the new exit on their next subscription refresh.
+**`node add`** — connects over SSH, adds the server as an exit in your topology, and applies the reviewed plan (hardening, the node agent and Xray, enrollment with the control service). Existing clients receive the new exit on their next subscription refresh.
 
-**`node list`** — lists nodes with live panel status, Xray version, and traffic. If panel status is unavailable, configured nodes are shown as `unknown` and the command exits `3`.
+**`node list`** — lists nodes with their agent's live status, version, and traffic. If the control service is unreachable, configured nodes are shown as `unknown` and the command exits `3`.
 
-**`node remove`** — removes an exit or routing gateway from your topology. It lists every resource that will be deleted (panel node and profile, node container, firewall rules, published Hosts), asks for confirmation, and applies exactly that review; the server stays in your saved servers. It refuses for the control server (use `meridian teardown`), while relays still route to the exit (remove them first or pass `--force`), while a routing gateway enters the fleet through it, and when the result would break the topology (for example an empty egress pool or the default egress). Routing rules scoped to a removed gateway are dropped with it.
+**`node remove`** — removes an exit or routing gateway from your topology. It lists every resource that will be deleted (the node's record and document, its agent and Xray, firewall rules, client endpoints), asks for confirmation, and applies exactly that review; the server stays in your saved servers. It refuses for the control server (use `meridian teardown`), while relays still route to the exit (remove them first or pass `--force`), while a routing gateway enters the fleet through it, and when the result would break the topology (for example an empty egress pool or the default egress). Routing rules scoped to a removed gateway are dropped with it.
 
-**`node replace`** — moves one exit to another server. `EXIT` is the exit ID or its server's saved name or IP; the new server uses the same target syntax as `node add` (a saved name or `local` works too) and is saved like `server add`. The exit keeps its ID, Reality keys, protocol paths, SNI, WARP and geo settings, and every relay that points at it, so relay users keep working and direct users get the new address on their next subscription refresh. The review lists what will be deployed on the new server and every resource cleaned up on the old one (node container, image, and directory; its nginx files, firewall rules, and certificates); Docker and the saved server stay. It refuses for the control server (moving the panel would change every subscription URL) and for a new server that already has a role.
+**`node replace`** — moves one exit to another server. `EXIT` is the exit ID or its server's saved name or IP; the new server uses the same target syntax as `node add` (a saved name or `local` works too) and is saved like `server add`. The exit keeps its ID, Reality keys, protocol paths, SNI, WARP and geo settings, and every relay that points at it, so relay users keep working and direct users get the new address on their next subscription refresh. The review lists what will be deployed on the new server and every resource cleaned up on the old one (the agent and Xray, nginx files, firewall rules, and certificates); the saved server stays. It refuses for the control server (moving it would change every subscription URL; use `meridian restore` when it is lost) and for a new server that already has a role.
 
 **`node sni`** — gives an exit's Reality path a new camouflage SNI. `EXIT` is the exit ID or its server's saved name or IP. It refuses `apple.com` and `icloud.com` names and `www.microsoft.com`, checks over SSH that the exit reaches the new site with TLS 1.3 and HTTP/2, shows the review (relays that follow the exit's SNI, relays that keep their own, routing gateways built on the path, and what gets cleaned up), confirms, and applies it. The old name is replaced, not kept alongside: apps switch at their next subscription refresh (every 6 hours) or a manual refresh, and until then they cannot connect over Reality. XHTTP, WSS, and Hysteria2 don't change. Use it when `meridian test --probe` reports the camouflage SNI blocked. With `--self-steal`, `NEW_SNI` is a domain you own: instead of the reachability check, it checks that the name resolves to the exit (stopping when it doesn't resolve, warning when it points elsewhere), and the exit gets a Let's Encrypt certificate for it and answers probes itself.
 
@@ -219,7 +220,7 @@ meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 
 **`relay add`** — adds a single-hop relay to your topology and applies it. Clients receive it on their next subscription refresh. For chains with more than one hop, use `meridian setup`.
 
-**`relay remove`** — `RELAY` is a relay server's IP or saved name, or a relay chain ID. It drops every chain through that server (narrow it with `--exit`), lists what will be deleted (Realm units, firewall rules, the exit-side listener, published Hosts), confirms, and applies the reviewed removal. The servers stay in your saved servers.
+**`relay remove`** — `RELAY` is a relay server's IP or saved name, or a relay chain ID. It drops every chain through that server (narrow it with `--exit`), lists what will be deleted (Realm units, firewall rules, the exit-side listener, client endpoints), confirms, and applies the reviewed removal. The servers stay in your saved servers.
 
 **`relay sni`** — gives the relay chains through a server (or one chain by ID; narrow it with `--exit`) a new camouflage SNI. It refuses the same names as `node sni`, checks that the exit reaches the site (a Reality listener on the exit serves the relay's own name), reviews, confirms, and applies. Passing the exit's own SNI makes the relay follow the exit again. Apps switch at their next subscription refresh.
 
@@ -254,11 +255,12 @@ meridian route remove EXIT ROUTE [--yes] [--json]
 
 ### meridian fleet
 
-Fleet-wide health and inventory from the live panel, and Remnawave upgrades.
+Fleet-wide health and inventory from the live control service, its history of applies, upgrades, and the fleet as an editable file.
 
 ```
 meridian fleet status [--json]
 meridian fleet inventory [--json]
+meridian fleet history [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -266,19 +268,21 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--json` | | Emit the result as a `meridian.output/v1` envelope (`status`, `inventory`, `export`, `import`) |
-| `--tested` | | `fleet upgrade`: ask neither Docker Hub nor GitHub; Remnawave returns to the versions this Meridian release was tested with, and a Realm you already upgraded stays |
+| `--json` | | Emit the result as a `meridian.output/v1` envelope (`status`, `inventory`, `history`, `export`, `import`) |
+| `--tested` | | `fleet upgrade`: don't ask GitHub; a Realm you already upgraded stays |
 | `--yes`, `-y` | | `fleet upgrade`, `fleet import`: skip the confirmation |
 | `--dry-run` | | `fleet import`: show the changes and the review, apply nothing |
 | `--forget-unreachable` | | `fleet import`: forget what was deployed on a removed server whose SSH port does not answer |
 
-**`fleet status`** — panel health, node heartbeats, relay listeners, and client counts. Missing declared clients degrade health; disabled, limited, or expired clients are counted but are your choice, not a fault. A reachable relay listener only proves TCP, so unverified relay routes keep health `unknown`; use `meridian test` to check the full path. Exit `0` means healthy, `4` degraded, and `3` unknown.
+**`fleet status`** — control service health, each agent's last report and whether it applied the current configuration, relay listeners, and client counts. Missing declared clients degrade health; disabled, limited, or expired clients are counted but are your choice, not a fault. A reachable relay listener only proves TCP, so unverified relay routes keep health `unknown`; use `meridian test` to check the full path. Exit `0` means healthy, `4` degraded, and `3` unknown.
 
-**`fleet inventory`** — your configured servers, roles, nodes, and relays, with live panel status when reachable. It never prints the panel API token or secret paths. If live status is unavailable, the configured inventory is still shown, with warnings, and the command exits `3`. Use `plan --json` to decide whether apply has work to do.
+**`fleet inventory`** — your configured servers, roles, nodes, and relays, with live status when the control service is reachable. It never prints API tokens or secret paths. If live status is unavailable, the configured inventory is still shown, with warnings, and the command exits `3`. Use `plan --json` to decide whether apply has work to do.
 
-**`fleet upgrade`** — moves Remnawave to its newest release without waiting for a Meridian update. It asks Docker Hub for the newest backend, node, and subscription page releases within the major this Meridian release supports (pre-releases and other majors are skipped), pins each by its multi-arch digest, and saves the choice in `cluster.yml` so later applies keep it. A newer pin in a later Meridian release takes over again. `--tested` sticks to the versions this release was tested with. PostgreSQL and Valkey always stay on Meridian's pins. With relays in the fleet it does the same for Realm: GitHub's newest release in the tested major, recorded with the sha256 GitHub publishes for each archive, which every relay checks before installing. It then reads the backend, subscription page, PostgreSQL, Valkey, and node images each server runs (read-only `docker inspect` over SSH) and shows each one as `current`, `upgrade`, `install`, or kept. The version policy is the one setup uses: a newer version tag or a floating tag (`latest`, `3`) you chose is kept and reported, never downgraded. A PostgreSQL major is never moved in place — the old major keeps running and the command explains the dump-and-restore it needs. After you confirm, it applies the reviewed plan and runs `meridian check` on every server. A server whose images cannot be read stops the command with exit `3` before anything changes; if the apply converges but a server still runs an old image, it exits `3` too.
+**`fleet history`** — every reviewed apply the control service recorded, newest first: its number, time, author (the machine's token name, `root` for the CLI's own token, `owner` for the console), status (`proposed`, `approved`, `applied`, or `failed`), and the start of its plan hash. `--json` returns `data.revisions[]`.
 
-**`fleet export`** — prints your fleet's reviewed topology as a YAML file you can edit: exits and their protocol paths, relays, gateways, egress pools, routing rules, routes, clients, and fleet settings. Servers appear by their saved name (or address when unnamed), never by internal ID, and the file starts with `schema: meridian.fleet/v1`. Reality keys, panel credentials, client links, and the XHTTP and WSS transport paths stay in Meridian and are not listed. `--json` returns the same document under `data.document`.
+**`fleet upgrade`** — moves relays to the newest Realm release without waiting for a Meridian update: GitHub's newest release in the tested major, recorded in `cluster.yml` with the sha256 GitHub publishes for each archive, which every relay checks before installing. `--tested` keeps the version this release was tested with. It reads the Realm version each relay runs and shows it as `current` or `upgrade`, then, after you confirm, applies the reviewed plan and runs `meridian check` on every server. A relay whose version cannot be read stops the command with exit `3` before anything changes. The control service and the agents come with Meridian itself: `meridian update`, then `meridian apply`, upgrades them.
+
+**`fleet export`** — prints your fleet's reviewed topology as a YAML file you can edit: exits and their protocol paths, relays, gateways, egress pools, routing rules, routes, clients, and fleet settings. Servers appear by their saved name (or address when unnamed), never by internal ID, and the file starts with `schema: meridian.fleet/v1`. Reality keys, API tokens, client links, and the XHTTP and WSS transport paths stay in Meridian and are not listed. `--json` returns the same document under `data.document`.
 
 **`fleet import`** — reads an edited file (or `-` for standard input) and shows what it changes, one line each: `+` adds, `-` removes, and `~` changes a field (`~ exit-2 sni www.example.com -> www.example.org`). It then lists every resource the change deletes and the review hash, asks, and applies exactly that review, like `apply`. A file with no edits prints "No changes". Removing a client from `access.users` removes them like `client remove`: their links stop working and their connection page is deleted. Adding one creates them like `client add` and publishes their page; `client show NAME` prints their links. New camouflage SNIs get the checks `node sni` runs. Import refuses another `schema`, a server you haven't saved (save it with `meridian server add`), transport paths in the file, changes to the control server, its domain, or its backend, removing or renaming the exit on the control server, and moving an exit to another server (use `node replace`). Keys and credentials stay as they are. Without a terminal, pass `--yes`; `--dry-run` shows the changes and the review without applying anything.
 
@@ -316,7 +320,7 @@ meridian context remove NAME [--yes]
 Check a server's health, or whether a new server can run Meridian. What runs depends on the server's role in your fleet:
 
 - **Not in the fleet yet** — pre-flight checks: camouflage target reachability and DNS, port 443 availability and outside reachability, domain DNS, OS, disk, and clock. Nothing is installed; a short-lived listener tests the firewall when port 443 is free. DNS uses the server's own resolver.
-- **Control, exit, or routing gateway** — panel connection, SSH (or local access), containers (including the subscription page's health), every compiled public and internal port, TLS certificates, and disk space. Run from another machine, the control server also gets a data-flow check: a ~50 KB download that warns when it freezes after about 16–24 KB (throttling, measured from where you are).
+- **Control, exit, or routing gateway** — the control service (it answers, belongs to this fleet, and runs a compatible version), each node's agent (online, applied the current configuration, current build), SSH (or local access), every compiled public and internal port, TLS certificates, and disk space. Run from another machine, the control server also gets a data-flow check: a ~50 KB download that warns when it freezes after about 16–24 KB (throttling, measured from where you are).
 - **Relay** — every Realm hop on the server: the service is active and can reach its next hop, and the chain's public entry accepts TCP from your machine.
 
 With no server, every server in the fleet is checked.
@@ -344,11 +348,11 @@ RealiTLScanner scans IPv4 ranges; an IPv6-only server exits `3`. Picking a resul
 
 Test delivered proxy traffic from your device. No SSH is needed.
 
-A full test picks an active client, fetches the exact Xray JSON that Remnawave delivers to them, and pushes real traffic through the automatic fallback and through every path of the target server. The first run may spend up to 120 seconds downloading and verifying the pinned Xray runtime. Traffic checks rotate independent IP observers and compare them with a direct request, so an observer outage is inconclusive rather than a false failure. `MERIDIAN_CONNECT_TEST_URL` overrides the observer for controlled environments.
+A full test picks an active client, fetches the exact Xray JSON that the control service delivers to them, and pushes real traffic through the automatic fallback and through every path of the target server. The first run may spend up to 120 seconds downloading and verifying the pinned Xray runtime. Traffic checks rotate independent IP observers and compare them with a direct request, so an observer outage is inconclusive rather than a false failure. `MERIDIAN_CONNECT_TEST_URL` overrides the observer for controlled environments.
 
 Each path reports its time to first byte. When a path fails, Meridian opens a plain TCP connection to its endpoint to say whether it **connects, but no traffic passes** (the server answers but the proxy session carries nothing: wrong credentials or a session being cut) or is **unreachable** (nothing answers on that port). With `--json`, `data.transports` lists every path's outcome (`ok`, `no_traffic`, `unreachable`, `failed`, `egress_mismatch`, `inconclusive`, `invalid`) and `first_byte_ms`.
 
-A panel outage, HTTP `429`, or HTTP `5xx` makes the subscription unavailable, so the run exits `3`. Any other subscription rejection such as `400` or `422` is a completed failure and exits `4`.
+A control service outage, HTTP `429`, or HTTP `5xx` makes the subscription unavailable, so the run exits `3`. Any other subscription rejection such as `400` or `422` is a completed failure and exits `4`.
 
 ```
 meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
@@ -365,7 +369,7 @@ Exit `0` means every check passed, `4` means the test found problems, and `3` me
 
 `--probe` looks at a server the way an active prober would, to check whether the deployment gives itself away, instead of sending traffic. It works on any IP or domain and applies stricter checks when the target belongs to your saved topology.
 
-Checks follow the real deployment: public and internal port exposure, HTTP/TLS behavior, SNI consistency and camouflage, common proxy and panel paths, WebSocket upgrades, reverse DNS, HTTP/2, legacy TLS versions, and configured domains. `--sni` overrides the SNI for generic TLS probes. UDP-only listeners are reported as needing a full `meridian test` instead of being guessed.
+Checks follow the real deployment: public and internal port exposure, HTTP/TLS behavior, SNI consistency and camouflage, common proxy and management-panel paths, WebSocket upgrades, reverse DNS, HTTP/2, legacy TLS versions, and configured domains. `--sni` overrides the SNI for generic TLS probes. UDP-only listeners are reported as needing a full `meridian test` instead of being guessed.
 
 `--probe` also answers "what is blocked?". It opens TLS to the server with its camouflage SNI; if that fails, it retries without the SNI and opens the real camouflage site directly, then reports whether the **server IP** or the **camouflage SNI** looks blocked. If the real site can't be reached either, the result is inconclusive rather than a finding. With a self-steal camouflage the real site is the server itself, so it is no independent comparison: when nothing gets through, the result is inconclusive. On the control server it also downloads the connection page's ~50 KB script and watches for a transfer that freezes after about 16–24 KB, which is how throttled foreign IPs behave. When a WSS path goes through a CDN, the same download runs through the CDN. These results only mean something when you run them from inside the censored network. `--probe` cannot be combined with `--basic`, `--client`, or `--domain`. Exit codes are the same as `test`; skipped checks are never reported as passes.
 
@@ -398,25 +402,25 @@ meridian logs [SERVER] [--lines N] [--grep TEXT] [--component NAME]
 | `--grep`, `-g TEXT` | | Only lines containing this text; case-insensitive, matched literally rather than as a regex |
 | `--component`, `-c NAME` | all | Only `node`, `panel`, `nginx`, or `relay`; repeat to pick several |
 
-`logs` reads what the server's roles run: exits and routing gateways show the Remnawave node container, the control server shows the panel containers (backend, database, Valkey, subscription page), both show the nginx error log, and relays show their Realm units' journal. `--user` and `--ssh-port` override the saved SSH user and port.
+`logs` reads what the server's roles run: exits and routing gateways show the agent (`netagent`) and Xray (`netcore`) under `node`, the control server shows the control service (`ctld`) under `panel`, both show the nginx error log, and relays show their Realm units' journal. `--user` and `--ssh-port` override the saved SSH user and port.
 
-Every line passes through the same redaction as `meridian doctor`: tokens, passwords, keys, UUIDs, subscription IDs, and the panel's and connection page's secret paths are replaced with `[REDACTED]`, so the output is safe to paste into a bug report. Lines print as plain text with terminal control characters removed.
+Every line passes through the same redaction as `meridian doctor`: tokens, passwords, keys, UUIDs, subscription IDs, and the control service's and connection page's secret paths are replaced with `[REDACTED]`, so the output is safe to paste into a bug report. Lines print as plain text with terminal control characters removed.
 
-A server without a fleet role, or a `--component` it doesn't run, exits `2` before connecting. A log that can't be read (a missing container, a lost SSH connection) is shown as unavailable and the command exits `3`.
+A server without a fleet role, or a `--component` it doesn't run, exits `2` before connecting. A log that can't be read (a missing service, a lost SSH connection) is shown as unavailable and the command exits `3`.
 
 ### meridian panel
 
-Show the Remnawave admin panel URL and admin username, and what Meridian manages there versus what is yours to change.
+Show the web console's address, and a one-time setup link while it has no owner.
 
 ```
-meridian panel [--show-password]
+meridian panel [--setup-link]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--show-password` | | Also print the admin password |
+| `--setup-link` | | Print a reset link even though the console has an owner: it sets a new password, turns the sign-in code off, and signs out every device |
 
-Edits to client status, traffic limits, expiry, and descriptions, and users you create in the panel, survive every apply. Edits to nodes, profiles, Hosts, squads, and templates Meridian created are reverted by the next apply; `meridian plan` shows them first.
+The setup link works once, for 15 minutes; open it to choose the owner's password. Once the console has an owner, `panel` prints the address and whether a sign-in code is on. Treat both the address and a setup link like passwords. In the console you manage people and API tokens; servers, revisions, and the subscription title are read-only there. See [Web console](/en/client-management/#web-console).
 
 ### meridian teardown
 
@@ -426,9 +430,86 @@ Remove Meridian from a server.
 meridian teardown [SERVER] [--user USER] [--ssh-port PORT] [--yes]
 ```
 
-On a single-server deployment, teardown removes everything Meridian created: the panel, node, nginx configuration, certificates, relays, and firewall rules on the server, then the local `cluster.yml` and saved server profile. Docker, system packages, SSH hardening, and fail2ban stay, and nginx keeps running if it still serves your own sites. It also removes 3x-ui from Meridian 3.x. In a multi-server fleet, teardown refuses a server that still has a role in the topology.
+On a single-server deployment, teardown removes everything Meridian created: the control service and its database, the agent and Xray, nginx configuration, certificates, relays, and firewall rules on the server, then the local `cluster.yml` and saved server profile. System packages, SSH hardening, and fail2ban stay, and nginx keeps running if it still serves your own sites. It also removes 3x-ui from Meridian 3.x. In a multi-server fleet, teardown refuses a server that still has a role in the topology.
 
 `--yes` skips the confirmation; the role checks still run first. Declining exits `1`. An unknown server name, or zero or several possible targets, exits `2` instead of prompting.
+
+### meridian backup
+
+Encrypted snapshots of the control service's state, the machines that receive them, and the recovery key.
+
+```
+meridian backup pull [--name NAME]
+meridian backup recovery-key [--yes]
+meridian backup devices
+meridian backup revoke ID
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--name NAME` | this computer's host name | `backup pull`: name this machine's key gets when it is first registered |
+| `--yes`, `-y` | | `backup recovery-key`: replace an existing recovery key without asking |
+
+After every command that changes the fleet, Meridian saves the control service's newest snapshot in `snapshots/` beside `cluster.yml` (the newest few are kept). A snapshot holds users, limits, traffic, revisions, API tokens, and a copy of this machine's `cluster.yml` and `servers.json`, so it can rebuild the fleet on a machine with nothing else. It is encrypted to every registered machine's key and to the recovery key, and never carries signing keys, sessions, or the console password. A failed save warns and never fails the command that triggered it.
+
+**`backup pull`** — saves a snapshot now. The first pull on a machine creates its key (`device.key`, readable only by you) and registers it with the control service.
+
+**`backup recovery-key`** — makes the fleet's recovery key, or replaces the existing one after asking, and prints it once. Meridian keeps only its public half, so write it down or print it and keep it offline. The first deploy of a fleet already shows one. Not available with `--json`.
+
+**`backup devices`** — lists the machines whose keys snapshots are sealed to, with their IDs and when each was registered, and whether the fleet has a recovery key.
+
+**`backup revoke`** — stops sealing new snapshots to one machine's key, for example a lost laptop. Snapshots it already holds stay readable with its key; revoke it before it can pull a new one.
+
+### meridian restore
+
+Rebuild a lost or seized control server on another server from a snapshot.
+
+```
+meridian restore --to SERVER [--snapshot FILE] [--recovery-key] [--force]
+                 [--name NAME] [--user USER] [--ssh-port PORT] [--yes]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--to SERVER` | (required) | The new control server: an IP, `user@IP:port`, or a saved name |
+| `--snapshot FILE` | newest saved | Snapshot to restore |
+| `--recovery-key` | | Open the snapshot with the recovery key instead of this machine's key; it is asked for (hidden) or read from one line of standard input |
+| `--force` | | Restore even though the old control service still answers |
+| `--name NAME` | (none) | Name for the new server |
+| `--user/-u USER` | root | SSH user on the new server |
+| `--ssh-port PORT` | 22 | SSH port on the new server |
+| `--yes`, `-y` | | Skip the confirmation |
+
+Restore opens the snapshot, reviews what it will do, and asks. It then installs the control service on the new server from the snapshot, moves the control server (and the old server's exit, if it had one) to the new address in your topology, and runs the normal reviewed apply. The restored service gets a new fleet authority, new signing keys, and a new API token, so every agent enrolls again and a seized server can't sign anything your nodes accept. Users keep their accounts, limits, and traffic. The console owner sets a new password with a link from `meridian panel`.
+
+On a bare IP every subscription URL contains the control server's address, so each link changes: the review says so and the end prints every client's new link. With a domain, links stay the same once its DNS record points at the new server; the review names the records.
+
+Restore refuses while the old control server still answers, because two control services would split the fleet; `--force` overrides it, for example when the old server was seized. It warns when `--snapshot` names an older file than the newest saved one: an older snapshot brings back tokens, machines, and people you have since removed. A restore that stops can be run again and continues where it stopped.
+
+On a machine without the fleet, pass the snapshot file and `--recovery-key`: the snapshot's own copy of the fleet's files is restored first. If this machine's copy is older than the snapshot's, restore puts the fleet in a new context and, after the review names it, takes the fleet over from the old one, which is then marked superseded and refuses changes until you `meridian context remove` it.
+
+### meridian migrate
+
+Move a fleet that runs the Remnawave panel to Meridian's control service, in place, keeping every link.
+
+```
+meridian migrate [--yes]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--yes`, `-y` | | Skip the confirmation |
+
+Migrate first reviews the move: the clients it carries over, anything about a client it can't keep, and the panel data nobody keeps (the panel's admin account and API tokens, per-day usage history, HWID device registrations, panel plugins and response rules Meridian didn't set, client IP forwarding (it served the panel's per-user IP limits), and the Remnawave subscription page; Meridian's own connection pages stay). After you confirm, it:
+
+1. Backs up the panel's database, to `backups/` on your machine and to `/var/backups/meridian-migration/` on the control server, with your fleet files
+2. Installs the control service beside the panel and imports every client with the same keys, subscription ID, status, limits, expiry, and traffic
+3. Stops the panel (its data stays) and removes each node's container
+4. Applies the fleet: every exit gets the agent, enrolled with the control service
+5. Checks that every client's subscription link is exactly what it was
+6. Removes Remnawave
+
+There is no rollback; the backup is the way back. Each step is saved, so a migration that stops resumes when you run it again, and a finished one does nothing. If the links check fails, Remnawave is left in place, stopped, and the command stops with an error. Without a terminal, pass `--yes`; otherwise migrate stops after the review. `meridian deploy` offers to migrate when it finds a Remnawave fleet.
 
 ### meridian update
 
@@ -455,6 +536,20 @@ meridian studio [--port PORT] [--assets-dir DIRECTORY] [--no-open]
 Studio prints and opens an address like `http://127.0.0.1:7391/studio/#k=…`. The part after `#k=` is a key that changes on every launch; only a browser tab opened from that address can use the Engine, so other programs and other users on the same computer cannot. Keep it private. After restarting Studio, open the new address it prints.
 
 Without `--port`, Studio uses port 7391, or the next free port up to 7400, so the draft your browser saves for Studio is still there next time. An explicit `--port` that is taken fails clearly, as do missing assets. An explicit asset directory must contain `studio/index.html`.
+
+### meridian serve
+
+Run the control service. Meridian installs it on the control server as the `ctld` systemd unit, which runs this command; you don't run it yourself.
+
+```
+meridian serve [--config FILE]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--config FILE` | `/etc/ctld/config.json` | Service configuration, written by Meridian |
+
+The service listens on `127.0.0.1:3000` behind nginx and keeps its state in one SQLite file under `/var/lib/ctld/`. It logs no requests, so subscription IDs and secret paths never reach the journal. `meridian logs SERVER -c panel` shows its log.
 
 ### meridian api
 
@@ -508,7 +603,7 @@ Global options go before the command, for example `meridian --quiet doctor`. Com
 | `--install-completion` | Install shell completion for the current shell |
 | `--show-completion` | Print the completion script for the current shell |
 
-JSON output uses the `meridian.output/v1` envelope (`schema`, `command`, `operation_id`, `status`, `summary`, `data`, `warnings`, `errors`). It is supported by every command that lists `--json`: deploy, plan, apply, check, test, probe, all client and route commands, fleet status/inventory/export/import, node/relay list, and the api commands. The global `--json` and a command's own `--json` are interchangeable. Secrets are redacted before JSON leaves the process. Run `meridian api commands --json` to discover the contracts.
+JSON output uses the `meridian.output/v1` envelope (`schema`, `command`, `operation_id`, `status`, `summary`, `data`, `warnings`, `errors`). It is supported by every command that lists `--json`: deploy, plan, apply, check, test, probe, all client and route commands, fleet status/inventory/history/export/import, node/relay list, and the api commands. The global `--json` and a command's own `--json` are interchangeable. Secrets are redacted before JSON leaves the process. Run `meridian api commands --json` to discover the contracts.
 
 ## Common server options
 
@@ -517,13 +612,13 @@ These recur across commands; each command accepts only the options listed in its
 | Flag | Used by |
 |------|---------|
 | `SERVER` argument | deploy, check, scan, test, doctor, logs, teardown, node add, relay add, server add |
-| `--user`, `-u USER` | deploy, check, node add, relay add, server add, scan, doctor, logs, teardown |
-| `--ssh-port PORT` | deploy, check, node add, relay add, server add, scan, doctor, logs, teardown |
+| `--user`, `-u USER` | deploy, check, node add, relay add, server add, scan, doctor, logs, teardown, restore |
+| `--ssh-port PORT` | deploy, check, node add, relay add, server add, scan, doctor, logs, teardown, restore |
 | `--sni HOST` | deploy, check, node add, relay add, test, doctor |
 | `--domain DOMAIN` | deploy, check, node add, test |
 | `--self-steal` | deploy, node add, node sni |
 
-Client commands use the panel API directly and don't take a server. `test` runs from your device and doesn't use SSH.
+Client commands use the control service's API directly and don't take a server. `test` runs from your device and doesn't use SSH.
 
 ## Server resolution
 

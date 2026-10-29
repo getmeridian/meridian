@@ -7,7 +7,7 @@ description: Meridian CLI 所有命令和标志的完整参考。
 
 ### meridian deploy
 
-部署一台服务器并获得可分享的连接链接。服务器既是控制服务器（Remnawave 面板）又是出口。部署会构建与 `meridian setup` 相同的已审核拓扑，带检查点应用它，通过交付的订阅验证真实流量，并输出连接页面和订阅 URL。重新运行相同命令可继续中断的部署或重新部署，并保留路径、密钥和用户。
+部署一台服务器并获得可分享的连接链接。服务器既是控制服务器（运行 Meridian 的控制服务）又是出口。部署会构建与 `meridian setup` 相同的已审核拓扑，带检查点应用它，通过交付的订阅验证真实流量，并输出连接页面和订阅 URL。重新运行相同命令可继续中断的部署或重新部署，并保留路径、密钥和用户。集群的首次部署结束时会显示一次恢复密钥（见 [meridian backup](#meridian-backup)）。
 
 ```
 meridian deploy [SERVER] [flags]
@@ -16,7 +16,7 @@ meridian deploy [SERVER] [flags]
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
 | `--sni HOST` | (自动) | 伪装目标。不指定时，首次部署会先尝试服务器所在子网内的网站，再尝试 `www.google.com`、`dl.google.com`、`www.cloudflare.com`，并使用第一个能承载流量的；重新部署保持保存的目标。显式 `--sni` 永远不会被替换 |
-| `--domain DOMAIN` | (无) | 你的域名：XHTTP 迁移到该域名上并新增 WSS，二者都经由 Cloudflare CDN（没有域名时 XHTTP 也能在 IP 上工作）。面板和连接页面保持在 IP 证书上 |
+| `--domain DOMAIN` | (无) | 你的域名：XHTTP 迁移到该域名上并新增 WSS，二者都经由 Cloudflare CDN（没有域名时 XHTTP 也能在 IP 上工作）。控制服务和连接页面保持在 IP 证书上 |
 | `--self-steal` | 关 | 用你自己的域名（`--sni`，否则 `--domain`）伪装，该域名通过仅 DNS 的记录指向服务器：Meridian 为它签发 Let's Encrypt 证书，服务器自己用 nginx 自带的 404 页面回应探测。部署会先检查域名解析到哪里：无法解析时停止，指向别处时警告。重新部署会保留该设置；不带此标志的新 `--sni` 会恢复借用的网站 |
 | `--hysteria2/--no-hysteria2` | 启 | 在 UDP/443 上提供 Hysteria2，用 salamander 伪装，作为最后的回退。使用域名的证书或没有域名的 IP 证书 |
 | `--fingerprint NAME` | chrome | 客户端在 Reality、XHTTP 和 WSS 上呈现的 TLS 指纹（`chrome`、`firefox`、`safari`、`ios`、`android`、`edge`、`random`、`randomized`）。如果你的地区开始标记当前指纹，请更改它；重新部署保留已保存的值 |
@@ -29,8 +29,7 @@ meridian deploy [SERVER] [flags]
 | `--harden / --no-harden` | 启 | 仅 SSH 密钥登录、fail2ban 和 UFW 防火墙。`--no-harden` 用于与其他服务共享的服务器 |
 | `--warp / --no-warp` | 关 | 通过 Cloudflare WARP 发送出站流量 |
 | `--geo-block` / `--no-geo-block` | 启 | 在出口拒绝俄罗斯域名和 IP（`geosite:category-ru` + `geoip:ru`）。Xray JSON 和 Mihomo 订阅已经从设备直接发送它们 |
-| `--client-ips / --no-client-ips` | 关 | 把每个客户端的真实 IP 传给 Xray 和面板，供 Remnawave 的按用户 IP 限制和连接日志使用。关闭时，每个 TCP 连接看起来都来自服务器本身 |
-| `--country CC` | 地址注册机构 | 显示在连接名称中、并作为面板节点旗帜的两字母国家代码。不指定时，首次部署会向服务器地址所属的区域互联网注册机构查询（通过 IANA 的 RDAP 引导服务，不使用 geo-IP 服务）；重新部署则沿用已保存的国家 |
+| `--country CC` | 地址注册机构 | 显示在连接名称中和控制台服务器列表中的两字母国家代码。不指定时，首次部署会向服务器地址所属的区域互联网注册机构查询（通过 IANA 的 RDAP 引导服务，不使用 geo-IP 服务）；重新部署则沿用已保存的国家 |
 | `--yes` | | 跳过确认提示 |
 | `--json` | | 将最终部署结果作为 `meridian.output/v1` 信封发出 |
 | `--events=jsonl` | | 在 stderr 上以 JSONL 形式流式传输类型化进度事件 |
@@ -59,7 +58,7 @@ meridian setup [--intent FILE|-] [--restart] [--yes]
 
 ### meridian plan
 
-显示 `meridian apply` 会变更什么，比较 `~/.config/meridian/cluster.yml` 中的拓扑与实时服务器和面板。没有变更任何东西。
+显示 `meridian apply` 会变更什么，比较 `~/.config/meridian/cluster.yml` 中的拓扑与实时服务器和控制服务。没有变更任何东西。
 
 ```
 meridian plan [--json]
@@ -75,7 +74,7 @@ meridian plan [--json]
 - `0` — 已收敛，无需更改
 - `1` — 无可规划内容（尚未部署集群，或本地状态不可用）
 - `2` — 有待应用的变更（请运行 `meridian apply`）
-- `3` — 所需证据（面板、SSH 或本地状态）不可用
+- `3` — 所需证据（控制服务、SSH 或本地状态）不可用
 
 不要手工编辑 `cluster.yml` 中的拓扑。用 `meridian setup`、`deploy`、`client add`、`node add` 或 `relay add` 变更它。
 
@@ -95,7 +94,9 @@ meridian apply [--yes] [--forget-unreachable] [--json]
 
 JSON `data` 包含 `plan_hash`、`generation` 和 `actions[]` 带 `status: "converged" | "applied" | "failed" | "unknown" | "skipped"`。JSON 模式永不提示：没有 `--yes` 它返回 `MERIDIAN_CONFIRMATION_REQUIRED` 带计划哈希并退出 `2`。失败的资源退出 `3`；修复原因并再次运行应用。如果远程变更后本地状态无法保存，应用退出 `3` 并说明；修复 `~/.config/meridian` 权限，然后再次运行 `plan` 和 `apply`。
 
-删除同样会被应用：离开拓扑的所有内容（用户、协议路径、出口、中继、路由网关）在计划中剩下的所有内容收敛后被删除，`plan` 首先列出它们。控制服务器只能通过 `meridian teardown` 删除。
+删除同样会被应用：离开拓扑的所有内容（用户、协议路径、出口、中继、路由网关）在计划中剩下的所有内容收敛后被删除，`plan` 首先列出它们。控制服务器只能通过 `meridian teardown` 删除，或通过 `meridian restore` 迁移。
+
+每次应用都会在控制服务中记录为一个修订（见 `meridian fleet history`），并在运行期间在那里持有租约，因此两台机器永远不会同时应用。
 
 ### meridian client
 
@@ -117,26 +118,26 @@ meridian client remove NAME [--yes] [--json]
 |------|---------|-------------|
 | `--json` | | 将结果作为 `meridian.output/v1` 信封发出（所有客户端命令） |
 | `--repair-page` | | 重新发布客户端的连接页面（`client show`） |
-| `--limit SIZE` | 无 | 流量限额（`client add`、`client set`）：`500MB`、`50GB`、`1.5TB`；`none` 或 `0` 取消限额。单位按二进制计算（1 GB = 1024³ 字节），与面板一致 |
+| `--limit SIZE` | 无 | 流量限额（`client add`、`client set`）：`500MB`、`50GB`、`1.5TB`；`none` 或 `0` 取消限额。单位按二进制计算（1 GB = 1024³ 字节），与控制服务一致 |
 | `--reset PERIOD` | never | 已用流量何时从零重新计算：`day`、`week`、`month` 或 `never`，按自然日、周、月 |
 | `--expires DATE` | never | 访问何时结束：`YYYY-MM-DD`（当天结束时，UTC）、ISO 时间如 `2026-12-31T18:00:00+03:00`（不带时区偏移的时间按 UTC 计），或 `never`。必须是将来的时间 |
 | `--yes`, `-y` | | 确认 `client reissue` 或 `client remove`；`--json` 需要 |
 
-**`client add`** — 添加一个或多个人到拓扑，应用它，并为每个人打印连接页面和订阅 URL。页面从他们的真实订阅构建，所以中继和 Hysteria2 在存在时显示。拓扑中已有的或面板中已存在的名称被拒绝。名称可以使用任何文字（`client add Биба 王小明`）：页面和输出按输入原样显示名称，而面板只接受拉丁字母、数字、`-` 和 `_`，会得到音译后的用户名（`biba`、`wangxiaoming`）。其他 client 命令接受任一形式。如果客户端的订阅链接无法构建，客户端仍被添加命令退出 `3`；仅缺失连接页面是警告（用 `client show --repair-page` 修复）。`--limit`、`--reset` 和 `--expires` 会在客户端创建后，为每个添加的名称设置与 `client set` 相同的限制；如果设置失败，客户端仍会被添加，命令给出警告并以 `3` 退出。
+**`client add`** — 添加一个或多个人到拓扑，应用它，并为每个人打印连接页面和订阅 URL。页面从他们的真实订阅构建，所以中继和 Hysteria2 在存在时显示。拓扑中已有的或控制服务中已存在的名称被拒绝。名称可以使用任何文字（`client add Биба 王小明`）：页面和输出按输入原样显示名称，而控制服务只接受拉丁字母、数字、`.`、`-` 和 `_`，会得到音译后的用户名（`biba`、`wangxiaoming`）。其他 client 命令接受任一形式。如果客户端的订阅链接无法构建，客户端仍被添加命令退出 `3`；仅缺失连接页面是警告（用 `client show --repair-page` 修复）。`--limit`、`--reset` 和 `--expires` 会在客户端创建后，为每个添加的名称设置与 `client set` 相同的限制；如果设置失败，客户端仍会被添加，命令给出警告并以 `3` 退出。
 
 **`client show`** — 打印连接页面、订阅 URL、状态、相对限额的流量及其重置周期、到期时间和最后在线时间。`--repair-page` 重新发布缺失的页面；如果失败，链接仍显示带警告和退出 `3`。
 
-**`client list`** — 列出客户端及其状态、流量、到期时间和最后在线时间。带 `--json`，返回 `data.summary` 计数和 `data.clients[]`。
+**`client list`** — 列出客户端及其状态、流量、到期时间和最后在线时间，包括在网页控制台中添加的用户（JSON 中为 `declared: false`）。带 `--json`，返回 `data.summary` 计数和 `data.clients[]`。
 
-**`client set`** — 修改客户端的流量限额、重置周期或到期时间；只修改你传入的选项，至少需要一个。因限额或到期被停用的客户端（状态 `limited` 或 `expired`），只要新的值允许，就能重新连接。修改立即生效，应用永远不会改动它们。无效的值会在 Meridian 连接任何地方之前以 `2` 退出。带 `--json` 时，在 `data.client` 中返回面板当前的客户端信息，包括 `traffic_limit_bytes`、`traffic_reset` 和 `expires_at`（为空表示永不到期）。
+**`client set`** — 修改客户端的流量限额、重置周期或到期时间；只修改你传入的选项，至少需要一个。因限额或到期被停用的客户端（状态 `limited` 或 `expired`），只要新的值允许，就能重新连接。修改立即生效，应用永远不会改动它们。无效的值会在 Meridian 连接任何地方之前以 `2` 退出。带 `--json` 时，在 `data.client` 中返回控制服务当前的客户端信息，包括 `traffic_limit_bytes`、`traffic_reset` 和 `expires_at`（为空表示永不到期）。
 
 **`client reset-traffic`** — 让客户端的已用流量从零开始计算，与进入新周期相同；因限额被停用的客户端可以重新连接。
 
 **`client enable` / `client disable`** — 立即恢复或暂停客户端。禁用持续到你运行 `client enable`；应用（包括重新部署和 `client add`、`node add`、`relay add`）保持客户端的状态不变。
 
-**`client reissue`** — 在链接泄露后替换客户端的链接。Remnawave 生成新的订阅 ID 和新的密钥，因此旧的订阅 URL、连接页面和链接全部失效。Meridian 先删除旧页面，再发布新页面并打印新链接。状态、限额、到期时间和 HWID 设备数限制保持面板中的设置；不认识的设备请在面板中删除。除非 `--yes`，否则要求确认；不属于你的客户端的名称会被拒绝。如果新页面无法发布，仍会显示链接并给出警告，退出码为 `3`（用 `client show --repair-page` 修复）。
+**`client reissue`** — 在链接泄露后替换客户端的链接。控制服务生成新的订阅 ID 和新的密钥，因此旧的订阅 URL、连接页面和链接全部失效。Meridian 先删除旧页面，再发布新页面并打印新链接。状态、限额和到期时间保持不变。除非 `--yes`，否则要求确认；不属于你的客户端的名称会被拒绝。如果新页面无法发布，仍会显示链接并给出警告，退出码为 `3`（用 `client show --repair-page` 修复）。
 
-**`client remove`** — 从拓扑中删除客户端，删除面板用户和其连接页面。除非 `--yes`，否则要求确认。最后一个客户端无法删除。不要直接在面板中删除用户；Meridian 在下次应用时重新创建拓扑中保留的任何客户端。
+**`client remove`** — 从拓扑中删除客户端，删除其在控制服务中的账户和连接页面。除非 `--yes`，否则要求确认。最后一个客户端无法删除。在网页控制台中添加的用户请在控制台中删除。
 
 ### meridian server
 
@@ -184,13 +185,13 @@ meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 | `--force` | | `node remove`：同时删除指向此出口的中继链 |
 | `--json` | | 将 `node list` 作为 `meridian.output/v1` 信封发出 |
 
-**`node add`** — 通过 SSH 连接，将服务器作为出口加入拓扑，并应用已审核的计划（系统加固、Docker、Xray、面板注册）。现有客户端会在下次订阅刷新时收到新出口。
+**`node add`** — 通过 SSH 连接，将服务器作为出口加入拓扑，并应用已审核的计划（系统加固、节点 agent 和 Xray、向控制服务注册）。现有客户端会在下次订阅刷新时收到新出口。
 
-**`node list`** — 列出节点及其在面板中的实时状态、Xray 版本和流量。如果面板状态不可用，已配置的节点会显示为 `unknown`，命令以退出码 `3` 结束。
+**`node list`** — 列出节点及其 agent 的实时状态、版本和流量。如果控制服务无法访问，已配置的节点会显示为 `unknown`，命令以退出码 `3` 结束。
 
-**`node remove`** — 从拓扑中移除一个出口或路由网关。它会列出将被删除的所有资源（面板节点和配置文件、节点容器、防火墙规则、已发布的 Host），请求确认后原样执行该审查计划；服务器本身仍保留在已保存的服务器列表中。控制服务器不能通过此命令移除（请使用 `meridian teardown`）；仍有中继指向该出口时也会拒绝（请先移除中继或传入 `--force`）；有路由网关经由该出口接入集群，或移除后会破坏拓扑（例如导致出口池为空或失去默认出口）时同样会拒绝。绑定到被移除网关的路由规则会一并删除。
+**`node remove`** — 从拓扑中移除一个出口或路由网关。它会列出将被删除的所有资源（节点记录和文档、其 agent 和 Xray、防火墙规则、客户端接入点），请求确认后原样执行该审查计划；服务器本身仍保留在已保存的服务器列表中。控制服务器不能通过此命令移除（请使用 `meridian teardown`）；仍有中继指向该出口时也会拒绝（请先移除中继或传入 `--force`）；有路由网关经由该出口接入集群，或移除后会破坏拓扑（例如导致出口池为空或失去默认出口）时同样会拒绝。绑定到被移除网关的路由规则会一并删除。
 
-**`node replace`** — 将一个出口移到另一个服务器。`EXIT` 是出口 ID 或其服务器的保存名称或 IP；新服务器使用与 `node add` 相同的目标语法（保存的名称或 `local` 也可用）并像 `server add` 一样被保存。出口保留其 ID、Reality 密钥、协议路径、SNI、WARP 和地理设置以及指向它的每个中继，所以中继用户保持工作，直接用户在下一次订阅刷新时获得新地址。审查列出将部署在新服务器上的内容以及在旧服务器上清理的每个资源（节点容器、镜像和目录；其 nginx 文件、防火墙规则和证书）；Docker 和保存的服务器保留。对于控制服务器拒绝（移动面板会改变每个订阅 URL），以及对于已经有角色的新服务器拒绝。
+**`node replace`** — 将一个出口移到另一个服务器。`EXIT` 是出口 ID 或其服务器的保存名称或 IP；新服务器使用与 `node add` 相同的目标语法（保存的名称或 `local` 也可用）并像 `server add` 一样被保存。出口保留其 ID、Reality 密钥、协议路径、SNI、WARP 和地理设置以及指向它的每个中继，所以中继用户保持工作，直接用户在下一次订阅刷新时获得新地址。审查列出将部署在新服务器上的内容以及在旧服务器上清理的每个资源（agent 和 Xray、nginx 文件、防火墙规则和证书）；保存的服务器保留。对于控制服务器拒绝（移动它会改变每个订阅 URL；丢失时请使用 `meridian restore`），以及对于已经有角色的新服务器拒绝。
 
 **`node sni`** — 为出口的 Reality 路径设置新的伪装 SNI。`EXIT` 是出口 ID 或其服务器的保存名称或 IP。它拒绝 `apple.com`、`icloud.com` 名称和 `www.microsoft.com`，通过 SSH 检查出口能否以 TLS 1.3 和 HTTP/2 访问新站点，显示审查（跟随出口 SNI 的中继、保留自己 SNI 的中继、基于该路径的路由网关以及将清理的内容），确认后应用。旧名称会被替换而不是并存：应用在下次订阅刷新（每 6 小时）或手动刷新时切换，在此之前无法通过 Reality 连接。XHTTP、WSS 和 Hysteria2 不变。当 `meridian test --probe` 报告伪装 SNI 被封锁时使用。使用 `--self-steal` 时，`NEW_SNI` 是你拥有的域名：它不做可达性检查，而是检查该域名是否解析到出口（无法解析时停止，指向别处时警告），出口会为它申请 Let's Encrypt 证书并自己回应探测。
 
@@ -219,7 +220,7 @@ meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 
 **`relay add`** — 添加单跳中继到拓扑并应用它。客户端在下次订阅刷新时接收它。对于多于一跳的链，使用 `meridian setup`。
 
-**`relay remove`** — `RELAY` 是中继服务器的 IP 或保存的名称，或中继链 ID。删除通过该服务器的每条链（用 `--exit` 缩小范围），列出将删除的内容（Realm 单元、防火墙规则、出口端侦听器、已发布的主机），确认，并应用审查的删除。服务器留在保存的服务器中。
+**`relay remove`** — `RELAY` 是中继服务器的 IP 或保存的名称，或中继链 ID。删除通过该服务器的每条链（用 `--exit` 缩小范围），列出将删除的内容（Realm 单元、防火墙规则、出口端侦听器、客户端接入点），确认，并应用审查的删除。服务器留在保存的服务器中。
 
 **`relay sni`** — 为通过某服务器的中继链（或按 ID 指定的一条链；用 `--exit` 缩小范围）设置新的伪装 SNI。它拒绝与 `node sni` 相同的名称，检查出口能否访问该站点（中继自己的名称由出口上的 Reality 侦听器提供），审查、确认并应用。传入出口自己的 SNI 会让中继重新跟随出口。应用在下次订阅刷新时切换。
 
@@ -254,11 +255,12 @@ meridian route remove EXIT ROUTE [--yes] [--json]
 
 ### meridian fleet
 
-基于实时面板的集群健康状态与资源清单，以及 Remnawave 升级。
+基于实时控制服务的集群健康状态与资源清单、应用历史、升级，以及可编辑的集群文件。
 
 ```
 meridian fleet status [--json]
 meridian fleet inventory [--json]
+meridian fleet history [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -266,19 +268,20 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
-| `--json` | | 将结果作为 `meridian.output/v1` 信封发出（`status`、`inventory`、`export`、`import`） |
-| `--tested` | | `fleet upgrade`：既不查询 Docker Hub 也不查询 GitHub；Remnawave 回到此 Meridian 版本测试过的版本，已升级的 Realm 保持不变 |
+| `--json` | | 将结果作为 `meridian.output/v1` 信封发出（`status`、`inventory`、`history`、`export`、`import`） |
+| `--tested` | | `fleet upgrade`：不查询 GitHub；已升级的 Realm 保持不变 |
 | `--yes`, `-y` | | `fleet upgrade`、`fleet import`：跳过确认 |
 | `--dry-run` | | `fleet import`：显示变更和审查结果，不应用任何内容 |
 | `--forget-unreachable` | | `fleet import`：忘记已移除且 SSH 端口无响应的服务器上部署的内容 |
 
-**`fleet status`** — 面板健康状态、节点心跳、中继监听端口以及客户端数量。已声明但缺失的客户端会使健康状态降级；已禁用、达到限额或过期的客户端会正常统计，属于你的主动设置而非故障。中继监听端口可达只能证明 TCP 连通，因此未经完整验证的中继路由会使健康状态保持为 `unknown`；请用 `meridian test` 测试完整路径。退出码 `0` 表示健康，`4` 表示降级，`3` 表示未知。
+**`fleet status`** — 控制服务健康状态、每个 agent 的最近报告及其是否已应用当前配置、中继监听端口以及客户端数量。已声明但缺失的客户端会使健康状态降级；已禁用、达到限额或过期的客户端会正常统计，属于你的主动设置而非故障。中继监听端口可达只能证明 TCP 连通，因此未经完整验证的中继路由会使健康状态保持为 `unknown`；请用 `meridian test` 测试完整路径。退出码 `0` 表示健康，`4` 表示降级，`3` 表示未知。
 
-**`fleet inventory`** — 列出已配置的服务器、角色、节点和中继，并在面板可达时附带实时状态。绝不会输出面板 API 令牌或秘密路径。如果实时状态不可用，仍会显示已配置的清单并附带警告，命令以退出码 `3` 结束。要判断 `apply` 是否有待执行的变更，请使用 `plan --json`。
+**`fleet inventory`** — 列出已配置的服务器、角色、节点和中继，并在控制服务可达时附带实时状态。绝不会输出 API 令牌或秘密路径。如果实时状态不可用，仍会显示已配置的清单并附带警告，命令以退出码 `3` 结束。要判断 `apply` 是否有待执行的变更，请使用 `plan --json`。
 
-**`fleet upgrade`** — 无需等待 Meridian 更新，即可将 Remnawave 升级到最新版本。它会向 Docker Hub 查询当前 Meridian 版本所支持主版本内最新的后端、节点和订阅页面版本（跳过预发布版和其他主版本），按多架构摘要固定每个镜像，并将选择保存到 `cluster.yml`，供之后的 `apply` 沿用；后续 Meridian 版本若带有更新的固定版本，则会自动接管。`--tested` 仅使用当前 Meridian 版本测试过的版本。PostgreSQL 和 Valkey 始终保持在 Meridian 的固定版本上。如果集群中有中继，它对 Realm 也会执行同样操作：选用 GitHub 上已测试主版本内的最新版本，并记录 GitHub 为每个压缩包发布的 sha256，每个中继在安装前都会校验。随后它通过 SSH 只读执行 `docker inspect`，读取每台服务器上运行的后端、订阅页面、PostgreSQL、Valkey 和节点镜像，并将每项显示为 `current`、`upgrade`、`install` 或保留。版本策略与 `setup` 一致：你自行选择的更新版本标签或浮动标签（`latest`、`3`）会保留并报告，绝不降级。PostgreSQL 主版本绝不会原地升级——旧主版本会继续运行，命令会说明所需的导出与恢复步骤。在你确认后，它会应用审核后的计划并在每台服务器上运行 `meridian check`。如果某台服务器的镜像无法读取，命令会在做任何改动前以退出码 `3` 停止；如果 `apply` 已收敛但某台服务器仍在运行旧镜像，同样以 `3` 退出。
+**`fleet history`** — 控制服务记录的每一次经过审核的应用，最新的在前：编号、时间、作者（机器的令牌名称；CLI 自身的令牌为 `root`，控制台为 `owner`）、状态（`proposed`、`approved`、`applied` 或 `failed`）以及计划哈希的开头部分。`--json` 返回 `data.revisions[]`。
 
-**`fleet export`** — 把集群已审查的拓扑输出为可编辑的 YAML 文件：出口及其协议路径、中继、网关、出口池、路由规则、路由、客户端和集群设置。服务器以保存的名称（没有名称时用地址）出现，从不使用内部 ID；文件以 `schema: meridian.fleet/v1` 开头。Reality 密钥、面板凭据、客户端链接以及 XHTTP 和 WSS 的传输路径都留在 Meridian 中，不会列出。`--json` 在 `data.document` 下返回同一份文档。
+**`fleet upgrade`** — 无需等待 Meridian 更新，即可把中继升级到最新的 Realm 版本：选用 GitHub 上已测试主版本内的最新版本，连同 GitHub 为每个压缩包发布的 sha256 一起记录到 `cluster.yml`，每个中继在安装前都会校验。`--tested` 保留此版本测试过的版本。它会读取每个中继运行的 Realm 版本并显示为 `current` 或 `upgrade`，确认后应用已审核的计划，并在每台服务器上运行 `meridian check`。如果某个中继的版本无法读取，命令会在任何改动之前以退出码 `3` 结束。控制服务和 agent 随 Meridian 本身发布：先运行 `meridian update`，再运行 `meridian apply` 即可升级它们。
+**`fleet export`** — 把集群已审查的拓扑输出为可编辑的 YAML 文件：出口及其协议路径、中继、网关、出口池、路由规则、路由、客户端和集群设置。服务器以保存的名称（没有名称时用地址）出现，从不使用内部 ID；文件以 `schema: meridian.fleet/v1` 开头。Reality 密钥、API 令牌、客户端链接以及 XHTTP 和 WSS 的传输路径都留在 Meridian 中，不会列出。`--json` 在 `data.document` 下返回同一份文档。
 
 **`fleet import`** — 读取编辑后的文件（或用 `-` 从标准输入读取），每处变更一行：`+` 表示添加，`-` 表示删除，`~` 表示修改字段（`~ exit-2 sni www.example.com -> www.example.org`）。随后列出变更将删除的每个资源和审查哈希，询问确认，并像 `apply` 一样只应用这次审查。未编辑的文件会输出“没有变更”。从 `access.users` 中删除客户端等同于 `client remove`：其链接失效，连接页面被删除。添加客户端等同于 `client add`，并发布其页面；用 `client show NAME` 查看链接。新的伪装 SNI 会经过与 `node sni` 相同的检查。导入会拒绝：其他 `schema`、未保存的服务器（用 `meridian server add` 保存）、文件中的传输路径、对控制服务器及其域名或后端的更改、删除或重命名控制服务器上的出口，以及把出口移到另一台服务器（请用 `node replace`）。密钥和凭据保持不变。没有终端时请传入 `--yes`；`--dry-run` 只显示变更和审查结果，不应用任何内容。
 
@@ -316,7 +319,7 @@ meridian context remove NAME [--yes]
 检查服务器健康状态，或检查一台新服务器能否运行 Meridian。检查项取决于服务器在集群中的角色：
 
 - **尚未加入集群** — 部署前检查：伪装目标可达性与 DNS、端口 443 是否空闲及外部可达性、域名 DNS、操作系统、磁盘空间和系统时钟。不会安装任何软件；当端口 443 空闲时，会短暂启动监听进程以测试防火墙。DNS 查询使用服务器自身的解析器。
-- **控制服务器、出口或路由网关** — 面板连接、SSH（或本机访问）、容器状态（包括订阅页面的健康检查）、每个已编译的公开与内部端口、TLS 证书和磁盘空间。从另一台机器运行时，还会对控制服务器执行数据流检查：下载约 50 KB 数据，若在约 16–24 KB 后卡住则发出警告（从你所在网络测得的限速特征）。
+- **控制服务器、出口或路由网关** — 控制服务（能响应、属于此集群、版本兼容）、每个节点的 agent（在线、已应用当前配置、构建为最新）、SSH（或本机访问）、每个已编译的公开与内部端口、TLS 证书和磁盘空间。从另一台机器运行时，还会对控制服务器执行数据流检查：下载约 50 KB 数据，若在约 16–24 KB 后卡住则发出警告（从你所在网络测得的限速特征）。
 - **中继** — 服务器上运行的每个 Realm 跃点：服务处于活动状态且能连通下一跳，并且中继链的公开入口接受来自你机器的 TCP 连接。
 
 不指定服务器时，会依次检查集群中的每台服务器。
@@ -344,11 +347,11 @@ RealiTLScanner 扫描 IPv4 范围；仅 IPv6 的服务器退出 `3`。选择结�
 
 从你的设备测试交付的代理流量。不需要 SSH。
 
-完整测试会选择一个活跃客户端，获取 Remnawave 下发给该客户端的同一份 Xray JSON，并通过自动回退组以及目标服务器的每条路径发送真实流量。首次运行可能需要最多 120 秒下载并校验固定版本的 Xray 运行时。流量检查会轮换多个独立的公网 IP 观测服务并与直连请求比对，因此观测服务本身故障会判定为“不确定”（inconclusive），而不会误报为连接失败。在受控环境中可通过 `MERIDIAN_CONNECT_TEST_URL` 指定观测服务地址。
+完整测试会选择一个活跃客户端，获取控制服务下发给该客户端的同一份 Xray JSON，并通过自动回退组以及目标服务器的每条路径发送真实流量。首次运行可能需要最多 120 秒下载并校验固定版本的 Xray 运行时。流量检查会轮换多个独立的公网 IP 观测服务并与直连请求比对，因此观测服务本身故障会判定为“不确定”（inconclusive），而不会误报为连接失败。在受控环境中可通过 `MERIDIAN_CONNECT_TEST_URL` 指定观测服务地址。
 
 每条路径都会报告首字节时间（TTFB）。当某条路径失败时，Meridian 会向其端点发起普通 TCP 连接，以区分是**能连上但无流量通过**（服务器有响应，但代理会话无法传输数据：凭据不匹配或连接被阻断）还是**无法连接**（该端口没有任何响应）。使用 `--json` 时，`data.transports` 会列出每条路径的结果（`ok`、`no_traffic`、`unreachable`、`failed`、`egress_mismatch`、`inconclusive`、`invalid`）及 `first_byte_ms`。
 
-如果面板宕机、返回 HTTP `429` 或 `5xx` 导致无法获取订阅，命令以退出码 `3` 结束。其他订阅被拒情况（如 `400` 或 `422`）视为测试失败，退出码为 `4`。
+如果控制服务宕机、返回 HTTP `429` 或 `5xx` 导致无法获取订阅，命令以退出码 `3` 结束。其他订阅被拒情况（如 `400` 或 `422`）视为测试失败，退出码为 `4`。
 
 ```
 meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
@@ -365,7 +368,7 @@ meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
 
 `--probe` 不发送代理流量，而是从审查方主动探测器的视角检查服务器，看部署是否会暴露自身特征。它可用于任意 IP 或域名，当目标属于你保存的拓扑时还会执行更严格的检查。
 
-检查内容紧跟实际部署：公开与内部端口暴露情况、HTTP/TLS 响应行为、SNI 一致性与伪装、常见代理与面板路径、WebSocket 升级、反向 DNS、HTTP/2、旧版 TLS 协议以及已配置的域名。`--sni` 可覆盖通用 TLS 探测使用的 SNI。对于纯 UDP 监听端口，命令不会凭空猜测，而是提示需要运行完整的 `meridian test`。
+检查内容紧跟实际部署：公开与内部端口暴露情况、HTTP/TLS 响应行为、SNI 一致性与伪装、常见代理与管理面板路径、WebSocket 升级、反向 DNS、HTTP/2、旧版 TLS 协议以及已配置的域名。`--sni` 可覆盖通用 TLS 探测使用的 SNI。对于纯 UDP 监听端口，命令不会凭空猜测，而是提示需要运行完整的 `meridian test`。
 
 `--probe` 还能回答“到底是什么被封锁了？”。它会先带上伪装 SNI 与服务器建立 TLS 连接；如果失败，则不带 SNI 重试，并直接连接真实的伪装站点，从而判断看起来被封锁的是**服务器 IP** 还是**伪装 SNI**。如果真实站点同样无法直连，结果会判定为“不确定”，而不会误报为问题。使用 self-steal 伪装时，真实站点就是服务器本身，没有独立的对照组：当连接完全不通时，结果为“不确定”。在控制服务器上，它还会下载连接页面的约 50 KB 脚本，检测传输是否会在约 16–24 KB 后卡住——这正是境外 IP 被限速时的典型表现。当 WSS 路径经过 CDN 时，也会通过 CDN 执行同样的下载检测。这些结果只有在受审查的网络内部运行时才有意义。`--probe` 不能与 `--basic`、`--client` 或 `--domain` 同时使用。退出码与 `test` 相同；跳过的检查绝不会算作通过。
 
@@ -398,26 +401,25 @@ meridian logs [SERVER] [--lines N] [--grep TEXT] [--component NAME]
 | `--grep`, `-g TEXT` | | 仅显示包含此文本的行；不区分大小写，按字面匹配而非正则表达式 |
 | `--component`, `-c NAME` | 全部 | 仅 `node`、`panel`、`nginx` 或 `relay`；重复使用可选择多个 |
 
-`logs` 读取服务器各角色所运行的内容：出口和路由网关显示 Remnawave 节点容器，控制服务器显示面板容器（后端、数据库、Valkey、订阅页面），二者都显示 nginx 错误日志，中继则显示其 Realm 单元的日志。`--user` 和 `--ssh-port` 覆盖保存的 SSH 用户和端口。
+`logs` 读取服务器各角色所运行的内容：出口和路由网关在 `node` 下显示 agent（`netagent`）和 Xray（`netcore`），控制服务器在 `panel` 下显示控制服务（`ctld`），二者都显示 nginx 错误日志，中继则显示其 Realm 单元的日志。`--user` 和 `--ssh-port` 覆盖保存的 SSH 用户和端口。
 
-每一行都经过与 `meridian doctor` 相同的脱敏处理：令牌、密码、密钥、UUID、订阅 ID，以及面板和连接页面的秘密路径都会被替换为 `[REDACTED]`，因此输出可以安全地粘贴到错误报告中。各行以纯文本打印，并已去除终端控制字符。
+每一行都经过与 `meridian doctor` 相同的脱敏处理：令牌、密码、密钥、UUID、订阅 ID，以及控制服务和连接页面的秘密路径都会被替换为 `[REDACTED]`，因此输出可以安全地粘贴到错误报告中。各行以纯文本打印，并已去除终端控制字符。
 
-没有集群角色的服务器，或其未运行的 `--component`，会在连接之前以 `2` 退出。无法读取的日志（容器缺失、SSH 连接丢失）会显示为不可用，命令以 `3` 退出。
+没有集群角色的服务器，或其未运行的 `--component`，会在连接之前以 `2` 退出。无法读取的日志（服务缺失、SSH 连接丢失）会显示为不可用，命令以 `3` 退出。
 
 ### meridian panel
 
-显示 Remnawave 管理面板 URL 和管理员用户名，以及哪些内容由 Meridian 管理、哪些内容可由你自由修改。
+显示网页控制台的地址；在控制台还没有所有者时，同时显示一次性设置链接。
 
 ```
-meridian panel [--show-password]
+meridian panel [--setup-link]
 ```
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
-| `--show-password` | | 也打印管理员密码 |
+| `--setup-link` | | 即使控制台已有所有者，也打印一个重置链接：它会设置新密码、关闭登录验证码，并让所有设备退出登录 |
 
-对客户端状态、流量限额、到期时间和备注描述的修改，以及你在面板中手动创建的用户，在每次 `apply` 后都会保留。对 Meridian 创建的节点、配置文件、Host、小队（squads）和模板所做的修改会在下次 `apply` 时恢复原状；`meridian plan` 会提前列出这些差异。
-
+设置链接只能使用一次，有效期 15 分钟；打开它来设置所有者的密码。控制台有所有者之后，`panel` 会打印地址以及是否已开启登录验证码。请像保护密码一样保护地址和设置链接。在控制台中你可以管理用户和 API 令牌；服务器、修订记录和订阅标题在那里是只读的。详见[网页控制台](/zh/client-management/#网页控制台)。
 ### meridian teardown
 
 从服务器上卸载 Meridian。
@@ -426,9 +428,86 @@ meridian panel [--show-password]
 meridian teardown [SERVER] [--user USER] [--ssh-port PORT] [--yes]
 ```
 
-在单服务器部署上，`teardown` 会删除 Meridian 创建的所有内容：服务器上的面板、节点、nginx 配置、证书、中继和防火墙规则，以及本地的 `cluster.yml` 和已保存的服务器配置。Docker、系统软件包、SSH 加固和 fail2ban 会保留；如果 nginx 仍在为你自己的网站提供服务，它也会继续运行。它还会一并清理 Meridian 3.x 留下的 3x-ui。在多服务器集群中，`teardown` 会拒绝卸载仍在拓扑中承担角色的服务器。
+在单服务器部署上，`teardown` 会删除 Meridian 创建的所有内容：服务器上的控制服务及其数据库、agent 和 Xray、nginx 配置、证书、中继和防火墙规则，以及本地的 `cluster.yml` 和已保存的服务器配置。系统软件包、SSH 加固和 fail2ban 会保留；如果 nginx 仍在为你自己的网站提供服务，它也会继续运行。它还会一并清理 Meridian 3.x 留下的 3x-ui。在多服务器集群中，`teardown` 会拒绝卸载仍在拓扑中承担角色的服务器。
 
 `--yes` 跳过确认；角色检查仍先运行。拒绝退出 `1`。未知的服务器名称或零个或多个可能目标退出 `2` 而不是提示。
+
+### meridian backup
+
+控制服务状态的加密快照、接收快照的机器，以及恢复密钥。
+
+```
+meridian backup pull [--name NAME]
+meridian backup recovery-key [--yes]
+meridian backup devices
+meridian backup revoke ID
+```
+
+| 标志 | 默认值 | 说明 |
+|------|---------|-------------|
+| `--name NAME` | 这台电脑的主机名 | `backup pull`：这台机器的密钥首次注册时使用的名称 |
+| `--yes`, `-y` | | `backup recovery-key`：不询问直接替换已有的恢复密钥 |
+
+每个修改集群的命令执行之后，Meridian 都会把控制服务的最新快照保存到 `cluster.yml` 旁边的 `snapshots/` 中（保留最近几份）。快照包含用户、限额、流量、修订记录、API 令牌，以及这台机器的 `cluster.yml` 和 `servers.json` 副本，因此可以在一台什么都没有的机器上重建集群。它加密给每台已注册机器的密钥和恢复密钥，从不包含签名密钥、会话或控制台密码。保存失败只会给出警告，绝不会让触发它的命令失败。
+
+**`backup pull`** — 立即保存一份快照。机器上的首次 pull 会创建它的密钥（`device.key`，只有你能读取）并向控制服务注册。
+
+**`backup recovery-key`** — 生成集群的恢复密钥，或在询问后替换已有的恢复密钥，并只显示一次。Meridian 只保留其公钥部分，所以请写下或打印出来并离线保存。集群首次部署时已经会显示一个。不支持 `--json`。
+
+**`backup devices`** — 列出快照所加密给的机器密钥，包括它们的 ID 和注册时间，以及集群是否已有恢复密钥。
+
+**`backup revoke`** — 不再为某台机器（例如丢失的笔记本电脑）的密钥加密新快照。它已经持有的快照仍可用它的密钥读取；请在它拉取新快照之前撤销。
+
+### meridian restore
+
+用快照在另一台服务器上重建丢失或被查扣的控制服务器。
+
+```
+meridian restore --to SERVER [--snapshot FILE] [--recovery-key] [--force]
+                 [--name NAME] [--user USER] [--ssh-port PORT] [--yes]
+```
+
+| 标志 | 默认值 | 说明 |
+|------|---------|-------------|
+| `--to SERVER` | （必需） | 新的控制服务器：IP、`user@IP:port` 或已保存的名称 |
+| `--snapshot FILE` | 最新保存的 | 要恢复的快照 |
+| `--recovery-key` | | 用恢复密钥而不是这台机器的密钥打开快照；密钥会以隐藏方式询问，或从标准输入读取一行 |
+| `--force` | | 即使旧控制服务仍在响应也执行恢复 |
+| `--name NAME` | （无） | 新服务器的名称 |
+| `--user/-u USER` | root | 新服务器上的 SSH 用户 |
+| `--ssh-port PORT` | 22 | 新服务器上的 SSH 端口 |
+| `--yes`, `-y` | | 跳过确认 |
+
+restore 会打开快照，审核它要做的事并请求确认。然后它用快照在新服务器上安装控制服务，在拓扑中把控制服务器（以及旧服务器上的出口，如果有的话）移到新地址，并运行常规的已审核应用。恢复后的服务会获得新的证书颁发机构、新的签名密钥和新的 API 令牌，因此每个 agent 都会重新注册，被查扣的服务器无法签发你的节点会接受的任何内容。用户保留各自的账户、限额和流量。控制台所有者需要通过 `meridian panel` 给出的链接设置新密码。
+
+使用裸 IP 时，每个订阅 URL 都包含控制服务器的地址，因此所有链接都会改变：审核时会说明这一点，结束时会打印每个客户端的新链接。使用域名时，只要域名的 DNS 记录指向新服务器，链接就保持不变；审核时会列出这些记录。
+
+只要旧控制服务器还在响应，restore 就会拒绝执行，因为两个控制服务会让集群分裂；`--force` 可以覆盖这一点，例如旧服务器已被查扣时。如果 `--snapshot` 指定的文件比最新保存的快照旧，它会发出警告：旧快照会带回你之后删除的令牌、机器和用户。中途停止的 restore 可以再次运行，会从中断处继续。
+
+在没有该集群的机器上，请传入快照文件和 `--recovery-key`：会先恢复快照自带的集群文件副本。如果这台机器上的副本比快照中的旧，restore 会把集群放进一个新的上下文，并在审核中说明后，从旧上下文接管集群；旧上下文会被标记为已被取代，并拒绝任何修改，直到你用 `meridian context remove` 删除它。
+
+### meridian migrate
+
+把运行 Remnawave 面板的集群就地迁移到 Meridian 的控制服务，并保留每条链接。
+
+```
+meridian migrate [--yes]
+```
+
+| 标志 | 默认值 | 说明 |
+|------|---------|-------------|
+| `--yes`, `-y` | | 跳过确认 |
+
+migrate 会先审核迁移内容：要迁移的客户端、某个客户端无法保留的内容，以及没有任何一方会保留的面板数据（面板的管理员账户和 API 令牌、按天的用量历史、HWID 设备注册、非 Meridian 设置的面板插件和响应规则、客户端 IP 转发（它服务于面板按用户的 IP 限制），以及 Remnawave 订阅页面；Meridian 自己的连接页面会保留）。确认后，它会：
+
+1. 备份面板数据库，连同你的集群文件，保存到你机器上的 `backups/` 和控制服务器上的 `/var/backups/meridian-migration/`
+2. 在面板旁边安装控制服务，并以相同的密钥、订阅 ID、状态、限额、到期时间和流量导入每个客户端
+3. 停止面板（其数据保留），并删除每个节点的容器
+4. 应用集群：每个出口都会装上 agent，并向控制服务注册
+5. 检查每个客户端的订阅链接是否完全没有变化
+6. 删除 Remnawave
+
+没有回滚；备份就是退路。每一步都会保存，因此中途停止的迁移再次运行时会继续，已完成的迁移不会再做任何事。如果链接检查失败，Remnawave 会保留在原处（处于停止状态），命令会以错误结束。没有终端时请传入 `--yes`，否则 migrate 会在审核后停止。`meridian deploy` 发现 Remnawave 集群时会提议迁移。
 
 ### meridian update
 
@@ -455,6 +534,20 @@ meridian studio [--port PORT] [--assets-dir DIRECTORY] [--no-open]
 Studio 会打印并打开形如 `http://127.0.0.1:7391/studio/#k=…` 的地址。`#k=` 后面的部分是密钥，每次启动都会变化；只有从该地址打开的浏览器标签页才能使用 Engine，因此同一台电脑上的其他程序和其他用户都无法使用。请妥善保密。重启 Studio 后，请打开它打印的新地址。
 
 不带 `--port` 时，Studio 使用端口 7391；如果被占用，则依次尝试后面的空闲端口，最多到 7400，这样浏览器为 Studio 保存的草稿下次仍然在。如果显式指定的 `--port` 已被占用，Studio 会给出清晰的错误并退出，缺少资产时也一样。显式指定的资产目录必须包含 `studio/index.html`。
+
+### meridian serve
+
+运行控制服务。Meridian 会把它安装为控制服务器上的 `ctld` systemd 单元，由该单元运行这条命令；你不需要自己运行它。
+
+```
+meridian serve [--config FILE]
+```
+
+| 标志 | 默认值 | 说明 |
+|------|---------|-------------|
+| `--config FILE` | `/etc/ctld/config.json` | 由 Meridian 写入的服务配置 |
+
+该服务在 nginx 之后监听 `127.0.0.1:3000`，并把状态保存在 `/var/lib/ctld/` 下的一个 SQLite 文件中。它不记录任何请求，因此订阅 ID 和秘密路径永远不会进入日志。`meridian logs SERVER -c panel` 可以查看它的日志。
 
 ### meridian api
 
@@ -508,7 +601,7 @@ meridian help [agents | COMMAND...]
 | `--install-completion` | 为当前 shell 安装补全 |
 | `--show-completion` | 为当前 shell 打印补全脚本 |
 
-JSON 输出使用 `meridian.output/v1` 信封（`schema`、`command`、`operation_id`、`status`、`summary`、`data`、`warnings`、`errors`）。所有列出了 `--json` 的命令都支持该格式：`deploy`、`plan`、`apply`、`check`、`test`、`probe`、所有 `client` 和 `route` 命令、`fleet status`/`inventory`/`export`/`import`、`node`/`relay list` 以及 `api` 命令。全局 `--json` 与子命令自身的 `--json` 等效。所有敏感信息在输出为 JSON 前都会自动脱敏。运行 `meridian api commands --json` 可查看完整契约列表。
+JSON 输出使用 `meridian.output/v1` 信封（`schema`、`command`、`operation_id`、`status`、`summary`、`data`、`warnings`、`errors`）。所有列出了 `--json` 的命令都支持该格式：`deploy`、`plan`、`apply`、`check`、`test`、`probe`、所有 `client` 和 `route` 命令、`fleet status`/`inventory`/`history`/`export`/`import`、`node`/`relay list` 以及 `api` 命令。全局 `--json` 与子命令自身的 `--json` 等效。所有敏感信息在输出为 JSON 前都会自动脱敏。运行 `meridian api commands --json` 可查看完整契约列表。
 
 ## 常见服务器选项
 
@@ -517,13 +610,13 @@ JSON 输出使用 `meridian.output/v1` 信封（`schema`、`command`、`operatio
 | 标志 | 被使用 |
 |------|---------|
 | `SERVER` 参数 | deploy、check、scan、test、doctor、logs、teardown、node add、relay add、server add |
-| `--user`, `-u USER` | deploy、check、node add、relay add、server add、scan、doctor、logs、teardown |
-| `--ssh-port PORT` | deploy、check、node add、relay add、server add、scan、doctor、logs、teardown |
+| `--user`, `-u USER` | deploy、check、node add、relay add、server add、scan、doctor、logs、teardown、restore |
+| `--ssh-port PORT` | deploy、check、node add、relay add、server add、scan、doctor、logs、teardown、restore |
 | `--sni HOST` | deploy、check、node add、relay add、test、doctor |
 | `--domain DOMAIN` | deploy、check、node add、test |
 | `--self-steal` | deploy、node add、node sni |
 
-客户端命令直接使用面板 API 并不取服务器。`test` 从你的设备运行并不使用 SSH。
+客户端命令直接使用控制服务的 API，不接受服务器参数。`test` 从你的设备运行并不使用 SSH。
 
 ## 服务器解析
 
