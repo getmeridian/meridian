@@ -170,7 +170,8 @@ def run(
                     hint_type="system",
                 )
             info("Removed cluster.yml (panel host was torn down)")
-        else:
+        elif not cluster.runs_control_service:
+            # A control-service fleet retires its node record with the reviewed plan.
             _deregister_panel_node(cluster, resolved.ip)
 
     # Registry deletion is last: a stale saved connection is recoverable, but

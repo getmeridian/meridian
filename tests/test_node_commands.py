@@ -308,6 +308,7 @@ class TestNodeList:
         with (
             patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
             patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+            patch("meridian.control_access.MeridianPanel", return_value=panel),
         ):
             mock_load.return_value = cluster
             run_list()
@@ -323,6 +324,7 @@ class TestNodeList:
         with (
             patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
             patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+            patch("meridian.control_access.MeridianPanel", return_value=panel),
             pytest.raises(typer.Exit) as exc_info,
         ):
             mock_load.return_value = cluster
@@ -346,6 +348,7 @@ class TestNodeList:
             with (
                 patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
                 patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+                patch("meridian.control_access.MeridianPanel", return_value=panel),
                 pytest.raises(typer.Exit) as exc_info,
             ):
                 run_list()
@@ -368,6 +371,7 @@ class TestNodeList:
             with (
                 patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
                 patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+                patch("meridian.control_access.MeridianPanel", return_value=panel),
             ):
                 mock_load.return_value = cluster
                 run_list()
@@ -422,6 +426,7 @@ class TestNodeList:
             with (
                 patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
                 patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+                patch("meridian.control_access.MeridianPanel", return_value=panel),
                 patch("meridian.commands.node.topology_from_local_cluster", return_value=topology),
             ):
                 run_list()
@@ -454,6 +459,7 @@ class TestNodeList:
         with (
             patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
             patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+            patch("meridian.control_access.MeridianPanel", return_value=panel),
             patch("meridian.commands.node.topology_from_local_cluster", return_value=topology),
         ):
             run_list()

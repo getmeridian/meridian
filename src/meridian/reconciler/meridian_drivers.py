@@ -53,7 +53,6 @@ from meridian.ssh import ServerConnection
 from meridian.xray_workload import salamander_password
 
 # An agent polls at least every 35 s (25 s wait plus margin); twice that is "seen".
-AGENT_SEEN_SECONDS = 90
 AGENT_CONNECT_TIMEOUT = 90.0
 # The first apply downloads the Xray archive (about 21 MB) before anything runs.
 WORKLOAD_APPLY_TIMEOUT = 300.0
@@ -130,7 +129,7 @@ class AgentRuntimeDriver:
         in_place = bool(installed) and installed[0] == binary.sha256 and active and current == expected
         with self.context.client() as client:
             status = client.node(payload.workload_ref)
-        seen = status is not None and _recent(status.last_seen_at)
+        seen = status is not None and status.is_live()
         return _observation(action, exists=in_place, connected=in_place and seen, remote_id=payload.workload_ref)
 
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
@@ -394,13 +393,6 @@ def _needs_keys(profile: ConfigProfilePayload) -> bool:
 
 def _service_id(logical_id: str) -> str:
     return logical_id.removeprefix("endpoint:")
-
-
-def _recent(timestamp: str | None) -> bool:
-    if not timestamp:
-        return False
-    seen = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
-    return (datetime.now(UTC) - seen).total_seconds() < AGENT_SEEN_SECONDS
 
 
 def _bootstrap_fields(text: str) -> dict[str, str]:

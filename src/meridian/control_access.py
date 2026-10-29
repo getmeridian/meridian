@@ -10,15 +10,19 @@ keep one implementation until the panel is removed (#95).
 from __future__ import annotations
 
 import math
-from collections.abc import Callable
-from typing import TypeVar
+from collections.abc import Callable, Sequence
+from functools import partial
+from typing import Self, TypeVar
 
 from meridian.cluster import ClusterConfig
 from meridian.control.client import ControlClient, ControlServiceAuthError, ControlServiceError
 from meridian.control.models import UserRecord, UserUpdate
+from meridian.core.fleet import FleetTopology
 from meridian.remnawave import (
     XRAY_JSON_CLIENT_TYPE,
+    Host,
     MeridianPanel,
+    Node,
     RemnawaveAuthError,
     RemnawaveError,
     RemnawaveNetworkError,
@@ -37,7 +41,7 @@ class ServiceAccessPanel:
         # Panel calls name users by ID; the service names them by username.
         self._usernames: dict[str, str] = {}
 
-    def __enter__(self) -> ServiceAccessPanel:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -89,13 +93,60 @@ class ServiceAccessPanel:
         )
 
 
+class ServiceFleetPanel(ServiceAccessPanel):
+    """The fleet-status subset of `MeridianPanel`: service health, node agents, and published relays.
+
+    The service names nodes and endpoints by their topology IDs, which the
+    fleet projection carries where a panel fleet carries UUIDs.
+    """
+
+    def __init__(self, url: str, token: str, *, node_ids: Sequence[str], endpoint_ids: Sequence[str]) -> None:
+        super().__init__(url, token)
+        self._node_ids = list(node_ids)
+        self._endpoint_ids = list(endpoint_ids)
+
+    def ping(self) -> bool:
+        return self._client.ping()
+
+    def list_nodes(self) -> list[Node]:
+        nodes: list[Node] = []
+        for node_id in self._node_ids:
+            status = _translated(partial(self._client.node, node_id))
+            if status is not None:
+                nodes.append(Node(uuid=node_id, name=node_id, is_connected=status.is_live()))
+        return nodes
+
+    def list_hosts(self) -> list[Host]:
+        hosts: list[Host] = []
+        for endpoint_id in self._endpoint_ids:
+            endpoint = _translated(partial(self._client.get_endpoint, endpoint_id))
+            if endpoint is not None:
+                hosts.append(
+                    Host(uuid=endpoint_id, remark=endpoint.remark, address=endpoint.address, port=endpoint.port)
+                )
+        return hosts
+
+
 AccessPanel = MeridianPanel | ServiceAccessPanel
+FleetPanel = MeridianPanel | ServiceFleetPanel
 
 
 def access_panel(cluster: ClusterConfig) -> AccessPanel:
     """The fleet's user directory: Remnawave, or Meridian's own control service."""
     if cluster.runs_control_service:
         return ServiceAccessPanel(cluster.panel.url, cluster.panel.api_token)
+    return MeridianPanel(cluster.panel.url, cluster.panel.api_token)
+
+
+def fleet_panel(cluster: ClusterConfig, topology: FleetTopology) -> FleetPanel:
+    """The fleet's live node and relay status: Remnawave, or Meridian's own control service."""
+    if cluster.runs_control_service:
+        return ServiceFleetPanel(
+            cluster.panel.url,
+            cluster.panel.api_token,
+            node_ids=[node.uuid for node in topology.nodes if node.uuid],
+            endpoint_ids=[ref.uuid for relay in topology.relays for ref in relay.host_refs],
+        )
     return MeridianPanel(cluster.panel.url, cluster.panel.api_token)
 
 

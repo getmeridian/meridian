@@ -12,6 +12,10 @@ import typer
 
 from meridian.cluster import ClusterConfig, SubscriptionPageConfig
 from meridian.commands import health
+from meridian.control.client import ControlServiceError
+from meridian.control.models import NodeStatus, ServiceHealth
+from meridian.control.service import utc_now
+from meridian.core.agent_types import NodeStateRef
 from meridian.core.fleet import TopologyNode
 from meridian.core.verification import build_verification_check
 from meridian.diagnostics.checks import CheckResult
@@ -21,6 +25,8 @@ from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.editor import add_relay_to_intent
 from meridian.setup.single_server import single_server_intent
 
+FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
+OTHER_FLEET_ID = "1f1e2d3c-4b5a-4968-8776-655443322110"
 PASSED = CheckResult(name="check", status="passed", detail="healthy")
 PLUGINS_READY = build_verification_check(
     "node_plugins",
@@ -241,3 +247,74 @@ def test_findings_print_their_fix(capsys: pytest.CaptureFixture[str]) -> None:
     err = capsys.readouterr().err
     assert "node is stopped" in err
     assert "Fix: docker start remnawave-node" in err
+
+
+def _service_fleet(fleet: SimpleNamespace, *, health_error: Exception | None = None) -> MagicMock:
+    """Turn the fixture into a control-service fleet and return its admin client."""
+    fleet.cluster.topology_intent = fleet.cluster.topology_intent.model_copy(
+        update={"control": fleet.cluster.topology_intent.control.model_copy(update={"backend": "meridian"})}
+    )
+    fleet.cluster.fleet_id = FLEET_ID
+    fleet.cluster.save()
+    client = MagicMock()
+    client.__enter__.return_value = client
+    client.health.return_value = ServiceHealth(version="4.0.0", fleet_id=FLEET_ID, fleet_epoch=1)
+    client.health.side_effect = health_error
+    client.node.return_value = NodeStatus(
+        node_id="exit-a",
+        fleet_epoch=1,
+        revision=2,
+        sha256="a" * 64,
+        spec_sha256="b" * 64,
+        applied=NodeStateRef(fleet_epoch=1, revision=2, sha256="a" * 64),
+        last_seen_at=utc_now(),
+        agent_version="0.1.0",
+    )
+    return client
+
+
+def _run_service(fleet: SimpleNamespace, client: MagicMock, units: MagicMock) -> SimpleNamespace:
+    with (
+        patch.object(health, "ControlClient", return_value=client),
+        patch.object(health, "check_unit_active", units),
+    ):
+        return _run(fleet, "exit-a")
+
+
+def test_a_control_service_fleet_checks_units_service_and_agent_instead_of_containers(
+    fleet: SimpleNamespace,
+) -> None:
+    client = _service_fleet(fleet)
+    units = MagicMock(return_value=PASSED)
+
+    mocks = _run_service(fleet, client, units)
+
+    assert [item.args[1] for item in units.call_args_list] == ["ctld.service", "netagent.service", "netcore.service"]
+    mocks.containers.assert_not_called()
+    mocks.plugins.assert_not_called()
+    fleet.panel.get_node.assert_not_called()
+    client.health.assert_called_once_with()
+    client.node.assert_called_once_with("exit-a")
+
+
+def test_an_unreachable_control_service_is_inconclusive_and_server_checks_still_run(
+    fleet: SimpleNamespace,
+) -> None:
+    client = _service_fleet(fleet, health_error=ControlServiceError("no answer", retryable=True))
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_service(fleet, client, MagicMock(return_value=PASSED))
+
+    assert exc_info.value.exit_code == 3
+    client.node.assert_not_called()
+    fleet.conn.check_ssh.assert_called_once()
+
+
+def test_a_service_answering_for_another_fleet_is_a_finding(fleet: SimpleNamespace) -> None:
+    client = _service_fleet(fleet)
+    client.health.return_value = ServiceHealth(version="4.0.0", fleet_id=OTHER_FLEET_ID, fleet_epoch=1)
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_service(fleet, client, MagicMock(return_value=PASSED))
+
+    assert exc_info.value.exit_code == 4

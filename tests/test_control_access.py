@@ -8,13 +8,14 @@ from pathlib import Path
 
 import pytest
 
+from meridian.adapters.cluster import topology_from_cluster
 from meridian.cluster import ClusterConfig
 from meridian.connectivity import create_verification_panel, select_active_client, verification_panel_factory
 from meridian.control.client import ControlClient, ControlServiceAuthError
-from meridian.control.models import ClientEndpoint
+from meridian.control.models import ClientEndpoint, NodeSpec
 from meridian.control.server import ControlServer
 from meridian.control.service import ControlService, token_sha256
-from meridian.control_access import ServiceAccessPanel, access_panel
+from meridian.control_access import ServiceAccessPanel, ServiceFleetPanel, access_panel, fleet_panel
 from meridian.remnawave import (
     XRAY_JSON_CLIENT_TYPE,
     MeridianPanel,
@@ -22,6 +23,8 @@ from meridian.remnawave import (
     RemnawaveError,
     RemnawaveNetworkError,
 )
+from meridian.servers import ServerEntry, ServerRegistry
+from meridian.setup.editor import add_relay_to_intent
 from meridian.setup.single_server import single_server_intent
 from meridian.xray_client import parse_xray_subscription, proxy_outbounds
 
@@ -135,3 +138,46 @@ def test_access_panel_follows_the_fleet_control_backend() -> None:
 
     cluster.topology_intent = single_server_intent(None, server_ref="srv-a", control="meridian")
     assert isinstance(access_panel(cluster), ServiceAccessPanel)
+
+
+def test_fleet_panel_lists_only_registered_nodes_and_published_relays(url: str) -> None:
+    with ControlClient(url, ADMIN_TOKEN) as client:
+        client.put_node("main", NodeSpec.model_validate({"resources": []}))
+        client.put_endpoint("relay-1:main-reality", REALITY)
+
+    with ServiceFleetPanel(
+        url, ADMIN_TOKEN, node_ids=["main", "gone"], endpoint_ids=["relay-1:main-reality", "relay-2:main-reality"]
+    ) as panel:
+        assert panel.ping()
+        nodes = panel.list_nodes()
+        hosts = panel.list_hosts()
+
+    # Registered but never polled: listed, and not connected.
+    assert [(node.uuid, node.is_connected) for node in nodes] == [("main", False)]
+    assert [(host.uuid, host.is_disabled) for host in hosts] == [("relay-1:main-reality", False)]
+
+
+def test_fleet_projection_names_service_nodes_and_relays_by_their_service_ids(servers_file: Path) -> None:
+    registry = ServerRegistry(servers_file)
+    registry.add(ServerEntry(host="198.51.100.10", name="exit-a"))
+    registry.add(ServerEntry(host="198.51.100.20", name="relay-a"))
+    intent = single_server_intent(None, server_ref=registry.find("exit-a").id, control="meridian")  # type: ignore[union-attr]
+    intent = add_relay_to_intent(
+        intent,
+        server_ref=registry.find("relay-a").id,
+        title="relay-a",
+        exit_ref="main",
+        listen_port=8443,  # type: ignore[union-attr]
+    )
+    cluster = ClusterConfig(topology_intent=intent)
+    cluster.panel.url = "https://198.51.100.10/secret"
+
+    topology = topology_from_cluster(cluster, servers=registry.list())
+    panel = fleet_panel(cluster, topology)
+
+    assert [node.uuid for node in topology.nodes] == ["main"]
+    relay_ids = [ref.uuid for ref in topology.relays[0].host_refs]
+    assert len(relay_ids) == 1 and relay_ids[0].startswith(f"{topology.relays[0].name}:")
+    assert isinstance(panel, ServiceFleetPanel)
+    cluster.topology_intent = single_server_intent(None, server_ref="srv-a")
+    assert isinstance(fleet_panel(cluster, topology), MeridianPanel)

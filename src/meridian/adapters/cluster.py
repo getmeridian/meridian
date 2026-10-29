@@ -142,6 +142,20 @@ def _active_workload(cluster: ClusterConfig, workload_id: str) -> WorkloadBindin
     )
 
 
+def _node_ref(cluster: ClusterConfig, workload: WorkloadBinding | None, node_id: str, server_ref: str) -> str:
+    """The node's ID at its control backend: a panel UUID, or the control service's node ID (the exit ID)."""
+    if cluster.runs_control_service:
+        return node_id
+    return workload.node_uuids.get(server_ref, "") if workload else ""
+
+
+def _host_ref(cluster: ClusterConfig, workload: WorkloadBinding | None, host_ref: str) -> str:
+    """A published entry's ID at its control backend: a panel Host UUID, or the service's endpoint ID."""
+    if cluster.runs_control_service:
+        return host_ref.removeprefix("host:")
+    return workload.host_uuids.get(host_ref, "") if workload else ""
+
+
 def _v4_nodes(
     cluster: ClusterConfig,
     servers: dict[str, ServerEntry],
@@ -164,7 +178,7 @@ def _v4_nodes(
         nodes.append(
             TopologyNode(
                 ip=server.host,
-                uuid=workload.node_uuids.get(exit_.server_ref, "") if workload else "",
+                uuid=_node_ref(cluster, workload, exit_.id, exit_.server_ref),
                 name=exit_.id,
                 ssh_user=server.user,
                 ssh_port=server.port,
@@ -223,7 +237,7 @@ def _v4_relays(
         exit_server = servers[exit_.server_ref]
         workload = _active_workload(cluster, exit_.id)
         host_ref = f"host:{relay.id}:{path.id}"
-        host_uuid = workload.host_uuids.get(host_ref, "") if workload else ""
+        host_uuid = _host_ref(cluster, workload, host_ref)
         relays.append(
             TopologyRelay(
                 ip=first_hop.host,

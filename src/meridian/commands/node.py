@@ -17,12 +17,12 @@ from meridian.commands._helpers import (
     apply_reviewed_intent,
     format_traffic,
     load_topology_cluster,
-    make_panel,
     require_intent,
 )
 from meridian.commands._validation import validate_command_input
 from meridian.config import HOME_DISPLAY
 from meridian.console import confirm, err_console, fail, info, ok, warn
+from meridian.control_access import fleet_panel
 from meridian.core.command_inputs import NodeAddRequest, NodeTargetRequest
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import build_node_list_result
@@ -199,7 +199,7 @@ def _run_list(*, operation: OperationContext) -> None:
     api_nodes = []
     warnings: list[ErrorModel] = []
     try:
-        with make_panel(cluster) as panel:
+        with fleet_panel(cluster, topology) as panel:
             api_nodes = panel.list_nodes()
     except RemnawaveError as exc:
         warnings.append(

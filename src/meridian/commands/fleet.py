@@ -16,6 +16,7 @@ from meridian.adapters.cluster import topology_from_local_cluster
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import format_traffic, load_topology_cluster, make_panel
 from meridian.console import err_console, error_context, fail, is_json_mode, warn
+from meridian.control_access import fleet_panel
 from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.fleet import FleetStatus, TopologyRelay
 from meridian.core.models import ErrorModel, Summary
@@ -94,7 +95,7 @@ def _run_inventory(*, operation: OperationContext) -> None:
     try:
         result = collect_fleet_inventory(
             topology,
-            make_panel(cluster),
+            fleet_panel(cluster, topology),
             classify_error=_classify_panel_error,
         )
     except MeridianError as exc:
@@ -262,7 +263,7 @@ def _run_status(*, operation: OperationContext) -> int:
     try:
         result = collect_fleet_status(
             topology,
-            make_panel(cluster),
+            fleet_panel(cluster, topology),
             check_relays=_check_relays_health,
             classify_error=_classify_panel_error,
         )
@@ -271,7 +272,7 @@ def _run_status(*, operation: OperationContext) -> int:
 
     status = result.status
     warnings = result.warnings
-    if status.panel.healthy:
+    if status.panel.healthy and not cluster.runs_control_service:
         warnings = [*warnings, *_panel_version_warnings(cluster)]
     _render_warnings(warnings)
     exit_code = {"healthy": 0, "degraded": 4, "unknown": 3}[status.summary.health]

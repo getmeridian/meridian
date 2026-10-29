@@ -50,6 +50,7 @@ def run(
         roles,
         subscription_page=cluster.subscription_page is not None and cluster.subscription_page.deployed,
         relay_units=_relay_units(intent, entry.id) if "relay" in roles else (),
+        control_service=cluster.runs_control_service,
     )
     if components:
         held = sorted({source.component for source in sources})

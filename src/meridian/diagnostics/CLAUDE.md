@@ -7,6 +7,7 @@
 **I/O follows perspective** — server health runs through a `core.execution.ServerConnection`; external checks use bounded sockets and argv-only subprocesses.
 **Flow checks** — `network.py` owns low-level TLS I/O and the child-interpreter `run_json_helper()`; `tls_probe.py` is the stage-timed flow primitive (connect, handshake, bytes until EOF or stall); `blocking.py` builds the SNI-vs-IP differential and data-stall checks from deployment facts (`blocking_jobs`, shared by `test --probe` and `check`); `probe.py` selects the rest.
 **Log tails** — `logs.py` maps fleet roles to sources (container names from `images.py`, Realm units from `server_render`) and returns redacted `LogTail`s; a missing source or lost SSH is an error, never an empty log.
+**Control-service health** — `control_service.py` checks the `ctld`/`netagent`/`netcore` units and judges each agent from its `NodeStatus` (`is_live()`, failed resources, applied vs current revision); the agent repairs a stopped core itself within 5 minutes.
 **Setup helpers** — `preflight.py` collects pre-deploy checks; `images.py` classifies each Remnawave container's image with the setup version policy; `camouflage.py` runs the pinned RealiTLScanner and picks same-subnet Reality targets (`commands/scan.py` adds only the spinner and prompt).
 
 ## What's done well

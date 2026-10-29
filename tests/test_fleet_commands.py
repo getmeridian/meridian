@@ -161,6 +161,7 @@ def _run(
     with (
         _fleet_source(topology or _fleet_topology()),
         patch("meridian.commands.fleet.make_panel", return_value=panel),
+        patch("meridian.commands.fleet.fleet_panel", return_value=panel),
         patch("meridian.commands.fleet.tcp_connect", **probe) as tcp,
         patch("meridian.commands.fleet.is_json_mode", return_value=json),
         patch("meridian.commands.fleet.emit_json") as emit,
@@ -406,7 +407,7 @@ class TestFleetInventory:
 
         with (
             _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=_panel(ping_ok=False)),
+            patch("meridian.commands.fleet.fleet_panel", return_value=_panel(ping_ok=False)),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
             patch("meridian.commands.fleet.emit_json") as emit,
             pytest.raises(typer.Exit) as exc_info,

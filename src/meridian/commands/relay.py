@@ -13,10 +13,11 @@ import typer
 from rich.markup import escape
 
 from meridian.adapters.cluster import topology_from_local_cluster
-from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, make_panel, require_intent
+from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, require_intent
 from meridian.commands._validation import validate_command_input
 from meridian.config import HOME_DISPLAY
 from meridian.console import confirm, err_console, fail, info, ok, warn
+from meridian.control_access import fleet_panel
 from meridian.core.command_inputs import RelayDeployRequest, RelayTargetRequest
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import build_relay_list_result
@@ -209,7 +210,7 @@ def _run_list(
     warnings: list[ErrorModel] = []
     if relays:
         try:
-            with make_panel(cluster) as panel:
+            with fleet_panel(cluster, topology) as panel:
                 host_map = {h.uuid: h for h in panel.list_hosts()}
                 for relay in relays:
                     endpoint = (relay.ip, relay.port)

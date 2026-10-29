@@ -7,6 +7,7 @@ internal CA (`AgentBootstrap`, `EnrollRequest`) replaces both in M2.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Literal
 
 from pydantic import Field
@@ -73,6 +74,11 @@ class NodeSpec(CoreModel):
     )
 
 
+# Agents long-poll for at most 25 s (plus a 10 s grace) and every poll counts as seen,
+# so an agent unseen for longer than this has lost the service.
+AGENT_SEEN_SECONDS = 90
+
+
 class NodeStatus(CoreModel):
     """The service's view of one node."""
 
@@ -86,6 +92,16 @@ class NodeStatus(CoreModel):
     agent_version: Version | None
     failed: list[str] = Field(default_factory=list, description="Resource IDs the last report marked failed.")
     errors: list[str] = Field(default_factory=list, description="Operator-facing messages of failed resources.")
+
+    def unseen_seconds(self, now: datetime | None = None) -> float | None:
+        """Seconds since the agent last reached the service; None if it never did."""
+        if self.last_seen_at is None:
+            return None
+        return ((now or datetime.now(UTC)) - datetime.fromisoformat(self.last_seen_at)).total_seconds()
+
+    def is_live(self, now: datetime | None = None) -> bool:
+        unseen = self.unseen_seconds(now)
+        return unseen is not None and unseen < AGENT_SEEN_SECONDS
 
 
 class ClientEndpoint(CoreModel):

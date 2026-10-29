@@ -12,6 +12,7 @@ from meridian.core.errors import MeridianError
 from meridian.core.execution import ServerConnection
 from meridian.core.redaction import redact_diagnostic_text
 from meridian.diagnostics.images import control_components, node_components
+from meridian.host_runtime import AGENT_UNIT, CONTROL_SERVICE_UNIT, CORE_UNIT
 
 LogComponent = Literal["node", "panel", "nginx", "relay"]
 LOG_COMPONENTS: tuple[LogComponent, ...] = ("node", "panel", "nginx", "relay")
@@ -53,15 +54,22 @@ def log_sources(
     *,
     subscription_page: bool,
     relay_units: Sequence[tuple[str, str]] = (),
+    control_service: bool = False,
 ) -> list[LogSource]:
     """The logs a server holding *roles* keeps, from the same container names deploy and check use.
 
-    *relay_units* pairs each Realm hop's unit with its pre-rename name.
+    *relay_units* pairs each Realm hop's unit with its pre-rename name; *control_service*
+    reads Meridian's own service and agent units instead of Remnawave's containers.
     """
     sources: list[LogSource] = []
-    if {"exit", "gateway"} & set(roles):
+    if control_service:
+        if {"exit", "gateway"} & set(roles):
+            sources.extend(LogSource("node", "unit", unit) for unit in (AGENT_UNIT, CORE_UNIT))
+        if "control" in roles:
+            sources.append(LogSource("panel", "unit", CONTROL_SERVICE_UNIT))
+    elif {"exit", "gateway"} & set(roles):
         sources.extend(LogSource("node", "container", item.container) for item in node_components())
-    if "control" in roles:
+    if "control" in roles and not control_service:
         sources.extend(
             LogSource("panel", "container", item.container)
             for item in control_components()
