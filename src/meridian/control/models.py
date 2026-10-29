@@ -150,9 +150,9 @@ class UserUpdate(CoreModel):
 
 
 SUB_TOKEN_PATTERN = r"^[A-Za-z0-9_-]{16,64}$"
-# A username never starts with a dot: the console builds relative URLs from it, and "." or ".." would
-# resolve away from the user. Dots elsewhere stay valid for people added before this rule.
-USERNAME_PATTERN = r"[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}"
+# Usernames are never "." or "..": the console builds relative URLs from them, and a browser
+# resolves those segments away. Written without lookahead, which Pydantic's regex engine lacks.
+USERNAME_PATTERN = r"(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\.\.[A-Za-z0-9_.-]{1,62})"
 
 
 class UserImport(CoreModel):

@@ -5,7 +5,7 @@
   "use strict";
   var M = (window.M = window.M || {});
   var h = M.h;
-  var USERNAME = /^[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}$/;  // models.USERNAME_PATTERN
+  var USERNAME = /^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\.\.[A-Za-z0-9_.-]{1,62})$/;  // models.USERNAME_PATTERN
   var GB = 1e9;
 
   M.displayName = function (username) {

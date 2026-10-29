@@ -456,11 +456,14 @@ def test_declared_people_are_the_clis_to_remove_or_relink(fleet: Fleet) -> None:
     assert fleet.call("DELETE", "/api/users/alice", bearer=ADMIN_TOKEN).status == 200
 
 
-@pytest.mark.parametrize("username", [".", "..", ".hidden"])
-def test_a_username_never_starts_with_a_dot(fleet: Fleet, username: str) -> None:
-    """The console builds relative URLs from usernames; `..` would resolve to another route."""
+@pytest.mark.parametrize(("username", "status"), [(".", 404), ("..", 404), (".hidden", 200), ("...", 200)])
+def test_only_dot_segments_are_refused_as_usernames(fleet: Fleet, username: str, status: int) -> None:
+    """A browser resolves "." and ".." away in the console's relative URLs; other dotted names keep working."""
     fleet.set_up()
-    assert fleet.call("PUT", f"/api/users/{username}", {}, bearer=ADMIN_TOKEN).status == 404
+    assert fleet.call("PUT", f"/api/users/{username}", {}, bearer=ADMIN_TOKEN).status == status
+    if status == 200:
+        assert fleet.call("GET", f"/api/users/{username}", bearer=ADMIN_TOKEN).status == 200
+        assert fleet.call("GET", f"/ui/api/people/{username}/share", bearer=ADMIN_TOKEN).status == 200
 
 
 # -- checks that must still hold when the write lands ----------------------------------------------
