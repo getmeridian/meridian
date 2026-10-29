@@ -23,4 +23,5 @@
 - The fleet title is intent-owned today: `ServiceSettingsDriver` puts the deployer's back on the next apply, which the Settings screen says.
 - An unconfigured service shows its notice before a setup link's form, and `check_setup_link` refuses too; the form once took a password only for setup to answer `ui_unconfigured`.
 - `M.busy` ignores a `cancelled` step-up — closing the password check once showed a generic error.
+- Treat page input as hostile: decode the hash through `M.route()`'s guard (a bare `%` threw at boot, and retry reloaded the same hash) and read name maps with `M.has()` (a person named `toString` broke People).
 - Keep each script under 800 lines and every `M.t("…")` key in `en.json`; the asset tests read literal keys only.

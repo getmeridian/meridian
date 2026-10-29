@@ -10,7 +10,7 @@
 
   M.displayName = function (username) {
     var names = (M.state.fleet && M.state.fleet.display_names) || {};
-    return names[username] || username;
+    return M.has(names, username) && names[username] ? String(names[username]) : username;
   };
 
   M.isDeclared = function (username) {

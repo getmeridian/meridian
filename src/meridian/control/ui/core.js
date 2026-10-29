@@ -265,8 +265,15 @@
 
   // -- routing -------------------------------------------------------------------------------
 
+  function decodePart(part) {
+    try { return decodeURIComponent(part); } catch (e) { return ""; } // "%" alone: no such route, not a crash
+  }
+
+  /* Own properties only: a person named "toString" must not read Object.prototype. */
+  M.has = function (object, key) { return Object.prototype.hasOwnProperty.call(object, key); };
+
   M.route = function () {
-    var parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
+    var parts = location.hash.replace(/^#\/?/, "").split("/").map(decodePart);
     return { name: parts[0] || "people", arg: parts[1] || "", extra: parts[2] || "" };
   };
   M.go = function (name, arg) {
