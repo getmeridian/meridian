@@ -103,6 +103,25 @@ def test_vanished_bindings_are_sorted_in_retirement_order() -> None:
     ]
 
 
+def test_what_an_uncommitted_apply_installed_retires_too() -> None:
+    """An exit whose first apply failed kept an enrolled agent and open firewall rules after its removal."""
+    failed = [
+        _binding("agent_runtime", "exit-2", server_ref="srv-b", active=False),
+        _binding("firewall_rule", "srv-b:tcp:443", server_ref="srv-b", active=False),
+    ]
+    for binding in failed:
+        binding.generation = 2  # the active generation is 1
+    stale = _binding("realm_hop", "old", active=False)  # retired before generation 1 committed
+    committed = _binding("agent_runtime", "exit-2", server_ref="srv-b")  # the same agent, committed earlier
+
+    retiring = retired_bindings(_plan(), _cluster(*failed, stale, committed))
+
+    assert [(binding.logical_id, binding.generation) for binding in retiring] == [
+        ("agent_runtime:exit-2", 2),
+        ("firewall_rule:srv-b:tcp:443", 2),
+    ]
+
+
 @pytest.mark.parametrize(
     "kind",
     ["node_workload", "agent_runtime", "client_endpoint", "realm_hop", "control_user"],

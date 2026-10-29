@@ -72,15 +72,26 @@ class RetiringDriver(Protocol):
 
 
 def retired_bindings(plan: ResourcePlan, cluster: ClusterConfig) -> list[ManagedResourceBinding]:
-    """Active bindings that left the plan or moved to another server, in retirement order."""
+    """Bindings that left the plan or moved to another server, in retirement order.
+
+    Besides the committed (active) ones, this counts what an uncommitted apply installed
+    (inactive, newer than the active generation): an exit whose first apply failed still
+    runs an enrolled agent and holds open firewall rules until something retires them.
+    """
     desired = {
         resource.logical_id: str(getattr(resource.payload, "server_ref", "") or "") for resource in plan.resources
     }
-    vanished = [
-        binding
-        for binding in cluster.managed_bindings.values()
-        if binding.active and (binding.logical_id not in desired or _moved(binding, desired[binding.logical_id]))
-    ]
+    newest: dict[tuple[str, str, str], ManagedResourceBinding] = {}
+    for binding in cluster.managed_bindings.values():
+        if not (binding.active or binding.generation > cluster.active_generation):
+            continue
+        if binding.logical_id in desired and not _moved(binding, desired[binding.logical_id]):
+            continue
+        # One remote resource retires once, however many generations bound it.
+        key = (binding.logical_id, binding.remote_id, binding.server_ref)
+        if key not in newest or binding.generation > newest[key].generation:
+            newest[key] = binding
+    vanished = list(newest.values())
     rank = {kind: index for index, kind in enumerate(RETIREMENT_ORDER)}
     return sorted(vanished, key=lambda item: (rank.get(item.resource_kind, len(rank)), item.logical_id))
 
