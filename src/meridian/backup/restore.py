@@ -41,7 +41,7 @@ from meridian.core.topology import SetupIntent
 from meridian.handoff import HandoffLinks
 from meridian.host_runtime import CONTROL_SERVICE_CONFIG, CONTROL_SERVICE_STATE_DIR, CONTROL_SERVICE_UNIT
 from meridian.provision.control_service import SERVICE_USER_COMMAND
-from meridian.provision.ensure import ensure_ufw_rule
+from meridian.provision.ensure import ensure_packages, ensure_ufw_rule
 from meridian.reconciler.retirement import forget_server
 from meridian.reconciler.server_render import render_firewall_rules
 from meridian.resolve import connection_for_entry
@@ -377,6 +377,14 @@ def open_control_ports(plan: ResourcePlan, entry: ServerEntry, conn: ServerConne
     A deploy applies them first through the plan; restore bootstraps before the plan runs,
     so a fresh server's SSH-only UFW kept port 80 closed and the ACME challenge timed out.
     """
+    # Stock Debian has no ufw, and the baseline that installs it runs later, inside the bootstrap.
+    installed = ensure_packages(conn, ["ufw"], timeout=120)
+    if not installed.ok:
+        raise BackupError(
+            f"ufw could not be installed on the new control server: {installed.detail}",
+            hint="Check apt on the new server, then run the same `meridian restore` again.",
+            retryable=True,
+        )
     control = next(item for item in plan.resources if isinstance(item.payload, ControlServicePayload))
     dependencies = set(control.dependencies)
     for resource in plan.resources:

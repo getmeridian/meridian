@@ -371,6 +371,10 @@ def test_restore_opens_the_control_services_ports_before_its_bootstrap() -> None
 
     opened = " ".join(call for call in conn.calls if "ufw" in call)
     assert "allow 80/tcp" in opened and "allow 443/tcp" in opened
+    # A fresh Debian server has no ufw yet: it is installed before the first rule.
+    install = next(index for index, call in enumerate(conn.calls) if "apt-get install" in call and "ufw" in call)
+    first_rule = next(index for index, call in enumerate(conn.calls) if call.startswith("ufw allow"))
+    assert install < first_rule
 
 
 def test_a_failed_save_after_the_upload_keeps_the_staged_database_for_the_rerun(
