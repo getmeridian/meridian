@@ -1,35 +1,28 @@
-//! The skeleton bootstrap file (`NodeBootstrap` in `meridian.control.models`).
+//! The bootstrap file SSH writes (`AgentBootstrap` in `meridian.core.agent_protocol`).
+//!
+//! It names the service, the node, and the pinned CA. A file that carries an
+//! enrollment token asks for a fresh enrollment; once enrolled, the agent
+//! rewrites it with the token fields set to null.
 
 use std::fmt;
 use std::path::Path;
 
-use base64::Engine as _;
-use base64::engine::general_purpose::STANDARD;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::model::PROTOCOL;
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct BootstrapFile {
-    protocol: String,
-    service_url: String,
-    fleet_id: String,
-    node_id: String,
-    node_token: String,
-    service_public_key: String,
-}
-
 /// Loaded bootstrap. `Debug` never prints the token.
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct Bootstrap {
+    pub protocol: String,
     pub service_url: String,
     pub fleet_id: String,
     pub node_id: String,
-    pub node_token: String,
-    pub public_key: [u8; 32],
-    /// Lowercase hex SHA-256 of the raw public key.
-    pub key_id: String,
+    pub enrollment_token: Option<String>,
+    pub token_expires_at: Option<String>,
+    pub ca_sha256: String,
+    pub tls_pin_sha256: Option<String>,
 }
 
 impl fmt::Debug for Bootstrap {
@@ -37,7 +30,8 @@ impl fmt::Debug for Bootstrap {
         f.debug_struct("Bootstrap")
             .field("fleet_id", &self.fleet_id)
             .field("node_id", &self.node_id)
-            .field("key_id", &self.key_id)
+            .field("ca_sha256", &self.ca_sha256)
+            .field("enrolling", &self.enrollment_token.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -50,7 +44,7 @@ impl Bootstrap {
     }
 
     pub fn from_json(bytes: &[u8], allow_http: bool) -> Result<Bootstrap, String> {
-        let file: BootstrapFile = serde_json::from_slice(bytes)
+        let file: Bootstrap = serde_json::from_slice(bytes)
             .map_err(|err| format!("bootstrap is malformed: {err}"))?;
         if file.protocol != PROTOCOL {
             return Err(format!(
@@ -63,27 +57,39 @@ impl Bootstrap {
         if !scheme_ok || file.service_url.ends_with('/') {
             return Err("bootstrap service_url must be https:// without a trailing slash".into());
         }
-        if file.node_token.len() < 32
-            || !file
-                .node_token
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+        if let Some(token) = &file.enrollment_token
+            && !is_opaque_token(token)
         {
-            return Err("bootstrap node_token is not a base64url token".into());
+            return Err("bootstrap enrollment_token is not a base64url token".into());
         }
-        let key = STANDARD
-            .decode(&file.service_public_key)
-            .map_err(|_| "bootstrap service_public_key is not base64".to_string())?;
-        let public_key: [u8; 32] = key
-            .try_into()
-            .map_err(|_| "bootstrap service_public_key is not 32 bytes".to_string())?;
-        Ok(Bootstrap {
-            service_url: file.service_url,
-            fleet_id: file.fleet_id,
-            node_id: file.node_id,
-            node_token: file.node_token,
-            key_id: crate::jcs::sha256_hex(&public_key),
-            public_key,
-        })
+        if !crate::jcs::is_sha256_hex(&file.ca_sha256) {
+            return Err("bootstrap ca_sha256 is not a lowercase hex SHA-256".into());
+        }
+        if file.tls_pin_sha256.is_some() {
+            // Fail closed: a pinned self-signed certificate needs a custom verifier this agent lacks.
+            return Err(
+                "bootstrap tls_pin_sha256 is not supported by this agent; serve a WebPKI certificate"
+                    .into(),
+            );
+        }
+        Ok(file)
     }
+
+    /// Null the spent enrollment token in memory and on disk (atomic, 0600).
+    pub fn spend_token(&mut self, path: &Path) -> Result<(), String> {
+        self.enrollment_token = None;
+        self.token_expires_at = None;
+        let mut bytes = serde_json::to_vec_pretty(self).map_err(|err| err.to_string())?;
+        bytes.push(b'\n');
+        crate::fsutil::write_atomic(path, &bytes, 0o600, None)
+            .map_err(|err| format!("cannot rewrite bootstrap: {err}"))
+    }
+}
+
+/// The contract's `OpaqueToken`: 32 to 256 base64url characters.
+pub fn is_opaque_token(token: &str) -> bool {
+    (32..=256).contains(&token.len())
+        && token
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }

@@ -7,7 +7,7 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::{self, Read, Write};
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -15,15 +15,15 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use serde_json::Value;
 
-use crate::compose::{self, UsersRef};
 use crate::fetch::{Fetch, HashingWriter};
 use crate::fsutil::{self, host_path};
 use crate::model::{
     BinaryPinSpec, FileSpec, Resource, ResourceError, ResourceObservation, Spec, UnitSpec,
-    XrayConfigSpec, parse_mode,
+    parse_mode,
 };
 use crate::state::LedgerEntry;
 use crate::system::Exec;
+use crate::xray::users_outcome;
 use crate::{debug, info};
 
 /// Largest file an archive member may extract to.
@@ -43,14 +43,14 @@ pub struct Engine<'a> {
 }
 
 #[derive(Debug)]
-pub struct Failure {
+pub(crate) struct Failure {
     pub code: &'static str,
     pub message: String,
     pub retryable: bool,
 }
 
 impl Failure {
-    fn new(code: &'static str, message: impl Into<String>) -> Failure {
+    pub(crate) fn new(code: &'static str, message: impl Into<String>) -> Failure {
         let message: String = message.into();
         let retryable = !matches!(
             code,
@@ -63,12 +63,12 @@ impl Failure {
         }
     }
 
-    fn io(err: &io::Error, what: &str) -> Failure {
+    pub(crate) fn io(err: &io::Error, what: &str) -> Failure {
         Failure::new(fsutil::write_error_code(err), format!("{what}: {err}"))
     }
 }
 
-enum Outcome {
+pub(crate) enum Outcome {
     Applied {
         changed: bool,
         installed: Option<String>,
@@ -504,137 +504,13 @@ impl Engine<'_> {
         Err(last)
     }
 
-    // ---- xray_config ----------------------------------------------------------
-
-    fn apply_xray_config(
-        &self,
-        spec: &XrayConfigSpec,
-        resources: &[Resource],
-        statuses: &HashMap<String, &'static str>,
-        entries: &HashMap<String, LedgerEntry>,
-        changed: &mut BTreeSet<String>,
-        placed: &mut HashSet<String>,
-    ) -> Outcome {
-        match self.try_xray_config(spec, resources, statuses, entries, changed, placed) {
-            Ok(outcome) => outcome,
-            Err(failure) => Outcome::Failed(failure),
-        }
-    }
-
-    fn try_xray_config(
-        &self,
-        spec: &XrayConfigSpec,
-        resources: &[Resource],
-        statuses: &HashMap<String, &'static str>,
-        entries: &HashMap<String, LedgerEntry>,
-        changed: &mut BTreeSet<String>,
-        placed: &mut HashSet<String>,
-    ) -> Result<Outcome, Failure> {
-        fsutil::check_path(&spec.path).map_err(|msg| Failure::new("path_not_allowed", msg))?;
-        let users: Vec<(UsersRef<'_>, &Resource)> = resources
-            .iter()
-            .filter_map(|r| match &r.spec {
-                Spec::XrayUsers(s) => Some((UsersRef::Vless(s), r)),
-                Spec::Hysteria2Users(s) => Some((UsersRef::Hysteria2(s), r)),
-                _ => None,
-            })
-            .collect();
-        let refs: Vec<UsersRef<'_>> = users.iter().map(|(u, _)| *u).collect();
-        let composed = compose::compose(&spec.config, &refs)
-            .map_err(|msg| Failure::new("validation_failed", msg))?;
-        let bytes = compose::render(&composed);
-        let installed = Some(crate::jcs::sha256_hex(&bytes));
-        let dest = host_path(&self.root, &spec.path);
-        let current =
-            fsutil::read_optional(&dest).map_err(|err| Failure::io(&err, "cannot read config"))?;
-        if current.as_deref() == Some(&bytes[..]) {
-            fsutil::ensure_mode_owner(&dest, 0o600, None)
-                .map_err(|err| Failure::io(&err, "cannot set mode"))?;
-            placed.extend(users.iter().map(|(u, _)| u.id().to_string()));
-            return Ok(Outcome::Applied {
-                changed: false,
-                installed,
-            });
-        }
-
-        let pin = |name: &str| {
-            resources.iter().find_map(|r| match &r.spec {
-                Spec::BinaryPin(p) if p.name == name => Some((p, r.id.as_str())),
-                _ => None,
-            })
-        };
-        let (xray, xray_id) = pin("xray").ok_or_else(|| {
-            Failure::new("validation_failed", "the document has no xray binary_pin")
-        })?;
-        if statuses.get(xray_id) != Some(&"applied") {
-            return Err(Failure::new(
-                "validation_failed",
-                "the xray binary is not installed",
-            ));
-        }
-        let asset_dir = pin("geosite").or_else(|| pin("geoip")).and_then(|(p, _)| {
-            host_path(&self.root, &p.install_path)
-                .parent()
-                .map(Path::to_path_buf)
-        });
-
-        let (tmp, mut file) = fsutil::create_temp(&dest, "netagent-test.json")
-            .map_err(|err| Failure::io(&err, "cannot write config"))?;
-        let written = file.write_all(&bytes).and_then(|()| file.sync_all());
-        drop(file);
-        if let Err(err) = written {
-            let _ = fs::remove_file(&tmp);
-            return Err(Failure::io(&err, "cannot write config"));
-        }
-        let binary = host_path(&self.root, &xray.install_path);
-        let tmp_arg = tmp.to_string_lossy().into_owned();
-        let asset = asset_dir.map(|dir| dir.to_string_lossy().into_owned());
-        let env: Vec<(&str, &str)> = asset
-            .iter()
-            .map(|dir| ("XRAY_LOCATION_ASSET", dir.as_str()))
-            .collect();
-        let tested = self.exec.run(
-            &binary.to_string_lossy(),
-            &["run", "-test", "-c", &tmp_arg],
-            &env,
-        );
-        let failure = match tested {
-            Ok(output) if output.success => None,
-            Ok(output) => Some(format!(
-                "xray rejected the config: {}",
-                last_line(&output.stdout, &output.stderr)
-            )),
-            Err(err) => Some(format!("cannot run xray: {err}")),
-        };
-        if let Some(message) = failure {
-            let _ = fs::remove_file(&tmp);
-            return Err(Failure::new("validation_failed", truncate(&message, 300)));
-        }
-        fsutil::commit(&tmp, &dest, 0o600, None)
-            .map_err(|err| Failure::io(&err, "cannot install config"))?;
-        info!("wrote xray config {}", spec.path);
-        for (users_ref, resource) in &users {
-            placed.insert(users_ref.id().to_string());
-            let same = entries.get(&resource.id).is_some_and(|entry| {
-                entry.kind == resource.kind && entry.applied_sha256 == resource.hash
-            });
-            if !same {
-                changed.insert(resource.id.clone());
-            }
-        }
-        Ok(Outcome::Applied {
-            changed: true,
-            installed,
-        })
-    }
-
     // ---- systemd_unit ---------------------------------------------------------
 
     fn unit_path(&self, name: &str) -> PathBuf {
         host_path(&self.root, &format!("{}/{name}", fsutil::UNIT_DIR))
     }
 
-    fn systemctl(&self, args: &[&str]) -> Result<String, String> {
+    pub(crate) fn systemctl(&self, args: &[&str]) -> Result<String, String> {
         match self.exec.run("systemctl", args, &[]) {
             Ok(output) if output.success => Ok(output.stdout),
             Ok(output) => Err(format!(
@@ -646,7 +522,7 @@ impl Engine<'_> {
         }
     }
 
-    fn query(&self, verb: &str, name: &str) -> String {
+    pub(crate) fn query(&self, verb: &str, name: &str) -> String {
         self.exec
             .run("systemctl", &[verb, name], &[])
             .map(|output| output.stdout.trim().to_string())
@@ -733,45 +609,6 @@ impl Engine<'_> {
     }
 }
 
-/// Users resources are applied once the composed config that carries them is in place.
-fn users_outcome(
-    resource: &Resource,
-    resources: &[Resource],
-    config_seen: bool,
-    statuses: &HashMap<String, &'static str>,
-    placed: &HashSet<String>,
-    changed: &BTreeSet<String>,
-) -> Outcome {
-    let config = resources
-        .iter()
-        .find(|r| matches!(r.spec, Spec::XrayConfig(_)));
-    let Some(config) = config else {
-        return Outcome::Failed(Failure::new(
-            "validation_failed",
-            "the document has no xray_config",
-        ));
-    };
-    if !config_seen {
-        return Outcome::Failed(Failure::new(
-            "validation_failed",
-            "users resources must follow xray_config",
-        ));
-    }
-    if placed.contains(&resource.id) {
-        Outcome::Applied {
-            changed: changed.contains(&resource.id),
-            installed: None,
-        }
-    } else if statuses.get(&config.id) == Some(&"applied") {
-        Outcome::Failed(Failure::new(
-            "internal",
-            "users were not composed into the config",
-        ))
-    } else {
-        Outcome::Blocked
-    }
-}
-
 /// Copy the installed file out of a downloaded artifact.
 fn extract(
     artifact: &Path,
@@ -831,7 +668,7 @@ fn extract(
     }
 }
 
-fn last_line<'a>(stdout: &'a str, stderr: &'a str) -> &'a str {
+pub(crate) fn last_line<'a>(stdout: &'a str, stderr: &'a str) -> &'a str {
     let last = |text: &'a str| text.lines().map(str::trim).rfind(|line| !line.is_empty());
     last(stderr).or_else(|| last(stdout)).unwrap_or("no output")
 }

@@ -1,8 +1,11 @@
 //! Shared doubles for the integration tests: temp roots, a fake host, a fake fetcher,
-//! a mock HTTP service, and document signing.
+//! a mock HTTP server, a test fleet CA, a fake control service, and document signing.
 #![allow(dead_code)]
 
-use std::collections::{HashMap, HashSet};
+pub mod pki;
+pub mod service;
+
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
 use std::os::unix::fs::MetadataExt;
@@ -13,7 +16,7 @@ use std::time::Duration;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
-use ed25519_dalek::{Signer, SigningKey};
+use ed25519_dalek::Signer;
 use meridian_agent::fetch::Fetch;
 use meridian_agent::jcs;
 use meridian_agent::model::Resource;
@@ -23,7 +26,7 @@ use serde_json::{Value, json};
 
 pub const FLEET_ID: &str = "0b6f3c1e-8f6a-4d2b-9c41-7a5e2d9f0c13";
 pub const NODE_ID: &str = "exit-1";
-pub const TOKEN: &str = "node-token-0123456789abcdefghijklmnopqrstuvwxyz";
+pub const ENROLL_TOKEN: &str = "enroll-token-0123456789abcdefghijklmnopqrstu";
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -84,6 +87,14 @@ pub struct FakeExec {
     pub units: Mutex<HashMap<String, UnitState>>,
     pub crashing: Mutex<HashSet<String>>,
     pub asset_dirs: Mutex<Vec<String>>,
+    /// `xray api adu`/`rmu` fail (the agent must fall back to a restart).
+    pub api_down: Mutex<bool>,
+    /// What `xray api adu` received (the file is removed right after).
+    pub added: Mutex<Vec<Value>>,
+    /// Users the fake running Xray holds, by email, after API calls.
+    pub live_users: Mutex<BTreeSet<String>>,
+    /// `xray api statsquery` output (protobuf JSON).
+    pub stats_output: Mutex<String>,
 }
 
 impl FakeExec {
@@ -167,6 +178,7 @@ impl Exec for FakeExec {
                 }
             }
             "journalctl" => ok("starting\nfailed to listen on 0.0.0.0:443: address in use\n"),
+            _ if args.first() == Some(&"api") => self.xray_api(args),
             _ if args.first() == Some(&"run") => {
                 if let Some((_, dir)) = env.iter().find(|(k, _)| *k == "XRAY_LOCATION_ASSET") {
                     self.asset_dirs.lock().unwrap().push(dir.to_string());
@@ -184,6 +196,46 @@ impl Exec for FakeExec {
     }
 
     fn sleep(&self, _duration: Duration) {}
+}
+
+impl FakeExec {
+    fn xray_api(&self, args: &[&str]) -> io::Result<CmdOutput> {
+        assert_eq!(args[2], "--server=127.0.0.1:10085");
+        if args[1] == "statsquery" {
+            assert_eq!(&args[3..], ["-pattern", "user>>>", "-reset"]);
+            let output = std::mem::take(&mut *self.stats_output.lock().unwrap());
+            return ok(if output.is_empty() { "{}" } else { &output });
+        }
+        if *self.api_down.lock().unwrap() {
+            return fail("", "failed to dial 127.0.0.1:10085: connection refused\n");
+        }
+        let mut live = self.live_users.lock().unwrap();
+        match args[1] {
+            "rmu" => {
+                assert!(args[3].starts_with("-tag="));
+                let emails = &args[4..];
+                for email in emails {
+                    live.remove(*email);
+                }
+                ok(&format!("Removed {} user(s) in total.\n", emails.len()))
+            }
+            "adu" => {
+                let body: Value = serde_json::from_slice(&std::fs::read(args[3])?).unwrap();
+                let mode = std::fs::metadata(args[3])?.mode() & 0o777;
+                assert_eq!(mode, 0o600, "the adu file holds user UUIDs");
+                let clients = body["inbounds"][0]["settings"]["clients"]
+                    .as_array()
+                    .unwrap();
+                for client in clients {
+                    live.insert(client["email"].as_str().unwrap().to_string());
+                }
+                let added = clients.len();
+                self.added.lock().unwrap().push(body);
+                ok(&format!("Added {added} user(s) in total.\n"))
+            }
+            other => panic!("unexpected xray api {other}"),
+        }
+    }
 }
 
 /// Serves artifacts by source (`service` keys are `service:<sha256>`), counting requests.
@@ -231,23 +283,22 @@ impl Fetch for FakeFetch {
 
 // ---- Documents ----------------------------------------------------------------
 
-pub fn signing_key() -> SigningKey {
-    SigningKey::from_bytes(&[7u8; 32])
-}
-
-pub fn bootstrap_json(service_url: &str, key: &SigningKey) -> Value {
+/// A bootstrap as the deployer writes it: a one-time token and the pinned CA.
+pub fn bootstrap_json(service_url: &str, pki: &pki::TestPki) -> Value {
     json!({
         "protocol": "meridian.agent/v1",
         "service_url": service_url,
         "fleet_id": FLEET_ID,
         "node_id": NODE_ID,
-        "node_token": TOKEN,
-        "service_public_key": STANDARD.encode(key.verifying_key().to_bytes()),
+        "enrollment_token": ENROLL_TOKEN,
+        "token_expires_at": "2026-10-29T12:30:00Z",
+        "ca_sha256": pki.ca_sha256(),
+        "tls_pin_sha256": null,
     })
 }
 
-/// A signed desired-state document over `resources`.
-pub fn document(epoch: u64, revision: u64, resources: &[Value], key: &SigningKey) -> Value {
+/// A desired-state document over `resources`, signed by the service certificate's key.
+pub fn document(epoch: u64, revision: u64, resources: &[Value], pki: &pki::TestPki) -> Value {
     let resources = Value::Array(resources.to_vec());
     let mut doc = json!({
         "protocol": "meridian.agent/v1",
@@ -259,9 +310,9 @@ pub fn document(epoch: u64, revision: u64, resources: &[Value], key: &SigningKey
         "issued_at": "2026-10-29T12:00:00Z",
         "resources": resources,
     });
-    let signature = key.sign(&signed_bytes(&doc).unwrap());
+    let signature = pki.service_key.sign(&signed_bytes(&doc).unwrap());
     doc["signature"] = json!({
-        "key_id": jcs::sha256_hex(&key.verifying_key().to_bytes()),
+        "key_id": pki.key_id(),
         "signature": STANDARD.encode(signature.to_bytes()),
     });
     doc
