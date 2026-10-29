@@ -312,11 +312,23 @@ def ssh_answers(entry: ServerEntry) -> bool:
 
 def upload_database(conn: ServerConnection, path: Path, sha256: str, *, fleet_id: str) -> None:
     """Put the staged database where the service reads it, with the service stopped; refuse another fleet's server."""
-    existing = conn.run(f"cat {CONTROL_SERVICE_CONFIG} 2>/dev/null", timeout=15, sensitive=True).stdout
+    config_path = shlex.quote(CONTROL_SERVICE_CONFIG)
+    read = conn.run(f"if [ -e {config_path} ]; then cat {config_path}; fi", timeout=15, sensitive=True)
+    if read.returncode != 0:
+        # Unread is not absent: uploading over a server that runs another fleet would wipe it.
+        raise BackupError(
+            f"Could not read which fleet the new server runs: {read.stderr.strip()[:200] or f'exit {read.returncode}'}",
+            hint="Check SSH to the new server, then run the same `meridian restore` again.",
+            retryable=True,
+        )
     try:
-        held = json.loads(existing).get("fleet_id") if existing.strip() else None
-    except ValueError:
-        held = None
+        held = json.loads(read.stdout).get("fleet_id") if read.stdout.strip() else None
+    except (ValueError, AttributeError):
+        raise BackupError(
+            f"{CONTROL_SERVICE_CONFIG} on the new server is unreadable, so its fleet is unknown.",
+            hint="Restore onto a fresh server, or move that file aside if it belongs to no fleet.",
+            category="user",
+        ) from None
     if held and held != fleet_id:
         raise BackupError(
             "That server already runs another fleet's control service.",

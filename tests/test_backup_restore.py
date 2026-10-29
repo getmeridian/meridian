@@ -297,6 +297,27 @@ def test_the_upload_refuses_a_server_running_another_fleet(tmp_path: Path) -> No
     assert conn.writes == []
 
 
+@pytest.mark.parametrize(
+    ("result", "message"),
+    [
+        ({"rc": 255, "stderr": "Connection reset"}, "Could not read which fleet"),
+        ({"stdout": "{not json"}, "unreadable"),
+    ],
+    ids=["unread", "malformed"],
+)
+def test_the_upload_refuses_a_server_whose_fleet_it_cannot_tell(
+    tmp_path: Path, result: dict[str, Any], message: str
+) -> None:
+    database = tmp_path / "control.db"
+    database.write_bytes(b"x")
+    conn = MockConnection()
+    conn.when("/etc/ctld/config.json", **result)
+
+    with pytest.raises(BackupError, match=message):
+        upload_database(conn, database, "0" * 64, fleet_id=FLEET_ID)  # type: ignore[arg-type]
+    assert conn.writes == [] and not any("systemctl stop" in call for call in conn.calls)
+
+
 def test_a_damaged_upload_is_refused(tmp_path: Path) -> None:
     database = tmp_path / "control.db"
     database.write_bytes(b"x")
