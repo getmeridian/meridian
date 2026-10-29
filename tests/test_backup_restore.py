@@ -374,6 +374,30 @@ def test_an_empty_context_takes_the_snapshots_own_fleet_files(fleet: tuple[Clust
     assert ServerRegistry(config.SERVER_PROFILES_FILE).find("srv-a") is not None
 
 
+def test_fleet_files_of_another_fleet_are_refused_before_anything_is_written(
+    fleet: tuple[ClusterConfig, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from meridian.cluster_persistence import dump_cluster
+    from meridian.commands import restore as restore_command
+    from meridian.control.models import DeployerStateDeposit
+
+    _cluster, snapshot = fleet
+    source = _source(snapshot)
+    config.CLUSTER_CONFIG.unlink()
+    config.SERVER_PROFILES_FILE.unlink()
+    foreign = DeployerStateDeposit(
+        cluster_yml=dump_cluster(ClusterConfig(fleet_id="0" * 8 + "-0000-4000-8000-" + "0" * 12)),
+        servers_json="[]",
+        generation=1,
+    )
+    monkeypatch.setattr(restore_command, "read_deployer_state", lambda _database: foreign)
+
+    with pytest.raises(BackupError, match="another fleet"):
+        restore_command._fleet_state(ClusterConfig(), source.snapshot)
+
+    assert not config.CLUSTER_CONFIG.exists() and not config.SERVER_PROFILES_FILE.exists()
+
+
 def test_a_copy_behind_the_snapshots_is_sent_to_a_new_context(fleet: tuple[ClusterConfig, Path]) -> None:
     import typer
 

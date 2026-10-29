@@ -10,7 +10,9 @@ copy of `cluster.yml` and `servers.json` is restored into the context first.
 from __future__ import annotations
 
 import getpass
+import json
 import sys
+import tempfile
 from pathlib import Path
 
 import typer
@@ -26,7 +28,7 @@ from meridian.commands._helpers import apply_reviewed_intent, load_cluster, pers
 from meridian.console import confirm, err_console, fail, has_tty, info, ok, warn
 from meridian.control.restore import read_deployer_state
 from meridian.control.snapshot import Snapshot, decrypt_snapshot
-from meridian.core.errors import MeridianError
+from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.topology import SetupIntent
 from meridian.servers import ServerRegistry
 
@@ -171,15 +173,28 @@ def _fleet_state(cluster: ClusterConfig, snapshot: Snapshot | None) -> ClusterCo
             hint="Restore into an empty context: meridian restore --to NEW-SERVER --context NAME",
             hint_type="user",
         )
+    _check_deposit(deposited.cluster_yml, deposited.servers_json, snapshot.header.fleet_id)
     write_private(config.CLUSTER_CONFIG, deposited.cluster_yml)
     write_private(config.SERVER_PROFILES_FILE, deposited.servers_json)
     info(f"Restored this fleet's cluster.yml and servers.json from the snapshot into {config.HOME_DISPLAY}")
     restored = load_cluster()
-    if restored.fleet_id != snapshot.header.fleet_id:
-        raise BackupError("The snapshot's fleet files name another fleet.", category="bug")
     # Snapshots from before deposits dropped it may carry the depositing machine's unfinished restore.
     restored.control_restore = finished_restore(restored.control_restore)
     return restored
+
+
+def _check_deposit(cluster_yml: str, servers_json: str, fleet_id: str) -> None:
+    """Refuse fleet files that would not load, or name another fleet, before writing them into the context."""
+    with tempfile.TemporaryDirectory() as scratch:
+        staged = Path(scratch) / "cluster.yml"
+        staged.write_text(cluster_yml, encoding="utf-8")
+        try:
+            deposited = ClusterConfig.load(staged)
+            json.loads(servers_json)
+        except (LocalStateError, ValueError) as exc:
+            raise BackupError(f"The snapshot's fleet files do not load: {exc}", category="bug") from exc
+    if deposited.fleet_id != fleet_id:
+        raise BackupError("The snapshot's fleet files name another fleet.", category="bug")
 
 
 def _render(review: RestoreReview, registry: ServerRegistry) -> None:
