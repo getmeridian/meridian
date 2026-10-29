@@ -206,7 +206,7 @@ class RevisionLedger:
 
     def _actor(self, caller: Caller) -> RevisionActor:
         if caller.token_id is None:
-            return RevisionActor(token_id=None, name=ROOT_AUTHOR)
+            return RevisionActor(token_id=None, name=caller.name or ROOT_AUTHOR)
         return RevisionActor(token_id=caller.token_id, name=self._tokens.get(caller.token_id).name)
 
     def _require(self, number: int) -> sqlite3.Row:

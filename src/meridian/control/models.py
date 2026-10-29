@@ -278,6 +278,27 @@ class TokenList(CoreModel):
     tokens: list[TokenRecord]
 
 
+class OwnerStatus(CoreModel):
+    """Whether the web UI has an owner yet (`meridian panel` reads it to decide what to print)."""
+
+    exists: bool
+    totp_enabled: bool
+
+
+class SetupLinkRequest(CoreModel):
+    """Issue a one-time UI setup link; `reset` also works once an owner exists (a lost password)."""
+
+    reset: bool = False
+
+
+class SetupLinkGrant(CoreModel):
+    """A one-time setup token: valid until `expires_at`, usable once, shown only in this response."""
+
+    token: OpaqueToken
+    purpose: Literal["setup", "reset"]
+    expires_at: Timestamp
+
+
 RevisionStatus = Literal["proposed", "approved", "applied", "failed"]
 _OPTIONAL_SHA256 = r"^(?:[0-9a-f]{64})?$"
 
@@ -360,3 +381,9 @@ class ServiceConfig(CoreModel):
     listen_host: str = "127.0.0.1"
     listen_port: int = Field(default=3000, ge=1, le=65535)
     state_dir: str = "/var/lib/ctld"
+    public_path: str = Field(
+        default="",
+        pattern=r"^(?:/[A-Za-z0-9_-]{1,128})?$",
+        description="The secret path nginx strips (`/<secret>`): the web owner's session cookie is scoped to it. "
+        "Empty keeps the web UI's sign-in closed.",
+    )

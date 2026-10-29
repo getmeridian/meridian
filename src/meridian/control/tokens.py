@@ -47,13 +47,20 @@ _COLUMNS = "token_id, name, scope, token_sha256, created_at, last_used_at, revok
 
 @dataclass(frozen=True)
 class Caller:
-    """Whom an `/api` request authenticated as: an issued token, or the root credential (`token_id` None)."""
+    """Whom an `/api` request authenticated as: an issued token, the root credential, or the web owner.
+
+    `token_id` is None for the root credential and the web owner's session; `name`
+    tells them apart (`None` is the root, the deployer's CLI).
+    """
 
     token_id: str | None
     scope: TokenScope
+    name: str | None = None
 
 
 ROOT = Caller(token_id=None, scope="admin")
+# A signed-in web UI owner holds the admin scope (`ui_routes.py`); revisions it records name it `owner`.
+WEB_OWNER = Caller(token_id=None, scope="admin", name="owner")
 
 
 def unauthenticated() -> ServiceError:

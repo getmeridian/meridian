@@ -42,6 +42,7 @@ from meridian.control.models import (
     UserUpdate,
     users_resource_id,
 )
+from meridian.control.owner import UI_TABLES, OwnerAuth
 from meridian.control.revisions import APPLY_FENCE_TABLE, REVISIONS_TABLE, RevisionLedger
 from meridian.control.store import Store
 from meridian.control.subscriptions import SubscriptionResponse, render_subscription, unknown_subscription
@@ -53,7 +54,7 @@ from meridian.core.agent_protocol import ObservedStateReport, PollRequest
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 8
 MAX_WAIT_SECONDS = 55
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -101,6 +102,11 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (API_TOKENS_TABLE,),
     (REVISIONS_TABLE, APPLY_FENCE_TABLE),
     ("ALTER TABLE users ADD COLUMN traffic_carried_bytes INTEGER NOT NULL DEFAULT 0",),
+    # 6 -> 7 belongs to encrypted snapshots (the backup tables), merged separately; their
+    # ledger creates its tables at start either way, so a database that skipped it is whole.
+    (),
+    # 7 -> 8: the web UI's owner, sessions, and setup links (`owner.py`).
+    UI_TABLES,
 )
 _USER_FIELDS = (
     "username",
@@ -152,6 +158,7 @@ class ControlService:
         self.authority = NodeAuthority(self._store, fleet_id, clock=clock)
         self.tokens = TokenRegistry(self._store, clock=clock)
         self.revisions = RevisionLedger(self._store, self.tokens, fleet_id, clock=clock)
+        self.owner = OwnerAuth(self._store, clock=clock)
         with self._transaction():
             # Documents signed by an earlier signing certificate are signed again.
             self._compose_all()
@@ -236,6 +243,10 @@ class ControlService:
             failed=failed,
             errors=errors,
         )
+
+    def list_nodes(self) -> list[NodeStatus]:
+        rows = self._store.rows("SELECT node_id FROM nodes ORDER BY node_id")
+        return [self.node_status(str(row["node_id"])) for row in rows]
 
     def poll(self, node_id: str, request: PollRequest, *, max_wait: float = MAX_WAIT_SECONDS) -> dict[str, Any]:
         """Wait up to `wait_seconds` (at most `max_wait`) for a document newer than `have`; return the response."""
