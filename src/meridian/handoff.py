@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import binascii
 import logging
+import shlex
 from collections.abc import Iterable
 from dataclasses import dataclass
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -172,11 +173,15 @@ def remove_connection_page(cluster: ClusterConfig, vless_uuid: str) -> str:
         canonical = str(UUID(vless_uuid))
     except ValueError:
         return f"unexpected page id {vless_uuid!r}"
+    # Pages are uploaded under the UUID as the service holds it, which an import may have kept uppercase.
+    spellings = sorted({canonical, vless_uuid})
+    directories = " ".join(shlex.quote(f"/var/www/private/{spelling}") for spelling in spellings)
     with control_connection(cluster) as conn:
-        result = conn.run(f"rm -rf /var/www/private/{canonical}", timeout=30)
+        result = conn.run(f"rm -rf {directories}", timeout=30)
     if result.returncode != 0:
         return (result.stderr or result.stdout).strip()[:200] or "could not delete the page"
-    forget_connection_page(cluster, canonical)
+    for spelling in spellings:
+        forget_connection_page(cluster, spelling)
     return ""
 
 

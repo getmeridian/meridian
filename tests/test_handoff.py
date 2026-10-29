@@ -145,3 +145,23 @@ def test_page_greets_the_person_by_the_name_they_typed() -> None:
     assert json.loads(conn.write_map["/var/www/private/vless-1/config.json"])["client_name"] == "Алиса"
     page = conn.write_map["/var/www/private/vless-1/index.html"]
     assert "Алиса" in (page.decode() if isinstance(page, bytes) else page)
+
+
+def test_a_page_kept_under_an_imported_uppercase_uuid_is_removed_too(monkeypatch) -> None:
+    """Pages upload under the UUID as the service holds it; removing only the lowercase directory left it live."""
+    from contextlib import nullcontext
+
+    from meridian import handoff
+    from meridian.pwa import connection_page_deployed, mark_connection_page_deployed
+
+    uuid = "3F2A9C4E-7B1D-4E6A-9C2F-1A2B3C4D5E6F"
+    cluster = ClusterConfig()
+    mark_connection_page_deployed(cluster, uuid)
+    conn = MockConnection()
+    monkeypatch.setattr(handoff, "control_connection", lambda _cluster: nullcontext(conn))
+
+    assert handoff.remove_connection_page(cluster, uuid) == ""
+
+    (command,) = conn.calls
+    assert f"/var/www/private/{uuid}" in command and f"/var/www/private/{uuid.lower()}" in command
+    assert not connection_page_deployed(cluster, uuid)

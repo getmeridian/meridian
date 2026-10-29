@@ -699,7 +699,8 @@ def _users_resource(inbound: ManagedInbound, users: list[UserRecord], config_id:
         "depends_on": [config_id],
         "kind": "xray_users",
         "inbound_tag": inbound.tag,
-        "users": [{"user_id": user.user_id, "uuid": user.uuid, "flow": inbound.flow} for user in users],
+        # An imported UUID keeps its case for Hysteria2; the document wants VLESS UUIDs lowercase.
+        "users": [{"user_id": user.user_id, "uuid": user.uuid.lower(), "flow": inbound.flow} for user in users],
     }
 
 

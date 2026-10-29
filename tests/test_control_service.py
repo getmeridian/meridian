@@ -16,7 +16,15 @@ from typing import Any
 import pytest
 
 from meridian.control.enrollment import token_sha256
-from meridian.control.models import ClientEndpoint, ManagedInbound, NodeSpec, ServiceSettings, users_resource_id
+from meridian.control.models import (
+    ClientEndpoint,
+    ManagedInbound,
+    NodeSpec,
+    ServiceSettings,
+    UserImport,
+    UserImportBatch,
+    users_resource_id,
+)
 from meridian.control.server import ControlServer
 from meridian.control.service import ControlService, ServiceError
 from meridian.core.agent_desired import DesiredNodeState
@@ -101,6 +109,17 @@ def test_document_inserts_users_after_the_xray_config_and_verifies(service: Cont
     authority = service.authority
     assert verify(document, DESIRED_STATE_CONTEXT, authority.service_public_key(), authority.service_key_id)
     DesiredNodeState.model_validate_json(json.dumps(document))
+
+
+def test_an_imported_uppercase_uuid_reaches_vless_in_lowercase(service: ControlService) -> None:
+    """The document refuses uppercase UUIDs, so one imported user wedged every VLESS node's composition."""
+    uuid = "3F2A9C4E-7B1D-4E6A-9C2F-1A2B3C4D5E6F"
+    service.import_users(UserImportBatch(users=[UserImport(username="alice", uuid=uuid, sub_token="Zq8xT3vNw2LmK7pR")]))
+    service.put_node_spec("main", _spec())
+
+    users = _document(service)["resources"][2]["users"]
+
+    assert [user["uuid"] for user in users] == [uuid.lower()]
 
 
 def test_revision_grows_only_when_resources_change(service: ControlService) -> None:
