@@ -98,12 +98,15 @@ def test_locales_match_english_key_for_key_and_placeholder_for_placeholder() -> 
 
 
 def test_every_literal_key_the_scripts_use_exists() -> None:
-    used = set()
-    for source in JS.values():
-        used |= set(re.findall(r'M\.t\("([a-z_]+\.[a-z_.]+)"\s*[,)]', source))
-        for pair in re.findall(r'renderNotice\(root, "([a-z_.]+)", "([a-z_.]+)"', source):
-            used |= set(pair)
-    assert sorted(used - set(ENGLISH)) == []
+    """Any literal in a catalog namespace counts, so a key picked by a ternary or passed on does too."""
+    namespaces = {key.split(".", 1)[0] for key in ENGLISH}
+    used = {
+        literal
+        for source in JS.values()
+        for literal in re.findall(r'"([a-z_]+\.[a-z_.]*[a-z])"', source)
+        if literal.split(".", 1)[0] in namespaces
+    }
+    assert used and sorted(used - set(ENGLISH)) == []
 
 
 @pytest.mark.parametrize(
@@ -125,8 +128,9 @@ def test_every_value_the_service_sends_has_a_label(prefix: str, values: tuple[st
 
 def test_every_refusal_the_sign_in_routes_raise_has_a_message() -> None:
     codes = set()
-    for module in ("owner.py", "ui_routes.py", "login_limits.py", "tokens.py"):
-        codes |= set(re.findall(r'ServiceError\(\s*"([a-z_]+)"', (SRC / module).read_text(encoding="utf-8")))
+    for module in ("owner.py", "ui_routes.py", "login_limits.py", "tokens.py", "server.py"):
+        source = (SRC / module).read_text(encoding="utf-8")
+        codes |= set(re.findall(r'(?:ServiceError|super\(\)\.__init__)\(\s*"([a-z_]+)"', source))
     assert codes and sorted(code for code in codes if f"error.{code}" not in ENGLISH) == []
 
 

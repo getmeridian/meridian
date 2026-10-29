@@ -276,5 +276,6 @@
   "error.invalid_request": "Some of the values aren't valid.",
   "error.conflict": "Something changed meanwhile. Reload and try again.",
   "error.declared_user": "Your fleet file lists this person. Change them with meridian on your computer.",
-  "error.internal": "The control service hit an error. Try again."
+  "error.internal": "The control service hit an error. Try again.",
+  "error.payload_too_large": "That's too much to send at once. Shorten it and try again."
 }

@@ -276,5 +276,6 @@
   "error.invalid_request": "部分输入无效。",
   "error.conflict": "期间有内容发生了变化。请刷新后重试。",
   "error.declared_user": "服务器配置文件列出了此用户。请在你的电脑上用 meridian 修改。",
-  "error.internal": "控制服务出错，请重试。"
+  "error.internal": "控制服务出错，请重试。",
+  "error.payload_too_large": "一次发送的内容太多，请精简后重试。"
 }
