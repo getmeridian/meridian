@@ -181,3 +181,14 @@ def test_an_unfinished_restore_stays_on_this_machine(fleet: ClusterConfig) -> No
 
     fleet.control_restore = ControlRestore(step="done", to_server_ref="srv-new", fleet_epoch=2)
     assert yaml.safe_load(deployer_state(fleet).cluster_yml)["control_restore"]["fleet_epoch"] == 2
+
+
+def test_a_key_another_run_made_first_is_kept_and_used(fleet: ClusterConfig) -> None:
+    """Two first pulls at once: the second must not replace the key the first sealed its snapshot to."""
+    first = create_device_key()
+    before = device_key_path().read_bytes()
+
+    second = create_device_key()
+
+    assert second == first and device_key_path().read_bytes() == before
+    assert [path.name for path in device_key_path().parent.iterdir() if path.name.endswith(".tmp")] == []

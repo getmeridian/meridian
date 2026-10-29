@@ -55,8 +55,15 @@ def create_device_key() -> KeyPair:
     """Make and save a new key for this context, replacing none: an existing file stays."""
     path = device_key_path()
     pair = generate_key_pair()
-    write_private(path, f"# Meridian device backup key. Keep it private.\n# public: {pair.public}\n{pair.secret}\n")
-    return pair
+    text = f"# Meridian device backup key. Keep it private.\n# public: {pair.public}\n{pair.secret}\n"
+    if write_private(path, text, exclusive=True):
+        return pair
+    # Another run made one first (two commands' first pulls at once): use that one, or the
+    # snapshot it saved would be sealed to a key this file no longer holds.
+    existing = load_device_key()
+    if existing is None:
+        raise BackupError(f"{path} vanished while it was being created; retry.", category="system")
+    return existing
 
 
 def device_name() -> str:
@@ -64,8 +71,8 @@ def device_name() -> str:
     return name or "device"
 
 
-def write_private(path: Path, text: str | bytes) -> None:
-    """Write atomically with mode 0600 in a 0700 directory."""
+def write_private(path: Path, text: str | bytes, *, exclusive: bool = False) -> bool:
+    """Write atomically with mode 0600 in a 0700 directory; False when `exclusive` finds the file there."""
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     data = text.encode("utf-8") if isinstance(text, str) else text
     fd, temporary = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
@@ -75,7 +82,16 @@ def write_private(path: Path, text: str | bytes) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.chmod(temporary, 0o600)
-        os.replace(temporary, path)
+        if not exclusive:
+            os.replace(temporary, path)
+            return True
+        try:
+            os.link(temporary, path)  # never replaces: fails if the file appeared meanwhile
+        except FileExistsError:
+            return False
+        finally:
+            Path(temporary).unlink(missing_ok=True)
+        return True
     except BaseException:
         Path(temporary).unlink(missing_ok=True)
         raise
