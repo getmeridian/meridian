@@ -41,8 +41,8 @@ export const en = {
     'Safe to re-run. A second run keeps credentials and keys, and resumes or updates the deployment in place.',
 
   // Behind-the-scenes timeline (title, then the text that follows it)
-  'step.1.title': 'Installs Docker',
-  'step.1.text': ' and deploys <strong>Xray</strong> managed by the <strong>Remnawave</strong> panel',
+  'step.1.title': 'Installs the control service',
+  'step.1.text': ' and a node agent that runs <strong>Xray</strong> — no Docker, no third-party panel',
   'step.2.title': 'Generates x25519 keypair',
   'step.2.text': ' — unique encryption keys for Reality authentication',
   'step.3.title': 'Hardens the server',
@@ -69,7 +69,7 @@ export const en = {
   'builder.tab.doctor': 'Doctor',
   'builder.tab.teardown': 'Teardown',
   'builder.desc.deploy':
-    'Deploy Reality, XHTTP, and Hysteria2 on one server. Sets up Docker, the Remnawave panel, nginx, the firewall, and TLS.',
+    'Deploy Reality, XHTTP, and Hysteria2 on one server. Sets up the control service, nginx, the firewall, and TLS.',
   'builder.desc.relay':
     'Add a TCP relay on a domestic server that forwards to an exit abroad. The exit must be deployed first.',
   'builder.desc.check':
@@ -180,10 +180,10 @@ export const en = {
     'Meridian architecture: nginx routes TCP 443 by SNI to Xray Reality, XHTTP, and the connection pages; Hysteria2 listens on UDP 443',
   'arch.standalone': 'Standalone mode (no domain)',
   'arch.standalone.body':
-    "<p><strong>nginx</strong> owns TCP port 443 and routes connections by TLS SNI with its stream module. Reality connections go to <strong>Xray</strong>. Everything else reaches nginx's http module, which serves the connection pages, subscriptions, and XHTTP over HTTPS with a short-lived Let's Encrypt certificate for the server's IP (issued by acme.sh). <strong>Hysteria2</strong> listens on UDP 443 with salamander obfuscation.</p><p>The Remnawave admin panel is reverse-proxied by nginx on a secret path — accessible via HTTPS, no SSH tunnel needed.</p>",
+    "<p><strong>nginx</strong> owns TCP port 443 and routes connections by TLS SNI with its stream module. Reality connections go to <strong>Xray</strong>. Everything else reaches nginx's http module, which serves the connection pages, subscriptions, and XHTTP over HTTPS with a short-lived Let's Encrypt certificate for the server's IP (issued by acme.sh). <strong>Hysteria2</strong> listens on UDP 443 with salamander obfuscation.</p><p>Meridian's <strong>control service</strong> sits behind nginx on a secret path: it keeps your users, serves their subscriptions, and hosts a web console reachable over HTTPS, no SSH tunnel needed. A small agent on each server dials out to it, so nodes open no extra ports.</p>",
   'arch.domain': 'Domain mode (CDN fallback)',
   'arch.domain.body':
-    "<p>With <code>--domain</code>, nginx gets a Let's Encrypt certificate for your domain and routes that SNI to the domain's paths. XHTTP moves to the domain and <strong>VLESS+WSS</strong> is added. With Cloudflare proxying the domain, both travel through the CDN and keep working if your server's IP is blocked. The panel and connection pages stay on the IP certificate.</p>",
+    "<p>With <code>--domain</code>, nginx gets a Let's Encrypt certificate for your domain and routes that SNI to the domain's paths. XHTTP moves to the domain and <strong>VLESS+WSS</strong> is added. With Cloudflare proxying the domain, both travel through the CDN and keep working if your server's IP is blocked. The control service and connection pages stay on the IP certificate.</p>",
   'arch.relay': 'Relay mode (domestic entry point)',
   'arch.relay.body':
     '<p>A <strong>Realm</strong> TCP forwarder on a server inside your country passes connections to your exit abroad. Relays carry Reality only; XHTTP, WSS, and Hysteria2 still connect to the exit directly. Encryption runs end to end between the app and the exit, so the relay never sees plaintext.</p><p>Add one with <code>meridian relay add RELAY_IP --exit EXIT</code>. Subscriptions and connection pages pick up the relay entries automatically.</p>',

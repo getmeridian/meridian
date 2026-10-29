@@ -34,12 +34,12 @@
     <!-- Reviewed apply: one line per change -->
     <text x="0" y="122" class="t g">  ✓</text><text x="28" y="122" class="t w">Prepare server</text><text x="145" y="122" class="t d">on 198.51.100.42</text>
     <text x="0" y="142" class="t g">  ✓</text><text x="28" y="142" class="t w">Firewall rule</text><text x="138" y="142" class="t d">on 198.51.100.42</text>
-    <text x="0" y="162" class="t g">  ✓</text><text x="28" y="162" class="t w">Install the control panel</text><text x="232" y="162" class="t d">on 198.51.100.42</text>
+    <text x="0" y="162" class="t g">  ✓</text><text x="28" y="162" class="t w">Install the control service</text><text x="248" y="162" class="t d">on 198.51.100.42</text>
     <text x="0" y="182" class="t g">  ✓</text><text x="28" y="182" class="t w">TLS certificate</text><text x="153" y="182" class="t d">on 198.51.100.42</text>
     <text x="0" y="202" class="t g">  ✓</text><text x="28" y="202" class="t w">Web server config</text><text x="169" y="202" class="t d">on 198.51.100.42</text>
-    <text x="0" y="222" class="t g">  ✓</text><text x="28" y="222" class="t w">Register proxy node</text>
-    <text x="0" y="242" class="t g">  ✓</text><text x="28" y="242" class="t w">Proxy profile</text>
-    <text x="0" y="262" class="t g">  ✓</text><text x="28" y="262" class="t w">Start proxy node</text><text x="161" y="262" class="t d">on 198.51.100.42</text>
+    <text x="0" y="222" class="t g">  ✓</text><text x="28" y="222" class="t w">Start the node agent</text><text x="194" y="222" class="t d">on 198.51.100.42</text>
+    <text x="0" y="242" class="t g">  ✓</text><text x="28" y="242" class="t w">Proxy workload</text><text x="145" y="242" class="t d">on 198.51.100.42</text>
+    <text x="0" y="262" class="t g">  ✓</text><text x="28" y="262" class="t w">Subscription settings</text>
     <text x="0" y="282" class="t g">  ✓</text><text x="28" y="282" class="t w">Published connection</text>
     <text x="0" y="302" class="t g">  ✓</text><text x="28" y="302" class="t w">User</text>
 

@@ -36,8 +36,8 @@ export const zh: LandingStrings = {
     '可放心重复运行。再次运行会保留凭证和密钥，并就地继续或更新部署。',
 
   // Behind-the-scenes timeline (title, then the text that follows it)
-  'step.1.title': '安装 Docker',
-  'step.1.text': '，并部署由 <strong>Remnawave</strong> 面板管理的 <strong>Xray</strong>',
+  'step.1.title': '安装控制服务',
+  'step.1.text': '，以及运行 <strong>Xray</strong> 的节点 agent，无需 Docker 或第三方面板',
   'step.2.title': '生成 x25519 密钥对',
   'step.2.text': '——为 Reality 认证生成唯一的加密密钥',
   'step.3.title': '加固服务器',
@@ -64,7 +64,7 @@ export const zh: LandingStrings = {
   'builder.tab.doctor': '诊断',
   'builder.tab.teardown': '卸载',
   'builder.desc.deploy':
-    '在一台服务器上部署 Reality、XHTTP 和 Hysteria2。会配置 Docker、Remnawave 面板、nginx、防火墙和 TLS。',
+    '在一台服务器上部署 Reality、XHTTP 和 Hysteria2。会配置控制服务、nginx、防火墙和 TLS。',
   'builder.desc.relay':
     '在境内服务器上添加 TCP 中继，转发到境外的出口服务器。必须先部署出口服务器。',
   'builder.desc.check':
@@ -175,10 +175,10 @@ export const zh: LandingStrings = {
     'Meridian 架构：nginx 按 SNI 将 TCP 443 路由到 Xray Reality、XHTTP 和连接页面；Hysteria2 监听 UDP 443',
   'arch.standalone': '独立模式（无域名）',
   'arch.standalone.body':
-    '<p><strong>nginx</strong> 占用 TCP 443 端口，并通过其 stream 模块按 TLS SNI 路由连接。Reality 连接交给 <strong>Xray</strong>。其余连接进入 nginx 的 http 模块，由它通过 HTTPS 提供连接页面、订阅和 XHTTP，使用的是为服务器 IP 签发的短期 Let\'s Encrypt 证书（由 acme.sh 签发）。<strong>Hysteria2</strong> 监听 UDP 443，并启用 salamander 混淆。</p><p>Remnawave 管理面板由 nginx 在一条秘密路径上反向代理，可直接通过 HTTPS 访问，无需 SSH 隧道。</p>',
+    '<p><strong>nginx</strong> 占用 TCP 443 端口，并通过其 stream 模块按 TLS SNI 路由连接。Reality 连接交给 <strong>Xray</strong>。其余连接进入 nginx 的 http 模块，由它通过 HTTPS 提供连接页面、订阅和 XHTTP，使用的是为服务器 IP 签发的短期 Let\'s Encrypt 证书（由 acme.sh 签发）。<strong>Hysteria2</strong> 监听 UDP 443，并启用 salamander 混淆。</p><p>Meridian 的<strong>控制服务</strong>位于 nginx 后的一条秘密路径上：它保存你的用户、提供订阅，并提供可通过 HTTPS 直接访问的网页控制台，无需 SSH 隧道。每台服务器上的小型 agent 主动连接它，因此节点不会开放额外端口。</p>',
   'arch.domain': '域名模式（CDN 备用）',
   'arch.domain.body':
-    '<p>使用 <code>--domain</code> 时，nginx 会为你的域名获取 Let\'s Encrypt 证书，并将该 SNI 路由到域名对应的路径。XHTTP 移到域名上，并新增 <strong>VLESS+WSS</strong>。如果由 Cloudflare 代理该域名，两者都经由 CDN 传输，即使服务器 IP 被封锁也能继续使用。面板和连接页面仍使用 IP 证书。</p>',
+    '<p>使用 <code>--domain</code> 时，nginx 会为你的域名获取 Let\'s Encrypt 证书，并将该 SNI 路由到域名对应的路径。XHTTP 移到域名上，并新增 <strong>VLESS+WSS</strong>。如果由 Cloudflare 代理该域名，两者都经由 CDN 传输，即使服务器 IP 被封锁也能继续使用。控制服务和连接页面仍使用 IP 证书。</p>',
   'arch.relay': '中继模式（境内入口）',
   'arch.relay.body':
     '<p>境内服务器上的 <strong>Realm</strong> TCP 转发器会把连接转交给你位于境外的出口服务器。中继只承载 Reality；XHTTP、WSS 和 Hysteria2 仍直接连接出口服务器。加密在应用与出口服务器之间端到端进行，因此中继看不到明文。</p><p>用 <code>meridian relay add RELAY_IP --exit EXIT</code> 添加中继。订阅和连接页面会自动包含中继条目。</p>',
