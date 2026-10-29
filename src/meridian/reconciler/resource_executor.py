@@ -44,6 +44,7 @@ from meridian.reconciler.resources import (
     UnsupportedResourceRetirementError,
     build_resource_actions,
     observation_converges,
+    observation_shortfall,
 )
 from meridian.reconciler.retirement import retire, retired_bindings, unretirable
 from meridian.reconciler.stall_retry import StallNotice, StallRetry, stall_event_notice
@@ -468,7 +469,8 @@ def _execute_action(
                 cluster,
                 persist,
                 clock,
-                "post-apply observation did not satisfy the reviewed hash and postconditions",
+                "post-apply observation did not satisfy the reviewed hash and postconditions: "
+                + observation_shortfall(action, observation),
             )
         _record_success(action, observation, binding, cluster, persist, clock, receipt=receipt)
         return ResourceActionResult(action=action, status="applied", changed=True)

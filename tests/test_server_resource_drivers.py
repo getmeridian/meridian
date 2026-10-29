@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -30,6 +31,7 @@ from meridian.reconciler.resources import (
     UnknownResourceOutcome,
     build_resource_actions,
     observation_converges,
+    observation_shortfall,
 )
 from meridian.reconciler.server_drivers import (
     CertificateDriver,
@@ -39,7 +41,7 @@ from meridian.reconciler.server_drivers import (
     ServerBaselineDriver,
     ServerDriverContext,
 )
-from meridian.reconciler.server_evidence import baseline_attestation
+from meridian.reconciler.server_evidence import baseline_attestation, listener_wait_command
 from meridian.reconciler.server_render import artifact_token, nginx_artifact_path, render_nginx_artifact
 from meridian.ssh import ServerConnection
 from tests.support.mock_connection import MockConnection
@@ -418,6 +420,42 @@ def test_nginx_rejects_unavailable_runtime_evidence(service, listener, match: st
         driver.observe(action, None)
 
 
+@pytest.mark.parametrize(
+    ("artifact", "service", "listener", "reason"),
+    [
+        ("edited", "active\n", _LISTENING, "differs from the reviewed render from line 1"),
+        ("rendered", "inactive\n", _LISTENING, "nginx is not active"),
+        ("rendered", "active\n", "", "nothing listens on TCP port 8443"),
+    ],
+    ids=["edited-file", "inactive", "not-listening"],
+)
+def test_nginx_failure_names_the_predicate_that_failed(artifact: str, service: str, listener: str, reason: str) -> None:
+    driver, action, connection = _nginx_observation_case()
+    if artifact == "edited":
+        connection.get_text.return_value = _result(stdout="# edited by hand\n")
+    connection.run.side_effect = [
+        _result(returncode=0 if service == "active\n" else 3, stdout=service),
+        _result(stdout=listener),
+    ]
+
+    shortfall = observation_shortfall(action, driver.observe(action, None))
+
+    assert reason in shortfall
+    assert "vpn.example.test" not in shortfall  # file contents never reach the error
+
+
+def test_listener_wait_returns_once_the_port_listens(tmp_path) -> None:
+    fake_ss = tmp_path / "ss"
+    fake_ss.write_text("#!/bin/sh\necho 'LISTEN 0 511 127.0.0.1:18565 0.0.0.0:*'\n")
+    fake_ss.chmod(0o755)
+    env = {"PATH": f"{tmp_path}:/usr/bin:/bin"}
+
+    listening = subprocess.run(["sh", "-c", listener_wait_command(18565, seconds=1)], env=env, check=False)
+    absent = subprocess.run(["sh", "-c", listener_wait_command(1856, seconds=1)], env=env, check=False)
+
+    assert (listening.returncode, absent.returncode) == (0, 1)
+
+
 def test_port_443_stream_apply_retires_the_legacy_artifact(monkeypatch) -> None:
     plan, action = _single_action(
         "nginx:shared:443:stream",
@@ -461,6 +499,8 @@ def test_port_443_stream_apply_retires_the_legacy_artifact(monkeypatch) -> None:
     NginxArtifactDriver(_context(plan, connection)).apply(action, None)
 
     assert any(call.args[0] == "rm -f /etc/nginx/stream.d/meridian.conf" for call in connection.run.call_args_list)
+    # Observation follows at once, so apply waits for the reloaded listener first.
+    assert connection.run.call_args_list[-1].args[0] == listener_wait_command(443)
 
 
 def _node_runtime_case(*, warp: bool = False) -> tuple[NodeRuntimeDriver, ResourceAction, MagicMock]:

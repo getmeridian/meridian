@@ -196,6 +196,14 @@ def port_is_listening(output: str, port: int) -> bool:
     return any(field.endswith(suffix) for line in output.splitlines() for field in line.split())
 
 
+def listener_wait_command(port: int, *, seconds: int = 10) -> str:
+    """Wait up to `seconds` for a TCP listener on `port` (the exact match `port_is_listening` makes)."""
+    return (
+        f"for _ in $(seq {seconds * 2}); do "
+        f"ss -H -lnt 2>/dev/null | awk '{{print $4}}' | grep -q ':{int(port)}$' && exit 0; sleep 0.5; done; exit 1"
+    )
+
+
 def build_observation(
     action: ResourceAction,
     *,
@@ -204,6 +212,7 @@ def build_observation(
     matches: bool,
     projection: object,
     satisfied: set[str],
+    mismatches: list[str] | None = None,
 ) -> ResourceObservation:
     """Build the canonical server-resource observation projection."""
     keys = sorted(
@@ -216,7 +225,24 @@ def build_observation(
         observed_hash=action.expected_hash if matches else canonical_hash(projection),
         remote_id=remote_id,
         satisfied_postconditions=keys,
+        mismatches=[] if matches else list(mismatches or ()),
     )
+
+
+def content_mismatch(name: str, observed: str | None, expected: str) -> str:
+    """Say where a managed file departs from its render without quoting it (files carry secret paths)."""
+    if observed is None:
+        return f"{name} is missing"
+    if observed == expected:
+        return ""
+    have, want = observed.splitlines(), expected.splitlines()
+    line = next((index for index, (a, b) in enumerate(zip(have, want, strict=False), 1) if a != b), None)
+    if line is None:
+        line = min(len(have), len(want)) + 1
+        if len(have) == len(want):
+            return f"{name} differs from the reviewed render only in line endings or a trailing newline"
+    sizes = f"{len(have)} lines on the server, {len(want)} reviewed"
+    return f"{name} differs from the reviewed render from line {line} ({sizes})"
 
 
 def _unavailable_reason(

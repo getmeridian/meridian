@@ -47,8 +47,10 @@ from meridian.reconciler.server_evidence import (
     baseline_attestation,
     baseline_check_command,
     build_observation,
+    content_mismatch,
     docker_container_running,
     file_content_or_absent,
+    listener_wait_command,
     negated_path_is_absent,
     port_is_listening,
     require_successful_evidence,
@@ -444,6 +446,16 @@ class NginxArtifactDriver(retirement.NginxArtifactRetirement):
         file_matches = current_content == expected
         port_listening = port_is_listening(listening.stdout, payload.listener_port)
         matches = file_matches and service_active and port_listening and legacy_absent
+        mismatches = [
+            reason
+            for reason, failed in (
+                (content_mismatch(path, current_content, expected), not file_matches),
+                ("nginx is not active", not service_active),
+                (f"nothing listens on TCP port {payload.listener_port}", not port_listening),
+                (f"{self._LEGACY_STREAM_PATH} is still present", not legacy_absent),
+            )
+            if failed
+        ]
         satisfied: set[str] = set()
         if current_content is not None:
             satisfied.add("exists")
@@ -461,6 +473,7 @@ class NginxArtifactDriver(retirement.NginxArtifactRetirement):
                 "legacy_absent": legacy_absent,
             },
             satisfied=satisfied,
+            mismatches=mismatches,
         )
 
     def apply(
@@ -539,6 +552,9 @@ class NginxArtifactDriver(retirement.NginxArtifactRetirement):
                 self._restore_file(conn, self._LEGACY_STREAM_PATH, legacy_content)
             conn.run(NGINX_ENABLE_AND_RELOAD, timeout=30)
             raise ResourceReconcileError(f"nginx reload failed for {path}.")
+        # Reload hands new listeners over asynchronously; observing at once can miss the port
+        # on a busy 1 vCPU server. A port that never comes up is the observation's to report.
+        conn.run(listener_wait_command(payload.listener_port), timeout=20)
         return ResourceApplyReceipt(remote_id=path)
 
     @staticmethod

@@ -96,6 +96,11 @@ class ResourceObservation(CoreModel):
     observed_hash: str = ""
     remote_id: str = ""
     satisfied_postconditions: list[str] = Field(default_factory=list)
+    mismatches: list[str] = Field(
+        default_factory=list,
+        description="What differs from the reviewed state, in plain words for the failure the operator sees; "
+        "never file contents or secret values.",
+    )
 
     @model_validator(mode="after")
     def validate_postconditions(self) -> ResourceObservation:
@@ -276,6 +281,22 @@ def observation_converges(action: ResourceAction, observation: ResourceObservati
         and observation.observed_hash == action.expected_hash
         and required.issubset(observation.satisfied_postconditions)
     )
+
+
+def observation_shortfall(action: ResourceAction, observation: ResourceObservation) -> str:
+    """Name what kept an observation from converging; a bare "did not converge" left nothing to act on."""
+    if not observation.exists:
+        return "the resource is absent"
+    reasons: list[str] = []
+    if observation.observed_hash != action.expected_hash:
+        reasons += observation.mismatches or ["its observed state differs from the reviewed one"]
+    for condition in action.resource.postconditions:
+        key = postcondition_key(condition.kind, condition.target_ref, condition.detail)
+        if key in observation.satisfied_postconditions:
+            continue
+        detail = f" {condition.detail}" if condition.detail else ""
+        reasons.append(f"postcondition '{condition.kind}{detail}' is unmet")
+    return "; ".join(dict.fromkeys(reasons))
 
 
 def payload_of(action: ResourceAction, expected_type: type[PayloadT]) -> PayloadT:
