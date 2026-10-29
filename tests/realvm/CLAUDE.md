@@ -30,6 +30,7 @@ Costs real money (~€0.01 per full single-topology run).
 - **`fleet upgrade` on a lab needs `GITHUB_TOKEN`** — the release check exhausts GitHub's unauthenticated limit; export `gh auth token`.
 - **Lab profiles pin a key file, so SSH never multiplexes** — keepalives and stall retries still run, but the control-socket reset needs a key-less profile to exercise.
 - **Hetzner images skip apt Recommends** (`00InstallRecommends`) — `small_vps.sh` deletes it and boots with `mem=… maxcpus=1`, so package and memory behaviour match other providers' small VPSes.
+- **`redact.sed` guards every pasted lab log** — add a case to `tests/test_realvm_redact.py` (it runs in CI) for each new secret form; hostnames before `...`, API tokens, IPv6, and hex secret paths once passed through.
 - **One Hetzner project rejects a duplicate SSH public key** — concurrent runs need distinct keys; set `REALVM_KNOWN_HOSTS` to keep throwaway host keys out of `~/.ssh/known_hosts`.
 
 ## Links
