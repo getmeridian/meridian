@@ -75,6 +75,9 @@ that dials out to it.
   the snapshot and the recovery key, restore brings the fleet files back too.
 
 ### Changed
+- Long connection lists start with three entries and an accessible “Show all”
+  toggle; every connection remains available in its original order, and
+  suspended accounts also dim individual import actions.
 - Stash is available among the additional iOS apps, with direct import,
   localized setup guidance, and a self-hosted icon.
 - Connection pages offer labelled store and direct-install alternatives from

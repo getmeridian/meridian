@@ -303,7 +303,7 @@ class TestPWATemplateSource:
 
     def test_every_data_t_key_is_translated(self) -> None:
         app_js = Path("src/meridian/templates/pwa/app.js").read_text()
-        used = set(re.findall(r'data-t="([^"]+)"', app_js))
+        used = set(re.findall(r'data-t="([\w.]+)"', app_js))
         for lang in ("ru", "fa", "zh"):
             block = app_js.split(f"\n  {lang}: {{\n", 1)[1].split("\n  },\n", 1)[0]
             keys = set(re.findall(r"'?([\w.]+)'?: '", block))

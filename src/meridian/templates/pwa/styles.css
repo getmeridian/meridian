@@ -231,6 +231,7 @@ svg{flex-shrink:0}
 
 /* Individual connections */
 .conn-list{display:flex;flex-direction:column;gap:6px}
+.conn-extra{display:flex;flex-direction:column;gap:6px}
 .conn{padding:10px 12px;border-radius:var(--r2);background:var(--sf2);border:1px solid var(--br)}
 .conn-main{display:flex;align-items:center;gap:10px}
 .conn-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}

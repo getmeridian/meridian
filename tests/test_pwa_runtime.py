@@ -526,3 +526,43 @@ def test_stash_import_is_percent_encoded_and_keeps_additional_status(page_data: 
         """,
         page_data,
     )
+
+
+def test_long_connection_lists_reveal_locally_in_subscription_order(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        data.config.protocols = Array.from({ length: 9 }, (_, i) => ({
+          key: 'reality', label: 'Connection ' + i, url: 'vless://550e8400-e29b-41d4-a716-446655440000@198.51.100.1:443#Connection-' + i, qr_b64: '', recommended: i === 0
+        }));
+        const browser = createBrowser(data.config, data.catalog, { info: data.info }); await browser.start();
+        assert.equal(browser.document.querySelectorAll('.conn').length, 3, 'initial rendering should stay small');
+        const button = browser.document.querySelector('[data-action="show-connections"]');
+        assert.ok(button); assert.match(button.textContent, /Show all 9/);
+        assert.equal(button.getAttribute('aria-expanded'), 'false');
+        assert.ok(browser.document.getElementById(button.getAttribute('aria-controls')));
+        const requests = browser.requests.length;
+        browser.fire('click', button);
+        assert.equal(button.getAttribute('aria-expanded'), 'true');
+        assert.equal(browser.document.querySelectorAll('.conn').length, 9);
+        assert.deepEqual(browser.document.querySelectorAll('.conn-name').map(el => el.textContent), data.config.protocols.map(p => p.label));
+        assert.equal(browser.requests.length, requests, 'revealing connections must not fetch data');
+        browser.context.page.switchLang('ru');
+        assert.equal(browser.document.querySelectorAll('.conn').length, 9, 'language changes keep the expanded list');
+        """,
+        page_data,
+    )
+
+
+def test_suspended_account_also_dims_individual_imports(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        data.info.user.userStatus = 'DISABLED'; data.info.user.isActive = false;
+        data.config.protocols = [{ key: 'reality', label: 'Connection', url: 'vless://550e8400-e29b-41d4-a716-446655440000@198.51.100.1:443', qr_b64: '', recommended: true }];
+        const browser = createBrowser(data.config, data.catalog, { userAgent: 'iPhone', info: data.info }); await browser.start();
+        const link = browser.document.querySelector('.conn').querySelector('a');
+        assert.equal(link.getAttribute('aria-disabled'), 'true');
+        assert.ok(browser.fire('click', link).defaultPrevented);
+        assert.equal(browser.context.location.protocol, 'https:', 'a suspended action cannot launch a handler');
+        """,
+        page_data,
+    )

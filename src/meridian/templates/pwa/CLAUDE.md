@@ -1,40 +1,34 @@
 # PWA Connection Page
 
-Server-hosted Progressive Web App and the only connection-page implementation.
+Server-hosted PWA; Meridian's only connection-page implementation.
 
 ## Design decisions
-**Vanilla ES5, no build step** — one IIFE with zero dependencies; the self-hosting rule (root `CLAUDE.md`) applies to every asset.
-**Runtime config** — `config.json` is fetched at load, not baked into HTML, so credentials rotate without redeploying pages; it points at Remnawave's canonical subscription URL, which Meridian never rebuilds.
-**Shared/per-client split** — static assets (`app.js`, `selfcheck.js`, `styles.css`, `sw.js`, `icon.svg`, `support.html`/`support.js`, generated `apps.json` and `probe.bin`) deploy once to `/pwa/`; per-client shell and config live in `/{uuid}/`.
-**Support page** — `support.html#<short id>` is the panel's `support-url`: `support.js` reads the person's own subscription for their UUID (VLESS or Hysteria2 link, or Xray JSON) and redirects to their page, or says the page is unavailable. The id stays in the fragment, out of server and CDN logs.
-**Security model** — guard config/catalog versions, shapes, bounds, schemes, and local images before rendering; escape text and attribute quotes alike. QR base64 is validated, and deep links never enter inline JS.
-**App catalog** — render `config.apps` immediately; apply the shared icon-bearing `pwa/apps.json` within 5 seconds, replacing only setup and preserving selection, focus, and disclosures. Catalog edits reach old pages with the next asset upload.
-**Self-check** — `selfcheck.js` (injected by `app.js`, so older shells get it) runs from the visitor's network: clock vs the server `Date` header, a stream of the 96 KB `probe.bin` (freeze window and timeouts mirror `diagnostics/blocking.py`), and the subscription's HTTP status. "Copy report" yields English text without links, hostnames, or UUIDs.
-**Account information** — `account.js` reads same-origin subscription `/info` on open, return, and refresh; its saved projection holds status, traffic, expiry, and check time only, and is labelled unverified until checked again.
-**i18n** — English HTML with `data-t` swaps; choose the saved locale before loading, always set lang/dir, and rebuild to return to English. Support follows the same preference.
-**Three-step setup** — a native platform/app picker drives install, import (with a nearby manual URL and menu path), and plain-text Connect records in all four locales. Clash desktop guides include TUN; choices stay in memory.
-**Installer alternatives** — platform-scoped records label stores, official downloads, packages, and architecture without detecting the chip; new destinations come only from Meridian's catalog or Remnawave's pinned defaults.
+**Vanilla ES5** — no dependencies or build step; `app.js` owns setup, injecting `account.js` and `selfcheck.js` so older shells receive new features.
+**Runtime config** — fetch `config.json`; keep the canonical subscription URL, never rebuild it. Shared assets deploy under `/pwa/`, client shells/config under `/{uuid}/`.
+**Support page** — `support.html#<short id>` reads the person's own subscription for their VLESS/Hysteria2 UUID (or Xray JSON) and redirects to their page; the id stays out of request paths and logs.
+**Security** — guard versions, shapes, bounds, import schemes, and image sources; escape text and attribute quotes. QR base64 is validated, and deep links never enter inline JS.
+**Catalog** — render embedded apps immediately, applying valid shared `apps.json` within 5 seconds. Replace only setup, preserving platform, app, focus, text selection, and disclosures.
+**Account** — same-origin `/info` on open, return, and refresh; save only status, traffic, expiry, days left, and check time. The saved answer is unverified until checked again, independently of reachability.
+**Three-step setup** — native platform/app pickers drive install, import, and localized plain-text Connect records. Manual import includes a selectable URL and the app's menu path; Clash desktop guides include TUN. Choices stay in memory.
+**Install alternatives** — platform-scoped records label stores, packages, and architecture without detecting the chip; new destinations come only from the existing catalog or Remnawave's pinned defaults.
+**i18n** — English markup with `data-t` swaps; choose the saved language before loading, always set lang/dir, and rebuild to return to English. Support follows the same preference; account dates/numbers use Intl, including the Persian calendar.
+**Self-check** — visitor-side clock vs server Date, a 96 KB probe stream, and subscription HTTP status; copied English reports contain no links, hostnames, UUIDs, or device data.
 
 ## What's done well
-- **SW scope trick + graceful offline** — registered with `{scope: '../'}` to control sibling client dirs (needs nginx `Service-Worker-Allowed: "/"`); shell is stale-while-revalidate, config network-first with a 503 fallback.
-- **Clock warnings share one threshold** — `CLOCK_WARN_MS` in `app.js` and `selfcheck.js` mirrors `core.defaults.CLOCK_DRIFT_WARN_SECONDS` (tested); the page check is skipped when the config is over an hour old, and the copy says connections *can* fail (Reality `maxTimeDiff` is unset).
-- **Connection names are the subscription remarks** — rows show the Remnawave remark verbatim; only the protocol hint below it is translated.
-- **Graceful extras** — wake lock for QR scanning fails quietly, the install banner auto-dismisses, and the skeleton admits a slow load after 10 s.
+- **SW scope and offline** — `{scope: '../'}` controls sibling client dirs (nginx needs `Service-Worker-Allowed: "/"`); config is network-first, shell stale-while-revalidate.
+- **One clock threshold** — `CLOCK_WARN_MS` in both scripts mirrors `core.defaults.CLOCK_DRIFT_WARN_SECONDS`; skip config-based checks after an hour and say connections *can* fail.
+- **Connection remarks stay verbatim** — translate protocol hints only; show three entries first and reveal the rest locally in subscription order, with an accessible total.
+- **Graceful extras** — wake lock fails quietly, install banner dismisses, and the skeleton admits a slow load after 10 seconds.
 
 ## Pitfalls
-- **Nested `<details>` CSS** — always use the `> summary` child combinator; bare `summary` leaks parent styles into nested toggles.
-- **`<details>` markers need three rules** — `list-style:none`, `::-webkit-details-marker{display:none}`, `::marker{content:none}`.
-- **The SW caches stale files** — develop with `meridian dev preview --watch` (disables the SW, injects a reload script).
-- **Catalog timeouts must work without AbortController** — ignore late answers as well as aborting supported requests; optional data never gates config rendering.
-- **`_PWA_APPS` must match `website/src/data/apps.json`** field for field and in order, including localized guides; CI validates.
-- **Deep links follow each handler lazily** — v2rayNG uses the `#fragment`, Throne takes standard Base64 of an ASCII URL, and v2rayN has no scheme; unused encodings must never break an action.
-- **Stash stays an additional iOS app** — its URL is percent-encoded for `stash://install-config`; its packaged SVG monogram travels in the shared catalog, with no external icon request.
-- **The CSP has no `style-src 'unsafe-inline'`** — `style=` attributes are silently dropped; use classes (CSSOM `el.style` still works).
-- **Self-check requests skip every cache** — `probe.bin` and `/sub/` bypass the SW with `cache: "no-store"`; a warm connection may be reused, so a freeze is conclusive but a pass is weaker evidence.
-- **Exit countries are data** — validate `config.exit_countries` ISO codes before building flags; names come from `Intl.DisplayNames` and refresh in `applyI18n`.
-- **Never put `data-t` on data** — a translated key replaces the element's whole text, remark included.
-- **Bad shared catalogs keep embedded apps** — reject the whole optional catalog before applying it; a text-node HTML serializer alone does not escape attribute quotes.
-- **Account freshness is separate from reachability** — failed `/info` reads keep the last saved answer unverified; suspended accounts explain and dim import actions, and every `no-store` request bypasses the SW.
-- **Catalog display labels need translations** — translate fixed platform labels and keep app names as data; changing platform resets the app, while catalog updates keep it if still available.
-- **A locale switch must work without storage** — rendering uses the chosen language in memory; re-detecting it after a failed `localStorage` write reverts the choice.
-- **Clipboard failures need a selectable fallback** — catch missing APIs, throws, and rejected promises for URLs and reports; reports never include a browser fingerprint.
+- **Nested details CSS** — use `> summary`; suppress markers with `list-style:none`, `::-webkit-details-marker`, and `::marker`.
+- **SW staleness** — develop with `meridian dev preview --watch`, which disables the SW and reloads changed assets; every `no-store` request bypasses the SW.
+- **Catalog parity** — `_PWA_APPS` must match `website/src/data/apps.json` field for field and in order, including localized guides; CI validates.
+- **Optional data never gates setup** — reject a bad catalog as a whole; ignore late replies even without AbortController.
+- **Handler-specific encodings** — v2rayNG uses the fragment, Throne standard Base64 of an ASCII URL, and Stash percent encoding. Compute only used placeholders; an invalid action keeps the manual route.
+- **No inline styles** — CSP drops `style=`; use classes (CSSOM `el.style` works).
+- **Self-check evidence** — requests skip caches; a reused warm connection makes a pass weaker evidence than a freeze.
+- **Country names are data** — validate ISO codes, use Intl.DisplayNames, and refresh after language changes; never put `data-t` on a remark or other user data.
+- **Locale state is in memory** — re-detecting after a failed localStorage write reverts the choice; translate fixed catalog display and accessibility labels.
+- **Clipboard recovery** — catch missing APIs, throws, and rejected promises; provide selectable text for both URLs and reports.
+- **Suspended imports stay disabled** — apply account state after catalog, platform, or connection-list updates, before any iOS handler can navigate.

@@ -7,6 +7,8 @@
  * ----------------------------------------------------------------------- */
 var T = {
   en: {
+    'conns.show': 'Show all {n}',
+    'conns.less': 'Show fewer',
     'install.other': 'Other install options',
     'install.appstore': 'App Store',
     'install.play': 'Google Play',
@@ -49,6 +51,8 @@ var T = {
     language: 'Language', close: 'Close', copy: 'Copy', 'qr.code': 'QR code',
   },
   ru: {
+    'conns.show': 'Показать все ({n})',
+    'conns.less': 'Показать меньше',
     'install.other': 'Другие способы установки',
     'install.appstore': 'App Store',
     'install.play': 'Google Play',
@@ -140,6 +144,8 @@ var T = {
     'open.short': 'Открыть',
   },
   fa: {
+    'conns.show': 'نمایش همهٔ {n} اتصال',
+    'conns.less': 'نمایش کمتر',
     'install.other': 'روش‌های دیگر نصب',
     'install.appstore': 'اپ استور',
     'install.play': 'گوگل پلی',
@@ -231,6 +237,8 @@ var T = {
     'open.short': 'باز کردن',
   },
   zh: {
+    'conns.show': '显示全部 {n} 个连接',
+    'conns.less': '收起部分连接',
     'install.other': '其他安装方式',
     'install.appstore': 'App Store',
     'install.play': 'Google Play',
@@ -344,6 +352,8 @@ var PLATFORM_ORDER = ['android', 'ios', 'windows', 'macos', 'linux'];
 var ALL_PLATFORMS = ['iOS', 'Android', 'Windows', 'macOS', 'Linux'];
 var selectedPlatform = detectPlatform();
 var selectedApp = '';
+var showAllConnections = false;
+var CONNECTION_PREVIEW = 3;
 var ROUTER_DOCS = 'https://getmeridian.org/{lang}/routers/';
 
 function appPlatforms(a) {
@@ -1027,9 +1037,9 @@ function renderConnection(proto, platform) {
   if (PROTOCOL_HINTS.hasOwnProperty(proto.key)) html += PROTOCOL_HINTS[proto.key];
   html += '</span></div><div class="conn-actions">';
   if (platform === 'ios') {
-    html += '<a href="#" class="btn btn-soft btn-sm" data-ios-idx="' + (iosButtonIndex++) + '" data-url="' + url + '" data-action="open-ios" data-t="open.short">Open</a>';
+    html += '<a data-import href="#" class="btn btn-soft btn-sm" data-ios-idx="' + (iosButtonIndex++) + '" data-url="' + url + '" data-action="open-ios" data-t="open.short">Open</a>';
   } else {
-    html += '<a href="' + url + '" class="btn btn-soft btn-sm" data-t="open.short">Open</a>';
+    html += '<a data-import href="' + url + '" class="btn btn-soft btn-sm" data-t="open.short">Open</a>';
   }
   html += '<button class="btn btn-ghost btn-icon" data-action="copy" data-url="' + url + '" data-t-aria="copy" aria-label="Copy">' + ICON_COPY + '</button>';
   if (hasQr) html += '<button class="btn btn-ghost btn-icon" data-action="toggle-qr" data-t-aria="qr.code" aria-expanded="false" aria-label="QR code">' + ICON_QR + '</button>';
@@ -1042,15 +1052,45 @@ function renderConnections(config, platform, open) {
   var rows = '';
   var protocols = config.protocols || [];
   var count = protocols.length;
-  for (var i = 0; i < count; i++) rows += renderConnection(protocols[i], platform);
+  var preview = Math.min(count, CONNECTION_PREVIEW);
+  for (var i = 0; i < preview; i++) rows += renderConnection(protocols[i], platform);
+  if (count > preview) {
+    var rest = '';
+    if (showAllConnections) for (var j = preview; j < count; j++) rest += renderConnection(protocols[j], platform);
+    rows += '<div class="conn-extra" id="more-connections"' + (showAllConnections ? '' : ' hidden') + '>' + rest + '</div>';
+    rows += '<button class="btn btn-ghost btn-sm" data-action="show-connections" aria-controls="more-connections" aria-expanded="' +
+      (showAllConnections ? 'true' : 'false') + '" data-t="' + (showAllConnections ? 'conns.less' : 'conns.show') + '" data-t-count="' + count + '">' +
+      escapeHtml(showAllConnections ? text('conns.less') : text('conns.show').replace('{n}', formatCount(count))) + '</button>';
+  }
   if (!count) return '';
   var html = '<details id="connections-panel" class="panel"' + (open ? ' open' : '') + '><summary>';
   html += '<span class="panel-icon">' + ICON_LIST + '</span>';
   html += '<span class="panel-text"><strong data-t="conns">All connections</strong>';
   html += '<span data-t="conns.desc">Already in your app. Use one directly only if you need to.</span></span>';
-  html += '<span class="count">' + count + '</span><span class="panel-chevron">' + ICON_CHEVRON + '</span>';
+  html += '<span class="count">' + formatCount(count) + '</span><span class="panel-chevron">' + ICON_CHEVRON + '</span>';
   html += '</summary><div class="panel-body conn-list">' + rows + '</div></details>';
   return html;
+}
+
+function formatCount(count) {
+  try { return new Intl.NumberFormat(currentLang).format(count); } catch (e) { return String(count); }
+}
+
+function toggleConnections(button) {
+  var extra = document.getElementById('more-connections');
+  var config = window._meridianConfig;
+  if (!extra || !config) return;
+  showAllConnections = !showAllConnections;
+  if (showAllConnections && !extra.firstElementChild) {
+    var html = '';
+    for (var i = CONNECTION_PREVIEW; i < config.protocols.length; i++) html += renderConnection(config.protocols[i], selectedPlatform);
+    extra.innerHTML = html;
+  }
+  extra.hidden = !showAllConnections;
+  button.setAttribute('aria-expanded', showAllConnections ? 'true' : 'false');
+  button.setAttribute('data-t', showAllConnections ? 'conns.less' : 'conns.show');
+  applyI18n(config.client_name, config.server_name);
+  document.dispatchEvent(new Event('meridian-setup'));
 }
 
 function renderTrouble() {
@@ -1143,6 +1183,8 @@ function applyI18n(clientName, serverName) {
       el.textContent = v.replace('{name}', capitalize(clientName));
     } else if (k === 'import.add' && el.dataset.tName) {
       el.textContent = v.replace('{name}', el.dataset.tName);
+    } else if (el.dataset.tCount) {
+      el.textContent = v.replace('{n}', formatCount(Number(el.dataset.tCount)));
     } else {
       el.textContent = v;
     }
@@ -1225,6 +1267,8 @@ function requestPersistentStorage() {
  * Event delegation — replaces all inline onclick handlers
  * ----------------------------------------------------------------------- */
 document.addEventListener('click', function(e) {
+  var disabled = e.target.closest('[data-import][aria-disabled="true"]');
+  if (disabled) { e.preventDefault(); return; }
   var target = e.target.closest('[data-action]');
   if (!target) return;
   var action = target.getAttribute('data-action');
@@ -1232,6 +1276,8 @@ document.addEventListener('click', function(e) {
   if (action === 'copy') {
     var url = target.getAttribute('data-url');
     if (url) copyToClipboard(url);
+  } else if (action === 'show-connections') {
+    toggleConnections(target);
   } else if (action === 'select-text') {
     target.select();
   } else if (action === 'dismiss-copy') {
@@ -1269,6 +1315,7 @@ document.addEventListener('change', function(event) {
       holder.innerHTML = renderConnections(config, selectedPlatform, old.open);
       old.parentNode.replaceChild(holder.firstElementChild, old);
       applyI18n(config.client_name, config.server_name);
+      document.dispatchEvent(new Event('meridian-setup'));
     }
   } else if (event.target.id === 'app-choice') {
     selectedApp = event.target.value; updateSetup(config);
