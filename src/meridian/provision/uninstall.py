@@ -8,7 +8,18 @@ from __future__ import annotations
 import shlex
 
 from meridian.host_runtime import (
+    AGENT_BINARY,
+    AGENT_CONFIG_DIR,
+    AGENT_LIB_DIR,
+    AGENT_STATE_DIR,
+    AGENT_UNIT,
     CONTAINERS,
+    CONTROL_SERVICE_CONFIG,
+    CONTROL_SERVICE_DIR,
+    CONTROL_SERVICE_NAME,
+    CONTROL_SERVICE_STATE_DIR,
+    CONTROL_SERVICE_UNIT,
+    CORE_UNIT,
     LEGACY_NODE_DIR,
     LEGACY_PANEL_DIR,
     LEGACY_PANEL_NETWORK,
@@ -82,6 +93,18 @@ class Uninstall:
                 " done; true"
             ),
             "rm -rf /usr/local/bin/netfwd /etc/netfwd",
+            # Meridian's own node agent first (it would restart the core), then the core and the control service
+            *(
+                f"systemctl stop {unit} 2>/dev/null; systemctl disable {unit} 2>/dev/null; true"
+                for unit in (AGENT_UNIT, CORE_UNIT, CONTROL_SERVICE_UNIT)
+            ),
+            (
+                f"rm -rf /etc/systemd/system/{AGENT_UNIT} /etc/systemd/system/{CORE_UNIT}"
+                f" /etc/systemd/system/{CONTROL_SERVICE_UNIT} {AGENT_BINARY} {AGENT_CONFIG_DIR} {AGENT_STATE_DIR}"
+                f" {AGENT_LIB_DIR} {CONTROL_SERVICE_DIR} {CONTROL_SERVICE_CONFIG.rsplit('/', 1)[0]}"
+                f" {CONTROL_SERVICE_STATE_DIR} {CONTROL_SERVICE_STATE_DIR}.attestation"
+            ),
+            f"userdel {CONTROL_SERVICE_NAME} 2>/dev/null; true",
             # Docker objects that may remain after compose down (pre-rename projects took the directory name)
             (
                 f"docker volume rm {PANEL_PROJECT}_valkey-socket {LEGACY_PANEL_SOCKET_VOLUME}"
