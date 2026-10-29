@@ -167,6 +167,17 @@ def test_a_spec_put_mirrors_its_artifacts_and_agents_download_them_with_a_sessio
     assert status == 404 and json.loads(body)["error"]["code"] == "not_found"
 
 
+def test_a_node_downloads_only_its_own_specs_artifacts(served: tuple[str, list[float], Upstream]) -> None:
+    http, _now, _upstream = served
+    exit_spec = _spec([URL, "service"]).model_dump(mode="json")
+    assert _request(f"{http}/api/nodes/exit", "PUT", exit_spec, ADMIN_TOKEN)[0] == 200
+    assert _request(f"{http}/api/nodes/main", "PUT", {"resources": []}, ADMIN_TOKEN)[0] == 200
+
+    status, body = _request(f"{http}/agent/v1/blobs/{SHA}", token=_session(http))  # "main" holds the session
+
+    assert status == 404 and json.loads(body)["error"]["code"] == "not_found"
+
+
 def test_a_missing_wanted_blob_is_fetched_again_after_an_agent_asks(
     served: tuple[str, list[float], Upstream],
 ) -> None:

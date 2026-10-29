@@ -491,12 +491,15 @@ class _Handler(BaseHTTPRequestHandler):
         return service.traffic.record(session.node_id, self._model(StatsReport))
 
     def agent_blob(self, match: re.Match[str]) -> Any:
-        self._session()
+        service, session = self._session()
         blobs = self.server.blobs
-        path = blobs.path(match[1]) if blobs is not None else None
-        if blobs is None or path is None:
-            if blobs is not None:
-                blobs.missed(match[1])
+        # Only an artifact of the session's own node: another node's pins are none of its business.
+        spec = service.node_spec(session.node_id)
+        if blobs is None or spec is None or all(item.sha256 != match[1] for item in spec_artifacts(spec)):
+            raise ServiceError("not_found", "Unknown blob.", 404)
+        path = blobs.path(match[1])
+        if path is None:
+            blobs.missed(match[1])
             raise ServiceError("not_found", "Unknown blob.", 404)
         # Streamed from disk: an Xray archive is tens of megabytes.
         with path.open("rb") as handle:
