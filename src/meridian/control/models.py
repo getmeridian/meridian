@@ -7,7 +7,7 @@ these models are what the deployer stores and reads over `/api`.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field
 
@@ -230,6 +230,80 @@ class IssuedToken(TokenRecord):
 
 class TokenList(CoreModel):
     tokens: list[TokenRecord]
+
+
+RevisionStatus = Literal["proposed", "approved", "applied", "failed"]
+_OPTIONAL_SHA256 = r"^(?:[0-9a-f]{64})?$"
+
+
+class RevisionActor(CoreModel):
+    """Who proposed or approved a revision: an issued token, or the root config token (`token_id` null)."""
+
+    token_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{12}$")
+    name: str = Field(description="The token's name; `root` for the configured admin token, the deployer's.")
+
+
+class RevisionProposal(CoreModel):
+    """A reviewed apply about to run: the secret-free topology intent and the hashes the operator approved."""
+
+    intent: dict[str, Any] = Field(description="`topology_intent` as JSON; refused when it carries a secret.")
+    plan_hash: Sha256Hex
+    review_hash: Sha256Hex
+
+
+class RevisionResult(CoreModel):
+    status: Literal["applied", "failed"]
+    detail: str = Field(default="", max_length=500)
+
+
+class RevisionSummary(CoreModel):
+    """One reviewed apply: proposed, then approved, then applied or failed."""
+
+    number: int = Field(ge=1, description="Increases by one per proposal and is never reused.")
+    created_at: Timestamp
+    author: RevisionActor
+    intent_sha256: Sha256Hex
+    plan_hash: Sha256Hex
+    review_hash: Sha256Hex
+    status: RevisionStatus
+    approved_by: RevisionActor | None = None
+    approved_at: Timestamp | None = None
+    finished_at: Timestamp | None = None
+    detail: str = ""
+
+
+class RevisionRecord(RevisionSummary):
+    intent: dict[str, Any]
+
+
+class RevisionList(CoreModel):
+    revisions: list[RevisionSummary] = Field(description="Newest first.")
+
+
+class ApplyFenceRecord(CoreModel):
+    """The fleet's apply fence (`reconciler/fence.py` decides; the service only compares and swaps)."""
+
+    fleet_id: FleetId
+    generation: int = Field(default=0, ge=0)
+    plan_hash: str = Field(default="", pattern=_OPTIONAL_SHA256)
+    revision: int | None = Field(default=None, ge=1, description="The last applied revision committed here.")
+    lease_holder: str = Field(default="", max_length=200)
+    lease_expires_at: str = Field(default="", max_length=64)
+
+
+class ApplyFenceState(CoreModel):
+    """The stored fence and its version; version 0 with no record means the service never held it."""
+
+    fleet_id: FleetId = Field(description="The service's own fleet ID.")
+    version: int = Field(ge=0)
+    record: ApplyFenceRecord | None = None
+
+
+class ApplyFenceSwap(CoreModel):
+    """Replace the fence only if it is still at `expected_version` (409 otherwise)."""
+
+    expected_version: int = Field(ge=0)
+    record: ApplyFenceRecord
 
 
 class ServiceConfig(CoreModel):

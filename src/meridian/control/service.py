@@ -39,6 +39,7 @@ from meridian.control.models import (
     UserUpdate,
     users_resource_id,
 )
+from meridian.control.revisions import APPLY_FENCE_TABLE, REVISIONS_TABLE, RevisionLedger
 from meridian.control.store import Store
 from meridian.control.subscriptions import SubscriptionResponse, render_subscription, unknown_subscription
 from meridian.control.times import utc_now
@@ -49,7 +50,7 @@ from meridian.core.agent_protocol import ObservedStateReport, PollRequest
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 MAX_WAIT_SECONDS = 55
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -94,6 +95,7 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "ALTER TABLE users ADD COLUMN traffic_reset_at TEXT",
     ),
     (API_TOKENS_TABLE,),
+    (REVISIONS_TABLE, APPLY_FENCE_TABLE),
 )
 _USER_FIELDS = (
     "username",
@@ -142,6 +144,7 @@ class ControlService:
         self.fleet_id = fleet_id
         self.authority = NodeAuthority(self._store, fleet_id, clock=clock)
         self.tokens = TokenRegistry(self._store, clock=clock)
+        self.revisions = RevisionLedger(self._store, self.tokens, fleet_id, clock=clock)
         with self._transaction():
             # Documents signed by an earlier signing certificate are signed again.
             self._compose_all()

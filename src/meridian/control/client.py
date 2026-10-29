@@ -9,12 +9,20 @@ from urllib.parse import quote
 import httpx
 
 from meridian.control.models import (
+    ApplyFenceRecord,
+    ApplyFenceState,
+    ApplyFenceSwap,
     ClientEndpoint,
     EnrollmentGrant,
     FleetAuthority,
     IssuedToken,
     NodeSpec,
     NodeStatus,
+    RevisionList,
+    RevisionProposal,
+    RevisionRecord,
+    RevisionResult,
+    RevisionSummary,
     ServiceHealth,
     ServiceSettings,
     TokenCreate,
@@ -34,6 +42,10 @@ class ControlServiceError(MeridianError):
 
 class ControlServiceNotFound(ControlServiceError):
     """The requested object does not exist."""
+
+
+class ControlServiceConflict(ControlServiceError):
+    """The request lost a race or does not fit the object's state (HTTP 409)."""
 
 
 class ControlServiceAuthError(ControlServiceError):
@@ -155,6 +167,35 @@ class ControlClient:
         """Revoke a token from its next request on (revoking the calling token is allowed)."""
         return TokenRecord.model_validate(self._call("DELETE", f"api/tokens/{_segment(token_id)}"))
 
+    def revisions(self) -> list[RevisionSummary]:
+        """Every recorded revision, newest first, without intent snapshots."""
+        return RevisionList.model_validate(self._call("GET", "api/revisions")).revisions
+
+    def revision(self, number: int) -> RevisionRecord | None:
+        try:
+            return RevisionRecord.model_validate(self._call("GET", f"api/revisions/{number}"))
+        except ControlServiceNotFound:
+            return None
+
+    def propose_revision(self, proposal: RevisionProposal) -> RevisionRecord:
+        return RevisionRecord.model_validate(self._call("POST", "api/revisions", proposal.model_dump(mode="json")))
+
+    def approve_revision(self, number: int) -> RevisionRecord:
+        """Approve a proposed revision; a token's own proposal needs an `admin` token."""
+        return RevisionRecord.model_validate(self._call("POST", f"api/revisions/{number}/approve", {}))
+
+    def record_revision_result(self, number: int, result: RevisionResult) -> RevisionRecord:
+        body = result.model_dump(mode="json")
+        return RevisionRecord.model_validate(self._call("POST", f"api/revisions/{number}/result", body))
+
+    def fence(self) -> ApplyFenceState:
+        return ApplyFenceState.model_validate(self._call("GET", "api/fence"))
+
+    def swap_fence(self, expected_version: int, record: ApplyFenceRecord) -> ApplyFenceState:
+        """Replace the apply fence; `ControlServiceConflict` when it is no longer at `expected_version`."""
+        body = ApplyFenceSwap(expected_version=expected_version, record=record).model_dump(mode="json")
+        return ApplyFenceState.model_validate(self._call("PUT", "api/fence", body))
+
     def fetch_subscription(self, sub_token: str, *, document: str = "") -> str:
         """Fetch a subscription the way a client app does (the `/sub` route, no admin token needed)."""
         path = f"sub/{_segment(sub_token)}" + (f"/{document}" if document else "")
@@ -176,6 +217,8 @@ class ControlClient:
             ) from exc
         if response.status_code == 404:
             raise ControlServiceNotFound(_message(response), category="user")
+        if response.status_code == 409:
+            raise ControlServiceConflict(_message(response), category="user")
         if response.status_code == 403:
             raise ControlServiceScopeError(
                 f"The control service refused the request: {_message(response)}",

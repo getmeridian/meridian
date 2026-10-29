@@ -80,6 +80,7 @@ from meridian.remnawave import XRAY_JSON_CLIENT_TYPE, MeridianPanel
 from meridian.remnawave.versions import check_panel_version, effective_pins
 from meridian.resolve import connection_for_entry
 from meridian.servers import ServerEntry, ServerRegistry
+from meridian.service_fence import ControlServiceFence, RevisionDraft
 from meridian.setup.control_plane import (
     bootstrap_control_plane,
     bootstrap_profile_values,
@@ -101,7 +102,8 @@ from meridian.state_fence import SSHApplyFence
 PersistCluster = Callable[[ClusterConfig], None]
 PanelFactory = Callable[[str, str], MeridianPanel]
 ConnectionBuilder = Callable[[ServerEntry], ServerConnection]
-FenceFactory = Callable[[ServerConnection], ApplyFence | None]
+# The control server's connection, the cluster, and the reviewed change the fence guards.
+FenceFactory = Callable[[ServerConnection, ClusterConfig, "SetupReview"], ApplyFence | None]
 ControlBootstrap = Callable[
     [ControlPlaneRuntimePayload, ResourcePlan, ClusterConfig, ServerEntry, ServerConnection],
     None,
@@ -195,9 +197,7 @@ class SetupRuntime:
         self._cancellation = cancellation
         self._reporter: Reporter = reporter or NoopReporter()
         self._operation = operation or OperationContext()
-        self._fence_factory: FenceFactory = fence_factory or partial(
-            SSHApplyFence, on_stall=stall_event_notice(self._reporter, self._operation)
-        )
+        self._fence_factory: FenceFactory = fence_factory or self._default_fence
         self._control_bootstrap = control_bootstrap or partial(
             bootstrap_control_plane,
             cancellation=cancellation,
@@ -310,7 +310,7 @@ class SetupRuntime:
                 shadow,
                 drivers,
             )
-            fence = self._fence_factory(control_connection)
+            fence = self._fence_factory(control_connection, cluster, review)
             fence_warning = fence.check(local_fence_view(cluster)) if fence is not None else ""
             return inspection.model_copy(update={"review_hash": review.review_hash, "fence_warning": fence_warning})
         finally:
@@ -335,7 +335,7 @@ class SetupRuntime:
         addresses = {server_ref: entry.host for server_ref, entry in entries.items()}
         refuse_legacy_deployments({ref: connections[ref] for ref in targets}, addresses)
         control = control_payload(review.plan)
-        fence = self._fence_factory(connections[control.server_ref])
+        fence = self._fence_factory(connections[control.server_ref], cluster, review)
         if fence is not None:
             # Refuse a stale copy before its intent edit is saved, not only before the first action.
             fence.ensure(local_fence_view(cluster))
@@ -410,6 +410,16 @@ class SetupRuntime:
         finally:
             panel.close()
         return result.model_copy(update={"review_hash": review.review_hash})
+
+    def _default_fence(self, connection: ServerConnection, cluster: ClusterConfig, review: SetupReview) -> ApplyFence:
+        """fence.json on a Remnawave fleet; the control service, recording the revision, on a Meridian one."""
+        on_stall = stall_event_notice(self._reporter, self._operation)
+        if review.intent.control.backend != "meridian":
+            return SSHApplyFence(connection, on_stall=on_stall)
+        draft = RevisionDraft.from_intent(
+            review.intent, plan_hash=review.plan.plan_hash, review_hash=review.review_hash
+        )
+        return ControlServiceFence(connection, cluster, draft, on_stall=on_stall)
 
     def _build_drivers(
         self,

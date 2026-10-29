@@ -27,8 +27,11 @@ from meridian import __version__
 from meridian.control.enrollment import Session, token_sha256
 from meridian.control.errors import ServiceError, agent_error
 from meridian.control.models import (
+    ApplyFenceSwap,
     ClientEndpoint,
     NodeSpec,
+    RevisionProposal,
+    RevisionResult,
     ServiceConfig,
     ServiceSettings,
     TokenCreate,
@@ -48,10 +51,12 @@ ENFORCE_INTERVAL_SECONDS = 30
 _NAME = r"([a-z0-9][a-z0-9_.:-]{0,127})"
 _USERNAME = r"([A-Za-z0-9_.-]{1,64})"
 _TOKEN_ID = r"([0-9a-f]{12})"
-# Every write that changes what the fleet runs or who may use it needs `admin` until
-# topology revisions exist (#95). Then these routes take `propose` (store a revision)
-# and a separate `approve` route applies one; reads stay `read`. Credentials
-# (enrollment grants, API tokens) always need `admin`.
+_REVISION = r"([1-9][0-9]{0,15})"
+# Every write that changes what the fleet runs or who may use it needs `admin`: it is
+# part of applying a revision. Revisions themselves take `propose` (record one) and
+# `approve` (approve someone else's; `revisions.py`), and recording a revision's result
+# or moving the apply fence is applying, so `admin`. Credentials (enrollment grants,
+# API tokens) always need `admin`; reads stay `read`.
 WRITE: TokenScope = "admin"
 
 
@@ -277,6 +282,32 @@ class _Handler(BaseHTTPRequestHandler):
     def revoke_token(self, match: re.Match[str]) -> Any:
         return self._service.tokens.revoke(match[1])
 
+    def list_revisions(self, _match: re.Match[str]) -> Any:
+        return self._service.revisions.list_revisions()
+
+    def get_revision(self, match: re.Match[str]) -> Any:
+        return self._service.revisions.get(int(match[1]))
+
+    def propose_revision(self, _match: re.Match[str]) -> Any:
+        return self._service.revisions.propose(self._model(RevisionProposal), caller=self._caller())
+
+    def approve_revision(self, match: re.Match[str]) -> Any:
+        return self._service.revisions.approve(int(match[1]), caller=self._caller())
+
+    def record_revision_result(self, match: re.Match[str]) -> Any:
+        return self._service.revisions.record_result(int(match[1]), self._model(RevisionResult))
+
+    def get_fence(self, _match: re.Match[str]) -> Any:
+        return self._service.revisions.fence()
+
+    def swap_fence(self, _match: re.Match[str]) -> Any:
+        return self._service.revisions.swap_fence(self._model(ApplyFenceSwap))
+
+    def _caller(self) -> Caller:
+        if self.caller is None:
+            raise unauthenticated()
+        return self.caller
+
     # -- agent API -------------------------------------------------------------------------
 
     def agent_enroll(self, _match: re.Match[str]) -> Any:
@@ -350,6 +381,13 @@ ROUTES: list[Route] = [
     ("GET", re.compile(r"/api/tokens"), "admin", _Handler.list_tokens),
     ("POST", re.compile(r"/api/tokens"), "admin", _Handler.create_token),
     ("DELETE", re.compile(rf"/api/tokens/{_TOKEN_ID}"), "admin", _Handler.revoke_token),
+    ("GET", re.compile(r"/api/revisions"), "read", _Handler.list_revisions),
+    ("POST", re.compile(r"/api/revisions"), "propose", _Handler.propose_revision),
+    ("GET", re.compile(rf"/api/revisions/{_REVISION}"), "read", _Handler.get_revision),
+    ("POST", re.compile(rf"/api/revisions/{_REVISION}/approve"), "approve", _Handler.approve_revision),
+    ("POST", re.compile(rf"/api/revisions/{_REVISION}/result"), WRITE, _Handler.record_revision_result),
+    ("GET", re.compile(r"/api/fence"), "read", _Handler.get_fence),
+    ("PUT", re.compile(r"/api/fence"), WRITE, _Handler.swap_fence),
     ("POST", re.compile(r"/agent/v1/enroll"), None, _Handler.agent_enroll),
     ("POST", re.compile(r"/agent/v1/hello"), None, _Handler.agent_hello),
     ("POST", re.compile(r"/agent/v1/renew"), None, _Handler.agent_renew),

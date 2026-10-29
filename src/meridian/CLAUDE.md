@@ -13,12 +13,14 @@
 **Neutral host names** — `host_runtime.py` is the one place for container, Compose project, and `/opt` names (`ctlsvc-*`, `netagent`); `legacy` names are read only to migrate and clean up, and images keep upstream tags.
 **Binary pins** — `binary_pins.py` holds the server binaries `fleet upgrade` may raise (Realm) and their trust rules; `github_releases.py` reads newer same-major releases with GitHub's per-asset sha256, saved in `ClusterConfig.binary_pins` and carried into `runtime_pins` like image pins.
 **Two control backends (#95)** — `ClusterConfig.runs_control_service` tells a hidden `--control=meridian` fleet from a Remnawave one; client paths use `control_access.access_panel()`, fleet/node/relay status `fleet_panel()` (the projection carries service node and endpoint IDs where a panel fleet carries UUIDs), and `check` reads units and agent reports; `make_panel()` stays Remnawave-only.
+**Revisions on the service (#95)** — on a control-service fleet `service_fence.py` moves the apply fence into the service and records each reviewed apply as a revision (secret-free intent, plan and review hashes, author, status); fence.json serves only until the service first answers, then is marked handed over so older Meridians refuse. Hidden `meridian fleet history` lists them.
 **Workload secrets** — `reconciler/workloads.py` allocates or reuses complete Reality key triples and persists them before remote mutation; `xray_workload.py` renders only reviewed protocols and egress.
 ## What's done well
 - **Forward-compatible YAML** — unknown keys land inertly in `_extra` (never store load-bearing state there); `load_topology_cluster()` refuses pre-topology files with rebuild guidance.
 - **One owner per state** — Remnawave owns users, `cluster.yml` owns topology, and the control server's apply fence (`reconciler/fence.py`) stops a stale or foreign copy from applying.
 - **Read-only fleet projection** — `adapters/cluster.py` is the only source of node/relay rows; it never projects routing gateways as exits or source-restricted relay hops as public endpoints.
 ## Pitfalls
+- **A handed-over fence.json is never a fallback** — once the service keeps the fence, an unreachable service is retried and refused; falling back to the file would let a stale copy apply around it.
 - **Local state is fail-closed** — only missing `cluster.yml`/`servers.json` means fresh; malformed files need recovery, and `srv-*` IDs survive connection edits.
 - **Never hard-code the home in messages** — print `config.HOME_DISPLAY`; a literal `~/.meridian` sent 4.x users into 3.x's directory.
 - **Rendered inputs are typed** — validate and canonicalize hostname, SNI, port, and transport path before nginx, Xray, or Remnawave serialization.
