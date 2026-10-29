@@ -234,10 +234,12 @@ def main_callback(
 
         # Human output speaks the chosen language, else the terminal's; machine output stays English.
         i18n.set_locale(i18n.explicit_locale() or i18n.system_locale())
-    if not machine_output and not (invocation is not None and invocation.help_requested):
+    # `serve` is a daemon: its journal gets no banner, and the server never phones out for updates.
+    daemon = ctx.invoked_subcommand == "serve"
+    if not machine_output and not daemon and not (invocation is not None and invocation.help_requested):
         banner(__version__)
 
-    if not DISABLE_UPDATE_CHECK and not machine_output and ctx.invoked_subcommand not in ("update",):
+    if not DISABLE_UPDATE_CHECK and not machine_output and ctx.invoked_subcommand not in ("update", "serve"):
         from meridian.update import check_for_update
 
         check_for_update(__version__)

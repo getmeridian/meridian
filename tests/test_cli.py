@@ -447,3 +447,15 @@ def test_beta_banner_points_testers_at_the_report_form(capsys) -> None:
 
     assert "beta" in beta and "template=v4_beta.yml" in beta
     assert "beta" not in stable
+
+
+def test_serve_prints_no_banner_and_never_checks_for_updates(monkeypatch, tmp_path) -> None:
+    checks: list[str] = []
+    monkeypatch.setattr("meridian.update.check_for_update", checks.append)
+    monkeypatch.setattr("meridian.control.server.serve", lambda _path: None)
+
+    result = runner.invoke(app, ["serve", "--config", str(tmp_path / "config.json")])
+
+    assert result.exit_code == 0, result.output
+    assert "Meridian v" not in result.output
+    assert checks == []
