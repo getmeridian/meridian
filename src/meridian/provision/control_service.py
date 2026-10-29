@@ -196,8 +196,9 @@ class InstallControlService:
         """
         files = " ".join(shlex.quote(path) for path in (INSTALLED_MARKER, CONTROL_SERVICE_CONFIG, unit))
         result = conn.run(
-            f'pid=$(systemctl show -p MainPID --value {CONTROL_SERVICE_UNIT}); [ "${{pid:-0}}" != 0 ] || exit 0; '
-            'started=$(( $(date +%s) - $(ps -o etimes= -p "$pid") )); '
+            # systemd's own start time: minimal images have no `ps`.
+            f"ts=$(systemctl show -p ExecMainStartTimestamp --value {CONTROL_SERVICE_UNIT}); "
+            '[ -n "$ts" ] || exit 0; started=$(date -d "$ts" +%s) || exit 1; '
             f"for f in {files}; do "
             '[ -e "$f" ] && [ "$(stat -c %Y "$f")" -gt "$started" ] && echo outdated; done; exit 0',
             timeout=15,

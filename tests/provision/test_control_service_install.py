@@ -80,7 +80,7 @@ def test_a_service_older_than_its_files_is_restarted_though_nothing_changes_now(
     config = json.dumps(install.install.config.model_dump(mode="json"), indent=2) + "\n"
     conn.when("cat /etc/ctld/config.json", stdout=config)
     conn.when("cat /etc/systemd/system/ctld.service", stdout=render_service_unit())
-    conn.when("ps -o etimes=", stdout="outdated\n")
+    conn.when("ExecMainStartTimestamp", stdout="outdated\n")
 
     result = install.run(conn, _ctx())
 
