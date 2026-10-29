@@ -187,7 +187,8 @@ def forget_unreachable_servers(
 
     A blocked or deleted server would fail cleanup on every apply. Forgetting drops
     only its server-side records; the panel still deletes what it holds. ``--yes``
-    alone never forgets: an automated run must say ``--forget-unreachable``.
+    alone never forgets: an automated run must say ``--forget-unreachable``. Nothing is
+    saved here: the caller's reviewed apply persists the forgetting with everything else.
     """
     from rich.markup import escape
 
@@ -220,13 +221,11 @@ def forget_unreachable_servers(
             err_console.print("  including clients you remove later, until you delete or wipe it at your provider.")
             if not confirm(f"Forget what Meridian deployed on {entry.name or entry.host}?"):
                 continue
+        # In memory only: the approved apply saves it, so a declined review forgets nothing.
         forgotten = forget_server(cluster, review.retiring, server_ref)
-        try:
-            cluster.save()
-        except LOCAL_STATE_SAVE_ERRORS as exc:
-            fail(f"Could not save local state: {exc}", hint="Nothing on the servers changed.", hint_type="system")
         err_console.print(
-            f"  [dim]Forgot {len(forgotten)} resources on {label}; delete or wipe it at your provider.[/dim]"
+            f"  [dim]This apply forgets {len(forgotten)} resources on {label}; "
+            "delete or wipe it at your provider.[/dim]"
         )
 
 

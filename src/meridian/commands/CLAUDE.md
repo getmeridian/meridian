@@ -25,6 +25,7 @@
 - Teardown refuses a server that still holds intent roles (only a whole single-server fleet goes in one step) and deletes the saved profile last.
 - `client reissue` deletes the old page before revoking: the page directory is the old VLESS UUID, which the revoke replaces, so a page left behind could never be found again.
 - Removals refuse the control server and its dependents before review; `node remove --force` only extends the edit to relay chains into that exit.
+- `forget_unreachable_servers()` forgets in memory only; the confirmed apply saves it (a declined `fleet import` once left bindings forgotten on disk).
 - Post-mutation local save failures exit 3, say remote state changed, and keep typed partial data where the contract allows.
 - Client mutations and tests act only on `topology_intent.access.users`; `client list`/`show` also read people added in a control service's console (`declared: false`, every user there is the fleet's), never a Remnawave panel's other users. There an exact service username wins over a case-folded or display-name match, and a name folding onto two people is refused (`show alice` once returned declared `Alice`'s link).
 - On a control-service fleet `panel` prints the web console and a one-time setup link only while it has no owner or with hidden `--setup-link` (a reset: new password, code off, every device signed out); the Remnawave output stays as it was.
