@@ -233,11 +233,10 @@
 
   "settings.fleet": "服务器",
   "settings.title": "标题",
-  "settings.title_hint": "显示在 VPN 应用和这里。服务器配置文件也会设置它：下次从你的电脑应用时会恢复那个标题，如需永久更改，请使用 meridian setup。",
+  "settings.title_hint": "显示在 VPN 应用和这里。它由服务器配置文件设置，请在你的电脑上更改：meridian setup，或在 meridian fleet export 中修改 delivery.profile_title，然后运行 meridian fleet import。",
   "settings.public_url": "公开地址",
   "settings.public_url_hint": "链接和页面都以此开头。它随服务器而变，因此只能从你的电脑更改。",
   "settings.no_public_url": "尚未设置",
-  "settings.saved_toast": "已保存。",
   "settings.appearance": "外观",
   "settings.theme": "主题",
   "settings.language": "语言",

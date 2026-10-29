@@ -288,19 +288,7 @@ class _Handler(BaseHTTPRequestHandler):
         return self._service.settings()
 
     def put_settings(self, _match: re.Match[str]) -> Any:
-        settings = self._model(ServiceSettings)
-        if self.owner_session is None:
-            return self._service.put_settings(settings)
-
-        # The public address follows the servers (the deployer's apply sets it); from a console session
-        # it could point every share link and subscription header at another host. Compared in the
-        # write's transaction, so an apply that moved it meanwhile is refused rather than rolled back.
-        def address_unchanged() -> None:
-            if settings.public_url != self._service.settings().public_url:
-                raise ServiceError("insufficient_scope", "The public address changes only from the meridian CLI.", 403)
-
-        with self._service.conditions(address_unchanged):
-            return self._service.put_settings(settings)
+        return self._service.put_settings(self._model(ServiceSettings))
 
     def get_node(self, match: re.Match[str]) -> Any:
         return self._service.node_status(match[1])
@@ -595,7 +583,6 @@ OWNER_STEP_UP: frozenset[Callable[..., Any]] = frozenset({_Handler.create_token}
 OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
     {
         _Handler.get_settings,
-        _Handler.put_settings,
         _Handler.list_users,
         _Handler.get_user,
         _Handler.create_user,

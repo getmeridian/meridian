@@ -233,11 +233,10 @@
 
   "settings.fleet": "Fleet",
   "settings.title": "Title",
-  "settings.title_hint": "Shown in VPN apps and here. Your fleet file sets it too: the next apply from your computer puts that title back, so change it with meridian setup to keep it.",
+  "settings.title_hint": "Shown in VPN apps and here. It comes from your fleet file, so change it from your computer: meridian setup, or delivery.profile_title in meridian fleet export, then meridian fleet import.",
   "settings.public_url": "Public address",
   "settings.public_url_hint": "Links and pages start here. It follows your servers, so it changes only from your computer.",
   "settings.no_public_url": "Not set yet",
-  "settings.saved_toast": "Saved.",
   "settings.appearance": "Appearance",
   "settings.theme": "Theme",
   "settings.language": "Language",

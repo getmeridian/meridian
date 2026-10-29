@@ -272,13 +272,12 @@ def test_without_a_session_the_api_answers_401(fleet: Fleet) -> None:
     assert fleet.call("GET", "/auth/state", session=True).body["signed_in"] is False
 
 
-def test_a_session_edits_the_title_but_never_the_public_address(fleet: Fleet) -> None:
+def test_a_session_reads_the_settings_but_never_writes_them(fleet: Fleet) -> None:
+    """The title and address are the fleet file's: an apply would put a console edit back."""
     fleet.set_up()
     current = fleet.ui("GET", "/api/settings").body
-    moved = fleet.ui("PUT", "/api/settings", {"profile_title": "Ours", "public_url": "https://203.0.113.9/x"})
-    assert moved.status == 403 and moved.body["error"]["code"] == "insufficient_scope"
     titled = fleet.ui("PUT", "/api/settings", {"profile_title": "Ours", "public_url": current["public_url"]})
-    assert titled.status == 200 and titled.body["profile_title"] == "Ours"
+    assert titled.status == 403 and titled.body["error"]["code"] == "insufficient_scope"
 
 
 def test_the_console_never_mints_an_admin_token(fleet: Fleet) -> None:
@@ -534,24 +533,6 @@ def test_a_person_declared_between_the_check_and_the_write_keeps_their_link(
     assert refused.status == 409 and refused.body["error"]["code"] == "declared_user"
     after = service.get_user("erin")
     assert after is not None and (after.uuid, after.sub_token) == (before.uuid, before.sub_token)
-
-
-def test_a_title_edit_never_rolls_back_an_address_the_cli_moved_meanwhile(
-    fleet: Fleet, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    fleet.set_up()
-    service = fleet.service
-    service.put_settings(ServiceSettings(profile_title="Meridian", public_url="https://198.51.100.7/a"))
-    put_settings = service.put_settings
-
-    def moved_meanwhile(settings: ServiceSettings) -> ServiceSettings:
-        put_settings(ServiceSettings(profile_title="Meridian", public_url="https://198.51.100.8/b"))
-        return put_settings(settings)
-
-    monkeypatch.setattr(service, "put_settings", moved_meanwhile)
-    refused = fleet.ui("PUT", "/api/settings", {"profile_title": "Ours", "public_url": "https://198.51.100.7/a"})
-    assert refused.status == 403
-    assert service.settings().public_url == "https://198.51.100.8/b"
 
 
 def test_a_session_revoked_after_authorizing_changes_nothing(fleet: Fleet, monkeypatch: pytest.MonkeyPatch) -> None:

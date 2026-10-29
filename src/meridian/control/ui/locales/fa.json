@@ -233,11 +233,10 @@
 
   "settings.fleet": "سرورها",
   "settings.title": "عنوان",
-  "settings.title_hint": "در برنامه‌های VPN و اینجا نمایش داده می‌شود. پرونده سرورها هم آن را تعیین می‌کند: اعمال بعدی از رایانه شما همان عنوان را برمی‌گرداند، پس برای ماندگاری آن را با meridian setup تغییر دهید.",
+  "settings.title_hint": "در برنامه‌های VPN و اینجا نمایش داده می‌شود. پرونده سرورها آن را تعیین می‌کند، پس آن را از رایانه خود تغییر دهید: meridian setup، یا delivery.profile_title در meridian fleet export و سپس meridian fleet import.",
   "settings.public_url": "نشانی عمومی",
   "settings.public_url_hint": "پیوندها و صفحه‌ها از اینجا شروع می‌شوند. این نشانی همراه سرورها تغییر می‌کند، پس فقط از رایانه شما عوض می‌شود.",
   "settings.no_public_url": "هنوز تعیین نشده",
-  "settings.saved_toast": "ذخیره شد.",
   "settings.appearance": "ظاهر",
   "settings.theme": "پوسته",
   "settings.language": "زبان",

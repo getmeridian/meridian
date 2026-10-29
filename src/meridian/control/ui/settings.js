@@ -16,33 +16,18 @@
   };
 
   function fleetCard() {
-    var title = h("input", { type: "text", maxlength: "100", required: true });
+    // The title is the fleet file's (`delivery.profile_title`): every apply sets it, so it is shown, not edited.
+    var title = h("p", { class: "row-title" });
     var publicUrl = h("p", { class: "mono small link-text" });
-    var form = h("form", { class: "stack", novalidate: true },
-      M.field(M.t("settings.title"), title, M.t("settings.title_hint")),
-      h("p", { class: "form-error", role: "alert" }),
-      h("div", { class: "row-actions" }, h("button", { class: "btn btn-primary btn-sm", type: "submit" }, M.t("action.save"))));
-    var current = null;
+    var error = h("p", { class: "form-error", role: "alert" });
     M.api("GET", "api/settings").then(function (settings) {
-      current = settings;
-      title.value = settings.profile_title;
+      title.textContent = settings.profile_title;
       publicUrl.textContent = settings.public_url || M.t("settings.no_public_url");
-    }, function (e) { form.querySelector(".form-error").textContent = M.errorText(e); });
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      if (!current || !title.value.trim()) return;
-      M.busy(form, function () {
-        return M.api("PUT", "api/settings", { profile_title: title.value.trim(), public_url: current.public_url });
-      }).then(function (saved) {
-        current = saved;
-        if (M.state.fleet) M.state.fleet.profile_title = saved.profile_title;
-        var brand = document.querySelector(".top-title");
-        if (brand) brand.textContent = saved.profile_title;
-        M.toast(M.t("settings.saved_toast"));
-      }, function () { /* shown in the form */ });
-    });
+    }, function (e) { error.textContent = M.errorText(e); });
     return h("section", { class: "card" },
-      h("h2", { text: M.t("settings.fleet") }), form,
+      h("h2", { text: M.t("settings.fleet") }),
+      h("p", { class: "label", text: M.t("settings.title") }), title,
+      h("p", { class: "muted small", text: M.t("settings.title_hint") }), error,
       h("p", { class: "label", text: M.t("settings.public_url") }), publicUrl,
       h("p", { class: "muted small", text: M.t("settings.public_url_hint") }));
   }

@@ -233,11 +233,10 @@
 
   "settings.fleet": "Серверы",
   "settings.title": "Название",
-  "settings.title_hint": "Видно в VPN-приложениях и здесь. Его задаёт и файл серверов: следующее применение с компьютера вернёт то название, поэтому для постоянной смены используйте meridian setup.",
+  "settings.title_hint": "Видно в VPN-приложениях и здесь. Его задаёт файл серверов, поэтому меняйте его с компьютера: meridian setup или delivery.profile_title в meridian fleet export, затем meridian fleet import.",
   "settings.public_url": "Публичный адрес",
   "settings.public_url_hint": "С него начинаются ссылки и страницы. Он следует за серверами, поэтому меняется только с вашего компьютера.",
   "settings.no_public_url": "Пока не задан",
-  "settings.saved_toast": "Сохранено.",
   "settings.appearance": "Внешний вид",
   "settings.theme": "Тема",
   "settings.language": "Язык",
