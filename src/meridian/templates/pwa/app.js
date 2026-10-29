@@ -904,8 +904,13 @@ function renderDisclosure(label, body, key, cls) {
 }
 
 function renderSubUrl(subUrl, compact) {
+  if (compact) {
+    /* Beside a visible URL, copying is an action, not a second field. */
+    return '<button class="btn btn-soft btn-block" data-ui-key="subscription-copy" data-action="copy" data-url="' + escapeHtml(subUrl) + '">' +
+      ICON_COPY + '<span data-t="manual.copy">Copy URL</span></button>';
+  }
   return '<button class="sub-url" data-ui-key="subscription-copy" data-action="copy" data-url="' + escapeHtml(subUrl) + '">' +
-    '<span class="sub-url-value"' + (compact ? ' data-t="manual.copy"' : '') + '>' + (compact ? 'Copy URL' : escapeHtml(subUrl)) + '</span>' + ICON_COPY + '</button>';
+    '<span class="sub-url-value">' + escapeHtml(subUrl) + '</span>' + ICON_COPY + '</button>';
 }
 
 function renderQr(b64, cls) {

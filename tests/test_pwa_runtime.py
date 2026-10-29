@@ -50,6 +50,10 @@ def run_case(name: str, data: dict[str, object]) -> None:
     assert result.returncode == 0, result.stderr or result.stdout
 
 
+def test_account_on_another_origin_stays_hidden_and_unfetched(page_data: dict[str, object]) -> None:
+    run_case("test_account_on_another_origin_stays_hidden_and_unfetched", page_data)
+
+
 def test_account_loads_info_without_cache_and_refreshes_on_return(page_data: dict[str, object]) -> None:
     run_case("test_account_loads_info_without_cache_and_refreshes_on_return", page_data)
 

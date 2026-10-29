@@ -42,7 +42,7 @@ _PWA_APPS: list[dict[str, Any]] = [
             "en": [
                 "Allow VPN permission if your device asks.",
                 "Choose a server from the imported subscription.",
-                "Tap the power button to connect.",
+                "Press the power button to connect.",
             ],
             "ru": [
                 "Если устройство запросит разрешение на VPN, разрешите.",
@@ -95,7 +95,7 @@ _PWA_APPS: list[dict[str, Any]] = [
             "en": [
                 "Allow VPN permission if your device asks.",
                 "Select the imported profile.",
-                "Tap the power button to connect.",
+                "Press the power button to connect.",
             ],
             "ru": [
                 "Если устройство запросит разрешение на VPN, разрешите.",
@@ -195,7 +195,7 @@ _PWA_APPS: list[dict[str, Any]] = [
             "en": [
                 "Allow VPN permission if your device asks.",
                 "Select the imported profile.",
-                "Tap the power button to connect.",
+                "Press the power button to connect.",
             ],
             "ru": [
                 "Если устройство запросит разрешение на VPN, разрешите.",
@@ -234,7 +234,7 @@ _PWA_APPS: list[dict[str, Any]] = [
             "en": [
                 "Allow VPN permission if your device asks.",
                 "Select the imported profile.",
-                "Tap the power button to connect.",
+                "Press the power button to connect.",
             ],
             "ru": [
                 "Если устройство запросит разрешение на VPN, разрешите.",

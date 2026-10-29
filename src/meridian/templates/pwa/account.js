@@ -14,7 +14,6 @@ var TEXT = {
     period: 'Traffic this period', lifetime: 'Lifetime traffic', expiry: 'Expiry', unlimited: 'Unlimited', never: 'No expiry',
     checked: 'Checked {time}', saved: 'Last saved {time}. These details are unverified.',
     failed: 'Could not check your account. Try refreshing when you are online.',
-    elsewhere: 'This page cannot check an account hosted at another address.',
     'days.one': '{n} day left', 'days.other': '{n} days left',
     units: ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'],
   },
@@ -29,7 +28,6 @@ var TEXT = {
     period: 'Трафик за текущий период', lifetime: 'Трафик за всё время', expiry: 'Срок действия', unlimited: 'Без лимита', never: 'Бессрочно',
     checked: 'Проверено: {time}', saved: 'Сохранено: {time}. Эти данные не подтверждены.',
     failed: 'Не удалось проверить аккаунт. Попробуйте обновить данные, когда появится интернет.',
-    elsewhere: 'Аккаунт размещён по другому адресу; с этой страницы его не проверить.',
     'days.one': 'Остался {n} день', 'days.few': 'Осталось {n} дня', 'days.many': 'Осталось {n} дней', 'days.other': 'Осталось {n} дня',
     units: ['Б', 'КиБ', 'МиБ', 'ГиБ', 'ТиБ', 'ПиБ'],
   },
@@ -44,7 +42,6 @@ var TEXT = {
     period: 'ترافیک این دوره', lifetime: 'کل ترافیک مصرف‌شده', expiry: 'پایان اعتبار', unlimited: 'نامحدود', never: 'بدون تاریخ انقضا',
     checked: 'بررسی‌شده در {time}', saved: 'آخرین ذخیره در {time}. این اطلاعات تأیید نشده‌اند.',
     failed: 'بررسی حساب ممکن نشد. وقتی به اینترنت وصل شدید، دوباره به‌روزرسانی کنید.',
-    elsewhere: 'حساب در نشانی دیگری میزبانی می‌شود و از این صفحه نمی‌توان آن را بررسی کرد.',
     'days.one': '{n} روز باقی مانده', 'days.other': '{n} روز باقی مانده',
     units: ['بایت', 'کیبی‌بایت', 'مبی‌بایت', 'گیبی‌بایت', 'تبی‌بایت', 'پبی‌بایت'],
   },
@@ -59,7 +56,6 @@ var TEXT = {
     period: '本期流量', lifetime: '累计流量', expiry: '到期时间', unlimited: '不限流量', never: '永久有效',
     checked: '检查时间：{time}', saved: '上次保存于 {time}。这些信息尚未核实。',
     failed: '无法检查账户。请联网后重试刷新。',
-    elsewhere: '账户托管在其他地址，此页面无法检查。',
     'days.one': '剩余 {n} 天', 'days.other': '剩余 {n} 天',
     units: ['字节', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'],
   },
@@ -146,7 +142,8 @@ function render() {
   var panel = document.getElementById('account-panel');
   if (!panel) return;
   panel.innerHTML = '';
-  panel.hidden = !window._meridianConfig || !window._meridianConfig.subscription_url;
+  /* A subscription on another origin cannot be read from here; say nothing rather than alarm. */
+  panel.hidden = !infoUrl;
   if (panel.hidden) return;
   panel.setAttribute('aria-busy', checking ? 'true' : 'false');
   var heading = element('div', 'account-heading');
@@ -166,11 +163,11 @@ function render() {
   } else if (snapshot) panel.appendChild(element('p', 'muted', t('missing')));
   if (checking) panel.appendChild(element('p', 'account-freshness', t('checking')));
   if (snapshot) panel.appendChild(element('p', 'account-freshness', t(verified ? 'checked' : 'saved', { time: date(snapshot.checkedAt, true) })));
-  if (failed) panel.appendChild(element('p', 'account-freshness account-unverified', t(infoUrl ? 'failed' : 'elsewhere')));
+  if (failed) panel.appendChild(element('p', 'account-freshness account-unverified', t('failed')));
   applyImportState();
 }
 function refresh() {
-  if (checking || !infoUrl) { if (!infoUrl) { failed = true; render(); } return; }
+  if (checking || !infoUrl) { if (!infoUrl) render(); return; }
   checking = true; failed = false; verified = false; render();
   var id = ++requestId, done = false;
   var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;

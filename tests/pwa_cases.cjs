@@ -54,6 +54,13 @@ const cases = {
     assert.ok(!panel.textContent.includes('unverified'));
     assert.equal(browser.document.querySelector('[data-import]').getAttribute('aria-disabled'), 'true');
   },
+  test_account_on_another_origin_stays_hidden_and_unfetched: async function(data) {
+    const config = { ...data.config, subscription_url: 'https://198.51.100.9/connect/sub/Other' };
+    const browser = createBrowser(config, data.catalog, { info: data.info });
+    await browser.start();
+    assert.equal(browser.requests.filter(r => r.url.endsWith('/info')).length, 0, 'no cross-origin account fetch');
+    assert.ok(browser.document.getElementById('account-panel').hidden, 'an unreadable account shows nothing');
+  },
   test_account_loads_info_without_cache_and_refreshes_on_return: async function(data) {
     const browser = createBrowser(data.config, data.catalog, { info: data.info });
     await browser.start();
@@ -162,7 +169,7 @@ const cases = {
     choice.value = 'FlClashX'; browser.fire('change', choice);
     const disclosure = browser.document.querySelector('[data-disclosure="manual-import"]');
     disclosure.open = true;
-    const copy = browser.document.querySelector('.sub-url'); copy.focus();
+    const copy = browser.document.querySelector('[data-ui-key="subscription-copy"]'); copy.focus();
     browser.document.getElementById('selfcheck-results').textContent = 'Saved self-check';
     release(response(data.catalog)); await browser.flush();
     assert.ok(browser.document.querySelector('[data-disclosure="manual-import"]').open);
@@ -207,7 +214,7 @@ const cases = {
     const browser = createBrowser(data.config, data.catalog);
     const value = data.quoted_url;
     browser.document.getElementById('app').innerHTML = browser.context.page.renderSubUrl(value);
-    const button = browser.document.querySelector('.sub-url');
+    const button = browser.document.querySelector('[data-ui-key="subscription-copy"]');
     assert.equal(button.getAttribute('data-url'), value, 'quotes must remain part of the attribute value');
     assert.ok(!button.hasAttribute('onfocus'));
     const app = { ...data.config.apps[0], name: 'demo" data-injected="yes' };
@@ -274,7 +281,7 @@ const cases = {
     const choice = browser.document.getElementById('app-choice'); choice.value = 'Throne'; browser.fire('change', choice);
     assert.ok(!browser.document.querySelector('.load-error'));
     assert.ok(!browser.document.querySelector('[data-import]'));
-    assert.ok(browser.document.querySelector('.sub-url'), 'the canonical manual URL must remain accessible');
+    assert.ok(browser.document.querySelector('[data-ui-key="subscription-copy"]'), 'the canonical manual URL must remain accessible');
   },
   test_recommended_app_has_three_localized_connect_steps: async function(data) {
     const browser = createBrowser(data.config, data.catalog, { info: data.info }); await browser.start();
