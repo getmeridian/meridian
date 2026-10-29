@@ -71,6 +71,8 @@ def render_service_unit() -> str:
         "RestartSec=3\n"
         "MemoryMax=256M\n"
         "OOMScoreAdjust=-500\n"
+        # control.db holds the fleet CA and every user's credentials; nothing else reads its files.
+        "UMask=0077\n"
         "NoNewPrivileges=yes\n"
         "ProtectSystem=strict\n"
         "ProtectHome=yes\n"
@@ -163,7 +165,13 @@ class InstallControlService:
     def _config(self, conn: ServerConnection) -> str:
         body = json.dumps(self.install.config.model_dump(mode="json"), indent=2) + "\n"
         written = ensure_file_content(
-            conn, CONTROL_SERVICE_CONFIG, body, mode="640", owner=f"root:{CONTROL_SERVICE_NAME}", create_parent=True
+            conn,
+            CONTROL_SERVICE_CONFIG,
+            body,
+            mode="640",
+            owner=f"root:{CONTROL_SERVICE_NAME}",
+            sensitive=True,  # it names the secret path
+            create_parent=True,
         )
         self._changed |= written.changed
         return "" if written.ok else f"could not write {CONTROL_SERVICE_CONFIG}: {written.detail}"
