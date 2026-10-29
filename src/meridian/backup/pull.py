@@ -42,8 +42,8 @@ def backup_client(cluster: ClusterConfig, *, timeout: float = TIMEOUT, report_mu
     """A client for backup calls; a pull's own writes never trigger another pull."""
     if not cluster.runs_control_service or not cluster.is_configured:
         raise BackupError(
-            "Only a fleet on Meridian's control service has snapshots.",
-            hint="Deploy with --control=meridian, or move a Remnawave fleet across with `meridian migrate`.",
+            "Only a deployed fleet on Meridian's control service has snapshots.",
+            hint="Deploy the fleet first, or move a Remnawave fleet across with `meridian migrate`.",
             category="user",
         )
     return ControlClient(cluster.panel.url, cluster.panel.api_token, timeout=timeout, report_mutations=report_mutations)

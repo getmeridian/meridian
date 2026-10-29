@@ -70,7 +70,7 @@ def test_unit_state_is_evidence_only_when_systemctl_answered(stdout: str, rc: in
 
 
 def test_control_service_logs_come_from_units_not_containers() -> None:
-    sources = log_sources(["control", "exit"], subscription_page=True, control_service=True)
+    sources = log_sources(["control", "exit"])
 
     assert [(source.component, source.kind, source.name) for source in sources] == [
         ("node", "unit", "netagent.service"),

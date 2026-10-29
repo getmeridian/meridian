@@ -76,6 +76,17 @@ def _reachable_retiring_servers(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _released_service_package(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Control-service installs name the released package; a checkout's wheel build takes minutes."""
+    from meridian import __version__
+    from meridian.control_artifacts import ServicePackage
+
+    package = ServicePackage(requirement=f"meridian-vpn=={__version__}")
+    for module in ("meridian.setup.control_service", "meridian.migrate.service_import"):
+        monkeypatch.setattr(f"{module}.service_package", lambda: package)
+
+
+@pytest.fixture(autouse=True)
 def _offline_registry_country(monkeypatch: pytest.MonkeyPatch) -> None:
     """Exit-country lookups never leave the test process; tests that need one inject a transport."""
     import httpx

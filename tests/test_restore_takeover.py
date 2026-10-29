@@ -57,7 +57,7 @@ def install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
 
 def _intent() -> SetupIntent:
     """A control server that is also the exit, plus a relay hop on a third server that stays put."""
-    intent = single_server_intent(None, server_ref="srv-a", address=OLD, control="meridian")
+    intent = single_server_intent(None, server_ref="srv-a", address=OLD)
     reality = next(path for path in intent.exits[0].paths if path.protocol == "reality")
     relay = TransparentRelayIntent(
         id="relay-a", hop_server_refs=["srv-hop"], exit_ref=intent.exits[0].id, protocol_path_ref=reality.id

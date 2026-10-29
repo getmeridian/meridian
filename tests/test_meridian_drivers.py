@@ -135,7 +135,7 @@ class FakeControl:
 
 @pytest.fixture
 def plan() -> ResourcePlan:
-    return compile_topology(single_server_intent(None, server_ref="srv-a", address="198.51.100.10", control="meridian"))
+    return compile_topology(single_server_intent(None, server_ref="srv-a", address="198.51.100.10"))
 
 
 def _setup(
@@ -404,7 +404,7 @@ def test_an_installed_agent_that_never_returns_is_enrolled_again(plan: ResourceP
 
 
 def _warp_plan() -> ResourcePlan:
-    intent = single_server_intent(None, server_ref="srv-a", address="198.51.100.10", control="meridian")
+    intent = single_server_intent(None, server_ref="srv-a", address="198.51.100.10")
     return compile_topology(intent.model_copy(update={"exits": [intent.exits[0].model_copy(update={"warp": True})]}))
 
 

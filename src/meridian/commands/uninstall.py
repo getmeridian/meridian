@@ -6,7 +6,7 @@ import typer
 
 from meridian import config
 from meridian.cluster import ClusterConfig
-from meridian.commands._helpers import load_cluster, load_topology_cluster, make_panel
+from meridian.commands._helpers import load_cluster, load_topology_cluster
 from meridian.commands.resolve import (
     ensure_server_connection,
     resolve_server,
@@ -14,7 +14,6 @@ from meridian.commands.resolve import (
 from meridian.compiler.deployment import deployment_server_refs
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.errors import LocalStateError
-from meridian.remnawave import RemnawaveError, RemnawaveNotFoundError
 from meridian.servers import ServerEntry, ServerRegistry
 
 
@@ -54,29 +53,6 @@ def _topology_references(cluster: ClusterConfig, entry: ServerEntry) -> list[str
         if workload.active and identities.intersection(workload.server_refs):
             references.append(f"active workload {workload.id}")
     return list(dict.fromkeys(references))
-
-
-def _deregister_panel_node(cluster: ClusterConfig, server_ip: str) -> None:
-    """Drop a role-less server's stale panel node after its remote uninstall."""
-    try:
-        with make_panel(cluster) as panel:
-            api_node = panel.find_node_by_address(server_ip)
-            if api_node is not None:
-                try:
-                    panel.disable_node(api_node.uuid)
-                except RemnawaveError:
-                    warn(f"Could not disable node {server_ip} in the panel; deleting it anyway")
-                try:
-                    panel.delete_node(api_node.uuid)
-                except RemnawaveNotFoundError:
-                    pass
-    except RemnawaveError as exc:
-        fail(
-            f"Remote uninstall completed, but panel cleanup failed: {exc}",
-            hint="Retry teardown when the panel is available; local state was retained.",
-            hint_type="system",
-        )
-    info(f"Removed node {server_ip} from the panel")
 
 
 def run(
@@ -168,9 +144,6 @@ def run(
                     hint_type="system",
                 )
             info("Removed cluster.yml (panel host was torn down)")
-        elif not cluster.runs_control_service:
-            # A control-service fleet retires its node record with the reviewed plan.
-            _deregister_panel_node(cluster, resolved.ip)
 
     # Registry deletion is last: a stale saved connection is recoverable, but
     # deleting it before topology persistence would discard retry information.

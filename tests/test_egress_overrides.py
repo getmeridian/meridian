@@ -6,7 +6,6 @@ import pytest
 from pydantic import ValidationError
 
 from meridian.cluster import RealityKeyBinding
-from meridian.compiler import compile_topology
 from meridian.compiler.models import ConfigProfilePayload, NodeRuntimePayload
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import (
@@ -15,7 +14,7 @@ from meridian.core.topology import (
 )
 from meridian.setup.editor import add_egress_override_to_intent, remove_egress_override_from_intent
 from meridian.xray_workload import render_workload_config
-from tests.support.topology import single_exit_intent
+from tests.support.topology import compile_panel_pass, single_exit_intent
 
 
 def _intent(*, warp: bool = False, geo_block: bool = False, overrides: list[EgressOverrideIntent] | None = None):
@@ -27,7 +26,7 @@ def _intent(*, warp: bool = False, geo_block: bool = False, overrides: list[Egre
 
 
 def _payload(intent: SetupIntent, payload_type: type):
-    payloads = [resource.payload for resource in compile_topology(intent).resources]
+    payloads = [resource.payload for resource in compile_panel_pass(intent).resources]
     return next(payload for payload in payloads if isinstance(payload, payload_type))
 
 

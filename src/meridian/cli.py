@@ -489,7 +489,8 @@ def deploy_cmd(
     client_ips: bool = typer.Option(
         False,
         "--client-ips/--no-client-ips",
-        help="Let the panel see each client's real IP (for per-user IP limits); off keeps it private",
+        hidden=True,  # the control service cannot forward client IPs yet
+        help="Forward each client's real IP to the server",
     ),
     display_name: str = typer.Option(
         "",
@@ -529,9 +530,6 @@ def deploy_cmd(
         "--cancel-file",
         hidden=True,
         help="Stop at the next safe point once this file exists (used by Studio)",
-    ),
-    control: str = typer.Option(
-        "remnawave", "--control", hidden=True, help="Control backend for a fresh fleet: remnawave or meridian"
     ),
 ) -> None:
     """Deploy one server and get a shareable connection link
@@ -576,7 +574,6 @@ def deploy_cmd(
         events=events,
         dry_run=dry_run,
         cancel_file=cancel_file,
-        control=control,
     )
 
 

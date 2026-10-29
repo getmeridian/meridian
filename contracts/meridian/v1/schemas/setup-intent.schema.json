@@ -50,7 +50,7 @@
       "description": "One server that owns the control-plane workload.",
       "properties": {
         "backend": {
-          "default": "remnawave",
+          "default": "meridian",
           "enum": [
             "remnawave",
             "meridian"

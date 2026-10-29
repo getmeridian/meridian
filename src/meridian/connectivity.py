@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import email.utils
-import math
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -29,7 +28,6 @@ from meridian.diagnostics.external import (
 from meridian.health import tcp_connect
 from meridian.remnawave import (
     XRAY_JSON_CLIENT_TYPE,
-    MeridianPanel,
     RemnawaveAuthError,
     RemnawaveError,
     RemnawaveNetworkError,
@@ -90,18 +88,11 @@ class ConnectionTester(Protocol):
     ) -> ConnectionAttempt: ...
 
 
-def create_verification_panel(url: str, token: str, timeout: float) -> MeridianPanel:
-    """Create a single-attempt panel client bounded by the verification timeout."""
-    return MeridianPanel(url, token, timeout=max(1, math.ceil(timeout)), max_retries=1)
+def _service_panel(url: str, token: str, timeout: float) -> VerificationPanel:
+    """The control service's client, the fleet's only control backend."""
+    from meridian.control_access import ServiceAccessPanel
 
-
-def verification_panel_factory(cluster: ClusterConfig) -> PanelFactory:
-    """The fleet's control backend: Remnawave, or Meridian's own control service."""
-    if cluster.runs_control_service:
-        from meridian.control_access import ServiceAccessPanel
-
-        return ServiceAccessPanel
-    return create_verification_panel
+    return ServiceAccessPanel(url, token, timeout)
 
 
 @dataclass(frozen=True)
@@ -242,7 +233,7 @@ def collect_connectivity_checks(
         target_ip,
         requested_client=client,
         timeout=timeout,
-        panel_factory=panel_factory or verification_panel_factory(cluster),
+        panel_factory=panel_factory or _service_panel,
         xray_provider=xray_provider,
         connection_tester=connection_tester,
     )

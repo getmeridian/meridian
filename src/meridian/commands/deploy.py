@@ -24,6 +24,7 @@ from meridian.adapters.cancellation import FileCancellationToken
 from meridian.adapters.reporters import JsonlReporter
 from meridian.branding import normalize_icon
 from meridian.cluster import BrandingConfig, ClusterConfig
+from meridian.cluster_persistence import saved_backend
 from meridian.commands._helpers import ReviewedApplyPersistenceError, persist_reviewed_apply
 from meridian.commands.apply_progress import apply_progress
 from meridian.commands.backup import offer_recovery_key
@@ -34,6 +35,7 @@ from meridian.console import (
     err_console,
     error_context,
     fail,
+    has_tty,
     info,
     is_quiet_mode,
     line,
@@ -46,7 +48,7 @@ from meridian.core.cancellation import CancellationToken, OperationCancelledErro
 from meridian.core.defaults import DEFAULT_SNI, REALITY_SNI_CANDIDATES
 from meridian.core.deploy import DeployPlan, DeployRequest, DeployResult, build_deploy_workflow
 from meridian.core.deploy_validation import DeployValidationError, normalize_deploy_request
-from meridian.core.errors import EngineError, MeridianError
+from meridian.core.errors import EngineError, MeridianError, RemnawaveFleetError
 from meridian.core.events import COMMAND_CANCELLED, COMMAND_COMPLETED, COMMAND_STARTED
 from meridian.core.inputs import is_ip
 from meridian.core.models import OutputStatus, Summary
@@ -96,7 +98,6 @@ def run(
     events: str = "",
     dry_run: bool = False,
     cancel_file: str = "",
-    control: str = "remnawave",
 ) -> None:
     """Deploy (or redeploy) one server and hand off its first client.
 
@@ -110,6 +111,9 @@ def run(
     with error_context("deploy", timer=operation.timer), _quiet_machine_output(final_json):
         if events and events != "jsonl":
             fail(f"Unsupported --events value: {events}", hint="Use: --events=jsonl", hint_type="user")
+        if saved_backend() == "remnawave":
+            _offer_migrate(machine=final_json or bool(request_path) or dry_run, yes=yes)
+            return
         requested_server = ""
         if ip and not request_path:
             ip, requested_server, user, ssh_port = _split_target(ip, user, ssh_port)
@@ -136,7 +140,6 @@ def run(
                 ssh_port=ssh_port,
                 self_steal=self_steal,
                 fingerprint=fingerprint,
-                control=control,
             )
         )
         machine_mode = final_json or bool(request_path) or dry_run
@@ -640,6 +643,17 @@ def _load_request(source: str) -> DeployRequest:
     except ValidationError as exc:
         error = wrap_validation_error("Invalid deploy request JSON", exc)
         fail(str(error), hint=error.hint, hint_type="user")
+
+
+def _offer_migrate(*, machine: bool, yes: bool) -> None:
+    """A fleet still on Remnawave moves before anything deploys: offer `meridian migrate` in a terminal."""
+    if machine or yes or not has_tty():
+        fail(RemnawaveFleetError())
+    from meridian.commands import migrate
+
+    warn("This fleet still runs Remnawave; move it to Meridian's control service first (every link stays)")
+    migrate.run()
+    info("Run `meridian deploy` again to redeploy on the control service")
 
 
 def _split_target(ip: str, user: str, ssh_port: int) -> tuple[str, str, str, int]:

@@ -95,9 +95,9 @@ CONCEPTS: list[dict[str, object]] = [
         "name": "Control server",
         "tag": "one per fleet",
         "text": "Holds the people, signs each server's configuration, and serves subscriptions and connection "
-        "pages over HTTPS on 443, behind a secret path. Today that is a Remnawave panel; Meridian's own "
-        "control service (<code>ctld</code>, <code>--control=meridian</code>) replaces it in 4.0, with "
-        "encrypted snapshots on every managing device and <code>restore</code> onto a new server.",
+        "pages over HTTPS on 443, behind a secret path. It runs Meridian's own control service "
+        "(<code>ctld</code>), with encrypted snapshots on every managing device and <code>restore</code> "
+        "onto a new server; <code>migrate</code> moves a Remnawave fleet onto it in place.",
         "commands": ["deploy", "panel", "serve", "migrate", "backup", "restore", "teardown"],
     },
     {

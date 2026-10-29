@@ -95,5 +95,15 @@ class LocalStateError(MeridianError):
         super().__init__(message, hint=hint, category=category)
 
 
+class RemnawaveFleetError(LocalStateError):
+    """A fleet that still runs Remnawave: this Meridian only moves it onto its control service."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "This fleet still runs Remnawave, which this Meridian no longer manages",
+            hint="Move it to Meridian's control service in place, keeping every link: meridian migrate",
+        )
+
+
 class LocalStateCorruptedError(LocalStateError):
     """An existing state file is empty, malformed, or structurally invalid."""

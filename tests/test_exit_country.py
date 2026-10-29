@@ -6,11 +6,11 @@ import json
 
 import httpx
 
-from meridian.compiler import compile_topology
 from meridian.compiler.models import HostPayload, NodeBindingPayload
 from meridian.compiler.names import country_flag, exit_places, host_remark
 from meridian.registry_country import registry_country
 from meridian.setup.single_server import single_server_intent
+from tests.support.topology import compile_panel_pass
 
 _BOOTSTRAP = {
     "services": [
@@ -69,7 +69,7 @@ def test_entry_names_lead_with_the_exit_country() -> None:
 
 
 def test_compiled_hosts_and_node_carry_the_region() -> None:
-    plan = compile_topology(single_server_intent(None, server_ref="srv-a", address="198.51.100.10", region="NL"))
+    plan = compile_panel_pass(single_server_intent(None, server_ref="srv-a", address="198.51.100.10", region="NL"))
 
     remarks = {
         r.payload.remark for r in plan.resources if isinstance(r.payload, HostPayload) and not r.payload.is_hidden

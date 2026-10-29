@@ -46,12 +46,7 @@ def run(
             hint="See which servers run what: meridian fleet status",
             hint_type="user",
         )
-    sources = log_sources(
-        roles,
-        subscription_page=cluster.subscription_page is not None and cluster.subscription_page.deployed,
-        relay_units=_relay_units(intent, entry.id) if "relay" in roles else (),
-        control_service=cluster.runs_control_service,
-    )
+    sources = log_sources(roles, relay_units=_relay_units(intent, entry.id) if "relay" in roles else ())
     if components:
         held = sorted({source.component for source in sources})
         sources = [source for source in sources if source.component in components]

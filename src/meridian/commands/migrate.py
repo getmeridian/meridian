@@ -88,6 +88,8 @@ def _render(review: MigrationReview, registry: ServerRegistry) -> None:
         print_(f"    {escape(item)}")
     if review.telegram:
         print_("    Telegram notifications")
+    if review.client_ips:
+        print_("    client IP forwarding (it served the panel's per-user IP limits)")
     home = escape(config.HOME_DISPLAY)
     print_(f"  [dim]A backup goes to {home}/backups and to /var/backups on the control server.[/dim]")
     print_("  [dim]Clients reconnect on their own once the agents start; there is no rollback window.[/dim]")

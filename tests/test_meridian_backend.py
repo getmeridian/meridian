@@ -16,7 +16,7 @@ from meridian.compiler.models import (
     NodeWorkloadPayload,
 )
 from meridian.core.deploy import DeployRequest
-from meridian.core.errors import LocalStateError
+from meridian.core.errors import LocalStateError, RemnawaveFleetError
 from meridian.core.topology import EgressOverrideIntent, ExitIntent, RoutingGatewayIntent, TransparentRelayIntent
 from meridian.setup.default_paths import default_exit_paths
 from meridian.setup.single_server import request_intent, single_server_intent
@@ -28,7 +28,7 @@ PANEL = "panel.example.com"
 
 
 def _intent(**changes: object):
-    intent = single_server_intent(None, server_ref="srv-a", address=ADDRESS, control="meridian")
+    intent = single_server_intent(None, server_ref="srv-a", address=ADDRESS)
     return intent.model_copy(update=changes) if changes else intent
 
 
@@ -42,7 +42,7 @@ def _overrides(*actions: str) -> list[EgressOverrideIntent]:
 def _domain_intent(*, sni: str = "", overrides: tuple[str, ...] = ()):
     """`deploy --domain` (XHTTP and WSS on the domain), with self-steal when *sni* is given."""
     intent = single_server_intent(
-        None, server_ref="srv-a", address=ADDRESS, control="meridian", domain=DOMAIN, sni=sni, self_steal=bool(sni)
+        None, server_ref="srv-a", address=ADDRESS, domain=DOMAIN, sni=sni, self_steal=bool(sni)
     )
     exit_ = intent.exits[0].model_copy(update={"egress_overrides": _overrides(*overrides)})
     return intent.model_copy(update={"exits": [exit_]})
@@ -199,7 +199,6 @@ def test_control_service_readiness_requires_the_url_on_its_domain(host: str, obs
 def test_control_bootstrap_refuses_before_provisioning_without_an_agent_build(tmp_home, monkeypatch) -> None:
     """A wheel install carries no agent: finding out at the first agent left a service with no nodes."""
     from meridian.cluster import ClusterConfig
-    from meridian.core.errors import LocalStateError
     from meridian.servers import ServerEntry
     from meridian.setup.control_service import bootstrap_control_service
     from tests.support.mock_connection import MockConnection
@@ -356,23 +355,24 @@ def test_a_relay_hop_on_the_node_api_port_keeps_its_firewall_rule() -> None:
     assert ("srv-a", 3010, ("srv-a",)) not in restricted
 
 
-def test_default_backend_stays_out_of_saved_intent() -> None:
-    """Existing cluster.yml files and contracts never see the hidden switch."""
-    remnawave = single_server_intent(None, server_ref="srv-a")
+def test_the_default_backend_stays_out_of_saved_intent() -> None:
+    intent = single_server_intent(None, server_ref="srv-a")
 
-    assert "backend" not in remnawave.model_dump(mode="json")["control"]
-    assert _intent().model_dump(mode="json")["control"]["backend"] == "meridian"
-    assert "control" not in DeployRequest().model_dump()
+    assert intent.control.backend == "meridian"
+    assert "backend" not in intent.model_dump(mode="json")["control"]
 
 
-def test_redeploy_cannot_switch_the_control_backend() -> None:
+def test_redeploy_refuses_a_remnawave_fleet_with_the_migrate_pointer() -> None:
     existing = single_server_intent(None, server_ref="srv-a", address=ADDRESS)
+    existing = existing.model_copy(update={"control": existing.control.model_copy(update={"backend": "remnawave"})})
 
-    with pytest.raises(LocalStateError, match="cannot change"):
-        request_intent(existing, DeployRequest(control="meridian"), server_ref="srv-a", address=ADDRESS)
+    with pytest.raises(RemnawaveFleetError) as error:
+        request_intent(existing, DeployRequest(), server_ref="srv-a", address=ADDRESS)
+
+    assert "meridian migrate" in error.value.hint
 
 
-def test_redeploy_keeps_the_meridian_backend_without_the_switch() -> None:
+def test_redeploy_keeps_the_meridian_backend() -> None:
     intent = request_intent(_intent(), DeployRequest(), server_ref="srv-a", address=ADDRESS)
 
     assert intent.control.backend == "meridian"

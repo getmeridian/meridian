@@ -221,6 +221,7 @@ def _load_string_list(data: dict[str, Any], key: str) -> list[str]:
 
 def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
     """Load a cluster config from parsed YAML."""
+    _name_legacy_backend(data)
     # Panel
     panel = _load_dataclass(
         data.get("panel", {}),
@@ -320,6 +321,42 @@ def _state_error(path: Path, reason: str) -> LocalStateCorruptedError:
             f"Do not delete {path} unless you intentionally want to abandon its local state."
         ),
     )
+
+
+def _name_legacy_backend(data: dict[str, Any]) -> None:
+    """Before version 4 a Remnawave intent was the default and left its backend out: name it.
+
+    Meridian intents always wrote `backend: meridian` then, so a missing key is Remnawave's.
+    """
+    version = data.get("version")
+    if isinstance(version, int) and version >= 4:
+        return
+    control = (
+        (data.get("topology_intent") or {}).get("control") if isinstance(data.get("topology_intent"), dict) else None
+    )
+    if isinstance(control, dict):
+        control.setdefault("backend", "remnawave")
+
+
+def saved_backend(path: Path | None = None) -> str:
+    """The saved fleet's control backend ("" without a readable topology), read without validating the rest.
+
+    A cheap look before a command runs; loading the whole file stays the command's job, errors included.
+    """
+    if path is None:
+        from meridian.config import CLUSTER_CONFIG
+
+        path = CLUSTER_CONFIG
+    try:
+        data = yaml.safe_load(path.read_text())
+    except (OSError, yaml.YAMLError):
+        return ""
+    if not isinstance(data, dict) or not isinstance(data.get("topology_intent"), dict):
+        return ""
+    _name_legacy_backend(data)
+    control = data["topology_intent"].get("control")
+    backend = control.get("backend", "meridian") if isinstance(control, dict) else ""
+    return backend if isinstance(backend, str) else ""
 
 
 def _require_mapping(data: dict[str, Any], key: str, *, nullable: bool = False) -> None:

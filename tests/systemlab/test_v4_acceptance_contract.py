@@ -5,7 +5,6 @@ from pathlib import Path
 
 import yaml
 
-from meridian.compiler import compile_topology
 from meridian.compiler.models import (
     ConfigProfilePayload,
     EgressPoolPayload,
@@ -15,6 +14,7 @@ from meridian.compiler.models import (
     SubscriptionTemplatePayload,
 )
 from meridian.config import XRAY_VERSION
+from tests.support.topology import compile_panel_pass
 from tests.systemlab.topology import build_systemlab_intent
 
 _COMPOSE_PATH = Path(__file__).parent / "compose.yml"
@@ -39,7 +39,7 @@ def _server_refs() -> dict[str, str]:
 def test_systemlab_intent_compiles_every_v4_acceptance_path() -> None:
     intent = build_systemlab_intent(_server_refs())
     assert {path.reality_sni for exit_ in intent.exits for path in exit_.paths} == {"www.google.com"}
-    plan = compile_topology(intent)
+    plan = compile_panel_pass(intent)
 
     profiles = [
         resource.payload

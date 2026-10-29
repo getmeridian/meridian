@@ -95,7 +95,7 @@ def new_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[NewS
 
 
 def _intent(control_domain: str = "") -> SetupIntent:
-    intent = single_server_intent(None, server_ref="srv-a", address=OLD, control="meridian")
+    intent = single_server_intent(None, server_ref="srv-a", address=OLD)
     return intent.model_copy(
         update={
             "access": intent.access.model_copy(update={"users": ["alice", "bob"]}),
@@ -389,9 +389,7 @@ def test_a_copy_behind_the_snapshots_is_sent_to_a_new_context(fleet: tuple[Clust
 def test_restore_opens_the_control_services_ports_before_its_bootstrap() -> None:
     from meridian.compiler import compile_topology
 
-    plan = compile_topology(
-        single_server_intent(None, server_ref="srv-new", address="198.51.100.30", control="meridian")
-    )
+    plan = compile_topology(single_server_intent(None, server_ref="srv-new", address="198.51.100.30"))
     conn = MockConnection()
 
     restore_steps.open_control_ports(plan, ServerEntry(host="198.51.100.30", id="srv-new"), conn)

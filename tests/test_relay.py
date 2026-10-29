@@ -282,7 +282,7 @@ class TestRelayListJsonEnvelope:
         try:
             with (
                 patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-                patch("meridian.control_access.MeridianPanel", return_value=panel),
+                patch("meridian.control_access.ServiceFleetPanel", return_value=panel),
                 patch("meridian.commands.relay.topology_from_local_cluster", return_value=topology),
                 pytest.raises(typer.Exit) as exc_info,
             ):
@@ -360,7 +360,7 @@ class TestRelayListJsonEnvelope:
         try:
             with (
                 patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-                patch("meridian.control_access.MeridianPanel", return_value=panel),
+                patch("meridian.control_access.ServiceFleetPanel", return_value=panel),
                 patch("meridian.commands.relay.topology_from_local_cluster", return_value=topology),
             ):
                 run_list(exit_arg="exit-v4")
@@ -424,7 +424,7 @@ class TestRelayListJsonEnvelope:
         try:
             with (
                 patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-                patch("meridian.control_access.MeridianPanel", return_value=panel),
+                patch("meridian.control_access.ServiceFleetPanel", return_value=panel),
                 patch("meridian.commands.relay.topology_from_local_cluster", return_value=topology),
             ):
                 run_list()

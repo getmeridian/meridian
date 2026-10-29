@@ -11,14 +11,13 @@ from typing import Literal
 from meridian.core.errors import MeridianError
 from meridian.core.execution import ServerConnection
 from meridian.core.redaction import redact_diagnostic_text
-from meridian.diagnostics.images import control_components, node_components
 from meridian.host_runtime import AGENT_UNIT, CONTROL_SERVICE_UNIT, CORE_UNIT
 
 LogComponent = Literal["node", "panel", "nginx", "relay"]
 LOG_COMPONENTS: tuple[LogComponent, ...] = ("node", "panel", "nginx", "relay")
 NGINX_ERROR_LOG = "/var/log/nginx/error.log"
 
-# Exit status a tail command uses for "this container, unit tool, or file is not there".
+# Exit status a tail command uses for "this unit tool or file is not there".
 _ABSENT = 10
 _JOURNAL_EMPTY = "-- No entries --"
 # ANSI escape sequences and other control characters: log lines can carry
@@ -28,10 +27,10 @@ _CONTROL_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x1b[@-_]|[\x00-\x08\x0b-\x1f
 
 @dataclass(frozen=True)
 class LogSource:
-    """One log a server keeps: a Docker container, systemd units, or a file."""
+    """One log a server keeps: systemd units or a file."""
 
     component: LogComponent
-    kind: Literal["container", "unit", "file"]
+    kind: Literal["unit", "file"]
     name: str
     legacy_names: tuple[str, ...] = ()  # pre-rename unit names whose journal still holds history
 
@@ -49,32 +48,16 @@ class LogTail:
         return not self.error
 
 
-def log_sources(
-    roles: Collection[str],
-    *,
-    subscription_page: bool,
-    relay_units: Sequence[tuple[str, str]] = (),
-    control_service: bool = False,
-) -> list[LogSource]:
-    """The logs a server holding *roles* keeps, from the same container names deploy and check use.
+def log_sources(roles: Collection[str], *, relay_units: Sequence[tuple[str, str]] = ()) -> list[LogSource]:
+    """The logs a server holding *roles* keeps, from the same unit names deploy and check use.
 
-    *relay_units* pairs each Realm hop's unit with its pre-rename name; *control_service*
-    reads Meridian's own service and agent units instead of Remnawave's containers.
+    *relay_units* pairs each Realm hop's unit with its pre-rename name.
     """
     sources: list[LogSource] = []
-    if control_service:
-        if {"exit", "gateway"} & set(roles):
-            sources.extend(LogSource("node", "unit", unit) for unit in (AGENT_UNIT, CORE_UNIT))
-        if "control" in roles:
-            sources.append(LogSource("panel", "unit", CONTROL_SERVICE_UNIT))
-    elif {"exit", "gateway"} & set(roles):
-        sources.extend(LogSource("node", "container", item.container) for item in node_components())
-    if "control" in roles and not control_service:
-        sources.extend(
-            LogSource("panel", "container", item.container)
-            for item in control_components()
-            if subscription_page or item.component != "subscription_page"
-        )
+    if {"exit", "gateway"} & set(roles):
+        sources.extend(LogSource("node", "unit", unit) for unit in (AGENT_UNIT, CORE_UNIT))
+    if "control" in roles:
+        sources.append(LogSource("panel", "unit", CONTROL_SERVICE_UNIT))
     if {"control", "exit", "gateway"} & set(roles):
         sources.append(LogSource("nginx", "file", NGINX_ERROR_LOG))
     if "relay" in roles:
@@ -90,16 +73,9 @@ def tail_command(source: LogSource, *, lines: int, pattern: str = "") -> str:
     """
     count = shlex.quote(str(lines))
     name = shlex.quote(source.name)
-    # -a: container logs carry raw bytes, and grep prints nothing for a "binary" stream.
+    # -a: logs can carry raw bytes, and grep prints nothing for a "binary" stream.
     grep = f"grep -a -F -i -e {shlex.quote(pattern)}"
-    if source.kind == "container":
-        guard = f"docker inspect --type container {name} >/dev/null 2>&1 || exit {_ABSENT}"
-        read = (
-            f"docker logs {name} 2>&1 | {grep} | tail -n {count}"
-            if pattern
-            else f"docker logs --tail {count} {name} 2>&1"
-        )
-    elif source.kind == "file":
+    if source.kind == "file":
         guard = f"test -r {name} || exit {_ABSENT}"
         read = f"{grep} {name} | tail -n {count}" if pattern else f"tail -n {count} {name}"
     else:
@@ -125,7 +101,7 @@ def collect_log(
     except (OSError, MeridianError) as exc:
         return LogTail(source, error=f"could not run the command: {exc}")
     if result.returncode == _ABSENT:
-        missing = {"container": "container not found", "file": "log file not found", "unit": "journalctl not found"}
+        missing = {"file": "log file not found", "unit": "journalctl not found"}
         return LogTail(source, error=missing[source.kind])
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip().splitlines()

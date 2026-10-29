@@ -9,6 +9,7 @@ import typer
 from rich.markup import escape
 
 from meridian import config
+from meridian.cluster_persistence import saved_backend
 from meridian.console import (
     confirm,
     err_console,
@@ -37,7 +38,7 @@ from meridian.contexts import (
     validate_name,
 )
 from meridian.core.contexts import ContextListResult, ContextSummary
-from meridian.core.errors import LocalStateError
+from meridian.core.errors import LocalStateError, RemnawaveFleetError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.i18n import t
@@ -47,6 +48,9 @@ from meridian.renderers import emit_json
 CREATES_FLEET = frozenset({"", "deploy", "setup", "studio", "restore"})
 # Command groups that never read a fleet, so a missing or malformed selection must not stop them.
 FLEET_FREE = frozenset({"context", "help", "update", "api", "serve"})
+# What a fleet still on Remnawave may run: moving it (deploy offers the move), removing it, and
+# commands that never reach its panel. Everything else needs the control service.
+REMNAWAVE_FLEET_COMMANDS = frozenset({"migrate", "deploy", "teardown", "server", "fleet.export"})
 # What a superseded context may still run (with a warning): commands that change nothing. Anything
 # not listed, a new command included, refuses there.
 READS_ONLY = frozenset(
@@ -95,11 +99,20 @@ def select_for_invocation(
             return
         if context_exists(config.INSTALL_HOME, selection.name):
             _gate_superseded(command)
+            _gate_remnawave(command)
             return
         if command not in CREATES_FLEET:
             fail(missing_context_error(config.INSTALL_HOME, selection))
         if not is_json_mode():
             info(t("context.creating", name=selection.name))
+
+
+def _gate_remnawave(command: str) -> None:
+    """A fleet still on Remnawave only moves (or goes): every other command points at `meridian migrate`."""
+    if command.split(".", 1)[0] in REMNAWAVE_FLEET_COMMANDS or command in REMNAWAVE_FLEET_COMMANDS:
+        return
+    if saved_backend() == "remnawave":
+        fail(RemnawaveFleetError())
 
 
 def _gate_superseded(command: str) -> None:

@@ -11,7 +11,7 @@ import pytest
 
 from meridian.adapters.cluster import topology_from_cluster
 from meridian.cluster import ClusterConfig
-from meridian.connectivity import create_verification_panel, select_active_client, verification_panel_factory
+from meridian.connectivity import select_active_client
 from meridian.control.client import (
     ControlClient,
     ControlServiceAuthError,
@@ -20,10 +20,9 @@ from meridian.control.client import (
     add_mutation_listener,
 )
 from meridian.control.models import ClientEndpoint, NodeSpec, NodeStatus
-from meridian.control_access import ServiceAccessPanel, ServiceFleetPanel, access_panel, fleet_panel
+from meridian.control_access import ServiceAccessPanel, ServiceFleetPanel, fleet_panel
 from meridian.remnawave import (
     XRAY_JSON_CLIENT_TYPE,
-    MeridianPanel,
     RemnawaveAuthError,
     RemnawaveError,
     RemnawaveNetworkError,
@@ -76,7 +75,7 @@ def test_verification_panel_selects_service_users_like_panel_users(url: str) -> 
         record = client.put_user("alice")
         client.put_endpoint("main:main-reality:direct", REALITY)
     cluster = ClusterConfig()
-    cluster.topology_intent = single_server_intent(None, server_ref="srv-a", client_name="alice", control="meridian")
+    cluster.topology_intent = single_server_intent(None, server_ref="srv-a", client_name="alice")
 
     with ServiceAccessPanel(url, ADMIN_TOKEN, 5) as panel:
         user = select_active_client(panel, cluster, "")
@@ -99,15 +98,6 @@ def test_verification_panel_raises_the_errors_verification_classifies(
         panel.get_user("alice")
 
 
-def test_verification_follows_the_fleet_control_backend() -> None:
-    cluster = ClusterConfig()
-    cluster.topology_intent = single_server_intent(None, server_ref="srv-a")
-    assert verification_panel_factory(cluster) is create_verification_panel
-
-    cluster.topology_intent = single_server_intent(None, server_ref="srv-a", control="meridian")
-    assert verification_panel_factory(cluster) is ServiceAccessPanel
-
-
 def test_access_panel_disables_enables_and_reissues_by_panel_id(url: str) -> None:
     with ControlClient(url, ADMIN_TOKEN) as client:
         before = client.put_user("alice")
@@ -127,17 +117,6 @@ def test_access_panel_disables_enables_and_reissues_by_panel_id(url: str) -> Non
 def test_access_panel_refuses_an_id_it_never_read(url: str) -> None:
     with ServiceAccessPanel(url, ADMIN_TOKEN) as panel, pytest.raises(RemnawaveError):
         panel.disable_user("u0000000000000000")
-
-
-def test_access_panel_follows_the_fleet_control_backend() -> None:
-    cluster = ClusterConfig()
-    cluster.panel.url = "https://198.51.100.10/secret"
-    cluster.panel.api_token = "token"
-    cluster.topology_intent = single_server_intent(None, server_ref="srv-a")
-    assert isinstance(access_panel(cluster), MeridianPanel)
-
-    cluster.topology_intent = single_server_intent(None, server_ref="srv-a", control="meridian")
-    assert isinstance(access_panel(cluster), ServiceAccessPanel)
 
 
 def test_fleet_panel_lists_only_registered_nodes_and_published_relays(url: str) -> None:
@@ -192,7 +171,7 @@ def test_fleet_projection_names_service_nodes_and_relays_by_their_service_ids(se
     registry = ServerRegistry(servers_file)
     registry.add(ServerEntry(host="198.51.100.10", name="exit-a"))
     registry.add(ServerEntry(host="198.51.100.20", name="relay-a"))
-    intent = single_server_intent(None, server_ref=registry.find("exit-a").id, control="meridian")  # type: ignore[union-attr]
+    intent = single_server_intent(None, server_ref=registry.find("exit-a").id)  # type: ignore[union-attr]
     intent = add_relay_to_intent(
         intent,
         server_ref=registry.find("relay-a").id,
@@ -210,8 +189,6 @@ def test_fleet_projection_names_service_nodes_and_relays_by_their_service_ids(se
     relay_ids = [ref.uuid for ref in topology.relays[0].host_refs]
     assert len(relay_ids) == 1 and relay_ids[0].startswith(f"{topology.relays[0].name}:")
     assert isinstance(panel, ServiceFleetPanel)
-    cluster.topology_intent = single_server_intent(None, server_ref="srv-a")
-    assert isinstance(fleet_panel(cluster, topology), MeridianPanel)
 
 
 def test_fleet_projection_names_a_service_gateway_by_its_node_id(servers_file: Path) -> None:

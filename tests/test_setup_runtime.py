@@ -92,7 +92,9 @@ class _Panel:
 
 
 def _intent() -> SetupIntent:
-    return single_exit_intent(paths=[reality_path("exit-a-reality", "www.microsoft.com")])
+    # The panel-built runtime below (`_Panel`, `build_remnawave_drivers`) drives a Remnawave fleet.
+    intent = single_exit_intent(paths=[reality_path("exit-a-reality", "www.microsoft.com")])
+    return intent.model_copy(update={"control": intent.control.model_copy(update={"backend": "remnawave"})})
 
 
 def _drivers(plan: ResourcePlan) -> ResourceDrivers:

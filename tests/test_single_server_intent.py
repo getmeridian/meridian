@@ -5,12 +5,12 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from meridian.compiler import compile_topology
 from meridian.compiler.models import HostPayload, NginxArtifactPayload
 from meridian.core.deploy import DeployRequest
 from meridian.core.errors import LocalStateError
 from meridian.core.topology import AccessIntent, ExitIntent, ProtocolPathIntent
 from meridian.setup.single_server import request_intent, single_server_intent
+from tests.support.topology import compile_panel_pass
 
 
 def test_fresh_ip_deploy_is_a_reality_exit_on_the_control_server() -> None:
@@ -22,7 +22,7 @@ def test_fresh_ip_deploy_is_a_reality_exit_on_the_control_server() -> None:
     assert [path.protocol for path in exit_.paths] == ["reality"]
     assert exit_.paths[0].reality_sni == "www.google.com"
     assert intent.access.users == ["alice"]
-    compile_topology(intent)
+    compile_panel_pass(intent)
 
 
 def test_domain_adds_tls_paths_and_opt_in_hysteria2() -> None:
@@ -32,7 +32,7 @@ def test_domain_adds_tls_paths_and_opt_in_hysteria2() -> None:
     assert set(paths) == {"reality", "xhttp", "wss", "hysteria2"}
     assert paths["xhttp"].tls_sni == paths["wss"].host == paths["hysteria2"].tls_sni == "vpn.example.com"
     assert paths["xhttp"].path != paths["wss"].path
-    compile_topology(intent)
+    compile_panel_pass(intent)
 
 
 def test_every_invisible_method_is_on_by_default_even_without_a_domain() -> None:
@@ -80,7 +80,7 @@ def test_fingerprint_reaches_every_tcp_path_and_survives_a_plain_redeploy() -> N
         assert paths == {"reality": "firefox", "xhttp": "firefox", "wss": "firefox", "hysteria2": "chrome"}
     hosts = [
         resource.payload
-        for resource in compile_topology(again).resources
+        for resource in compile_panel_pass(again).resources
         if isinstance(resource.payload, HostPayload) and not resource.payload.is_hidden
     ]
     published = [(host.protocol, host.fingerprint) for host in hosts if not host.xray_json_template_ref]
@@ -111,7 +111,9 @@ def test_harden_flag_reaches_every_server_baseline() -> None:
     from meridian.compiler.models import ServerBaselinePayload
 
     intent = single_server_intent(None, server_ref="srv-a").model_copy(update={"harden": False})
-    baselines = [r.payload for r in compile_topology(intent).resources if isinstance(r.payload, ServerBaselinePayload)]
+    baselines = [
+        r.payload for r in compile_panel_pass(intent).resources if isinstance(r.payload, ServerBaselinePayload)
+    ]
 
     assert baselines and all(not payload.harden for payload in baselines)
 
@@ -122,7 +124,7 @@ def test_self_steal_on_the_domain_reuses_it_for_reality_and_one_tls_server() -> 
 
     reality = intent.exits[0].paths[0]
     assert (reality.reality_sni, reality.self_steal) == ("vpn.example.com", True)
-    plan = compile_topology(intent)
+    plan = compile_panel_pass(intent)
     servers = [
         resource.payload
         for resource in plan.resources

@@ -1,4 +1,4 @@
-"""`client set`, `client reset-traffic`, and limits in `client add` and `client show`, alike on both backends."""
+"""`client set`, `client reset-traffic`, and limits in `client add` and `client show`."""
 
 from __future__ import annotations
 
@@ -26,7 +26,6 @@ from meridian.handoff import HandoffLinks
 from meridian.remnawave import User
 from meridian.setup.single_server import single_server_intent
 from tests.support.control_service import ADMIN_TOKEN, serve_control
-from tests.support.remnawave_http import FakeRemnawave
 from tests.support.topology import single_exit_intent
 
 GB = 1024**3
@@ -60,10 +59,10 @@ def test_usage_line(strategy: str, limit: int, shown: str) -> None:
     assert format_usage(build_client_record(user)) == shown
 
 
-# --- Commands on both backends --------------------------------------------------------------------------------
+# --- Commands against a control service -------------------------------------------------------------------------
 
 
-def _remnawave_cluster(tmp_path: Path) -> ClusterConfig:
+def _mocked_cluster(tmp_path: Path) -> ClusterConfig:
     cluster = ClusterConfig(
         panel=PanelConfig(url="https://198.51.100.1/panel", api_token="test-token", server_ip="198.51.100.1"),
         topology_intent=single_exit_intent(users=["alice", "bob"]),
@@ -73,34 +72,22 @@ def _remnawave_cluster(tmp_path: Path) -> ClusterConfig:
 
 
 @contextmanager
-def _backend(kind: str, tmp_path: Path, *, json_mode: bool = False) -> Iterator[SimpleNamespace]:
-    """A saved fleet of either control backend with client alice, served to client commands."""
+def _fleet(tmp_path: Path, *, json_mode: bool = False) -> Iterator[SimpleNamespace]:
+    """A saved fleet on a real loopback control service with client alice, served to client commands."""
     set_json_mode(json_mode)
     try:
         with ExitStack() as stack:
-            if kind == "remnawave":
-                cluster = _remnawave_cluster(tmp_path)
-                fake = FakeRemnawave("alice")
-                stack.enter_context(patch("meridian.control_access.MeridianPanel", side_effect=fake.panel))
-                create = fake.add
-            else:
-                url = stack.enter_context(serve_control(tmp_path))
-                cluster = ClusterConfig(
-                    panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, server_ip="198.51.100.1"),
-                    topology_intent=single_server_intent(
-                        None, server_ref="srv-a", client_name="alice", control="meridian"
-                    ),
-                )
-                client = stack.enter_context(ControlClient(url, ADMIN_TOKEN))
-                client.put_user("alice")
-                create = client.put_user  # type: ignore[assignment]
+            url = stack.enter_context(serve_control(tmp_path))
+            cluster = ClusterConfig(
+                panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, server_ip="198.51.100.1"),
+                topology_intent=single_server_intent(None, server_ref="srv-a", client_name="alice"),
+            )
+            client = stack.enter_context(ControlClient(url, ADMIN_TOKEN))
+            client.put_user("alice")
             stack.enter_context(patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster))
-            yield SimpleNamespace(cluster=cluster, create=create)
+            yield SimpleNamespace(cluster=cluster, create=client.put_user)
     finally:
         set_json_mode(False)
-
-
-BACKENDS = pytest.mark.parametrize("backend", ["remnawave", "meridian"])
 
 
 def _envelope(capsys: pytest.CaptureFixture[str], schema: str) -> dict[str, Any]:
@@ -109,11 +96,8 @@ def _envelope(capsys: pytest.CaptureFixture[str], schema: str) -> dict[str, Any]
     return payload
 
 
-@BACKENDS
-def test_client_set_changes_and_clears_limits_alike_on_both_backends(
-    backend: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    with _backend(backend, tmp_path, json_mode=True):
+def test_client_set_changes_and_clears_limits(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    with _fleet(tmp_path, json_mode=True):
         run_set("alice", limit="50GB", reset="month", expires=FUTURE_DAY)
         first = _envelope(capsys, "client-set-envelope")
         run_set("alice", limit="none", reset=None, expires="never")
@@ -131,11 +115,8 @@ def test_client_set_changes_and_clears_limits_alike_on_both_backends(
     assert (client["traffic_limit_bytes"], client["traffic_reset"], client["expires_at"]) == (0, "month", "")
 
 
-@BACKENDS
-def test_client_reset_traffic_starts_usage_from_zero(
-    backend: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    with _backend(backend, tmp_path, json_mode=True):
+def test_client_reset_traffic_starts_usage_from_zero(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    with _fleet(tmp_path, json_mode=True):
         run_reset_traffic("alice")
         payload = _envelope(capsys, "client-reset-traffic-envelope")
 
@@ -143,11 +124,10 @@ def test_client_reset_traffic_starts_usage_from_zero(
     assert payload["data"]["client"]["traffic_used_bytes"] == 0
 
 
-@BACKENDS
 def test_client_show_prints_usage_against_the_limit_and_the_expiry(
-    backend: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    with _backend(backend, tmp_path):
+    with _fleet(tmp_path):
         run_set("alice", limit="50GB", reset="month", expires=FUTURE_DAY)
         capsys.readouterr()
         with patch("meridian.commands.client.resolve_page_url", return_value=PageResolution()):
@@ -158,7 +138,6 @@ def test_client_show_prints_usage_against_the_limit_and_the_expiry(
     assert f"Expires   {FUTURE_DAY}" in output
 
 
-@BACKENDS
 @pytest.mark.parametrize(
     ("options", "message"),
     [
@@ -170,11 +149,11 @@ def test_client_show_prints_usage_against_the_limit_and_the_expiry(
     ids=["nothing", "bad-limit", "past-expiry", "bad-period"],
 )
 def test_client_set_refuses_bad_input_before_any_connection(
-    backend: str, options: dict[str, str], message: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    options: dict[str, str], message: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     arguments = {"limit": None, "reset": None, "expires": None, **options}
     with (
-        _backend(backend, tmp_path, json_mode=True),
+        _fleet(tmp_path, json_mode=True),
         patch("meridian.commands.client_limits.access_panel") as access_panel,
         pytest.raises(typer.Exit) as exc_info,
     ):
@@ -186,18 +165,16 @@ def test_client_set_refuses_bad_input_before_any_connection(
     access_panel.assert_not_called()
 
 
-@BACKENDS
-def test_client_set_refuses_a_name_that_is_not_a_fleet_client(backend: str, tmp_path: Path) -> None:
-    with _backend(backend, tmp_path), pytest.raises(typer.Exit) as exc_info:
+def test_client_set_refuses_a_name_that_is_not_a_fleet_client(tmp_path: Path) -> None:
+    with _fleet(tmp_path), pytest.raises(typer.Exit) as exc_info:
         run_set("mallory", limit="50GB", reset=None, expires=None)
     assert exc_info.value.exit_code == 2
 
 
-@BACKENDS
 def test_client_add_sets_limits_after_the_reviewed_apply(
-    backend: str, tmp_path: Path, tmp_home: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, tmp_home: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    with _backend(backend, tmp_path, json_mode=True) as fleet:
+    with _fleet(tmp_path, json_mode=True) as fleet:
         runtime = MagicMock()
 
         def apply_intent(intent: Any, *_args: object, **_kwargs: object) -> SimpleNamespace:
@@ -246,8 +223,8 @@ def test_client_add_reports_limits_it_could_not_set_as_a_partial_result(
     set_json_mode(True)
     try:
         with (
-            patch("meridian.commands._helpers.ClusterConfig.load", return_value=_remnawave_cluster(tmp_path)),
-            patch("meridian.control_access.MeridianPanel", return_value=panel),
+            patch("meridian.commands._helpers.ClusterConfig.load", return_value=_mocked_cluster(tmp_path)),
+            patch("meridian.control_access.ServiceAccessPanel", return_value=panel),
             patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
             patch("meridian.servers.ServerRegistry"),
             patch("meridian.commands.client.publish_connection_pages", return_value=[]),
@@ -264,23 +241,17 @@ def test_client_add_reports_limits_it_could_not_set_as_a_partial_result(
     assert "meridian client set carol" in payload["warnings"][0]["hint"]
 
 
-@pytest.mark.parametrize(("backend", "listed"), [("remnawave", False), ("meridian", True)])
-def test_client_list_shows_console_people_only_where_every_user_is_the_fleets(
-    backend: str, listed: bool, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """A control service holds only this fleet's people, so one added in its console is listed, marked;
-    a Remnawave panel may hold others, so only declared clients show there."""
-    with _backend(backend, tmp_path, json_mode=True) as fleet:
+def test_client_list_shows_console_people_marked(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A control service holds only this fleet's people, so one added in its console is listed, marked."""
+    with _fleet(tmp_path, json_mode=True) as fleet:
         fleet.create("carol")
         run_list()
         clients = _envelope(capsys, "client-list-envelope")["data"]["clients"]
         set_json_mode(False)
         run_list()
 
-    assert {client["username"]: client["declared"] for client in clients} == (
-        {"alice": True, "carol": False} if listed else {"alice": True}
-    )
-    assert ("carol · console" in capsys.readouterr().err) is listed
+    assert {client["username"]: client["declared"] for client in clients} == {"alice": True, "carol": False}
+    assert "carol · console" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("username", ["ab", "a.b", "c" * 37], ids=["two-chars", "dotted", "37-chars"])
@@ -288,7 +259,7 @@ def test_client_show_reads_a_console_name_outside_remnawaves_rules(
     username: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """The control service allows names Remnawave never did; `client list` shows them, so `show` must too."""
-    with _backend("meridian", tmp_path, json_mode=True) as fleet:
+    with _fleet(tmp_path, json_mode=True) as fleet:
         fleet.create(username)
         with patch("meridian.commands.client.resolve_page_url", return_value=PageResolution()):
             run_show(username)
@@ -301,7 +272,7 @@ def test_client_show_prefers_an_exact_console_name_and_refuses_an_ambiguous_one(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Declared `alice` and console `ALICE` are two people; a case-folded lookup handed out alice's link."""
-    with _backend("meridian", tmp_path, json_mode=True) as fleet:
+    with _fleet(tmp_path, json_mode=True) as fleet:
         fleet.create("ALICE")
         with patch("meridian.commands.client.resolve_page_url", return_value=PageResolution()):
             run_show("ALICE")
@@ -318,7 +289,7 @@ def test_enabling_an_expired_client_reports_that_it_stays_expired(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """The service re-applies expiry at once; the command once claimed `active` all the same."""
-    with _backend("meridian", tmp_path, json_mode=True) as fleet:
+    with _fleet(tmp_path, json_mode=True) as fleet:
         with ControlClient(fleet.cluster.panel.url, ADMIN_TOKEN) as client:
             client.update_user("alice", UserUpdate(status="disabled", expire_at="2020-01-01T00:00:00Z"))
         run_enable("alice")

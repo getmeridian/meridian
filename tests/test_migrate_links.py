@@ -53,7 +53,8 @@ def _relay_intent() -> SetupIntent:
     relay = TransparentRelayIntent(
         id="relay-a", hop_server_refs=["srv-relay"], exit_ref=intent.exits[0].id, protocol_path_ref=reality.id
     )
-    return intent.model_copy(update={"transparent_relays": [relay]})
+    control = intent.control.model_copy(update={"backend": "remnawave"})
+    return intent.model_copy(update={"transparent_relays": [relay], "control": control})
 
 
 def _cluster(intent: SetupIntent) -> ClusterConfig:

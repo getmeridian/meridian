@@ -32,7 +32,8 @@ def _load_warning(message: str, *, details: list[str] | None = None) -> None:
         logger.warning("%s", message)
 
 
-CURRENT_CLUSTER_VERSION = 3
+# 4: the control backend defaults to Meridian's service, so a Remnawave intent names its backend (#95).
+CURRENT_CLUSTER_VERSION = 4
 
 
 class ClusterConfigExternallyModifiedError(RuntimeError):

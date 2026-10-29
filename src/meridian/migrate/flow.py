@@ -75,6 +75,7 @@ class MigrationReview:
     node_servers: list[str]
     dropped: tuple[str, ...] = DROPPED_PANEL_STATE
     telegram: bool = False
+    client_ips: bool = False
 
     @property
     def retired_by_apply(self) -> list[ManagedResourceBinding]:
@@ -138,7 +139,14 @@ class ControlMigrator:
                 "This fleet already runs Meridian's control service; there is nothing to migrate.",
                 category="user",
             )
-        flipped = intent.model_copy(update={"control": intent.control.model_copy(update={"backend": "meridian"})})
+        # Client IP forwarding fed the panel's per-user IP limits; the control service has none, and
+        # `deploy` no longer reaches a Remnawave fleet to turn it off, so the move drops it.
+        flipped = intent.model_copy(
+            update={
+                "control": intent.control.model_copy(update={"backend": "meridian"}),
+                "forward_client_ips": False,
+            }
+        )
         validate_meridian_backend(flipped)
         setup = SetupRuntime(self._registry, cluster_loader=lambda: self.cluster).review(
             SetupDraft.from_intent(flipped), cluster=self.cluster
@@ -159,6 +167,7 @@ class ControlMigrator:
             forgotten=panel_bindings(self.cluster, setup.plan),
             node_servers=sorted({binding.server_ref for binding in node_runtime_bindings(self.cluster)}),
             telegram=self.cluster.telegram is not None,
+            client_ips=intent.forward_client_ips,
         )
 
     # -- run ------------------------------------------------------------------------------

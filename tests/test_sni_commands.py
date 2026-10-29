@@ -11,13 +11,13 @@ import typer
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.commands.sni import run_exit_sni, run_relay_sni
-from meridian.compiler.compile import compile_topology
 from meridian.compiler.models import InboundPayload
 from meridian.core.topology import SetupIntent
 from meridian.diagnostics.camouflage import OwnHostname, camouflage_refusal
 from meridian.reconciler.resources import ResourceExecutionResult
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.editor import set_exit_reality_sni, set_relay_reality_sni
+from tests.support.topology import compile_panel_pass
 from tests.test_topology_removal_commands import SERVERS, _intent
 
 
@@ -124,7 +124,7 @@ def test_relay_sni_edit_refuses_unknown_chains() -> None:
 
 
 def test_compiled_plan_carries_only_the_new_exit_sni() -> None:
-    plan = compile_topology(set_exit_reality_sni(_intent(), "exit-b", "new.example.net"))
+    plan = compile_panel_pass(set_exit_reality_sni(_intent(), "exit-b", "new.example.net"))
 
     inbounds = [
         resource.payload
@@ -139,7 +139,7 @@ def test_compiled_plan_carries_only_the_new_exit_sni() -> None:
 
 
 def test_compiled_plan_gives_a_relay_with_its_own_sni_a_listener_for_it() -> None:
-    plan = compile_topology(set_relay_reality_sni(_intent(), {"relay-a"}, "new.example.net"))
+    plan = compile_panel_pass(set_relay_reality_sni(_intent(), {"relay-a"}, "new.example.net"))
 
     relay_inbounds = [
         resource.payload

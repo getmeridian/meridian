@@ -23,7 +23,6 @@ from meridian.cluster import (
     WorkloadBinding,
 )
 from meridian.compiler import compile_topology
-from meridian.compiler.errors import TopologyCompileError
 from meridian.control.models import UserImportBatch, UserImportResult
 from meridian.core.errors import LocalStateError
 from meridian.core.topology import SetupIntent, TransparentRelayIntent
@@ -56,7 +55,8 @@ def _intent() -> SetupIntent:
         id="relay-a", hop_server_refs=["srv-relay"], exit_ref=intent.exits[0].id, protocol_path_ref=reality.id
     )
     access = intent.access.model_copy(update={"users": ["alice", "bob"]})
-    return intent.model_copy(update={"transparent_relays": [relay], "access": access})
+    control = intent.control.model_copy(update={"backend": "remnawave"})
+    return intent.model_copy(update={"transparent_relays": [relay], "access": access, "control": control})
 
 
 def _remnawave_fleet(intent: SetupIntent) -> ClusterConfig:
@@ -439,13 +439,15 @@ def test_a_fleet_already_on_the_control_service_is_refused(tmp_home: Path, monke
     assert error.value.category == "user"
 
 
-def test_a_topology_the_meridian_backend_refuses_is_refused_before_anything_changes(
+def test_client_ip_forwarding_is_dropped_and_named_in_the_review(
     tmp_home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     fleet = Fleet(tmp_home, monkeypatch, intent=_intent().model_copy(update={"forward_client_ips": True}))
 
-    with pytest.raises(TopologyCompileError, match="client IP forwarding"):
-        ControlMigrator(ClusterConfig.load(), fleet.registry, connection_builder=_never_dial).review()
+    review = fleet.migrator().review()
+
+    assert review.client_ips
+    assert not review.intent.forward_client_ips
 
 
 def test_an_unresolved_earlier_apply_is_refused_before_anything_stops(fleet: Fleet) -> None:

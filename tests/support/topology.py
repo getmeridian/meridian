@@ -10,6 +10,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 from unittest.mock import MagicMock
 
+from meridian.compiler import compile_topology
 from meridian.compiler.models import (
     COMPILER_VERSION,
     CompiledResource,
@@ -63,6 +64,16 @@ def single_exit_intent(
     )
 
 
+def compile_panel_pass(intent: SetupIntent, **options: Any) -> ResourcePlan:
+    """Compile the panel-shaped first pass every plan starts from.
+
+    The Meridian backend rewrites this pass (`compiler/meridian_backend.py`, tested in
+    `test_meridian_backend.py`); tests of topology decisions it carries over read it here.
+    """
+    control = intent.control.model_copy(update={"backend": "remnawave"})
+    return compile_topology(intent.model_copy(update={"control": control}), **options)
+
+
 def resource_plan(*resources: CompiledResource) -> ResourcePlan:
     """A plan over *resources* with a correct plan hash."""
     return ResourcePlan(
@@ -97,7 +108,7 @@ def panel_mock(**return_values: Any) -> MagicMock:
 GATEWAY_SERVERS = {"srv-a": "198.51.100.10", "srv-b": "198.51.100.20", "srv-g": "198.51.100.40"}
 
 
-def gateway_fleet_intent(*, control: str = "meridian") -> SetupIntent:
+def gateway_fleet_intent() -> SetupIntent:
     """Exits `main` (srv-a, the control server) and `de` (srv-b) behind routing gateway `gw` (srv-g).
 
     The gateway blocks one domain, sends one out of its own address, one to `de`, and the
@@ -106,7 +117,7 @@ def gateway_fleet_intent(*, control: str = "meridian") -> SetupIntent:
     from meridian.setup.default_paths import default_exit_paths
     from meridian.setup.single_server import single_server_intent
 
-    intent = single_server_intent(None, server_ref="srv-a", address=GATEWAY_SERVERS["srv-a"], control=control)
+    intent = single_server_intent(None, server_ref="srv-a", address=GATEWAY_SERVERS["srv-a"])
     second = ExitIntent(id="de", server_ref="srv-b", paths=default_exit_paths("de", address=GATEWAY_SERVERS["srv-b"]))
     return intent.model_copy(
         update={

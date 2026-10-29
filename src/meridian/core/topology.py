@@ -80,8 +80,8 @@ class ControlPlaneIntent(CoreModel):
     server_ref: ServerReferenceValue
     public_hostname: OptionalHostnameValue = ""
     title: ServerTitleValue = "Meridian"
-    # Meridian's own control service and node agent replace Remnawave (#95, hidden in betas).
-    backend: ControlBackend = Field(default="remnawave", exclude_if=lambda backend: backend == "remnawave")
+    # Meridian's own control service and node agent (#95); "remnawave" survives only until `meridian migrate`.
+    backend: ControlBackend = Field(default="meridian", exclude_if=lambda backend: backend == "meridian")
 
 
 class ProtocolPathIntent(CoreModel):

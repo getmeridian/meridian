@@ -79,7 +79,7 @@ def _cli(
         with ExitStack() as stack:
             stack.enter_context(patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster))
             panel_cls = stack.enter_context(
-                patch("meridian.control_access.MeridianPanel", return_value=panel or _make_panel_mock())
+                patch("meridian.control_access.ServiceAccessPanel", return_value=panel or _make_panel_mock())
             )
             if runtime is not None:
                 stack.enter_context(patch("meridian.setup.runtime.SetupRuntime", return_value=runtime))
@@ -201,15 +201,6 @@ class TestRunShow:
         output = capsys.readouterr().err
         assert "panel-admin" not in output
         assert "panel-password" not in output
-
-    def test_v4_show_does_not_expose_internal_service_user(self, tmp_home: Path) -> None:
-        panel = _make_panel_mock()
-
-        with _cli(_make_cluster(tmp_home, users=["alice"]), panel), pytest.raises(typer.Exit) as exc_info:
-            run_show(name="meridian-route-123")
-
-        assert exc_info.value.exit_code == 2
-        panel.get_user.assert_not_called()
 
     def test_show_nonexistent_client_fails(self, tmp_home: Path) -> None:
         panel = _make_panel_mock()
@@ -337,17 +328,6 @@ class TestRunList:
             run_list()
 
         panel.list_users.assert_called_once()
-
-    def test_v4_list_hides_internal_service_users(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        panel = _make_panel_mock()
-        panel.list_users.return_value = [_make_user("alice"), _make_user("meridian-route-123")]
-
-        with _cli(_make_cluster(tmp_home, users=["alice"]), panel, json_mode=True):
-            run_list()
-
-        payload = _json(capsys)
-        assert payload["data"]["summary"]["clients"] == 1
-        assert [client["username"] for client in payload["data"]["clients"]] == ["alice"]
 
     def test_list_json_outputs_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
         with _cli(_make_cluster(tmp_home), json_mode=True):

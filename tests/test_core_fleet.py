@@ -156,15 +156,12 @@ def _v4_cluster() -> ClusterConfig:
                 id="exit-a",
                 generation=2,
                 active=True,
-                node_uuids={"srv-exit": "node-exit-a"},
-                host_uuids={"host:relay-a:reality-a": "host-relay-a"},
             ),
             WorkloadBinding(
                 id="gateway-a",
                 kind="routing_gateway",
                 generation=2,
                 active=True,
-                node_uuids={"srv-gateway": "node-gateway-a"},
             ),
         ],
         active_generation=2,
@@ -190,7 +187,7 @@ def test_v4_projection_exposes_all_xray_nodes_and_advertised_relay_endpoint() ->
     assert topology.nodes[0].model_dump() == {
         "ip": "198.51.100.20",
         "name": "exit-a",
-        "uuid": "node-exit-a",
+        "uuid": "exit-a",
         "is_panel_host": False,
         "ssh_user": "ubuntu",
         "ssh_port": 2222,
@@ -204,7 +201,7 @@ def test_v4_projection_exposes_all_xray_nodes_and_advertised_relay_endpoint() ->
     assert topology.nodes[1].model_dump() == {
         "ip": "198.51.100.40",
         "name": "gateway-a",
-        "uuid": "node-gateway-a",
+        "uuid": "gateway-a",
         "is_panel_host": False,
         "ssh_user": "root",
         "ssh_port": 22,
@@ -224,7 +221,7 @@ def test_v4_projection_exposes_all_xray_nodes_and_advertised_relay_endpoint() ->
             "ssh_port": 22,
             "exit_node_ip": "198.51.100.20",
             "sni": "www.example.com",
-            "host_refs": [{"protocol": "reality", "uuid": "host-relay-a"}],
+            "host_refs": [{"protocol": "reality", "uuid": "relay-a:reality-a"}],
         }
     ]
     assert inventory.summary.nodes == 2

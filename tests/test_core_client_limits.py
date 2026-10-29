@@ -252,7 +252,7 @@ def test_control_service_apply_keeps_limits_set_by_the_operator(tmp_path: Path) 
     from tests.support.mock_connection import MockConnection
 
     plan = compile_topology(
-        single_server_intent(None, server_ref="srv-a", address="198.51.100.10", client_name="alice", control="meridian")
+        single_server_intent(None, server_ref="srv-a", address="198.51.100.10", client_name="alice")
     )
     action = next(item for item in build_resource_actions(plan, 1) if item.resource.payload.kind == "control_user")
     with serve_control(tmp_path) as url:

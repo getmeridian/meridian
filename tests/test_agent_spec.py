@@ -19,7 +19,7 @@ from meridian.setup.single_server import single_server_intent
 
 
 def _profile():
-    plan = compile_topology(single_server_intent(None, server_ref="srv-a", address="198.51.100.10", control="meridian"))
+    plan = compile_topology(single_server_intent(None, server_ref="srv-a", address="198.51.100.10"))
     return next(item.payload for item in plan.resources if isinstance(item.payload, NodeWorkloadPayload)).profile
 
 

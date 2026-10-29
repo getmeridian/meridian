@@ -28,7 +28,6 @@ from meridian.core.fleet import FleetTopology
 from meridian.remnawave import (
     XRAY_JSON_CLIENT_TYPE,
     Host,
-    MeridianPanel,
     Node,
     RemnawaveAuthError,
     RemnawaveError,
@@ -170,27 +169,23 @@ class ServiceFleetPanel(ServiceAccessPanel):
         return hosts
 
 
-AccessPanel = MeridianPanel | ServiceAccessPanel
-FleetPanel = MeridianPanel | ServiceFleetPanel
+AccessPanel = ServiceAccessPanel
+FleetPanel = ServiceFleetPanel
 
 
 def access_panel(cluster: ClusterConfig) -> AccessPanel:
-    """The fleet's user directory: Remnawave, or Meridian's own control service."""
-    if cluster.runs_control_service:
-        return ServiceAccessPanel(cluster.panel.url, cluster.panel.api_token)
-    return MeridianPanel(cluster.panel.url, cluster.panel.api_token)
+    """The fleet's user directory: Meridian's control service."""
+    return ServiceAccessPanel(cluster.panel.url, cluster.panel.api_token)
 
 
 def fleet_panel(cluster: ClusterConfig, topology: FleetTopology) -> FleetPanel:
-    """The fleet's live node and relay status: Remnawave, or Meridian's own control service."""
-    if cluster.runs_control_service:
-        return ServiceFleetPanel(
-            cluster.panel.url,
-            cluster.panel.api_token,
-            node_ids=[node.uuid for node in topology.nodes if node.uuid],
-            endpoint_ids=[ref.uuid for relay in topology.relays for ref in relay.host_refs],
-        )
-    return MeridianPanel(cluster.panel.url, cluster.panel.api_token)
+    """The fleet's live node and relay status, from the control service."""
+    return ServiceFleetPanel(
+        cluster.panel.url,
+        cluster.panel.api_token,
+        node_ids=[node.uuid for node in topology.nodes if node.uuid],
+        endpoint_ids=[ref.uuid for relay in topology.relays for ref in relay.host_refs],
+    )
 
 
 def _translated(call: Callable[[], T]) -> T:

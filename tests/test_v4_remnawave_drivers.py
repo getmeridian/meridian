@@ -11,7 +11,6 @@ from uuid import UUID
 import pytest
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding, RealityKeyBinding, WorkloadBinding
-from meridian.compiler import compile_topology
 from meridian.compiler.models import (
     NON_XRAY_JSON_TYPES,
     SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
@@ -57,6 +56,7 @@ from meridian.remnawave import (
     User,
 )
 from meridian.xray_workload import WorkloadConfigError
+from tests.support.topology import compile_panel_pass
 
 _REMNAWAVE_DISPLAY_NAME_RE = re.compile(r"^[A-Za-z0-9_ -]+$")
 _REMNAWAVE_USERNAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -567,7 +567,7 @@ def _keys(server_ref: str) -> RealityKeyBinding:
 
 
 def test_missing_profile_observation_does_not_allocate_workload_secrets() -> None:
-    plan = compile_topology(_intent())
+    plan = compile_panel_pass(_intent())
     action = next(
         action
         for action in build_resource_actions(plan, generation=1)
@@ -605,7 +605,7 @@ def test_missing_profile_observation_does_not_allocate_workload_secrets() -> Non
 
 
 def test_existing_profile_with_incomplete_reality_keys_is_an_observation_error() -> None:
-    plan = compile_topology(_intent())
+    plan = compile_panel_pass(_intent())
     action = next(
         action
         for action in build_resource_actions(plan, generation=1)
@@ -654,7 +654,7 @@ def test_existing_profile_with_incomplete_reality_keys_is_an_observation_error()
 
 
 def test_moved_exit_repoints_its_owned_node_instead_of_refusing() -> None:
-    plan = compile_topology(_intent())
+    plan = compile_panel_pass(_intent())
     cluster = ClusterConfig()
     panel = StatefulPanel()
     workloads = WorkloadStateManager(cluster, persist=lambda _state: None, key_factory=_keys)
@@ -685,7 +685,7 @@ def test_moved_exit_repoints_its_owned_node_instead_of_refusing() -> None:
 
 
 def test_two_exits_reconcile_distinct_profiles_nodes_hosts_and_squad() -> None:
-    plan = compile_topology(_intent())
+    plan = compile_panel_pass(_intent())
     cluster = ClusterConfig()
     panel = StatefulPanel()
     panel.subscription_settings.response_rules = [{"name": "unmanaged"}]
@@ -831,7 +831,7 @@ def test_gateway_reconciles_service_edges_ordered_routes_and_fail_closed_pool() 
         default_egress_ref="primary",
         access=base.access,
     )
-    plan = compile_topology(intent)
+    plan = compile_panel_pass(intent)
     cluster = ClusterConfig()
     panel = StatefulPanel()
     key_calls: list[str] = []
@@ -942,7 +942,7 @@ def test_gateway_reconciles_service_edges_ordered_routes_and_fail_closed_pool() 
 
 
 def test_unbound_mismatched_profile_name_collision_is_not_adopted() -> None:
-    plan = compile_topology(_intent())
+    plan = compile_panel_pass(_intent())
     profile_resource = next(
         resource
         for resource in plan.resources
@@ -978,7 +978,7 @@ def test_unbound_mismatched_profile_name_collision_is_not_adopted() -> None:
 
 
 def test_intent_change_after_first_apply_converges_with_the_same_keys() -> None:
-    first_plan = compile_topology(_intent())
+    first_plan = compile_panel_pass(_intent())
     cluster = ClusterConfig()
     panel = StatefulPanel()
     key_calls: list[str] = []
@@ -1011,7 +1011,7 @@ def test_intent_change_after_first_apply_converges_with_the_same_keys() -> None:
     ).all_succeeded
 
     grown = _intent().model_copy(update={"access": AccessIntent(users=["default", "zed"])})
-    second_plan = compile_topology(grown)
+    second_plan = compile_panel_pass(grown)
     assert second_plan.plan_hash != first_plan.plan_hash
 
     result = execute_resource_plan(second_plan, cluster, drivers_for(second_plan), persist=lambda _state: None)
@@ -1052,11 +1052,11 @@ def test_adding_an_exit_renames_existing_hosts_in_place_instead_of_twinning_them
         result = execute_resource_plan(plan, cluster, drivers, persist=lambda _state: None)
         assert result.all_succeeded, [item.error for item in result.results if item.error]
 
-    run(compile_topology(single))
+    run(compile_panel_pass(single))
     first = {binding.logical_id: binding.remote_id for binding in cluster.managed_bindings.values() if binding.active}
     first_remarks = {host.uuid: host.remark for host in panel.hosts.values()}
 
-    grown = compile_topology(_intent())
+    grown = compile_panel_pass(_intent())
     run(grown)
 
     host_count = sum(1 for resource in grown.resources if resource.payload.kind == "host")
@@ -1073,7 +1073,7 @@ def test_adding_an_exit_renames_existing_hosts_in_place_instead_of_twinning_them
 def test_node_country_follows_the_exit_region_and_otherwise_stays_the_operators() -> None:
     base = _intent()
     intent = base.model_copy(update={"exits": [base.exits[0].model_copy(update={"region": "DE"}), base.exits[1]]})
-    plan = compile_topology(intent)
+    plan = compile_panel_pass(intent)
     cluster = ClusterConfig()
     panel = StatefulPanel()
     workloads = WorkloadStateManager(cluster, persist=lambda _state: None, key_factory=_keys)
@@ -1114,7 +1114,7 @@ def test_node_country_follows_the_exit_region_and_otherwise_stays_the_operators(
 def test_seeded_support_placeholder_becomes_the_support_page_and_apps_get_xray_json(
     panel_url: str, expected: str | None
 ) -> None:
-    plan = compile_topology(_intent())
+    plan = compile_panel_pass(_intent())
     cluster = ClusterConfig()
     cluster.panel.url = panel_url
     cluster.panel.sub_path = "page-path"
@@ -1139,7 +1139,7 @@ def test_seeded_support_placeholder_becomes_the_support_page_and_apps_get_xray_j
 
 
 def test_every_subscription_carries_the_managed_refresh_interval_and_keeps_operator_headers() -> None:
-    plan = compile_topology(_intent())
+    plan = compile_panel_pass(_intent())
     cluster = ClusterConfig()
     panel = StatefulPanel()
     panel.subscription_settings.custom_response_headers["support-url"] = "https://support.example.com"

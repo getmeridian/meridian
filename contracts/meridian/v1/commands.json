@@ -987,7 +987,6 @@
         "--request",
         "--dry-run",
         "--cancel-file",
-        "--control",
         "--context"
       ],
       "outcomes": [
