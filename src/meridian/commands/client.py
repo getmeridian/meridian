@@ -400,7 +400,6 @@ def _reissue(cluster: ClusterConfig, name: str, shown: str, operation: Operation
     print_handoff_links(subscription_url, page_url=links.page_url)
     err_console.print()
     err_console.print(f"  [dim]{escape(t('client.reissue_send', name=shown))}[/dim]")
-    err_console.print(f"  [dim]{escape(t('client.reissue_devices'))}[/dim]")
     err_console.print()
     for warning in warnings:
         warn(warning.message)
