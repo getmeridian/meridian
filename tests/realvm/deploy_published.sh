@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Install a published meridian-vpn on a lab VM and deploy it there, as a tester would.
+#
+#   tests/realvm/deploy_published.sh "$VM_EXIT" 4.0.0b8 --domain "$(echo "$VM_EXIT" | tr . -).sslip.io"
+#
+# Runs `meridian deploy local ARGS... --yes` on the server under `script`, so the
+# full transcript stays in /root/deploy.log there. Prints the deploy's exit code.
+set -euo pipefail
+
+IP=${1:?usage: deploy_published.sh IP VERSION [DEPLOY_ARGS...]}
+VERSION=${2:?usage: deploy_published.sh IP VERSION [DEPLOY_ARGS...]}
+shift 2
+ARGS=$(printf '%q ' "$@")
+
+ssh -o BatchMode=yes "root@$IP" bash -s -- "$VERSION" "$ARGS" <<'REMOTE'
+set -uo pipefail
+version=$1 args=$2
+export PATH=/root/.local/bin:$PATH
+command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1
+uv tool install -q --force "meridian-vpn==$version"
+meridian --version
+script -qec "meridian deploy local $args --yes" /root/deploy.log </dev/null
+echo "deploy exit: $?"
+REMOTE

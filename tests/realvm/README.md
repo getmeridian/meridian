@@ -99,6 +99,13 @@ run already uploaded), the VMs' pinned host keys, an `ssh_config` with
   the transcript lands in the lab directory.
 - `pwa_shots.py OUT URL [case ...]` — Playwright screenshots of a connection
   page across phone/desktop, light/dark, and languages.
+- `small_vps.sh IP MEMORY [--swap SIZE]` — reboots a VM as a small VPS from
+  another provider: one vCPU, `mem=` RAM, apt installing Recommends.
+- `deploy_published.sh IP VERSION [ARGS...]` — installs a released
+  `meridian-vpn` on the VM and runs `meridian deploy local ARGS... --yes`
+  there, as a tester would; the transcript stays in `/root/deploy.log`.
+- `redact.sed` — `sed -E -f tests/realvm/redact.sed` masks addresses, tokens,
+  keys, and hostnames before lab output is pasted anywhere.
 
 Labs are labelled like harness runs, so orphan cleanup below finds them too.
 
