@@ -41,6 +41,7 @@ from .runtime import (
 XRAY_JSON_CLIENT_TYPE = "json"
 SERVICE_USER_DESCRIPTION = "Managed by Meridian service routing"
 ACCESS_USER_DESCRIPTION = "Managed by Meridian access"
+ACCESS_USER_TAG = "MERIDIAN_ACCESS"
 
 
 class ControlPlaneMixin:
@@ -214,7 +215,7 @@ class ControlPlaneMixin:
             "username": username,
             "expireAt": expire_at,
             "description": ACCESS_USER_DESCRIPTION,
-            "tag": "MERIDIAN_ACCESS",
+            "tag": ACCESS_USER_TAG,
             "activeInternalSquads": squad_uuids,
         }
         if external_squad_uuid:

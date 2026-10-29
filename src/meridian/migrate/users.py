@@ -17,7 +17,7 @@ from meridian.control.models import SUB_TOKEN_PATTERN, LimitStrategy, UserImport
 from meridian.core.client_limits import NEVER_EXPIRES_YEAR
 from meridian.migrate import MigrationError
 from meridian.remnawave import User
-from meridian.remnawave.control_plane import ACCESS_USER_DESCRIPTION
+from meridian.remnawave.control_plane import ACCESS_USER_DESCRIPTION, ACCESS_USER_TAG
 
 _STATUSES: dict[str, UserStatus] = {
     "ACTIVE": "active",
@@ -124,7 +124,7 @@ def _dropped(user: User) -> list[str]:
         dropped.append(f"HWID device limit {user.hwid_device_limit}")
     for label, value in (
         ("description", "" if user.description == ACCESS_USER_DESCRIPTION else user.description),
-        ("tag", user.tag),
+        ("tag", "" if user.tag == ACCESS_USER_TAG else user.tag),
         ("email", user.email),
         ("Telegram ID", user.telegram_id),
     ):

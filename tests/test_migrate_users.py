@@ -7,7 +7,7 @@ import pytest
 from meridian.migrate import MigrationError
 from meridian.migrate.users import carry_users
 from meridian.remnawave import User
-from meridian.remnawave.control_plane import ACCESS_USER_DESCRIPTION
+from meridian.remnawave.control_plane import ACCESS_USER_DESCRIPTION, ACCESS_USER_TAG
 from meridian.remnawave.models import NEVER_EXPIRES_AT
 
 ALICE_UUID = "3f2a9c4e-7b1d-4e6a-9c2f-1a2b3c4d5e6f"
@@ -84,8 +84,8 @@ def test_a_rolling_month_imports_as_the_calendar_month() -> None:
     assert carried.batch.users[0].traffic_limit_strategy == "month"
 
 
-def test_meridians_own_description_is_not_reported() -> None:
-    assert carry_users([_user()], ["alice"]).notes == {}
+def test_meridians_own_description_and_tag_are_not_reported() -> None:
+    assert carry_users([_user(tag=ACCESS_USER_TAG)], ["alice"]).notes == {}
 
 
 def test_an_intent_user_missing_from_the_panel_is_refused() -> None:
