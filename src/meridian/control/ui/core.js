@@ -13,12 +13,14 @@
 
   /* h("button", {class: "btn", onclick: fn, type: "button"}, "Text", child, [more]) */
   M.h = function (tag, attrs) {
-    var el = document.createElement(tag);
+    var svgTags = ["svg", "g", "path", "rect", "line", "text", "title", "desc", "circle", "polyline"];
+    var el = svgTags.indexOf(tag) >= 0 ? document.createElementNS("http://www.w3.org/2000/svg", tag)
+      : document.createElement(tag);
     if (attrs) {
       Object.keys(attrs).forEach(function (name) {
         var value = attrs[name];
         if (value === null || value === undefined || value === false) return;
-        if (name === "class") el.className = value;
+        if (name === "class") el.setAttribute("class", value);
         else if (name === "text") el.textContent = value;
         else if (name.slice(0, 2) === "on" && typeof value === "function") el.addEventListener(name.slice(2), value);
         else if (name === "dataset") Object.keys(value).forEach(function (k) { el.dataset[k] = value[k]; });
@@ -62,15 +64,8 @@
     x: "M6 6l12 12M18 6L6 18",
   };
   M.icon = function (name) {
-    var ns = "http://www.w3.org/2000/svg";
-    var svg = document.createElementNS(ns, "svg");
-    svg.setAttribute("viewBox", "0 0 24 24");
-    svg.setAttribute("aria-hidden", "true");
-    svg.setAttribute("class", "icon");
-    var path = document.createElementNS(ns, "path");
-    path.setAttribute("d", ICONS[name] || "");
-    svg.appendChild(path);
-    return svg;
+    return M.h("svg", { viewBox: "0 0 24 24", "aria-hidden": "true", class: "icon" },
+      M.h("path", { d: ICONS[name] || "" }));
   };
 
   // -- requests ---------------------------------------------------------------------------

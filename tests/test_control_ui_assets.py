@@ -77,7 +77,7 @@ def test_every_route_the_console_calls_admits_an_owner_session() -> None:
     for method, literal, joined, tail, person_suffix in calls:
         if literal is None:
             literal, joined, tail = "api/users/", True, person_suffix
-        paths = ["/" + literal + (sample + (tail or "") if joined else "") for sample in _ID_SAMPLES]
+        paths = [("/" + literal + (sample + (tail or "") if joined else "")).split("?", 1)[0] for sample in _ID_SAMPLES]
         routes = [route for route in ALL_ROUTES for path in paths if route[0] == method and route[1].fullmatch(path)]
         assert routes, f"{method} {paths[0]} matches no route"
         scope, handler = routes[0][2], routes[0][3]

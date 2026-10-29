@@ -3,9 +3,10 @@
 ## Design decisions
 - **Served by the service, under the secret path** — `ui_routes.py` serves `index.html` at `/` and these files at `/ui/<name>`; the API lives in the same process, so there is no CORS, no build step, and no outside request (system fonts, a local icon, QR codes are SVG data URIs from `segno`).
 - **Vanilla JS on one namespace** — `boot.js` sets theme and direction before paint; `core.js` owns `M.h` (the only DOM builder), `M.api`, dialogs, and formatting; each screen file adds `M.screens.*`; `app.js` runs the state machine (setup link → no owner → sign in → shell).
-- **The console changes only what the service owns** — People (add, link and QR, enable/disable, expiry, limits and reset strategy, reset traffic, reissue, remove), API tokens (secret shown once, revoke). Servers, Revisions, and the fleet title are read-only, and topology screens print the `meridian` command instead of offering a button.
+- **The console changes only what the service owns** — People (add, link and QR, enable/disable, expiry, limits and reset strategy, reset traffic, reissue, remove), API tokens (secret shown once, revoke), and operator-owned privacy settings. Servers, Revisions, and the fleet title are read-only, and topology screens print the `meridian` command instead of offering a button.
 - **People the deployer declared stay the deployer's** — users in the last applied revision's intent (`ui_views.is_declared`, `declared` on each share view, `declared_users` on the fleet view); only they have a connection page. Removing one or issuing a new link shows `meridian client remove|reissue NAME`, and the service refuses both to an owner session (`declared_user`); API tokens stay allowed.
 - **Same locale approach as the PWA** — `locales/{en,ru,fa,zh}.json`, English fallback, `fa` sets `dir="rtl"`; numbers and sizes are bidi-isolated.
+- **Privacy and history** — Settings discloses every level before confirmation and PUT; M.api handles owner step-up. Usage charts and icons use SVG through M.h, with UTC day labels and an accessible totals table.
 - **Passkeys are a seam** — `PasskeyState` reports `no_domain` on a bare IP and `not_built` otherwise; py_webauthn would add pyOpenSSL, pyasn1, and cbor2 to every CLI install, and attestation is never parsed by hand.
 
 ## What's done well
@@ -27,5 +28,6 @@
 - Saving a person PATCHes only the fields edited, and the limit field shows bytes unrounded (`M.gbText`) — a CLI quota of 4 MB rounded to "0" GB, so saving the expiry sent 0: unlimited.
 - Adding a person is one `POST /api/users` carrying expiry and limits (`ControlService.create_user`, one transaction, 409 `user_exists`); create-then-PATCH left an active, unlimited person whenever the PATCH never landed, and a retry only met `user_exists`.
 - Judge "declared" from the person's own share view, never only the fleet list fetched at boot — a console reissue once moved a declared person's UUID while their page stayed under the old one (the service cannot write `/var/www/private/`), and a stale list offered Remove.
+- Turning a privacy level off preserves its disabled numeric defaults; invalid unfinished edits must never block lowering a level.
 - Keep each script under 800 lines and every `M.t("…")` key in `en.json`; the asset tests read literal keys only.
 - A screen that re-requests on every pick wraps its request in `M.latestOnly()` and labels from the value it asked for — the revision diff once showed #2's reply under "1 to 3".

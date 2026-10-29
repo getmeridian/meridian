@@ -41,6 +41,7 @@
         M.statusPill(user.status)),
       shareCard(share),
       h("div", { class: "cards" }, usageCard(user), accessCard(user)),
+      M.personHistory(name),
       dangerCard(user, share.declared),
     ]);
   }

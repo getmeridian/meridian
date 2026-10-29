@@ -35,6 +35,7 @@
         M.cliHint(),
         servers.length ? h("div", { class: "cards" }, servers.map(serverCard))
           : h("div", { class: "empty" }, h("p", { text: M.t("servers.empty") })),
+        M.fleetHistory(),
       ]);
     }, function (e) { failed(view, e); });
   };

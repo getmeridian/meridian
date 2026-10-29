@@ -9,6 +9,7 @@
     M.mount(view, [
       h("div", { class: "page-head" }, h("div", {}, h("h1", { text: M.t("nav.settings") }))),
       h("div", { class: "cards" }, fleetCard(), appearanceCard()),
+      M.privacySection(),
       h("h2", { class: "section-title", text: M.t("settings.security") }),
       h("div", { class: "cards" }, passwordCard(), totpCard(), passkeyCard(), sessionsCard()),
       M.cliHint(),

@@ -118,6 +118,30 @@
 .diff-after { color: var(--t1); overflow-wrap: anywhere; }
 .diff-arrow { color: var(--t3); }
 
+/* -- privacy and UTC history ---------------------------------------------------------------- */
+.privacy-options { border: 1px solid var(--b1); min-inline-size: 0; }
+.privacy-options legend { font-family: var(--heading); font-size: 1.0625rem; font-weight: 600; padding-inline: 6px; }
+.privacy-choice { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: var(--r);
+  background: var(--s2); border: 1px solid var(--b1); cursor: pointer; }
+.privacy-choice:has(input:checked) { border-color: var(--ac); background: var(--band); }
+.privacy-choice input { margin-block-start: 4px; width: auto; min-height: 0; flex-shrink: 0; }
+.privacy-change { padding-block: 12px; border-top: 1px solid var(--b1); }
+.privacy-change:first-child { border-top: 0; }
+.privacy-diff { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px; font-size: .8125rem; }
+.usage-plot > * + * { margin-top: 6px; }
+.usage-chart { display: block; width: 100%; height: auto; }
+.usage-grid { stroke: var(--b1); stroke-width: 1; }
+.usage-bar { fill: var(--ac); }
+.usage-bar:focus { outline: none; fill: var(--ac-text); stroke: var(--t1); stroke-width: 1; }
+.usage-zero { opacity: .25; }
+.usage-dates { display: flex; justify-content: space-between; gap: 10px; }
+.usage-data summary { cursor: pointer; color: var(--t2); font-size: .875rem; }
+.usage-table-scroll { overflow-x: auto; margin-top: 10px; }
+.usage-table { width: 100%; border-collapse: collapse; font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.usage-table th, .usage-table td { padding: 8px 12px; text-align: end; border-bottom: 1px solid var(--b1); }
+.usage-table th:first-child { text-align: start; font-weight: 500; }
+.usage-table thead { color: var(--t2); }
+
 /* -- small screens -------------------------------------------------------------------------- */
 @media (max-width: 640px) {
   h1 { font-size: 1.5rem; }
@@ -132,6 +156,7 @@
   .share-links { width: 100%; }
   .totp-grid { grid-template-columns: 1fr; justify-items: center; }
   .hide-sm { display: none; }
+  .privacy-diff { grid-template-columns: 1fr; gap: 10px; }
   .danger-row { flex-direction: column; align-items: stretch; }
   .search { max-width: none; }
 }
