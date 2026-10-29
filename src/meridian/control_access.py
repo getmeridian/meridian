@@ -20,9 +20,19 @@ from meridian.control.client import (
     ControlClient,
     ControlServiceAuthError,
     ControlServiceError,
+    ControlServiceHistoryOff,
     ControlServiceScopeError,
 )
-from meridian.control.models import LimitStrategy, UserRecord, UserUpdate
+from meridian.control.models import (
+    LimitStrategy,
+    PrivacySettings,
+    PrivacyState,
+    PrivacyUpdateResult,
+    TrafficDailySummary,
+    UserRecord,
+    UserUpdate,
+    UserUsage,
+)
 from meridian.core.client_limits import ClientLimitChange, TrafficReset
 from meridian.core.fleet import FleetTopology
 from meridian.remnawave import (
@@ -65,6 +75,29 @@ class ServiceAccessPanel:
 
     def list_users(self) -> list[User]:
         return [self._user(record) for record in _translated(self._client.list_users)]
+
+    def privacy(self) -> PrivacyState:
+        return _translated(self._client.privacy)
+
+    def set_privacy(self, settings: PrivacySettings) -> PrivacyUpdateResult:
+        return _translated(lambda: self._client.set_privacy(settings))
+
+    def user_usage(self, username: str, *, days: int = 30) -> UserUsage:
+        return _translated(lambda: self._client.user_usage(username, days=days))
+
+    def daily_traffic(self, *, days: int = 30) -> TrafficDailySummary:
+        return _translated(lambda: self._client.daily_traffic(days=days))
+
+    def recent_usage(self, username: str) -> UserUsage | None:
+        """Seven days for `client show`, absent when the owner keeps history off (including a concurrent switch)."""
+
+        def read() -> UserUsage | None:
+            try:
+                return self._client.user_usage(username, days=7)
+            except ControlServiceHistoryOff:
+                return None
+
+        return _translated(read)
 
     def fetch_subscription(self, short_uuid: str, *, client_type: str = "") -> SubscriptionDocument:
         # The service names its documents by suffix (`/sub/TOKEN/mihomo`); anything else gets the Base64 list.

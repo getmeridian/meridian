@@ -13,6 +13,7 @@ from meridian import __version__
 from meridian import cli_types as click
 from meridian.cli_backup import backup_app, restore_cmd
 from meridian.cli_catalog import command_path, requested_context, requests_help, requests_machine_output, supports_json
+from meridian.cli_daemon import serve_cmd
 from meridian.cli_groups import (
     api_app,
     client_app,
@@ -41,6 +42,7 @@ from meridian.cli_options import (
     add_context_option,
     enable_json_output,
 )
+from meridian.cli_privacy import privacy_app
 from meridian.config import DISABLE_UPDATE_CHECK
 from meridian.console import banner
 
@@ -56,7 +58,7 @@ _HELP_LAYOUT: tuple[tuple[str, tuple[str, ...]], ...] = (
     (CLIENTS, ("client",)),
     (SERVERS, ("node", "relay", "route", "fleet", "server", "context")),
     (CHECK_AND_FIX, ("check", "test", "probe", "doctor", "logs", "plan", "apply", "backup", "restore")),
-    (ADVANCED, ("panel", "scan", "studio", "update", "migrate", "teardown", "api")),
+    (ADVANCED, ("panel", "privacy", "scan", "studio", "update", "migrate", "teardown", "api")),
 )
 # Option panels inside `deploy --help`.
 SERVER_ACCESS = "Server access"
@@ -113,9 +115,13 @@ class _SectionedGroup(TyperGroup):
         if not ctx.resilient_parsing:
             path, command, rest = command_path(ctx, args)
             _refuse_renamed(ctx, path, command, rest)
-            leaf = command if command is not None and not isinstance(command, click.Group) else None
+            leaf = (
+                command
+                if command is not None and (not isinstance(command, click.Group) or command.invoke_without_command)
+                else None
+            )
             ctx.meta[_INVOCATION] = _Invocation(
-                name=".".join(path),
+                name="privacy.show" if path == ["privacy"] else ".".join(path),
                 supports_json=leaf is not None and supports_json(leaf),
                 machine_output=leaf is not None and requests_machine_output(ctx, path[-1], leaf, rest),
                 help_requested=requests_help(ctx, args, command, rest),
@@ -179,7 +185,9 @@ app.add_typer(context_app, name="context", rich_help_panel=SERVERS)
 app.add_typer(api_app, name="api", rich_help_panel=ADVANCED)
 app.add_typer(dev_app, name="dev", hidden=True)
 app.add_typer(backup_app, name="backup", rich_help_panel=CHECK_AND_FIX)
+app.add_typer(privacy_app, name="privacy", rich_help_panel=ADVANCED)
 app.command("restore", rich_help_panel=CHECK_AND_FIX)(restore_cmd)
+app.command("serve", hidden=True)(serve_cmd)
 
 
 @app.callback(invoke_without_command=True)
@@ -782,15 +790,3 @@ def migrate_cmd(yes: Yes = False) -> None:
     from meridian.commands.migrate import run
 
     run(yes)
-
-
-@app.command("serve", hidden=True)
-def serve_cmd(
-    config: str = typer.Option("/etc/ctld/config.json", "--config", help="Service configuration file"),
-) -> None:
-    """Run the control service (on the control server, under systemd)"""
-    from pathlib import Path
-
-    from meridian.control.server import serve
-
-    serve(Path(config))

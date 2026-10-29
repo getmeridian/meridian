@@ -1,0 +1,41 @@
+{
+  "additionalProperties": false,
+  "description": "Operator-owned privacy choices; reviewed applies never replace them.",
+  "properties": {
+    "default_device_limit": {
+      "default": 3,
+      "maximum": 100,
+      "minimum": 1,
+      "title": "Default Device Limit",
+      "type": "integer"
+    },
+    "device_limits": {
+      "default": "off",
+      "enum": [
+        "off",
+        "private",
+        "full"
+      ],
+      "title": "Device Limits",
+      "type": "string"
+    },
+    "history_days": {
+      "default": 90,
+      "maximum": 730,
+      "minimum": 7,
+      "title": "History Days",
+      "type": "integer"
+    },
+    "usage_history": {
+      "default": "off",
+      "enum": [
+        "off",
+        "daily"
+      ],
+      "title": "Usage History",
+      "type": "string"
+    }
+  },
+  "title": "PrivacySettings",
+  "type": "object"
+}

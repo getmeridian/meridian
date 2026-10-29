@@ -31,6 +31,16 @@ export type ShareAvailable = boolean;
 export type ShareUrl = string;
 export type SubscriptionAvailable = boolean;
 export type SubscriptionUrl = string;
+export type Day = string;
+export type DownlinkBytes = number;
+export type UplinkBytes = number;
+export type Daily = UserTrafficDay[];
+/**
+ * Days returned, including today; at most the retention cap.
+ */
+export type Days = number;
+export type HistoryDays = number;
+export type Username1 = string;
 
 /**
  * Result for showing one client.
@@ -38,6 +48,10 @@ export type SubscriptionUrl = string;
 export interface ClientShowResult {
   client: ClientDetail;
   handoff: ClientHandoff;
+  /**
+   * The last seven UTC days, absent while daily history is off.
+   */
+  usage?: UserUsage | null;
 }
 /**
  * Client metadata for a detail view.
@@ -62,4 +76,18 @@ export interface ClientHandoff {
   share_url?: ShareUrl;
   subscription_available: SubscriptionAvailable;
   subscription_url?: SubscriptionUrl;
+}
+/**
+ * UTC days, oldest first, including zero-use days; never reconstructed from lifetime totals.
+ */
+export interface UserUsage {
+  daily: Daily;
+  days: Days;
+  history_days: HistoryDays;
+  username: Username1;
+}
+export interface UserTrafficDay {
+  day: Day;
+  downlink_bytes: DownlinkBytes;
+  uplink_bytes: UplinkBytes;
 }

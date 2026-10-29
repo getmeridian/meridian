@@ -237,7 +237,7 @@ For a way to open Russian sites directly while keeping the block, see [Split rou
 
 ## Client addresses
 
-The control service never records where your users connect from. Every TCP connection reaches Xray through nginx on the server, and the service keeps only each person's traffic totals, never an address or a connection log.
+The control service never stores client IP addresses or connection logs. Every TCP connection reaches Xray through nginx on the server. By default the service keeps lifetime traffic totals and last seen; [Privacy](/en/privacy/) lets you opt in to daily history or device limits with a plain disclosure of what they reveal.
 
 ## Adding a relay
 

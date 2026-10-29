@@ -18,6 +18,7 @@
 
 ## Pitfalls
 
+- **Privacy disclosures are source text** — privacy.md explains defaults, seizure costs, downgrade deletion, and private device re-registration after restore in every locale; totals-only claims must say they are the default.
 - **Locale parity** — all four locale directories must have the same filenames. A missing file means that locale won't have that doc page, and the sidebar will show a gap.
 - **AI bundles are English-only** — `scripts/ai-docs.mjs` reads only from `en/`. Translations don't affect the AI-facing docs.
 - **A new page joins the sidebar list** — add its slug to `src/lib/docs-sidebar.mjs`; the build fails on a page that is missing from it or a slug without a page.

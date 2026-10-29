@@ -100,6 +100,7 @@ def panel_mock(**return_values: Any) -> MagicMock:
     panel.__enter__.return_value = panel
     panel.__exit__.return_value = False
     panel.ping.return_value = True
+    panel.recent_usage.return_value = None
     for method, value in return_values.items():
         getattr(panel, method).return_value = value
     return panel

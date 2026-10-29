@@ -896,6 +896,63 @@ export const commandCatalog = {
     },
     {
       "argv": [
+        "client",
+        "usage",
+        "NAME"
+      ],
+      "command": "client.usage",
+      "data_schema": "client-usage",
+      "description": "Show a person's daily usage when daily history is on",
+      "envelope_schema": "client-usage-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "daily client usage was read",
+        "1": "unexpected Meridian bug",
+        "2": "history is off, client not found, or invalid days",
+        "3": "system or panel failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--days",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "daily client usage was read",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "history is off, client not found, or invalid days",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or panel failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
         "context",
         "list"
       ],
@@ -1357,6 +1414,62 @@ export const commandCatalog = {
     },
     {
       "argv": [
+        "fleet",
+        "usage"
+      ],
+      "command": "fleet.usage",
+      "data_schema": "traffic-daily",
+      "description": "Show daily fleet and server usage when daily history is on",
+      "envelope_schema": "fleet-usage-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "daily fleet and node usage was read",
+        "1": "unexpected Meridian bug",
+        "2": "history is off or invalid days",
+        "3": "system or panel failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--days",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "daily fleet and node usage was read",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "history is off or invalid days",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or panel failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
         "node",
         "list"
       ],
@@ -1474,6 +1587,128 @@ export const commandCatalog = {
       "statuses": [
         "no_changes",
         "changed",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "privacy",
+        "set"
+      ],
+      "command": "privacy.set",
+      "data_schema": "privacy-update",
+      "description": "Change privacy settings after reviewing what will be stored or deleted",
+      "envelope_schema": "privacy-set-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "privacy settings were changed; privacy settings already match",
+        "1": "unexpected Meridian bug",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--devices",
+        "--device-limit",
+        "--history",
+        "--history-days",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "privacy settings were changed",
+          "status": "changed"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "privacy settings already match",
+          "status": "no_changes"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "changed",
+        "no_changes",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "privacy",
+        "show"
+      ],
+      "command": "privacy.show",
+      "data_schema": "privacy-state",
+      "description": "Show privacy levels, their disclosures, and the last changes",
+      "envelope_schema": "privacy-show-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "privacy settings and changes were read",
+        "1": "unexpected Meridian bug",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "privacy settings and changes were read",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
         "failed"
       ]
     },

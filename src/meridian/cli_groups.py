@@ -9,6 +9,7 @@ from typing import Annotated
 
 import typer
 
+from meridian.cli_fleet_usage import fleet_usage_cmd
 from meridian.cli_options import (
     Expires,
     ForgetUnreachable,
@@ -39,6 +40,7 @@ context_app = typer.Typer(
 )
 api_app = typer.Typer(help="Machine-readable contracts for scripts and UIs", no_args_is_help=True)
 dev_app = typer.Typer(help="Developer tools for testing and debugging", no_args_is_help=True)
+fleet_app.command("usage")(fleet_usage_cmd)
 
 
 @client_app.command("add")
@@ -89,6 +91,18 @@ def client_list_cmd(
     from meridian.commands.client import run_list
 
     run_list()
+
+
+@client_app.command("usage")
+def client_usage_cmd(
+    name: str = typer.Argument(..., help="Client name"),
+    days: str = typer.Option("30", "--days", metavar="N", help="UTC days to show, 1–730, within the retention cap"),
+    _json: Json = False,
+) -> None:
+    """Show a person's daily usage when daily history is on"""
+    from meridian.commands.client_usage import run_usage
+
+    run_usage(name, days=days)
 
 
 @client_app.command("set")

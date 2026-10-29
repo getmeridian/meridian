@@ -6,7 +6,14 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, Field, RootModel, create_model
 
-from meridian.control.models import RevisionList
+from meridian.control.models import (
+    PrivacySettings,
+    PrivacyState,
+    PrivacyUpdateResult,
+    RevisionList,
+    TrafficDailySummary,
+    UserUsage,
+)
 from meridian.core.apply import (
     ApplyCommandData,
     ApplyCounts,
@@ -396,6 +403,35 @@ _, _, ClientShowOutputEnvelope = _make_command_envelope(
     doc="Envelope schema for `meridian client show --json`.",
 )
 
+_, _, ClientUsageOutputEnvelope = _make_command_envelope(
+    "ClientUsage",
+    "client.usage",
+    UserUsage,
+    doc="Envelope schema for `meridian client usage --json`.",
+)
+
+_, _, PrivacyShowOutputEnvelope = _make_command_envelope(
+    "PrivacyShow",
+    "privacy.show",
+    PrivacyState,
+    doc="Envelope schema for `meridian privacy show --json`.",
+)
+
+_, _, PrivacySetOutputEnvelope = _make_command_envelope(
+    "PrivacySet",
+    "privacy.set",
+    PrivacyUpdateResult,
+    success_statuses=Literal["changed", "no_changes"],
+    doc="Envelope schema for `meridian privacy set --json`.",
+)
+
+_, _, FleetUsageOutputEnvelope = _make_command_envelope(
+    "FleetUsage",
+    "fleet.usage",
+    TrafficDailySummary,
+    doc="Envelope schema for `meridian fleet usage --json`.",
+)
+
 _, _, ClientAddOutputEnvelope = _make_command_envelope(
     "ClientAdd",
     "client.add",
@@ -535,6 +571,13 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "api-workflow-envelope": ApiWorkflowOutputEnvelope,
     "client-list-envelope": ClientListOutputEnvelope,
     "client-show-envelope": ClientShowOutputEnvelope,
+    "client-usage-envelope": ClientUsageOutputEnvelope,
+    "privacy-show-envelope": PrivacyShowOutputEnvelope,
+    "privacy-set-envelope": PrivacySetOutputEnvelope,
+    "privacy-settings": PrivacySettings,
+    "privacy-state": PrivacyState,
+    "privacy-update": PrivacyUpdateResult,
+    "traffic-daily": TrafficDailySummary,
     "client-add-envelope": ClientAddOutputEnvelope,
     "client-remove-envelope": ClientRemoveOutputEnvelope,
     "client-reissue-envelope": ClientReissueOutputEnvelope,
@@ -572,6 +615,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "fleet-inventory-envelope": FleetInventoryOutputEnvelope,
     "fleet-export-envelope": FleetExportOutputEnvelope,
     "fleet-history-envelope": FleetHistoryOutputEnvelope,
+    "fleet-usage-envelope": FleetUsageOutputEnvelope,
     "fleet-import-envelope": FleetImportOutputEnvelope,
     "event": Event,
     "error": ErrorModel,
@@ -589,6 +633,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "summary": Summary,
     "client-list": ClientListResult,
     "client-show": ClientShowResult,
+    "client-usage": UserUsage,
     "client-add": ClientAddResult,
     "client-remove": ClientRemoveResult,
     "client-reissue": ClientReissueResult,

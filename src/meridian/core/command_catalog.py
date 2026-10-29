@@ -139,6 +139,15 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         ],
         stability="stable",
     ),
+    "client.usage": CommandOutput(
+        data_schema="client-usage",
+        outcomes=[
+            _ok("daily client usage was read"),
+            _user("history is off, client not found, or invalid days"),
+            *_PANEL_FAILURES,
+        ],
+        stability="preview",
+    ),
     "client.list": CommandOutput(
         data_schema="client-list", outcomes=[_ok("client list was collected"), *_FAILURES], stability="stable"
     ),
@@ -255,6 +264,15 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         outcomes=[_ok("the recorded revisions were listed"), *_FAILURES],
         stability="preview",
     ),
+    "fleet.usage": CommandOutput(
+        data_schema="traffic-daily",
+        outcomes=[
+            _ok("daily fleet and node usage was read"),
+            _user("history is off or invalid days"),
+            *_PANEL_FAILURES,
+        ],
+        stability="preview",
+    ),
     "fleet.export": CommandOutput(
         data_schema="fleet-export",
         outcomes=[_ok("the fleet document was exported"), *_FAILURES],
@@ -326,6 +344,20 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         stability="preview",
     ),
     "panel": None,
+    "privacy.show": CommandOutput(
+        data_schema="privacy-state",
+        outcomes=[_ok("privacy settings and changes were read"), *_FAILURES],
+        stability="preview",
+    ),
+    "privacy.set": CommandOutput(
+        data_schema="privacy-update",
+        outcomes=[
+            _ok("privacy settings were changed", status="changed"),
+            _ok("privacy settings already match", status="no_changes"),
+            *_FAILURES,
+        ],
+        stability="preview",
+    ),
     "scan": None,
     "studio": None,
     "migrate": None,

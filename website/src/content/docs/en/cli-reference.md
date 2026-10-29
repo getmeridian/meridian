@@ -105,6 +105,7 @@ Manage the people who connect.
 ```
 meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--json]
 meridian client show NAME [--repair-page] [--json]
+meridian client usage NAME [--days N] [--json]
 meridian client list [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--json]
 meridian client reset-traffic NAME [--json]
@@ -116,6 +117,7 @@ meridian client remove NAME [--yes] [--json]
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--days N` | 30 | UTC days for `client usage` or `fleet usage`, 1–730, capped at the saved retention |
 | `--json` | | Emit the result as a `meridian.output/v1` envelope (all client commands) |
 | `--repair-page` | | Republish the client's connection page (`client show`) |
 | `--limit SIZE` | none | Traffic limit (`client add`, `client set`): `500MB`, `50GB`, `1.5TB`; `none` or `0` removes it. Units are binary (1 GB = 1024³ bytes), as the control service counts |
@@ -138,6 +140,29 @@ meridian client remove NAME [--yes] [--json]
 **`client reissue`** — replaces a client's links after a leak. The control service issues a new subscription ID and new keys, so the old subscription URL, connection page, and links stop working. Meridian deletes the old page first, then publishes the new one and prints the new links. Status, limits, and expiry stay as set. Asks for confirmation unless `--yes`, and refuses names that aren't your clients. If the new page can't be published, the links are still shown with a warning and exit `3` (repair it with `client show --repair-page`).
 
 **`client remove`** — removes the client from the topology, deletes their account in the control service and their connection page. Asks for confirmation unless `--yes`. The last client cannot be removed. People added in the web console are removed there.
+
+**`client usage`** — shows daily upload, download, and total bytes for any person in this control service, including console people. Daily history must be enabled in [Privacy](/en/privacy/); otherwise it exits `2` with the opt-in command. `client show` adds the last seven UTC days when history is on (`data.usage` in JSON, `null` when off). Empty days mean no recorded traffic; history is never backfilled.
+
+### meridian privacy
+
+Choose what the control service stores. Both device limits and daily history default to off; applying the fleet never changes these settings. See [Privacy](/en/privacy/) for the disclosures and seizure consequences.
+
+```bash
+meridian privacy [--json]
+meridian privacy show [--json]
+meridian privacy set [--devices off|private|full] [--device-limit N] [--history off|daily] [--history-days N] [--yes] [--json]
+```
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--devices LEVEL` | unchanged | Device limits: `off`, `private` keyed fingerprints, or `full` device details |
+| `--device-limit N` | unchanged (initially 3) | Default per-person cap when their own is unset, 1–100 |
+| `--history LEVEL` | unchanged | `off` lifetime totals and last seen, or `daily` per-person and per-server UTC totals |
+| `--history-days N` | unchanged (initially 90) | Retain 7–730 UTC days, including today |
+| `--yes`, `-y` | | Skip confirmation; required for a JSON change |
+| `--json` | | Emit a `meridian.output/v1` envelope |
+
+Bare `privacy` is `privacy show`: settings, disclosures, and the last 50 changes. `set` changes only options you pass, shows what a raised level stores and what a lowered one removes, and asks for confirmation. Identical values are a no-op. JSON `data` includes the settings and changes; a set also reports `deleted` row counts and `rekeyed_devices`. The change records the token's name, `owner`, or `root`, the time, and before/after values. Private records are cleared after a restore because the fleet fingerprint key is never snapshotted.
 
 ### meridian server
 
@@ -261,6 +286,7 @@ Fleet-wide health and inventory from the live control service, its history of ap
 meridian fleet status [--json]
 meridian fleet inventory [--json]
 meridian fleet history [--json]
+meridian fleet usage [--days N] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -268,6 +294,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--days N` | 30 | UTC days for `client usage` or `fleet usage`, 1–730, capped at the saved retention |
 | `--json` | | Emit the result as a `meridian.output/v1` envelope (`status`, `inventory`, `history`, `export`, `import`) |
 | `--tested` | | `fleet upgrade`: skip GitHub; Realm stays on the tested version or what you already upgraded to |
 | `--yes`, `-y` | | `fleet upgrade`, `fleet import`: skip the confirmation |
@@ -285,6 +312,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 **`fleet export`** — prints your fleet's reviewed topology as a YAML file you can edit: exits and their protocol paths, relays, gateways, egress pools, routing rules, routes, clients, and fleet settings. Servers appear by their saved name (or address when unnamed), never by internal ID, and the file starts with `schema: meridian.fleet/v1`. Reality keys, API tokens, client links, and the XHTTP and WSS transport paths stay in Meridian and are not listed. `--json` returns the same document under `data.document`.
 
 **`fleet import`** — reads an edited file (or `-` for standard input) and shows what it changes, one line each: `+` adds, `-` removes, and `~` changes a field (`~ exit-2 sni www.example.com -> www.example.org`). It then lists every resource the change deletes and the review hash, asks, and applies exactly that review, like `apply`. A file with no edits prints "No changes". Removing a client from `access.users` removes them like `client remove`: their links stop working and their connection page is deleted. Adding one creates them like `client add` and publishes their page; `client show NAME` prints their links. New camouflage SNIs get the checks `node sni` runs. Import refuses another `schema`, a server you haven't saved (save it with `meridian server add`), transport paths in the file, changes to the control server, its domain, or its backend, removing or renaming the exit on the control server, and moving an exit to another server (use `node replace`). Keys and credentials stay as they are. Without a terminal, pass `--yes`; `--dry-run` shows the changes and the review without applying anything.
+
+**`fleet usage`** — shows per-server byte totals for each UTC day, including retained use of removed servers. `--days N` chooses 1–730 days within retention. Daily history must be on; JSON returns fleet totals and `nodes[].daily` in `data`.
 
 ### meridian context
 

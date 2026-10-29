@@ -7,6 +7,7 @@ from typing import Protocol, Self
 
 from pydantic import Field
 
+from meridian.control.models import UserUsage
 from meridian.core.clients import (
     ClientListResult,
     ClientShowResult,
@@ -79,6 +80,7 @@ def collect_client_show(
     build_subscription_url: SubscriptionUrlBuilder | None = None,
     allowed_usernames: Collection[str] | None = None,
     declared_usernames: Collection[str] | None = None,
+    read_usage: Callable[[str], UserUsage | None] | None = None,
 ) -> ClientShowServiceResult:
     """Collect one client plus deterministic handoff links."""
     if allowed_usernames is not None and username not in allowed_usernames:
@@ -89,12 +91,14 @@ def collect_client_show(
             raise ClientNotFoundError(username)
         share_url = build_share_url(user) if build_share_url else ""
         subscription_url = build_subscription_url(user.short_uuid) if build_subscription_url and user.short_uuid else ""
+        usage = read_usage(username) if read_usage else None
     return ClientShowServiceResult(
         client=build_client_show_result(
             user,
             share_url=share_url,
             subscription_url=subscription_url,
             declared=declared_usernames is None or username in declared_usernames,
+            usage=usage,
         ),
         share_url=share_url,
         subscription_url=subscription_url,

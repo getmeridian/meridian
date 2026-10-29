@@ -29,6 +29,7 @@ from meridian.commands.client_state import (
     persist_client_state,
     require_access_user,
 )
+from meridian.commands.client_usage import print_usage
 from meridian.commands.client_v4 import run_add_v4, run_remove_v4
 from meridian.console import confirm, err_console, error_context, fail, is_json_mode, ok, warn
 from meridian.control_access import access_panel
@@ -125,13 +126,15 @@ def _show(*, name: str, repair_page: bool, operation: OperationContext) -> None:
         return resolution.url
 
     try:
+        panel = access_panel(cluster)
         result = collect_client_show(
-            access_panel(cluster),
+            panel,
             name,
             build_share_url=share_url,
             build_subscription_url=cluster.panel.subscription_url,
             allowed_usernames=_readable_users(cluster),
             declared_usernames=access_users,
+            read_usage=panel.recent_usage if cluster.runs_control_service else None,
         )
     except ClientNotFoundError:
         fail(
@@ -190,6 +193,9 @@ def _show(*, name: str, repair_page: bool, operation: OperationContext) -> None:
 
     err_console.print()
     print_client_usage(detail)
+    if result.client.usage is not None:
+        err_console.print()
+        print_usage(result.client.usage)
 
     err_console.print()
     err_console.print("  [dim]View all clients:  meridian client list[/dim]")

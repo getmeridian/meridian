@@ -1,0 +1,359 @@
+{
+  "$defs": {
+    "EmptyData": {
+      "additionalProperties": false,
+      "description": "Empty data object used by envelopes without command-specific failure data.",
+      "properties": {},
+      "title": "EmptyData",
+      "type": "object"
+    },
+    "ErrorModel": {
+      "additionalProperties": false,
+      "description": "Structured error safe for JSON/API clients.",
+      "properties": {
+        "category": {
+          "enum": [
+            "user",
+            "system",
+            "bug",
+            "cancelled"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "cause": {
+          "additionalProperties": true,
+          "title": "Cause",
+          "type": "object"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "exit_code": {
+          "default": 1,
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "hint": {
+          "default": "",
+          "title": "Hint",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "message"
+      ],
+      "title": "MeridianError",
+      "type": "object"
+    },
+    "PrivacyChange": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "$ref": "#/$defs/PrivacySettings"
+        },
+        "author": {
+          "title": "Author",
+          "type": "string"
+        },
+        "before": {
+          "$ref": "#/$defs/PrivacySettings"
+        },
+        "changed_at": {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Changed At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "changed_at",
+        "author",
+        "before",
+        "after"
+      ],
+      "title": "PrivacyChange",
+      "type": "object"
+    },
+    "PrivacySettings": {
+      "additionalProperties": false,
+      "description": "Operator-owned privacy choices; reviewed applies never replace them.",
+      "properties": {
+        "default_device_limit": {
+          "default": 3,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Default Device Limit",
+          "type": "integer"
+        },
+        "device_limits": {
+          "default": "off",
+          "enum": [
+            "off",
+            "private",
+            "full"
+          ],
+          "title": "Device Limits",
+          "type": "string"
+        },
+        "history_days": {
+          "default": 90,
+          "maximum": 730,
+          "minimum": 7,
+          "title": "History Days",
+          "type": "integer"
+        },
+        "usage_history": {
+          "default": "off",
+          "enum": [
+            "off",
+            "daily"
+          ],
+          "title": "Usage History",
+          "type": "string"
+        }
+      },
+      "title": "PrivacySettings",
+      "type": "object"
+    },
+    "PrivacyState": {
+      "additionalProperties": false,
+      "properties": {
+        "changes": {
+          "description": "Newest first, at most 50 changes.",
+          "items": {
+            "$ref": "#/$defs/PrivacyChange"
+          },
+          "maxItems": 50,
+          "title": "Changes",
+          "type": "array"
+        },
+        "settings": {
+          "$ref": "#/$defs/PrivacySettings"
+        }
+      },
+      "required": [
+        "settings",
+        "changes"
+      ],
+      "title": "PrivacyState",
+      "type": "object"
+    },
+    "Summary": {
+      "additionalProperties": false,
+      "description": "Structured summary shown in JSON envelopes and UI dashboards.",
+      "properties": {
+        "changed": {
+          "default": false,
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "Summary",
+      "type": "object"
+    },
+    "_PrivacyShowSuccessEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "privacy.show",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/PrivacyState"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "maxItems": 0,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "ok",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_PrivacyShowSuccessEnvelope",
+      "type": "object"
+    },
+    "_PrivacyShowTerminalEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "privacy.show",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/EmptyData"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "minItems": 1,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "failed",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_PrivacyShowTerminalEnvelope",
+      "type": "object"
+    }
+  },
+  "description": "Envelope schema for `meridian privacy show --json`.",
+  "discriminator": {
+    "mapping": {
+      "failed": "#/$defs/_PrivacyShowTerminalEnvelope",
+      "ok": "#/$defs/_PrivacyShowSuccessEnvelope"
+    },
+    "propertyName": "status"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/_PrivacyShowSuccessEnvelope"
+    },
+    {
+      "$ref": "#/$defs/_PrivacyShowTerminalEnvelope"
+    }
+  ],
+  "title": "PrivacyShowOutputEnvelope"
+}

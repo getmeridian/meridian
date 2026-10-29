@@ -66,6 +66,6 @@ def _console(cluster: ClusterConfig, *, setup_link: bool) -> None:
         err_console.print("  [dim]Lost the password? A fresh setup link: meridian panel --setup-link[/dim]")
     err_console.print()
     err_console.print("  [dim]Treat the URL and any setup link like passwords; neither is ever saved in a log.[/dim]")
-    err_console.print("  [bold]The console changes[/bold] people, API tokens, and the fleet title.")
+    err_console.print("  [bold]The console changes[/bold] people, API tokens, and privacy settings.")
     err_console.print("  [bold]Servers change here[/bold], with meridian: the control server never holds SSH keys.")
     err_console.print()

@@ -90,6 +90,8 @@ CONTEXT_HELP = "Fleet to work on, by context name (default: MERIDIAN_CONTEXT, el
 # Where a leaf `--context` would only mislead: `context` names its own fleets, `serve` runs on a server.
 CONTEXT_FREE = ("context", "serve")
 LEAF_CONTEXT = "meridian.leaf_context"
+GROUP_CONTEXT = "meridian.group_context"
+GROUP_MACHINE_OUTPUT = "meridian.group_machine_output"
 
 
 def _remember_leaf_context(ctx: click.Context, _param: object, value: object) -> object:
@@ -110,7 +112,9 @@ def add_context_option(group: click.Group) -> None:
             continue
         if isinstance(command, click.Group):
             add_context_option(command)
-        elif not any("--context" in getattr(param, "opts", ()) for param in command.params):
+            if not command.invoke_without_command:
+                continue
+        if not any("--context" in getattr(param, "opts", ()) for param in command.params):
             command.params.append(
                 click.Option(
                     param_decls=["--context"],

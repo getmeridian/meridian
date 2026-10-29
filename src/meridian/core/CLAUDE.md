@@ -15,6 +15,7 @@
 - **Narrow panel interfaces** - services depend on protocols such as `FleetPanelClient` and `ClientPanelClient`, not the concrete Remnawave client.
 - **Client limits, one change for both backends** - `client_limits.py` parses `--limit` (binary units, in `Decimal`, at most `MAX_TRAFFIC_LIMIT_BYTES` = SQLite's int64; a 400-digit float once raised `OverflowError` with no envelope), `--reset`, and `--expires` (a bare date ends that day, UTC; past dates and years from 2099 are refused) into `ClientLimitChange`, whose explicit `expires_at: null` means never; each panel adapter maps it onto its API.
 - **Fleet document** - `fleet_document.py` owns the `meridian.fleet/v1` schema, server-ref mapping, and `intent_changes()`, the one description of how two intents differ; it reports a reorder rather than ever returning no change for unequal intents.
+- **Privacy and usage contracts** — control.models owns settings, audit, and UTC day totals; command envelopes compose those same models. ClientShowResult carries optional seven-day usage, not a second history shape.
 - **Two names per person** - `AccessIntent.users` are Remnawave usernames (Latin only); `display_names` keeps the typed name when it differs and is omitted when empty. `assign_access_usernames()` is the one place that maps typed names to usernames (known first, Latin names claim themselves, the rest transliterate via anyascii); look people up with `find_user()`.
 
 ## What's done well

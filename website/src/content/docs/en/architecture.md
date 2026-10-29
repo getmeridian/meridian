@@ -75,7 +75,7 @@ flowchart LR
 
 Every connection points at the control service; nothing connects to a node. Each agent dials out over HTTPS on 443, waits for a new document, and reports what it applied and the traffic it counted. The control service signs every node document with the fleet's own key, and the agent refuses one that doesn't verify, so a forged or replayed document changes nothing. A new node joins with a single-use enrollment token that Meridian hands it over SSH, then holds a certificate from the fleet's own authority.
 
-Traffic is counted once per report, even when a report is resent. The service keeps totals per person and never stores where anyone connects from.
+Traffic is counted once per report, even when a report is resent. By default the service keeps lifetime totals and last seen, without client IP addresses. Optional [Privacy](/en/privacy/) settings add daily person/server totals with retention and device fingerprints or full device details.
 
 ## How Reality works
 

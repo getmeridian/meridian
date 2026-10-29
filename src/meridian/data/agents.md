@@ -12,6 +12,7 @@ You are probably helping one of two people:
 - **Fleet roles.** One server is the *control server*. It runs Meridian's control service (users, subscriptions, the web console) and the connection pages; every exit and gateway runs a small agent that dials out to it. *Exits* are where traffic leaves for the internet, and the control server is usually an exit too. *Relays* are plain TCP forwarders, placed where an exit's address is blocked. *Gateways* pick an exit (or a pool of exits) for each destination by rule, or send it directly from the gateway.
 - **One reviewed topology.** The deployer's machine keeps the whole fleet description in `cluster.yml`, inside Meridian's home directory. Every change is an edit to that topology: `deploy`, `setup`, `node add`, `relay add`, `client add`, and `route add` all edit it. Meridian then compiles it into a hash-reviewed plan and applies it with checkpoints. An interrupted apply resumes where it stopped. A converged fleet plans no changes.
 - **Users live in the control service.** Client accounts, their keys, and their traffic are stored in the control service on the control server. `cluster.yml` lists which clients Meridian manages; people added in the web console show up in `client list` too (`declared: false`).
+- **Privacy is the owner's choice.** Device limits and daily history default to off. `meridian privacy show --json` reads the service's settings and change log; `privacy set` shows the storage and seizure disclosure before confirmation. These settings are not in the reviewed topology, and applies leave them alone.
 - **Delivery.** Each client gets a connection page with QR codes and app links, plus a subscription URL. Apps refresh the subscription, so fleet changes reach devices without new links.
 - **Connection methods.** Reality and XHTTP run on TCP 443, Hysteria2 on UDP 443 as a fallback, and WSS through Cloudflare when a domain is set. Apps try them in order.
 
@@ -27,7 +28,7 @@ You are probably helping one of two people:
 1. **Run non-interactively.** Pass `--yes` to commands that confirm. `meridian setup` is a wizard that needs a terminal. Use `deploy`, `node add`, `relay add`, and `client add` instead, or `setup --intent FILE --yes` with a complete topology document.
 2. **Prefer JSON.** Commands that support `--json` print one `meridian.output/v1` envelope on stdout. Read results under `data`; failures come back as an envelope too. Progress, warnings, and update notices go to stderr. `meridian api commands` lists every command with a machine-readable contract.
 3. **Read before you change.** Run `meridian plan` to see pending changes. It exits `0` when converged and `2` when changes are pending. Then run `meridian apply --yes`.
-4. **Ask before destroying.** Get explicit confirmation before `teardown`, `node remove`, `relay remove`, `client remove`, `client reissue`, `restore`, `migrate`, `backup revoke`, or a `fleet import` whose changes include `-` lines. Removal deletes the control service and server state for what disappears, and people relying on it lose access; a reissue cuts off the client's devices until they import the new link.
+4. **Ask before destroying.** Get explicit confirmation before `teardown`, `node remove`, `relay remove`, `client remove`, `client reissue`, `restore`, `migrate`, `backup revoke`, or a `fleet import` whose changes include `-` lines. Removal deletes the control service and server state for what disappears, and people relying on it lose access; a reissue cuts off the client's devices until they import the new link. Review a `privacy set` disclosure before opting in or deleting its records; only then pass `--yes`.
 5. **Treat links as secrets.** Connection pages and subscription URLs grant access. They appear in full only in the output of the command that produced them (`deploy`, `client add`, `client show`, `client reissue`). Hand each one only to the person it belongs to, and don't log it. The same goes for the console address and setup link `meridian panel` prints; never run `meridian panel --setup-link` unless the user asks to reset the console owner, since it signs out every device.
 6. **Test from the right place.** `meridian check` inspects servers over SSH. `meridian test` sends real traffic from the machine it runs on, and `meridian test --probe` (short form: `meridian probe`) checks what a censor sees. Results about blocking only mean something when run from inside the censored network.
 7. **Report with doctor.** `meridian doctor` collects a redacted diagnostic report that is safe to attach to a bug report. `meridian logs SERVER` shows recent agent, control service, nginx, and relay logs with the same redaction; narrow it with `--grep TEXT` and `--component NAME`.
@@ -60,6 +61,12 @@ meridian client add alice --json
 meridian client set alice --limit 50GB --reset month --expires 2026-12-31 --json
 meridian client set alice --limit none --expires never --json
 meridian client reset-traffic alice --json
+
+# Opt in to daily usage after reviewing its disclosure, then read person and server totals
+meridian privacy show --json
+meridian privacy set --history daily --history-days 90 --yes --json
+meridian client usage alice --days 7 --json
+meridian fleet usage --days 7 --json
 
 # A link leaked: replace it (the old page and subscription stop working)
 meridian client reissue alice --yes --json

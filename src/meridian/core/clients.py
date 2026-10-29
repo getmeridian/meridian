@@ -7,6 +7,7 @@ from typing import Literal, Protocol, Sequence
 
 from pydantic import Field
 
+from meridian.control.models import UserUsage
 from meridian.core.client_limits import canonical_expiry, traffic_reset_from_strategy
 from meridian.core.models import CoreModel
 
@@ -109,6 +110,9 @@ class ClientShowResult(CoreModel):
 
     client: ClientDetail
     handoff: ClientHandoff
+    usage: UserUsage | None = Field(
+        default=None, description="The last seven UTC days, absent while daily history is off."
+    )
 
 
 class ClientCreated(CoreModel):
@@ -220,6 +224,7 @@ def build_client_show_result(
     share_url: str = "",
     subscription_url: str = "",
     declared: bool = True,
+    usage: UserUsage | None = None,
 ) -> ClientShowResult:
     """Build a one-client result with optional handoff links."""
     return ClientShowResult(
@@ -230,6 +235,7 @@ def build_client_show_result(
             share_url=share_url,
             subscription_url=subscription_url,
         ),
+        usage=usage,
     )
 
 

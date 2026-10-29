@@ -105,6 +105,7 @@ JSON `data` 包含 `plan_hash`、`generation` 和 `actions[]` 带 `status: "conv
 ```
 meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--json]
 meridian client show NAME [--repair-page] [--json]
+meridian client usage NAME [--days N] [--json]
 meridian client list [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--json]
 meridian client reset-traffic NAME [--json]
@@ -116,6 +117,7 @@ meridian client remove NAME [--yes] [--json]
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
+| `--days N` | 30 | `client usage` 或 `fleet usage` 的 UTC 天数，1–730，受已保存保留时间限制 |
 | `--json` | | 将结果作为 `meridian.output/v1` 信封发出（所有客户端命令） |
 | `--repair-page` | | 重新发布客户端的连接页面（`client show`） |
 | `--limit SIZE` | 无 | 流量限额（`client add`、`client set`）：`500MB`、`50GB`、`1.5TB`；`none` 或 `0` 取消限额。单位按二进制计算（1 GB = 1024³ 字节），与控制服务一致 |
@@ -138,6 +140,29 @@ meridian client remove NAME [--yes] [--json]
 **`client reissue`** — 在链接泄露后替换客户端的链接。控制服务生成新的订阅 ID 和新的密钥，因此旧的订阅 URL、连接页面和链接全部失效。Meridian 先删除旧页面，再发布新页面并打印新链接。状态、限额和到期时间保持不变。除非 `--yes`，否则要求确认；不属于你的客户端的名称会被拒绝。如果新页面无法发布，仍会显示链接并给出警告，退出码为 `3`（用 `client show --repair-page` 修复）。
 
 **`client remove`** — 从拓扑中删除客户端，删除其在控制服务中的账户和连接页面。除非 `--yes`，否则要求确认。最后一个客户端无法删除。在网页控制台中添加的用户请在控制台中删除。
+
+**`client usage`** — 显示控制服务中任何人员（含控制台添加者）的每日上传、下载及总字节数。须在[隐私](/zh/privacy/)中开启每日历史；否则退出码为 `2`，并提示启用命令。历史开启时，`client show` 附最近七个 UTC 天（JSON 的 `data.usage`，关闭时为 `null`）。空白日期表示无记录的流量，不会补算过去用量。
+
+### meridian privacy
+
+选择控制服务保存哪些信息。设备限制和每日历史默认均关闭；应用服务器组配置不会改变这些设置。[隐私](/zh/privacy/)说明每个级别保存什么，以及服务器被夺取后的后果。
+
+```bash
+meridian privacy [--json]
+meridian privacy show [--json]
+meridian privacy set [--devices off|private|full] [--device-limit N] [--history off|daily] [--history-days N] [--yes] [--json]
+```
+
+| 选项 | 默认 | 描述 |
+| --- | --- | --- |
+| `--devices LEVEL` | 不变 | `off`、带密钥指纹 `private` 或设备详情 `full` |
+| `--device-limit N` | 不变（初始 3） | 未设置个人上限时使用的默认上限，1–100 |
+| `--history LEVEL` | 不变 | `off`：累计总量和最后活跃；`daily`：人员和服务器的 UTC 每日总量 |
+| `--history-days N` | 不变（初始 90） | 保留 7–730 个 UTC 天，含今天 |
+| `--yes`, `-y` | | 跳过确认；JSON 变更必须提供 |
+| `--json` | | 输出 `meridian.output/v1` envelope |
+
+单独运行 `privacy` 等同于 `privacy show`：显示设置、隐私说明和最近 50 次变更。`set` 只更改传入选项，说明提高级别会保存什么、降低级别会删除什么，并要求确认。相同值不会产生变更。JSON 的 `data` 包含设置和变更；`set` 还报告 `deleted` 中的删除记录数和 `rekeyed_devices` 中的转换数。日志保存令牌名称、`owner` 或 `root`、时间和前后值。恢复后清空私密设备记录，因为指纹密钥永远不包含在快照中。
 
 ### meridian server
 
@@ -261,6 +286,7 @@ meridian route remove EXIT ROUTE [--yes] [--json]
 meridian fleet status [--json]
 meridian fleet inventory [--json]
 meridian fleet history [--json]
+meridian fleet usage [--days N] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -268,6 +294,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
+| `--days N` | 30 | `client usage` 或 `fleet usage` 的 UTC 天数，1–730，受已保存保留时间限制 |
 | `--json` | | 将结果作为 `meridian.output/v1` 信封发出（`status`、`inventory`、`history`、`export`、`import`） |
 | `--tested` | | `fleet upgrade`：跳过 GitHub；Realm 保持在已测试的版本或你已升级到的版本 |
 | `--yes`, `-y` | | `fleet upgrade`、`fleet import`：跳过确认 |
@@ -285,6 +312,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 **`fleet export`** — 把集群已审查的拓扑输出为可编辑的 YAML 文件：出口及其协议路径、中继、网关、出口池、路由规则、路由、客户端和集群设置。服务器以保存的名称（没有名称时用地址）出现，从不使用内部 ID；文件以 `schema: meridian.fleet/v1` 开头。Reality 密钥、API 令牌、客户端链接以及 XHTTP 和 WSS 的传输路径都留在 Meridian 中，不会列出。`--json` 在 `data.document` 下返回同一份文档。
 
 **`fleet import`** — 读取编辑后的文件（或用 `-` 从标准输入读取），每处变更一行：`+` 表示添加，`-` 表示删除，`~` 表示修改字段（`~ exit-2 sni www.example.com -> www.example.org`）。随后列出变更将删除的每个资源和审查哈希，询问确认，并像 `apply` 一样只应用这次审查。未编辑的文件会输出“没有变更”。从 `access.users` 中删除客户端等同于 `client remove`：其链接失效，连接页面被删除。添加客户端等同于 `client add`，并发布其页面；用 `client show NAME` 查看链接。新的伪装 SNI 会经过与 `node sni` 相同的检查。导入会拒绝：其他 `schema`、未保存的服务器（用 `meridian server add` 保存）、文件中的传输路径、对控制服务器及其域名或后端的更改、删除或重命名控制服务器上的出口，以及把出口移到另一台服务器（请用 `node replace`）。密钥和凭据保持不变。没有终端时请传入 `--yes`；`--dry-run` 只显示变更和审查结果，不应用任何内容。
+
+**`fleet usage`** — 显示每台服务器每个 UTC 天的总字节数，包括已删除服务器仍在保留期内的用量。`--days N` 选择保留期内 1–730 天。每日历史须开启；JSON 在 `data` 中返回服务器组总量和 `nodes[].daily`。
 
 ### meridian context
 
