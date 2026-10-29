@@ -21,3 +21,4 @@
 - **Refuse while the old control server answers** — two services at once split the fleet; only `--force` overrides it.
 - **Open the control service's firewall rules before its bootstrap** — restore installs before the plan runs, so a fresh server's SSH-only UFW kept port 80 closed and the ACME challenge timed out; `open_control_ports()` applies the rules `control:service` depends on.
 - **Never read the recovery key from argv** — shell history and `ps` keep it; `--recovery-key` asks with a hidden prompt or reads one line of stdin.
+- **Checkpoint before deleting what a rerun needs** — the staged database goes only after `loaded` is saved; deleted first, a failed save left a rerun uploading a file that no longer existed.

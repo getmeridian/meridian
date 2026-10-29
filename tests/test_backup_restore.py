@@ -350,3 +350,27 @@ def test_restore_opens_the_control_services_ports_before_its_bootstrap() -> None
 
     opened = " ".join(call for call in conn.calls if "ufw" in call)
     assert "allow 80/tcp" in opened and "allow 443/tcp" in opened
+
+
+def test_a_failed_save_after_the_upload_keeps_the_staged_database_for_the_rerun(
+    fleet: tuple[ClusterConfig, Path], new_server: NewServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(restore_steps, "service_answers", lambda url, token: False)
+    cluster, snapshot = fleet
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
+    target = registry.find("srv-b")
+    assert target is not None
+
+    def persist(state: ClusterConfig) -> None:
+        if state.control_restore is not None and state.control_restore.step == "loaded":
+            raise OSError("disk full")
+        state.save()
+
+    restorer = ControlRestorer(cluster, registry, persist=persist, connection_builder=lambda entry: MockConnection())
+    with pytest.raises(OSError, match="disk full"):
+        restorer.run(restorer.review(target, _source(snapshot)), new_server.apply)
+
+    resumed, target = _restorer(ClusterConfig.load())
+    outcome = resumed.run(resumed.review(target, RestoreSource(snapshot, None)), new_server.apply)
+
+    assert new_server.uploads == 2 and outcome.fleet_epoch == 2

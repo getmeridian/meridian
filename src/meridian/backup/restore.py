@@ -221,9 +221,10 @@ class ControlRestorer:
             self._on_step(f"Loading the restored state onto {target}")
             staged_path = Path(restore.staged_database)
             upload_database(conn, staged_path, restore.staged_sha256, fleet_id=self.cluster.fleet_id)
-            staged_path.unlink(missing_ok=True)
             restore.staged_database = ""
+            # Saved before the file goes: a failed save reruns the upload, which needs it.
             self._checkpoint(restore, "loaded")
+            staged_path.unlink(missing_ok=True)
         if not restore.reached("installed"):
             self._on_step(f"Installing the control service on {target}")
             install_service(review.setup.plan, self.cluster, review.target, conn)
