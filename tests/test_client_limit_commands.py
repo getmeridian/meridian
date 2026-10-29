@@ -294,3 +294,20 @@ def test_client_show_reads_a_console_name_outside_remnawaves_rules(
         client = _envelope(capsys, "client-show-envelope")["data"]["client"]
 
     assert (client["username"], client["declared"]) == (username, False)
+
+
+def test_client_show_prefers_an_exact_console_name_and_refuses_an_ambiguous_one(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Declared `alice` and console `ALICE` are two people; a case-folded lookup handed out alice's link."""
+    with _backend("meridian", tmp_path, json_mode=True) as fleet:
+        fleet.create("ALICE")
+        with patch("meridian.commands.client.resolve_page_url", return_value=PageResolution()):
+            run_show("ALICE")
+            client = _envelope(capsys, "client-show-envelope")["data"]["client"]
+            with pytest.raises(typer.Exit) as refused:
+                run_show("Alice")
+
+    assert (client["username"], client["declared"]) == ("ALICE", False)
+    assert refused.value.exit_code == 2
+    assert "could mean ALICE, alice" in capsys.readouterr().out

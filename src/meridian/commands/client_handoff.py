@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Collection
 from dataclasses import dataclass
 
 from rich.markup import escape
@@ -49,17 +50,34 @@ def validate_client_name(name: str) -> None:
     validate_command_input(ClientNameRequest, "Invalid client name", name=name)
 
 
-def resolve_client_name(cluster: ClusterConfig, name: str, *, console_people: bool = False) -> str:
+def resolve_client_name(
+    cluster: ClusterConfig, name: str, *, console_people: bool = False, console_names: Collection[str] = ()
+) -> str:
     """The panel username a typed client name means: a username or a display name (Биба).
 
     `console_people` (reads only) also accepts a name the control service allows, for a
     person added in its console: such names may hold dots or fall outside Remnawave's lengths.
+    `console_names` are the service's usernames: an exact one wins over a case-folded or
+    display-name match, and a name that folds onto two people is refused.
     """
     intent = cluster.topology_intent
+    declared = list(intent.access.users) if intent is not None else []
+    console = console_people and cluster.runs_control_service
+    if console and (name in declared or name in console_names):
+        return name
     found = intent.access.find_user(name) if intent is not None else None
+    if console:
+        wanted = name.strip().casefold()
+        matches = sorted({*([found] if found else []), *(user for user in console_names if user.casefold() == wanted)})
+        if len(matches) > 1:
+            fail(
+                f"'{name}' could mean {', '.join(matches)}",
+                hint="Use the exact username, as `meridian client list` shows it.",
+                hint_type="user",
+            )
     if found is not None:
         return found
-    if console_people and cluster.runs_control_service and re.fullmatch(USERNAME_PATTERN, name):
+    if console and re.fullmatch(USERNAME_PATTERN, name):
         return name
     try:
         validate_access_username_value(name)

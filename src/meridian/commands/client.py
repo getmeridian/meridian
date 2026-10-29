@@ -58,6 +58,17 @@ def _readable_users(cluster: ClusterConfig) -> list[str] | None:
     return None if cluster.runs_control_service else _access_users(cluster)
 
 
+def _console_names(cluster: ClusterConfig) -> list[str]:
+    """Every username the control service holds (none on a Remnawave fleet), to resolve a typed name exactly."""
+    if not cluster.runs_control_service:
+        return []
+    try:
+        with access_panel(cluster) as panel:
+            return [user.username for user in panel.list_users()]
+    except RemnawaveError as exc:
+        fail(f"Could not read clients: {exc}", hint=exc.hint or "Check panel connectivity", hint_type=exc.category)
+
+
 def run_add(
     names: list[str], *, limit: str | None = None, reset: str | None = None, expires: str | None = None
 ) -> None:
@@ -95,7 +106,7 @@ def run_show(name: str, repair_page: bool = False) -> None:
 
 def _show(*, name: str, repair_page: bool, operation: OperationContext) -> None:
     cluster = load_topology_cluster()
-    name = resolve_client_name(cluster, name, console_people=True)
+    name = resolve_client_name(cluster, name, console_people=True, console_names=_console_names(cluster))
     if not cluster.runs_control_service:  # there the name was checked against the service's own rule
         validate_client_name(name)
     access_users = _access_users(cluster)
