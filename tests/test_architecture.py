@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import subprocess
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "meridian"
@@ -354,3 +355,28 @@ class TestStructuralHealth:
             + "\n".join(violations)
             + "\nSee core/errors.py for MeridianError hierarchy."
         )
+
+
+def test_no_tracked_text_file_carries_merge_conflict_markers() -> None:
+    """A merge once committed `<<<<<<<` markers into a CLAUDE.md that no linter reads."""
+    root = SRC.parents[1]
+    tracked = (
+        subprocess.run(
+            ["git", "ls-files", "-z", "*.md", "*.py", "*.rs", "*.yml", "*.yaml", "*.toml", "*.json"],
+            cwd=root,
+            capture_output=True,
+            check=True,
+        )
+        .stdout.decode()
+        .split("\0")
+    )
+    marked = [
+        name
+        for name in tracked
+        if name
+        and (root / name).is_file()
+        and any(
+            line.startswith(("<<<<<<< ", ">>>>>>> ")) for line in (root / name).read_text(errors="replace").splitlines()
+        )
+    ]
+    assert marked == []
