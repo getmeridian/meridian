@@ -153,8 +153,9 @@
   }
 
   M.intentDiff = function (older, newer) {
-    var a = flatten(older || {}, "", {});
-    var b = flatten(newer || {}, "", {});
+    // Null-prototype maps: a key named like a built-in (toString, __proto__) must read as absent, not inherited.
+    var a = flatten(older || {}, "", Object.create(null));
+    var b = flatten(newer || {}, "", Object.create(null));
     var paths = Object.keys(a).concat(Object.keys(b).filter(function (k) { return !M.has(a, k); })).sort();
     return paths.filter(function (p) { return a[p] !== b[p]; }).map(function (p) {
       return { path: p, before: a[p], after: b[p] };
