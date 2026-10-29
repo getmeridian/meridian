@@ -428,6 +428,7 @@ function renderPage(config) {
   }
 
   html += renderHero(config);
+  html += '<section class="card account" id="account-panel" aria-live="polite" hidden></section>';
 
   html += '<div class="install-banner" id="install-banner">';
   html += '<div class="install-banner-text"><strong data-t="install.title">Install this app</strong><span data-t="install.offline">Access your connection offline</span></div>';
@@ -467,6 +468,8 @@ function renderPage(config) {
   requestWakeLock();
   applyI18n(config.client_name, config.server_name);
   highlightActiveLang();
+  loadAccountPanel();
+  document.dispatchEvent(new Event('meridian-render'));
 }
 
 function renderTopBar() {
@@ -557,7 +560,7 @@ function renderAppRow(a, key) {
 
 function renderImportButton(a, subUrl, serverName, primary) {
   var href = buildDeepLink(a.deeplink, subUrl, serverName);
-  var html = '<a class="btn btn-block ' + (primary ? 'btn-primary' : 'btn-soft') + '" href="' + escapeHtml(href) + '">';
+  var html = '<a data-import class="btn btn-block ' + (primary ? 'btn-primary' : 'btn-soft') + '" href="' + escapeHtml(href) + '">';
   html += a.icon ? renderAppMark(a, 22) : ICON_PLUS;
   html += '<span data-t="import.add" data-t-name="' + escapeHtml(a.name) + '">Add to ' + escapeHtml(a.name) + '</span>';
   return html + '</a>';
@@ -614,6 +617,7 @@ function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
     var imports = appsFor(apps, key, true);
     html += '<div class="step"><span class="step-num">2</span><div class="step-body">';
     html += '<h2 data-t="step.add">Add your connection</h2>';
+    html += '<p class="muted import-status" id="import-status" role="status" hidden></p>';
     html += '<p class="muted" data-t="step.add.desc">One tap adds every server, and the app keeps them up to date.</p>';
     if (imports.rec.length) {
       html += '<div class="import-list">';
@@ -829,6 +833,15 @@ function loadSelfCheck() {
   s.id = 'selfcheck-js';
   s.src = '../pwa/selfcheck.js';
   document.body.appendChild(s);
+}
+
+/* Injected here so existing per-client shells receive the account panel too. */
+function loadAccountPanel() {
+  if (document.getElementById('account-js')) return;
+  var script = document.createElement('script');
+  script.id = 'account-js';
+  script.src = '../pwa/account.js';
+  document.body.appendChild(script);
 }
 
 function requestPersistentStorage() {

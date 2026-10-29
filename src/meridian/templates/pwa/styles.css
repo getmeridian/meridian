@@ -346,3 +346,19 @@ svg{flex-shrink:0}
   .card,.panels{box-shadow:none !important;border-color:#ccc}
   .topbar,.install-banner,.foot,.btn{display:none !important}
 }
+
+/* Account information */
+.account{padding:18px;margin-bottom:16px;display:flex;flex-direction:column;gap:8px}
+.account-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.account-heading h2{font-size:1.06rem;font-weight:650}
+.account-status{font-size:.88rem;color:var(--green)}
+.account-status.is-disabled,.account-status.is-expired,.account-status.is-limited{color:var(--amber)}
+.account-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:8px}
+.account-metric{min-width:0}
+.account-metric dt{font-size:.76rem;color:var(--tx3);margin-bottom:4px}
+.account-metric dd{font-size:.9rem;font-weight:600;overflow-wrap:anywhere}
+.account-metric .account-note{font-size:.76rem;font-weight:400;color:var(--tx2);margin-top:3px}
+.account-freshness{font-size:.75rem;color:var(--tx3);line-height:1.45}
+.account-unverified,.import-status{color:var(--amber)}
+[data-import][aria-disabled="true"]{opacity:.45;cursor:not-allowed}
+@media (max-width:479px){.account-metrics{grid-template-columns:1fr;gap:12px}}

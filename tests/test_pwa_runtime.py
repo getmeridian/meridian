@@ -1,0 +1,147 @@
+"""Exercise shipped PWA JavaScript at its DOM, storage, and fetch boundaries."""
+
+from __future__ import annotations
+
+import json
+import shutil
+import subprocess
+import textwrap
+from datetime import UTC, datetime, timedelta
+
+import pytest
+
+from meridian.control.formats.browser import subscription_info
+from meridian.control.formats.entries import SubscriptionUser
+from meridian.render import render_apps_catalog, render_config_json
+
+NODE = shutil.which("node")
+pytestmark = pytest.mark.skipif(NODE is None, reason="PWA runtime checks need Node, without npm packages")
+
+
+@pytest.fixture
+def page_data() -> dict[str, object]:
+    now = datetime.now(UTC)
+    user = SubscriptionUser(
+        short_id="demo",
+        username="client",
+        uuid="550e8400-e29b-41d4-a716-446655440000",
+        status="active",
+        used_bytes=1536,
+        limit_bytes=4096,
+        lifetime_used_bytes=8192,
+        expires_at=now + timedelta(days=7),
+    )
+    url = "https://198.51.100.1/connect/sub/demo"
+    return {
+        "config": json.loads(render_config_json([], "198.51.100.1", subscription_url=url)),
+        "catalog": json.loads(render_apps_catalog()),
+        "info": subscription_info(user, [], url, now),
+    }
+
+
+def run_page(script: str, data: dict[str, object]) -> None:
+    source = (
+        "const assert = require('node:assert/strict');\n"
+        "const { createBrowser, response } = require('./tests/support/pwa_browser.cjs');\n"
+        "const data = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));\n"
+        "(async function() {\n"
+        + textwrap.dedent(script)
+        + "\n})().catch(error => { console.error(error); process.exit(1); });"
+    )
+    result = subprocess.run(
+        [NODE or "node", "-e", source],
+        input=json.dumps(data),
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+
+
+def test_account_loads_info_without_cache_and_refreshes_on_return(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog, { info: data.info });
+        await browser.start();
+        let requests = browser.requests.filter(r => r.url.endsWith('/info'));
+        assert.equal(requests.length, 1, 'opening the page must fetch account information');
+        assert.equal(requests[0].init.cache, 'no-store');
+        const panel = browser.document.getElementById('account-panel');
+        assert.match(panel.textContent, /Active/);
+        assert.match(panel.textContent, /1.5.*KiB/);
+        assert.match(panel.textContent, /4.*KiB/);
+        assert.match(panel.textContent, /8.*KiB/);
+        assert.match(panel.textContent, /7 days left/);
+        assert.match(panel.textContent, /Checked/);
+        browser.document.visibilityState = 'hidden'; browser.fire('visibilitychange');
+        browser.document.visibilityState = 'visible'; browser.fire('visibilitychange');
+        await browser.flush();
+        browser.fire('click', browser.document.querySelector('[data-action="account-refresh"]'));
+        await browser.flush();
+        assert.equal(browser.requests.filter(r => r.url.endsWith('/info')).length, 3);
+        """,
+        page_data,
+    )
+
+
+@pytest.mark.parametrize("status", ["DISABLED", "EXPIRED", "LIMITED"])
+def test_suspended_account_explains_and_dims_imports(page_data: dict[str, object], status: str) -> None:
+    page_data["status"] = status
+    run_page(
+        """
+        data.info.user.userStatus = data.status; data.info.user.isActive = false;
+        const browser = createBrowser(data.config, data.catalog, { info: data.info });
+        await browser.start();
+        const panel = browser.document.getElementById('account-panel');
+        assert.ok(panel, 'account panel is missing');
+        assert.match(panel.textContent.toLowerCase(), new RegExp(data.status.toLowerCase()));
+        const link = browser.document.querySelector('[data-import]');
+        assert.equal(link.getAttribute('aria-disabled'), 'true');
+        assert.ok(browser.fire('click', link).defaultPrevented, 'suspended import must not navigate');
+        assert.ok(browser.document.getElementById('import-status').textContent.length > 30);
+        """,
+        page_data,
+    )
+
+
+def test_account_failure_keeps_only_account_snapshot_and_marks_it_unverified(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        let fail = false;
+        const options = { fetch(url) {
+          if (url.endsWith('/info')) return fail ? Promise.reject(new Error('offline')) : Promise.resolve(response(data.info));
+          return Promise.resolve(response(url.endsWith('config.json') ? data.config : data.catalog));
+        } };
+        const browser = createBrowser(data.config, data.catalog, options); await browser.start();
+        const saved = JSON.stringify(browser.storage);
+        assert.ok(Object.keys(browser.storage).some(k => k.startsWith('meridian-account:')), 'account answer was not saved');
+        for (const secret of ['198.51.100.1', 'subscriptionUrl', 'username', 'links', 'userAgent', 'shortUuid']) {
+          assert.ok(!saved.includes(secret), 'account storage must omit ' + secret);
+        }
+        const checks = browser.document.getElementById('selfcheck-results'); checks.textContent = 'Reachability result';
+        fail = true;
+        browser.fire('click', browser.document.querySelector('[data-action="account-refresh"]')); await browser.flush();
+        assert.match(browser.document.getElementById('account-panel').textContent, /unverified/i);
+        assert.match(browser.document.getElementById('account-panel').textContent, /1.5.*KiB/);
+        assert.equal(checks.textContent, 'Reachability result');
+        const reloaded = createBrowser(data.config, data.catalog, { ...options, storage: browser.storage }); await reloaded.start();
+        assert.match(reloaded.document.getElementById('account-panel').textContent, /unverified/i);
+        assert.match(reloaded.document.getElementById('account-panel').textContent, /1.5.*KiB/);
+        """,
+        page_data,
+    )
+
+
+def test_account_unlimited_and_no_expiry_are_not_zero_or_a_sentinel_date(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        data.info.user.trafficLimitBytes = '0'; data.info.user.expiresAt = '2099-12-31T23:59:59.000Z';
+        const browser = createBrowser(data.config, data.catalog, { info: data.info }); await browser.start();
+        const panel = browser.document.getElementById('account-panel'); assert.ok(panel, 'account panel is missing');
+        assert.match(panel.textContent, /Unlimited/); assert.match(panel.textContent, /No expiry/);
+        assert.ok(!panel.textContent.includes('2099'));
+        """,
+        page_data,
+    )
+

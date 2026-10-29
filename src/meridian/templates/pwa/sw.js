@@ -3,6 +3,7 @@ var CACHE_VERSION = 'pwa-v1';
 var SHELL_ASSETS = [
   '../pwa/styles.css',
   '../pwa/app.js',
+  '../pwa/account.js',
   '../pwa/selfcheck.js',
   '../pwa/icon.svg',
 ];
@@ -33,6 +34,7 @@ self.addEventListener('fetch', function(event) {
   /* Straight to the network: the self-check must measure the live path, the
      subscription must never be cached, and the Cache API stores GETs only */
   if (event.request.method !== 'GET' ||
+      event.request.cache === 'no-store' ||
       path.indexOf('/sub/') !== -1 ||
       path.endsWith('/probe.bin')) {
     return;
