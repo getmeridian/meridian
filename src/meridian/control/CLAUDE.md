@@ -28,7 +28,7 @@
 ## Pitfalls
 - nginx answers 502/503/504 for a stopped or hung service — `ControlClient` raises those as retryable unreachable errors; as plain refusals, a stopped ctld failed the fence at once with "refused: HTTP 502".
 - `serve` is a daemon: the root callback skips the beta banner and the update check for it (it once printed the banner into journald and phoned out on every start).
-- Decode the path before routing — `ControlClient` percent-encodes IDs, so `:` in endpoint IDs arrives as `%3A` and every endpoint PUT 404'd.
+- Decode the path before routing — `ControlClient` percent-encodes IDs, so `:` in endpoint IDs arrives as `%3A` and every endpoint PUT 404'd; node routes match only topology IDs (`_NODE`), or a grant stored `main:exit` before its response refused it and broke the fleet view.
 - Compare timestamps parsed, never as strings — the contract allows fractional seconds, and `…:00.5Z` sorts before `…:00Z`.
 - Never log requests or store where they came from: paths carry the secret path and subscription tokens (`log_message` is silenced); a token keeps only a once-a-minute `last_used_at`.
 - Secrets never ride a snapshot — the copy drops the `secrets` table, sessions, enrollment tokens, nonces, and the `ui_*` owner tables, then VACUUMs (autocommit, or SQLite refuses) so their pages go too; a restore regenerates them, so a seized server's CA signs nothing agents accept. Strip through `strip_unsnapshotted()`, which skips tables an older schema lacks: a restore strips before migrating, and a bare `DELETE FROM ui_owner` refused every schema-7 snapshot.

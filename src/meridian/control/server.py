@@ -66,6 +66,8 @@ ModelT = TypeVar("ModelT", bound=BaseModel)
 MAX_BODY_BYTES = AGENT_HTTP_SURFACE.max_request_bytes
 ENFORCE_INTERVAL_SECONDS = 30
 _NAME = r"([a-z0-9][a-z0-9_.:-]{0,127})"
+# A node ID is a topology ID (`core.inputs`); an endpoint ID may also carry `.` and `:`.
+_NODE = r"([a-z0-9][a-z0-9_-]{0,47})"
 _USERNAME = f"({USERNAME_PATTERN})"
 _TOKEN_ID = r"([0-9a-f]{12})"
 _REVISION = r"([1-9][0-9]{0,15})"
@@ -528,10 +530,10 @@ ROUTES: list[Route] = [
     ("GET", re.compile(r"/api/health"), "read", _Handler.health),
     ("GET", re.compile(r"/api/settings"), "read", _Handler.get_settings),
     ("PUT", re.compile(r"/api/settings"), WRITE, _Handler.put_settings),
-    ("GET", re.compile(rf"/api/nodes/{_NAME}"), "read", _Handler.get_node),
-    ("PUT", re.compile(rf"/api/nodes/{_NAME}"), WRITE, _Handler.put_node),
-    ("DELETE", re.compile(rf"/api/nodes/{_NAME}"), WRITE, _Handler.delete_node),
-    ("POST", re.compile(rf"/api/nodes/{_NAME}/enrollment"), "admin", _Handler.grant_enrollment),
+    ("GET", re.compile(rf"/api/nodes/{_NODE}"), "read", _Handler.get_node),
+    ("PUT", re.compile(rf"/api/nodes/{_NODE}"), WRITE, _Handler.put_node),
+    ("DELETE", re.compile(rf"/api/nodes/{_NODE}"), WRITE, _Handler.delete_node),
+    ("POST", re.compile(rf"/api/nodes/{_NODE}/enrollment"), "admin", _Handler.grant_enrollment),
     ("GET", re.compile(r"/api/ca"), "read", _Handler.fleet_authority),
     ("GET", re.compile(r"/api/traffic"), "read", _Handler.traffic),
     ("GET", re.compile(r"/api/users"), "read", _Handler.list_users),

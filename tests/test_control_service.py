@@ -395,6 +395,19 @@ def test_admin_validation_errors_are_400(http: str) -> None:
     assert status == 400 and body["error"]["code"] == "invalid_request"
 
 
+@pytest.mark.parametrize("method", ["POST", "PUT"])
+def test_a_node_id_outside_the_topology_pattern_is_refused_before_anything_is_stored(
+    http: str, service: ControlService, method: str
+) -> None:
+    path = "/enrollment" if method == "POST" else ""
+    body: Any = {} if method == "POST" else _spec().model_dump(mode="json")
+
+    status, _ = _request(f"{http}/api/nodes/main%3Aexit{path}", method, body, ADMIN_TOKEN)
+
+    assert status == 404
+    assert service.node_specs() == [] and service.node_spec("main:exit") is None
+
+
 def _report(document: dict[str, Any], *, failed: str = "") -> dict[str, Any]:
     ref = {"fleet_epoch": document["fleet_epoch"], "revision": document["revision"], "sha256": document["sha256"]}
     now = "2026-10-29T12:00:00Z"
