@@ -108,6 +108,8 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     # 7 -> 8: the web UI's owner, sessions, and setup links (`owner.py`).
     UI_TABLES,
 )
+# meta key prefix: the last revision a deleted node was signed at.
+_RETIRED_REVISION = "retired_revision:"
 _USER_FIELDS = (
     "username",
     "user_id",
@@ -219,6 +221,10 @@ class ControlService:
 
     def delete_node(self, node_id: str) -> None:
         with self._transaction():
+            row = self._node(node_id)
+            if row is not None and row["revision"]:
+                # An agent that keeps its state refuses an older revision, so a re-added node continues from here.
+                self._set_meta(_RETIRED_REVISION + node_id, str(row["revision"]))
             self._db.execute("DELETE FROM nodes WHERE node_id = ?", (node_id,))
             self.authority.forget_node(node_id)
 
@@ -584,7 +590,7 @@ class ControlService:
         # A restore bumps the epoch: the same resources are signed again under it.
         if resources_sha == row["doc_sha256"] and signed == (self.authority.service_key_id, self.fleet_epoch):
             return
-        revision = (row["revision"] or 0) + 1
+        revision = (row["revision"] or int(self._meta(_RETIRED_REVISION + node_id) or 0)) + 1
         document: dict[str, Any] = {
             "protocol": AGENT_PROTOCOL,
             "fleet_id": self.fleet_id,

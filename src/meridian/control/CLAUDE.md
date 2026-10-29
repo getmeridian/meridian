@@ -36,7 +36,7 @@
 - `executescript()` commits on its own — create tables with `Store.create()`, never inside `transaction()`.
 - Hash and sign the document as JSON values, never re-serialized typed models (the agent verifies the bytes it received); verify a `NodeProof` over the hello dict as received, too.
 - Record a hello nonce only after the proof verifies, and keep it until `issued_at` + 300 s + margin, or a captured hello replays.
-- Traffic baselines outlive node deletion — a re-added node whose agent kept its counter store would otherwise count its totals twice.
+- Traffic baselines and revisions outlive node deletion (`retired_revision:` in `meta`) — a re-added node whose agent kept its state would otherwise count its totals twice and refuse every document as older.
 - A poll answers before its session expires, so the agent's next request is a fresh `hello` rather than a 401.
 - `control/` never imports the deployer (CLI, SSH, panel, provision, reconciler); architecture-tested.
 - Never compress or send Referrer-Policy on `/sub/` — nginx gzips JSON/Base64 (YAML stays plain, as `gzip_types` has none) and adds its own Referrer-Policy; the panel's duplicate was a corpus defect.

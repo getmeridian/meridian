@@ -114,6 +114,16 @@ def test_revision_grows_only_when_resources_change(service: ControlService) -> N
     assert service.node_status("main").revision == 3
 
 
+def test_a_node_removed_and_added_again_continues_its_revisions(service: ControlService) -> None:
+    service.put_node_spec("main", _spec())
+    service.put_user("alice")
+    service.delete_node("main")
+
+    service.put_node_spec("main", _spec())
+
+    assert service.node_status("main").revision == 3
+
+
 def test_poll_with_a_current_document_waits_then_answers_empty(service: ControlService) -> None:
     service.put_node_spec("main", _spec())
     status = service.node_status("main")
