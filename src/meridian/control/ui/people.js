@@ -157,20 +157,11 @@
           form.querySelector(".form-error").textContent = M.t("people.name_invalid");
           return;
         }
-        M.busy(form, function () {
-          return M.api("GET", "api/users/" + encodeURIComponent(username)).then(function () {
-            throw new M.ApiError(409, "user_exists", "");
-          }, function (error) {
-            if (error.status !== 404) throw error;
-            return M.api("PUT", "api/users/" + encodeURIComponent(username));
-          }).then(function () {
-            var change = limits.value();
-            if (expiry.value) change.expire_at = M.endOfDay(expiry.value);
-            var defaults = !change.traffic_limit_bytes && change.traffic_limit_strategy === "no_reset";
-            if (defaults && !change.expire_at) return null; // what a new person starts with already
-            return M.api("PATCH", "api/users/" + encodeURIComponent(username), change);
-          });
-        }).then(function () {
+        // One request with the settings: create-then-PATCH left an unlimited person when the PATCH failed.
+        var body = limits.value();
+        body.username = username;
+        body.expire_at = M.endOfDay(expiry.value);
+        M.busy(form, function () { return M.api("POST", "api/users", body); }).then(function () {
           close();
           M.toast(M.t("people.added_toast", { name: username }));
           M.go("people", username);

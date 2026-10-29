@@ -155,6 +155,16 @@ SUB_TOKEN_PATTERN = r"^[A-Za-z0-9_-]{16,64}$"
 USERNAME_PATTERN = r"(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\.\.[A-Za-z0-9_.-]{1,62})"
 
 
+class UserCreate(CoreModel):
+    """A new user with their first settings, created in one step (the console's "Add person")."""
+
+    username: str = Field(pattern=rf"^{USERNAME_PATTERN}$")
+    status: Literal["active", "disabled"] = "active"
+    expire_at: Timestamp | None = None
+    traffic_limit_bytes: int = Field(default=0, ge=0)
+    traffic_limit_strategy: LimitStrategy = "no_reset"
+
+
 class UserImport(CoreModel):
     """One user carried over from another control plane (`meridian migrate`), credentials and usage included.
 

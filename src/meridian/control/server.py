@@ -47,6 +47,7 @@ from meridian.control.models import (
     ServiceSettings,
     TokenCreate,
     TokenScope,
+    UserCreate,
     UserImportBatch,
     UserRecord,
     UserUpdate,
@@ -334,6 +335,9 @@ class _Handler(BaseHTTPRequestHandler):
     def put_user(self, match: re.Match[str]) -> Any:
         return self._service.put_user(match[1])
 
+    def create_user(self, _match: re.Match[str]) -> Any:
+        return self._service.create_user(self._model(UserCreate))
+
     def import_users(self, _match: re.Match[str]) -> Any:
         return self._service.import_users(self._model(UserImportBatch))
 
@@ -528,6 +532,7 @@ ROUTES: list[Route] = [
     ("GET", re.compile(r"/api/ca"), "read", _Handler.fleet_authority),
     ("GET", re.compile(r"/api/traffic"), "read", _Handler.traffic),
     ("GET", re.compile(r"/api/users"), "read", _Handler.list_users),
+    ("POST", re.compile(r"/api/users"), WRITE, _Handler.create_user),
     # Credentials go in as well as out: importing users (`meridian migrate`) is the root of applying.
     ("POST", re.compile(r"/api/import/users"), "admin", _Handler.import_users),
     ("GET", re.compile(rf"/api/users/{_USERNAME}"), "read", _Handler.get_user),
@@ -582,7 +587,7 @@ OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
         _Handler.put_settings,
         _Handler.list_users,
         _Handler.get_user,
-        _Handler.put_user,
+        _Handler.create_user,
         _Handler.update_user,
         _Handler.reissue_user,
         _Handler.reset_user_traffic,

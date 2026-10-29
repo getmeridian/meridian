@@ -200,7 +200,7 @@ def test_sign_in_and_session_writes_refuse_cross_site_requests(fleet: Fleet, hea
     fleet.set_up()
     login = fleet.call("POST", "/auth/login", {"password": PASSWORD}, headers=headers)
     assert login.status == 403 and login.body["error"]["code"] == "csrf"
-    write = fleet.call("PUT", "/api/users/alice", headers=headers, session=True)
+    write = fleet.call("POST", "/api/users", {"username": "alice"}, headers=headers, session=True)
     assert write.status == 403 and write.body["error"]["code"] == "csrf"
     assert fleet.service.get_user("alice") is None
 
@@ -209,7 +209,7 @@ def test_a_same_origin_page_passes_the_csrf_checks(fleet: Fleet) -> None:
     fleet.set_up()
     host = fleet.url.removeprefix("http://")
     headers = {"Sec-Fetch-Site": "same-origin", "Origin": f"http://{host}"}
-    assert fleet.ui("PUT", "/api/users/alice", headers=headers).status == 200
+    assert fleet.ui("POST", "/api/users", {"username": "alice"}, headers=headers).status == 200
 
 
 def test_session_reads_need_no_csrf_header(fleet: Fleet) -> None:
@@ -222,16 +222,46 @@ def test_session_reads_need_no_csrf_header(fleet: Fleet) -> None:
 
 def test_a_session_holds_the_admin_scope_and_sees_credentials(fleet: Fleet) -> None:
     fleet.set_up()
-    assert fleet.ui("PUT", "/api/users/alice").status == 200
+    assert fleet.ui("POST", "/api/users", {"username": "alice"}).status == 200
     user = fleet.ui("GET", "/api/users/alice").body
     assert user["uuid"] and user["sub_token"]
     assert fleet.ui("GET", "/api/tokens").status == 200
 
 
+def test_adding_a_person_sets_their_limits_and_expiry_in_one_step(fleet: Fleet) -> None:
+    """Create then PATCH left an active, unlimited person when the second request never landed."""
+    fleet.set_up()
+    body = {
+        "username": "alice",
+        "expire_at": "2031-01-01T00:00:00Z",
+        "traffic_limit_bytes": 4194304,
+        "traffic_limit_strategy": "month",
+    }
+    created = fleet.ui("POST", "/api/users", body)
+    assert created.status == 200
+    alice = fleet.service.get_user("alice")
+    assert alice is not None
+    assert (alice.status, alice.expire_at, alice.traffic_limit_bytes, alice.traffic_limit_strategy) == (
+        "active",
+        "2031-01-01T00:00:00Z",
+        4194304,
+        "month",
+    )
+    again = fleet.ui("POST", "/api/users", {"username": "alice"})
+    assert again.status == 409 and again.body["error"]["code"] == "user_exists"
+    assert fleet.service.get_user("alice") == alice
+
+
+def test_a_person_added_already_expired_starts_expired(fleet: Fleet) -> None:
+    fleet.set_up()
+    assert fleet.ui("POST", "/api/users", {"username": "bob", "expire_at": "2020-01-01T00:00:00Z"}).status == 200
+    assert fleet.service.get_user("bob").status == "expired"  # type: ignore[union-attr]
+
+
 def test_bearer_wins_over_a_session_cookie(fleet: Fleet) -> None:
     fleet.set_up()
     read = fleet.call("POST", "/api/tokens", {"name": "viewer", "scope": "read"}, bearer=ADMIN_TOKEN).body["token"]
-    reply = fleet.call("PUT", "/api/users/alice", headers=UI, bearer=read, session=True)
+    reply = fleet.call("POST", "/api/users", {"username": "alice"}, headers=UI, bearer=read, session=True)
     assert reply.status == 403 and reply.body["error"]["code"] == "insufficient_scope"
 
 
@@ -297,6 +327,7 @@ def test_minting_a_token_needs_a_recent_confirmation(fleet: Fleet) -> None:
         ("PUT", "/api/backup/recovery-key", {"public_key": "age1x"}),
         ("PUT", "/api/backup/deployer-state", {}),
         ("GET", "/api/backup/snapshot", None),
+        ("PUT", "/api/users/main", {}),
         ("PUT", "/api/nodes/main", {}),
         ("DELETE", "/api/nodes/main", None),
         ("PUT", "/api/endpoints/main", {}),

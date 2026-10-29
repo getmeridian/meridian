@@ -35,6 +35,7 @@ from meridian.control.models import (
     NodeStatus,
     ServiceHealth,
     ServiceSettings,
+    UserCreate,
     UserImport,
     UserImportBatch,
     UserImportResult,
@@ -315,19 +316,40 @@ class ControlService:
             existing = self.get_user(username)
             if existing is not None:
                 return existing
-            self._db.execute(
-                "INSERT INTO users (username, user_id, uuid, sub_token, status, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    username,
-                    f"u{secrets.token_hex(8)}",
-                    str(uuid_module.uuid4()),
-                    secrets.token_urlsafe(18),
-                    "active",
-                    utc_now(),
-                ),
-            )
+            self._insert_user(UserCreate(username=username))
             self._compose_all()
             return self._require_user(username)
+
+    def create_user(self, create: UserCreate) -> UserRecord:
+        """Create a user with fresh credentials and their first settings at once; refuse a name already taken.
+
+        One transaction, so an interrupted "Add person" never leaves an active user without
+        the limits or expiry the form asked for.
+        """
+        with self._transaction():
+            if self.get_user(create.username) is not None:
+                raise ServiceError("user_exists", f"User {create.username!r} already exists.", 409)
+            self._insert_user(create)
+            self._enforce(utc_now())
+            self._compose_all()
+            return self._require_user(create.username)
+
+    def _insert_user(self, create: UserCreate) -> None:
+        self._db.execute(
+            "INSERT INTO users (username, user_id, uuid, sub_token, status, created_at, expire_at,"
+            " traffic_limit_bytes, traffic_limit_strategy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                create.username,
+                f"u{secrets.token_hex(8)}",
+                str(uuid_module.uuid4()),
+                secrets.token_urlsafe(18),
+                create.status,
+                utc_now(),
+                create.expire_at,
+                create.traffic_limit_bytes,
+                create.traffic_limit_strategy,
+            ),
+        )
 
     def import_users(self, batch: UserImportBatch) -> UserImportResult:
         """Create users with the credentials, status, limits, and usage another control plane gave them.
