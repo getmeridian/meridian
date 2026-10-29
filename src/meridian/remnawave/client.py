@@ -11,8 +11,11 @@ from urllib.parse import quote
 
 import httpx
 
+from meridian.core.client_limits import ClientLimitChange, TrafficReset
+
 from .control_plane import ControlPlaneMixin
 from .models import (
+    NEVER_EXPIRES_AT,
     ConfigProfile,
     Host,
     HostSecurityLayer,
@@ -37,6 +40,7 @@ logger = logging.getLogger("meridian.api")
 
 _EMPTY_BODY_STATUSES = frozenset({202, 204})
 _USERS_PAGE_SIZE = 1000  # Remnawave rejects larger pages
+_RESET_STRATEGIES: dict[TrafficReset, str] = {"never": "NO_RESET", "day": "DAY", "week": "WEEK", "month": "MONTH"}
 
 
 def _segment(value: str) -> str:
@@ -255,6 +259,25 @@ class MeridianPanel(ControlPlaneMixin):
     def disable_user(self, user_id: str) -> None:
         """Disable a user."""
         self._post(f"/api/users/{_segment(user_id)}/actions/disable")
+
+    def update_user_limits(self, user_id: str, change: ClientLimitChange) -> User:
+        """Set the operator-owned traffic limit, reset period, and expiry the change names.
+
+        The panel lifts LIMITED or EXPIRED once a new limit or expiry allows the user again;
+        "never expires" is stored as ``NEVER_EXPIRES_AT``, since every panel user needs a date.
+        """
+        body: dict[str, Any] = {"id": int(user_id)}
+        if change.traffic_limit_bytes is not None:
+            body["trafficLimitBytes"] = change.traffic_limit_bytes
+        if change.traffic_reset is not None:
+            body["trafficLimitStrategy"] = _RESET_STRATEGIES[change.traffic_reset]
+        if change.sets_expiry:
+            body["expireAt"] = change.expires_at or NEVER_EXPIRES_AT
+        return parse_user(self._patch("/api/users", json=body))
+
+    def reset_user_traffic(self, user_id: str) -> User:
+        """Start the user's used traffic from zero; a LIMITED user becomes ACTIVE again."""
+        return parse_user(self._post(f"/api/users/{_segment(user_id)}/actions/reset-traffic"))
 
     def revoke_user_subscription(self, user_id: str) -> User:
         """Issue a new short UUID, VLESS UUID, and passwords; the user and its settings stay.

@@ -1,5 +1,7 @@
 """Client management -- add, show, list, reissue, remove, enable, disable access users.
 
+Limits and expiry (`client set`, `client reset-traffic`) live in `client_limits.py`.
+
 Clients are declared in the topology's access intent; their runtime state lives in Remnawave.
 """
 
@@ -21,6 +23,7 @@ from meridian.commands.client_handoff import (
     resolve_page_url,
     validate_client_name,
 )
+from meridian.commands.client_limits import format_expiry, parse_limit_options, print_client_usage
 from meridian.commands.client_state import (
     build_client_persistence_warning,
     persist_client_state,
@@ -49,10 +52,13 @@ def _access_users(cluster: ClusterConfig) -> list[str]:
     return list(require_intent(cluster).access.users)
 
 
-def run_add(names: list[str]) -> None:
-    """Add one or more clients to the proxy cluster."""
+def run_add(
+    names: list[str], *, limit: str | None = None, reset: str | None = None, expires: str | None = None
+) -> None:
+    """Add one or more clients to the proxy cluster, optionally with traffic limits and an expiry."""
     operation = OperationContext()
     with error_context("client.add", timer=operation.timer):
+        limits = parse_limit_options(limit=limit, reset=reset, expires=expires)
         seen: set[str] = set()
         for name in names:
             if name.strip().casefold() in seen:
@@ -70,6 +76,7 @@ def run_add(names: list[str]) -> None:
             operation,
             display_names=display_names,
             publish_handoff=publish_connection_pages,
+            limits=limits,
         )
 
 
@@ -159,11 +166,7 @@ def _show(*, name: str, repair_page: bool, operation: OperationContext) -> None:
     print_handoff_links(result.subscription_url, page_url=result.share_url)
 
     err_console.print()
-    err_console.print(f"  [bold]Status[/bold]    {format_status(detail.status)}")
-    traffic = format_traffic(detail.traffic_used_bytes, detail.traffic_limit_bytes)
-    err_console.print(f"  [bold]Traffic[/bold]   {traffic}")
-    if detail.last_seen:
-        err_console.print(f"  [bold]Last seen[/bold] {escape(detail.last_seen)}")
+    print_client_usage(detail)
 
     err_console.print()
     if cluster.panel.url and not cluster.runs_control_service:
@@ -222,6 +225,7 @@ def _list(*, operation: OperationContext) -> None:
     table.add_column("Name", style="bold cyan")
     table.add_column("Status", justify="center")
     table.add_column("Traffic", style="dim")
+    table.add_column("Expires", style="dim")
     table.add_column("Last seen", style="dim")
 
     access = require_intent(cluster).access
@@ -231,6 +235,7 @@ def _list(*, operation: OperationContext) -> None:
             escape(shown if shown == client.username else f"{shown} ({client.username})"),
             format_status(client.status),
             format_traffic(client.traffic_used_bytes, client.traffic_limit_bytes),
+            escape(format_expiry(client.expires_at) if client.expires_at else "-"),
             escape(client.last_seen or "-"),
         )
 

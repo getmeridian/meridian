@@ -43,7 +43,7 @@ To share a client's links again:
 meridian client show alice
 ```
 
-This prints the connection page and subscription URL, plus status, traffic, and when the client was last seen. If the page is missing (for example, the upload failed), republish it:
+This prints the connection page and subscription URL, plus status, traffic, expiry, and when the client was last seen. If the page is missing (for example, the upload failed), republish it:
 
 ```
 meridian client show alice --repair-page
@@ -55,7 +55,42 @@ meridian client show alice --repair-page
 meridian client list
 ```
 
-Shows every client with status, traffic, creation time, and last seen.
+Shows every client with status, traffic, expiry, and last seen.
+
+## Limit traffic and set an expiry
+
+Give a client a monthly traffic allowance and an end date:
+
+```
+meridian client set alice --limit 50GB --reset month --expires 2026-12-31
+```
+
+The same options work when you add someone (`meridian client add alice --limit 50GB --reset month`). Later, only the options you pass change:
+
+```
+meridian client set alice --expires 2027-06-30
+meridian client set alice --limit none --expires never
+```
+
+- `--limit` takes a size such as `500MB`, `50GB`, or `1.5TB` (1 GB is 1024³ bytes, as the panel counts); `none` removes the limit.
+- `--reset` starts used traffic from zero every `day`, `week`, or `month`; `never` keeps counting.
+- `--expires` takes a date (access ends when that day ends, in UTC), an ISO time such as `2026-12-31T18:00:00+03:00`, or `never`.
+
+A client who reaches the limit shows as `limited`, and one past the expiry as `expired`. They stay cut off until the next reset, or until you raise the limit or move the date. To give the allowance back right away:
+
+```
+meridian client reset-traffic alice
+```
+
+`client show` prints where they stand:
+
+```
+  Status    ● active
+  Traffic   12.4 GB / 50 GB (resets monthly)
+  Expires   2026-12-31
+```
+
+Apply, redeploys, and fleet changes never change a client's limits or expiry.
 
 ## Suspend and resume a client
 

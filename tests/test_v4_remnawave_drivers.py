@@ -891,6 +891,10 @@ def test_gateway_reconciles_service_edges_ordered_routes_and_fail_closed_pool() 
     access_user = next(user for user in panel.users.values() if user.description == "Managed by Meridian access")
     access_user.status = "DISABLED"
     access_user.description = "Grandma's tablet"
+    # `client set` limits and expiry are the operator's too.
+    access_user.traffic_limit_bytes = 50 * 1024**3
+    access_user.traffic_limit_strategy = "MONTH"
+    access_user.expire_at = "2031-12-31T23:59:59.000Z"
     restored = execute_resource_plan(
         plan,
         cluster,
@@ -901,6 +905,11 @@ def test_gateway_reconciles_service_edges_ordered_routes_and_fail_closed_pool() 
     assert not restored.changed
     assert access_user.status == "DISABLED"
     assert access_user.description == "Grandma's tablet"
+    assert (access_user.traffic_limit_bytes, access_user.traffic_limit_strategy, access_user.expire_at) == (
+        50 * 1024**3,
+        "MONTH",
+        "2031-12-31T23:59:59.000Z",
+    )
     assert panel.calls["enable_user"] == 0
 
     mutation_counts = panel.calls.copy()

@@ -365,11 +365,14 @@
         "1": "unexpected Meridian bug",
         "130": "process interrupted; no JSON envelope is emitted",
         "2": "invalid input or client conflict",
-        "3": "clients were added with failed requests or incomplete page/local-state follow-up; system or panel failure"
+        "3": "clients were added with failed requests or incomplete page, limits, or local-state follow-up; system or panel failure"
       },
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
+        "--limit",
+        "--reset",
+        "--expires",
         "--json",
         "--yes"
       ],
@@ -383,7 +386,7 @@
         {
           "category": "none",
           "exit_code": 3,
-          "meaning": "clients were added with failed requests or incomplete page/local-state follow-up",
+          "meaning": "clients were added with failed requests or incomplete page, limits, or local-state follow-up",
           "status": "ok"
         },
         {
@@ -678,6 +681,119 @@
           "category": "user",
           "exit_code": 2,
           "meaning": "client not found or input error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or panel failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "reset-traffic",
+        "NAME"
+      ],
+      "command": "client.reset-traffic",
+      "data_schema": "client-limits",
+      "description": "Start a client's used traffic from zero; a client cut off by their limit connects again",
+      "envelope_schema": "client-reset-traffic-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "client traffic was reset",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "client not found or input error",
+        "3": "system or panel failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "client traffic was reset",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "client not found or input error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or panel failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "set",
+        "NAME"
+      ],
+      "command": "client.set",
+      "data_schema": "client-limits",
+      "description": "Change a client's traffic limit, reset period, or expiry",
+      "envelope_schema": "client-set-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "client limits were changed",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "client not found, nothing to change, or an invalid size, period, or date",
+        "3": "system or panel failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--limit",
+        "--reset",
+        "--expires",
+        "--json"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "client limits were changed",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "client not found, nothing to change, or an invalid size, period, or date",
           "status": "failed"
         },
         {

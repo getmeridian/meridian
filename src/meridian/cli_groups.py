@@ -10,19 +10,22 @@ from typing import Annotated
 import typer
 
 from meridian.cli_options import (
+    Expires,
     ForgetUnreachable,
     Json,
     NewServer,
     SelfSteal,
     SshPort,
     Target,
+    TrafficLimit,
+    TrafficResetPeriod,
     User,
     Yes,
     enable_json_output,
 )
 
 client_app = typer.Typer(
-    help="Manage who can connect: add, show, list, reissue, enable, disable, remove", no_args_is_help=True
+    help="Manage who can connect: add, show, list, limit, reissue, enable, disable, remove", no_args_is_help=True
 )
 server_app = typer.Typer(help="Save and name servers you reach over SSH", no_args_is_help=True)
 node_app = typer.Typer(help="Add, list, replace, or remove exit servers, or change their SNI", no_args_is_help=True)
@@ -38,21 +41,25 @@ dev_app = typer.Typer(help="Developer tools for testing and debugging", no_args_
 @client_app.command("add")
 def client_add(
     names: list[str] = typer.Argument(..., metavar="NAME", help="Client name(s) to add"),
+    limit: TrafficLimit = None,
+    reset: TrafficResetPeriod = None,
+    expires: Expires = None,
     _json: Json = False,
     # Adding never asks; accepted so scripts can pass --yes to every mutating command.
     _yes: bool = typer.Option(False, "--yes", "-y", hidden=True),
 ) -> None:
     """Add one or more clients (people who connect)
 
-    Prints each client's connection page and subscription link.
+    Prints each client's connection page and subscription link. Limits and expiry apply to every name.
 
     [dim]Examples:[/dim]
       [cyan]meridian client add alice[/cyan]
       [cyan]meridian client add alice bob charlie[/cyan]
+      [cyan]meridian client add alice --limit 50GB --reset month --expires 2026-12-31[/cyan]
     """
     from meridian.commands.client import run_add
 
-    run_add(names)
+    run_add(names, limit=limit, reset=reset, expires=expires)
 
 
 @client_app.command("show")
@@ -79,6 +86,44 @@ def client_list_cmd(
     from meridian.commands.client import run_list
 
     run_list()
+
+
+@client_app.command("set")
+def client_set_cmd(
+    name: str = typer.Argument(..., help="Client name"),
+    limit: TrafficLimit = None,
+    reset: TrafficResetPeriod = None,
+    expires: Expires = None,
+    _json: Json = False,
+) -> None:
+    """Change a client's traffic limit, reset period, or expiry
+
+    Only the options you pass change. A client cut off by their limit or expiry can connect
+    again as soon as the new values allow it.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian client set alice --expires 2026-12-31[/cyan]
+      [cyan]meridian client set alice --limit 50GB --reset month[/cyan]
+      [cyan]meridian client set alice --limit none --expires never[/cyan]
+    """
+    from meridian.commands.client_limits import run_set
+
+    run_set(name, limit=limit, reset=reset, expires=expires)
+
+
+@client_app.command("reset-traffic")
+def client_reset_traffic_cmd(
+    name: str = typer.Argument(..., help="Client name"),
+    _json: Json = False,
+) -> None:
+    """Start a client's used traffic from zero; a client cut off by their limit connects again
+
+    [dim]Examples:[/dim]
+      [cyan]meridian client reset-traffic alice[/cyan]
+    """
+    from meridian.commands.client_limits import run_reset_traffic
+
+    run_reset_traffic(name)
 
 
 @client_app.command("remove")

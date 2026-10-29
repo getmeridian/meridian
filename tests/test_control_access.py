@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import threading
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -13,10 +12,7 @@ from meridian.adapters.cluster import topology_from_cluster
 from meridian.cluster import ClusterConfig
 from meridian.connectivity import create_verification_panel, select_active_client, verification_panel_factory
 from meridian.control.client import ControlClient, ControlServiceAuthError, ControlServiceError
-from meridian.control.enrollment import token_sha256
 from meridian.control.models import ClientEndpoint, NodeSpec
-from meridian.control.server import ControlServer
-from meridian.control.service import ControlService
 from meridian.control_access import ServiceAccessPanel, ServiceFleetPanel, access_panel, fleet_panel
 from meridian.remnawave import (
     XRAY_JSON_CLIENT_TYPE,
@@ -29,9 +25,8 @@ from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.editor import add_relay_to_intent
 from meridian.setup.single_server import single_server_intent
 from meridian.xray_client import parse_xray_subscription, proxy_outbounds
+from tests.support.control_service import ADMIN_TOKEN, serve_control
 
-FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
-ADMIN_TOKEN = "admin-token-for-tests-only-0123456789"
 REALITY = ClientEndpoint(
     remark="Reality",
     protocol="reality",
@@ -47,13 +42,8 @@ REALITY = ClientEndpoint(
 
 @pytest.fixture
 def url(tmp_path: Path) -> Iterator[str]:
-    service = ControlService(tmp_path / "control.db", fleet_id=FLEET_ID, version="4.0.0")
-    server = ControlServer(("127.0.0.1", 0), service, token_sha256(ADMIN_TOKEN))
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    yield f"http://127.0.0.1:{server.server_address[1]}"
-    server.shutdown()
-    server.server_close()
+    with serve_control(tmp_path) as base:
+        yield base
 
 
 def test_client_round_trips_users_and_subscriptions(url: str) -> None:

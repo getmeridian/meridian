@@ -16,6 +16,7 @@ from meridian.core.apply import (
 from meridian.core.cancellation import OperationCancellation
 from meridian.core.clients import (
     ClientAddResult,
+    ClientLimitsResult,
     ClientListResult,
     ClientReissueResult,
     ClientRemoveResult,
@@ -405,6 +406,20 @@ _, _, ClientDisableOutputEnvelope = _make_command_envelope(
     doc="Envelope schema for `meridian client disable --json`.",
 )
 
+_, _, ClientSetOutputEnvelope = _make_command_envelope(
+    "ClientSet",
+    "client.set",
+    ClientLimitsResult,
+    doc="Envelope schema for `meridian client set --json`.",
+)
+
+_, _, ClientResetTrafficOutputEnvelope = _make_command_envelope(
+    "ClientResetTraffic",
+    "client.reset-traffic",
+    ClientLimitsResult,
+    doc="Envelope schema for `meridian client reset-traffic --json`.",
+)
+
 _, _, NodeListOutputEnvelope = _make_command_envelope(
     "NodeList",
     "node.list",
@@ -493,6 +508,8 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "client-reissue-envelope": ClientReissueOutputEnvelope,
     "client-enable-envelope": ClientEnableOutputEnvelope,
     "client-disable-envelope": ClientDisableOutputEnvelope,
+    "client-set-envelope": ClientSetOutputEnvelope,
+    "client-reset-traffic-envelope": ClientResetTrafficOutputEnvelope,
     "node-list-envelope": NodeListOutputEnvelope,
     "relay-list-envelope": RelayListOutputEnvelope,
     "route-add-envelope": RouteAddOutputEnvelope,
@@ -540,6 +557,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "client-remove": ClientRemoveResult,
     "client-reissue": ClientReissueResult,
     "client-status": ClientStatusResult,
+    "client-limits": ClientLimitsResult,
     "client-name-request": ClientNameRequest,
     "server-add-request": ServerAddRequest,
     "server-bootstrap-key-request": ServerBootstrapKeyRequest,

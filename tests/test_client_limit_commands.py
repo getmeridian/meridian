@@ -1,0 +1,263 @@
+"""`client set`, `client reset-traffic`, and limits in `client add` and `client show`, alike on both backends."""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+import pytest
+import typer
+
+from meridian.cluster import ClusterConfig, PanelConfig
+from meridian.commands.client import run_add, run_show
+from meridian.commands.client_handoff import PageResolution
+from meridian.commands.client_limits import format_expiry, format_usage, run_reset_traffic, run_set
+from meridian.console import set_json_mode
+from meridian.control.client import ControlClient
+from meridian.core.clients import build_client_record
+from meridian.core.schema import schema_model
+from meridian.handoff import HandoffLinks
+from meridian.remnawave import User
+from meridian.setup.single_server import single_server_intent
+from tests.support.control_service import ADMIN_TOKEN, serve_control
+from tests.support.remnawave_http import FakeRemnawave
+from tests.support.topology import single_exit_intent
+
+GB = 1024**3
+FUTURE_DAY = "2031-12-31"
+
+
+# --- Display ----------------------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("expires_at", "shown"),
+    [("2026-12-31T23:59:59Z", "2026-12-31"), ("2026-12-31T15:00:00Z", "2026-12-31 15:00 UTC"), ("", "never")],
+    ids=["end-of-day", "time", "never"],
+)
+def test_expiry_display(expires_at: str, shown: str) -> None:
+    assert format_expiry(expires_at) == shown
+
+
+@pytest.mark.parametrize(
+    ("strategy", "limit", "shown"),
+    [
+        ("MONTH", 50 * GB, "12.4 GB / 50 GB (resets monthly)"),
+        ("NO_RESET", 50 * GB, "12.4 GB / 50 GB"),
+        ("", 0, "12.4 GB"),
+        ("MONTH_ROLLING", 50 * GB, "12.4 GB / 50 GB (resets monthly on the day they were added)"),
+    ],
+    ids=["monthly", "no-reset", "unlimited", "panel-rolling"],
+)
+def test_usage_line(strategy: str, limit: int, shown: str) -> None:
+    user = User(used_traffic_bytes=int(12.4 * GB), traffic_limit_bytes=limit, traffic_limit_strategy=strategy)
+    assert format_usage(build_client_record(user)) == shown
+
+
+# --- Commands on both backends --------------------------------------------------------------------------------
+
+
+def _remnawave_cluster(tmp_path: Path) -> ClusterConfig:
+    cluster = ClusterConfig(
+        panel=PanelConfig(url="https://198.51.100.1/panel", api_token="test-token", server_ip="198.51.100.1"),
+        topology_intent=single_exit_intent(users=["alice", "bob"]),
+    )
+    cluster.save(tmp_path / "cluster.yml")
+    return cluster
+
+
+@contextmanager
+def _backend(kind: str, tmp_path: Path, *, json_mode: bool = False) -> Iterator[SimpleNamespace]:
+    """A saved fleet of either control backend with client alice, served to client commands."""
+    set_json_mode(json_mode)
+    try:
+        with ExitStack() as stack:
+            if kind == "remnawave":
+                cluster = _remnawave_cluster(tmp_path)
+                fake = FakeRemnawave("alice")
+                stack.enter_context(patch("meridian.control_access.MeridianPanel", side_effect=fake.panel))
+                create = fake.add
+            else:
+                url = stack.enter_context(serve_control(tmp_path))
+                cluster = ClusterConfig(
+                    panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, server_ip="198.51.100.1"),
+                    topology_intent=single_server_intent(
+                        None, server_ref="srv-a", client_name="alice", control="meridian"
+                    ),
+                )
+                client = stack.enter_context(ControlClient(url, ADMIN_TOKEN))
+                client.put_user("alice")
+                create = client.put_user  # type: ignore[assignment]
+            stack.enter_context(patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster))
+            yield SimpleNamespace(cluster=cluster, create=create)
+    finally:
+        set_json_mode(False)
+
+
+BACKENDS = pytest.mark.parametrize("backend", ["remnawave", "meridian"])
+
+
+def _envelope(capsys: pytest.CaptureFixture[str], schema: str) -> dict[str, Any]:
+    payload = json.loads(capsys.readouterr().out)
+    schema_model(schema).model_validate(payload)
+    return payload
+
+
+@BACKENDS
+def test_client_set_changes_and_clears_limits_alike_on_both_backends(
+    backend: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with _backend(backend, tmp_path, json_mode=True):
+        run_set("alice", limit="50GB", reset="month", expires=FUTURE_DAY)
+        first = _envelope(capsys, "client-set-envelope")
+        run_set("alice", limit="none", reset=None, expires="never")
+        second = _envelope(capsys, "client-set-envelope")
+
+    assert first["command"] == "client.set" and first["summary"]["changed"] is True
+    client = first["data"]["client"]
+    assert (client["username"], client["status"].lower()) == ("alice", "active")
+    assert (client["traffic_limit_bytes"], client["traffic_reset"], client["expires_at"]) == (
+        50 * GB,
+        "month",
+        f"{FUTURE_DAY}T23:59:59Z",
+    )
+    client = second["data"]["client"]
+    assert (client["traffic_limit_bytes"], client["traffic_reset"], client["expires_at"]) == (0, "month", "")
+
+
+@BACKENDS
+def test_client_reset_traffic_starts_usage_from_zero(
+    backend: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with _backend(backend, tmp_path, json_mode=True):
+        run_reset_traffic("alice")
+        payload = _envelope(capsys, "client-reset-traffic-envelope")
+
+    assert payload["command"] == "client.reset-traffic"
+    assert payload["data"]["client"]["traffic_used_bytes"] == 0
+
+
+@BACKENDS
+def test_client_show_prints_usage_against_the_limit_and_the_expiry(
+    backend: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with _backend(backend, tmp_path):
+        run_set("alice", limit="50GB", reset="month", expires=FUTURE_DAY)
+        capsys.readouterr()
+        with patch("meridian.commands.client.resolve_page_url", return_value=PageResolution()):
+            run_show("alice")
+
+    output = capsys.readouterr().err
+    assert "Traffic   " in output and "/ 50 GB (resets monthly)" in output
+    assert f"Expires   {FUTURE_DAY}" in output
+
+
+@BACKENDS
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        ({}, "Nothing to change"),
+        ({"limit": "lots"}, "is not a size"),
+        ({"expires": "2020-01-01"}, "in the past"),
+        ({"reset": "hourly"}, "is not one of"),
+    ],
+    ids=["nothing", "bad-limit", "past-expiry", "bad-period"],
+)
+def test_client_set_refuses_bad_input_before_any_connection(
+    backend: str, options: dict[str, str], message: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    arguments = {"limit": None, "reset": None, "expires": None, **options}
+    with (
+        _backend(backend, tmp_path, json_mode=True),
+        patch("meridian.commands.client_limits.access_panel") as access_panel,
+        pytest.raises(typer.Exit) as exc_info,
+    ):
+        run_set("alice", **arguments)
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exc_info.value.exit_code == 2
+    assert message in payload["errors"][0]["message"]
+    access_panel.assert_not_called()
+
+
+@BACKENDS
+def test_client_set_refuses_a_name_that_is_not_a_fleet_client(backend: str, tmp_path: Path) -> None:
+    with _backend(backend, tmp_path), pytest.raises(typer.Exit) as exc_info:
+        run_set("mallory", limit="50GB", reset=None, expires=None)
+    assert exc_info.value.exit_code == 2
+
+
+@BACKENDS
+def test_client_add_sets_limits_after_the_reviewed_apply(
+    backend: str, tmp_path: Path, tmp_home: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with _backend(backend, tmp_path, json_mode=True) as fleet:
+        runtime = MagicMock()
+
+        def apply_intent(intent: Any, *_args: object, **_kwargs: object) -> SimpleNamespace:
+            fleet.create("carol")
+            return SimpleNamespace(all_succeeded=True, changed=True, failed=[])
+
+        runtime.apply_intent.side_effect = apply_intent
+        with (
+            patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+            patch("meridian.servers.ServerRegistry"),
+            patch(
+                "meridian.commands.client.publish_connection_pages",
+                return_value=[HandoffLinks("carol", subscription_url="https://198.51.100.1/pages/sub/short-carol")],
+            ),
+        ):
+            run_add(["carol"], limit="50GB", reset="month", expires=FUTURE_DAY)
+        payload = _envelope(capsys, "client-add-envelope")
+        with access_panel_for(fleet.cluster) as panel:
+            carol = build_client_record(panel.get_user("carol"))  # type: ignore[arg-type]
+
+    assert payload["status"] == "ok" and payload["warnings"] == []
+    assert (carol.traffic_limit_bytes, carol.traffic_reset, carol.expires_at) == (
+        50 * GB,
+        "month",
+        f"{FUTURE_DAY}T23:59:59Z",
+    )
+
+
+def access_panel_for(cluster: ClusterConfig) -> Any:
+    from meridian.control_access import access_panel
+
+    return access_panel(cluster)
+
+
+def test_client_add_reports_limits_it_could_not_set_as_a_partial_result(
+    tmp_path: Path, tmp_home: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from meridian.remnawave import RemnawaveError
+
+    panel = MagicMock()
+    panel.__enter__.return_value = panel
+    panel.get_user.side_effect = [None, User(id="102", username="carol", short_uuid="short-carol", status="ACTIVE")]
+    panel.update_user_limits.side_effect = RemnawaveError("Panel API error: 400")
+    runtime = MagicMock()
+    runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, changed=True, failed=[])
+    set_json_mode(True)
+    try:
+        with (
+            patch("meridian.commands._helpers.ClusterConfig.load", return_value=_remnawave_cluster(tmp_path)),
+            patch("meridian.control_access.MeridianPanel", return_value=panel),
+            patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+            patch("meridian.servers.ServerRegistry"),
+            patch("meridian.commands.client.publish_connection_pages", return_value=[]),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_add(["carol"], limit="50GB")
+    finally:
+        set_json_mode(False)
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exc_info.value.exit_code == 3
+    assert payload["data"]["clients"][0]["username"] == "carol"
+    assert payload["warnings"][0]["code"] == "MERIDIAN_CLIENT_LIMITS_FAILED"
+    assert "meridian client set carol" in payload["warnings"][0]["hint"]
