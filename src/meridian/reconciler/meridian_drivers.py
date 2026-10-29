@@ -14,7 +14,7 @@ import json
 import shlex
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -92,6 +92,14 @@ class MeridianDriverContext:
     server_addresses: Mapping[str, str]
     agent_binary: Callable[[str], AgentBinary]
     sleep: Callable[[float], None] = time.sleep
+    _architectures: dict[str, str] = field(default_factory=dict, repr=False)
+
+    def architecture(self, server_ref: str) -> str:
+        """The server's `uname -m`, read once per apply: it picks the agent and Xray builds."""
+        if server_ref not in self._architectures:
+            conn = self.connection_for(server_ref)
+            self._architectures[server_ref] = _run(conn, "uname -m", "read the architecture").strip()
+        return self._architectures[server_ref]
 
     def address(self, server_ref: str) -> str:
         address = self.server_addresses.get(server_ref, "")
@@ -224,7 +232,7 @@ class AgentRuntimeDriver:
         healthy = inspection.active and inspection.identity and (inspection.live or self._reconnects(payload))
         if healthy and inspection.current_build:
             return ResourceApplyReceipt(remote_id=payload.workload_ref)  # only WARP needed repair
-        arch = _run(conn, "uname -m", "read the architecture").strip()
+        arch = self.context.architecture(payload.server_ref)
         binary = self.context.agent_binary(arch)
         if healthy:
             self._upgrade(conn, payload, binary)
@@ -309,7 +317,7 @@ class AgentRuntimeDriver:
     def _inspect(self, payload: AgentRuntimePayload) -> AgentInspection:
         """What runs on the node, under which identity, and whether the service sees it live."""
         conn = self.context.connection_for(payload.server_ref)
-        arch = _run(conn, "uname -m", "read the architecture").strip()
+        arch = self.context.architecture(payload.server_ref)
         binary = self.context.agent_binary(arch)
         # The running image, not the file: a swap whose restart was lost still runs the old build.
         running = running_sha256(conn)
@@ -402,7 +410,7 @@ class NodeWorkloadDriver:
         credentials = self.context.service_credentials(payload.profile, action.generation)
         if (keys is None and _needs_keys(payload.profile)) or credentials is None:
             return _observation(action, exists=False, connected=False, remote_id="")
-        spec = build_node_spec(payload.profile, keys, credentials)
+        spec = build_node_spec(payload.profile, keys, credentials, arch=self.context.architecture(payload.server_ref))
         with self.context.client() as client:
             status = client.node(payload.workload_ref)
         stored = status is not None and status.spec_sha256 == _spec_hash(spec)
@@ -426,7 +434,7 @@ class NodeWorkloadDriver:
                 f"Routing gateway {payload.workload_ref} dials an exit that has no Reality keys yet.",
                 hint="Apply the plan again; the exit workloads it routes to come first.",
             )
-        spec = build_node_spec(payload.profile, keys, credentials)
+        spec = build_node_spec(payload.profile, keys, credentials, arch=self.context.architecture(payload.server_ref))
         with self.context.client() as client:
             status = client.put_node(payload.workload_ref, spec)
             deadline = time.monotonic() + WORKLOAD_APPLY_TIMEOUT

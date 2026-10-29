@@ -13,12 +13,14 @@ from typing import Any, Final
 
 from meridian.cluster import RealityKeyBinding
 from meridian.compiler.models import ConfigProfilePayload
-from meridian.config import XRAY_ARCHIVE_BYTES, XRAY_GITHUB_URL, XRAY_SHA256, XRAY_VERSION
+from meridian.config import XRAY_ARCHIVE_BYTES, XRAY_ASSET_MAP, XRAY_GITHUB_URL, XRAY_SHA256, XRAY_VERSION
 from meridian.control.models import ManagedInbound, NodeSpec, users_resource_id
 from meridian.host_runtime import AGENT_LIB_DIR, CORE_BINARY, CORE_CONFIG, CORE_UNIT
+from meridian.reconciler.resources import ResourceReconcileError
 from meridian.xray_workload import ServiceRouteCredential, bridge_client_uuid, render_workload_config
 
-XRAY_LINUX_ASSET = "Xray-linux-64.zip"
+# The Linux Xray archive for each machine (`uname -m`) an agent runs on.
+XRAY_LINUX_ASSETS: Final = {arch: asset for (system, arch), asset in XRAY_ASSET_MAP.items() if system == "Linux"}
 # Loopback gRPC API the agent will use for users and traffic counters (M2).
 CORE_API_PORT = 10085
 _PINS = (
@@ -48,8 +50,17 @@ def build_node_spec(
     profile: ConfigProfilePayload,
     reality_keys: RealityKeyBinding | None,
     service_credentials: dict[str, ServiceRouteCredential] | None = None,
+    *,
+    arch: str,
 ) -> NodeSpec:
-    """Return the agent resources for one workload; a gateway passes its edges' credentials."""
+    """Return the agent resources for one workload on an `arch` machine; a gateway passes its edges' credentials."""
+    asset = XRAY_LINUX_ASSETS.get(arch)
+    if asset is None:
+        raise ResourceReconcileError(
+            f"Xray has no Linux build Meridian pins for {arch or 'this architecture'}.",
+            hint=f"Use a server with one of: {', '.join(sorted(XRAY_LINUX_ASSETS))}.",
+            category="user",
+        )
     inbounds = managed_inbounds(profile)
     users = [users_resource_id(inbound.tag) for inbound in inbounds]
     pins = [pin[0] for pin in _PINS]
@@ -60,9 +71,9 @@ def build_node_spec(
             "name": name,
             "version": XRAY_VERSION,
             # GitHub first; the control service mirrors it for nodes that cannot reach GitHub.
-            "sources": [f"{XRAY_GITHUB_URL}/v{XRAY_VERSION}/{XRAY_LINUX_ASSET}", "service"],
-            "size": XRAY_ARCHIVE_BYTES[XRAY_LINUX_ASSET],
-            "sha256": XRAY_SHA256[XRAY_LINUX_ASSET],
+            "sources": [f"{XRAY_GITHUB_URL}/v{XRAY_VERSION}/{asset}", "service"],
+            "size": XRAY_ARCHIVE_BYTES[asset],
+            "sha256": XRAY_SHA256[asset],
             "archive": "zip",
             "member": member,
             "install_path": path,

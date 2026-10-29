@@ -35,8 +35,7 @@ def _hook(root: Path, target_name: str) -> CustomBuildHook:
 def test_every_agent_target_is_built_packaged_and_checked() -> None:
     builds = {f"netagent-{target}" for target in AGENT_TARGETS.values()}
 
-    assert set(hatch_build.AGENT_BUILDS) == set(verify_package_assets.AGENT_BUILDS)
-    assert builds <= set(hatch_build.AGENT_BUILDS)
+    assert set(hatch_build.AGENT_BUILDS) == builds == set(verify_package_assets.AGENT_BUILDS)
 
 
 @pytest.mark.parametrize(
@@ -147,4 +146,10 @@ def test_an_architecture_with_no_build_names_the_supported_ones(packaged: Path) 
     with pytest.raises(LocalStateError, match="no build for riscv64") as error:
         agent_binary("riscv64")
 
-    assert error.value.hint == "Use a server with one of: x86_64."
+    assert error.value.hint == "Use a server with one of: aarch64, x86_64."
+
+
+def test_an_arm_server_gets_the_arm_build(packaged: Path) -> None:
+    _write_build(packaged, "aarch64-unknown-linux-musl", b"arm build")
+
+    assert agent_binary("aarch64").data == b"arm build"

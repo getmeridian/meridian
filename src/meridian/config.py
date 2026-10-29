@@ -206,6 +206,7 @@ XRAY_SHA256: dict[str, str] = {
 # Xray archive sizes, which the node agent checks before the hash (`binary_pin.size`)
 XRAY_ARCHIVE_BYTES: dict[str, int] = {
     "Xray-linux-64.zip": 21164807,
+    "Xray-linux-arm64-v8a.zip": 19699639,
 }
 
 # uv installs Meridian's control service (`meridian serve`) with its own Python on the control

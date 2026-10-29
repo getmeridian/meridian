@@ -23,7 +23,7 @@ from urllib.parse import unquote, urlparse
 from meridian import __version__
 from meridian.core.errors import LocalStateError
 
-AGENT_TARGETS = {"x86_64": "x86_64-unknown-linux-musl"}
+AGENT_TARGETS = {"x86_64": "x86_64-unknown-linux-musl", "aarch64": "aarch64-unknown-linux-musl"}
 # Where a built wheel carries the agent builds (scripts/hatch_build.py copies them from agent/dist).
 PACKAGED_AGENT_DIR = Path(__file__).resolve().parent / "agent_dist"
 

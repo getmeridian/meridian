@@ -155,7 +155,7 @@ def _setup(
             cluster=cluster,
             client=lambda: control,  # type: ignore[arg-type,return-value]
             workloads=WorkloadStateManager(cluster, persist=lambda _c: None, key_factory=LocalRealityKeyFactory()),
-            connection_for=lambda _ref: conn or MockConnection(),
+            connection_for=lambda _ref: conn or MockConnection().when("uname -m", stdout="x86_64\n"),
             server_addresses=addresses or {"srv-a": "198.51.100.10"},
             agent_binary=lambda _arch: BINARY,
             sleep=lambda _s: None,
@@ -186,6 +186,19 @@ def test_workload_converges_once_the_agent_applies_the_current_revision(plan: Re
 
     assert cluster.workloads[0].reality_keys
     assert observation_converges(action, drivers["node_workload"].observe(action, None))
+
+
+def test_an_arm_exit_gets_the_arm_xray_archive(plan: ResourcePlan) -> None:
+    conn = MockConnection().when("uname -m", stdout="aarch64\n")
+    drivers, control, _cluster = _setup(plan, conn)
+    control.reports = [{"applied": True}]
+
+    drivers["node_workload"].apply(_action(plan, "workload:main"), None)
+
+    (spec,) = control.specs.values()
+    pins = [resource for resource in spec.resources if resource.kind == "binary_pin"]
+    assert pins and all(pin.sources[0].endswith("/Xray-linux-arm64-v8a.zip") for pin in pins)
+    assert sum("uname -m" in call for call in conn.calls) == 1, "read once per apply"
 
 
 def test_workload_refuses_a_first_document_the_agent_failed(plan: ResourcePlan) -> None:
