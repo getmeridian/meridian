@@ -7,6 +7,10 @@
 
 export type CreatedAt = string;
 /**
+ * False for a person added in the control service's web console rather than the fleet's reviewed intent; the CLI reads them, and the console manages them.
+ */
+export type Declared = boolean;
+/**
  * UTC timestamp; empty means never.
  */
 export type ExpiresAt = string;
@@ -40,6 +44,7 @@ export interface ClientShowResult {
  */
 export interface ClientDetail {
   created_at: CreatedAt;
+  declared?: Declared;
   expires_at: ExpiresAt;
   id: Id;
   last_seen: LastSeen;
