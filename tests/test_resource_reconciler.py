@@ -669,6 +669,23 @@ class TestUnknownOutcomeRecovery:
         assert result.results[0].status == "unknown"
         assert next(iter(cluster.action_checkpoints.values())).status == "unknown"
 
+    def test_a_post_apply_shortfall_names_what_differs(self) -> None:
+        """The failure carries the driver's own reasons, not only "did not satisfy the reviewed hash"."""
+        plan = _plan()
+        drifted = ResourceObservation(
+            exists=True, observed_hash="0" * 64, mismatches=["the rule allows the wrong port"]
+        )
+        driver = ScriptedDriver([_missing(), drifted], [ResourceApplyReceipt(remote_id="firewall-1")])
+        cluster = ClusterConfig()
+
+        result = execute_resource_plan(
+            plan, cluster, {"firewall_rule": driver}, persist=lambda _state: None, clock=_clock
+        )
+
+        assert result.results[0].status == "failed"
+        assert "the rule allows the wrong port" in (result.results[0].error or "")
+        assert "the rule allows the wrong port" in (next(iter(cluster.action_checkpoints.values())).last_error or "")
+
 
 class TestPendingPlanSafety:
     def test_different_plan_cannot_replace_unknown_pending_action(self) -> None:
