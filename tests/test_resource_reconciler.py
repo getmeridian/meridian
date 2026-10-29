@@ -7,8 +7,10 @@ from datetime import UTC, datetime
 
 import pytest
 
-from meridian.cluster import ActionCheckpoint, ClusterConfig, ManagedResourceBinding
+from meridian.cluster import ActionCheckpoint, ClusterConfig, ManagedResourceBinding, WorkloadBinding
 from meridian.compiler.models import (
+    ConfigProfilePayload,
+    NodeWorkloadPayload,
     ProbePayload,
     ResourcePlan,
     make_resource,
@@ -242,6 +244,22 @@ class TestCheckpointedExecution:
         assert driver.apply_calls == []
         assert saves == []
         assert cluster.pending_plan_hash == ""
+
+    def test_a_meridian_plan_keeps_its_workloads_active_at_commit(self) -> None:
+        profile = ConfigProfilePayload(workload_id="exit-a", name="exit-a", inbound_refs=[], inbounds=[])
+        workload = make_resource(
+            "workload:exit-a",
+            NodeWorkloadPayload(workload_ref="exit-a", server_ref="srv-a", agent_ref="agent:exit-a", profile=profile),
+        )
+        cluster = ClusterConfig(workloads=[WorkloadBinding(id="exit-a", generation=1, server_refs=["srv-a"])])
+        driver = ScriptedDriver([_missing(), _converged(build_resource_actions(resource_plan(workload), 1)[0])])
+
+        result = execute_resource_plan(
+            resource_plan(workload), cluster, {"node_workload": driver}, persist=lambda _state: None, clock=_clock
+        )
+
+        assert result.all_succeeded
+        assert cluster.workloads[0].active
 
     def test_progress_events_report_each_action_and_skip_its_dependents(self) -> None:
         plan = _plan(with_probe=True)

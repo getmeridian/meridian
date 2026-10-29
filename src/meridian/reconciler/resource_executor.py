@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from meridian.cluster import ActionCheckpoint, ClusterConfig, ManagedResourceBinding
-from meridian.compiler.models import ConfigProfilePayload, ResourcePlan
+from meridian.compiler.models import ConfigProfilePayload, NodeWorkloadPayload, ResourcePlan
 from meridian.core.cancellation import (
     CancellationToken,
     OperationCancellation,
@@ -653,10 +653,11 @@ def _commit_generation(
     for binding in cluster.managed_bindings.values():
         binding.active = binding.generation == generation and binding.logical_id in current_ids
     _drop_superseded_bindings(cluster, generation)
+    # A panel plan carries each workload's Profile; a Meridian plan embeds it in the agent's workload.
     current_workloads = {
-        resource.payload.workload_id
-        for resource in plan.resources
-        if isinstance(resource.payload, ConfigProfilePayload)
+        payload.workload_id if isinstance(payload, ConfigProfilePayload) else payload.profile.workload_id
+        for payload in (resource.payload for resource in plan.resources)
+        if isinstance(payload, ConfigProfilePayload | NodeWorkloadPayload)
     }
     for workload in cluster.workloads:
         workload.active = workload.generation == generation and workload.id in current_workloads
