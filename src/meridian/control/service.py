@@ -16,7 +16,7 @@ import sqlite3
 import time
 import uuid as uuid_module
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -178,6 +178,10 @@ class ControlService:
 
     def health(self) -> ServiceHealth:
         return ServiceHealth(version=self._version, fleet_id=self.fleet_id, fleet_epoch=self.fleet_epoch)
+
+    def conditions(self, *checks: Callable[[], object]) -> AbstractContextManager[None]:
+        """Checks every transaction in the block runs before its write (`Store.conditions`)."""
+        return self._store.conditions(*checks)
 
     def put_settings(self, settings: ServiceSettings) -> ServiceSettings:
         with self._transaction():

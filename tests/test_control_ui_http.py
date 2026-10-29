@@ -461,3 +461,72 @@ def test_a_username_never_starts_with_a_dot(fleet: Fleet, username: str) -> None
     """The console builds relative URLs from usernames; `..` would resolve to another route."""
     fleet.set_up()
     assert fleet.call("PUT", f"/api/users/{username}", {}, bearer=ADMIN_TOKEN).status == 404
+
+
+# -- checks that must still hold when the write lands ----------------------------------------------
+
+
+def test_a_person_an_apply_is_declaring_stays_the_clis(fleet: Fleet) -> None:
+    """The apply creates its people while its revision is still approved, before it records applied."""
+    fleet.set_up()
+    proposal = RevisionProposal(intent={"access": {"users": ["dave"]}}, plan_hash="1" * 64, review_hash="2" * 64)
+    number = fleet.service.revisions.propose(proposal, caller=ROOT).number
+    fleet.service.revisions.approve(number, caller=ROOT)
+    fleet.service.put_user("dave")
+    for method, path in (("POST", "/api/users/dave/reissue"), ("DELETE", "/api/users/dave")):
+        refused = fleet.ui(method, path, {} if method == "POST" else None)
+        assert refused.status == 409 and refused.body["error"]["code"] == "declared_user"
+
+
+def test_a_person_declared_between_the_check_and_the_write_keeps_their_link(
+    fleet: Fleet, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fleet.set_up()
+    service = fleet.service
+    before = service.put_user("erin")
+    reissue = service.reissue_user
+
+    def declared_meanwhile(username: str) -> Any:
+        _declare(service, username)  # the apply finishes after the request was authorized
+        return reissue(username)
+
+    monkeypatch.setattr(service, "reissue_user", declared_meanwhile)
+    refused = fleet.ui("POST", "/api/users/erin/reissue", {})
+    assert refused.status == 409 and refused.body["error"]["code"] == "declared_user"
+    after = service.get_user("erin")
+    assert after is not None and (after.uuid, after.sub_token) == (before.uuid, before.sub_token)
+
+
+def test_a_title_edit_never_rolls_back_an_address_the_cli_moved_meanwhile(
+    fleet: Fleet, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fleet.set_up()
+    service = fleet.service
+    service.put_settings(ServiceSettings(profile_title="Meridian", public_url="https://198.51.100.7/a"))
+    put_settings = service.put_settings
+
+    def moved_meanwhile(settings: ServiceSettings) -> ServiceSettings:
+        put_settings(ServiceSettings(profile_title="Meridian", public_url="https://198.51.100.8/b"))
+        return put_settings(settings)
+
+    monkeypatch.setattr(service, "put_settings", moved_meanwhile)
+    refused = fleet.ui("PUT", "/api/settings", {"profile_title": "Ours", "public_url": "https://198.51.100.7/a"})
+    assert refused.status == 403
+    assert service.settings().public_url == "https://198.51.100.8/b"
+
+
+def test_a_session_revoked_after_authorizing_changes_nothing(fleet: Fleet, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every owner write rechecks the session in its own transaction, not only before reading the body."""
+    fleet.set_up()
+    service = fleet.service
+    service.put_user("frank")
+    update_user = service.update_user
+
+    def revoked_meanwhile(*args: Any, **kwargs: Any) -> Any:
+        service.owner.logout(service.owner.authenticate(fleet.cookie))  # another tab signs out
+        return update_user(*args, **kwargs)
+
+    monkeypatch.setattr(service, "update_user", revoked_meanwhile)
+    assert fleet.ui("PATCH", "/api/users/frank", {"status": "disabled"}).status == 401
+    user = service.get_user("frank")
+    assert user is not None and user.status == "active"

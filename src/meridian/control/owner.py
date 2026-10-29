@@ -24,6 +24,7 @@ import secrets
 import sqlite3
 import time
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Literal, TypeVar
 
@@ -284,12 +285,17 @@ class OwnerAuth:
         if self._now() - session.confirmed_at > CONFIRM_SECONDS:
             raise _reauth_required()
 
-    def hold_recent(self, session: OwnerSession) -> None:
-        """Inside the change's transaction: the session is still live and was confirmed recently.
+    def while_live(self, session: OwnerSession) -> AbstractContextManager[None]:
+        """Every transaction in the block first checks the session is still live (`hold_live`).
 
-        `require_recent` judged the session as it was read; a sign-out, a reset,
-        another device's password change, or plain expiry may have ended it since
-        (while a new password hashed, say), and an ended session must change nothing.
+        The request authenticated before it read its body; a sign-out, revocation, or expiry
+        since must stop its write, as it stops the session's next request.
+        """
+        return self._store.conditions(lambda: self.hold_live(session))
+
+    def hold_live(self, session: OwnerSession) -> int:
+        """Inside a transaction: the session still exists and has not expired; its `confirmed_at`.
+
         Expired rows linger until `authenticate` meets them, so expiry is checked here too.
         """
         now = self._now()
@@ -299,7 +305,16 @@ class OwnerAuth:
         )
         if row is None:
             raise unauthenticated()
-        if now - int(row["confirmed_at"]) > CONFIRM_SECONDS:
+        return int(row["confirmed_at"])
+
+    def hold_recent(self, session: OwnerSession) -> None:
+        """Inside the change's transaction: the session is still live and was confirmed recently.
+
+        `require_recent` judged the session as it was read; a sign-out, a reset, another
+        device's password change, or expiry may have ended it since (while a new password
+        hashed, say), and an ended session must change nothing.
+        """
+        if self._now() - self.hold_live(session) > CONFIRM_SECONDS:
             raise _reauth_required()
 
     # -- password and TOTP -------------------------------------------------------------

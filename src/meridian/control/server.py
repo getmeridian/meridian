@@ -18,6 +18,7 @@ import shutil
 import threading
 import time
 from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, TypeVar
@@ -143,7 +144,9 @@ class _Handler(BaseHTTPRequestHandler):
                             _owner_may(handler)
                             if handler in OWNER_STEP_UP:
                                 self._service.owner.require_recent(self.owner_session)
-                    result = handler(self, match)
+                    session = self.owner_session
+                    with self._service.owner.while_live(session) if session is not None else nullcontext():
+                        result = handler(self, match)
                     if result is not None:
                         self._json(200, result)
                     return
@@ -277,11 +280,18 @@ class _Handler(BaseHTTPRequestHandler):
 
     def put_settings(self, _match: re.Match[str]) -> Any:
         settings = self._model(ServiceSettings)
+        if self.owner_session is None:
+            return self._service.put_settings(settings)
+
         # The public address follows the servers (the deployer's apply sets it); from a console session
-        # it could point every share link and subscription header at another host.
-        if self.owner_session is not None and settings.public_url != self._service.settings().public_url:
-            raise ServiceError("insufficient_scope", "The public address changes only from the meridian CLI.", 403)
-        return self._service.put_settings(settings)
+        # it could point every share link and subscription header at another host. Compared in the
+        # write's transaction, so an apply that moved it meanwhile is refused rather than rolled back.
+        def address_unchanged() -> None:
+            if settings.public_url != self._service.settings().public_url:
+                raise ServiceError("insufficient_scope", "The public address changes only from the meridian CLI.", 403)
+
+        with self._service.conditions(address_unchanged):
+            return self._service.put_settings(settings)
 
     def get_node(self, match: re.Match[str]) -> Any:
         return self._service.node_status(match[1])
@@ -331,27 +341,34 @@ class _Handler(BaseHTTPRequestHandler):
         return self._service.update_user(match[1], self._model(UserUpdate))
 
     def reissue_user(self, match: re.Match[str]) -> Any:
-        self._refuse_declared(match[1], "meridian client reissue")
-        return self._service.reissue_user(match[1])
+        with self._refuse_declared(match[1], "meridian client reissue"):
+            return self._service.reissue_user(match[1])
 
     def reset_user_traffic(self, match: re.Match[str]) -> Any:
         return self._service.reset_user_traffic(match[1])
 
     def delete_user(self, match: re.Match[str]) -> Any:
-        self._refuse_declared(match[1], "meridian client remove")
-        self._service.delete_user(match[1])
+        with self._refuse_declared(match[1], "meridian client remove"):
+            self._service.delete_user(match[1])
         return {"deleted": match[1]}
 
-    def _refuse_declared(self, username: str, command: str) -> None:
+    def _refuse_declared(self, username: str, command: str) -> AbstractContextManager[None]:
         """A person the deployer declared is the CLI's to remove or relink: only it moves their connection page.
 
         An API token (the CLI itself, or a script acting for the deployer) stays allowed;
-        the web owner is told the command instead.
+        the web owner is told the command instead. Checked in the write's transaction, so an
+        apply that declares the person meanwhile still wins.
         """
-        if self.owner_session is not None and is_declared(self._service, username):
-            raise ServiceError(
-                "declared_user", f"The fleet file declares {username}; run `{command} {username}` instead.", 409
-            )
+        if self.owner_session is None:
+            return nullcontext()
+
+        def undeclared() -> None:
+            if is_declared(self._service, username):
+                raise ServiceError(
+                    "declared_user", f"The fleet file declares {username}; run `{command} {username}` instead.", 409
+                )
+
+        return self._service.conditions(undeclared)
 
     def get_endpoint(self, match: re.Match[str]) -> Any:
         endpoint = self._service.get_endpoint(match[1])

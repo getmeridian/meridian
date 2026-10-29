@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -19,6 +19,7 @@ from typing import Any
 class Store:
     def __init__(self, database: Path) -> None:
         self.lock = threading.RLock()
+        self._local = threading.local()
         self.changed = threading.Condition(self.lock)
         database.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(database, check_same_thread=False, isolation_level=None)
@@ -35,10 +36,28 @@ class Store:
             self.db.executescript(schema)
 
     @contextmanager
+    def conditions(self, *checks: Callable[[], object]) -> Iterator[None]:
+        """Run `checks` at the start of every transaction this thread opens inside the block.
+
+        A request is authorized before it reads its body and reaches its write; a check
+        that must still hold when the write lands (the session is live, the person is not
+        the CLI's) raises here, inside the write's own transaction, and nothing changes.
+        Checks only read: one that opened a transaction would recurse.
+        """
+        previous: tuple[Callable[[], object], ...] = getattr(self._local, "checks", ())
+        self._local.checks = (*previous, *checks)
+        try:
+            yield
+        finally:
+            self._local.checks = previous
+
+    @contextmanager
     def transaction(self) -> Iterator[None]:
         with self.lock:
             self.db.execute("BEGIN IMMEDIATE")
             try:
+                for check in getattr(self._local, "checks", ()):
+                    check()
                 yield
             except BaseException:
                 self.db.execute("ROLLBACK")
