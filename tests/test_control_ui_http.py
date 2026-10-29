@@ -242,6 +242,15 @@ def test_without_a_session_the_api_answers_401(fleet: Fleet) -> None:
     assert fleet.call("GET", "/auth/state", session=True).body["signed_in"] is False
 
 
+def test_a_session_edits_the_title_but_never_the_public_address(fleet: Fleet) -> None:
+    fleet.set_up()
+    current = fleet.ui("GET", "/api/settings").body
+    moved = fleet.ui("PUT", "/api/settings", {"profile_title": "Ours", "public_url": "https://203.0.113.9/x"})
+    assert moved.status == 403 and moved.body["error"]["code"] == "insufficient_scope"
+    titled = fleet.ui("PUT", "/api/settings", {"profile_title": "Ours", "public_url": current["public_url"]})
+    assert titled.status == 200 and titled.body["profile_title"] == "Ours"
+
+
 def test_the_console_never_mints_an_admin_token(fleet: Fleet) -> None:
     """An admin token would reach every route `OWNER_ROUTES` keeps from a session."""
     fleet.set_up()  # signed in this second: step-up would pass
