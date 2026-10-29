@@ -116,13 +116,24 @@ def agent_binary(arch: str) -> AgentBinary:
         )
     path = _agent_path(target)
     if path is None or not path.is_file():
-        raise LocalStateError(
-            "The node agent binary is missing.",
-            hint="Build it with `make agent` in the repository, or point MERIDIAN_AGENT_BINARY at one.",
-            category="user",
-        )
+        raise _missing_agent()
     data = path.read_bytes()
     return AgentBinary(data=data, sha256=hashlib.sha256(data).hexdigest(), version=_build_version(path))
+
+
+def require_agent_build() -> None:
+    """Refuse before anything is provisioned when this Meridian has no agent build to install at all."""
+    if not any((path := _agent_path(target)) is not None and path.is_file() for target in AGENT_TARGETS.values()):
+        raise _missing_agent()
+
+
+def _missing_agent() -> LocalStateError:
+    # Wheels carry no agent yet; only a checkout's `make agent` or MERIDIAN_AGENT_BINARY provides one.
+    return LocalStateError(
+        "The node agent binary is missing.",
+        hint="Build it with `make agent` in the repository, or point MERIDIAN_AGENT_BINARY at one.",
+        category="user",
+    )
 
 
 def agent_version() -> str:

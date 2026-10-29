@@ -15,6 +15,7 @@ from collections.abc import Callable, Mapping
 
 from meridian.cluster import ClusterConfig
 from meridian.compiler.models import (
+    AgentRuntimePayload,
     ControlServicePayload,
     ControlUserPayload,
     NodeWorkloadPayload,
@@ -23,7 +24,7 @@ from meridian.compiler.models import (
 )
 from meridian.control.client import ControlClient
 from meridian.control.models import ServiceConfig
-from meridian.control_artifacts import agent_binary, service_package
+from meridian.control_artifacts import agent_binary, require_agent_build, service_package
 from meridian.core.cancellation import CancellationToken
 from meridian.core.errors import ProvisioningError
 from meridian.core.output import OperationContext
@@ -93,6 +94,9 @@ def bootstrap_control_service(
             hint="Go back and select the existing control server.",
             category="user",
         )
+    if any(isinstance(resource.payload, AgentRuntimePayload) for resource in plan.resources):
+        # Found only once the first agent installed, a missing build left a service with no nodes.
+        require_agent_build()
     cluster.fleet_id = cluster.fleet_id or str(uuid.uuid4())
     cluster.panel.server_ip = entry.host
     cluster.panel.ssh_user = entry.user

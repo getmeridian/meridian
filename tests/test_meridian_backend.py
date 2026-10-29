@@ -196,10 +196,36 @@ def test_control_service_readiness_requires_the_url_on_its_domain(host: str, obs
     assert bool(conn.calls) is observed  # only a matching URL goes on to read the attestation
 
 
+def test_control_bootstrap_refuses_before_provisioning_without_an_agent_build(tmp_home, monkeypatch) -> None:
+    """A wheel install carries no agent: finding out at the first agent left a service with no nodes."""
+    from meridian.cluster import ClusterConfig
+    from meridian.core.errors import LocalStateError
+    from meridian.servers import ServerEntry
+    from meridian.setup.control_service import bootstrap_control_service
+    from tests.support.mock_connection import MockConnection
+
+    monkeypatch.setenv("MERIDIAN_AGENT_BINARY", str(tmp_home / "no-such-agent"))
+    plan = compile_topology(_intent())
+    payload = next(item.payload for item in plan.resources if isinstance(item.payload, ControlServicePayload))
+    conn = MockConnection()
+
+    with pytest.raises(LocalStateError, match="node agent binary is missing"):
+        bootstrap_control_service(
+            payload, plan, ClusterConfig(), ServerEntry(host=ADDRESS, user="root", id="srv-a"), conn,
+            harden=False, reality_port=10443, reality_sni="a.example",
+        )  # fmt: skip
+
+    assert conn.calls == [] and conn.writes == []
+
+
 def test_control_bootstrap_scopes_the_console_to_the_secret_path(tmp_home, monkeypatch) -> None:
     """The web console's session cookie needs the path nginx strips; without it sign-in is refused."""
     import meridian.provision as provision
     from meridian.cluster import ClusterConfig
+
+    agent = tmp_home / "netagent"
+    agent.write_bytes(b"\x7fELF-agent")
+    monkeypatch.setenv("MERIDIAN_AGENT_BINARY", str(agent))
     from meridian.servers import ServerEntry
     from meridian.setup.control_service import bootstrap_control_service
     from tests.support.mock_connection import MockConnection
