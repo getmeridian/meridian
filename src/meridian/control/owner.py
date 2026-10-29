@@ -175,6 +175,7 @@ class OwnerAuth:
             self._store.db.execute("DELETE FROM ui_sessions")
             session = self._new_session(now)
         self.limiter.succeeded(SETUP_BUCKET)
+        self.limiter.succeeded(OWNER_BUCKET)  # the new password must not inherit the old one's lockout
         return session
 
     # -- sign-in -----------------------------------------------------------------------
@@ -317,6 +318,7 @@ class OwnerAuth:
                 "UPDATE ui_owner SET password_hash = ?, password_changed_at = ? WHERE id = 1", (password_hash, now)
             )
             self._store.db.execute("DELETE FROM ui_sessions WHERE session_id != ?", (session.session_id,))
+        self.limiter.succeeded(OWNER_BUCKET)
 
     def begin_totp(self, session: OwnerSession, *, account: str) -> tuple[str, str]:
         """Store a pending secret and return it with its `otpauth://` URI; nothing changes until it is confirmed."""

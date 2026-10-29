@@ -245,9 +245,10 @@ def test_weak_password_is_refused_without_spending_the_link(owner: OwnerAuth) ->
 
 
 def test_guessing_setup_links_locks_out(owner: OwnerAuth) -> None:
-    for _ in range(10):
-        with pytest.raises(ServiceError):
+    for _ in range(FREE_FAILURES):
+        with pytest.raises(ServiceError) as refused:
             owner.check_setup_link("x" * 43)
+        assert refused.value.code == "link_invalid"  # LockedOut is a ServiceError too
     with pytest.raises(LockedOut):
         owner.check_setup_link("x" * 43)
 
@@ -288,6 +289,20 @@ def test_login_locks_the_account_after_five_failures(owner: OwnerAuth) -> None:
             owner.login("wrong password!", "")
     with pytest.raises(LockedOut):
         owner.login(PASSWORD, "")  # even the right password waits
+
+
+@pytest.mark.parametrize("recover", ["reset link", "password change"])
+def test_a_new_password_lifts_the_sign_in_lockout(owner: OwnerAuth, recover: str) -> None:
+    """The owner who forgot their password (or an attacker's guesses) must not lock out the new one."""
+    session = owner.authenticate(set_up(owner))
+    for _ in range(FREE_FAILURES):
+        with pytest.raises(ServiceError):
+            owner.login("wrong password!", "")
+    if recover == "reset link":
+        owner.complete_setup(owner.issue_setup_link(reset=True).token, "a brand new password")
+    else:
+        owner.change_password(session, "a brand new password")
+    assert owner.login("a brand new password", "").token
 
 
 def _at_once(count: int, guess) -> list[BaseException | None]:  # type: ignore[no-untyped-def]
