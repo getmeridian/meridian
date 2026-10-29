@@ -96,3 +96,29 @@ def test_an_untouched_small_limit_is_shown_exactly_and_never_sent() -> None:
 
 def test_a_new_person_sends_both_limit_fields() -> None:
     assert limit_form(None) == ["", {"traffic_limit_bytes": 0, "traffic_limit_strategy": "month"}]
+
+
+_LATEST_HARNESS = """
+const fs = require("fs");
+global.window = {};
+window.M = { h: () => ({}), has: (o, k) => Object.prototype.hasOwnProperty.call(o, k) };
+eval(fs.readFileSync(process.argv[1], "utf8"));
+const latest = window.M.latestOnly();
+const settle = {};
+const seen = [];
+["two", "one"].forEach((name) => {
+  const request = new Promise((resolve, reject) => { settle[name] = [resolve, reject]; });
+  latest(request).then((value) => seen.push("ok:" + value), (error) => seen.push("err:" + error));
+});
+settle.one[0]("one");
+settle.two[1]("two");
+setTimeout(() => process.stdout.write(JSON.stringify(seen)), 10);
+"""
+
+
+def test_a_superseded_comparison_never_lands_under_the_newer_label() -> None:
+    """Picking #2 then #1: #2's late reply once replaced #1's diff while the label still said #1."""
+    result = subprocess.run(
+        ["node", "-e", _LATEST_HARNESS, str(UI_DIR / "fleet.js")], capture_output=True, text=True, check=True
+    )
+    assert json.loads(result.stdout) == ["ok:one"]

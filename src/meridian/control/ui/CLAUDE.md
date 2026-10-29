@@ -28,3 +28,4 @@
 - Adding a person is one `POST /api/users` carrying expiry and limits (`ControlService.create_user`, one transaction, 409 `user_exists`); create-then-PATCH left an active, unlimited person whenever the PATCH never landed, and a retry only met `user_exists`.
 - Judge "declared" from the person's own share view, never only the fleet list fetched at boot — a console reissue once moved a declared person's UUID while their page stayed under the old one (the service cannot write `/var/www/private/`), and a stale list offered Remove.
 - Keep each script under 800 lines and every `M.t("…")` key in `en.json`; the asset tests read literal keys only.
+- A screen that re-requests on every pick wraps its request in `M.latestOnly()` and labels from the value it asked for — the revision diff once showed #2's reply under "1 to 3".

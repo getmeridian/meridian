@@ -94,6 +94,18 @@
     return M.pill(kinds[status] || "muted", M.t("revision." + status));
   }
 
+  /* Each call wraps one request; only the newest call's answer (or error) settles, so a slower,
+   * superseded reply never lands under the label of a newer choice. */
+  M.latestOnly = function () {
+    var turn = 0;
+    return function (request) {
+      var mine = ++turn;
+      var never = new Promise(function () {});
+      return request.then(function (value) { return mine === turn ? value : never; },
+        function (error) { if (mine === turn) throw error; return never; });
+    };
+  };
+
   function renderRevision(view, number) {
     loading(view);
     Promise.all([M.api("GET", "api/revisions/" + number), M.api("GET", "api/revisions")]).then(function (results) {
@@ -105,12 +117,14 @@
             text: "#" + r.number + " · " + M.t("revision." + r.status) });
         }));
       var diffBox = h("div", { class: "diff" });
+      var latest = M.latestOnly();
       function showDiff() {
         if (!compare.value) { M.mount(diffBox, h("p", { class: "muted", text: M.t("revisions.first") })); return; }
-        M.api("GET", "api/revisions/" + compare.value).then(function (other) {
-          var older = Number(compare.value) < number;
+        var chosen = Number(compare.value);
+        latest(M.api("GET", "api/revisions/" + chosen)).then(function (other) {
+          var older = chosen < number;
           renderDiff(diffBox, older ? other.intent : revision.intent, older ? revision.intent : other.intent,
-            older ? Number(compare.value) : number, older ? number : Number(compare.value));
+            older ? chosen : number, older ? number : chosen);
         }, function (e) { failed(diffBox, e); });
       }
       compare.addEventListener("change", showDiff);
