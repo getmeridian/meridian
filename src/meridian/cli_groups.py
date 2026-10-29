@@ -369,7 +369,7 @@ def node_add_cmd(
     """Add an exit server to the fleet
 
     Connects via SSH, adds the server as an exit in your topology, and
-    applies the reviewed plan (hardening, Docker, Xray, panel registration).
+    applies the reviewed plan (hardening, firewall, the node agent and Xray).
 
     [dim]Examples:[/dim]
       [cyan]meridian node add 198.51.100.10[/cyan]
