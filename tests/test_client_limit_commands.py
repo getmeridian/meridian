@@ -14,11 +14,12 @@ import pytest
 import typer
 
 from meridian.cluster import ClusterConfig, PanelConfig
-from meridian.commands.client import run_add, run_list, run_show
+from meridian.commands.client import run_add, run_enable, run_list, run_show
 from meridian.commands.client_handoff import PageResolution
 from meridian.commands.client_limits import format_expiry, format_usage, run_reset_traffic, run_set
 from meridian.console import set_json_mode
 from meridian.control.client import ControlClient
+from meridian.control.models import UserUpdate
 from meridian.core.clients import build_client_record
 from meridian.core.schema import schema_model
 from meridian.handoff import HandoffLinks
@@ -311,3 +312,16 @@ def test_client_show_prefers_an_exact_console_name_and_refuses_an_ambiguous_one(
     assert (client["username"], client["declared"]) == ("ALICE", False)
     assert refused.value.exit_code == 2
     assert "could mean ALICE, alice" in capsys.readouterr().out
+
+
+def test_enabling_an_expired_client_reports_that_it_stays_expired(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The service re-applies expiry at once; the command once claimed `active` all the same."""
+    with _backend("meridian", tmp_path, json_mode=True) as fleet:
+        with ControlClient(fleet.cluster.panel.url, ADMIN_TOKEN) as client:
+            client.update_user("alice", UserUpdate(status="disabled", expire_at="2020-01-01T00:00:00Z"))
+        run_enable("alice")
+        payload = _envelope(capsys, "client-enable-envelope")
+
+    assert payload["data"]["client"] == {"username": "alice", "status": "expired"}

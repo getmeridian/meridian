@@ -67,11 +67,12 @@ class ServiceAccessPanel:
         content = _translated(lambda: self._client.fetch_subscription(short_uuid, document=document))
         return SubscriptionDocument(url=f"sub/{short_uuid}", content=content, client_type=client_type)
 
-    def enable_user(self, user_id: str) -> None:
-        self._update(user_id, UserUpdate(status="active"))
+    def enable_user(self, user_id: str) -> User:
+        """Enable the user; the service at once re-applies expiry and quota, so the answer may be EXPIRED or LIMITED."""
+        return self._update(user_id, UserUpdate(status="active"))
 
-    def disable_user(self, user_id: str) -> None:
-        self._update(user_id, UserUpdate(status="disabled"))
+    def disable_user(self, user_id: str) -> User:
+        return self._update(user_id, UserUpdate(status="disabled"))
 
     def update_user_limits(self, user_id: str, change: ClientLimitChange) -> User:
         """Set the limits the change names; the service lifts `limited`/`expired` once they allow the user."""
@@ -94,9 +95,9 @@ class ServiceAccessPanel:
         username = self._username(user_id)
         return self._user(_translated(lambda: self._client.reissue_user(username)))
 
-    def _update(self, user_id: str, update: UserUpdate) -> None:
+    def _update(self, user_id: str, update: UserUpdate) -> User:
         username = self._username(user_id)
-        _translated(lambda: self._client.update_user(username, update))
+        return self._user(_translated(lambda: self._client.update_user(username, update)))
 
     def _username(self, user_id: str) -> str:
         username = self._usernames.get(user_id)

@@ -145,7 +145,8 @@ class ClientRemoveResult(CoreModel):
     client: ClientReference
 
 
-ClientMutationStatus = Literal["active", "disabled"]
+# What a client is after enable/disable: enabling an expired or over-quota client leaves it so.
+ClientMutationStatus = Literal["active", "disabled", "expired", "limited"]
 
 
 class ClientStatus(CoreModel):

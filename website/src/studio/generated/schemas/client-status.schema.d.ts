@@ -5,7 +5,7 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
-export type Status = "active" | "disabled";
+export type Status = "active" | "disabled" | "expired" | "limited";
 export type Username = string;
 
 /**

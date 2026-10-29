@@ -10,7 +10,7 @@
  */
 export type ClientEnableOutputEnvelope = _ClientEnableSuccessEnvelope | _ClientEnableTerminalEnvelope;
 export type Command = "client.enable";
-export type Status = "active" | "disabled";
+export type Status = "active" | "disabled" | "expired" | "limited";
 export type Username = string;
 export type DurationMs = number;
 /**

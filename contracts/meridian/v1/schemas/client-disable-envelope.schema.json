@@ -7,7 +7,9 @@
         "status": {
           "enum": [
             "active",
-            "disabled"
+            "disabled",
+            "expired",
+            "limited"
           ],
           "title": "Status",
           "type": "string"

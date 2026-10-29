@@ -32,7 +32,12 @@ from meridian.commands.client_state import (
 from meridian.commands.client_v4 import run_add_v4, run_remove_v4
 from meridian.console import confirm, err_console, error_context, fail, is_json_mode, ok, warn
 from meridian.control_access import access_panel
-from meridian.core.clients import PanelUserLike, build_client_reissue_result, build_client_status_result
+from meridian.core.clients import (
+    ClientMutationStatus,
+    PanelUserLike,
+    build_client_reissue_result,
+    build_client_status_result,
+)
 from meridian.core.fleet import public_url
 from meridian.core.models import ErrorModel, Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -406,6 +411,19 @@ def _reissue(cluster: ClusterConfig, name: str, shown: str, operation: Operation
         raise typer.Exit(exit_code)
 
 
+def _effective_status(updated: PanelUserLike | None, requested: ClientMutationStatus) -> ClientMutationStatus:
+    """The status the directory reports after the change (Remnawave answers nothing, so the request stands)."""
+    if updated is None:
+        return requested
+    statuses: dict[str, ClientMutationStatus] = {
+        "active": "active",
+        "disabled": "disabled",
+        "expired": "expired",
+        "limited": "limited",
+    }
+    return statuses.get(updated.status.lower(), requested)
+
+
 def run_enable(name: str) -> None:
     """Re-enable a suspended client so they can connect again."""
     _set_enabled(name, "enable")
@@ -432,7 +450,7 @@ def _set_enabled(name: str, action: Literal["enable", "disable"]) -> None:
                     hint_type="user",
                 )
             try:
-                (panel.enable_user if action == "enable" else panel.disable_user)(client.id)
+                updated = (panel.enable_user if action == "enable" else panel.disable_user)(client.id)
             except RemnawaveError as e:
                 fail(
                     f"Could not {action} client '{name}': {e}",
@@ -440,17 +458,27 @@ def _set_enabled(name: str, action: Literal["enable", "disable"]) -> None:
                     hint_type=e.category,
                 )
 
+        status = _effective_status(updated, "active" if action == "enable" else "disabled")
+        held = status not in {"active", "disabled"}
         if is_json_mode():
             emit_json(
                 command_envelope(
                     command=f"client.{action}",
-                    data=build_client_status_result(name, "active" if action == "enable" else "disabled").to_data(),
+                    data=build_client_status_result(name, status).to_data(),
                     summary=Summary(text=f"{action.capitalize()}d client '{name}'", changed=True),
                     timer=operation.timer,
                 )
             )
             return
         ok(f"Client '{name}' {action}d")
+        if held:
+            if status == "expired":
+                warn(f"Client '{name}' is still expired: its expiry has passed")
+                lift = f"meridian client set {escape(name)} --expires never"
+            else:
+                warn(f"Client '{name}' is still limited: it used its traffic limit")
+                lift = f"meridian client reset-traffic {escape(name)}"
+            err_console.print(f"  [dim]Lift it:           {lift}[/dim]")
         err_console.print()
         if action == "enable":
             err_console.print(f"  [dim]Show client:       meridian client show {escape(name)}[/dim]")
