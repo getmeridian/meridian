@@ -306,6 +306,16 @@ def test_a_server_serves_one_fleet_at_a_time(install: Path) -> None:
     refuse_servers_claimed_elsewhere(["198.51.100.40"])  # its own fleet
 
 
+def test_an_equivalent_ipv6_spelling_is_the_same_server(install: Path) -> None:
+    from meridian.fleet_contexts import refuse_servers_claimed_elsewhere
+
+    _fleet(context_home(install, "family"), control="2001:db8::1")
+    config.select_context("work")
+
+    with pytest.raises(LocalStateError, match="context 'family'"):
+        refuse_servers_claimed_elsewhere(["2001:db8:0:0:0:0:0:1"])
+
+
 def test_every_public_leaf_accepts_context_except_the_context_group() -> None:
     from meridian.cli_catalog import long_options, public_commands
 

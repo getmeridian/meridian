@@ -17,6 +17,7 @@ from meridian.contexts import context_home, context_names
 from meridian.core.contexts import ContextSummary
 from meridian.core.errors import LocalStateError
 from meridian.servers import ServerRegistry
+from meridian.verification import canonical_endpoint_address
 
 
 def _fleet(home: Path) -> tuple[ClusterConfig, ServerRegistry]:
@@ -72,12 +73,14 @@ def refuse_servers_claimed_elsewhere(hosts: Iterable[str]) -> None:
     """
     if config.PINNED_HOME:
         return
-    wanted = set(hosts)
+    wanted = {_same_host(host) for host in hosts}
     for name in context_names(config.INSTALL_HOME):
         if name == config.CONTEXT:
             continue
         try:
-            claimed = wanted & fleet_server_hosts(context_home(config.INSTALL_HOME, name))
+            claimed = wanted & {
+                _same_host(host) for host in fleet_server_hosts(context_home(config.INSTALL_HOME, name))
+            }
         except (LocalStateError, OSError, ValueError):
             continue
         if claimed:
@@ -89,3 +92,8 @@ def refuse_servers_claimed_elsewhere(hosts: Iterable[str]) -> None:
                 ),
                 category="user",
             )
+
+
+def _same_host(host: str) -> str:
+    """One spelling per server: `2001:db8::1` and `2001:db8:0:0:0:0:0:1` are one machine."""
+    return canonical_endpoint_address(host).lower()
