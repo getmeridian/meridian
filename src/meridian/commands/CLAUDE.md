@@ -26,7 +26,7 @@
 - `client reissue` deletes the old page before revoking: the page directory is the old VLESS UUID, which the revoke replaces, so a page left behind could never be found again.
 - Removals refuse the control server and its dependents before review; `node remove --force` only extends the edit to relay chains into that exit.
 - Post-mutation local save failures exit 3, say remote state changed, and keep typed partial data where the contract allows.
-- Client reads and tests expose only `topology_intent.access.users`, never panel-wide service users.
+- Client mutations and tests act only on `topology_intent.access.users`; `client list`/`show` also read people added in a control service's console (`declared: false`, every user there is the fleet's), never a Remnawave panel's other users.
 - On a control-service fleet `panel` prints the web console and a one-time setup link only while it has no owner or with hidden `--setup-link` (a reset: new password, code off, every device signed out); the Remnawave output stays as it was.
 - Never render saved admin credentials except `panel --show-password`; handoff links (`HANDOFF_LINK_KEYS`) appear only in the producing command's final output (`emit_json(..., reveal=...)`); doctor and `logs` pass free-form text through `redact_diagnostic_text()` with `ClusterConfig.secret_values()` (bare request paths match no pattern) and never through Rich markup.
 - A bare word that is neither a saved name nor an address is refused, never dialed; `test`/`probe` targets check saved names before DNS (a dot-less name was refused as a domain); keep `--timeout` a string so bad values still get the JSON error envelope.

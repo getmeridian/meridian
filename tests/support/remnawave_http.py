@@ -53,6 +53,10 @@ class FakeRemnawave:
         if request.method == "GET" and path.startswith("/api/users/by-username/"):
             user = self.users.get(path.rsplit("/", 1)[1])
             return httpx.Response(200, json={"response": user}) if user else httpx.Response(404)
+        if request.method == "GET" and path == "/api/users":
+            start = int(request.url.params.get("start", 0))
+            page = list(self.users.values())[start : start + int(request.url.params.get("size", 25))]
+            return httpx.Response(200, json={"response": {"users": page, "total": len(self.users)}})
         if request.method == "PATCH" and path == "/api/users":
             user = self._by_id(body["id"])
             user.update({key: value for key, value in body.items() if key in self._UPDATABLE})

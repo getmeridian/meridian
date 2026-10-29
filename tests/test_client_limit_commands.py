@@ -14,7 +14,7 @@ import pytest
 import typer
 
 from meridian.cluster import ClusterConfig, PanelConfig
-from meridian.commands.client import run_add, run_show
+from meridian.commands.client import run_add, run_list, run_show
 from meridian.commands.client_handoff import PageResolution
 from meridian.commands.client_limits import format_expiry, format_usage, run_reset_traffic, run_set
 from meridian.console import set_json_mode
@@ -261,3 +261,22 @@ def test_client_add_reports_limits_it_could_not_set_as_a_partial_result(
     assert payload["data"]["clients"][0]["username"] == "carol"
     assert payload["warnings"][0]["code"] == "MERIDIAN_CLIENT_LIMITS_FAILED"
     assert "meridian client set carol" in payload["warnings"][0]["hint"]
+
+
+@pytest.mark.parametrize(("backend", "listed"), [("remnawave", False), ("meridian", True)])
+def test_client_list_shows_console_people_only_where_every_user_is_the_fleets(
+    backend: str, listed: bool, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A control service holds only this fleet's people, so one added in its console is listed, marked;
+    a Remnawave panel may hold others, so only declared clients show there."""
+    with _backend(backend, tmp_path, json_mode=True) as fleet:
+        fleet.create("carol")
+        run_list()
+        clients = _envelope(capsys, "client-list-envelope")["data"]["clients"]
+        set_json_mode(False)
+        run_list()
+
+    assert {client["username"]: client["declared"] for client in clients} == (
+        {"alice": True, "carol": False} if listed else {"alice": True}
+    )
+    assert ("carol · console" in capsys.readouterr().err) is listed

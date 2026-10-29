@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from typing import Literal, Protocol, Sequence
 
 from pydantic import Field
@@ -61,6 +61,11 @@ class ClientRecord(CoreModel):
     expires_at: str = Field(description="UTC timestamp; empty means never.")
     created_at: str
     last_seen: str
+    declared: bool = Field(
+        default=True,
+        description="False for a person added in the control service's web console rather than the fleet's "
+        "reviewed intent; the CLI reads them, and the console manages them.",
+    )
 
 
 class ClientHandoff(CoreModel):
@@ -162,7 +167,7 @@ class ClientLimitsResult(CoreModel):
     client: ClientRecord
 
 
-def build_client_record(user: PanelUserLike) -> ClientRecord:
+def build_client_record(user: PanelUserLike, *, declared: bool = True) -> ClientRecord:
     """Build a redacted client record from a panel user object."""
     return ClientRecord(
         username=user.username,
@@ -174,18 +179,21 @@ def build_client_record(user: PanelUserLike) -> ClientRecord:
         expires_at=canonical_expiry(user.expire_at),
         created_at=user.created_at,
         last_seen=user.online_at,
+        declared=declared,
     )
 
 
-def build_client_detail(user: PanelUserLike) -> ClientDetail:
+def build_client_detail(user: PanelUserLike, *, declared: bool = True) -> ClientDetail:
     """Build one client detail result from panel state."""
-    base = build_client_record(user)
+    base = build_client_record(user, declared=declared)
     return ClientDetail(**base.model_dump())
 
 
-def build_client_list_result(users: Sequence[PanelUserLike]) -> ClientListResult:
-    """Build a client list result with status counts."""
-    records = [build_client_record(user) for user in users]
+def build_client_list_result(
+    users: Sequence[PanelUserLike], *, declared: Collection[str] | None = None
+) -> ClientListResult:
+    """Build a client list result with status counts; `declared` (when given) marks the others undeclared."""
+    records = [build_client_record(user, declared=declared is None or user.username in declared) for user in users]
     statuses = [record.status.upper() for record in records]
     active = sum(1 for status in statuses if status == "ACTIVE")
     disabled = sum(1 for status in statuses if status == "DISABLED")
@@ -210,10 +218,11 @@ def build_client_show_result(
     *,
     share_url: str = "",
     subscription_url: str = "",
+    declared: bool = True,
 ) -> ClientShowResult:
     """Build a one-client result with optional handoff links."""
     return ClientShowResult(
-        client=build_client_detail(user),
+        client=build_client_detail(user, declared=declared),
         handoff=ClientHandoff(
             share_available=bool(share_url),
             subscription_available=bool(subscription_url),

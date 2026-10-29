@@ -52,6 +52,12 @@ def _access_users(cluster: ClusterConfig) -> list[str]:
     return list(require_intent(cluster).access.users)
 
 
+def _readable_users(cluster: ClusterConfig) -> list[str] | None:
+    """Who list and show may read: on a control service every user is a person of this fleet,
+    including those added in its web console; a Remnawave panel may hold others, so only declared ones."""
+    return None if cluster.runs_control_service else _access_users(cluster)
+
+
 def run_add(
     names: list[str], *, limit: str | None = None, reset: str | None = None, expires: str | None = None
 ) -> None:
@@ -108,7 +114,8 @@ def _show(*, name: str, repair_page: bool, operation: OperationContext) -> None:
             name,
             build_share_url=share_url,
             build_subscription_url=cluster.panel.subscription_url,
-            allowed_usernames=access_users,
+            allowed_usernames=_readable_users(cluster),
+            declared_usernames=access_users,
         )
     except ClientNotFoundError:
         fail(
@@ -191,7 +198,9 @@ def _list(*, operation: OperationContext) -> None:
 
     cluster = load_topology_cluster()
     try:
-        result = collect_client_list(access_panel(cluster), allowed_usernames=_access_users(cluster))
+        result = collect_client_list(
+            access_panel(cluster), allowed_usernames=_readable_users(cluster), declared_usernames=_access_users(cluster)
+        )
     except RemnawaveError as e:
         fail(
             f"Could not list clients: {e}",
@@ -231,8 +240,9 @@ def _list(*, operation: OperationContext) -> None:
     access = require_intent(cluster).access
     for client in result.clients.clients:
         shown = access.display_name(client.username)
+        label = escape(shown if shown == client.username else f"{shown} ({client.username})")
         table.add_row(
-            escape(shown if shown == client.username else f"{shown} ({client.username})"),
+            label if client.declared else f"{label} [dim]· console[/dim]",
             format_status(client.status),
             format_traffic(client.traffic_used_bytes, client.traffic_limit_bytes),
             escape(format_expiry(client.expires_at) if client.expires_at else "-"),
@@ -246,6 +256,8 @@ def _list(*, operation: OperationContext) -> None:
     err_console.print(table)
     err_console.print()
     err_console.print(f"  [dim]Total: {count} client{suffix}[/dim]")
+    if not all(client.declared for client in result.clients.clients):
+        err_console.print("  [dim]· console: added in the web console; change them there.[/dim]")
     err_console.print()
     err_console.print("  [dim]Add: meridian client add NAME  |  Remove: meridian client remove NAME[/dim]")
     err_console.print()

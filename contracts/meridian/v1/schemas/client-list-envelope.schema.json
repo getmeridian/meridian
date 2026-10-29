@@ -69,6 +69,12 @@
           "title": "Created At",
           "type": "string"
         },
+        "declared": {
+          "default": true,
+          "description": "False for a person added in the control service's web console rather than the fleet's reviewed intent; the CLI reads them, and the console manages them.",
+          "title": "Declared",
+          "type": "boolean"
+        },
         "expires_at": {
           "description": "UTC timestamp; empty means never.",
           "title": "Expires At",

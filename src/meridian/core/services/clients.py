@@ -59,14 +59,16 @@ def collect_client_list(
     panel_client: ClientPanelClient,
     *,
     allowed_usernames: Collection[str] | None = None,
+    declared_usernames: Collection[str] | None = None,
 ) -> ClientListServiceResult:
-    """Collect redacted client list data from the panel."""
+    """Collect redacted client list data from the panel; `declared_usernames` marks the rest undeclared."""
     with panel_client as panel:
         users = panel.list_users()
     if allowed_usernames is not None:
         allowed = set(allowed_usernames)
         users = [user for user in users if user.username in allowed]
-    return ClientListServiceResult(clients=build_client_list_result(users))
+    declared = None if declared_usernames is None else set(declared_usernames)
+    return ClientListServiceResult(clients=build_client_list_result(users, declared=declared))
 
 
 def collect_client_show(
@@ -76,6 +78,7 @@ def collect_client_show(
     build_share_url: ShareUrlBuilder | None = None,
     build_subscription_url: SubscriptionUrlBuilder | None = None,
     allowed_usernames: Collection[str] | None = None,
+    declared_usernames: Collection[str] | None = None,
 ) -> ClientShowServiceResult:
     """Collect one client plus deterministic handoff links."""
     if allowed_usernames is not None and username not in allowed_usernames:
@@ -87,7 +90,12 @@ def collect_client_show(
         share_url = build_share_url(user) if build_share_url else ""
         subscription_url = build_subscription_url(user.short_uuid) if build_subscription_url and user.short_uuid else ""
     return ClientShowServiceResult(
-        client=build_client_show_result(user, share_url=share_url, subscription_url=subscription_url),
+        client=build_client_show_result(
+            user,
+            share_url=share_url,
+            subscription_url=subscription_url,
+            declared=declared_usernames is None or username in declared_usernames,
+        ),
         share_url=share_url,
         subscription_url=subscription_url,
     )
