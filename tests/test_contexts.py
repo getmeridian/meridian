@@ -330,6 +330,29 @@ def test_a_context_that_cannot_be_read_refuses_rather_than_lets_a_server_go(inst
     assert "context remove family" in (error.value.hint or "")
 
 
+def test_a_server_stays_claimed_until_its_retirement_finishes(install: Path) -> None:
+    """Removed from intent but still running there: the other fleet's cleanup would delete what lands on it."""
+    from meridian.cluster import ManagedResourceBinding
+    from meridian.fleet_contexts import refuse_servers_claimed_elsewhere
+
+    home = context_home(install, "family")
+    _fleet(home, control="198.51.100.40")
+    ServerRegistry(home / "servers.json").add(ServerEntry(host="198.51.100.41", name="old", id="srv-old"))
+    cluster = ClusterConfig.load(home / "cluster.yml")
+    binding = ManagedResourceBinding(
+        logical_id="agent:old", resource_kind="agent_runtime", generation=1, active=True, server_ref="srv-old"
+    )
+    cluster.managed_bindings["agent:old@1"] = binding
+    cluster.save(home / "cluster.yml")
+    config.select_context("work")
+
+    with pytest.raises(LocalStateError, match="198.51.100.41"):
+        refuse_servers_claimed_elsewhere(["198.51.100.41"])
+    binding.active = False
+    cluster.save(home / "cluster.yml")
+    refuse_servers_claimed_elsewhere(["198.51.100.41"])
+
+
 def test_every_public_leaf_accepts_context_except_the_context_group() -> None:
     from meridian.cli_catalog import long_options, public_commands
 

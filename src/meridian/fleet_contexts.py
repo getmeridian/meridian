@@ -25,15 +25,23 @@ def _fleet(home: Path) -> tuple[ClusterConfig, ServerRegistry]:
 
 
 def fleet_server_hosts(home: Path) -> set[str]:
-    """Addresses of every server the fleet's reviewed intent puts a role on."""
+    """Addresses of every server the fleet's reviewed intent puts a role on, or still runs something on.
+
+    A server removed from the intent stays claimed while an active binding places a resource
+    there: its retirement (or `--forget-unreachable`) releases it, not the intent edit.
+    """
     cluster, registry = _fleet(home)
     intent = cluster.topology_intent
-    if intent is None:
-        return {cluster.panel.server_ip} if cluster.panel.server_ip else set()
+    refs = set(deployment_server_refs(intent)) if intent is not None else set()
+    refs |= {
+        binding.server_ref for binding in cluster.managed_bindings.values() if binding.active and binding.server_ref
+    }
     hosts: set[str] = set()
-    for server_ref in deployment_server_refs(intent):
+    for server_ref in refs:
         entry = registry.find(server_ref)
         hosts.add(entry.host if entry is not None else server_ref)
+    if intent is None and cluster.panel.server_ip:
+        hosts.add(cluster.panel.server_ip)
     return hosts
 
 
