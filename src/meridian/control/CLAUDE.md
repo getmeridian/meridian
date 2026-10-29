@@ -6,6 +6,8 @@
 - **Signed from day one** — every document carries an Ed25519 signature (`core/agent_signing.py`); SSH bootstrap pins the raw public key from `signing.pub`, so TLS interception can't inject state. `key_id` is the key's SHA-256 until the M2 internal CA.
 - **Skeleton auth** — admin and node tokens are bearer tokens stored only as SHA-256; minting a node token revokes the previous one. Enroll/hello with CSRs replaces node tokens in M2.
 - **Stdlib HTTP on loopback** — `ThreadingHTTPServer` behind nginx's secret path; a thread per waiting long-poll is cheap at Meridian's fleet sizes. nginx strips the secret path, so routes are `/api`, `/agent/v1`, `/sub`.
+- **Operator-owned users** — the operator sets `active`/`disabled`, expiry, and limits over `PATCH /api/users`; enforcement (a 30 s timer plus every change) turns an active user `expired`, and node documents carry only active users. Extending an expired user's expiry reactivates them.
+- **Schema migrations** — `SCHEMA_VERSION` plus `_MIGRATIONS` (statements per version step); a database from a newer Meridian is refused, never downgraded.
 - **One SQLite file** — fleet identity, signing key (`secrets` table), nodes, users, endpoints; WAL mode, one process-wide lock, a condition variable wakes polls on a new revision.
 - **Subscriptions follow the golden corpus** — URI order, remarks, and Xray outbound shapes match `tests/systemlab/golden/`; Hysteria2 auth is the VLESS UUID, as Remnawave delivered it.
 
@@ -15,6 +17,7 @@
 
 ## Pitfalls
 - Decode the path before routing — `ControlClient` percent-encodes IDs, so `:` in endpoint IDs arrives as `%3A` and every endpoint PUT 404'd.
+- Compare timestamps parsed, never as strings — the contract allows fractional seconds, and `…:00.5Z` sorts before `…:00Z`.
 - Never log requests: paths carry the secret path and subscription tokens (`log_message` is silenced).
 - `executescript()` commits on its own — run the schema outside `_transaction()`.
 - Hash and sign the document as JSON values, never re-serialized typed models (the agent verifies the bytes it received).

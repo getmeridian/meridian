@@ -16,6 +16,7 @@ from meridian.control.models import (
     ServiceHealth,
     ServiceSettings,
     UserRecord,
+    UserUpdate,
 )
 from meridian.core.errors import MeridianError
 
@@ -97,6 +98,13 @@ class ControlClient:
 
     def put_user(self, username: str) -> UserRecord:
         return UserRecord.model_validate(self._call("PUT", f"api/users/{_segment(username)}", {}))
+
+    def update_user(self, username: str, update: UserUpdate) -> UserRecord:
+        body = update.model_dump(mode="json", include=update.model_fields_set)
+        return UserRecord.model_validate(self._call("PATCH", f"api/users/{_segment(username)}", body))
+
+    def reissue_user(self, username: str) -> UserRecord:
+        return UserRecord.model_validate(self._call("POST", f"api/users/{_segment(username)}/reissue", {}))
 
     def delete_user(self, username: str) -> None:
         self._call("DELETE", f"api/users/{_segment(username)}")

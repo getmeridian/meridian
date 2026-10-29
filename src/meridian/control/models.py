@@ -106,15 +106,35 @@ class ClientEndpoint(CoreModel):
     salamander_password: str = ""
 
 
+UserStatus = Literal["active", "disabled", "limited", "expired"]
+LimitStrategy = Literal["no_reset", "day", "week", "month"]
+
+
 class UserRecord(CoreModel):
-    """One access user as the service stores it."""
+    """One access user as the service stores it.
+
+    The operator sets `active` or `disabled`; the service's enforcement turns an
+    active user `expired` once `expire_at` passes and `limited` at the traffic limit.
+    """
 
     username: str
     user_id: str
     uuid: str
     sub_token: str
-    status: Literal["active", "disabled"]
+    status: UserStatus
     created_at: Timestamp
+    expire_at: Timestamp | None = None
+    traffic_limit_bytes: int = Field(default=0, ge=0, description="0 means unlimited.")
+    traffic_limit_strategy: LimitStrategy = "no_reset"
+
+
+class UserUpdate(CoreModel):
+    """A partial change to one user; omitted fields keep their value, `expire_at: null` clears the expiry."""
+
+    status: Literal["active", "disabled"] | None = None
+    expire_at: Timestamp | None = None
+    traffic_limit_bytes: int | None = Field(default=None, ge=0)
+    traffic_limit_strategy: LimitStrategy | None = None
 
 
 class ServiceSettings(CoreModel):

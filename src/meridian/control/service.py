@@ -32,6 +32,7 @@ from meridian.control.models import (
     ServiceHealth,
     ServiceSettings,
     UserRecord,
+    UserUpdate,
     users_resource_id,
 )
 from meridian.control.subscriptions import base64_subscription, xray_json_subscription
@@ -40,7 +41,7 @@ from meridian.core.agent_protocol import ObservedStateReport, PollRequest
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT, generate_signing_key, public_key, sign
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MAX_WAIT_SECONDS = 55
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -65,10 +66,24 @@ CREATE TABLE IF NOT EXISTS users (
     uuid TEXT NOT NULL UNIQUE,
     sub_token TEXT NOT NULL UNIQUE,
     status TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    expire_at TEXT,
+    traffic_limit_bytes INTEGER NOT NULL DEFAULT 0,
+    traffic_limit_strategy TEXT NOT NULL DEFAULT 'no_reset'
 );
 CREATE TABLE IF NOT EXISTS endpoints (endpoint_id TEXT PRIMARY KEY, body TEXT NOT NULL);
 """
+# Statements that bring a database from version N to N + 1 (index N - 1).
+_MIGRATIONS: tuple[tuple[str, ...], ...] = (
+    (
+        "ALTER TABLE users ADD COLUMN expire_at TEXT",
+        "ALTER TABLE users ADD COLUMN traffic_limit_bytes INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN traffic_limit_strategy TEXT NOT NULL DEFAULT 'no_reset'",
+    ),
+)
+_USER_COLUMNS = (
+    "username, user_id, uuid, sub_token, status, created_at, expire_at, traffic_limit_bytes, traffic_limit_strategy"
+)
 
 
 class ServiceError(Exception):
@@ -105,7 +120,7 @@ class ControlService:
             if stored and stored != fleet_id:
                 raise ServiceError("conflict", "The database belongs to another fleet.", 409)
             self._set_meta("fleet_id", fleet_id)
-            self._set_meta("schema_version", str(SCHEMA_VERSION))
+            self._migrate()
             if not self._meta("fleet_epoch"):
                 self._set_meta("fleet_epoch", "1")
             if not self._meta("profile_title"):
@@ -253,40 +268,93 @@ class ControlService:
             existing = self.get_user(username)
             if existing is not None:
                 return existing
-            record = UserRecord(
-                username=username,
-                user_id=f"u{secrets.token_hex(8)}",
-                uuid=str(uuid_module.uuid4()),
-                sub_token=secrets.token_urlsafe(18),
-                status="active",
-                created_at=utc_now(),
-            )
             self._db.execute(
-                "INSERT INTO users VALUES (?, ?, ?, ?, ?, ?)",
-                (record.username, record.user_id, record.uuid, record.sub_token, record.status, record.created_at),
+                "INSERT INTO users (username, user_id, uuid, sub_token, status, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    username,
+                    f"u{secrets.token_hex(8)}",
+                    str(uuid_module.uuid4()),
+                    secrets.token_urlsafe(18),
+                    "active",
+                    utc_now(),
+                ),
             )
             self._compose_all()
-            return record
+            return self._require_user(username)
+
+    def update_user(self, username: str, update: UserUpdate) -> UserRecord:
+        """Apply the operator's change; extending an expired user's expiry makes it active again."""
+        with self._transaction():
+            user = self._require_user(username)
+            changes = update.model_dump(include=update.model_fields_set)
+            if "status" in changes and changes["status"] is None:
+                del changes["status"]
+            for field in ("traffic_limit_bytes", "traffic_limit_strategy"):
+                if field in changes and changes[field] is None:
+                    del changes[field]
+            merged = user.model_copy(update=changes)
+            if merged.status == "expired" and "expire_at" in changes and not _expired(merged, utc_now()):
+                merged = merged.model_copy(update={"status": "active"})
+            self._db.execute(
+                "UPDATE users SET status = ?, expire_at = ?, traffic_limit_bytes = ?, traffic_limit_strategy = ? "
+                "WHERE username = ?",
+                (
+                    merged.status,
+                    merged.expire_at,
+                    merged.traffic_limit_bytes,
+                    merged.traffic_limit_strategy,
+                    username,
+                ),
+            )
+            self._enforce(utc_now())
+            self._compose_all()
+            return self._require_user(username)
+
+    def reissue_user(self, username: str) -> UserRecord:
+        """Replace the user's VLESS UUID and subscription token; old links stop working."""
+        with self._transaction():
+            self._require_user(username)
+            self._db.execute(
+                "UPDATE users SET uuid = ?, sub_token = ? WHERE username = ?",
+                (str(uuid_module.uuid4()), secrets.token_urlsafe(18), username),
+            )
+            self._compose_all()
+            return self._require_user(username)
+
+    def enforce(self, now: str | None = None) -> list[str]:
+        """Expire active users whose `expire_at` passed; return who changed."""
+        with self._transaction():
+            changed = self._enforce(now or utc_now())
+            if changed:
+                self._compose_all()
+            return changed
 
     def get_user(self, username: str) -> UserRecord | None:
         with self._lock:
-            row = self._db.execute(
-                "SELECT username, user_id, uuid, sub_token, status, created_at FROM users WHERE username = ?",
-                (username,),
-            ).fetchone()
+            row = self._db.execute(f"SELECT {_USER_COLUMNS} FROM users WHERE username = ?", (username,)).fetchone()
         return _user(row) if row else None
 
     def list_users(self) -> list[UserRecord]:
         with self._lock:
-            rows = self._db.execute(
-                "SELECT username, user_id, uuid, sub_token, status, created_at FROM users ORDER BY username"
-            ).fetchall()
+            rows = self._db.execute(f"SELECT {_USER_COLUMNS} FROM users ORDER BY username").fetchall()
         return [_user(row) for row in rows]
 
     def delete_user(self, username: str) -> None:
         with self._transaction():
             self._db.execute("DELETE FROM users WHERE username = ?", (username,))
             self._compose_all()
+
+    def _require_user(self, username: str) -> UserRecord:
+        user = self.get_user(username)
+        if user is None:
+            raise ServiceError("not_found", f"Unknown user {username!r}.", 404)
+        return user
+
+    def _enforce(self, now: str) -> list[str]:
+        expired = [user.username for user in self.list_users() if user.status == "active" and _expired(user, now)]
+        for username in expired:
+            self._db.execute("UPDATE users SET status = 'expired' WHERE username = ?", (username,))
+        return expired
 
     def put_endpoint(self, endpoint_id: str, endpoint: ClientEndpoint) -> ClientEndpoint:
         with self._transaction():
@@ -308,10 +376,7 @@ class ControlService:
     def subscription(self, sub_token: str, document: str) -> tuple[str, str, dict[str, str]]:
         """Return (content type, body, headers) of a user's subscription document."""
         with self._lock:
-            row = self._db.execute(
-                "SELECT username, user_id, uuid, sub_token, status, created_at FROM users WHERE sub_token = ?",
-                (sub_token,),
-            ).fetchone()
+            row = self._db.execute(f"SELECT {_USER_COLUMNS} FROM users WHERE sub_token = ?", (sub_token,)).fetchone()
             bodies = [item[0] for item in self._db.execute("SELECT body FROM endpoints").fetchall()]
         user = _user(row) if row else None
         if user is None or user.status != "active":
@@ -360,6 +425,15 @@ class ControlService:
         self._changed.notify_all()
 
     # -- storage helpers -----------------------------------------------------------------
+
+    def _migrate(self) -> None:
+        stored = int(self._meta("schema_version") or SCHEMA_VERSION)
+        if stored > SCHEMA_VERSION:
+            raise ServiceError("conflict", "The database was written by a newer Meridian.", 409)
+        for statements in _MIGRATIONS[stored - 1 : SCHEMA_VERSION - 1]:
+            for statement in statements:
+                self._db.execute(statement)
+        self._set_meta("schema_version", str(SCHEMA_VERSION))
 
     @contextmanager
     def _transaction(self) -> Iterator[None]:
@@ -444,7 +518,10 @@ def _users_resource(inbound: ManagedInbound, users: list[UserRecord], config_id:
 
 
 def _user(row: Any) -> UserRecord:
-    username, user_id, uuid, sub_token, status, created_at = row
-    return UserRecord(
-        username=username, user_id=user_id, uuid=uuid, sub_token=sub_token, status=status, created_at=created_at
-    )
+    names = [column.strip() for column in _USER_COLUMNS.split(",")]
+    return UserRecord.model_validate(dict(zip(names, tuple(row), strict=True)))
+
+
+def _expired(user: UserRecord, now: str) -> bool:
+    # Parse, never compare strings: a fractional "…:00.5Z" sorts before "…:00Z".
+    return user.expire_at is not None and datetime.fromisoformat(user.expire_at) <= datetime.fromisoformat(now)

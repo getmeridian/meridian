@@ -11,6 +11,7 @@ from __future__ import annotations
 import hmac
 import json
 import re
+import threading
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -20,13 +21,14 @@ from urllib.parse import unquote
 from pydantic import BaseModel, ValidationError
 
 from meridian import __version__
-from meridian.control.models import ClientEndpoint, NodeSpec, ServiceConfig, ServiceSettings
+from meridian.control.models import ClientEndpoint, NodeSpec, ServiceConfig, ServiceSettings, UserUpdate
 from meridian.control.service import ControlService, ServiceError, token_sha256, utc_now
 from meridian.core.agent_http import AGENT_HTTP_SURFACE
 from meridian.core.agent_protocol import ObservedStateReport, PollRequest
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 MAX_BODY_BYTES = AGENT_HTTP_SURFACE.max_request_bytes
+ENFORCE_INTERVAL_SECONDS = 30
 _NAME = r"([a-z0-9][a-z0-9_.:-]{0,127})"
 _USERNAME = r"([A-Za-z0-9_.-]{1,64})"
 
@@ -59,6 +61,9 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self) -> None:
         self._dispatch("DELETE")
+
+    def do_PATCH(self) -> None:
+        self._dispatch("PATCH")
 
     def log_message(self, format: str, *args: Any) -> None:
         """Keep no request log: paths carry subscription tokens and the secret path."""
@@ -185,6 +190,12 @@ class _Handler(BaseHTTPRequestHandler):
     def put_user(self, match: re.Match[str]) -> Any:
         return self._admin().put_user(match[1])
 
+    def update_user(self, match: re.Match[str]) -> Any:
+        return self._admin().update_user(match[1], self._model(UserUpdate))
+
+    def reissue_user(self, match: re.Match[str]) -> Any:
+        return self._admin().reissue_user(match[1])
+
     def delete_user(self, match: re.Match[str]) -> Any:
         self._admin().delete_user(match[1])
         return {"deleted": match[1]}
@@ -236,6 +247,8 @@ _ROUTES: list[Route] = [
     ("GET", re.compile(r"/api/users"), _Handler.list_users),
     ("GET", re.compile(rf"/api/users/{_USERNAME}"), _Handler.get_user),
     ("PUT", re.compile(rf"/api/users/{_USERNAME}"), _Handler.put_user),
+    ("PATCH", re.compile(rf"/api/users/{_USERNAME}"), _Handler.update_user),
+    ("POST", re.compile(rf"/api/users/{_USERNAME}/reissue"), _Handler.reissue_user),
     ("DELETE", re.compile(rf"/api/users/{_USERNAME}"), _Handler.delete_user),
     ("GET", re.compile(rf"/api/endpoints/{_NAME}"), _Handler.get_endpoint),
     ("PUT", re.compile(rf"/api/endpoints/{_NAME}"), _Handler.put_endpoint),
@@ -262,7 +275,19 @@ def serve(config_path: Path) -> None:
     service = ControlService(state_dir / "control.db", fleet_id=config.fleet_id, version=__version__)
     service.write_public_key(state_dir / "signing.pub")
     server = ControlServer((config.listen_host, config.listen_port), service, config.admin_token_sha256)
+    stop = threading.Event()
+    threading.Thread(target=_enforce_forever, args=(service, stop), daemon=True).start()
     try:
         server.serve_forever()
     finally:
+        stop.set()
         server.server_close()
+
+
+def _enforce_forever(service: ControlService, stop: threading.Event) -> None:
+    """Expire users on time even when nothing else changes."""
+    while not stop.wait(ENFORCE_INTERVAL_SECONDS):
+        try:
+            service.enforce()
+        except Exception:  # noqa: BLE001 - the next tick retries; the service must keep serving
+            continue
