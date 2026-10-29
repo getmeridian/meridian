@@ -19,4 +19,5 @@
 
 - **A copy behind the snapshot's deposited generation must not restore** — its intent would retire what newer applies added; it is sent to a fresh context, which takes the snapshot's copy.
 - **Refuse while the old control server answers** — two services at once split the fleet; only `--force` overrides it.
+- **Open the control service's firewall rules before its bootstrap** — restore installs before the plan runs, so a fresh server's SSH-only UFW kept port 80 closed and the ACME challenge timed out; `open_control_ports()` applies the rules `control:service` depends on.
 - **Never read the recovery key from argv** — shell history and `ps` keep it; `--recovery-key` asks with a hidden prompt or reads one line of stdin.

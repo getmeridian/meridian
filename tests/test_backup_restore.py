@@ -336,3 +336,17 @@ def test_a_copy_behind_the_snapshots_is_sent_to_a_new_context(fleet: tuple[Clust
 
     with pytest.raises(typer.Exit):
         _fleet_state(cluster, _source(snapshot).snapshot)
+
+
+def test_restore_opens_the_control_services_ports_before_its_bootstrap() -> None:
+    from meridian.compiler import compile_topology
+
+    plan = compile_topology(
+        single_server_intent(None, server_ref="srv-new", address="198.51.100.30", control="meridian")
+    )
+    conn = MockConnection()
+
+    restore_steps.open_control_ports(plan, ServerEntry(host="198.51.100.30", id="srv-new"), conn)
+
+    opened = " ".join(call for call in conn.calls if "ufw" in call)
+    assert "allow 80/tcp" in opened and "allow 443/tcp" in opened

@@ -30,7 +30,7 @@ from meridian import __version__, config
 from meridian.backup import BackupError
 from meridian.cluster import ClusterConfig, ControlRestore, RestoreStep
 from meridian.compiler.deployment import deployment_server_refs
-from meridian.compiler.models import ControlServicePayload, ResourcePlan
+from meridian.compiler.models import ControlServicePayload, FirewallRulePayload, ResourcePlan
 from meridian.control.client import ControlClient, ControlServiceAuthError, ControlServiceError
 from meridian.control.restore import stage_restored_database
 from meridian.control.snapshot import Snapshot, SnapshotHeader
@@ -41,7 +41,9 @@ from meridian.core.topology import SetupIntent
 from meridian.handoff import HandoffLinks
 from meridian.host_runtime import CONTROL_SERVICE_CONFIG, CONTROL_SERVICE_STATE_DIR, CONTROL_SERVICE_UNIT
 from meridian.provision.control_service import SERVICE_USER_COMMAND
+from meridian.provision.ensure import ensure_ufw_rule
 from meridian.reconciler.retirement import forget_server
+from meridian.reconciler.server_render import render_firewall_rules
 from meridian.resolve import connection_for_entry
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.control_plane import control_payload
@@ -352,7 +354,30 @@ def install_service(plan: ResourcePlan, cluster: ClusterConfig, entry: ServerEnt
     payload = control_payload(plan)
     if not isinstance(payload, ControlServicePayload):
         raise BackupError("The reviewed plan has no Meridian control service.", category="bug")
+    open_control_ports(plan, entry, conn)
     bootstrap_reviewed_control_service(payload, plan, cluster, entry, conn)
+
+
+def open_control_ports(plan: ResourcePlan, entry: ServerEntry, conn: ServerConnection) -> None:
+    """Open the firewall rules the control service depends on before its bootstrap.
+
+    A deploy applies them first through the plan; restore bootstraps before the plan runs,
+    so a fresh server's SSH-only UFW kept port 80 closed and the ACME challenge timed out.
+    """
+    control = next(item for item in plan.resources if isinstance(item.payload, ControlServicePayload))
+    dependencies = set(control.dependencies)
+    for resource in plan.resources:
+        rule = resource.payload
+        if resource.logical_id not in dependencies or not isinstance(rule, FirewallRulePayload):
+            continue
+        for text in render_firewall_rules(resource.logical_id, rule, {entry.id: entry.host}):
+            result = ensure_ufw_rule(conn, text)
+            if not result.ok:
+                raise BackupError(
+                    f"Could not open {rule.port}/{rule.transport} on the new control server: {result.detail}",
+                    hint="Check UFW on the new server, then run the same `meridian restore` again.",
+                    retryable=True,
+                )
 
 
 def verify_restored(cluster: ClusterConfig, fleet_epoch: int) -> None:
