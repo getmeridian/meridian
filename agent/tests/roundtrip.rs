@@ -327,6 +327,31 @@ fn a_session_the_service_forgot_is_reopened_with_a_fresh_hello() {
 }
 
 #[test]
+fn a_service_that_refuses_the_protocol_is_not_asked_again_until_the_backoff_ends() {
+    let pki = TestPki::new();
+    let service = service(&pki);
+    service.state.lock().unwrap().refuse_protocol = true;
+    let node = Node::new(&service.url(), &pki);
+    let exec = FakeExec::default();
+    let mut agent = Agent::new(node.options(), &exec).unwrap();
+
+    let err = agent.poll_once().unwrap_err();
+    assert_eq!(err.code(), Some("unsupported_protocol"));
+    assert!(agent.protocol_refused());
+    assert!(
+        agent.is_enrolled(),
+        "a refused protocol never touches the credentials"
+    );
+
+    // Neither polls nor reports say hello again inside the window, which honours the
+    // service's longer hint: a refusal is a long backoff, never a crash or a hello storm.
+    let again = agent.poll_once().unwrap_err();
+    assert!(matches!(again, HttpError::Status { retry_after: Some(wait), .. } if wait > 300));
+    assert!(agent.send_report().is_err());
+    assert_eq!(service.endpoints(), ["enroll", "hello"]);
+}
+
+#[test]
 fn a_revoked_node_stops_until_a_new_bootstrap_enrolls_it_again() {
     let pki = TestPki::new();
     let service = service(&pki);

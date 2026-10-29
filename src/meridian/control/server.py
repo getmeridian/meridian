@@ -191,6 +191,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _error(self, exc: ServiceError, *, agent: bool) -> None:
         retryable = exc.status in (429, 500, 503)
+        retry_after = exc.retry_after if exc.retry_after is not None else (5 if retryable else None)
         if agent:
             body: dict[str, Any] = {
                 "type": "error",
@@ -199,13 +200,16 @@ class _Handler(BaseHTTPRequestHandler):
                     "code": exc.code,
                     "message": str(exc),
                     "retryable": retryable,
-                    "retry_after_seconds": 5 if retryable else None,
+                    "retry_after_seconds": retry_after,
                     "server_time": utc_now(),
                 },
             }
         else:
             body = {"error": {"code": exc.code, "message": str(exc)}}
-        self._json(exc.status, body)
+        data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        # The contract mirrors `retry_after_seconds` in the HTTP header.
+        headers = {"Retry-After": str(retry_after)} if agent and retry_after is not None else None
+        self._send(exc.status, "application/json", data, headers)
 
     # -- admin API -------------------------------------------------------------------------
 

@@ -13,13 +13,14 @@ from typing import Any
 import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric.ec import SECP256R1, generate_private_key
-from cryptography.hazmat.primitives.serialization import Encoding
+from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat
 
 from meridian.control.errors import ServiceError
 from meridian.control.pki import agent_uri, service_uri
 from meridian.control.service import ControlService
 from meridian.core.agent_protocol import EnrollRequest, EnrollResponse, HelloResponse, RenewRequest
-from meridian.core.agent_signing import DESIRED_STATE_CONTEXT, verify
+from meridian.core.agent_signing import DESIRED_STATE_CONTEXT, sign_proof, verify
+from meridian.core.version_skew import UNSUPPORTED_PROTOCOL_RETRY_SECONDS
 from tests.support.agent_node import FLEET_ID, FakeNode, csr_pem
 
 
@@ -170,6 +171,36 @@ def test_proof_time_must_be_within_300_seconds(
         service.authority.hello(body)
     else:
         _refused(code, lambda: service.authority.hello(body))
+
+
+@pytest.mark.parametrize(
+    "protocols", [["meridian.agent/v2"], ["meridian.agent/v9", "meridian.agent/v2"]], ids=["newer", "several"]
+)
+def test_a_hello_in_no_protocol_the_service_speaks_is_refused_with_a_long_retry(
+    service: ControlService, clock: Clock, protocols: list[str]
+) -> None:
+    node = FakeNode()
+    _enroll(service, node)
+    body = node.hello(clock.stamp())
+    # A newer agent's hello need not even parse as this protocol's: the refusal comes first.
+    body["protocols"], body["future_field"] = protocols, True
+
+    refused = _refused("unsupported_protocol", lambda: service.authority.hello(body))
+
+    assert (refused.status, refused.retry_after) == (400, UNSUPPORTED_PROTOCOL_RETRY_SECONDS)
+    assert "meridian apply" in str(refused)
+
+
+def test_an_agent_offering_this_protocol_among_others_is_welcomed_in_it(service: ControlService, clock: Clock) -> None:
+    node = FakeNode()
+    _enroll(service, node)
+    body = node.hello(clock.stamp())
+    body["protocols"] = ["meridian.agent/v1", "meridian.agent/v2"]
+    raw = node.key.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption())
+    del body["proof"]["signature"]
+    body["proof"]["signature"] = sign_proof(body, raw)
+
+    assert service.authority.hello(body)[1].protocol == "meridian.agent/v1"
 
 
 def test_a_replayed_hello_is_refused(service: ControlService, clock: Clock) -> None:

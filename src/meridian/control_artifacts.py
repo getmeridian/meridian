@@ -40,11 +40,30 @@ class ServicePackage:
             return f"{self.wheel_name}:{hashlib.sha256(self.wheel).hexdigest()}"
         return self.requirement
 
+    @property
+    def version(self) -> str:
+        return package_version(self.identity)
+
+
+def package_version(identity: str) -> str:
+    """The `meridian-vpn` version a recorded package identity names, or "" when it names none.
+
+    Identities are `meridian-vpn==<version>` (a release) or `<wheel file name>:<sha256>` (a checkout's
+    wheel, `meridian_vpn-<version>-<tags>.whl`).
+    """
+    name, separator, version = identity.partition("==")
+    if separator:
+        return version.strip() if name.strip() == "meridian-vpn" else ""
+    wheel = identity.partition(":")[0]
+    parts = wheel.split("-")
+    return parts[1] if len(parts) >= 3 and parts[0] == "meridian_vpn" and wheel.endswith(".whl") else ""
+
 
 @dataclass(frozen=True)
 class AgentBinary:
     data: bytes
     sha256: str
+    version: str = ""  # From the build's `.version` file; "" when the build has none.
 
 
 def source_checkout() -> Path | None:
@@ -95,9 +114,7 @@ def agent_binary(arch: str) -> AgentBinary:
             hint="Use an x86_64 server for the control-service preview.",
             category="user",
         )
-    override = os.environ.get("MERIDIAN_AGENT_BINARY", "")
-    checkout = source_checkout()
-    path = Path(override) if override else (checkout / "agent" / "dist" / f"netagent-{target}" if checkout else None)
+    path = _agent_path(target)
     if path is None or not path.is_file():
         raise LocalStateError(
             "The node agent binary is missing.",
@@ -105,4 +122,29 @@ def agent_binary(arch: str) -> AgentBinary:
             category="user",
         )
     data = path.read_bytes()
-    return AgentBinary(data=data, sha256=hashlib.sha256(data).hexdigest())
+    return AgentBinary(data=data, sha256=hashlib.sha256(data).hexdigest(), version=_build_version(path))
+
+
+def agent_version() -> str:
+    """The agent version this Meridian installs (every target shares one crate version), or ""."""
+    for target in AGENT_TARGETS.values():
+        path = _agent_path(target)
+        if path is not None and path.is_file():
+            return _build_version(path)
+    return ""
+
+
+def _agent_path(target: str) -> Path | None:
+    override = os.environ.get("MERIDIAN_AGENT_BINARY", "")
+    if override:
+        return Path(override)
+    checkout = source_checkout()
+    return checkout / "agent" / "dist" / f"netagent-{target}" if checkout else None
+
+
+def _build_version(binary: Path) -> str:
+    """`make agent` writes the crate version beside each binary as `<binary>.version`."""
+    try:
+        return binary.with_name(binary.name + ".version").read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""

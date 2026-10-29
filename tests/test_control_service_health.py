@@ -8,7 +8,12 @@ import pytest
 
 from meridian.control.models import NodeStatus
 from meridian.core.agent_types import NodeStateRef
-from meridian.diagnostics.control_service import agent_finding, check_unit_active
+from meridian.diagnostics.control_service import (
+    agent_finding,
+    agent_version_finding,
+    check_unit_active,
+    service_version_finding,
+)
 from meridian.diagnostics.logs import log_sources
 from tests.support.mock_connection import MockConnection
 
@@ -73,3 +78,39 @@ def test_control_service_logs_come_from_units_not_containers() -> None:
         ("panel", "unit", "ctld.service"),
         ("nginx", "file", "/var/log/nginx/error.log"),
     ]
+
+
+@pytest.mark.parametrize(
+    ("service", "expected", "message"),
+    [
+        ("4.0.0", "passed", "runs this Meridian"),
+        ("4.0.0b8", "warning", "upgrades it"),
+        ("4.1.0", "failed", "cannot apply"),
+        ("weird!", "skipped", "Cannot compare"),
+    ],
+    ids=["same", "older", "newer", "unparsable"],
+)
+def test_service_version_finding_follows_the_skew_rules(service: str, expected: str, message: str) -> None:
+    found = service_version_finding("4.0.0", service)
+
+    assert found.status == expected
+    assert message in found.message
+
+
+@pytest.mark.parametrize(
+    ("expected", "status", "warns"),
+    [
+        ("0.2.0", _status(agent_version="0.1.0"), True),
+        ("0.2.0", _status(agent_version="0.2.0"), False),
+        ("", _status(agent_version="0.1.0"), False),
+        ("0.2.0", _status(agent_version=None, last_seen_at=None), False),
+        ("0.2.0", None, False),
+    ],
+    ids=["behind", "current", "unknown-build", "never-reported", "unregistered"],
+)
+def test_agent_version_finding_warns_only_on_a_known_difference(
+    expected: str, status: NodeStatus | None, warns: bool
+) -> None:
+    found = agent_version_finding(expected, status)
+
+    assert (found is not None and found.status == "warning") is warns

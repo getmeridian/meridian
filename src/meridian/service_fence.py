@@ -14,6 +14,11 @@ by then. The first apply that finds the service answering with no fence adopts
 so an older Meridian refuses) and only then writes the service's fence. From
 then on an unreachable service is retried and then refused, never bypassed:
 the handed-over file tells this apart from a fleet whose service never came up.
+
+Version skew (`core/version_skew.py`). Whenever the service answers, a service
+newer than this CLI refuses the apply before the lease is taken: this CLI would
+install its own, older package over it. An older service is upgraded by the
+apply's own pinned install.
 """
 
 from __future__ import annotations
@@ -25,7 +30,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal, TypeVar
 
-from meridian import config
+from meridian import __version__, config
 from meridian.cluster import ClusterConfig
 from meridian.control.client import ControlClient, ControlServiceConflict, ControlServiceError
 from meridian.control.models import (
@@ -37,6 +42,7 @@ from meridian.control.models import (
 from meridian.control.revisions import secret_paths
 from meridian.core.errors import LocalStateError
 from meridian.core.topology import SetupIntent
+from meridian.core.version_skew import newer_service_hint, service_skew
 from meridian.reconciler.fence import (
     RENEW_AFTER,
     FenceRecord,
@@ -122,8 +128,10 @@ class ControlServiceFence:
         on_stall: StallNotice | None = None,
         client_factory: ClientFactory | None = None,
         ssh_fence: SSHApplyFence | None = None,
+        cli_version: str = __version__,
     ) -> None:
         self._cluster = cluster
+        self._cli_version = cli_version
         self._draft = revision
         self._ssh = ssh_fence or SSHApplyFence(conn, holder=holder, clock=clock, on_stall=on_stall)
         self._holder = self._ssh.holder
@@ -262,6 +270,7 @@ class ControlServiceFence:
             if not handed_over(stored):
                 return _Located("ssh", stored)  # the service has never held the fence: it is still being set up
             state = self._fence_state(TIMEOUT, patient=True)
+        self._refuse_newer_service()
         if state.record is not None:
             remote = _fence_record(state.record)
             return _Located("service", remote, state.version, state.fleet_id, state.record.revision)
@@ -270,6 +279,19 @@ class ControlServiceFence:
             # A move that marked fence.json but never reached the service: adopt the marked state.
             return _Located("service", released(stored) if stored else None, 0, state.fleet_id)
         return _Located("service", stored, 0, state.fleet_id, hand_over=True)
+
+    def _refuse_newer_service(self) -> None:
+        try:
+            health = self._call(lambda client: client.health(), timeout=QUICK_TIMEOUT, patient=False)
+        except FleetFenceError:
+            return  # No evidence; the install step refuses a downgrade on its own.
+        if service_skew(self._cli_version, health.version) == "service_newer":
+            raise FleetFenceError(
+                f"The control service runs Meridian {health.version}, newer than this Meridian "
+                f"({self._cli_version}); applying would downgrade it.",
+                hint=newer_service_hint(health.version),
+                category="user",
+            )
 
     def _decide(self, located: _Located, local: LocalFenceView, *, new_fleet_id: str) -> FenceRecord:
         return decide_acquire(

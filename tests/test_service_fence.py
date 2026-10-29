@@ -30,6 +30,7 @@ _NOW = datetime(2026, 10, 13, 3, 0, tzinfo=UTC)
 _FLEET = "11111111-1111-4111-8111-111111111111"
 _TOKEN = "admin-token-for-tests-only-0123456789"
 _OLD, _NEW = "a" * 64, "c" * 64
+_CLI = "4.0.0"
 
 
 @dataclass
@@ -57,7 +58,7 @@ class _LossyClient(ControlClient):
 
 @pytest.fixture
 def service(tmp_path: Path) -> Iterator[Service]:
-    control = ControlService(tmp_path / "control.db", fleet_id=_FLEET, version="4.0.0")
+    control = ControlService(tmp_path / "control.db", fleet_id=_FLEET, version=_CLI)
     server = ControlServer(("127.0.0.1", 0), control, token_sha256(_TOKEN))
     thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
     thread.start()
@@ -94,6 +95,7 @@ def _fence(host: FenceHost, cluster: ClusterConfig, service: Service | None = No
         holder=holder,
         clock=lambda: _NOW,
         client_factory=factory,
+        cli_version=kwargs.pop("cli_version", _CLI),
         **kwargs,
     )
 
@@ -380,3 +382,31 @@ def test_an_older_service_without_the_fence_route_keeps_fence_json_until_it_is_u
     # The apply reinstalled the service; it records the revision, and the next apply adopts fence.json.
     assert _revisions(service) == [(1, "applied")]
     assert service.service.revisions.fence().version == 0
+
+
+# --- version skew: the service never runs older code than the copy that applies ------------
+
+
+@pytest.mark.parametrize(
+    ("cli", "refused"),
+    [("4.0.0", False), ("4.0.1", False), ("4.0.0b8", True), ("3.9.0", True), ("not-a-version", False)],
+    ids=["same", "service-older", "cli-beta-behind", "cli-major-behind", "unparsable"],
+)
+def test_a_service_newer_than_this_meridian_refuses_the_apply_before_the_lease(
+    service: Service, cli: str, refused: bool
+) -> None:
+    host, cluster = FenceHost(), _cluster(service.url)
+    fence = _fence(host, cluster, service, cli_version=cli)
+
+    if not refused:
+        fence.acquire(_local())
+        fence.release()
+        return
+    with pytest.raises(FleetFenceError) as raised:
+        fence.acquire(_local())
+    assert raised.value.category == "user"
+    assert "meridian update" in raised.value.hint
+    assert service.service.revisions.fence().record is None, "nothing was taken"
+    assert _revisions(service) == []
+    # Plan shows the same refusal as a warning instead of failing.
+    assert "newer than this Meridian" in _fence(host, cluster, service, cli_version=cli).check(_local())

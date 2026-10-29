@@ -22,6 +22,7 @@ from meridian.core.agent_desired import DesiredNodeState
 from meridian.core.agent_protocol import ObservedStateReport, PollRequest
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT, verify
 from meridian.core.agent_types import NodeStateRef
+from meridian.core.version_skew import UNSUPPORTED_PROTOCOL_RETRY_SECONDS
 from tests.support.agent_node import FakeNode
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
@@ -363,6 +364,20 @@ def test_agent_errors_use_the_protocol_envelope(http: str) -> None:
     status, body = _request(f"{http}/agent/v1/poll", "POST", {"type": "poll", "have": None, "wait_seconds": 0}, "x")
     assert status == 401
     assert body["type"] == "error" and body["error"]["code"] == "unauthenticated"
+
+
+def test_an_unsupported_protocol_carries_its_retry_in_body_and_header(http: str) -> None:
+    hello = {"type": "hello", "protocols": ["meridian.agent/v2"], "anything": "else"}
+    request = urllib.request.Request(f"{http}/agent/v1/hello", data=json.dumps(hello).encode(), method="POST")
+
+    with pytest.raises(urllib.error.HTTPError) as raised:
+        urllib.request.urlopen(request, timeout=10)
+
+    body = json.loads(raised.value.read())
+    assert raised.value.code == 400 and body["error"]["code"] == "unsupported_protocol"
+    assert body["error"]["retryable"] is False
+    assert body["error"]["retry_after_seconds"] == UNSUPPORTED_PROTOCOL_RETRY_SECONDS
+    assert raised.value.headers["Retry-After"] == str(UNSUPPORTED_PROTOCOL_RETRY_SECONDS)
 
 
 def test_admin_validation_errors_are_400(http: str) -> None:

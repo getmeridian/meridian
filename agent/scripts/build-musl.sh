@@ -26,4 +26,6 @@ EOF
   cargo build --locked --release --target "$target"
   cp "$CARGO_TARGET_DIR/$target/release/netagent" "/out/netagent-$target"
   (cd /out && sha256sum "netagent-$target" | cut -d' ' -f1 > "netagent-$target.sha256")
+  # What `meridian check` compares with each node's reported agent version.
+  sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1 > "/out/netagent-$target.version"
 done

@@ -4,6 +4,10 @@ A sha256-pinned uv installs `meridian-vpn` with its own Python under
 `/opt/ctld`, so the service never depends on the distribution's Python (Ubuntu
 22.04 ships 3.10). It runs as the `ctld` system user on loopback; nginx's
 secret path is its only way in.
+
+The install never downgrades: a server whose recorded package is newer than
+this CLI's fails the step (`core/version_skew.py`), since the newer service's
+database refuses to open under the older one.
 """
 
 from __future__ import annotations
@@ -15,7 +19,8 @@ from dataclasses import dataclass
 
 from meridian.config import CONTROL_SERVICE_PYTHON, UV_GITHUB_URL, UV_SHA256, UV_VERSION
 from meridian.control.models import ServiceConfig
-from meridian.control_artifacts import ServicePackage
+from meridian.control_artifacts import ServicePackage, package_version
+from meridian.core.version_skew import newer_service_hint, service_skew
 from meridian.host_runtime import (
     CONTROL_SERVICE_CONFIG,
     CONTROL_SERVICE_DIR,
@@ -125,6 +130,12 @@ class InstallControlService:
         marker = conn.run(f"cat {INSTALLED_MARKER} 2>/dev/null", timeout=15).stdout.strip()
         if marker == package.identity and conn.run(f"test -x {SERVICE_BINARY}", timeout=15).returncode == 0:
             return ""
+        installed = package_version(marker)
+        if installed and service_skew(package.version, installed) == "service_newer":
+            return (
+                f"the control server runs Meridian {installed}, newer than this Meridian ({package.version}). "
+                + newer_service_hint(installed)
+            )
         spec = package.requirement
         if package.wheel:
             spec = f"{CONTROL_SERVICE_DIR}/wheels/{package.wheel_name}"
