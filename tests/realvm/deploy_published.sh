@@ -14,7 +14,7 @@ ARGS=$(printf '%q ' "$@")
 
 ssh -o BatchMode=yes "root@$IP" bash -s -- "$VERSION" "$ARGS" <<'REMOTE'
 set -uo pipefail
-version=$1 args=$2
+version=$1 args=${2:-}  # ssh drops an empty argument
 export PATH=/root/.local/bin:$PATH
 command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1
 uv tool install -q --force "meridian-vpn==$version"

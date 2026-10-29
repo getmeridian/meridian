@@ -16,7 +16,7 @@ SWAP=""
 
 ssh -o BatchMode=yes "root@$IP" bash -s -- "$MEM" "$SWAP" <<'REMOTE'
 set -euo pipefail
-mem=$1 swap=$2
+mem=$1 swap=${2:-}  # ssh drops an empty argument
 rm -f /etc/apt/apt.conf.d/00InstallRecommends
 if ! grep -q "mem=$mem maxcpus=1" /etc/default/grub; then
   sed -i -E 's/ ?mem=[0-9]+[MG] maxcpus=1//; s/^GRUB_CMDLINE_LINUX_DEFAULT="/&mem='"$mem"' maxcpus=1 /' /etc/default/grub
