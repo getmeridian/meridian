@@ -91,8 +91,14 @@ class TokenRegistry:
                 )
         return Caller(token_id=str(row["token_id"]), scope=row["scope"])
 
-    def issue(self, request: TokenCreate, *, issuer: Caller) -> IssuedToken:
-        """Mint a token; its secret is in this response only."""
+    def issue(
+        self, request: TokenCreate, *, issuer: Caller, still_allowed: Callable[[], None] | None = None
+    ) -> IssuedToken:
+        """Mint a token; its secret is in this response only.
+
+        `still_allowed` runs inside the insert's transaction and raises to refuse, for a
+        caller whose right to mint can lapse while the request waits (a console session).
+        """
         if not scope_covers(issuer.scope, request.scope):
             raise ServiceError(
                 "insufficient_scope", f"A {issuer.scope} token cannot mint a {request.scope} token.", 403
@@ -100,6 +106,8 @@ class TokenRegistry:
         token_id = secrets.token_hex(6)
         token = f"mrd_{token_id}_{secrets.token_hex(32)}"
         with self._store.transaction():
+            if still_allowed is not None:
+                still_allowed()
             self._store.db.execute(
                 "INSERT INTO api_tokens (token_id, name, scope, token_sha256, created_at) VALUES (?, ?, ?, ?, ?)",
                 (token_id, request.name, request.scope, token_sha256(token), format_timestamp(self._clock())),

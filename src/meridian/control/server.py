@@ -364,7 +364,15 @@ class _Handler(BaseHTTPRequestHandler):
     def create_token(self, _match: re.Match[str]) -> Any:
         if self.caller is None:
             raise unauthenticated()
-        return self._service.tokens.issue(self._model(TokenCreate), issuer=self.caller)
+        request = self._model(TokenCreate)
+        session = self.owner_session
+        if session is None:
+            return self._service.tokens.issue(request, issuer=self.caller)
+        # An admin token would reach every route `OWNER_ROUTES` keeps from the console.
+        if request.scope == "admin":
+            raise ServiceError("insufficient_scope", "The console mints tokens up to approve; admin ones never.", 403)
+        owner = self._service.owner
+        return self._service.tokens.issue(request, issuer=self.caller, still_allowed=lambda: owner.hold_recent(session))
 
     def list_tokens(self, _match: re.Match[str]) -> Any:
         return self._service.tokens.list_tokens()

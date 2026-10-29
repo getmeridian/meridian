@@ -242,6 +242,29 @@ def test_without_a_session_the_api_answers_401(fleet: Fleet) -> None:
     assert fleet.call("GET", "/auth/state", session=True).body["signed_in"] is False
 
 
+def test_the_console_never_mints_an_admin_token(fleet: Fleet) -> None:
+    """An admin token would reach every route `OWNER_ROUTES` keeps from a session."""
+    fleet.set_up()  # signed in this second: step-up would pass
+    refused = fleet.ui("POST", "/api/tokens", {"name": "ci", "scope": "admin"})
+    assert refused.status == 403 and refused.body["error"]["code"] == "insufficient_scope"
+    assert fleet.ui("POST", "/api/tokens", {"name": "ci", "scope": "approve"}).status == 200
+
+
+def test_a_session_signed_out_while_minting_mints_nothing(fleet: Fleet, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The step-up is held inside the insert's transaction, not only judged before the body is read."""
+    fleet.set_up()
+    owner = fleet.service.owner
+    judged = owner.require_recent
+
+    def then_signed_out(session: Any) -> None:
+        judged(session)
+        owner.logout(session)  # another tab signs out after the early check passed
+
+    monkeypatch.setattr(owner, "require_recent", then_signed_out)
+    assert fleet.ui("POST", "/api/tokens", {"name": "ci", "scope": "read"}).status == 401
+    assert fleet.call("GET", "/api/tokens", bearer=ADMIN_TOKEN).body["tokens"] == []
+
+
 def test_minting_a_token_needs_a_recent_confirmation(fleet: Fleet) -> None:
     fleet.set_up()
     fleet.clock.now += CONFIRM_SECONDS + 1

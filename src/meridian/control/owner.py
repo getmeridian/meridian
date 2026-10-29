@@ -187,10 +187,11 @@ class OwnerAuth:
 
         def mark(now: int) -> None:
             cursor = self._store.db.execute(
-                "UPDATE ui_sessions SET confirmed_at = ? WHERE session_id = ?", (now, session.session_id)
+                "UPDATE ui_sessions SET confirmed_at = ? WHERE session_id = ? AND last_seen_at > ? AND created_at > ?",
+                (now, session.session_id, now - IDLE_SECONDS, now - ABSOLUTE_SECONDS),
             )
             if cursor.rowcount != 1:
-                raise unauthenticated()  # signed out (or reset) while the password hashed
+                raise unauthenticated()  # signed out, reset, or expired while the password hashed
 
         self._verify(password, code, bucket=session_bucket(session), then=mark)
 
@@ -282,17 +283,22 @@ class OwnerAuth:
         if self._now() - session.confirmed_at > CONFIRM_SECONDS:
             raise _reauth_required()
 
-    def _hold_recent(self, session: OwnerSession) -> None:
-        """Inside the change's transaction: the session still exists and was confirmed recently.
+    def hold_recent(self, session: OwnerSession) -> None:
+        """Inside the change's transaction: the session is still live and was confirmed recently.
 
-        `require_recent` judged the session as it was read; a sign-out, a reset, or
-        another device's password change may have ended it since (while a new password
-        hashed, say), and an ended session must change nothing.
+        `require_recent` judged the session as it was read; a sign-out, a reset,
+        another device's password change, or plain expiry may have ended it since
+        (while a new password hashed, say), and an ended session must change nothing.
+        Expired rows linger until `authenticate` meets them, so expiry is checked here too.
         """
-        row = self._store.row("SELECT confirmed_at FROM ui_sessions WHERE session_id = ?", (session.session_id,))
+        now = self._now()
+        row = self._store.row(
+            "SELECT confirmed_at FROM ui_sessions WHERE session_id = ? AND last_seen_at > ? AND created_at > ?",
+            (session.session_id, now - IDLE_SECONDS, now - ABSOLUTE_SECONDS),
+        )
         if row is None:
             raise unauthenticated()
-        if self._now() - int(row["confirmed_at"]) > CONFIRM_SECONDS:
+        if now - int(row["confirmed_at"]) > CONFIRM_SECONDS:
             raise _reauth_required()
 
     # -- password and TOTP -------------------------------------------------------------
@@ -306,7 +312,7 @@ class OwnerAuth:
             raise ServiceError("weak_password", str(exc), 400) from exc
         now = self._now()
         with self._store.transaction():
-            self._hold_recent(session)
+            self.hold_recent(session)
             self._store.db.execute(
                 "UPDATE ui_owner SET password_hash = ?, password_changed_at = ? WHERE id = 1", (password_hash, now)
             )
@@ -317,7 +323,7 @@ class OwnerAuth:
         self.require_recent(session)
         secret = new_totp_secret()
         with self._store.transaction():
-            self._hold_recent(session)
+            self.hold_recent(session)
             if self._owner() is None:
                 raise ServiceError("setup_required", "The web UI has no owner yet.", 409)
             self._store.db.execute("UPDATE ui_owner SET totp_pending = ? WHERE id = 1", (secret,))
@@ -327,7 +333,7 @@ class OwnerAuth:
         """Turn TOTP on once a code from the pending secret matches; other sessions end."""
         self.require_recent(session)
         with self.limiter.turn(session_bucket(session)), self._store.transaction():
-            self._hold_recent(session)
+            self.hold_recent(session)
             owner = self._owner()
             pending = owner["totp_pending"] if owner is not None else None
             if not pending:
@@ -346,7 +352,7 @@ class OwnerAuth:
     def disable_totp(self, session: OwnerSession) -> None:
         self.require_recent(session)
         with self._store.transaction():
-            self._hold_recent(session)
+            self.hold_recent(session)
             self._store.db.execute(
                 "UPDATE ui_owner SET totp_secret = NULL, totp_pending = NULL, totp_last_step = NULL WHERE id = 1"
             )

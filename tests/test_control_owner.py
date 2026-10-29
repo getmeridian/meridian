@@ -401,6 +401,30 @@ def test_a_session_ended_while_confirming_stays_ended(owner: OwnerAuth, monkeypa
     assert refused.value.code == "unauthenticated"
 
 
+def test_a_session_that_expired_while_confirming_stays_ended(
+    owner: OwnerAuth, clock: Clock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Expired rows linger until `authenticate` meets them, so the confirmation must check expiry itself."""
+    session = owner.authenticate(set_up(owner))
+
+    def slow_verify(password: str, stored: str) -> bool:
+        clock.now += IDLE_SECONDS + 1
+        return verify_password(password, stored)
+
+    monkeypatch.setattr(owner_module, "verify_password", slow_verify)
+    with pytest.raises(ServiceError) as refused:
+        owner.confirm(session, PASSWORD, "")
+    assert refused.value.code == "unauthenticated"
+
+
+def test_an_expired_session_holds_no_recent_confirmation(owner: OwnerAuth, clock: Clock) -> None:
+    session = owner.authenticate(set_up(owner))
+    clock.now += ABSOLUTE_SECONDS
+    with pytest.raises(ServiceError) as refused:
+        owner.hold_recent(session)
+    assert refused.value.code == "unauthenticated"
+
+
 def test_a_session_ended_while_its_new_password_hashes_changes_nothing(
     owner: OwnerAuth, monkeypatch: pytest.MonkeyPatch
 ) -> None:

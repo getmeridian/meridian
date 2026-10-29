@@ -219,7 +219,7 @@
   function createToken(view) {
     M.dialog(M.t("tokens.create_title"), function (close) {
       var name = h("input", { type: "text", required: true, maxlength: "64", autocomplete: "off" });
-      var scope = h("select", {}, ["read", "propose", "approve", "admin"].map(function (s) {
+      var scope = h("select", {}, ["read", "propose", "approve"].map(function (s) {
         return h("option", { value: s, text: M.t("scope." + s) + " — " + M.t("scope." + s + "_hint") });
       }));
       var form = h("form", { class: "stack", novalidate: true },
