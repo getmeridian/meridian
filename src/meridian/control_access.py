@@ -46,7 +46,7 @@ _RESET_STRATEGIES: dict[TrafficReset, LimitStrategy] = {
 
 
 class ServiceAccessPanel:
-    """The user-facing subset of `MeridianPanel`, served by the control service."""
+    """Client reads and writes (users, limits, subscriptions) served by the control service."""
 
     def __init__(self, url: str, token: str, timeout: float = 20.0) -> None:
         self._client = ControlClient(url, token, timeout=max(1, math.ceil(timeout)))
@@ -128,10 +128,10 @@ class ServiceAccessPanel:
 
 
 class ServiceFleetPanel(ServiceAccessPanel):
-    """The fleet-status subset of `MeridianPanel`: service health, node agents, and published relays.
+    """Fleet status from the control service: service health, node agents, and published relays.
 
     The service names nodes and endpoints by their topology IDs, which the
-    fleet projection carries where a panel fleet carries UUIDs.
+    fleet projection carries.
     """
 
     def __init__(self, url: str, token: str, *, node_ids: Sequence[str], endpoint_ids: Sequence[str]) -> None:

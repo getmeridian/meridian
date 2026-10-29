@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 from typing import Protocol as TypingProtocol
 
-from meridian.config import DEFAULT_SNI, REMNAWAVE_BACKEND_IMAGE, REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE
+from meridian.config import DEFAULT_SNI
 from meridian.core.cancellation import CancellationToken, raise_if_cancelled
 from meridian.core.events import PROVISION_STEP_COMPLETED, PROVISION_STEP_FAILED, PROVISION_STEP_STARTED
 from meridian.core.reporters import NoopReporter, Reporter
@@ -20,7 +20,6 @@ if TYPE_CHECKING:
     from meridian.core.models import EventLevel
     from meridian.core.output import OperationContext
     from meridian.provision.control_service import ControlServiceInstall
-    from meridian.remnawave import MeridianPanel
 
 StepStatus = Literal["ok", "changed", "skipped", "failed"]
 
@@ -50,13 +49,10 @@ class ProvisionContext:
     xhttp_enabled: bool = True
     hosted_page: bool = False  # serve connection pages via HTTPS on server
     harden: bool = True  # enable SSH hardening + firewall (skip for shared servers)
-    # The reviewed Remnawave images (this CLI's pins, or newer ones `fleet upgrade` saved).
-    backend_image: str = REMNAWAVE_BACKEND_IMAGE
-    subscription_page_image: str = REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE
 
     results: list[StepResult] = field(default_factory=list)
 
-    # Port layout — Xray ports configured in Remnawave config profile
+    # Port layout — the Xray ports nginx routes to
     xhttp_port: int = 0  # computed from seed
     reality_port: int = 443  # overridden with a deterministic per-node backend port
     wss_port: int = 0  # computed from seed (domain mode only)
@@ -66,9 +62,7 @@ class ProvisionContext:
     info_page_path: str = ""
     xhttp_path: str = ""
     ws_path: str = ""
-    subscription_page_path: str = ""
-    panel_api: MeridianPanel | None = field(default=None, repr=False)
-    # Meridian's own control service instead of the Remnawave panel stack (#95).
+    # The control server's service install; None outside the control bootstrap.
     control_service: ControlServiceInstall | None = field(default=None, repr=False)
     cluster: ClusterConfig | None = field(default=None, repr=False)
 

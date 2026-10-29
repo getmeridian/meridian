@@ -29,11 +29,10 @@ from meridian.core.topology import SetupIntent, TransparentRelayIntent
 from meridian.host_runtime import NODE_DIR
 from meridian.migrate import MigrationError
 from meridian.migrate.flow import ControlMigrator, MigrationReview
-from meridian.node_deploy import panel_base_url
 from meridian.reconciler.fence import FleetFenceError
 from meridian.remnawave import User
-from meridian.remnawave.models import NEVER_EXPIRES_AT
 from meridian.servers import ServerEntry, ServerRegistry
+from meridian.setup.control_service import service_base_url as panel_base_url
 from meridian.setup.single_server import single_server_intent
 from meridian.state_fence import FENCE_FILE
 from tests.support.fence_host import FenceHost
@@ -46,6 +45,8 @@ USERS = {
     "alice": ("3f2a9c4e-7b1d-4e6a-9c2f-1a2b3c4d5e6f", "Zq8xT3vNw2LmK7pR"),
     "bob": ("9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a", "hX4_n-Q9rT2wYb7K"),
 }
+
+REMNAWAVE_NEVER = "2099-12-31T23:59:59.000Z"
 
 
 def _intent() -> SetupIntent:
@@ -110,7 +111,7 @@ def _panel_users() -> list[User]:
             vless_uuid=uuid,
             short_uuid=short,
             status="ACTIVE",
-            expire_at=NEVER_EXPIRES_AT,
+            expire_at=REMNAWAVE_NEVER,
             traffic_limit_strategy="NO_RESET",
             used_traffic_bytes=10 * index,
             lifetime_used_traffic_bytes=100 * index,

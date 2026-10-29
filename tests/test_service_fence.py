@@ -359,19 +359,17 @@ def test_a_draft_carries_the_secret_free_intent_and_the_reviewed_hashes() -> Non
     assert draft.proposal().plan_hash == _NEW
 
 
-@pytest.mark.parametrize(("backend", "kind"), [("remnawave", SSHApplyFence), ("meridian", ControlServiceFence)])
-def test_setup_runtime_fences_by_the_reviewed_control_backend(tmp_path: Path, backend: str, kind: type) -> None:
-    from meridian.core.topology import ControlPlaneIntent
+def test_setup_runtime_fences_through_the_control_service(tmp_path: Path) -> None:
     from meridian.servers import ServerRegistry
     from meridian.setup.runtime import SetupReview, SetupRuntime
 
-    intent = single_exit_intent(control=ControlPlaneIntent(server_ref="srv-control", backend=backend))
+    intent = single_exit_intent()
     review = SetupReview(intent=intent, plan=resource_plan(firewall_resource(443)))
     runtime = SetupRuntime(ServerRegistry(tmp_path / "servers.json"))
 
     fence = runtime._default_fence(FenceHost(), _cluster(), review)  # type: ignore[arg-type]
 
-    assert type(fence) is kind
+    assert type(fence) is ControlServiceFence
 
 
 def test_a_copy_without_the_services_credentials_is_refused_once_the_service_keeps_the_fence(

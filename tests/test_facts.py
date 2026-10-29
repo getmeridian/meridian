@@ -71,18 +71,3 @@ def test_ufw_state_reports_active() -> None:
     state = facts.ufw_state()
     assert state.installed is True
     assert state.active is True
-
-
-def test_kernel_release_reads_major_and_minor() -> None:
-    facts = ServerFacts(FakeConn().when("uname -r", stdout="6.8.0-45-generic\n"))  # type: ignore[arg-type]
-
-    kernel = facts.kernel_release()
-    assert kernel is not None
-    assert kernel.release == "6.8.0-45-generic"
-    assert kernel.version == (6, 8)
-
-
-def test_kernel_release_is_none_when_uname_cannot_run() -> None:
-    facts = ServerFacts(FakeConn().when("uname -r", rc=255))  # type: ignore[arg-type]
-
-    assert facts.kernel_release() is None

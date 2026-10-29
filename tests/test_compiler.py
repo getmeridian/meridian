@@ -1190,11 +1190,11 @@ def test_exit_overrides_with_an_unknown_geoip_list_are_refused_but_still_load() 
         compile_panel_pass(intent)
 
 
-def test_geodata_lists_follow_the_pinned_node_image() -> None:
-    from meridian.config import REMNAWAVE_NODE_IMAGE
-    from meridian.core.geodata_lists import SOURCE_IMAGE
+def test_geodata_lists_follow_the_pinned_xray() -> None:
+    from meridian.config import XRAY_VERSION
+    from meridian.core.geodata_lists import SOURCE
 
-    assert SOURCE_IMAGE == REMNAWAVE_NODE_IMAGE, "Node image moved: run scripts/export_geodata_lists.py"
+    assert SOURCE.startswith(f"Xray-core v{XRAY_VERSION} "), "Xray moved: run scripts/export_geodata_lists.py"
 
 
 def test_built_in_server_rules_name_lists_the_pinned_geodata_has() -> None:

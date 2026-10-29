@@ -11,12 +11,9 @@ import pytest
 from meridian.cluster import ManagedResourceBinding
 from meridian.compiler.models import (
     CertificatePayload,
-    ControlPlaneRuntimePayload,
     ControlServicePayload,
-    NodeRuntimePayload,
     certificate_directory,
 )
-from meridian.host_runtime import LEGACY_NODE_DIR, NODE_DIR
 from meridian.reconciler.resources import ResourceReconcileError
 from meridian.reconciler.server_render import (
     legacy_realm_config_path,
@@ -28,7 +25,6 @@ from meridian.reconciler.server_retirement import (
     CertificateRetirement,
     FirewallRetirement,
     NginxArtifactRetirement,
-    NodeRuntimeRetirement,
     RealmHopRetirement,
 )
 from tests.support.mock_connection import MockConnection
@@ -102,17 +98,6 @@ def test_unexpected_ids_are_refused_without_touching_the_server(cls, remote_id: 
 def test_bindings_without_a_recorded_server_are_refused() -> None:
     with pytest.raises(ResourceReconcileError, match="before Meridian tracked its server"):
         _driver(FirewallRetirement, MockConnection()).retire(_binding(_MARKER, server_ref=""))
-
-
-def _plan_with_node(server_ref: str) -> SimpleNamespace:
-    payload = NodeRuntimePayload(workload_ref="exit-c", server_ref=server_ref, binding_ref="binding:exit-c")
-    return SimpleNamespace(resources=[SimpleNamespace(payload=payload)])
-
-
-def _runtime_driver(conn: MockConnection, *, plan: SimpleNamespace | None = None) -> NodeRuntimeRetirement:
-    driver = NodeRuntimeRetirement()
-    driver.context = SimpleNamespace(connection=lambda server_ref: conn, plan=plan or SimpleNamespace(resources=[]))
-    return driver
 
 
 def test_realm_hop_unit_and_config_are_removed_and_verified_stopped() -> None:
@@ -194,58 +179,6 @@ def test_realm_hop_refuses_a_service_name_that_does_not_match_its_resource() -> 
     assert conn.calls == []
 
 
-@pytest.mark.parametrize("remote_id", [NODE_DIR, LEGACY_NODE_DIR], ids=["neutral", "pre-rename"])
-def test_node_runtime_container_and_compose_dir_are_removed_under_both_names(remote_id: str) -> None:
-    conn = MockConnection()
-
-    _runtime_driver(conn).retire(
-        ManagedResourceBinding(logical_id="node:exit-b", remote_id=remote_id, server_ref="srv-exit-b")
-    )
-
-    command, rule_cleanup = conn.calls
-    assert f"docker compose -f {NODE_DIR}/docker-compose.yml down" in command
-    # Its Docker-internal API rule goes too, under the neutral and the pre-rename comment.
-    assert "grep -F -e '# fw-node-api' -e '# Meridian node API (Docker internal)'" in rule_cleanup
-    assert "ufw --force delete" in rule_cleanup
-    assert "docker rm -f netagent" in command and "docker rm -f remnawave-node" in command
-    assert f"rm -rf {NODE_DIR};" in command and f"rm -rf {LEGACY_NODE_DIR} && test ! -e {LEGACY_NODE_DIR}" in command
-    # The control plane's directories are a separate project and stay.
-    assert "/opt/remnawave" not in command and "/opt/ctlsvc" not in command
-    # The pulled node image goes too; Docker itself (baseline-installed, maybe operator-used) stays.
-    assert "docker images -q remnawave/node" in command and "docker image rm $ids" in command
-    assert "apt-get" not in command and "purge" not in command
-
-
-def test_node_runtime_replaced_on_the_same_server_is_only_forgotten() -> None:
-    conn = MockConnection()
-
-    _runtime_driver(conn, plan=_plan_with_node("srv-exit-b")).retire(
-        ManagedResourceBinding(logical_id="node:exit-b", remote_id=NODE_DIR, server_ref="srv-exit-b")
-    )
-
-    assert conn.calls == []
-
-
-def test_node_runtime_removal_failure_is_reported() -> None:
-    conn = MockConnection()
-    conn.when("docker compose", rc=1, stderr="Cannot connect to the Docker daemon")
-
-    with pytest.raises(ResourceReconcileError, match="Cannot connect to the Docker daemon"):
-        _runtime_driver(conn).retire(
-            ManagedResourceBinding(logical_id="node:exit-b", remote_id=NODE_DIR, server_ref="srv-exit-b")
-        )
-
-
-def test_node_runtime_refuses_an_unexpected_directory() -> None:
-    conn = MockConnection()
-
-    with pytest.raises(ResourceReconcileError, match="Unexpected node runtime"):
-        _runtime_driver(conn).retire(
-            ManagedResourceBinding(logical_id="node:exit-b", remote_id="/", server_ref="srv-exit-b")
-        )
-    assert conn.calls == []
-
-
 def _certificate_driver(conn: MockConnection, *payloads: object) -> CertificateRetirement:
     driver = CertificateRetirement()
     resources = [SimpleNamespace(payload=payload) for payload in payloads]
@@ -283,14 +216,9 @@ def test_certificate_on_a_server_that_keeps_another_keeps_the_challenge_listener
     assert "meridian-v4-acme.conf" not in command
 
 
-@pytest.mark.parametrize(
-    "control",
-    [ControlPlaneRuntimePayload, ControlServicePayload],
-    ids=["remnawave-panel", "control-service"],
-)
-def test_the_control_servers_shared_ip_certificate_is_never_removed(control: type) -> None:
+def test_the_control_servers_shared_ip_certificate_is_never_removed() -> None:
     conn = MockConnection()
-    runtime = control.model_construct(server_ref="srv-a")
+    runtime = ControlServicePayload.model_construct(server_ref="srv-a")
 
     _certificate_driver(conn, runtime).retire(_binding("/etc/ssl/meridian/fullchain.pem"))
 

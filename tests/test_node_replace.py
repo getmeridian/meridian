@@ -25,7 +25,7 @@ class _Runtime:
     def review(self, draft: object, *, cluster: object) -> SimpleNamespace:
         retiring = (
             ManagedResourceBinding(
-                logical_id="node:exit-b", resource_kind="node_runtime", active=True, server_ref="srv-exit-b"
+                logical_id="agent:exit-b", resource_kind="agent_runtime", active=True, server_ref="srv-exit-b"
             ),
         )
         return SimpleNamespace(retiring=retiring, review_hash="sha256:review")
@@ -93,7 +93,7 @@ def test_the_exit_moves_with_its_id_paths_and_relays(
     assert approved == "sha256:review"
     output = capsys.readouterr().err
     assert "Relays re-pointed to the new server: relay-a" in output
-    assert "remove node:exit-b (exit-b-host)" in output
+    assert "remove agent:exit-b (exit-b-host)" in output
 
 
 def test_a_saved_spare_server_keeps_its_title(registry: ServerRegistry) -> None:
@@ -200,9 +200,9 @@ def test_rerun_on_the_current_server_without_stale_paths_is_refused(registry: Se
 
 def _cluster_with_old_runtime() -> ClusterConfig:
     binding = ManagedResourceBinding(
-        logical_id="node:exit-b", resource_kind="node_runtime", generation=1, active=True, server_ref="srv-exit-b"
+        logical_id="agent:exit-b", resource_kind="agent_runtime", generation=1, active=True, server_ref="srv-exit-b"
     )
-    return ClusterConfig(topology_intent=_intent(), managed_bindings={"node:exit-b@1": binding})
+    return ClusterConfig(topology_intent=_intent(), managed_bindings={"agent:exit-b@1": binding})
 
 
 @pytest.mark.parametrize(
@@ -230,4 +230,4 @@ def test_an_unreachable_old_server_is_forgotten_only_when_asked(
         code, runtime, _connect = _replace("exit-b", "198.51.100.20", cluster=cluster, yes=yes, forget=forget)
 
     assert code == 0 and runtime.applied is not None
-    assert cluster.managed_bindings["node:exit-b@1"].active is not forgotten
+    assert cluster.managed_bindings["agent:exit-b@1"].active is not forgotten

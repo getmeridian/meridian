@@ -1,6 +1,6 @@
 """End-user handoff: connection pages built from each user's canonical subscription.
 
-The page lists exactly the links Remnawave serves to that user (direct exits,
+The page lists exactly the links the control service serves to that user (direct exits,
 relays, Hysteria2), so it can never drift from what client apps receive.
 """
 

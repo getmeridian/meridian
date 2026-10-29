@@ -1,4 +1,4 @@
-# cluster.example.yml — annotated reference for ~/.meridian/cluster.yml
+# cluster.example.yml — annotated reference for ~/.config/meridian/cluster.yml
 #
 # Meridian writes this file; you generally do NOT edit it by hand. Change the
 # fleet with `meridian deploy`, `meridian setup`, `meridian node add`,
@@ -6,25 +6,24 @@
 # `topology_intent` for you.
 #
 # Two parts:
-#   1. Panel access and presentation (panel, branding, subscription_page,
-#      telegram) — written during deploy.
+#   1. Control-service access and presentation (panel, branding) — written
+#      during deploy.
 #   2. topology_intent — the reviewed description of your fleet. Servers are
-#      referenced by the stable IDs saved in ~/.meridian/servers.json, never
+#      referenced by the stable IDs saved in servers.json beside this file, never
 #      by address. Compiled-resource bookkeeping (workloads, managed_bindings,
 #      allocations, action_checkpoints, generations) is appended after apply.
 #
 # All IPs in this example use RFC 5737 documentation ranges (198.51.100.x).
 
-version: 3
+version: 4
 
 # ---------------------------------------------------------------------------
-# Panel — populated by `meridian deploy`. Edit api_token only when rotating.
+# Panel — the control service, populated by `meridian deploy`. The URL and
+# admin token reach it through nginx's secret path on 443.
 # ---------------------------------------------------------------------------
 panel:
   url: https://198.51.100.1/panel-secret-path
-  api_token: example-jwt-token-from-remnawave-panel
-  admin_user: admin
-  admin_pass: example-admin-password
+  api_token: example-control-service-admin-token
   server_ip: 198.51.100.1
   ssh_user: root
   ssh_port: 22
@@ -39,28 +38,6 @@ branding:
   server_name: "Example VPN"
   icon: "🌍"
   color: ocean                               # ocean | sunset | forest | lavender | rose | slate
-
-# ---------------------------------------------------------------------------
-# Subscription page — Remnawave subscription frontend container.
-# `path` is the random nginx route generated on first deploy; persisted.
-# ---------------------------------------------------------------------------
-subscription_page:
-  enabled: true
-  path: ""                                   # auto-generated; do not pre-fill
-
-# ---------------------------------------------------------------------------
-# Telegram notifications — passed through to Remnawave backend.
-# Omit entirely to disable. When bot_token is set, notifications are
-# enabled on next deploy/redeploy. Chat IDs use "chat_id" or
-# "chat_id:thread_id" format (thread_id for topics in group chats).
-# ---------------------------------------------------------------------------
-# telegram:
-#   bot_token: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-#   notify_users: "-100123456789"             # user events (create, expire, etc.)
-#   notify_nodes: "-100123456789:80"          # node events (online/offline)
-#   notify_crm: "-100123456789"              # CRM / billing events
-#   notify_service: "-100123456789"          # service events (login, restart)
-#   notify_tblocker: "-100123456789"         # torrent blocker events
 
 # ---------------------------------------------------------------------------
 # Topology intent — one control plane, one exit, and a relay in front of it.

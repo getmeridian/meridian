@@ -135,9 +135,8 @@ def test_a_workload_moved_to_another_server_keeps_its_reality_keys() -> None:
         raise AssertionError("a moved workload keeps its keys; clients behind relays still hold them")
 
     manager = WorkloadStateManager(cluster, persist=lambda _state: None, key_factory=unexpected_factory)
-    seeded = manager.carry_forward(_profile(), generation=2, desired_hash=_HASH_B, server_ref="srv-exit-b")
+    seeded = manager.ensure(_profile(), generation=2, desired_hash=_HASH_B, server_ref="srv-exit-b")
 
-    assert seeded is not None
     assert seeded.server_refs == ["srv-exit-b"]
     assert seeded.reality_keys == {"srv-exit-b": _keys()}
 
@@ -202,22 +201,8 @@ def test_two_exit_uuid_bindings_remain_independent() -> None:
         server_ref="srv-exit-b",
     )
 
-    manager.record_profile_uuid("exit-a", 1, "profile-a")
-    manager.record_profile_uuid("exit-b", 1, "profile-b")
-    manager.record_inbound_uuid("exit-a", 1, "inbound:exit-a:reality", "inbound-a")
-    manager.record_inbound_uuid("exit-b", 1, "inbound:exit-b:reality", "inbound-b")
-    manager.record_node_uuid("exit-a", 1, "srv-exit-a", "node-a")
-    manager.record_node_uuid("exit-b", 1, "srv-exit-b", "node-b")
-    manager.record_host_uuid("exit-a", 1, "host:exit-a:reality:direct", "host-a")
-    manager.record_host_uuid("exit-b", 1, "host:exit-b:reality:direct", "host-b")
-
-    exit_a = manager.require("exit-a", 1)
-    exit_b = manager.require("exit-b", 1)
-    assert exit_a.config_profile_uuid == "profile-a"
-    assert exit_b.config_profile_uuid == "profile-b"
+    exit_a = manager.find("exit-a", 1)
+    exit_b = manager.find("exit-b", 1)
+    assert exit_a is not None and exit_b is not None
     assert exit_a.reality_keys["srv-exit-a"] == _keys("a")
     assert exit_b.reality_keys["srv-exit-b"] == _keys("b")
-    assert exit_a.inbound_uuids == {"inbound:exit-a:reality": "inbound-a"}
-    assert exit_b.inbound_uuids == {"inbound:exit-b:reality": "inbound-b"}
-    assert exit_a.host_uuids == {"host:exit-a:reality:direct": "host-a"}
-    assert exit_b.host_uuids == {"host:exit-b:reality:direct": "host-b"}

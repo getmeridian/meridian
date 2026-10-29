@@ -1,8 +1,8 @@
 """Relay management -- deploy, list, remove, check relay nodes.
 
 Relays are lightweight Realm TCP forwarders that provide domestic entry
-points. All relay-to-panel mapping uses Remnawave Host entries; topology
-is persisted in cluster.yml.
+points. Each relay hop is published as a client endpoint of the control
+service; topology is persisted in cluster.yml.
 """
 
 from __future__ import annotations

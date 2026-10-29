@@ -495,8 +495,6 @@ class SetupWizard:
     def _verify(self, draft: SetupDraft) -> None:
         self.prompt.explain(t("verify.explain"))
         self._verification = self.runtime.verify(draft)
-        for message in self._verification.warnings:
-            self.io.write(f"[warn]{escape(message)}[/warn]")
         self.prompt.say(t("verify.done", count=self._verification.node_count), style="ok")
         self.service.mark_verified(datetime.now(UTC).isoformat().replace("+00:00", "Z"))
 
@@ -511,21 +509,9 @@ class SetupWizard:
                 self.io.write(f"    [warn]{escape(t('handoff.page_unavailable', error=links.error))}[/warn]")
             self.io.write(f"    {escape(t('handoff.subscription'))} {escape(links.subscription_url)}")
         self.prompt.explain(t("handoff.explain"))
-        if verification.panel_url:
-            self._admin_panel(verification)
         self.prompt.explain(t("handoff.next"))
         self.service.complete_handoff()
         return "completed"
-
-    def _admin_panel(self, verification: SetupVerification) -> None:
-        """Where the Remnawave panel lives, for the curious; the password stays behind `meridian panel`."""
-        self.io.write("")
-        self.io.write(f"  [bold]{escape(t('handoff.admin_title'))}[/bold]")
-        self.io.write(f"    {escape(t('handoff.admin_url'))} [bold]{escape(verification.panel_url)}[/bold]")
-        if verification.admin_user:
-            self.io.write(f"    {escape(t('handoff.admin_login'))} {escape(verification.admin_user)}")
-        self.io.write(f"    {escape(t('handoff.admin_password'))} meridian panel --show-password")
-        self.io.write(f"    [dim]{escape(t('handoff.admin_warning'))}[/dim]")
 
     def _write_summary(self, draft: SetupDraft, review: SetupReview) -> None:
         intent = review.intent

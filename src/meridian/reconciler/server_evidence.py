@@ -53,7 +53,6 @@ _TOOL_FAILURES = (
     ": not found",
 )
 _MISSING_FILE = ("no such file or directory", "not a directory")
-_MISSING_CONTAINER = ("no such object", "no such container")
 _NEGATIVE_SERVICE_STATES = {
     "activating",
     "deactivating",
@@ -159,22 +158,6 @@ def managed_command_output(
     if result.returncode == 0:
         return result.stdout
     _raise_unavailable(logical_id, description, f"managed command returned exit code {result.returncode}")
-
-
-def docker_container_running(
-    logical_id: str,
-    result: CommandEvidence,
-    container_name: str,
-) -> bool:
-    """Return container state only when Docker produced authoritative evidence."""
-    description = f"Docker container {container_name}"
-    require_available_evidence(logical_id, result, description)
-    output = _output(result)
-    if result.returncode == 1 and any(marker in output for marker in _MISSING_CONTAINER):
-        return False
-    if result.returncode == 0 and result.stdout.strip().casefold() in {"true", "false"}:
-        return result.stdout.strip().casefold() == "true"
-    _raise_unavailable(logical_id, description, f"Docker inspection returned exit code {result.returncode}")
 
 
 def require_available_evidence(

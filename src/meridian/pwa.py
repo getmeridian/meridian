@@ -82,7 +82,7 @@ def generate_client_files(
 ) -> dict[str, str]:
     """Generate all per-client PWA files as a {filename: content} dict.
 
-    Remnawave's subscription URL is canonical; Meridian does not synthesize a
+    The control service's subscription URL is canonical; Meridian does not synthesize a
     second subscription from local topology state.
     """
     return {

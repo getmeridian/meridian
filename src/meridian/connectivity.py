@@ -482,7 +482,7 @@ def _run_canonical_subscription(
                         code="SUBSCRIPTION_INVALID",
                         status="failed",
                         message=str(exc),
-                        remediation="Repair the Remnawave subscription template and host bindings.",
+                        remediation="Run meridian apply to republish the fleet's client endpoints.",
                     )
                 ],
             )
@@ -519,7 +519,7 @@ def _run_canonical_subscription(
                         code="UNSUPPORTED_OUTBOUND",
                         status="failed",
                         message="Unsupported canonical outbound(s): " + ", ".join(unsupported),
-                        remediation="Update Meridian/Remnawave or remove unsupported delivered protocols.",
+                        remediation="Update Meridian or remove unsupported delivered protocols.",
                     )
                 ],
             )

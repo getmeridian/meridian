@@ -1,8 +1,7 @@
 """Docker provisioning step.
 
-InstallDocker is panel-agnostic — it installs Docker CE from the official
-repository. The panel/node container deployment is handled by
-remnawave_panel.py and node_deploy.py respectively.
+InstallDocker installs Docker CE from the official repository for a
+baseline that asks for it.
 """
 
 from __future__ import annotations

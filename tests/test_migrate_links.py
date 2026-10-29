@@ -21,10 +21,10 @@ from meridian.compiler.models import ClientEndpointPayload, HostPayload, Resourc
 from meridian.control.client import ControlClient
 from meridian.control.models import UserImport, UserImportBatch
 from meridian.core.topology import SetupIntent, TransparentRelayIntent
-from meridian.node_deploy import panel_base_url
 from meridian.reconciler.meridian_drivers import ClientEndpointDriver, MeridianDriverContext
 from meridian.reconciler.resources import build_resource_actions
 from meridian.reconciler.workloads import WorkloadStateManager
+from meridian.setup.control_service import service_base_url as panel_base_url
 from meridian.setup.single_server import single_server_intent
 from meridian.xray_workload import salamander_password
 from tests.support.control_service import ADMIN_TOKEN, serve_control

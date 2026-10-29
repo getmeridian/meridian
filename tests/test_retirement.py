@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-from typing import get_args
-
 import pytest
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
-from meridian.compiler.models import (
-    DeploymentTarget,
-    ResourceKind,
-    ResourcePlan,
-)
+from meridian.compiler.models import DeploymentTarget, ResourcePlan
+from meridian.core.resources import APPLIED_KINDS
 from meridian.reconciler.resource_executor import validate_resource_plan_transition
 from meridian.reconciler.resources import UnsupportedResourceRetirementError
 from meridian.reconciler.retirement import (
@@ -25,13 +20,7 @@ from meridian.reconciler.retirement import (
 )
 from tests.support.topology import firewall_resource, resource_plan
 
-TEARDOWN_OWNED = {
-    "control_plane_runtime",
-    "subscription_template",
-    "subscription_settings",
-    "control_service",
-    "service_settings",
-}
+TEARDOWN_OWNED = {"control_service", "service_settings"}
 
 
 def _plan() -> ResourcePlan:
@@ -68,8 +57,8 @@ class _Recorder:
             raise OSError("server unreachable")
 
 
-def test_every_kind_except_teardown_owned_ones_can_be_retired() -> None:
-    assert set(RETIREMENT_ORDER) == set(get_args(ResourceKind)) - TEARDOWN_OWNED
+def test_every_applied_kind_except_teardown_owned_ones_can_be_retired() -> None:
+    assert set(RETIREMENT_ORDER) == APPLIED_KINDS - TEARDOWN_OWNED
     assert len(RETIREMENT_ORDER) == len(set(RETIREMENT_ORDER))
     assert set(FORGET_ONLY) <= set(RETIREMENT_ORDER)
 
@@ -77,21 +66,14 @@ def test_every_kind_except_teardown_owned_ones_can_be_retired() -> None:
 @pytest.mark.parametrize(
     ("first", "then"),
     [
-        ("access_user", "external_squad"),
-        ("access_user", "internal_squad"),
-        ("service_user", "internal_squad"),
-        ("host", "inbound"),
-        ("host", "config_profile"),
-        ("internal_squad", "config_profile"),
-        ("node_binding", "config_profile"),
-        ("node_binding", "node_runtime"),
-        ("config_profile", "node_runtime"),
-        ("node_runtime", "nginx_artifact"),
+        ("control_user", "node_workload"),
+        ("client_endpoint", "node_workload"),
+        ("node_workload", "agent_runtime"),
+        ("agent_runtime", "nginx_artifact"),
         ("realm_hop", "nginx_artifact"),
         ("realm_hop", "firewall_rule"),
         ("nginx_artifact", "firewall_rule"),
         ("firewall_rule", "certificate"),
-        ("probe", "server_baseline"),
     ],
 )
 def test_dependents_retire_before_what_they_use(first: str, then: str) -> None:
@@ -106,16 +88,16 @@ def test_vanished_bindings_are_sorted_in_retirement_order() -> None:
         desired,
         _binding("server_baseline"),
         _binding("realm_hop"),
-        _binding("config_profile"),
-        _binding("node_binding"),
-        _binding("access_user"),
-        _binding("host", active=False),  # already retired
+        _binding("agent_runtime"),
+        _binding("node_workload"),
+        _binding("control_user"),
+        _binding("client_endpoint", active=False),  # already retired
     )
 
     assert [binding.resource_kind for binding in retired_bindings(_plan(), cluster)] == [
-        "access_user",
-        "node_binding",
-        "config_profile",
+        "control_user",
+        "node_workload",
+        "agent_runtime",
         "realm_hop",
         "server_baseline",
     ]
@@ -123,7 +105,7 @@ def test_vanished_bindings_are_sorted_in_retirement_order() -> None:
 
 @pytest.mark.parametrize(
     "kind",
-    ["node_binding", "node_runtime", "config_profile", "realm_hop", "service_user", "internal_squad", "egress_pool"],
+    ["node_workload", "agent_runtime", "client_endpoint", "realm_hop", "control_user"],
 )
 def test_executor_accepts_plans_that_remove_exits_relays_and_gateways(kind: str) -> None:
     validate_resource_plan_transition(_plan(), _cluster(_binding(kind)))
@@ -135,10 +117,15 @@ def test_executor_still_refuses_teardown_owned_kinds(kind: str) -> None:
         validate_resource_plan_transition(_plan(), _cluster(_binding(kind)))
 
 
+def test_a_panel_kind_left_in_a_fleet_is_refused_rather_than_retired() -> None:
+    """Only `meridian migrate` forgets a Remnawave fleet's panel-side bindings."""
+    with pytest.raises(UnsupportedResourceRetirementError, match="host:gone"):
+        validate_resource_plan_transition(_plan(), _cluster(_binding("host")))
+
+
 def test_forget_only_kinds_are_deactivated_without_a_remote_call() -> None:
     events: list[str] = []
-    kinds = ("inbound", "egress_pool", "route_rule", "routing_gateway", "server_baseline")
-    bindings = [_binding(kind) for kind in kinds]
+    bindings = [_binding(kind) for kind in FORGET_ONLY]
     cluster = _cluster(*bindings)
     recorder = _Recorder(events)
 
@@ -165,24 +152,24 @@ def test_a_failed_rank_stops_later_ranks_and_a_retry_resumes() -> None:
     bindings = retired_bindings(
         _plan(),
         _cluster(
-            _binding("node_binding", "a"),
-            _binding("node_binding", "b"),
-            _binding("config_profile"),
-            _binding("node_runtime", server_ref="srv-b"),
+            _binding("node_workload", "a"),
+            _binding("node_workload", "b"),
+            _binding("agent_runtime", server_ref="srv-b"),
+            _binding("realm_hop", server_ref="srv-b"),
         ),
     )
     cluster = _cluster(*bindings)
     saves: list[int] = []
-    drivers = dict.fromkeys(RETIREMENT_ORDER, _Recorder(events, fail_on="node_binding:a"))
+    drivers = dict.fromkeys(RETIREMENT_ORDER, _Recorder(events, fail_on="node_workload:a"))
 
     retired, errors = retire(bindings, drivers, cluster, lambda _state: saves.append(1))
 
-    assert events == ["node_binding:a", "node_binding:b"]  # the whole failed rank is attempted
-    assert retired == ["node_binding:b"]
-    assert errors[0] == "retire node_binding:a: server unreachable"
+    assert events == ["node_workload:a", "node_workload:b"]  # the whole failed rank is attempted
+    assert retired == ["node_workload:b"]
+    assert errors[0] == "retire node_workload:a: server unreachable"
     assert errors[1:] == [
-        "retire config_profile:gone: skipped until earlier removals succeed",
-        "retire node_runtime:gone: skipped until earlier removals succeed",
+        "retire agent_runtime:gone: skipped until earlier removals succeed",
+        "retire realm_hop:gone: skipped until earlier removals succeed",
     ]
     assert len(saves) == 1
 
@@ -191,15 +178,15 @@ def test_a_failed_rank_stops_later_ranks_and_a_retry_resumes() -> None:
     retried, errors = retire(retired_bindings(_plan(), cluster), drivers, cluster, lambda _state: None)
 
     assert errors == []
-    assert retried == ["node_binding:a", "config_profile:gone", "node_runtime:gone"]
+    assert retried == ["node_workload:a", "agent_runtime:gone", "realm_hop:gone"]
 
 
 def test_retiring_servers_skip_forget_only_bindings() -> None:
     bindings = [
         _binding("realm_hop", server_ref="srv-relay"),
         _binding("server_baseline", server_ref="srv-baseline-only"),
-        _binding("node_binding", server_ref="srv-exit"),
-        _binding("host"),
+        _binding("agent_runtime", server_ref="srv-exit"),
+        _binding("control_user"),
     ]
 
     assert retiring_server_refs(bindings) == {"srv-relay", "srv-exit"}
@@ -216,25 +203,18 @@ def test_review_hash_covers_the_retirement_set_and_its_ssh_targets() -> None:
 
     assert base != "p" * 64
     assert base == retirement_review_hash("p" * 64, [relay], {"srv-relay": target})
-    assert base != retirement_review_hash("p" * 64, [relay, _binding("host")], {"srv-relay": target})
+    assert base != retirement_review_hash("p" * 64, [relay, _binding("control_user")], {"srv-relay": target})
     moved = DeploymentTarget(host="198.51.100.31", user="root", port=22)
     assert base != retirement_review_hash("p" * 64, [relay], {"srv-relay": moved})
     assert base != retirement_review_hash("q" * 64, [relay], {"srv-relay": target})
 
 
-@pytest.mark.parametrize(
-    ("backend", "runtime"),
-    # A re-enrolled agent revokes the old one's credentials, but only retirement stops its core.
-    [("remnawave", "node_runtime"), ("meridian", "agent_runtime")],
-    ids=["panel-node", "agent"],
-)
-def test_an_exit_moved_to_another_server_retires_only_the_old_servers_placements(backend: str, runtime: str) -> None:
+def test_an_exit_moved_to_another_server_retires_only_the_old_servers_placements() -> None:
     from meridian.compiler import compile_topology
     from meridian.setup.editor import add_exit_to_intent
     from meridian.setup.single_server import single_server_intent
 
     base = single_server_intent(None, server_ref="srv-a")
-    base = base.model_copy(update={"control": base.control.model_copy(update={"backend": backend})})
     before = add_exit_to_intent(
         base,
         server_ref="srv-b",
@@ -268,28 +248,29 @@ def test_an_exit_moved_to_another_server_retires_only_the_old_servers_placements
 
     assert {binding.server_ref for binding in retiring} == {"srv-b"}
     kinds = {binding.resource_kind for binding in retiring}
-    assert runtime in kinds and "nginx_artifact" in kinds and "firewall_rule" in kinds
-    # The panel Node keeps its UUID and is re-addressed in place, never deleted.
-    assert "node_binding" not in kinds
+    # A re-enrolled agent revokes the old one's credentials, but only retirement stops its core.
+    assert {"agent_runtime", "nginx_artifact", "firewall_rule"} <= kinds
+    # The service's node keeps its identity and is re-addressed in place, never deleted.
+    assert "node_workload" not in kinds
 
 
-def test_forgetting_a_server_keeps_panel_cleanup_and_other_servers() -> None:
+def test_forgetting_a_server_keeps_service_cleanup_and_other_servers() -> None:
     def binding(logical_id: str, kind: str, server_ref: str) -> ManagedResourceBinding:
         return ManagedResourceBinding(
             logical_id=logical_id, resource_kind=kind, generation=1, active=True, server_ref=server_ref
         )
 
     retiring = [
-        binding("node:exit-b", "node_runtime", "srv-old"),
+        binding("agent:exit-b", "agent_runtime", "srv-old"),
         binding("firewall:old:443", "firewall_rule", "srv-old"),
         binding("baseline:srv-old", "server_baseline", "srv-old"),
-        binding("binding:exit-b", "node_binding", "srv-old"),
+        binding("workload:exit-b", "node_workload", "srv-old"),
         binding("firewall:other:443", "firewall_rule", "srv-other"),
     ]
     cluster = ClusterConfig(managed_bindings={f"{item.logical_id}@1": item for item in retiring})
 
     forgotten = forget_server(cluster, retiring, "srv-old")
 
-    assert forgotten == ["baseline:srv-old", "firewall:old:443", "node:exit-b"]
+    assert forgotten == ["agent:exit-b", "baseline:srv-old", "firewall:old:443"]
     still_active = sorted(item.logical_id for item in cluster.managed_bindings.values() if item.active)
-    assert still_active == ["binding:exit-b", "firewall:other:443"]
+    assert still_active == ["firewall:other:443", "workload:exit-b"]

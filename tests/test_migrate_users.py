@@ -7,10 +7,11 @@ import pytest
 from meridian.migrate import MigrationError
 from meridian.migrate.users import carry_users
 from meridian.remnawave import User
-from meridian.remnawave.control_plane import ACCESS_USER_DESCRIPTION, ACCESS_USER_TAG
-from meridian.remnawave.models import NEVER_EXPIRES_AT
+from meridian.remnawave.client import ACCESS_USER_DESCRIPTION, ACCESS_USER_TAG
 
 ALICE_UUID = "3f2a9c4e-7b1d-4e6a-9c2f-1a2b3c4d5e6f"
+
+REMNAWAVE_NEVER = "2099-12-31T23:59:59.000Z"
 
 
 def _user(username: str = "alice", **changes: object) -> User:
@@ -20,7 +21,7 @@ def _user(username: str = "alice", **changes: object) -> User:
         "short_uuid": f"{username}ShortUuid0001"[:16].ljust(16, "0"),
         "vless_uuid": ALICE_UUID if username == "alice" else f"{ALICE_UUID[:-2]}{len(username):02d}",
         "status": "ACTIVE",
-        "expire_at": NEVER_EXPIRES_AT,
+        "expire_at": REMNAWAVE_NEVER,
         "traffic_limit_strategy": "NO_RESET",
         "description": ACCESS_USER_DESCRIPTION,
         **changes,

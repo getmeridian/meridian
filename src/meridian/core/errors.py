@@ -74,13 +74,6 @@ class ProvisioningError(MeridianError):
         super().__init__(message, hint=hint, category=category)
 
 
-class PanelSetupError(MeridianError):
-    """Remnawave panel API configuration failure (register, token, node, profile)."""
-
-    def __init__(self, message: str, *, hint: str = "", category: ErrorCategory = "system") -> None:
-        super().__init__(message, hint=hint, category=category)
-
-
 class InfrastructureEvidenceUnavailableError(MeridianError):
     """Required infrastructure evidence could not be collected reliably."""
 

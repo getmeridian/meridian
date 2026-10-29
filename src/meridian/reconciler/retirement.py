@@ -16,45 +16,23 @@ from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import DeploymentTarget, ResourcePlan, canonical_hash
 
 # Dependents first, so nothing is deleted while something that uses it remains:
-# users before the squads they join, Hosts before the Inbounds they publish,
-# panel Nodes before their Profile, and server runtimes before the listeners,
-# firewall openings, and baseline beneath them.
+# users and endpoints before the node workloads that serve them, and server
+# runtimes before the listeners, firewall openings, and baseline beneath them.
+# A Remnawave fleet's panel-side kinds are not here: `meridian migrate` forgets them.
 RETIREMENT_ORDER: tuple[str, ...] = (
-    "access_user",
     "control_user",
-    "service_user",
-    "host",
     "client_endpoint",
-    "external_squad",
-    "internal_squad",
-    "inbound",
-    "node_binding",
-    "config_profile",
-    "routing_gateway",
-    "egress_pool",
-    "route_rule",
     "node_workload",
-    "node_runtime",
     "agent_runtime",
     "realm_hop",
     "nginx_artifact",
     "firewall_rule",
     "certificate",
-    "probe",
     "server_baseline",
 )
 
 # Kinds whose binding is dropped without a remote call, and why.
 FORGET_ONLY: Mapping[str, str] = {
-    # Inbounds and routing projections are materialized inside their config
-    # Profile: either the surviving Profile was already rewritten without them
-    # during convergence, or the whole Profile is deleted by its own retirement.
-    "inbound": "lives inside its config Profile",
-    "routing_gateway": "lives inside its config Profile",
-    "egress_pool": "lives inside its config Profile",
-    "route_rule": "lives inside its config Profile",
-    # Probes are read-only checks with nothing to delete.
-    "probe": "read-only check",
     # The baseline installs packages and hardens SSH/UFW. Undoing that could lock
     # the operator out or break unrelated services, so it is never reverted.
     "server_baseline": "packages and SSH/firewall hardening are never reverted",
@@ -63,17 +41,17 @@ FORGET_ONLY: Mapping[str, str] = {
 
 # Kinds whose remote state lives on one server. When the plan keeps such a
 # resource but places it on another server (`node replace`), the old placement
-# is retired on the server its binding recorded. Panel-side kinds keep their
-# UUID across the move and are updated in place instead.
+# is retired on the server its binding recorded. Service-side kinds keep their
+# identity across the move and are updated in place instead.
 SERVER_PLACED: frozenset[str] = frozenset(
-    {"node_runtime", "agent_runtime", "realm_hop", "nginx_artifact", "firewall_rule", "certificate"}
+    {"agent_runtime", "realm_hop", "nginx_artifact", "firewall_rule", "certificate"}
 )
 
 
 def forget_server(cluster: ClusterConfig, bindings: Iterable[ManagedResourceBinding], server_ref: str) -> list[str]:
     """Drop the retiring server-side bindings on one unreachable server without contacting it.
 
-    Panel-side bindings stay, so the panel still deletes what it holds; whatever
+    Service-side bindings stay, so the service still deletes what it holds; whatever
     ran on the server keeps running until the operator deletes or wipes it.
     """
     server_side = SERVER_PLACED | {"server_baseline"}

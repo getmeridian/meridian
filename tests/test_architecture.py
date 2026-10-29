@@ -106,11 +106,7 @@ CONTROL_FORBIDDEN = (
 
 # Shared library modules must not import private (_-prefixed) symbols
 # from commands/.
-LIBRARY_MODULES = [
-    SRC / "panel_bootstrap.py",
-    SRC / "node_deploy.py",
-    SRC / "reality_keys.py",
-]
+LIBRARY_MODULES = [SRC / "resolve.py", *sorted((SRC / "setup").rglob("*.py"))]
 
 
 class TestLayerBoundaries:
@@ -147,7 +143,7 @@ class TestLayerBoundaries:
         assert violations == [], "import Click's classes from meridian.cli_types:\n" + "\n".join(violations)
 
     def test_library_modules_never_import_private_from_commands(self) -> None:
-        """panel_bootstrap.py and friends must not import _foo from commands/.
+        """resolve.py and setup/ must not import _foo from commands/.
 
         These modules are shared business logic consumed by both CLI commands
         and the reconciler. Importing private command functions creates an
@@ -250,9 +246,7 @@ class TestContractDrift:
 # Files above this limit must be in the allowlist with a reason.
 FILE_SIZE_BUDGET = 800
 
-FILE_SIZE_ALLOWLIST: dict[str, str] = {
-    "remnawave.py": "single API client wrapping 10+ REST domains — facade pattern is intentional",
-}
+FILE_SIZE_ALLOWLIST: dict[str, str] = {}
 
 
 class TestStructuralHealth:
@@ -326,17 +320,11 @@ class TestStructuralHealth:
         """Library modules must raise exceptions, not call console.fail().
 
         fail() exits the process — it belongs in CLI command entry points only.
-        Library modules (resolve, panel_bootstrap, node_deploy, reality_keys,
-        provision/) should raise typed exceptions that command callers convert
-        to fail() calls.
+        Library modules (resolve, setup/, provision/, migrate/) should raise
+        typed exceptions that command callers convert to fail() calls.
         """
         # Modules that must not import fail from meridian.console
-        library_files = [
-            SRC / "resolve.py",
-            SRC / "panel_bootstrap.py",
-            SRC / "node_deploy.py",
-            SRC / "reality_keys.py",
-        ]
+        library_files = [SRC / "resolve.py", *sorted((SRC / "setup").rglob("*.py"))]
         library_files.extend(sorted((SRC / "provision").rglob("*.py")))
         library_files.extend(sorted((SRC / "migrate").rglob("*.py")))
 

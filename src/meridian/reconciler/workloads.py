@@ -18,7 +18,6 @@ from meridian.cluster import (
 )
 from meridian.compiler.models import ConfigProfilePayload
 from meridian.core.errors import LocalStateError
-from meridian.reality_keys import X25519Source, generate_reality_keypair
 
 PersistCluster = Callable[[ClusterConfig], None]
 
@@ -86,30 +85,6 @@ class WorkloadStateManager:
         self._persist(self.cluster)
         return workload
 
-    def carry_forward(
-        self,
-        profile: ConfigProfilePayload,
-        *,
-        generation: int,
-        desired_hash: str,
-        server_ref: str,
-    ) -> WorkloadBinding | None:
-        """Seed a new generation from an earlier one without allocating secrets.
-
-        A changed intent compiles to a new generation whose Profile already
-        exists remotely; observation must render it with the inherited keys.
-        Returns None when no earlier generation exists for this workload.
-        """
-        existing = self.find(profile.workload_id, generation)
-        if existing is not None:
-            return existing
-        if not any(
-            item.id == profile.workload_id and item.generation < generation and item.reality_keys
-            for item in self.cluster.workloads
-        ):
-            return None
-        return self.ensure(profile, generation=generation, desired_hash=desired_hash, server_ref=server_ref)
-
     def find(self, workload_id: str, generation: int) -> WorkloadBinding | None:
         return next(
             (
@@ -119,53 +94,6 @@ class WorkloadStateManager:
             ),
             None,
         )
-
-    def record_profile_uuid(self, workload_id: str, generation: int, profile_uuid: str) -> None:
-        workload = self.require(workload_id, generation)
-        workload.config_profile_uuid = profile_uuid
-        self._persist(self.cluster)
-
-    def record_inbound_uuid(
-        self,
-        workload_id: str,
-        generation: int,
-        inbound_ref: str,
-        inbound_uuid: str,
-    ) -> None:
-        workload = self.require(workload_id, generation)
-        workload.inbound_uuids[inbound_ref] = inbound_uuid
-        self._persist(self.cluster)
-
-    def record_node_uuid(
-        self,
-        workload_id: str,
-        generation: int,
-        server_ref: str,
-        node_uuid: str,
-    ) -> None:
-        workload = self.require(workload_id, generation)
-        workload.node_uuids[server_ref] = node_uuid
-        self._persist(self.cluster)
-
-    def record_host_uuid(
-        self,
-        workload_id: str,
-        generation: int,
-        host_ref: str,
-        host_uuid: str,
-    ) -> None:
-        workload = self.require(workload_id, generation)
-        workload.host_uuids[host_ref] = host_uuid
-        self._persist(self.cluster)
-
-    def require(self, workload_id: str, generation: int) -> WorkloadBinding:
-        workload = self.find(workload_id, generation)
-        if workload is None:
-            raise WorkloadStateError(
-                f"Workload state {workload_id}@{generation} is missing.",
-                hint="Re-run the Profile action before dependent resources.",
-            )
-        return workload
 
     def _ensure_reality_keys(
         self,
@@ -218,21 +146,6 @@ class WorkloadStateManager:
                 path=inbound.path,
                 tag=inbound.tag,
             )
-
-
-class PanelRealityKeyFactory:
-    """Generate one Reality key triple through the control panel's x25519 tool."""
-
-    def __init__(self, panel: X25519Source) -> None:
-        self._panel = panel
-
-    def __call__(self, server_ref: str) -> RealityKeyBinding:
-        private_key, public_key = generate_reality_keypair(self._panel)
-        return RealityKeyBinding(
-            public_key=public_key,
-            private_key=private_key,
-            short_id=secrets.token_hex(4),
-        )
 
 
 def _require_complete_keys(workload_id: str, keys: RealityKeyBinding) -> None:

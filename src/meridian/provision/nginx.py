@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 import shlex
 
-from meridian.config import ACME_SH_SHA256, ACME_SH_VERSION, REMNAWAVE_PANEL_PORT, REMNAWAVE_SUBSCRIPTION_PAGE_PORT
+from meridian.config import ACME_SH_SHA256, ACME_SH_VERSION
 from meridian.provision.apt_keys import verify_apt_key
 from meridian.provision.ensure import apt_failure, apt_lock_held, apt_update_and_install, resolve_ctx, run_apt
 from meridian.provision.nginx_render import (
@@ -268,41 +268,37 @@ class ConfigureNginx:
         nginx_internal_port: int = 8443,
         ws_path: str | None = None,
         wss_internal_port: int | None = None,
-        panel_web_base_path: str | None = None,
-        panel_internal_port: int | None = None,
+        service_base_path: str | None = None,
+        service_port: int | None = None,
         info_page_path: str | None = None,
         server_ip: str | None = None,
         skip_dns_check: bool = False,
         ip_mode: bool = False,
         xhttp_path: str | None = None,
         xhttp_internal_port: int | None = None,
-        subscription_page_path: str | None = None,
-        subscription_page_port: int | None = None,
-        control_service: bool = False,
     ) -> None:
-        self.control_service = control_service
         self.domain = domain
         self.reality_sni = reality_sni
         self.reality_backend_port = reality_backend_port
         self.nginx_internal_port = nginx_internal_port
         self.ws_path = ws_path
         self.wss_internal_port = wss_internal_port
-        self.panel_web_base_path = panel_web_base_path
-        self.panel_internal_port = panel_internal_port
+        self.service_base_path = service_base_path
+        self.service_port = service_port
         self.info_page_path = info_page_path
         self.server_ip = server_ip
         self.skip_dns_check = skip_dns_check
         self.ip_mode = ip_mode
         self.xhttp_path = xhttp_path
         self.xhttp_internal_port = xhttp_internal_port
-        self.subscription_page_path = subscription_page_path
-        self.subscription_page_port = subscription_page_port
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
-        # Resolve runtime values from context (populated by ConfigurePanel).
-        panel_web_base_path = resolve_ctx(self.panel_web_base_path, ctx.web_base_path)
+        # Resolve runtime values from context (populated by the control bootstrap).
+        service_base_path = resolve_ctx(self.service_base_path, ctx.web_base_path)
         info_page_path = resolve_ctx(self.info_page_path, ctx.info_page_path)
-        panel_internal_port = resolve_ctx(self.panel_internal_port, REMNAWAVE_PANEL_PORT)
+        service_port = resolve_ctx(
+            self.service_port, ctx.control_service.config.listen_port if ctx.control_service else 0
+        )
         server_ip = resolve_ctx(self.server_ip, ctx.ip)
         xhttp_path = resolve_ctx(self.xhttp_path, ctx.xhttp_path)
         xhttp_internal_port = resolve_ctx(
@@ -313,8 +309,6 @@ class ConfigureNginx:
         wss_internal_port = resolve_ctx(self.wss_internal_port, ctx.wss_port)
         reality_sni = resolve_ctx(self.reality_sni, ctx.sni)
         reality_backend_port = resolve_ctx(self.reality_backend_port, ctx.reality_port)
-        sub_page_path = resolve_ctx(self.subscription_page_path, ctx.subscription_page_path)
-        sub_page_port = resolve_ctx(self.subscription_page_port, REMNAWAVE_SUBSCRIPTION_PAGE_PORT)
 
         # -- DNS pre-check (domain mode only) --
         if not self.ip_mode and not self.skip_dns_check:
@@ -378,14 +372,11 @@ class ConfigureNginx:
             http_config = render_nginx_ip_config(
                 server_ip=server_ip,
                 nginx_internal_port=self.nginx_internal_port,
-                panel_web_base_path=panel_web_base_path,
-                panel_internal_port=panel_internal_port,
+                service_base_path=service_base_path,
+                service_port=service_port,
                 info_page_path=info_page_path,
                 xhttp_path=xhttp_path,
                 xhttp_internal_port=xhttp_internal_port,
-                subscription_page_path="" if self.control_service else sub_page_path,
-                subscription_page_port=0 if self.control_service else sub_page_port,
-                control_service=self.control_service,
             )
         else:
             http_config = render_nginx_http_config(
@@ -393,14 +384,11 @@ class ConfigureNginx:
                 nginx_internal_port=self.nginx_internal_port,
                 ws_path=ws_path,
                 wss_internal_port=wss_internal_port,
-                panel_web_base_path=panel_web_base_path,
-                panel_internal_port=panel_internal_port,
+                service_base_path=service_base_path,
+                service_port=service_port,
                 info_page_path=info_page_path,
                 xhttp_path=xhttp_path,
                 xhttp_internal_port=xhttp_internal_port,
-                subscription_page_path="" if self.control_service else sub_page_path,
-                subscription_page_port=0 if self.control_service else sub_page_port,
-                control_service=self.control_service,
             )
         result = conn.put_text(
             "/etc/nginx/conf.d/meridian-http.conf",

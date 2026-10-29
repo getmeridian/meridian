@@ -37,7 +37,6 @@ from meridian.reconciler.server_render import (
     render_realm_config,
     render_realm_unit,
 )
-from meridian.remnawave import MeridianPanel
 from meridian.ssh import ServerConnection
 from tests.support.topology import resource_plan
 
@@ -204,7 +203,6 @@ def test_realm_restart_failure_restores_previous_files(monkeypatch: pytest.Monke
     context = ServerDriverContext(
         plan=plan,
         cluster=ClusterConfig(),
-        panel=cast(MeridianPanel, object()),
         connection_for=lambda _server_ref: cast(ServerConnection, conn),
         server_addresses=ADDRESSES,
     )
@@ -244,7 +242,6 @@ def test_realm_observation_reads_version_before_feature_suffixes() -> None:
     context = ServerDriverContext(
         plan=plan,
         cluster=ClusterConfig(),
-        panel=cast(MeridianPanel, object()),
         connection_for=lambda _server_ref: cast(ServerConnection, conn),
         server_addresses=ADDRESSES,
     )
@@ -283,7 +280,6 @@ def _realm_observation_case() -> tuple[RealmHopDriver, ResourceAction, MagicMock
     context = ServerDriverContext(
         plan=plan,
         cluster=ClusterConfig(),
-        panel=cast(MeridianPanel, object()),
         connection_for=lambda _server_ref: conn,
         server_addresses=ADDRESSES,
     )
@@ -421,7 +417,6 @@ def test_realm_restart_timeout_is_reobserved_without_guessing_rollback(
     context = ServerDriverContext(
         plan=plan,
         cluster=ClusterConfig(),
-        panel=cast(MeridianPanel, object()),
         connection_for=lambda _server_ref: cast(ServerConnection, conn),
         server_addresses=ADDRESSES,
     )
@@ -453,7 +448,6 @@ def _migration_case(
     context = ServerDriverContext(
         plan=plan,
         cluster=ClusterConfig(),
-        panel=cast(MeridianPanel, object()),
         connection_for=lambda _server_ref: cast(ServerConnection, conn),
         server_addresses=ADDRESSES,
     )

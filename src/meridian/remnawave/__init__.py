@@ -1,21 +1,7 @@
-"""Remnawave control-plane adapter facade."""
+"""What remains of the Remnawave adapter: migrate's reader, the shared models, and the error types."""
 
-from .client import MeridianPanel
-from .control_plane import XRAY_JSON_CLIENT_TYPE
-from .models import (
-    ConfigProfile,
-    ExternalSquad,
-    Host,
-    HostSecurityLayer,
-    Inbound,
-    InternalSquad,
-    Node,
-    NodeCredentials,
-    SubscriptionDocument,
-    SubscriptionSettings,
-    SubscriptionTemplate,
-    User,
-)
+from .client import RemnawaveReader
+from .models import Host, Node, SubscriptionDocument, User
 from .runtime import (
     RemnawaveAuthError,
     RemnawaveError,
@@ -23,23 +9,18 @@ from .runtime import (
     RemnawaveNotFoundError,
 )
 
+# The canonical Xray JSON document type in a subscription URL.
+XRAY_JSON_CLIENT_TYPE = "json"
+
 __all__ = [
-    "ConfigProfile",
-    "ExternalSquad",
     "Host",
-    "HostSecurityLayer",
-    "Inbound",
-    "InternalSquad",
-    "MeridianPanel",
     "Node",
-    "NodeCredentials",
     "RemnawaveAuthError",
     "RemnawaveError",
     "RemnawaveNetworkError",
     "RemnawaveNotFoundError",
+    "RemnawaveReader",
     "SubscriptionDocument",
-    "SubscriptionSettings",
-    "SubscriptionTemplate",
     "User",
     "XRAY_JSON_CLIENT_TYPE",
 ]

@@ -39,4 +39,4 @@
 - **Stable release type ignores beta tags** — `git describe` excludes `a`/`b`/`rc` tags, or 4.0.0 after 4.0.0b2 would be titled a patch.
 - **Expressions reach shell through `env:`** — never inline `${{ }}` in a `run:` script (code scanning flags it as injection); CI's token is read-only.
 - **publish-pypi builds the agent before the wheel** — `make agent` fills `agent/dist`, which the build hook packages; `--release` refuses a wheel missing either musl build or whose digest file disagrees (a wheel without it cannot deploy a control-service fleet).
-- **System lab timeout 45min** — Remnawave image pulls inside nested Docker are slow. Timeout is generous to accommodate cold caches.
+- **System lab timeout 45min** — image builds and package installs on cold caches are slow; the timeout is generous on purpose.

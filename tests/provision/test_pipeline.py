@@ -1,7 +1,4 @@
-"""Tests for build_setup_steps() pipeline assembly.
-
-Uses the Remnawave panel/node architecture.
-"""
+"""Tests for build_setup_steps(): the control bootstrap's recipe."""
 
 from __future__ import annotations
 
@@ -9,6 +6,7 @@ import pytest
 
 from meridian.provision import build_setup_steps
 from meridian.provision.steps import ProvisionContext
+from tests.support.control_service import bootstrap_context
 
 
 def step_names(ctx: ProvisionContext) -> list[str]:
@@ -19,34 +17,27 @@ def step_names(ctx: ProvisionContext) -> list[str]:
 @pytest.fixture
 def base_ctx() -> ProvisionContext:
     """Minimal context: no domain, no hosted page, harden off, xhttp off."""
-    return ProvisionContext(
-        ip="198.51.100.1",
-        harden=False,
-        xhttp_enabled=False,
-        hosted_page=False,
-        domain="",
-    )
+    return bootstrap_context(harden=False, xhttp_enabled=False, hosted_page=False, domain="")
 
 
 @pytest.fixture
 def domain_ctx() -> ProvisionContext:
     """Context with domain mode enabled and all features on."""
-    return ProvisionContext(
-        ip="198.51.100.1",
-        domain="example.com",
-        harden=True,
-        xhttp_enabled=True,
-        hosted_page=False,
-    )
+    return bootstrap_context(domain="example.com", harden=True, xhttp_enabled=True, hosted_page=False)
+
+
+def test_the_recipe_needs_the_service_install() -> None:
+    with pytest.raises(ValueError, match="control service"):
+        build_setup_steps(ProvisionContext(ip="198.51.100.1"))
 
 
 class TestMinimalPipeline:
-    def test_minimal_step_count(self, base_ctx: ProvisionContext):
-        """Minimal config: swap, disk check, packages, auto-upgrades, timezone, BBR,
-        docker, remnawave panel = 8 steps (no nginx without hosted_page; the plan owns public ports)."""
-        steps = build_setup_steps(base_ctx)
-        names = [s.name for s in steps]
-        assert len(steps) == 8, f"Expected 8 minimal steps, got {len(steps)}: {names}"
+    def test_minimal_steps_run_the_baseline_then_the_service(self, base_ctx: ProvisionContext):
+        """No nginx without hosted_page or a domain; the plan owns public ports, and the service needs no Docker."""
+        names = step_names(base_ctx)
+        assert names[-1] == "Install control service"
+        assert "Install Docker" not in names
+        assert "Add swap space" not in names
 
     def test_no_services_without_domain_or_hosted_page(self, base_ctx: ProvisionContext):
         names = step_names(base_ctx)
@@ -103,56 +94,24 @@ class TestSetupPipelinePackages:
         assert "fail2ban" in install_step._packages
 
 
-class TestHostedPage:
-    def test_hosted_page_adds_services(self, base_ctx: ProvisionContext):
-        base_ctx.hosted_page = True
-        names = step_names(base_ctx)
-        assert "Install nginx" in names
-        assert "Configure nginx" in names
-        assert "Issue TLS certificate" in names
-        assert "Deploy PWA assets" in names
+@pytest.mark.parametrize(
+    "fields",
+    [{"hosted_page": True}, {"domain": "example.com"}],
+    ids=["hosted-page", "domain"],
+)
+def test_a_web_server_adds_nginx_tls_and_pwa_assets(fields: dict) -> None:
+    names = step_names(bootstrap_context(harden=False, xhttp_enabled=False, **fields))
+    assert {"Install nginx", "Configure nginx", "Issue TLS certificate", "Deploy PWA assets"} <= set(names)
 
 
-class TestDomainMode:
-    def test_domain_mode_adds_services(self):
-        ctx = ProvisionContext(
-            ip="198.51.100.1",
-            domain="example.com",
-            harden=False,
-            xhttp_enabled=False,
-            hosted_page=False,
-        )
-        names = step_names(ctx)
-        assert "Install nginx" in names
-        assert "Configure nginx" in names
-        assert "Issue TLS certificate" in names
-        assert "Deploy PWA assets" in names
-
-
-class TestFullPipeline:
-    def test_full_pipeline_has_remnawave_steps(self, domain_ctx: ProvisionContext):
-        names = step_names(domain_ctx)
-        assert "Deploy Remnawave panel" in names
-        assert "Install Docker" in names
-        assert "Install nginx" in names
-        assert "Issue TLS certificate" in names
-
-
-class TestStepOrdering:
-    def test_step_ordering(self, domain_ctx: ProvisionContext):
-        names = step_names(domain_ctx)
-
-        def assert_before(a: str, b: str) -> None:
-            assert a in names, f"{a!r} not found in steps"
-            assert b in names, f"{b!r} not found in steps"
-            assert names.index(a) < names.index(b), f"{a!r} should come before {b!r}, got order: {names}"
-
-        # Packages before Docker
-        assert_before("Install system packages", "Install Docker")
-        # Docker before Remnawave
-        assert_before("Install Docker", "Deploy Remnawave panel")
-        # Remnawave before nginx
-        assert_before("Deploy Remnawave panel", "Install nginx")
-        assert_before("Install nginx", "Configure nginx")
-        assert_before("Configure nginx", "Issue TLS certificate")
-        assert_before("Issue TLS certificate", "Deploy PWA assets")
+def test_step_ordering(domain_ctx: ProvisionContext) -> None:
+    names = step_names(domain_ctx)
+    order = [
+        "Install system packages",
+        "Install control service",
+        "Install nginx",
+        "Configure nginx",
+        "Issue TLS certificate",
+        "Deploy PWA assets",
+    ]
+    assert [name for name in names if name in order] == order

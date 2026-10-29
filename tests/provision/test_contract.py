@@ -3,14 +3,12 @@
 These tests verify that typed context data written by each step is
 sufficient for downstream steps. They catch missing fields, omitted
 builder arguments, and broken port/path flow.
-
-Uses the Remnawave provisioning pipeline.
 """
 
 from __future__ import annotations
 
 from meridian.provision import build_setup_steps
-from meridian.provision.steps import ProvisionContext
+from tests.support.control_service import bootstrap_context
 from tests.support.mock_connection import MockConnection
 
 
@@ -50,14 +48,6 @@ def _make_pipeline_conn() -> MockConnection:
         stdout="Status: active\n\n22/tcp  ALLOW  Anywhere\n443/tcp ALLOW  Anywhere\n80/tcp  ALLOW  Anywhere\n",
     )
 
-    # InstallDocker: already installed
-    conn.when("docker --version", stdout="Docker version 27.0.0\n")
-    conn.when("docker ps -q", stdout="abc123\n")
-
-    # Remnawave panel: already running
-    conn.when("docker inspect", stdout='[{"State":{"Status":"running"}}]')
-    conn.when("docker compose", rc=0)
-
     # nginx
     conn.when("dpkg -l nginx", stdout="ii  nginx\n")
     conn.when("nginx -t", rc=0)
@@ -79,11 +69,7 @@ def _make_pipeline_conn() -> MockConnection:
 
 class TestFullPipelineContract:
     def test_standalone_pipeline_uses_typed_context(self) -> None:
-        ctx = ProvisionContext(
-            ip="198.51.100.1",
-            xhttp_enabled=True,
-            hosted_page=True,
-        )
+        ctx = bootstrap_context(xhttp_enabled=True, hosted_page=True)
         ctx.xhttp_port = 31589
         ctx.reality_port = 10589
 
@@ -100,12 +86,7 @@ class TestFullPipelineContract:
                 ) from e
 
     def test_domain_pipeline_uses_typed_context(self) -> None:
-        ctx = ProvisionContext(
-            ip="198.51.100.1",
-            domain="example.com",
-            xhttp_enabled=True,
-            hosted_page=True,
-        )
+        ctx = bootstrap_context(domain="example.com", xhttp_enabled=True, hosted_page=True)
         ctx.xhttp_port = 31589
         ctx.reality_port = 10589
         ctx.wss_port = 21589
@@ -120,11 +101,7 @@ class TestFullPipelineContract:
                 raise AssertionError(f"Step '{step.name}' crashed with AttributeError: {e}.") from e
 
     def test_no_harden_pipeline_uses_typed_context(self) -> None:
-        ctx = ProvisionContext(
-            ip="198.51.100.1",
-            harden=False,
-            hosted_page=True,
-        )
+        ctx = bootstrap_context(harden=False, hosted_page=True)
         ctx.xhttp_port = 31589
         ctx.reality_port = 10589
 

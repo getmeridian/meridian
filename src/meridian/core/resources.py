@@ -31,3 +31,21 @@ ResourceKind = Literal[
     "control_user",
     "service_settings",
 ]
+
+# The kinds a reviewed plan applies. The compiler's panel-shaped first pass names
+# the rest, and `compiler.meridian_backend` maps each onto one of these.
+APPLIED_KINDS: frozenset[ResourceKind] = frozenset(
+    {
+        "server_baseline",
+        "nginx_artifact",
+        "realm_hop",
+        "firewall_rule",
+        "certificate",
+        "control_service",
+        "agent_runtime",
+        "node_workload",
+        "client_endpoint",
+        "control_user",
+        "service_settings",
+    }
+)

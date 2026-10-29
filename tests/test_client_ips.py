@@ -119,8 +119,8 @@ def test_panel_server_always_offers_a_proxy_protocol_listener() -> None:
     rendered = render_nginx_server_block(
         host="198.51.100.10",
         nginx_internal_port=8443,
-        panel_web_base_path="panel",
-        panel_internal_port=3000,
+        service_base_path="panel",
+        service_port=3000,
         info_page_path="info",
         extra_locations="",
         root_action="return 404;",

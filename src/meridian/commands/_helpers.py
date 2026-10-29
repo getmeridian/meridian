@@ -11,7 +11,6 @@ from meridian.commands.apply_progress import apply_progress
 from meridian.console import fail
 from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.topology import ExitIntent, SetupIntent
-from meridian.remnawave import MeridianPanel
 
 if TYPE_CHECKING:
     from meridian.core.reporters import Reporter
@@ -104,11 +103,6 @@ def load_cluster() -> ClusterConfig:
         return ClusterConfig.load()
     except LocalStateError as exc:
         fail(exc)
-
-
-def make_panel(cluster: ClusterConfig) -> MeridianPanel:
-    """Create a MeridianPanel client from cluster config."""
-    return MeridianPanel(cluster.panel.url, cluster.panel.api_token)
 
 
 def persist_reviewed_apply(cluster: ClusterConfig) -> None:

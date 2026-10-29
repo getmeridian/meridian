@@ -315,10 +315,8 @@ def _execute(
             draft = SetupDraft.from_intent(intent).model_copy(
                 update={"review_hash": applied.plan_hash, "applied_plan_hash": applied.plan_hash}
             )
-            verification = runtime.verify(draft)
-            for message in verification.warnings:
-                warn(message)
-            ok("Verified the control plane, node, and subscription")
+            runtime.verify(draft)
+            ok("Verified the control service, node, and subscription")
             traffic, detail = _verify_traffic(resolved.ip, client, cancellation=cancellation)
             if traffic == "failed" and attempt + 1 < len(sni_candidates):
                 warn(f"No traffic through camouflage target {sni or DEFAULT_SNI}; trying {sni_candidates[attempt + 1]}")
@@ -578,8 +576,6 @@ def _print_success(server_ip: str, cluster: ClusterConfig, request: DeployReques
     err_console.print()
     line()
     err_console.print(f"\n  [dim]Redeploy with the same settings:  {_redeploy_command(server_ip, request)}[/dim]")
-    if cluster.panel.url and not cluster.runs_control_service:
-        err_console.print(f"  [dim]Remnawave panel (advanced):        {cluster.panel.display_url}[/dim]")
     err_console.print()
 
 

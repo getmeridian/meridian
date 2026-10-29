@@ -306,7 +306,7 @@ class TestCheckpointedExecution:
         assert completed.type == "plan.action.completed"
         assert completed.data["changed"] is True
 
-    def test_vanished_host_and_user_are_retired_after_convergence(self) -> None:
+    def test_vanished_endpoint_and_user_are_retired_after_convergence(self) -> None:
         plan = _plan()
         action = build_resource_actions(plan, generation=2)[0]
         events: list[str] = []
@@ -323,7 +323,7 @@ class TestCheckpointedExecution:
                 remote_id=f"{kind}-remote",
                 active=True,
             )
-            for kind in ("host", "access_user")
+            for kind in ("client_endpoint", "control_user")
         }
         cluster = ClusterConfig(managed_bindings=bindings, active_generation=1, active_plan_hash=_HASH_B)
         firewall = Retiring([_missing(), _converged(action)], [ResourceApplyReceipt(remote_id="fw")], events=events)
@@ -332,15 +332,15 @@ class TestCheckpointedExecution:
         result = execute_resource_plan(
             plan,
             cluster,
-            {"firewall_rule": firewall, "host": retiring, "access_user": retiring},
+            {"firewall_rule": firewall, "client_endpoint": retiring, "control_user": retiring},
             persist=lambda _state: None,
             clock=_clock,
         )
 
         assert result.all_succeeded
-        assert result.retired == ["access_user:gone", "host:gone"]
+        assert result.retired == ["control_user:gone", "client_endpoint:gone"]
         assert events.index("apply:firewall:srv-exit:tcp:443") < events.index(
-            "retire:access_user:gone:access_user-remote"
+            "retire:control_user:gone:control_user-remote"
         )
         assert not any(binding.active for key, binding in cluster.managed_bindings.items() if key.endswith(":gone@1"))
         assert cluster.active_generation == 2
@@ -351,12 +351,16 @@ class TestCheckpointedExecution:
 
         class Broken(ScriptedDriver):
             def retire(self, binding: ManagedResourceBinding) -> None:
-                raise OSError("panel unavailable")
+                raise OSError("service unavailable")
 
         cluster = ClusterConfig(
             managed_bindings={
-                "host:gone@1": ManagedResourceBinding(
-                    logical_id="host:gone", resource_kind="host", generation=1, remote_id="h", active=True
+                "client_endpoint:gone@1": ManagedResourceBinding(
+                    logical_id="client_endpoint:gone",
+                    resource_kind="client_endpoint",
+                    generation=1,
+                    remote_id="e",
+                    active=True,
                 )
             },
             active_generation=1,
@@ -365,13 +369,17 @@ class TestCheckpointedExecution:
         firewall = ScriptedDriver([_missing(), _converged(action)], [ResourceApplyReceipt(remote_id="fw")])
 
         result = execute_resource_plan(
-            plan, cluster, {"firewall_rule": firewall, "host": Broken([])}, persist=lambda _state: None, clock=_clock
+            plan,
+            cluster,
+            {"firewall_rule": firewall, "client_endpoint": Broken([])},
+            persist=lambda _state: None,
+            clock=_clock,
         )
 
         assert not result.all_succeeded
-        assert "retire host:gone: panel unavailable" in result.failure_summary
+        assert "retire client_endpoint:gone: service unavailable" in result.failure_summary
         assert cluster.active_generation == 1
-        assert cluster.managed_bindings["host:gone@1"].active
+        assert cluster.managed_bindings["client_endpoint:gone@1"].active
 
     def test_applies_in_dependency_order_and_commits_generation(self) -> None:
         plan = _plan(with_probe=True)

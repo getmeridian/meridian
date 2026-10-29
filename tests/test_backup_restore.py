@@ -26,10 +26,10 @@ from meridian.control.service import ControlService
 from meridian.control.snapshot import decrypt_snapshot
 from meridian.core.topology import SetupIntent
 from meridian.handoff import HandoffLinks
-from meridian.node_deploy import panel_base_url
 from meridian.reconciler.fence import FleetFenceError, LocalFenceView
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.service_fence import ControlServiceFence
+from meridian.setup.control_service import service_base_url as panel_base_url
 from meridian.setup.single_server import single_server_intent
 from meridian.state_fence import SERVICE_HOLDER
 from tests.support.control_service import ADMIN_TOKEN, FLEET_ID, serve_control

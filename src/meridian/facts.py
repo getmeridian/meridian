@@ -7,7 +7,6 @@ instance only; callers create a fresh instance after mutating volatile state.
 
 from __future__ import annotations
 
-import re
 import shlex
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -42,17 +41,6 @@ class UfwState:
     installed: bool = False
     active: bool = False
     raw_status: str = ""
-
-
-@dataclass(frozen=True)
-class KernelRelease:
-    release: str = ""
-
-    @property
-    def version(self) -> tuple[int, int] | None:
-        """``(major, minor)`` from ``uname -r``; None when the release string is unrecognized."""
-        match = re.match(r"(\d+)\.(\d+)", self.release)
-        return (int(match.group(1)), int(match.group(2))) if match else None
 
 
 def parse_ssh_ports(output: str) -> list[int]:
@@ -113,14 +101,6 @@ class ServerFacts:
             self._cache["arch"] = result.stdout.strip() if result.returncode == 0 else ""
         return self._cache["arch"]
 
-    def kernel_release(self) -> KernelRelease | None:
-        """Running kernel; None when ``uname`` could not run (unavailable evidence)."""
-        if "kernel_release" not in self._cache:
-            result = self.conn.run("uname -r", timeout=15)
-            release = result.stdout.strip()
-            self._cache["kernel_release"] = KernelRelease(release) if result.returncode == 0 and release else None
-        return self._cache["kernel_release"]
-
     def dpkg_arch(self) -> str:
         if "dpkg_arch" not in self._cache:
             result = self.conn.run("dpkg --print-architecture", timeout=15)
@@ -160,17 +140,6 @@ class ServerFacts:
                 except (ValueError, AttributeError):
                     self._cache[key] = None
         return self._cache[key]
-
-    def memory_mb(self) -> tuple[int, int] | None:
-        """Total RAM and active swap in MB, from ``/proc/meminfo``."""
-        if "memory_mb" not in self._cache:
-            result = self.conn.run("cat /proc/meminfo", timeout=15)
-            fields = dict(re.findall(r"^(MemTotal|SwapTotal):\s+(\d+) kB", result.stdout, re.MULTILINE))
-            if result.returncode != 0 or len(fields) != 2:
-                self._cache["memory_mb"] = None
-            else:
-                self._cache["memory_mb"] = (int(fields["MemTotal"]) // 1024, int(fields["SwapTotal"]) // 1024)
-        return self._cache["memory_mb"]
 
     def installed_packages(self, packages: list[str]) -> set[str]:
         if not packages:

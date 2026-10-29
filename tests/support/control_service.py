@@ -8,8 +8,12 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from meridian.control.enrollment import token_sha256
+from meridian.control.models import ServiceConfig
 from meridian.control.server import ControlServer
 from meridian.control.service import ControlService
+from meridian.control_artifacts import ServicePackage
+from meridian.provision.control_service import ControlServiceInstall
+from meridian.provision.steps import ProvisionContext
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
 ADMIN_TOKEN = "admin-token-for-tests-only-0123456789"
@@ -30,3 +34,13 @@ def serve_control(state_dir: Path, *, public_path: str = "") -> Iterator[str]:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def bootstrap_context(**fields: object) -> ProvisionContext:
+    """A control bootstrap's provisioning context: the given fields plus the service install."""
+    ctx = ProvisionContext(**{"ip": "198.51.100.1", **fields})  # type: ignore[arg-type]
+    ctx.control_service = ControlServiceInstall(
+        package=ServicePackage(requirement="meridian-vpn==4.0.0"),
+        config=ServiceConfig(fleet_id=FLEET_ID, admin_token_sha256="a" * 64),
+    )
+    return ctx

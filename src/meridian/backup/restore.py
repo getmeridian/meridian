@@ -50,7 +50,6 @@ from meridian.reconciler.retirement import forget_server
 from meridian.reconciler.server_render import render_firewall_rules
 from meridian.resolve import connection_for_entry
 from meridian.servers import ServerEntry, ServerRegistry
-from meridian.setup.control_plane import control_payload
 from meridian.setup.editor import move_control_server_in_intent
 from meridian.setup.runtime import SetupReview, SetupRuntime
 from meridian.ssh import ServerConnection
@@ -437,11 +436,9 @@ def hand_fence_to_service(conn: ServerConnection, cluster: ClusterConfig) -> Non
 
 def install_service(plan: ResourcePlan, cluster: ClusterConfig, entry: ServerEntry, conn: ServerConnection) -> None:
     """The setup path's control bootstrap: baseline, nginx, certificate, and the service over the restored state."""
-    from meridian.setup.control_service import bootstrap_reviewed_control_service
+    from meridian.setup.control_service import bootstrap_reviewed_control_service, control_payload
 
     payload = control_payload(plan)
-    if not isinstance(payload, ControlServicePayload):
-        raise BackupError("The reviewed plan has no Meridian control service.", category="bug")
     open_control_ports(plan, entry, conn)
     bootstrap_reviewed_control_service(payload, plan, cluster, entry, conn)
 

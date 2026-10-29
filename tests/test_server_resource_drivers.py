@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from meridian.cluster import ClusterConfig, ManagedResourceBinding
+from meridian.cluster import ClusterConfig
 from meridian.compiler.models import (
     CertificatePayload,
     DeploymentContract,
@@ -16,14 +16,10 @@ from meridian.compiler.models import (
     FirewallRulePayload,
     NginxArtifactPayload,
     NginxRouteSpec,
-    NodeBindingPayload,
-    NodeRuntimePayload,
     ResourcePlan,
     ServerBaselinePayload,
     make_resource,
 )
-from meridian.config import REMNAWAVE_NODE_IMAGE
-from meridian.provision.runtime_migration import LEGACY_NODE_PROBE
 from meridian.provision.steps import StepResult
 from meridian.reconciler.resources import (
     ResourceAction,
@@ -37,14 +33,12 @@ from meridian.reconciler.server_drivers import (
     CertificateDriver,
     FirewallRuleDriver,
     NginxArtifactDriver,
-    NodeRuntimeDriver,
     ServerBaselineDriver,
     ServerDriverContext,
 )
 from meridian.reconciler.server_evidence import baseline_attestation, content_mismatch, listener_wait_command
 from meridian.reconciler.server_render import artifact_token, nginx_artifact_path, render_nginx_artifact
 from meridian.ssh import ServerConnection
-from tests.support.mock_connection import MockConnection
 from tests.support.topology import resource_plan
 
 _LISTENING = "LISTEN 0 1024 0.0.0.0:8443 0.0.0.0:*\n"
@@ -70,7 +64,6 @@ def _context(plan: ResourcePlan, connection: MagicMock, **fields) -> ServerDrive
     return ServerDriverContext(
         plan=plan,
         cluster=fields.pop("cluster", ClusterConfig()),
-        panel=fields.pop("panel", MagicMock()),
         connection_for=lambda _ref: connection,
         server_addresses={"srv-exit": "198.51.100.10"},
         **fields,
@@ -501,235 +494,6 @@ def test_port_443_stream_apply_retires_the_legacy_artifact(monkeypatch) -> None:
     assert any(call.args[0] == "rm -f /etc/nginx/stream.d/meridian.conf" for call in connection.run.call_args_list)
     # Observation follows at once, so apply waits for the reloaded listener first.
     assert connection.run.call_args_list[-1].args[0] == listener_wait_command(443)
-
-
-def _node_runtime_case(*, warp: bool = False) -> tuple[NodeRuntimeDriver, ResourceAction, MagicMock]:
-    binding = make_resource(
-        "binding:exit-a",
-        NodeBindingPayload(
-            workload_ref="exit-a",
-            server_ref="srv-exit",
-            name="Meridian v4 exit-a",
-            profile_ref="profile:exit-a",
-            inbound_refs=["inbound:exit-a"],
-        ),
-    )
-    runtime = make_resource(
-        "node:exit-a",
-        NodeRuntimePayload(
-            workload_ref="exit-a",
-            server_ref="srv-exit",
-            binding_ref=binding.logical_id,
-            warp=warp,
-        ),
-        dependencies=[binding.logical_id],
-    )
-    plan = resource_plan(binding, runtime)
-    action = build_resource_actions(plan, 1)[1]
-    cluster = ClusterConfig(
-        managed_bindings={
-            f"{binding.logical_id}@1": ManagedResourceBinding(
-                logical_id=binding.logical_id,
-                resource_kind="node_binding",
-                generation=1,
-                remote_id="node-uuid",
-            )
-        }
-    )
-    panel = MagicMock()
-    connection = _connection()
-    connection.run.return_value = _result()
-    driver = NodeRuntimeDriver(
-        _context(plan, connection, cluster=cluster, panel=panel, node_secrets={"exit-a": "node-secret"})
-    )
-    return driver, action, panel
-
-
-def _observed_node_runtime(
-    *, compose: str = "compose\n", warp: bool = False
-) -> tuple[NodeRuntimeDriver, ResourceAction, MagicMock]:
-    """Node runtime driver whose server holds `compose` and whose panel Node is connected."""
-    driver, action, panel = _node_runtime_case(warp=warp)
-    connection = _connection()
-    connection.get_text.return_value = _result(stdout=compose)
-    connection.run.return_value = _result(stdout="true\n")
-    driver.context.connection_for = lambda _ref: connection
-    panel.get_node.return_value = SimpleNamespace(is_connected=True)
-    return driver, action, connection
-
-
-def test_node_runtime_missing_container_is_confirmed_drift() -> None:
-    driver, action, connection = _observed_node_runtime()
-    connection.run.side_effect = [_result(returncode=1, stdout="Error: No such object: netagent\n"), _result()]
-
-    assert not observation_converges(action, driver.observe(action, None))
-
-
-@pytest.mark.parametrize("survivor", ["container", "dir"])
-def test_node_runtime_surviving_pre_rename_container_or_directory_is_drift(survivor: str) -> None:
-    from meridian.node_deploy import render_node_compose
-
-    driver, action, connection = _observed_node_runtime(compose=render_node_compose(REMNAWAVE_NODE_IMAGE))
-    assert observation_converges(action, driver.observe(action, None))
-
-    connection.run.side_effect = lambda command, **_: (
-        _result(stdout=f"{survivor}\n") if command == LEGACY_NODE_PROBE else _result(stdout="true\n")
-    )
-
-    assert not observation_converges(action, driver.observe(action, None))
-
-
-def _legacy_node_apply(*, connected: bool) -> tuple[MockConnection, list[int], MagicMock]:
-    """Apply onto a server still running the pre-rename node; returns calls, call count at deploy, and deploy."""
-    driver, action, _ = _node_runtime_case()
-    conn = MockConnection()
-    conn.when(LEGACY_NODE_PROBE, stdout="container\ndir\n")
-    conn.when("cat /opt/netagent/docker-compose.yml", rc=1, stderr="No such file or directory")
-    conn.when("cat /opt/remnanode/docker-compose.yml", stdout="services:\n  x:\n    image: remnawave/node:3.9.1\n")
-    driver.context.connection_for = lambda _ref: conn
-    at_deploy: list[int] = []
-    deploy = MagicMock(side_effect=lambda *_a, **_k: at_deploy.append(conn.call_count) or True)
-    with (
-        patch("meridian.reconciler.server_drivers.deploy_node_container", deploy),
-        patch("meridian.reconciler.server_drivers.wait_for_node_connected", return_value=connected),
-    ):
-        if connected:
-            driver.apply(action, None)
-        else:
-            with pytest.raises(ResourceReconcileError, match="did not connect"):
-                driver.apply(action, None)
-    return conn, at_deploy, deploy
-
-
-def test_node_runtime_rename_stops_the_legacy_container_first_and_removes_it_last() -> None:
-    conn, at_deploy, deploy = _legacy_node_apply(connected=True)
-
-    calls = conn.calls
-    stop = next(i for i, call in enumerate(calls) if "docker stop -t 30 remnawave-node" in call)
-    remove = next(i for i, call in enumerate(calls) if "rm -rf /opt/remnanode" in call)
-    # Same host ports: the legacy node releases them before the renamed one binds.
-    assert stop < at_deploy[0] <= remove
-    assert "docker rm -f remnawave-node" in calls[remove]
-    # The operator's newer image choice carries over from the legacy compose file.
-    assert deploy.call_args.kwargs["image"] == "remnawave/node:3.9.1"
-
-
-def test_node_runtime_rename_that_never_connects_restarts_the_legacy_container() -> None:
-    conn, _, _ = _legacy_node_apply(connected=False)
-
-    conn.assert_called_with_pattern("docker start remnawave-node")
-    conn.assert_not_called_with_pattern("rm -rf /opt/remnanode")
-
-
-@pytest.mark.parametrize(
-    ("returncode", "output"),
-    [
-        (1, "permission denied while connecting to the Docker daemon socket"),
-        (124, "inspection timed out"),
-        (127, "docker: command not found"),
-        (255, "SSH connection closed"),
-    ],
-)
-def test_node_runtime_rejects_unavailable_docker_evidence(returncode: int, output: str) -> None:
-    driver, action, connection = _observed_node_runtime()
-    connection.run.return_value = _result(returncode=returncode, stderr=output)
-
-    with pytest.raises(ResourceReconcileError, match="Docker container netagent evidence is unavailable"):
-        driver.observe(action, None)
-
-
-def test_node_runtime_missing_managed_warp_binary_is_drift() -> None:
-    driver, action, connection = _observed_node_runtime(warp=True)
-    connection.run.side_effect = [
-        _result(stdout="true\n"),
-        _result(),
-        _result(returncode=127, stderr="warp-cli: command not found"),
-    ]
-
-    assert not observation_converges(action, driver.observe(action, None))
-
-
-def test_node_runtime_rejects_warp_daemon_failure() -> None:
-    driver, action, connection = _observed_node_runtime(warp=True)
-    connection.run.side_effect = [
-        _result(stdout="true\n"),
-        _result(),
-        _result(returncode=1, stderr="Cannot connect to daemon"),
-    ]
-
-    with pytest.raises(ResourceReconcileError, match="WARP status evidence is unavailable"):
-        driver.observe(action, None)
-
-
-@pytest.mark.parametrize("connected", [True, False])
-def test_node_runtime_apply_waits_for_bound_node_to_connect(connected: bool) -> None:
-    driver, action, panel = _node_runtime_case()
-
-    with (
-        patch("meridian.reconciler.server_drivers.deploy_node_container", return_value=True),
-        patch("meridian.reconciler.server_drivers.wait_for_node_connected", return_value=connected) as wait,
-    ):
-        if connected:
-            driver.apply(action, None)
-        else:
-            with pytest.raises(ResourceReconcileError, match="did not connect to the panel"):
-                driver.apply(action, None)
-
-    wait.assert_called_once_with(panel, "node-uuid")
-
-
-def _node_runtime_with_compose(image: str) -> tuple[NodeRuntimeDriver, ResourceAction]:
-    from meridian.node_deploy import render_node_compose
-
-    driver, action, _ = _observed_node_runtime(compose=render_node_compose(image))
-    return driver, action
-
-
-def _applied_image(driver: NodeRuntimeDriver, action: ResourceAction) -> str:
-    with (
-        patch("meridian.reconciler.server_drivers.deploy_node_container", return_value=True) as deploy,
-        patch("meridian.reconciler.server_drivers.wait_for_node_connected", return_value=True),
-    ):
-        driver.apply(action, None)
-    return deploy.call_args.kwargs["image"]
-
-
-@pytest.mark.parametrize("image", ["remnawave/node:3.9.1", "remnawave/node:4.0.0", "remnawave/node:latest"])
-def test_node_runtime_accepts_operator_upgraded_image(image: str) -> None:
-    driver, action = _node_runtime_with_compose(image)
-
-    assert observation_converges(action, driver.observe(action, None))
-    assert _applied_image(driver, action) == image
-
-
-def test_node_runtime_upgrades_image_older_than_the_pin() -> None:
-    from meridian.config import REMNAWAVE_NODE_IMAGE
-
-    driver, action = _node_runtime_with_compose("remnawave/node:2.8.0")
-
-    assert not observation_converges(action, driver.observe(action, None))
-    assert _applied_image(driver, action) == REMNAWAVE_NODE_IMAGE
-
-
-def test_node_runtime_adopts_the_pinned_digest_for_a_tag_only_compose_once() -> None:
-    from meridian.config import REMNAWAVE_NODE_IMAGE
-    from meridian.remnawave.versions import parse_image
-
-    driver, action = _node_runtime_with_compose(f"remnawave/node:{parse_image(REMNAWAVE_NODE_IMAGE).tag}")
-    assert not observation_converges(action, driver.observe(action, None))
-
-    pinned_driver, pinned_action = _node_runtime_with_compose(REMNAWAVE_NODE_IMAGE)
-    assert observation_converges(pinned_action, pinned_driver.observe(pinned_action, None))
-
-
-def test_node_runtime_accepts_another_spelling_of_the_pinned_digest() -> None:
-    from meridian.config import REMNAWAVE_NODE_IMAGE
-    from meridian.remnawave.versions import parse_image
-
-    pin = parse_image(REMNAWAVE_NODE_IMAGE)
-    driver, action = _node_runtime_with_compose(f"docker.io/{pin.repository}@{pin.digest}")
-
-    assert observation_converges(action, driver.observe(action, None))
 
 
 @pytest.mark.parametrize(

@@ -382,6 +382,11 @@ def leaked_kinds(response: Response, known: Sequence[tuple[str, str]]) -> list[s
 _PAIR = re.compile(r'\[\n\s+("(?:[^"\\]|\\.)*"),\n\s+("(?:[^"\\]|\\.)*")\n\s+\]')
 
 
+# The Remnawave release the corpus was captured from; links it served must keep working after
+# `meridian migrate`, though Meridian no longer deploys a panel to capture again.
+CAPTURED_BACKEND = "remnawave/backend:3.4.5@sha256:b16d724b90fd7c9fec2df04bd28938a671cafc62894105068e11550ee3449c56"
+
+
 def _dump(payload: Any) -> str:
     """Indented JSON with each header pair on one line."""
     return _PAIR.sub(r"[\1, \2]", json.dumps(payload, indent=2, ensure_ascii=False)) + "\n"
@@ -391,7 +396,6 @@ def write_corpus(
     captures: Mapping[tuple[str, str], Capture], contexts: Mapping[str, Mapping[str, Any]], out: Path
 ) -> None:
     """Replace *out* with fixtures, deduplicated bodies, and the manifest."""
-    from meridian.config import REMNAWAVE_BACKEND_IMAGE
     from tests.systemlab.golden_agents import AGENTS
 
     for capture in captures.values():
@@ -410,7 +414,7 @@ def write_corpus(
             (topology_dir / fixture["response"]["body"]["file"]).write_text(stored, encoding="utf-8")
     first = next(iter(contexts.values()))
     manifest = {
-        "remnawave_backend": REMNAWAVE_BACKEND_IMAGE,
+        "remnawave_backend": CAPTURED_BACKEND,
         "meridian_version": first.get("meridian_version", ""),
         "serve_json_at_base_subscription": first.get("serve_json_at_base_subscription"),
         "response_rules": first.get("response_rules"),

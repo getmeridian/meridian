@@ -17,7 +17,7 @@ from meridian.control.models import SUB_TOKEN_PATTERN, LimitStrategy, UserImport
 from meridian.core.client_limits import NEVER_EXPIRES_YEAR
 from meridian.migrate import MigrationError
 from meridian.remnawave import User
-from meridian.remnawave.control_plane import ACCESS_USER_DESCRIPTION, ACCESS_USER_TAG
+from meridian.remnawave.client import ACCESS_USER_DESCRIPTION, ACCESS_USER_TAG
 
 _STATUSES: dict[str, UserStatus] = {
     "ACTIVE": "active",

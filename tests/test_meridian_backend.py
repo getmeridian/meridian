@@ -269,7 +269,8 @@ def _on_remnawave(intent):
 
 def test_a_control_server_without_an_exit_runs_only_the_service() -> None:
     """Its bootstrap and 443 stream match a panel-only server's: no Reality route, default backend ports."""
-    from meridian.setup.control_plane import bootstrap_profile_values
+    from meridian.core.defaults import DEFAULT_SNI
+    from meridian.setup.control_service import bootstrap_reality
 
     meridian = compile_topology(_control_only_fleet())
     panel = compile_topology(_on_remnawave(_control_only_fleet()))
@@ -286,7 +287,7 @@ def test_a_control_server_without_an_exit_runs_only_the_service() -> None:
     }
     assert on_control == {"server_baseline", "firewall_rule", "control_service", "nginx_artifact"}
     assert control_stream(meridian) == control_stream(panel)
-    assert bootstrap_profile_values(meridian) == bootstrap_profile_values(panel)
+    assert bootstrap_reality(meridian) == (10443, DEFAULT_SNI)
 
 
 def test_every_exit_gets_its_own_agent_and_workload() -> None:

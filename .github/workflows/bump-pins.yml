@@ -1,9 +1,9 @@
 name: Bump pins
 
-# Weekly: raise Realm, RealiTLScanner, acme.sh, and Remnawave image pins to the
-# newest release in each tested major (scripts/bump_pins.py) and open a pull
-# request for review. Fleets can already take newer Realm and Remnawave releases
-# with `meridian fleet upgrade`; this keeps the defaults new installs get current.
+# Weekly: raise Realm, RealiTLScanner, and acme.sh pins to the newest release in
+# each tested major (scripts/bump_pins.py) and open a pull request for review.
+# Fleets can already take a newer Realm with `meridian fleet upgrade`; this keeps
+# the defaults new installs get current.
 on:
   schedule:
     - cron: "17 6 * * 1"

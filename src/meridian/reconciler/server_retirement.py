@@ -10,15 +10,9 @@ from meridian.cluster import ManagedResourceBinding
 from meridian.compiler.models import (
     IP_CERTIFICATE_DIRECTORY,
     CertificatePayload,
-    ControlPlaneRuntimePayload,
     ControlServicePayload,
-    NodeRuntimePayload,
     certificate_directory,
 )
-from meridian.config import REMNAWAVE_NODE_IMAGE
-from meridian.host_runtime import LEGACY_NODE_DIR, NODE, NODE_DIR
-from meridian.node_deploy import delete_node_api_rules
-from meridian.provision.runtime_migration import remove_legacy_node_command
 from meridian.reconciler.resources import ResourceReconcileError
 from meridian.reconciler.server_render import (
     legacy_firewall_marker,
@@ -28,10 +22,8 @@ from meridian.reconciler.server_render import (
     realm_service_name,
     unit_path,
 )
-from meridian.remnawave.versions import parse_image
 from meridian.ssh import ServerConnection
 
-_NODE_REPOSITORY = parse_image(REMNAWAVE_NODE_IMAGE).repository
 _FIREWALL_MARKER = re.compile(r"(?:fw|meridian-v4)-[0-9a-f]{16}")
 _CERTIFICATE = re.compile(r"/etc/ssl/meridian(?:/certs/[0-9a-f]{16})?/fullchain\.pem")
 ACME_CHALLENGE_PATH = "/etc/nginx/sites-available/meridian-v4-acme.conf"
@@ -101,8 +93,8 @@ class CertificateRetirement:
 
     acme.sh records where it installs each certificate, so the renewal entry is found
     from the binding's ``fullchain.pem`` path, even for a hashed domain directory. The
-    panel or control service shares the server's IP certificate, so nothing is touched
-    while either runs there or another certificate in the plan has the same files. The ACME
+    control service shares the server's IP certificate, so nothing is touched
+    while it runs there or another certificate in the plan has the same files. The ACME
     challenge listener goes once no certificate is left on the server.
     """
 
@@ -116,10 +108,10 @@ class CertificateRetirement:
         kept = [
             resource.payload
             for resource in self.context.plan.resources
-            if isinstance(resource.payload, CertificatePayload | ControlPlaneRuntimePayload | ControlServicePayload)
+            if isinstance(resource.payload, CertificatePayload | ControlServicePayload)
             and resource.payload.server_ref == binding.server_ref
         ]
-        if any(isinstance(payload, ControlPlaneRuntimePayload | ControlServicePayload) for payload in kept):
+        if any(isinstance(payload, ControlServicePayload) for payload in kept):
             return
         directory = fullchain.rsplit("/", 1)[0]
         if any(
@@ -183,43 +175,3 @@ class RealmHopRetirement:
         )
         if result.returncode != 0:
             raise ResourceReconcileError(f"Realm service {binding.remote_id} is still running after removal.")
-
-
-class NodeRuntimeRetirement:
-    """Stop and delete the node container, its Compose directory, and its image, under both names.
-
-    The control plane lives in a separate Compose project, so it keeps running.
-    When the reviewed plan still runs a node on the same server, the directory
-    already belongs to that replacement and only the binding is forgotten.
-    Docker itself stays: the baseline installed it and is never reverted, and
-    the operator may run other containers.
-    """
-
-    context: Any
-
-    def retire(self, binding: ManagedResourceBinding) -> None:
-        if binding.remote_id not in {NODE_DIR, LEGACY_NODE_DIR}:
-            raise ResourceReconcileError(f"Unexpected node runtime for {binding.logical_id}: {binding.remote_id!r}")
-        conn = _connection(self.context, binding)
-        if any(
-            isinstance(resource.payload, NodeRuntimePayload) and resource.payload.server_ref == binding.server_ref
-            for resource in self.context.plan.resources
-        ):
-            return
-        compose = shlex.quote(f"{NODE_DIR}/docker-compose.yml")
-        name = shlex.quote(NODE.name)
-        result = conn.run(
-            f"if [ -f {compose} ]; then docker compose -f {compose} down --remove-orphans --volumes || exit 1; fi;"
-            f" if docker inspect --type container {name} >/dev/null 2>&1;"
-            f" then docker rm -f {name} >/dev/null || exit 1; fi;"
-            f" rm -rf {shlex.quote(NODE_DIR)}; {remove_legacy_node_command()} || exit 1;"
-            # Images still used by another container refuse removal; that is fine.
-            f" ids=$(docker images -q {shlex.quote(_NODE_REPOSITORY)} 2>/dev/null | sort -u);"
-            ' if [ -n "$ids" ]; then docker image rm $ids >/dev/null 2>&1; fi; true',
-            timeout=120,
-        )
-        if result.returncode != 0:
-            detail = (result.stderr or result.stdout).strip()[:200]
-            raise ResourceReconcileError(f"Could not remove the Remnawave node runtime: {detail}")
-        if not delete_node_api_rules(conn):
-            raise ResourceReconcileError("Could not remove the node API firewall rule.")

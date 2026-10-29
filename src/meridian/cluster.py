@@ -17,7 +17,6 @@ from typing import Any, Literal, Self
 from urllib.parse import quote, urlsplit
 
 from meridian.binary_pins import BinaryPin
-from meridian.core.defaults import SUPPORT_PAGE
 from meridian.core.inputs import is_ip, validate_optional_transport_path_value
 from meridian.core.topology import SetupIntent
 
@@ -78,18 +77,6 @@ class PanelConfig:
             return ""
         parsed = urlsplit(self.url)
         return f"{parsed.scheme}://{parsed.netloc}/{self.sub_path}/sub/{quote(short_uuid, safe='')}"
-
-    def support_url(self) -> str:
-        """Panel-wide ``support-url`` header value; empty when it cannot be built.
-
-        Pages live under each VLESS UUID, which no header template can name, so the
-        shared support page reads the person's subscription and redirects. Remnawave
-        fills ``{{SHORT_UUID}}`` per user; the fragment keeps it out of server logs.
-        """
-        if not self.url or not self.sub_path:
-            return ""
-        parsed = urlsplit(self.url)
-        return f"{parsed.scheme}://{parsed.netloc}/{self.sub_path}/{SUPPORT_PAGE}#{{{{SHORT_UUID}}}}"
 
     @property
     def display_url(self) -> str:
@@ -304,8 +291,7 @@ class ClusterConfig:
     allocations: dict[str, ResourceAllocation] = field(default_factory=dict)
     action_checkpoints: dict[str, ActionCheckpoint] = field(default_factory=dict)
     connection_page_markers: list[str] = field(default_factory=list)
-    # Newer Remnawave releases `fleet upgrade` moved past this CLI's pins
-    # (runtime pin name -> tag@sha256 image); see remnawave.versions.effective_pins.
+    # A Remnawave fleet's saved image pins, kept only until `meridian migrate` clears them.
     image_pins: dict[str, str] = field(default_factory=dict)
     # Newer server binaries (Realm) `fleet upgrade` recorded; see binary_pins.effective_binary_pins.
     binary_pins: dict[str, BinaryPin] = field(default_factory=dict)

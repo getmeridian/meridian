@@ -9,6 +9,7 @@ user's delivered Xray JSON instead of the Remnawave panel.
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import secrets
 import uuid
 from collections.abc import Callable, Mapping
@@ -20,27 +21,69 @@ from meridian.compiler.models import (
     ControlUserPayload,
     NodeWorkloadPayload,
     ResourcePlan,
+    ServerBaselinePayload,
     canonical_hash,
 )
 from meridian.control.client import ControlClient
 from meridian.control.models import ServiceConfig
 from meridian.control_artifacts import agent_binary, require_agent_build, service_package
 from meridian.core.cancellation import CancellationToken
+from meridian.core.defaults import DEFAULT_SNI
 from meridian.core.errors import ProvisioningError
 from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
 from meridian.host_runtime import CONTROL_SERVICE_STATE_DIR
-from meridian.node_deploy import panel_base_url
 from meridian.provision.ensure import ensure_file_content
+from meridian.reconciler.control_service_driver import xray_subscription_is_valid
 from meridian.reconciler.meridian_drivers import MeridianDriverContext, build_meridian_drivers
 from meridian.reconciler.resources import ResourceAction, ResourceDrivers, ResourceReconcileError
-from meridian.reconciler.runtime_drivers import xray_subscription_is_valid
+from meridian.reconciler.server_evidence import file_content_or_absent
 from meridian.reconciler.workloads import LocalRealityKeyFactory, WorkloadStateManager
 from meridian.servers import ServerEntry
 from meridian.ssh import ServerConnection
 
 _ATTESTATION_PATH = f"{CONTROL_SERVICE_STATE_DIR}.attestation"
 PersistCluster = Callable[[ClusterConfig], None]
+
+
+def control_payload(plan: ResourcePlan) -> ControlServicePayload:
+    controls = [resource.payload for resource in plan.resources if isinstance(resource.payload, ControlServicePayload)]
+    if len(controls) != 1:
+        raise ResourceReconcileError("A reviewed topology must contain exactly one control service.")
+    return controls[0]
+
+
+def plan_harden(plan: ResourcePlan, server_ref: str) -> bool:
+    """Whether the reviewed baseline hardens this server (SSH key-only, fail2ban)."""
+    return next(
+        (
+            resource.payload.harden
+            for resource in plan.resources
+            if isinstance(resource.payload, ServerBaselinePayload) and resource.payload.server_ref == server_ref
+        ),
+        True,
+    )
+
+
+def bootstrap_reality(plan: ResourcePlan) -> tuple[int, str]:
+    """The Reality port and SNI nginx's interim 443 fallback uses before the reviewed stream replaces it.
+
+    Only the exit running on the control server shares its nginx; another exit's
+    port would be wrong here, and adding one that sorts first re-ran the bootstrap.
+    """
+    control_ref = control_payload(plan).server_ref
+    for resource in plan.resources:
+        payload = resource.payload
+        if not isinstance(payload, NodeWorkloadPayload) or payload.server_ref != control_ref:
+            continue
+        if payload.profile.workload_kind != "exit":
+            continue
+        for inbound in payload.profile.inbounds:
+            if inbound.protocol == "reality":
+                # A self-steal name would point the fallback at this very server.
+                return inbound.listen_port, DEFAULT_SNI if inbound.reality_dest_port else inbound.reality_sni
+        break
+    return 10443, DEFAULT_SNI
 
 
 def control_client(cluster: ClusterConfig) -> ControlClient:
@@ -145,7 +188,7 @@ def bootstrap_control_service(
             hint=f"Step '{failed[0].name}' failed: {failed[0].detail}\nRun: meridian check {entry.host}",
         )
     written = ensure_file_content(
-        connection, _ATTESTATION_PATH, f"{_attestation(payload, plan)}\n", mode="600", create_parent=True
+        connection, _ATTESTATION_PATH, f"{service_attestation(payload, plan)}\n", mode="600", create_parent=True
     )
     if not written.ok:
         raise ResourceReconcileError(f"Could not attest the control service: {written.detail}")
@@ -163,9 +206,7 @@ def bootstrap_reviewed_control_service(
     operation: OperationContext | None = None,
 ) -> None:
     """`bootstrap_control_service()` with the values a reviewed plan gives it (apply and restore)."""
-    from meridian.setup.control_plane import bootstrap_profile_values, plan_harden
-
-    ports, reality_sni = bootstrap_profile_values(plan)
+    reality_port, reality_sni = bootstrap_reality(plan)
     bootstrap_control_service(
         payload,
         plan,
@@ -173,7 +214,7 @@ def bootstrap_reviewed_control_service(
         entry,
         connection,
         harden=plan_harden(plan, payload.server_ref),
-        reality_port=ports["reality"],
+        reality_port=reality_port,
         reality_sni=reality_sni,
         cancellation=cancellation,
         reporter=reporter,
@@ -196,8 +237,10 @@ def control_service_ready(
     if cluster.panel.url != _service_url(entry, payload, cluster.panel.secret_path):
         # A saved URL on the old name would hand agents and links a certificate that no longer matches.
         return False
-    attestation = connection.run(f"cat {_ATTESTATION_PATH} 2>/dev/null", timeout=15).stdout.strip()
-    if attestation != _attestation(payload, plan):
+    # A lost connection is unavailable evidence, never a reason to reinstall the service.
+    read = connection.get_text(_ATTESTATION_PATH, timeout=15)
+    attestation = file_content_or_absent(action.resource.logical_id, read, "control-service attestation")
+    if attestation is None or attestation.strip() != service_attestation(payload, plan):
         return False
     with control_client(cluster) as client:
         return client.ping()
@@ -234,11 +277,22 @@ class _Document:
         self.content = content
 
 
+def service_base_url(ip: str, domain: str, secret_path: str) -> str:
+    """Where nginx serves the control service: its domain (or bracketed IP) and secret path."""
+    host = domain or ip
+    try:
+        if ipaddress.ip_address(host).version == 6:
+            host = f"[{host}]"
+    except ValueError:
+        pass
+    return f"https://{host}/{secret_path}/"
+
+
 def _service_url(entry: ServerEntry, payload: ControlServicePayload, secret_path: str) -> str:
-    return panel_base_url(entry.host, payload.public_hostname, secret_path).rstrip("/")
+    return service_base_url(entry.host, payload.public_hostname, secret_path).rstrip("/")
 
 
-def _attestation(payload: ControlServicePayload, plan: ResourcePlan) -> str:
+def service_attestation(payload: ControlServicePayload, plan: ResourcePlan) -> str:
     """Hash what the bootstrap consumes, so unrelated plan changes never reinstall the service."""
     contract = plan.deployment_contract
     target = contract.server_targets.get(payload.server_ref)

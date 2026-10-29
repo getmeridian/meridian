@@ -2,7 +2,7 @@
 
 Limits and expiry (`client set`, `client reset-traffic`) live in `client_limits.py`.
 
-Clients are declared in the topology's access intent; their runtime state lives in Remnawave.
+Clients are declared in the topology's access intent; their runtime state lives in the control service.
 """
 
 from __future__ import annotations
@@ -38,7 +38,6 @@ from meridian.core.clients import (
     build_client_reissue_result,
     build_client_status_result,
 )
-from meridian.core.fleet import public_url
 from meridian.core.models import ErrorModel, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.redaction import HANDOFF_LINK_KEYS, redact_string
@@ -193,8 +192,6 @@ def _show(*, name: str, repair_page: bool, operation: OperationContext) -> None:
     print_client_usage(detail)
 
     err_console.print()
-    if cluster.panel.url and not cluster.runs_control_service:
-        err_console.print(f"  [dim]Remnawave panel:   {escape(public_url(cluster.panel.display_url))}[/dim]")
     err_console.print("  [dim]View all clients:  meridian client list[/dim]")
     err_console.print()
     if repair_warnings:
@@ -203,7 +200,7 @@ def _show(*, name: str, repair_page: bool, operation: OperationContext) -> None:
 
 
 def run_list() -> None:
-    """List all clients from the Remnawave panel."""
+    """List the fleet's clients from the control service."""
     operation = OperationContext()
     with error_context("client.list", timer=operation.timer):
         _list(operation=operation)
@@ -412,7 +409,7 @@ def _reissue(cluster: ClusterConfig, name: str, shown: str, operation: Operation
 
 
 def _effective_status(updated: PanelUserLike | None, requested: ClientMutationStatus) -> ClientMutationStatus:
-    """The status the directory reports after the change (Remnawave answers nothing, so the request stands)."""
+    """The status the directory reports after the change (without an answer, the request stands)."""
     if updated is None:
         return requested
     statuses: dict[str, ClientMutationStatus] = {

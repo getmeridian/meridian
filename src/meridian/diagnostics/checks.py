@@ -71,67 +71,6 @@ def check_disk_space(conn: ServerConnection, *, min_free_mb: int = 1024) -> Chec
     )
 
 
-def check_container_running(conn: ServerConnection, container_name: str, legacy_name: str = "") -> CheckResult:
-    """Check whether a Docker container is running by name.
-
-    A missing container whose pre-rename ``legacy_name`` still exists has not been
-    migrated yet; that finding points at ``meridian apply`` instead of a restart.
-    """
-    q_name = shlex.quote(container_name)
-    result = conn.run(
-        "command -v docker >/dev/null 2>&1 || exit 127; "
-        f"docker inspect -f '{{{{.State.Running}}}} {{{{if .State.Health}}}}{{{{.State.Health.Status}}}}{{{{end}}}}' "
-        f"{q_name} 2>/dev/null",
-        timeout=15,
-    )
-
-    if command_evidence_unavailable(result.returncode):
-        return CheckResult(
-            name=f"container:{container_name}",
-            status="skipped",
-            detail=_unavailable_detail(result.returncode, "Docker container inspection"),
-        )
-
-    if result.returncode != 0:
-        legacy = legacy_name and conn.run(f"docker inspect --type container {shlex.quote(legacy_name)}", timeout=15)
-        if legacy and legacy.returncode == 0:
-            return CheckResult(
-                name=f"container:{container_name}",
-                status="failed",
-                detail=f"Still runs under its pre-rename name {legacy_name!r}",
-                remediation="Run `meridian apply` to rename it; its data stays.",
-            )
-        return CheckResult(
-            name=f"container:{container_name}",
-            status="failed",
-            detail=f"Container {container_name!r} not found",
-            remediation=f"Deploy or restart the {container_name} container",
-        )
-
-    running, _, health = result.stdout.strip().partition(" ")
-    if running == "true" and health == "unhealthy":
-        # A crash-looping service often still reports Running between restarts.
-        return CheckResult(
-            name=f"container:{container_name}",
-            status="warning",
-            detail=f"{container_name} is running but its health check fails",
-            remediation=f"docker logs --tail 50 {container_name}",
-        )
-    if running == "true":
-        return CheckResult(
-            name=f"container:{container_name}",
-            status="passed",
-            detail=f"{container_name} is running",
-        )
-
-    return CheckResult(
-        name=f"container:{container_name}",
-        status="failed",
-        detail=f"{container_name} exists but is not running",
-        remediation=f"docker start {container_name}",
-    )
-
-
 def check_port_listening(
     conn: ServerConnection,
     port: int,

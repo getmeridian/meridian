@@ -16,9 +16,10 @@ import pytest
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.control.client import ControlClient
 from meridian.control.models import UserImport, UserImportBatch
+from meridian.host_runtime import LEGACY_NODE_DIR, NODE_DIR
 from meridian.migrate import MigrationError, service_import
 from meridian.migrate.backup import SERVER_BACKUP_ROOT, backup_panel
-from meridian.migrate.cutover import remove_panel, stop_panel
+from meridian.migrate.cutover import remove_node_runtime, remove_panel, stop_panel
 from meridian.migrate.service_import import MIGRATION_SERVICE_PORT, import_over_ssh, install_beside_panel
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.provision.uninstall import Uninstall, panel_stack_removal
@@ -245,6 +246,32 @@ def test_panel_removal_that_fails_or_cannot_be_checked_is_never_done(pattern: st
 
     with pytest.raises(MigrationError, match=message):
         remove_panel(conn)
+
+
+def test_node_removal_deletes_the_container_compose_dir_image_and_api_rule_under_both_names() -> None:
+    conn = MockConnection()
+
+    remove_node_runtime(conn)
+
+    command, rule_cleanup = conn.calls
+    assert f"docker compose -f {NODE_DIR}/docker-compose.yml down" in command
+    assert "netagent" in command and "remnawave-node" in command
+    assert f"rm -rf {NODE_DIR} {LEGACY_NODE_DIR}" in command
+    # The control plane's directories are a separate project and stay.
+    assert "/opt/remnawave" not in command and "/opt/ctlsvc" not in command
+    # The pulled node image goes too; Docker itself (baseline-installed, maybe operator-used) stays.
+    assert "docker images -q remnawave/node" in command and "docker image rm $ids" in command
+    assert "apt-get" not in command and "purge" not in command
+    assert "grep -F -e '# fw-node-api' -e '# Meridian node API (Docker internal)'" in rule_cleanup
+    assert "ufw --force delete" in rule_cleanup
+
+
+def test_node_removal_failure_stops_the_migration_with_dockers_reason() -> None:
+    conn = MockConnection()
+    conn.when("docker compose", rc=1, stderr="Cannot connect to the Docker daemon")
+
+    with pytest.raises(MigrationError, match="Cannot connect to the Docker daemon"):
+        remove_node_runtime(conn)
 
 
 def test_teardown_removes_the_panel_stack_but_never_the_migration_backup() -> None:

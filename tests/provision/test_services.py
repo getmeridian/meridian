@@ -29,8 +29,8 @@ _STREAM = {
 _IP = {
     "server_ip": "198.51.100.1",
     "nginx_internal_port": 8443,
-    "panel_web_base_path": "secretpanel",
-    "panel_internal_port": 2053,
+    "service_base_path": "secretpanel",
+    "service_port": 2053,
     "info_page_path": "connect",
 }
 _DOMAIN = {
@@ -38,8 +38,8 @@ _DOMAIN = {
     "nginx_internal_port": 8443,
     "ws_path": "wspath",
     "wss_internal_port": 28000,
-    "panel_web_base_path": "secretpanel",
-    "panel_internal_port": 2053,
+    "service_base_path": "secretpanel",
+    "service_port": 2053,
     "info_page_path": "connect",
 }
 
@@ -49,14 +49,10 @@ CONFIGS = {
     "stream_domain": render_nginx_stream_config(**_STREAM, domain="example.com"),
     "ip": render_nginx_ip_config(**_IP),
     "ip_xhttp": render_nginx_ip_config(**_IP, xhttp_path="xh-abc123", xhttp_internal_port=29000),
-    # Meridian's own control service has a base path and no frontend to rewrite.
-    "ip_control_service": render_nginx_ip_config(**_IP, control_service=True),
     "domain": render_nginx_http_config(**_DOMAIN),
     "domain_xhttp": render_nginx_http_config(**_DOMAIN, xhttp_path="xh-def456", xhttp_internal_port=29500),
-    # A control-service domain: the bootstrap has no WSS listener (compiled artifacts own WSS).
-    "domain_control_service": render_nginx_http_config(
-        **{**_DOMAIN, "ws_path": "", "wss_internal_port": 0}, control_service=True
-    ),
+    # The control bootstrap has no WSS listener (compiled artifacts own WSS).
+    "domain_no_wss": render_nginx_http_config(**{**_DOMAIN, "ws_path": "", "wss_internal_port": 0}),
 }
 
 _SECURITY_HEADERS = ("X-Frame-Options", "X-Content-Type-Options", "Referrer-Policy")
@@ -87,9 +83,12 @@ PRESENT = {
         "proxy_socket_keepalive on",
     ),
     "stream_domain": ("example.com  nginx_https", "198.51.100.1  nginx_https"),
-    "domain_control_service": ("server_name example.com;", "proxy_pass http://127.0.0.1:2053/sub/", "return 301"),
-    "ip_control_service": ("proxy_buffering off", "proxy_read_timeout 90s", "proxy_pass http://127.0.0.1:2053/sub/"),
+    "domain_no_wss": ("server_name example.com;", "proxy_pass http://127.0.0.1:2053/sub/", "return 301"),
     "ip": (
+        # The service's agent long-poll is held up to 55 s and must not be buffered.
+        "proxy_buffering off",
+        "proxy_read_timeout 90s",
+        "proxy_pass http://127.0.0.1:2053/sub/",
         "ssl_certificate",
         "/etc/ssl/meridian/fullchain.pem",
         "/.well-known/acme-challenge/",
@@ -141,11 +140,20 @@ PRESENT = {
 
 ABSENT = {
     # An empty WSS path rendered a second `location /` to port 0, which fails `nginx -t`.
-    "domain_control_service": ("VLESS+WSS", "127.0.0.1:0", "location / {\n            proxy_pass"),
-    "ip_control_service": ("sub_filter_types", "/api/sub/;"),
+    "domain_no_wss": ("VLESS+WSS", "127.0.0.1:0", "location / {\n            proxy_pass"),
     "stream": ("example.com", "blackhole"),
     # IP mode never redirects port 80 to HTTPS: a redirect to a 403 is a contradiction.
-    "ip": ("XHTTP", "meridian_xhttp", "VLESS+WSS", "TLSv1.0", "TLSv1.1", "SSLv", "return 301"),
+    "ip": (
+        "XHTTP",
+        "meridian_xhttp",
+        "VLESS+WSS",
+        "TLSv1.0",
+        "TLSv1.1",
+        "SSLv",
+        "return 301",
+        "sub_filter",
+        "/api/sub/",
+    ),
 }
 
 
@@ -187,28 +195,6 @@ def test_https_block_serves_only_nginx_generated_errors(config: str) -> None:
     assert "return 444" not in https_block
     assert "return 200" not in https_block
     assert "default_type text/html" not in https_block
-
-
-@pytest.mark.parametrize("config", ["ip", "domain"])
-def test_panel_proxy_passes_websocket_upgrade_for_the_remnawave_ui(config: str) -> None:
-    cfg = CONFIGS[config]
-    panel_block = cfg[cfg.index("secretpanel") :]
-    assert "proxy_set_header Upgrade" in panel_block
-    assert "proxy_set_header Connection $connection_upgrade" in panel_block
-    assert "proxy_set_header Host $host" in panel_block
-    assert "proxy_http_version 1.1" in panel_block
-
-
-def test_panel_subpath_rewrites_match_the_3_4_frontend_bundle() -> None:
-    cfg = CONFIGS["ip"]
-    # The 3.4 bundle emits route/asset literals in backticks; quoted forms never match.
-    for literal in ("dashboard", "auth", "oauth2/", "locales/", "lotties/", "favicons/", "assets/"):
-        assert f"sub_filter '`/{literal}' '`/secretpanel/{literal}';" in cfg
-    assert "sub_filter '\"/" not in cfg
-    # /api calls ride the rewritten axios baseURL; rewriting them would double the prefix.
-    assert "'`/api" not in cfg
-    assert "proxy_redirect /api/ /secretpanel/api/;" in cfg
-    assert "proxy_cookie_path /api/ /secretpanel/api/;" in cfg
 
 
 def test_ip_mode_port_80_only_serves_acme_challenges() -> None:

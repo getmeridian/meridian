@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Protocol, TypeVar, get_args
+from typing import Protocol, TypeVar
 
 from pydantic import Field, model_validator
 
@@ -11,6 +11,7 @@ from meridian.compiler.models import CompiledResource, ResourceKind, ResourcePla
 from meridian.core.apply import CompiledApplyActionStatus
 from meridian.core.errors import MeridianError
 from meridian.core.models import CoreModel
+from meridian.core.resources import APPLIED_KINDS
 
 PayloadT = TypeVar("PayloadT")
 
@@ -215,8 +216,8 @@ ResourceDrivers = dict[ResourceKind, ResourceDriver]
 
 
 def assert_complete_driver_registry(drivers: ResourceDrivers) -> None:
-    """Require exactly one production driver for every finite resource kind."""
-    expected = set(get_args(ResourceKind))
+    """Require exactly one production driver for every kind a reviewed plan applies."""
+    expected = set(APPLIED_KINDS)
     actual = set(drivers)
     missing = sorted(expected - actual)
     extra = sorted(actual - expected)

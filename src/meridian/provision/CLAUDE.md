@@ -1,21 +1,18 @@
 # provision — Pure-Python step pipeline
 ## Design decisions
 **Steps over scripts** — each step is a class with `run(conn, ctx) → StepResult` (ok/changed/skipped/failed); the pipeline stops on the first failure.
-**Recipes are ordered lists** — `build_server_baseline_steps()` (OS, SSH-safe UFW, optional Docker; paired with read-only `build_server_baseline_checks()`) and `build_setup_steps()` (swap, control plane, nginx, TLS) return steps in execution order, gated by plain `if`; keep each step after what it depends on. WARP installs through the reconciler's node-runtime or agent-runtime driver.
+**Recipes are ordered lists** — `build_server_baseline_steps()` (OS, SSH-safe UFW, optional Docker; paired with read-only `build_server_baseline_checks()`) and `build_setup_steps()` (control service, nginx, TLS; it refuses a context without the service's install) return steps in execution order, gated by plain `if`; keep each step after what it depends on. WARP installs through the reconciler's agent-runtime driver.
 **Typed context** — `ProvisionContext` has explicit fields for configuration and inter-step data; no dictionary escape hatches.
-**Remnawave containers** — the panel stack runs in a bridge network on `127.0.0.1:3000` behind nginx; the node (`node_deploy.py`) runs host-network with `cap_add: NET_ADMIN`, without which the panel's node plugins and IP Control silently do nothing.
-**SSH for infrastructure, REST for configuration** — steps deploy containers; panel, user, and profile setup happens over the API once they run.
+**SSH for infrastructure, REST for configuration** — steps install the service and nginx; users, endpoints, and settings go over its admin API once it runs.
 **nginx and TLS split** — `nginx_render.py` renders config strings, `nginx.py` holds the steps, `tls.py` issues acme.sh certificates.
 **Semantic ensure helpers** — `ensure.py` wraps package, file, service, and UFW operations; use it plus `ServerFacts` instead of new check/act shell snippets.
 **Renderer-free steps** — `Provisioner.run()` emits typed core events; Rich lives only in `progress.py` (`RichStepRenderer` for the CLI, `NoopStepRenderer` for Engine and tests).
 **Cooperative cancellation** — `Provisioner.run(cancellation=...)` polls only before each step; a running step and its SSH commands always finish.
 **Relay steps are panel-agnostic** — `RelayContext` and `InstallRealm` back the reconciler's Realm driver; the binary installs as `RELAY_BINARY_PATH` and the sshd drop-in is `00-hardening.conf`.
-**Control service install** — `InstallControlService` puts a sha256-pinned uv under `/opt/ctld`, installs the exact `meridian-vpn` (or `control_artifacts`' dev wheel) on uv-managed Python 3.12, and restarts `ctld` only after a change, never over a newer recorded package (`core/version_skew.py`); the Meridian backend skips Docker and swap.
+**Control service install** — `InstallControlService` puts a sha256-pinned uv under `/opt/ctld`, installs the exact `meridian-vpn` (or `control_artifacts`' dev wheel) on uv-managed Python 3.12, and restarts `ctld` only after a change, never over a newer recorded package (`core/version_skew.py`).
 ## What's done well
-- **Idempotent containers** — panel steps check `docker inspect` before deploying and poll the backend's health endpoint after.
-- **Secrets generated once** — the PostgreSQL password and `APP_SECRET` come from `secrets.token_hex` on first install; restarts reuse `.env` (API tokens depend on `APP_SECRET`).
+- **Check before acting** — steps read package status, file content, and unit state first, so a rerun reports `ok`, not `changed`.
 ## Pitfalls
-- **Panel sub-path rewrites follow the bundle** — Remnawave has no base path, so `sub_filter` must match the shipped frontend's literals (3.4 uses backticks); re-grep on every backend bump and never rewrite `` `/api ``.
 - **nginx `add_header` inheritance** — a child `location` with `add_header` drops parent headers; use `map`.
 - **acme.sh short-lived IP certs** — 6-day certs need `--days 5` and an explicit renew window; report acme.sh's last lines (`_acme_reason`), since its first ones are only timestamps.
 - **nginx stream is a dynamic module** — install `libnginx-mod-stream`.
@@ -24,17 +21,13 @@
 - **XHTTP locations need `client_max_body_size 0`** — nginx counts streamed bodies against its 1m default; serve packet-up only.
 - **Never `return 444` in HTTPS blocks** — use 403/404 (less fingerprintable).
 - **Legacy stream config yields to V4** — `ConfigureNginx` skips `stream.d/meridian.conf` once a `meridian-v4-*` stream file listens on 443, or `nginx -t` fails on a duplicate listener.
-- **Panel data is the directory, never a named volume** — PostgreSQL uses the `./data` bind mount and the Compose `name:` is pinned; `runtime_migration.py` moves `/opt/remnawave` by one rename after stopping the old stack, refusing mounts or two directories first.
-- **Compose failures keep their end** — `compose_error()` drops progress lines and keeps the tail, and `collect_stack_diagnostics()` adds each container's state, exit code, OOM flag, restarts, health, kernel OOM kills, and the newest log lines; the first 200 characters only ever said "Network … Creating". `up -d` blocks on every `service_healthy` dependency, so the panel gets `up_timeout=600`: at 120 s a slow 1 vCPU server was killed mid-wait, and a timeout is reported as one, not as Compose's progress lines.
 - **Every apt-get goes through `ensure.run_apt()`** — it waits up to 5 minutes while unattended-upgrades or cloud-init holds the lock, and `apt_failure()` names the holder; never `2>/dev/null` apt, or a lock reads as an ordinary failure (the nginx install then fell through to the nginx.org path). Update and install are separate calls (`apt_update_and_install()`), and install only after a check says something is missing: `InstallNginx` runs on every certificate and nginx apply.
-- **`docker compose restart` keeps the old environment** — after an `env_file` change, `up -d --no-deps --force-recreate`.
 - **Teardown never removes the `meridian` CLI** — an operator-installed copy is how they redeploy.
 - **Teardown keeps what may predate Meridian** — fail2ban stays on (host hardening, like SSH settings), and nginx is stopped only when no operator config remains.
 - **Teardown never deletes `/var/backups/meridian-migration`** — it holds the only copy of a migrated panel's database; `panel_stack_removal()` is the one panel-removal list teardown and `migrate` share.
 - **One unit per `systemctl` call when a unit may be absent** — multi-unit `disable --now` aborts on a missing unit and stops nothing.
 - **Realm installs only a pinned tarball** — `RelayContext.realm_sha256` comes from the reviewed plan; a target without a digest fails (it once skipped verification silently).
 - **Realm is the static musl build, run before it replaces anything** — upstream's 2.9.6 gnu build needs glibc 2.38, so `fleet upgrade` on Ubuntu 22.04 overwrote a working binary with one that could not start. A binary that runs and fails observes as drift (reinstall), not unavailable evidence.
-- **A 1 GB control server needs swap** — without it the panel's first start starved sshd, and the retry hung on "Install system packages" (the step users saw); `EnsureSwap` runs first and adds `/swapfile` below `CONTROL_MIN_MEMORY_MB`. Teardown leaves it.
 - **Firewall follows the effective sshd port** — never assume `22/tcp`.
 - **Recipes never own public ports** — compiled, tagged rules open them; `ConfigureFirewall` deletes only the bare, comment-less `443/udp` an old bootstrap added.
 - **Baseline checks exit 1 for absence** — a bare `docker` or `ufw` exits 127 (stock Debian has no ufw), which observation treats as unavailable evidence.

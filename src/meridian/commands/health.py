@@ -1,10 +1,9 @@
 """`meridian check`: role-aware server health on the shared verification contract.
 
 A server that is not in the fleet yet gets pre-flight checks; a control, exit,
-or gateway server gets container (or, on a control-service fleet, unit and agent),
-listener, TLS, and disk checks (plus node-plugin readiness where a Remnawave node
-runs); a relay server gets its Realm hops checked. With no target, every fleet
-server is checked.
+or gateway server gets unit, agent, listener, TLS, and disk checks; a relay
+server gets its Realm hops checked. With no target, every fleet server is
+checked.
 """
 
 from __future__ import annotations
@@ -345,7 +344,7 @@ def _server_report(
 
 
 def _service_unit_checks(conn: ServerConnection, roles: list[str], host: str) -> list[VerificationCheck]:
-    """Meridian's own units in place of Remnawave's containers (#95)."""
+    """The control service, agent, and core units each role runs."""
     logs = f"meridian logs {host} --component"
     units: list[tuple[str, str, str]] = []
     if "control" in roles:

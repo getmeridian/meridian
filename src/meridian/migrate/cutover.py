@@ -11,16 +11,13 @@ are forgotten rather than retired through an API that no longer answers.
 from __future__ import annotations
 
 import shlex
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from collections.abc import Mapping
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import ResourcePlan
-from meridian.host_runtime import LEGACY_PANEL_DIR, PANEL_DIR, PANEL_STOP_ORDER
+from meridian.host_runtime import LEGACY_NODE_DIR, LEGACY_PANEL_DIR, NODE, NODE_DIR, PANEL_DIR, PANEL_STOP_ORDER
 from meridian.migrate import MigrationError
 from meridian.provision.uninstall import panel_stack_removal
-from meridian.reconciler.server_retirement import NodeRuntimeRetirement
-from meridian.setup.control_plane import CONTROL_RUNTIME_ATTESTATION_PATH
 from meridian.ssh import ServerConnection
 
 # Kinds whose whole state is in the panel's database (or, for probes, nowhere).
@@ -43,6 +40,8 @@ PANEL_SIDE_KINDS: frozenset[str] = frozenset(
         "route_rule",
     }
 )
+# The Remnawave bootstrap's attestation; the panel goes, so it does too.
+CONTROL_RUNTIME_ATTESTATION_PATH = "/var/lib/meridian/control-runtime.attestation"
 # Every panel container under its neutral and pre-rename name, dependents first.
 _PANEL_NAMES = tuple(shlex.quote(name) for container in PANEL_STOP_ORDER for name in (container.name, container.legacy))
 
@@ -90,31 +89,49 @@ def stop_panel(conn: ServerConnection) -> None:
         )
 
 
-@dataclass(frozen=True)
-class _RetirementContext:
-    """What `NodeRuntimeRetirement` reads: the plan (to see no node stays) and SSH per server."""
-
-    plan: ResourcePlan
-    connection_for: Callable[[str], ServerConnection]
-
-    def connection(self, server_ref: str) -> ServerConnection:
-        return self.connection_for(server_ref)
+# The node API firewall rule under its neutral and pre-rename comment.
+NODE_API_RULE_COMMENTS = ("fw-node-api", "Meridian node API (Docker internal)")
+_NODE_REPOSITORY = "remnawave/node"
 
 
-class _NodeRemoval(NodeRuntimeRetirement):
-    def __init__(self, context: _RetirementContext) -> None:
-        self.context = context
+def remove_node_runtime(conn: ServerConnection) -> None:
+    """Stop and delete the node container, its Compose directory, image, and API rule, under both names.
+
+    Docker itself stays: the baseline installed it, and the operator may run other containers.
+    """
+    compose = shlex.quote(f"{NODE_DIR}/docker-compose.yml")
+    names = " ".join(shlex.quote(name) for name in (NODE.name, NODE.legacy))
+    directories = " ".join(shlex.quote(path) for path in (NODE_DIR, LEGACY_NODE_DIR))
+    result = conn.run(
+        f"if [ -f {compose} ]; then docker compose -f {compose} down --remove-orphans --volumes || exit 1; fi;"
+        f' for c in {names}; do if docker inspect --type container "$c" >/dev/null 2>&1;'
+        ' then docker rm -f "$c" >/dev/null || exit 1; fi; done;'
+        f' rm -rf {directories} && for d in {directories}; do test ! -e "$d" || exit 1; done;'
+        # Images still used by another container refuse removal; that is fine.
+        f" ids=$(docker images -q {shlex.quote(_NODE_REPOSITORY)} 2>/dev/null | sort -u);"
+        ' if [ -n "$ids" ]; then docker image rm $ids >/dev/null 2>&1; fi; true',
+        timeout=120,
+    )
+    if result.returncode != 0:
+        detail = _detail(result.stderr or result.stdout, result.returncode)
+        raise MigrationError(f"Could not remove the Remnawave node runtime: {detail}")
+    patterns = " ".join(f"-e {shlex.quote('# ' + comment)}" for comment in NODE_API_RULE_COMMENTS)
+    rules = conn.run(
+        f"ufw status numbered 2>/dev/null | grep -F {patterns}"
+        r" | sed -n 's/^\[ *\([0-9][0-9]*\)\].*/\1/p'"
+        ' | sort -rn | while read -r rule; do ufw --force delete "$rule" >/dev/null || exit 1; done',
+        timeout=30,
+    )
+    if rules.returncode != 0:
+        raise MigrationError("Could not remove the node API firewall rule.")
 
 
-def remove_node_runtimes(
-    bindings: list[ManagedResourceBinding], plan: ResourcePlan, connections: Mapping[str, ServerConnection]
-) -> None:
-    """Remove each exit's panel-managed node container (and its node API rule) through node retirement."""
-    removal = _NodeRemoval(_RetirementContext(plan=plan, connection_for=connections.__getitem__))
+def remove_node_runtimes(bindings: list[ManagedResourceBinding], connections: Mapping[str, ServerConnection]) -> None:
+    """Remove each exit's panel-managed node container (and its node API rule)."""
     # One removal per server: every node binding there names the same container and directory.
     for binding in {binding.server_ref: binding for binding in bindings}.values():
         try:
-            removal.retire(binding)
+            remove_node_runtime(connections[binding.server_ref])
         except Exception as exc:  # noqa: BLE001 - reported with the server it failed on
             raise MigrationError(
                 f"Could not remove the node container on {binding.server_ref}: {exc}",

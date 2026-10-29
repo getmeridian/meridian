@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib
-import re
 from importlib.metadata import PackageNotFoundError, version
 
 import pytest
@@ -11,22 +10,7 @@ import pytest
 import meridian.config as config
 
 
-class TestPinnedImages:
-    @pytest.mark.parametrize(
-        "name",
-        [
-            "REMNAWAVE_BACKEND_IMAGE",
-            "REMNAWAVE_NODE_IMAGE",
-            "REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE",
-            "REMNAWAVE_POSTGRES_IMAGE",
-            "REMNAWAVE_VALKEY_IMAGE",
-        ],
-    )
-    def test_every_installed_image_pins_an_exact_tag_and_index_digest(self, name: str) -> None:
-        # A mutable tag alone lets a re-push change what fresh servers run.
-        image = getattr(config, name)
-        assert re.fullmatch(r"[a-z0-9./-]+:[0-9][0-9A-Za-z.-]*@sha256:[0-9a-f]{64}", image), image
-
+class TestDependencies:
     def test_remnawave_sdk_is_not_a_dependency(self) -> None:
         with pytest.raises(PackageNotFoundError):
             version("remnawave")

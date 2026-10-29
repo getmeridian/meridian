@@ -44,7 +44,7 @@ from meridian.migrate.users import DROPPED_PANEL_STATE, CarriedUsers, carry_user
 from meridian.reconciler.fence import local_fence_view
 from meridian.reconciler.resource_executor import refuse_unresolved_pending_plan
 from meridian.reconciler.resources import PendingPlanConflictError
-from meridian.remnawave import MeridianPanel
+from meridian.remnawave import RemnawaveReader
 from meridian.resolve import connection_for_entry
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.control_service import verify_control_service
@@ -54,7 +54,7 @@ from meridian.state_fence import SSHApplyFence, apply_holder
 
 SNAPSHOT_NAME = "users.json"
 LINKS_NAME = "links.json"
-PanelFactory = Callable[[str, str], MeridianPanel]
+PanelFactory = Callable[[str, str], RemnawaveReader]
 ConnectionBuilder = Callable[[ServerEntry], ServerConnection]
 # Applies the flipped intent through the reviewed apply path, continuing the migration's lease
 # (the third argument is its holder); raises (or exits) unless it converged.
@@ -105,7 +105,7 @@ class ControlMigrator:
         registry: ServerRegistry,
         *,
         persist: Persist | None = None,
-        panel_factory: PanelFactory = MeridianPanel,
+        panel_factory: PanelFactory = RemnawaveReader,
         connection_builder: ConnectionBuilder = connection_for_entry,
         on_step: Callable[[str], None] | None = None,
         clock: Callable[[], datetime] | None = None,
@@ -260,7 +260,7 @@ class ControlMigrator:
         stop_panel(control)
         nodes = node_runtime_bindings(self.cluster)
         self._on_step("Removing the panel's node containers")
-        remove_node_runtimes(nodes, review.setup.plan, self._server_connections(nodes))
+        remove_node_runtimes(nodes, self._server_connections(nodes))
         forget([*panel_bindings(self.cluster, review.setup.plan), *nodes])
         if migration.service_token:
             self.cluster.panel.api_token = migration.service_token

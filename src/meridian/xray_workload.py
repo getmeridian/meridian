@@ -1,4 +1,4 @@
-"""Render one reviewed workload into a Remnawave Xray profile."""
+"""Render one reviewed workload into the Xray profile its node agent runs."""
 
 from __future__ import annotations
 
@@ -145,7 +145,6 @@ def render_workload_config(
         ]
     config: dict[str, Any] = {
         # No access log: it would record every user's destinations on the server.
-        # Remnawave reads only startup errors from the log; IP stats use the API.
         "log": {"loglevel": "warning", "access": "none"},
         "dns": _dns_config(profile),
         "routing": routing,
@@ -306,8 +305,8 @@ def _render_inbound_body(
                 ],
                 "alpn": ["h3"],
             },
-            # Salamander turns QUIC (and its visible SNI) into random-looking UDP. Remnawave
-            # copies the inbound's finalmask into every client format.
+            # Salamander turns QUIC (and its visible SNI) into random-looking UDP. Every
+            # client format carries the inbound's finalmask.
             "finalmask": {"udp": [{"type": "salamander", "settings": {"password": salamander_password(keys)}}]},
         },
     }

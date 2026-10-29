@@ -91,31 +91,6 @@ except ContextError:
 DEFAULT_SNI = "www.google.com"  # mirrored in meridian.core.defaults for core isolation
 ACME_SERVER = os.environ.get("MERIDIAN_ACME_SERVER", "letsencrypt").strip() or "letsencrypt"
 
-# Remnawave panel + node
-# Tested tuple, pinned to multi-arch (amd64 + arm64) index digests so a
-# re-pushed tag cannot change what a fresh server runs. Remnawave pins are
-# installed on fresh servers and never used to downgrade a newer tag the
-# operator chose (see meridian.remnawave.versions); PostgreSQL and Valkey are
-# Meridian-owned and always rendered as pinned. Move the three Remnawave pins
-# together, then refresh every digest with scripts/pin_image_digests.py.
-REMNAWAVE_BACKEND_IMAGE = (
-    "remnawave/backend:3.4.5@sha256:b16d724b90fd7c9fec2df04bd28938a671cafc62894105068e11550ee3449c56"
-)
-REMNAWAVE_NODE_IMAGE = "remnawave/node:3.4.2@sha256:1f97485b4bc7e4944f1ae95cc57d176376813b0022e9567b705f384f1a2e909d"
-REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE = (
-    "remnawave/subscription-page:8.0.0@sha256:04e8d479afb3598024e4018e9e15cd7fe879938250090a690ba39f1ee91b79ac"
-)
-REMNAWAVE_POSTGRES_IMAGE = (
-    "postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
-)
-REMNAWAVE_VALKEY_IMAGE = (
-    "valkey/valkey:9.1.2-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11"
-)
-REMNAWAVE_MIN_VERSION = "3.4.0"  # oldest panel API Meridian speaks
-REMNAWAVE_TESTED_MAJOR = 3  # newer majors run with a warning
-REMNAWAVE_PANEL_PORT = 3000  # internal port, nginx reverse-proxied
-REMNAWAVE_NODE_API_PORT = 3010  # node API port (panel→node mTLS communication)
-REMNAWAVE_SUBSCRIPTION_PAGE_PORT = 3020  # host port (internal 3010 remapped to avoid node API conflict)
 # Runtime directories and container names live in meridian.host_runtime.
 
 # Exit-IP observers are single-stack: a dual-stack exit would otherwise answer
@@ -186,8 +161,9 @@ REALM_SHA256: dict[str, str] = {
 RELAY_BINARY_PATH = "/usr/local/bin/netfwd"
 LEGACY_REALM_BINARY_PATH = "/usr/local/bin/realm"
 
-# Xray client binary (for connection verification)
-XRAY_VERSION = "26.7.28"  # matches xray bundled in remnawave/node:3.4.2
+# Xray: the core every node agent runs and the client `meridian test` verifies with.
+# Moving it needs scripts/export_geodata_lists.py, since agents load its geodata.
+XRAY_VERSION = "26.7.28"
 XRAY_GITHUB_URL = "https://github.com/XTLS/Xray-core/releases/download"
 XRAY_ASSET_MAP: dict[tuple[str, str], str] = {
     ("Darwin", "arm64"): "Xray-macos-arm64-v8a.zip",

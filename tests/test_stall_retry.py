@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -131,7 +130,6 @@ def _apply(host: UfwHost, *ports: int) -> tuple[Any, CaptureReporter]:
     context = ServerDriverContext(
         plan=plan,
         cluster=ClusterConfig(),
-        panel=MagicMock(),
         connection_for=lambda _ref: host,  # type: ignore[arg-type,return-value]
         server_addresses={"srv-exit": "198.51.100.10"},
     )
@@ -190,7 +188,6 @@ def test_read_only_plan_rides_out_a_stalled_observation() -> None:
     context = ServerDriverContext(
         plan=plan,
         cluster=ClusterConfig(),
-        panel=MagicMock(),
         connection_for=lambda _ref: host,  # type: ignore[arg-type,return-value]
         server_addresses={"srv-exit": "198.51.100.10"},
     )
