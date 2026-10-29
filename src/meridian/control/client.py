@@ -12,10 +12,15 @@ from meridian.control.models import (
     ClientEndpoint,
     EnrollmentGrant,
     FleetAuthority,
+    IssuedToken,
     NodeSpec,
     NodeStatus,
     ServiceHealth,
     ServiceSettings,
+    TokenCreate,
+    TokenList,
+    TokenRecord,
+    TokenScope,
     TrafficSummary,
     UserRecord,
     UserUpdate,
@@ -33,6 +38,10 @@ class ControlServiceNotFound(ControlServiceError):
 
 class ControlServiceAuthError(ControlServiceError):
     """The service refused the saved admin token."""
+
+
+class ControlServiceScopeError(ControlServiceAuthError):
+    """The token is valid, but its scope does not cover the request."""
 
 
 class ControlClient:
@@ -134,6 +143,18 @@ class ControlClient:
     def delete_endpoint(self, endpoint_id: str) -> None:
         self._call("DELETE", f"api/endpoints/{_segment(endpoint_id)}")
 
+    def create_token(self, name: str, scope: TokenScope) -> IssuedToken:
+        """Mint a device's or agent's token; the secret is in this response only."""
+        body = TokenCreate(name=name, scope=scope).model_dump(mode="json")
+        return IssuedToken.model_validate(self._call("POST", "api/tokens", body))
+
+    def list_tokens(self) -> list[TokenRecord]:
+        return TokenList.model_validate(self._call("GET", "api/tokens")).tokens
+
+    def revoke_token(self, token_id: str) -> TokenRecord:
+        """Revoke a token from its next request on (revoking the calling token is allowed)."""
+        return TokenRecord.model_validate(self._call("DELETE", f"api/tokens/{_segment(token_id)}"))
+
     def fetch_subscription(self, sub_token: str, *, document: str = "") -> str:
         """Fetch a subscription the way a client app does (the `/sub` route, no admin token needed)."""
         path = f"sub/{_segment(sub_token)}" + (f"/{document}" if document else "")
@@ -155,7 +176,13 @@ class ControlClient:
             ) from exc
         if response.status_code == 404:
             raise ControlServiceNotFound(_message(response), category="user")
-        if response.status_code in (401, 403):
+        if response.status_code == 403:
+            raise ControlServiceScopeError(
+                f"The control service refused the request: {_message(response)}",
+                hint="Use a token whose scope covers this request.",
+                category="user",
+            )
+        if response.status_code == 401:
             raise ControlServiceAuthError(
                 "The control service refused the saved admin token.",
                 hint="Restore the fleet's saved credentials (cluster.yml) or redeploy the control server.",

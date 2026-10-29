@@ -2,7 +2,8 @@
 
 One SQLite file holds the fleet identity, the CA and signing key
 (`enrollment.NodeAuthority`), node specs and the signed documents composed from
-them, user records, client endpoints, and traffic totals (`traffic.TrafficLedger`).
+them, user records, client endpoints, traffic totals (`traffic.TrafficLedger`),
+and scoped API tokens (`tokens.TokenRegistry`).
 Every change that alters a node's resources composes a new revision, signs it,
 and wakes that node's waiting poll.
 """
@@ -41,13 +42,14 @@ from meridian.control.models import (
 from meridian.control.store import Store
 from meridian.control.subscriptions import SubscriptionResponse, render_subscription, unknown_subscription
 from meridian.control.times import utc_now
+from meridian.control.tokens import API_TOKENS_TABLE, TokenRegistry
 from meridian.control.traffic import TrafficLedger
 from meridian.core.agent_desired import DesiredNodeState
 from meridian.core.agent_protocol import ObservedStateReport, PollRequest
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 MAX_WAIT_SECONDS = 55
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -91,6 +93,7 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "ALTER TABLE users ADD COLUMN traffic_offset_bytes INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE users ADD COLUMN traffic_reset_at TEXT",
     ),
+    (API_TOKENS_TABLE,),
 )
 _USER_FIELDS = (
     "username",
@@ -138,6 +141,7 @@ class ControlService:
                 self._set_meta("profile_title", "Meridian")
         self.fleet_id = fleet_id
         self.authority = NodeAuthority(self._store, fleet_id, clock=clock)
+        self.tokens = TokenRegistry(self._store, clock=clock)
         with self._transaction():
             # Documents signed by an earlier signing certificate are signed again.
             self._compose_all()

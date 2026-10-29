@@ -189,6 +189,44 @@ class TrafficSummary(CoreModel):
     users: list[UserTrafficTotal]
 
 
+TokenScope = Literal["read", "propose", "approve", "admin"]
+# Each scope includes every scope before it.
+TOKEN_SCOPES: tuple[TokenScope, ...] = ("read", "propose", "approve", "admin")
+
+
+def scope_covers(held: TokenScope, needed: TokenScope) -> bool:
+    """Whether a token holding `held` may do what `needed` guards."""
+    return TOKEN_SCOPES.index(held) >= TOKEN_SCOPES.index(needed)
+
+
+class TokenCreate(CoreModel):
+    """Mint one device's or agent's API token; the scope may not exceed the caller's."""
+
+    name: str = Field(min_length=1, max_length=64, pattern=r"^[^\x00-\x1f\x7f]+$")
+    scope: TokenScope
+
+
+class TokenRecord(CoreModel):
+    """One API token's metadata; never its secret, hash, or where it was used from."""
+
+    id: str = Field(pattern=r"^[0-9a-f]{12}$")
+    name: str
+    scope: TokenScope
+    created_at: Timestamp
+    last_used_at: Timestamp | None = Field(default=None, description="Coarse: updated at most once a minute.")
+    revoked_at: Timestamp | None = None
+
+
+class IssuedToken(TokenRecord):
+    """A freshly minted token: the only response that ever carries its secret."""
+
+    token: OpaqueToken
+
+
+class TokenList(CoreModel):
+    tokens: list[TokenRecord]
+
+
 class ServiceConfig(CoreModel):
     """`/etc/ctld/config.json`, written by SSH bootstrap; the admin token is stored only as a hash."""
 
