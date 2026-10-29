@@ -235,6 +235,12 @@ class TestInstallNginx:
         assert result.status == "ok"
         conn.assert_called_with_pattern("acme.sh --install-cronjob")
 
+    def test_a_preinstalled_nginx_org_build_still_gets_the_sites_enabled_include(self):
+        """Only Meridian's own nginx.org install added it, so a server that already ran nginx.org served nothing."""
+        conn = _installed_nginx()
+        InstallNginx().run(conn, ProvisionContext(ip="198.51.100.1"))
+        conn.assert_called_with_pattern("include /etc/nginx/sites-enabled/")
+
     def test_a_working_stream_module_never_reaches_apt(self):
         """This step runs on every certificate and nginx apply; nginx.org builds have stream built in."""
         conn = _installed_nginx()

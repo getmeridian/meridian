@@ -177,7 +177,10 @@ class InstallNginx:
                 "sed -i '/load_module.*ngx_stream_module/d' /etc/nginx/nginx.conf 2>/dev/null; true",
                 timeout=15,
             )
-            conn.run(_ENSURE_SITES_INCLUDE, timeout=15)
+
+        # Every run, not only after our own nginx.org install: an nginx.org build already on the
+        # server (a resumed install, an image that ships it) never included sites-enabled either.
+        conn.run(_ENSURE_SITES_INCLUDE, timeout=15)
 
         # -- Ensure stream module is available --
         # Check first: this step runs on every certificate and nginx apply, and nginx.org builds have
