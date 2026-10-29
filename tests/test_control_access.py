@@ -85,6 +85,18 @@ def test_verification_panel_selects_service_users_like_panel_users(url: str) -> 
     assert proxy_outbounds(parse_xray_subscription(document.content))
 
 
+@pytest.mark.parametrize(("client_type", "marker"), [("mihomo", "proxy-groups:"), ("singbox", '"outbounds"')])
+def test_every_service_document_reaches_the_access_panel(url: str, client_type: str, marker: str) -> None:
+    with ControlClient(url, ADMIN_TOKEN) as client:
+        record = client.put_user("alice")
+        client.put_endpoint("main:main-reality:direct", REALITY)
+
+    with ServiceAccessPanel(url, ADMIN_TOKEN, 5) as panel:
+        document = panel.fetch_subscription(record.sub_token, client_type=client_type)
+
+    assert marker in document.content
+
+
 @pytest.mark.parametrize(
     ("token", "port", "error"),
     [(ADMIN_TOKEN, 1, RemnawaveNetworkError), ("not-the-token", None, RemnawaveAuthError)],

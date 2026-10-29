@@ -67,7 +67,8 @@ class ServiceAccessPanel:
         return [self._user(record) for record in _translated(self._client.list_users)]
 
     def fetch_subscription(self, short_uuid: str, *, client_type: str = "") -> SubscriptionDocument:
-        document = "json" if client_type == XRAY_JSON_CLIENT_TYPE else ""
+        # The service names its documents by suffix (`/sub/TOKEN/mihomo`); anything else gets the Base64 list.
+        document = client_type if client_type in (XRAY_JSON_CLIENT_TYPE, "mihomo", "singbox") else ""
         content = _translated(lambda: self._client.fetch_subscription(short_uuid, document=document))
         return SubscriptionDocument(url=f"sub/{short_uuid}", content=content, client_type=client_type)
 
