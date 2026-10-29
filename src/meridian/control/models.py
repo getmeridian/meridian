@@ -83,6 +83,15 @@ class NodeStatus(CoreModel):
         unseen = self.unseen_seconds(now)
         return unseen is not None and unseen < AGENT_SEEN_SECONDS
 
+    @property
+    def in_sync(self) -> bool:
+        """The agent reported applying exactly the current document: epoch, revision, and hash."""
+        return self.applied is not None and (
+            self.applied.fleet_epoch,
+            self.applied.revision,
+            self.applied.sha256,
+        ) == (self.fleet_epoch, self.revision, self.sha256)
+
 
 class ClientEndpoint(CoreModel):
     """One public way into an exit, as subscriptions publish it.

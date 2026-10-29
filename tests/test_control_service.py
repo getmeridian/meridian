@@ -164,6 +164,26 @@ def test_report_records_the_applied_revision_and_failures(service: ControlServic
     assert status.errors == ["core-unit: unit exited"]
 
 
+def test_an_applied_report_keeps_the_epoch_the_agent_named(service: ControlService) -> None:
+    service.put_node_spec("main", _spec())
+    document = _document(service)
+    current = _report(document)
+    service.report("main", ObservedStateReport.model_validate(current), current)
+    assert service.node_status("main").in_sync
+
+    with service._store.transaction():  # a restore: the next epoch, the same resources signed again
+        service._store.set_meta("fleet_epoch", "2")
+    service.put_node_spec("main", _spec())
+    restored = _document(service)
+    cached = _report({**restored, "fleet_epoch": 1})  # built before the agent saw the new epoch
+    service.report("main", ObservedStateReport.model_validate(cached), cached)
+
+    status = service.node_status("main")
+    assert (restored["fleet_epoch"], restored["revision"], restored["sha256"]) == (2, 2, document["sha256"])
+    assert status.applied is not None and status.applied.fleet_epoch == 1
+    assert not status.in_sync
+
+
 def test_a_database_refuses_another_fleet(tmp_path: Path) -> None:
     ControlService(tmp_path / "control.db", fleet_id=FLEET_ID, version="4.0.0")
     with pytest.raises(ServiceError):

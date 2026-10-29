@@ -247,15 +247,19 @@ class ControlService:
         row = self._node(node_id)
         if row is None:
             raise ServiceError("not_found", f"Node {node_id!r} is unknown.", 404)
+        report = json.loads(row["report"]) if row["report"] else {}
+        # The epoch the agent reported, never the service's: a cached report from before a restore
+        # names the old epoch, and relabelling it would read as in sync.
+        applied_epoch = (report.get("applied") or {}).get("fleet_epoch") or self.fleet_epoch
         applied = (
-            NodeStateRef(fleet_epoch=self.fleet_epoch, revision=row["applied_revision"], sha256=row["applied_sha256"])
+            NodeStateRef(fleet_epoch=applied_epoch, revision=row["applied_revision"], sha256=row["applied_sha256"])
             if row["applied_revision"]
             else None
         )
         failed: list[str] = []
         errors: list[str] = []
-        if row["report"]:
-            for item in json.loads(row["report"]).get("resources", []):
+        if report:
+            for item in report.get("resources", []):
                 if item.get("status") == "failed":
                     failed.append(item["id"])
                     errors.append(f"{item['id']}: {(item.get('error') or {}).get('message', '')}")

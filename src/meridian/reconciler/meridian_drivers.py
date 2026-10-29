@@ -536,13 +536,7 @@ def _observation(action: ResourceAction, *, exists: bool, connected: bool, remot
 
 
 def _applied(status: NodeStatus | None) -> bool:
-    return (
-        status is not None
-        and status.applied is not None
-        and status.applied.revision == status.revision
-        and status.applied.sha256 == status.sha256
-        and not status.failed
-    )
+    return status is not None and status.in_sync and not status.failed
 
 
 def _spec_hash(spec: NodeSpec) -> str:

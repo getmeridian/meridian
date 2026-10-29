@@ -65,7 +65,7 @@ def agent_finding(status: NodeStatus | None, *, logs_hint: str, now: datetime | 
             f"Read the agent log ({logs_hint}), then re-run: meridian apply",
         )
     applied = status.applied.revision if status.applied is not None else None
-    if applied != status.revision:
+    if not status.in_sync:
         return finding(
             "agent",
             "warning",

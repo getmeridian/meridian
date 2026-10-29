@@ -206,7 +206,7 @@ def verify_control_service(plan: ResourcePlan, cluster: ClusterConfig) -> tuple[
         nodes = [item.payload for item in plan.resources if isinstance(item.payload, NodeWorkloadPayload)]
         for node in nodes:
             status = client.node(node.workload_ref)
-            if status is None or status.applied is None or status.applied.revision != status.revision:
+            if status is None or not status.in_sync:
                 raise ResourceReconcileError(f"Node {node.workload_ref} has not applied its current document.")
         urls: dict[str, str] = {}
         for item in plan.resources:
