@@ -722,6 +722,19 @@ def test_a_swap_whose_restart_was_lost_still_reads_as_the_old_build(plan: Resour
     assert not drivers["agent_runtime"].observe(action, None).exists
 
 
+@pytest.mark.parametrize(("reported", "converges"), [(NEW_VERSION, True), (OLD_VERSION, False)], ids=["new", "old"])
+def test_a_new_build_converges_only_once_it_reports_itself(plan: ResourcePlan, reported: str, converges: bool) -> None:
+    """Right after a swap the old build's hello still reads live; a new build that never connected is not converged."""
+    host = AgentHost()
+    host.binary = host.running = BINARY.sha256
+    drivers, _control = _upgrade_setup(plan, host, [{"last_seen_at": _SEEN, "agent_version": reported}])
+    driver = drivers["agent_runtime"]
+    driver.context.agent_binary = lambda _arch: AgentBinary(data=BINARY.data, sha256=BINARY.sha256, version=NEW_VERSION)
+    action = _action(plan, "agent:main")
+
+    assert observation_converges(action, driver.observe(action, None)) is converges
+
+
 def test_retrying_a_swap_whose_restart_was_lost_rolls_back_to_the_running_build(
     plan: ResourcePlan, monkeypatch: pytest.MonkeyPatch
 ) -> None:

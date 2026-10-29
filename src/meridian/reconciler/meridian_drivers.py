@@ -180,7 +180,7 @@ class AgentInspection:
     current_build: bool  # the unit's process runs this Meridian's agent build
     active: bool
     identity: bool  # the bootstrap names this node, service, and CA
-    live: bool  # the service saw the agent recently
+    live: bool  # the service saw the agent recently, reporting this build when this build runs
 
     @property
     def in_place(self) -> bool:
@@ -229,7 +229,9 @@ class AgentRuntimeDriver:
         inspection = self._inspect(payload)
         # A service outage leaves a healthy agent unseen until its backoff ends; wait it out
         # rather than re-enroll (or refuse to upgrade) a node that is fine.
-        healthy = inspection.active and inspection.identity and (inspection.live or self._reconnects(payload))
+        healthy = (
+            inspection.active and inspection.identity and (inspection.live or self._reconnects(payload, inspection))
+        )
         if healthy and inspection.current_build:
             return ResourceApplyReceipt(remote_id=payload.workload_ref)  # only WARP needed repair
         arch = self.context.architecture(payload.server_ref)
@@ -333,19 +335,21 @@ class AgentRuntimeDriver:
         with self.context.client() as client:
             ca_sha256 = client.fleet_authority().ca_sha256
             status = client.node(payload.workload_ref)
+        current_build = running == binary.sha256
         return AgentInspection(
-            current_build=running == binary.sha256,
+            current_build=current_build,
             active=active,
             identity=_bootstrap_identity(bootstrap) == self._identity(payload, ca_sha256),
-            live=status is not None and status.is_live(),
+            live=_reports(status, binary.version if current_build else ""),
         )
 
-    def _reconnects(self, payload: AgentRuntimePayload) -> bool:
+    def _reconnects(self, payload: AgentRuntimePayload, inspection: AgentInspection) -> bool:
+        binary = self.context.agent_binary(self.context.architecture(payload.server_ref))
+        expected = binary.version if inspection.current_build else ""
         with self.context.client() as client:
             for _ in range(int(AGENT_RECONNECT_SECONDS / POLL_INTERVAL)):
                 self.context.sleep(POLL_INTERVAL)
-                status = client.node(payload.workload_ref)
-                if status is not None and status.is_live():
+                if _reports(client.node(payload.workload_ref), expected):
                     return True
         return False
 
@@ -637,3 +641,14 @@ def _ok(result: Any, what: str) -> None:
         raise UnknownResourceOutcome(f"Lost the server while trying to {what}; observation is required.")
     if result.returncode != 0:
         raise ResourceReconcileError(f"Could not {what}: {result.stderr.strip()[:200]}")
+
+
+def _reports(status: NodeStatus | None, version: str) -> bool:
+    """Seen recently, and by `version` when one is given.
+
+    Right after a swap the previous build's hello still reads live for a while; a new
+    build that never reached the service must not pass for one that did.
+    """
+    if status is None or not status.is_live():
+        return False
+    return not version or status.agent_version == version
