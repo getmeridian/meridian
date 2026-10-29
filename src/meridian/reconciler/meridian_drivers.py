@@ -42,6 +42,16 @@ from meridian.host_runtime import (
     CORE_UNIT,
 )
 from meridian.reconciler.agent_spec import build_node_spec
+from meridian.reconciler.agent_upgrade import (
+    PREVIOUS_BINARY,
+    STAGED_BINARY,
+    finish_upgrade,
+    roll_back,
+    running_sha256,
+    stage_agent,
+    swap_in,
+    wait_for_upgrade,
+)
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceApplyReceipt,
@@ -137,6 +147,20 @@ def build_meridian_drivers(context: MeridianDriverContext) -> ResourceDrivers:
     }
 
 
+@dataclass(frozen=True)
+class AgentInspection:
+    """What one look at a node's agent found."""
+
+    current_build: bool  # the unit's process runs this Meridian's agent build
+    active: bool
+    identity: bool  # the bootstrap names this node, service, and CA
+    live: bool  # the service saw the agent recently
+
+    @property
+    def in_place(self) -> bool:
+        return self.current_build and self.active and self.identity
+
+
 class AgentRuntimeDriver:
     """Install the agent binary, write its bootstrap with a fresh enrollment token, and run it.
 
@@ -145,8 +169,16 @@ class AgentRuntimeDriver:
 
     The agent generates its node key, enrolls with the token, and rewrites the
     bootstrap with the token nulled, so observation compares only the identity
-    fields. Bare-IP control servers serve a Let's Encrypt IP certificate, so the
-    agent verifies TLS through WebPKI and `tls_pin_sha256` stays null.
+    fields. A healthy agent of another build is upgraded in place
+    (`agent_upgrade.py`): same key, certificate, and bootstrap, and the previous
+    binary back if the new one never reports. Only a missing, foreign, or dead
+    agent is enrolled again.
+
+    TLS on 443 is always WebPKI: the bootstrap fails rather than keep a self-signed
+    certificate, and the CLI never sends credentials over one either, so
+    `tls_pin_sha256` stays null and the agent refuses a pin. Pinning would also
+    break on every renewal of a 6-day IP certificate, while the fleet CA already
+    authenticates the service end to end (signed documents, node proofs).
     """
 
     def __init__(self, context: MeridianDriverContext) -> None:
@@ -154,23 +186,30 @@ class AgentRuntimeDriver:
 
     def observe(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceObservation:
         payload = payload_of(action, AgentRuntimePayload)
-        in_place, seen = self._inspect(payload)
+        inspection = self._inspect(payload)
+        in_place = inspection.in_place
         if in_place and payload.warp:
             in_place = warp_connected(action.resource.logical_id, self.context.connection_for(payload.server_ref))
-        return _observation(action, exists=in_place, connected=in_place and seen, remote_id=payload.workload_ref)
+        return _observation(
+            action, exists=in_place, connected=in_place and inspection.live, remote_id=payload.workload_ref
+        )
 
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
         payload = payload_of(action, AgentRuntimePayload)
         conn = self.context.connection_for(payload.server_ref)
         if payload.warp:
             ensure_warp(conn, self.context.address(payload.server_ref))
-        in_place, seen = self._inspect(payload)
-        if in_place and (seen or self._reconnects(payload)):
-            # Only WARP needed repair, or a service outage left a healthy agent unseen until its
-            # backoff ends; re-enrolling it is churn.
-            return ResourceApplyReceipt(remote_id=payload.workload_ref)
+        inspection = self._inspect(payload)
+        # A service outage leaves a healthy agent unseen until its backoff ends; wait it out
+        # rather than re-enroll (or refuse to upgrade) a node that is fine.
+        healthy = inspection.active and inspection.identity and (inspection.live or self._reconnects(payload))
+        if healthy and inspection.current_build:
+            return ResourceApplyReceipt(remote_id=payload.workload_ref)  # only WARP needed repair
         arch = _run(conn, "uname -m", "read the architecture").strip()
         binary = self.context.agent_binary(arch)
+        if healthy:
+            self._upgrade(conn, payload, binary)
+            return ResourceApplyReceipt(remote_id=payload.workload_ref)
         _ok(conn.put_bytes(AGENT_BINARY, binary.data, mode="755", timeout=180), "upload the agent")
         with self.context.client() as client:
             grant = client.grant_enrollment(payload.workload_ref)
@@ -212,21 +251,54 @@ class AgentRuntimeDriver:
                 self.context.sleep(POLL_INTERVAL)
         return ResourceApplyReceipt(remote_id=payload.workload_ref)
 
-    def _inspect(self, payload: AgentRuntimePayload) -> tuple[bool, bool]:
-        """Whether this agent build runs with the expected identity, and whether the service sees it live."""
+    def _upgrade(self, conn: ServerConnection, payload: AgentRuntimePayload, binary: AgentBinary) -> None:
+        """Swap a healthy agent's binary for this build, keeping its identity; roll back if it never reports."""
+        staged = stage_agent(conn, binary, payload.workload_ref)
+        _ok(conn.put_text(f"/etc/systemd/system/{AGENT_UNIT}", _agent_unit(), mode="644", timeout=15), "write unit")
+        with self.context.client() as client:
+            before = client.node(payload.workload_ref)
+            swap_in(conn)
+            if wait_for_upgrade(
+                conn,
+                client,
+                payload.workload_ref,
+                staged=staged,
+                binary=binary,
+                before=before,
+                sleep=self.context.sleep,
+                interval=POLL_INTERVAL,
+            ):
+                finish_upgrade(conn)
+                return
+        logs = conn.run(f"journalctl -u {AGENT_UNIT} -n 5 --no-pager -o cat", timeout=15).stdout.strip()[-300:]
+        if not roll_back(conn):
+            raise ResourceReconcileError(
+                f"The upgraded agent on {payload.server_ref} never reported, and the previous one was not restored.",
+                hint=f"On the server: mv -f {PREVIOUS_BINARY} {AGENT_BINARY} && systemctl restart {AGENT_UNIT}",
+            )
+        raise ResourceReconcileError(
+            f"The upgraded agent on {payload.server_ref} never reported {staged.version}; the previous agent is back.",
+            hint=f"Its last log lines: {logs}",
+        )
+
+    def _inspect(self, payload: AgentRuntimePayload) -> AgentInspection:
+        """What runs on the node, under which identity, and whether the service sees it live."""
         conn = self.context.connection_for(payload.server_ref)
         arch = _run(conn, "uname -m", "read the architecture").strip()
         binary = self.context.agent_binary(arch)
-        installed = _run(conn, f"sha256sum {AGENT_BINARY} 2>/dev/null || true", "hash the agent").split()
+        # The running image, not the file: a swap whose restart was lost still runs the old build.
+        running = running_sha256(conn)
         active = conn.run(f"systemctl is-active {AGENT_UNIT}", timeout=15).stdout.strip() == "active"
         bootstrap = conn.run(f"cat {AGENT_BOOTSTRAP} 2>/dev/null", timeout=15, sensitive=True).stdout
         with self.context.client() as client:
             ca_sha256 = client.fleet_authority().ca_sha256
             status = client.node(payload.workload_ref)
-        expected = self._identity(payload, ca_sha256)
-        current = _bootstrap_identity(bootstrap)
-        in_place = bool(installed) and installed[0] == binary.sha256 and active and current == expected
-        return in_place, status is not None and status.is_live()
+        return AgentInspection(
+            current_build=running == binary.sha256,
+            active=active,
+            identity=_bootstrap_identity(bootstrap) == self._identity(payload, ca_sha256),
+            live=status is not None and status.is_live(),
+        )
 
     def _reconnects(self, payload: AgentRuntimePayload) -> bool:
         with self.context.client() as client:
@@ -260,6 +332,8 @@ class AgentRuntimeDriver:
                 f"/etc/systemd/system/{AGENT_UNIT}",
                 f"/etc/systemd/system/{CORE_UNIT}",
                 AGENT_BINARY,
+                STAGED_BINARY,
+                PREVIOUS_BINARY,
                 AGENT_CONFIG_DIR,
                 AGENT_LIB_DIR,
                 AGENT_STATE_DIR,

@@ -59,7 +59,8 @@ def build_node_spec(
             "kind": "binary_pin",
             "name": name,
             "version": XRAY_VERSION,
-            "sources": [f"{XRAY_GITHUB_URL}/v{XRAY_VERSION}/{XRAY_LINUX_ASSET}"],
+            # GitHub first; the control service mirrors it for nodes that cannot reach GitHub.
+            "sources": [f"{XRAY_GITHUB_URL}/v{XRAY_VERSION}/{XRAY_LINUX_ASSET}", "service"],
             "size": XRAY_ARCHIVE_BYTES[XRAY_LINUX_ASSET],
             "sha256": XRAY_SHA256[XRAY_LINUX_ASSET],
             "archive": "zip",

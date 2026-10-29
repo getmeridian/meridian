@@ -13,7 +13,7 @@ use crate::fetch::{Client, HttpError};
 use crate::fsutil::host_path;
 use crate::identity::Identity;
 use crate::model::{
-    NodeStateRef, ObservedStateReport, PollRequest, PollResponse, ReportAck, Resource,
+    NodeStateRef, ObservedStateReport, PROTOCOL, PollRequest, PollResponse, ReportAck, Resource,
     ResourceObservation, Spec, StatsAck,
 };
 use crate::session::{self, Session};
@@ -29,6 +29,9 @@ pub const REPORT_INTERVAL: Duration = Duration::from_secs(60);
 /// Drift re-check and retry of failed resources between new documents.
 pub const RECONCILE_INTERVAL: Duration = Duration::from_secs(300);
 const MAX_BACKOFF: Duration = Duration::from_secs(60);
+/// After `unsupported_protocol`, say hello again no sooner than this (or the service's
+/// `retry_after_seconds`, if longer): only a matching agent or service can fix it.
+pub const PROTOCOL_REFUSED_BACKOFF: Duration = Duration::from_secs(300);
 /// After a failed renewal, try again this much later (the certificate outlives several tries).
 const RENEW_RETRY_SECONDS: u64 = 3600;
 
@@ -79,6 +82,8 @@ pub struct Agent<'a> {
     session: Option<Session>,
     /// The service revoked this node's certificate: only a fresh enrollment token helps.
     revoked: bool,
+    /// The service refused this agent's protocol; no hello is sent before this instant.
+    protocol_refused_until: Option<Instant>,
     traffic: TrafficStore,
     exec: &'a dyn Exec,
     opts: Options,
@@ -95,6 +100,23 @@ fn typed<T: DeserializeOwned>(body: Value, expected: &str) -> Result<T, HttpErro
         )));
     }
     serde_json::from_value(body).map_err(|err| HttpError::Protocol(err.to_string()))
+}
+
+/// How long to stay quiet after `unsupported_protocol`: the service's hint, never under the floor.
+fn refused_wait(err: &HttpError) -> Duration {
+    let hinted = match err {
+        HttpError::Status { retry_after, .. } => retry_after.unwrap_or(0).min(86_400),
+        _ => 0,
+    };
+    PROTOCOL_REFUSED_BACKOFF.max(Duration::from_secs(hinted))
+}
+
+fn protocol_refused_error(left: Duration) -> HttpError {
+    HttpError::Status {
+        status: 400,
+        retry_after: Some(left.as_secs().max(1)),
+        code: Some("unsupported_protocol".into()),
+    }
 }
 
 fn revoked_error() -> HttpError {
@@ -126,6 +148,7 @@ impl<'a> Agent<'a> {
             trust: None,
             session: None,
             revoked: false,
+            protocol_refused_until: None,
             traffic,
             exec,
             opts,
@@ -141,6 +164,12 @@ impl<'a> Agent<'a> {
 
     pub fn has_held(&self) -> bool {
         self.state.held.is_some()
+    }
+
+    /// Whether the service refused this agent's protocol and no hello is due yet.
+    pub fn protocol_refused(&self) -> bool {
+        self.protocol_refused_until
+            .is_some_and(|until| Instant::now() < until)
     }
 
     pub fn is_enrolled(&self) -> bool {
@@ -219,6 +248,13 @@ impl<'a> Agent<'a> {
         if self.revoked {
             return Err(revoked_error());
         }
+        if let Some(until) = self.protocol_refused_until {
+            let left = until.saturating_duration_since(Instant::now());
+            if !left.is_zero() {
+                return Err(protocol_refused_error(left));
+            }
+            self.protocol_refused_until = None;
+        }
         let opened = session::hello(
             &self.client,
             &self.bootstrap,
@@ -237,6 +273,15 @@ impl<'a> Agent<'a> {
                 ) {
                     info!("the service refused this node's certificate; run `meridian apply`");
                     self.revoked = true;
+                }
+                if err.code() == Some("unsupported_protocol") {
+                    let wait = refused_wait(&err);
+                    info!(
+                        "the control service does not speak {PROTOCOL}; run `meridian apply` to install a \
+                         matching agent (next hello in {}s)",
+                        wait.as_secs()
+                    );
+                    self.protocol_refused_until = Some(Instant::now() + wait);
                 }
                 return Err(err);
             }

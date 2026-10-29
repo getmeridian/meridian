@@ -17,6 +17,7 @@ from typing import TypeVar
 
 import typer
 
+from meridian import __version__
 from meridian.adapters.cluster import topology_from_local_cluster
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import load_cluster, make_panel
@@ -25,6 +26,7 @@ from meridian.commands.resolve import ensure_server_connection, resolve_server
 from meridian.config import DEFAULT_SNI
 from meridian.console import err_console, error_context, fail, info, is_json_mode
 from meridian.control.client import ControlClient, ControlServiceError
+from meridian.control_artifacts import agent_version
 from meridian.core.errors import LocalStateError
 from meridian.core.execution import ServerConnection
 from meridian.core.fleet import TopologyNode
@@ -40,7 +42,12 @@ from meridian.diagnostics.checks import (
     check_port_listening,
     check_tls_certificate,
 )
-from meridian.diagnostics.control_service import agent_finding, check_unit_active
+from meridian.diagnostics.control_service import (
+    agent_finding,
+    agent_version_finding,
+    check_unit_active,
+    service_version_finding,
+)
 from meridian.diagnostics.evidence import check_from_result, finding, finish_check
 from meridian.diagnostics.exit_dns import check_exit_dns
 from meridian.diagnostics.network import resolve_hostname
@@ -284,6 +291,8 @@ class _ServiceSession:
             )
         else:
             found = finding("control_service", "passed", f"Control service {health.version} answers")
+            version = service_version_finding(__version__, health.version)
+            return finish_check("control_service", "Control service", [found, version], started)
         return finish_check("control_service", "Control service", [found], started)
 
     def node_check(self, node: TopologyNode) -> VerificationCheck:
@@ -293,6 +302,9 @@ class _ServiceSession:
             found = finding("agent", "skipped", f"Control service unreachable: {self.error}")
         else:
             found = agent_finding(status, logs_hint=f"meridian logs {node.ip} --component node")
+            version = agent_version_finding(agent_version(), status)
+            if version is not None:
+                return finish_check("agent", "Node agent", [found, version], started)
         return finish_check("agent", "Node agent", [found], started)
 
     def _read(self, call: Callable[[ControlClient], T]) -> T | None:

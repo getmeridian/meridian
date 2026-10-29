@@ -11,6 +11,7 @@ use common::*;
 use meridian_agent::agent::{Agent, Options, PollOutcome};
 use meridian_agent::fetch::HttpError;
 use meridian_agent::jcs;
+use meridian_agent::selfcheck::self_check;
 use serde_json::{Value, json};
 
 const XRAY: &[u8] = b"\x7fELF fake xray";
@@ -327,6 +328,31 @@ fn a_session_the_service_forgot_is_reopened_with_a_fresh_hello() {
 }
 
 #[test]
+fn a_service_that_refuses_the_protocol_is_not_asked_again_until_the_backoff_ends() {
+    let pki = TestPki::new();
+    let service = service(&pki);
+    service.state.lock().unwrap().refuse_protocol = true;
+    let node = Node::new(&service.url(), &pki);
+    let exec = FakeExec::default();
+    let mut agent = Agent::new(node.options(), &exec).unwrap();
+
+    let err = agent.poll_once().unwrap_err();
+    assert_eq!(err.code(), Some("unsupported_protocol"));
+    assert!(agent.protocol_refused());
+    assert!(
+        agent.is_enrolled(),
+        "a refused protocol never touches the credentials"
+    );
+
+    // Neither polls nor reports say hello again inside the window, which honours the
+    // service's longer hint: a refusal is a long backoff, never a crash or a hello storm.
+    let again = agent.poll_once().unwrap_err();
+    assert!(matches!(again, HttpError::Status { retry_after: Some(wait), .. } if wait > 300));
+    assert!(agent.send_report().is_err());
+    assert_eq!(service.endpoints(), ["enroll", "hello"]);
+}
+
+#[test]
 fn a_revoked_node_stops_until_a_new_bootstrap_enrolls_it_again() {
     let pki = TestPki::new();
     let service = service(&pki);
@@ -514,5 +540,49 @@ fn malformed_credentials_stop_the_agent() {
     std::fs::write(node.state.path().join("identity.json"), b"{").unwrap();
     let exec = FakeExec::default();
     let err = Agent::new(node.options(), &exec).err().unwrap();
+    assert!(err.contains("malformed"), "{err}");
+}
+
+fn files(dir: &std::path::Path) -> Vec<(String, Vec<u8>)> {
+    let mut entries: Vec<(String, Vec<u8>)> = std::fs::read_dir(dir)
+        .unwrap()
+        .filter_map(|entry| {
+            let path = entry.unwrap().path();
+            path.is_file().then(|| {
+                (
+                    path.file_name().unwrap().to_string_lossy().into_owned(),
+                    std::fs::read(&path).unwrap(),
+                )
+            })
+        })
+        .collect();
+    entries.sort();
+    entries
+}
+
+#[test]
+fn a_staged_build_checks_the_nodes_files_without_writing_or_dialing() {
+    let pki = TestPki::new();
+    let service = service(&pki);
+    service.push(document(1, 1, &supported(), &pki));
+    let node = Node::new(&service.url(), &pki);
+    let exec = FakeExec::default();
+    let mut agent = Agent::new(node.options(), &exec).unwrap();
+    agent.poll_once().unwrap();
+    let before = (files(node.state.path()), node.read_bootstrap());
+    let requests = service.endpoints().len();
+
+    let report = self_check(&node.bootstrap(), node.state.path(), true).unwrap();
+
+    assert_eq!(report["version"], meridian_agent::VERSION);
+    assert_eq!(report["node_id"], NODE_ID);
+    assert_eq!(report["enrolled"], true);
+    assert_eq!(report["held_verifies"], true);
+    assert_eq!((files(node.state.path()), node.read_bootstrap()), before);
+    assert_eq!(service.endpoints().len(), requests, "check never dials");
+
+    // A build that cannot read the node's files refuses to take over.
+    std::fs::write(node.state.path().join("state.json"), b"{not json").unwrap();
+    let err = self_check(&node.bootstrap(), node.state.path(), true).unwrap_err();
     assert!(err.contains("malformed"), "{err}");
 }

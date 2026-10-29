@@ -91,6 +91,8 @@ pub struct FakeExec {
     pub api_down: Mutex<bool>,
     /// What `xray api adu` received (the file is removed right after).
     pub added: Mutex<Vec<Value>>,
+    /// What `xray api adi` received: inbounds rebuilt with all their users.
+    pub rebuilt: Mutex<Vec<Value>>,
     /// Users the fake running Xray holds, by email, after API calls.
     pub live_users: Mutex<BTreeSet<String>>,
     /// `xray api statsquery` output (protobuf JSON).
@@ -232,6 +234,25 @@ impl FakeExec {
                 let added = clients.len();
                 self.added.lock().unwrap().push(body);
                 ok(&format!("Added {added} user(s) in total.\n"))
+            }
+            "rmi" => {
+                let tag = args[3];
+                ok(&format!(
+                    "removing inbounds: [{tag}]\nremoving: {tag}\n{{}}\n"
+                ))
+            }
+            "adi" => {
+                let body: Value = serde_json::from_slice(&std::fs::read(args[3])?).unwrap();
+                let mode = std::fs::metadata(args[3])?.mode() & 0o777;
+                assert_eq!(mode, 0o600, "the adi file holds user credentials");
+                for client in body["inbounds"][0]["settings"]["clients"]
+                    .as_array()
+                    .unwrap()
+                {
+                    live.insert(client["email"].as_str().unwrap().to_string());
+                }
+                self.rebuilt.lock().unwrap().push(body);
+                ok("adding: inbound\n{}\n")
             }
             other => panic!("unexpected xray api {other}"),
         }

@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from meridian.control.models import NodeStatus
 from meridian.core.verification import VerificationFinding
+from meridian.core.version_skew import agent_version_differs, newer_service_hint, service_skew
 from meridian.diagnostics.checks import CheckResult, command_evidence_unavailable
 from meridian.diagnostics.evidence import finding
 
@@ -72,6 +73,42 @@ def agent_finding(status: NodeStatus | None, *, logs_hint: str, now: datetime | 
             f"Wait a minute and re-run the check; if it stays behind, read: {logs_hint}",
         )
     return finding("agent", "passed", f"The node agent applied revision {applied}")
+
+
+def service_version_finding(cli_version: str, service_version: str) -> VerificationFinding:
+    """Judge the CLI/service pair (`core/version_skew.py`): newer refuses applies, older is upgraded by one."""
+    skew = service_skew(cli_version, service_version)
+    if skew == "service_newer":
+        return finding(
+            "service_version",
+            "failed",
+            f"The control service runs Meridian {service_version}, newer than this Meridian ({cli_version}); "
+            "this copy cannot apply",
+            newer_service_hint(service_version),
+        )
+    if skew == "service_older":
+        return finding(
+            "service_version",
+            "warning",
+            f"The control service runs Meridian {service_version}; this Meridian ({cli_version}) upgrades it",
+            "Run: meridian apply",
+        )
+    if skew == "unknown":
+        return finding("service_version", "skipped", f"Cannot compare service {service_version} with {cli_version}")
+    return finding("service_version", "passed", f"The control service runs this Meridian ({cli_version})")
+
+
+def agent_version_finding(expected: str, status: NodeStatus | None) -> VerificationFinding | None:
+    """A warning when a node reports another agent than this Meridian installs; None when nothing to say."""
+    reported = status.agent_version if status is not None else None
+    if not agent_version_differs(expected, reported):
+        return None
+    return finding(
+        "agent_version",
+        "warning",
+        f"The node agent runs {reported}; this Meridian installs {expected}",
+        "Run: meridian apply (the agent upgrades in place and keeps its identity)",
+    )
 
 
 def _ago(seconds: float) -> str:

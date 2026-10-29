@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 import typer
 
+from meridian import __version__
 from meridian.cluster import ClusterConfig, SubscriptionPageConfig
 from meridian.commands import health
 from meridian.control.client import ControlServiceError
@@ -273,7 +274,7 @@ def _service_fleet(fleet: SimpleNamespace, *, health_error: Exception | None = N
     fleet.cluster.save()
     client = MagicMock()
     client.__enter__.return_value = client
-    client.health.return_value = ServiceHealth(version="4.0.0", fleet_id=FLEET_ID, fleet_epoch=1)
+    client.health.return_value = ServiceHealth(version=__version__, fleet_id=FLEET_ID, fleet_epoch=1)
     client.health.side_effect = health_error
     client.node.return_value = NodeStatus(
         node_id="exit-a",
@@ -288,12 +289,33 @@ def _service_fleet(fleet: SimpleNamespace, *, health_error: Exception | None = N
     return client
 
 
-def _run_service(fleet: SimpleNamespace, client: MagicMock, units: MagicMock) -> SimpleNamespace:
+def _run_service(
+    fleet: SimpleNamespace, client: MagicMock, units: MagicMock, *, agent: str = "0.1.0"
+) -> SimpleNamespace:
     with (
         patch.object(health, "ControlClient", return_value=client),
         patch.object(health, "check_unit_active", units),
+        patch.object(health, "agent_version", return_value=agent),
     ):
         return _run(fleet, "exit-a")
+
+
+@pytest.mark.parametrize(
+    ("service", "agent", "message"),
+    [("9.0.0", "0.1.0", "newer than this Meridian"), (__version__, "0.2.0", "this Meridian installs 0.2.0")],
+    ids=["newer-service", "older-agent"],
+)
+def test_version_skew_is_a_check_finding(
+    fleet: SimpleNamespace, capsys: pytest.CaptureFixture[str], service: str, agent: str, message: str
+) -> None:
+    client = _service_fleet(fleet)
+    client.health.return_value = ServiceHealth(version=service, fleet_id=FLEET_ID, fleet_epoch=1)
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_service(fleet, client, MagicMock(return_value=PASSED), agent=agent)
+
+    assert exc_info.value.exit_code == 4
+    assert message in capsys.readouterr().err
 
 
 def test_a_control_service_fleet_checks_units_service_and_agent_instead_of_containers(

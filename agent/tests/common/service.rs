@@ -29,6 +29,8 @@ pub struct ServiceState {
     pub renew_in: i64,
     pub capabilities: Vec<&'static str>,
     pub blobs: HashMap<String, Vec<u8>>,
+    /// Answer every hello `unsupported_protocol`, as a service of another protocol would.
+    pub refuse_protocol: bool,
     nonces: HashSet<String>,
     issued: usize,
 }
@@ -90,6 +92,15 @@ impl ServiceState {
     fn hello(&mut self, body: &Value) -> (u16, Vec<u8>) {
         if self.revoked {
             return error(403, "credential_revoked");
+        }
+        if self.refuse_protocol {
+            let body = json!({
+                "type": "error", "protocol": "meridian.agent/v1",
+                "error": {"code": "unsupported_protocol", "message": "unsupported_protocol",
+                          "retryable": false, "retry_after_seconds": 600,
+                          "server_time": format_unix(now_unix())},
+            });
+            return (400, serde_json::to_vec(&body).unwrap());
         }
         let proof = &body["proof"];
         let key = certificate_key(proof["certificate_pem"].as_str().unwrap()).unwrap();
@@ -196,6 +207,7 @@ impl FakeService {
             renew_in: 86_400,
             capabilities: vec!["long_poll", "xray_config", "xray_users", "traffic_stats"],
             blobs: HashMap::new(),
+            refuse_protocol: false,
             nonces: HashSet::new(),
             issued: 0,
         }));

@@ -199,6 +199,11 @@ class ControlService:
             self._compose(node_id)
         return self.node_status(node_id)
 
+    def node_specs(self) -> list[NodeSpec]:
+        """Every stored node spec (the blob mirror reads their artifacts at start)."""
+        rows = self._store.rows("SELECT spec FROM nodes WHERE spec IS NOT NULL")
+        return [NodeSpec.model_validate_json(row["spec"]) for row in rows]
+
     def delete_node(self, node_id: str) -> None:
         with self._transaction():
             self._db.execute("DELETE FROM nodes WHERE node_id = ?", (node_id,))

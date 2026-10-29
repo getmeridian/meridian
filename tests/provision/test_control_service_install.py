@@ -113,3 +113,29 @@ def test_service_unit_runs_unprivileged_with_only_its_state_writable() -> None:
     assert "User=ctld" in unit
     assert "ProtectSystem=strict" in unit
     assert "ReadWritePaths=/var/lib/ctld" in unit
+
+
+@pytest.mark.parametrize(
+    ("marker", "refused"),
+    [
+        ("meridian-vpn==3.9.0", False),
+        ("meridian_vpn-4.0.0b8-py3-none-any.whl:" + "d" * 64, False),
+        ("meridian-vpn==4.0.1", True),
+        ("meridian_vpn-4.1.0-py3-none-any.whl:" + "d" * 64, True),
+        ("something else", False),
+    ],
+    ids=["older-release", "older-wheel", "newer-release", "newer-wheel", "unrecognised"],
+)
+def test_an_install_never_downgrades_a_newer_service(marker: str, refused: bool) -> None:
+    conn = MockConnection()
+    conn.when("bin/uv --version", stdout=f"uv {UV_VERSION}\n")
+    conn.when(f"cat {INSTALLED_MARKER}", stdout=f"{marker}\n")
+
+    result = _install().run(conn, _ctx())
+
+    if refused:
+        assert result.status == "failed"
+        assert "newer than this Meridian (4.0.0)" in result.detail
+        conn.assert_not_called_with_pattern("tool install")
+    else:
+        conn.assert_called_with_pattern("tool install --force")

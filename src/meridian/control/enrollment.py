@@ -52,6 +52,11 @@ from meridian.core.agent_signing import (
     verify_proof,
 )
 from meridian.core.agent_types import AGENT_PROTOCOL
+from meridian.core.version_skew import (
+    SUPPORTED_AGENT_PROTOCOLS,
+    UNSUPPORTED_PROTOCOL_RETRY_SECONDS,
+    common_agent_protocol,
+)
 
 ENROLLMENT_TOKEN_SECONDS = 30 * 60
 SESSION_SECONDS = 60 * 60
@@ -207,9 +212,15 @@ class NodeAuthority:
 
     def hello(self, raw: dict[str, Any]) -> tuple[HelloRequest, HelloResponse]:
         """Check a hello and its `NodeProof` (as received) and open a session."""
+        # Before validation: a hello from another protocol need not parse as this one's.
+        if common_agent_protocol(raw.get("protocols") or []) is None:
+            raise agent_error(
+                "unsupported_protocol",
+                f"This service speaks {', '.join(SUPPORTED_AGENT_PROTOCOLS)}; install a matching agent with "
+                "`meridian apply`.",
+                retry_after=UNSUPPORTED_PROTOCOL_RETRY_SECONDS,
+            )
         request = HelloRequest.model_validate(raw)
-        if AGENT_PROTOCOL not in request.protocols:
-            raise agent_error("unsupported_protocol", f"This service speaks only {AGENT_PROTOCOL}.")
         if request.fleet_id != self.fleet_id:
             raise agent_error("unauthenticated", "The hello names another fleet.")
         now = self._now()
