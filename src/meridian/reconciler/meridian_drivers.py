@@ -255,31 +255,39 @@ class AgentRuntimeDriver:
         """Swap a healthy agent's binary for this build, keeping its identity; roll back if it never reports."""
         staged = stage_agent(conn, binary, payload.workload_ref)
         _ok(conn.put_text(f"/etc/systemd/system/{AGENT_UNIT}", _agent_unit(), mode="644", timeout=15), "write unit")
+        failure: Exception | None = None
         with self.context.client() as client:
             before = client.node(payload.workload_ref)
-            swap_in(conn)
-            if wait_for_upgrade(
-                conn,
-                client,
-                payload.workload_ref,
-                staged=staged,
-                binary=binary,
-                before=before,
-                sleep=self.context.sleep,
-                interval=POLL_INTERVAL,
-            ):
+            try:
+                swap_in(conn)
+                upgraded = wait_for_upgrade(
+                    conn,
+                    client,
+                    payload.workload_ref,
+                    staged=staged,
+                    binary=binary,
+                    before=before,
+                    sleep=self.context.sleep,
+                    interval=POLL_INTERVAL,
+                )
+            except Exception as exc:  # noqa: BLE001 - any failure after the swap puts the previous agent back
+                failure, upgraded = exc, False
+            if upgraded:
                 finish_upgrade(conn)
                 return
         logs = conn.run(f"journalctl -u {AGENT_UNIT} -n 5 --no-pager -o cat", timeout=15).stdout.strip()[-300:]
+        what = f"failed: {failure}" if failure is not None else f"never reported {staged.version}"
         if not roll_back(conn):
-            raise ResourceReconcileError(
-                f"The upgraded agent on {payload.server_ref} never reported, and the previous one was not restored.",
-                hint=f"On the server: mv -f {PREVIOUS_BINARY} {AGENT_BINARY} && systemctl restart {AGENT_UNIT}",
-            )
+            message = f"The upgraded agent on {payload.server_ref} {what}, and the previous one was not restored."
+            hint = f"On the server: mv -f {PREVIOUS_BINARY} {AGENT_BINARY} && systemctl restart {AGENT_UNIT}"
+            if isinstance(failure, UnknownResourceOutcome):
+                # The server was lost mid-swap; observation finds out which build runs now.
+                raise UnknownResourceOutcome(f"{message} If it stays stopped: {hint}") from failure
+            raise ResourceReconcileError(message, hint=hint) from failure
         raise ResourceReconcileError(
-            f"The upgraded agent on {payload.server_ref} never reported {staged.version}; the previous agent is back.",
+            f"The upgraded agent on {payload.server_ref} {what}; the previous agent is back.",
             hint=f"Its last log lines: {logs}",
-        )
+        ) from failure
 
     def _inspect(self, payload: AgentRuntimePayload) -> AgentInspection:
         """What runs on the node, under which identity, and whether the service sees it live."""

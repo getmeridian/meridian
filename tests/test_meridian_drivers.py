@@ -30,6 +30,7 @@ from meridian.control.models import (
     NodeStatus,
     ServiceSettings,
 )
+from meridian.control.client import ControlServiceError
 from meridian.control_artifacts import AgentBinary
 from meridian.core.agent_protocol import AgentBootstrap
 from meridian.core.agent_types import NodeStateRef, canonical_sha256
@@ -47,6 +48,7 @@ from meridian.reconciler.meridian_drivers import MeridianDriverContext, build_me
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceReconcileError,
+    UnknownResourceOutcome,
     build_resource_actions,
     observation_converges,
 )
@@ -136,12 +138,17 @@ def plan() -> ResourcePlan:
     return compile_topology(single_server_intent(None, server_ref="srv-a", address="198.51.100.10", control="meridian"))
 
 
-def _setup(plan: ResourcePlan, conn: MockConnection | None = None, addresses: dict[str, str] | None = None):
+def _setup(
+    plan: ResourcePlan,
+    conn: MockConnection | None = None,
+    addresses: dict[str, str] | None = None,
+    control: FakeControl | None = None,
+):
     cluster = ClusterConfig()
     cluster.fleet_id = FLEET_ID
     cluster.panel.url = "https://198.51.100.10/secret"
     cluster.panel.sub_path = "pages"
-    control = FakeControl()
+    control = control or FakeControl()
     drivers = build_meridian_drivers(
         MeridianDriverContext(
             plan=plan,
@@ -511,10 +518,14 @@ OLD_VERSION, NEW_VERSION = "0.1.0+0123456789ab", "0.2.0+ba9876543210"
 class AgentHost(MockConnection):
     """A node whose agent binary, staged copy, previous copy, and running image follow the commands."""
 
-    def __init__(self, *, check_rc: int = 0, enrolled: bool = True, active: bool = True) -> None:
+    def __init__(
+        self, *, check_rc: int = 0, enrolled: bool = True, active: bool = True, swap_rc: int = 0, rollback_rc: int = 0
+    ) -> None:
         super().__init__()
         self.binary, self.staged, self.previous, self.running = OLD_SHA, "", "", OLD_SHA
         self.check_rc, self.enrolled = check_rc, enrolled
+        # A failing swap renamed the new build in, but its restart failed (or the reply was lost).
+        self.swap_rc, self.rollback_rc = swap_rc, rollback_rc
         self.when("uname -m", stdout="x86_64\n")
         self.when("systemctl is-active", stdout="active\n" if active else "failed\n", rc=0 if active else 3)
         self.when(f"cat {AGENT_BOOTSTRAP}", stdout=_enrolled_bootstrap())
@@ -529,6 +540,18 @@ class AgentHost(MockConnection):
     def run(self, command: str, timeout: int = 30, **kwargs: object) -> Any:
         result = super().run(command, timeout=timeout, **kwargs)
         staged, previous = agent_upgrade.STAGED_BINARY, agent_upgrade.PREVIOUS_BINARY
+        if f"mv -f {staged} {AGENT_BINARY}" in command:
+            # The previous binary is whatever the command copies; the staged build is renamed in and restarted.
+            kept = self.running if "cp /proc/$pid/exe" in command else self.binary
+            self.previous, self.binary, self.staged = kept, self.staged, ""
+            self.running = self.binary if not self.swap_rc else ""
+            return subprocess.CompletedProcess([], self.swap_rc, "", "restart failed" if self.swap_rc else "")
+        if command.startswith(f"mv -f {previous} {AGENT_BINARY}"):
+            if self.rollback_rc:
+                return subprocess.CompletedProcess([], self.rollback_rc, "", "")
+            self.binary, self.previous = self.previous, ""
+            self.running = self.binary
+            return result
         if "MainPID" in command:
             return subprocess.CompletedProcess([], 0, f"{self.running}  /proc/4242/exe\n", "")
         if command.startswith(f"sha256sum {staged}"):
@@ -538,13 +561,7 @@ class AgentHost(MockConnection):
             if self.check_rc:
                 return subprocess.CompletedProcess([], 1, "", "netagent: state.json is malformed")
             return subprocess.CompletedProcess([], 0, json.dumps(report) + "\n", "")
-        if command.startswith(f"cp -p {AGENT_BINARY} {previous} && mv -f {staged}"):
-            self.previous, self.binary, self.staged = self.binary, self.staged, ""
-            self.running = self.binary
-        elif command.startswith(f"mv -f {previous} {AGENT_BINARY}"):
-            self.binary, self.previous = self.previous, ""
-            self.running = self.binary
-        elif command == f"rm -f {previous}":
+        if command == f"rm -f {previous}":
             self.previous = ""
         elif command == f"rm -f {staged}":
             self.staged = ""
@@ -574,7 +591,7 @@ def test_a_new_agent_build_is_swapped_in_keeping_the_nodes_identity(plan: Resour
     assert AGENT_BOOTSTRAP not in host.write_map
     calls = host.calls
     check = next(i for i, call in enumerate(calls) if " check --bootstrap" in call)
-    swap = next(i for i, call in enumerate(calls) if call.startswith(f"cp -p {AGENT_BINARY}"))
+    swap = next(i for i, call in enumerate(calls) if f"mv -f {agent_upgrade.STAGED_BINARY}" in call)
     assert check < swap, "the staged build checks the node's files before it replaces anything"
     action = _action(plan, "agent:main")
     assert observation_converges(action, drivers["agent_runtime"].observe(action, None))
@@ -622,6 +639,58 @@ def test_a_swap_whose_restart_was_lost_still_reads_as_the_old_build(plan: Resour
     action = _action(plan, "agent:main")
 
     assert not drivers["agent_runtime"].observe(action, None).exists
+
+
+def test_retrying_a_swap_whose_restart_was_lost_rolls_back_to_the_running_build(
+    plan: ResourcePlan, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The file already holds the new build; only the running image is the one to keep."""
+    monkeypatch.setattr(agent_upgrade, "UPGRADE_REPORT_TIMEOUT", 0.0)
+    host = AgentHost()
+    host.binary = BINARY.sha256
+    drivers, _control = _upgrade_setup(plan, host, [{"last_seen_at": _SEEN, "agent_version": OLD_VERSION}])
+
+    with pytest.raises(ResourceReconcileError, match="the previous agent is back"):
+        drivers["agent_runtime"].apply(_action(plan, "agent:main"), None)
+
+    assert (host.binary, host.running) == (OLD_SHA, OLD_SHA)
+
+
+class _LostReply(FakeControl):
+    """The service answers until the swap, then its gateway fails."""
+
+    def __init__(self, host: AgentHost) -> None:
+        super().__init__()
+        self.host = host
+
+    def node(self, node_id: str) -> NodeStatus | None:
+        if self.host.running == BINARY.sha256:
+            raise ControlServiceError("Control service returned HTTP 502")
+        return super().node(node_id)
+
+
+@pytest.mark.parametrize(
+    ("swap_rc", "rollback_rc", "service_fails", "error", "binary"),
+    [
+        (1, 0, False, "failed: Could not swap in the new agent: restart failed; the previous agent is back", OLD_SHA),
+        (0, 0, True, "HTTP 502; the previous agent is back", OLD_SHA),
+        (255, 255, False, "Lost the server.*not restored", BINARY.sha256),
+    ],
+    ids=["restart-fails", "service-fails-while-polling", "server-lost"],
+)
+def test_a_failure_after_the_swap_puts_the_previous_agent_back(
+    plan: ResourcePlan, swap_rc: int, rollback_rc: int, service_fails: bool, error: str, binary: str
+) -> None:
+    host = AgentHost(swap_rc=swap_rc, rollback_rc=rollback_rc)
+    drivers, control, _cluster = _setup(plan, host, control=_LostReply(host) if service_fails else None)
+    control.reports = [{"last_seen_at": _SEEN, "agent_version": OLD_VERSION}]
+
+    with pytest.raises(ResourceReconcileError, match=error) as raised:
+        drivers["agent_runtime"].apply(_action(plan, "agent:main"), None)
+
+    assert host.binary == binary
+    # A lost server is not a definite failure: observation finds out which build runs.
+    assert isinstance(raised.value, UnknownResourceOutcome) == (swap_rc == 255)
 
 
 def test_a_dead_agent_of_an_old_build_is_enrolled_again_not_upgraded(plan: ResourcePlan) -> None:

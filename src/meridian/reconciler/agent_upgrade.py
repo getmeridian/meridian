@@ -61,10 +61,17 @@ def stage_agent(conn: ServerConnection, binary: AgentBinary, node_id: str) -> St
 
 
 def swap_in(conn: ServerConnection) -> None:
-    """Keep the running binary as the previous one, rename the staged one over it, and restart the agent."""
+    """Keep the running image as the previous binary, rename the staged one over it, and restart the agent.
+
+    The previous binary is copied from the process, not the file: after a swap whose restart
+    was lost the file already holds the new build, and copying it would leave nothing to roll
+    back to.
+    """
+    keep = shlex.quote(f"{PREVIOUS_BINARY}.tmp")
     result = conn.run(
-        f"cp -p {AGENT_BINARY} {PREVIOUS_BINARY} && mv -f {STAGED_BINARY} {AGENT_BINARY} && "
-        f"systemctl daemon-reload && systemctl restart {AGENT_UNIT}",
+        f'pid=$(systemctl show -p MainPID --value {AGENT_UNIT}); [ "${{pid:-0}}" != 0 ] || exit 3; '
+        f"cp /proc/$pid/exe {keep} && chmod 755 {keep} && mv -f {keep} {PREVIOUS_BINARY} && "
+        f"mv -f {STAGED_BINARY} {AGENT_BINARY} && systemctl daemon-reload && systemctl restart {AGENT_UNIT}",
         timeout=60,
     )
     _done(result, "swap in the new agent")
