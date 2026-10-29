@@ -249,6 +249,27 @@ class TestNodeAdd:
         assert registry.add.call_args.args[0].name == "finland"
         assert applied.call_args.args[0].exits[-1].id == "exit-finland"
 
+    def test_re_adding_a_server_saved_under_its_address_derives_the_exit_name(self) -> None:
+        """A removed exit's profile keeps its IP as its name; reusing it failed name validation."""
+        cluster = ClusterConfig(topology_intent=_minimal_v4_intent())
+        registry = MagicMock()
+        registry.find.return_value = SimpleNamespace(id="srv-new", host="198.51.100.5", name="198.51.100.5")
+        resolved = SimpleNamespace(ip="198.51.100.5", user="root", port=22, machine_id="")
+        applied = MagicMock(return_value=SimpleNamespace(all_succeeded=True, changed=True))
+
+        with (
+            patch("meridian.commands.node.load_topology_cluster", return_value=cluster),
+            patch("meridian.servers.ServerRegistry", return_value=registry),
+            patch("meridian.commands.resolve.resolve_server", return_value=resolved),
+            patch("meridian.commands.resolve.ensure_server_connection", return_value=resolved),
+            patch("meridian.commands.node._neighbor_sni", return_value=""),
+            patch("meridian.commands.node.registry_country", return_value="FI"),
+            patch("meridian.setup.runtime.SetupRuntime.apply_intent", applied),
+        ):
+            run_add(ip="198.51.100.5", yes=True)
+
+        assert applied.call_args.args[0].exits[-1].id.startswith("exit-")
+
     def test_rerunning_add_with_a_different_sni_refuses_instead_of_ignoring_it(self) -> None:
         cluster = ClusterConfig(topology_intent=_minimal_v4_intent())
         pending = cluster.topology_intent.exits[0]

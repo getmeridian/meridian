@@ -68,8 +68,9 @@ def run_add(
         NodeAddRequest,
         "Invalid node add request",
         ip=target.ip,
-        # A saved server keeps its title (saving it as its IP renamed it) and names the exit.
-        name=name or (saved.name if saved is not None else ""),
+        # A saved server keeps its title (saving it as its IP renamed it) and names the exit;
+        # a profile saved under its own address has no title (an IP is no exit name).
+        name=name or (saved.name if saved is not None and saved.name != saved.host else ""),
         user=target.user,
         ssh_port=target.port,
         sni=sni,
