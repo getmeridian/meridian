@@ -90,7 +90,7 @@ def _blob(handler: Any, match: re.Match[str]) -> None:
 
 
 def main() -> None:
-    control_server._ROUTES.insert(0, ("GET", re.compile(r"/agent/v1/blobs/([0-9a-f]{64})"), _blob))
+    control_server.ROUTES.insert(0, ("GET", re.compile(r"/agent/v1/blobs/([0-9a-f]{64})"), None, _blob))
     workdir = Path(sys.argv[1])
     service = ControlService(workdir / "control.db", fleet_id=FLEET_ID, version="4.0.0")
     server = ControlServer(("127.0.0.1", 0), service, token_sha256("admin-token-for-tests-only-0123456789"))
