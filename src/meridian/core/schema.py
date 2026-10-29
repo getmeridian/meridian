@@ -6,6 +6,7 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, Field, RootModel, create_model
 
+from meridian.control.models import RevisionList
 from meridian.core.apply import (
     ApplyCommandData,
     ApplyCounts,
@@ -366,6 +367,13 @@ _, _, FleetExportOutputEnvelope = _make_command_envelope(
     doc="Envelope schema for `meridian fleet export --json`.",
 )
 
+_, _, FleetHistoryOutputEnvelope = _make_command_envelope(
+    "FleetHistory",
+    "fleet.history",
+    RevisionList,
+    doc="Envelope schema for `meridian fleet history --json`.",
+)
+
 _, _, FleetImportOutputEnvelope = _make_command_envelope(
     "FleetImport",
     "fleet.import",
@@ -563,6 +571,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "fleet-status-envelope": FleetStatusOutputEnvelope,
     "fleet-inventory-envelope": FleetInventoryOutputEnvelope,
     "fleet-export-envelope": FleetExportOutputEnvelope,
+    "fleet-history-envelope": FleetHistoryOutputEnvelope,
     "fleet-import-envelope": FleetImportOutputEnvelope,
     "event": Event,
     "error": ErrorModel,
@@ -620,6 +629,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "fleet-status": FleetStatus,
     "fleet-inventory": FleetInventory,
     "fleet-export": FleetExportResult,
+    "fleet-history": RevisionList,
     "fleet-import": FleetImportResult,
     "intent-change": IntentChange,
     "node-list": NodeListResult,

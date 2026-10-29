@@ -548,11 +548,11 @@ def fleet_import_cmd(
     run_import(file, dry_run=dry_run, yes=yes, forget_unreachable=forget_unreachable)
 
 
-@fleet_app.command("history", hidden=True)
+@fleet_app.command("history")
 def fleet_history_cmd(
     _json: Json = False,
 ) -> None:
-    """List the reviewed applies the control service recorded (control-service fleets)"""
+    """List the reviewed applies the control service recorded"""
     from meridian.commands.fleet_history import run_history
 
     run_history()

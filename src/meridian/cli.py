@@ -55,8 +55,8 @@ _HELP_LAYOUT: tuple[tuple[str, tuple[str, ...]], ...] = (
     (GET_STARTED, ("setup", "deploy", "help")),
     (CLIENTS, ("client",)),
     (SERVERS, ("node", "relay", "route", "fleet", "server", "context")),
-    (CHECK_AND_FIX, ("check", "test", "probe", "doctor", "logs", "plan", "apply")),
-    (ADVANCED, ("panel", "scan", "studio", "update", "teardown", "api")),
+    (CHECK_AND_FIX, ("check", "test", "probe", "doctor", "logs", "plan", "apply", "backup", "restore")),
+    (ADVANCED, ("panel", "scan", "studio", "update", "migrate", "teardown", "api")),
 )
 # Option panels inside `deploy --help`.
 SERVER_ACCESS = "Server access"
@@ -178,8 +178,8 @@ app.add_typer(fleet_app, name="fleet", rich_help_panel=SERVERS)
 app.add_typer(context_app, name="context", rich_help_panel=SERVERS)
 app.add_typer(api_app, name="api", rich_help_panel=ADVANCED)
 app.add_typer(dev_app, name="dev", hidden=True)
-app.add_typer(backup_app, name="backup", hidden=True)
-app.command("restore", hidden=True)(restore_cmd)
+app.add_typer(backup_app, name="backup", rich_help_panel=CHECK_AND_FIX)
+app.command("restore", rich_help_panel=CHECK_AND_FIX)(restore_cmd)
 
 
 @app.callback(invoke_without_command=True)
@@ -780,7 +780,7 @@ def update_cmd(
         raise typer.Exit(exit_code)
 
 
-@app.command("migrate", hidden=True)
+@app.command("migrate", rich_help_panel=ADVANCED)
 def migrate_cmd(yes: Yes = False) -> None:
     """Move this Remnawave fleet onto Meridian's own control service, keeping every link"""
     from meridian.commands.migrate import run

@@ -1,4 +1,4 @@
-"""`meridian fleet history` (hidden while the control service is): the service's recorded revisions."""
+"""`meridian fleet history`: the control service's recorded revisions."""
 
 from __future__ import annotations
 
@@ -9,13 +9,12 @@ from rich.table import Table
 from meridian.commands._helpers import load_topology_cluster
 from meridian.console import err_console, error_context, fail, info, is_json_mode
 from meridian.control.client import ControlClient, ControlServiceError
-from meridian.control.models import RevisionSummary
+from meridian.control.models import RevisionList, RevisionSummary
 from meridian.core.errors import LocalStateError
 from meridian.core.output import OperationContext, command_envelope
 from meridian.renderers import emit_json
 
 COMMAND = "fleet.history"
-NOT_RECORDED = "Revisions are recorded only on control-service fleets."
 PLAN_PREFIX = 12
 _STATUS_STYLE = {"applied": "green", "failed": "red", "approved": "yellow", "proposed": "dim"}
 
@@ -28,19 +27,6 @@ def run_history() -> None:
 
 def _run_history(operation: OperationContext) -> None:
     cluster = load_topology_cluster()
-    if not cluster.runs_control_service:
-        if is_json_mode():
-            emit_json(
-                command_envelope(
-                    command=COMMAND,
-                    data={"recorded": False, "revisions": []},
-                    summary=NOT_RECORDED,
-                    timer=operation.timer,
-                )
-            )
-        else:
-            info(NOT_RECORDED)
-        return
     if not cluster.panel.url or not cluster.panel.api_token:
         fail(
             LocalStateError(
@@ -59,7 +45,7 @@ def _run_history(operation: OperationContext) -> None:
         emit_json(
             command_envelope(
                 command=COMMAND,
-                data={"recorded": True, "revisions": [item.to_data() for item in revisions]},
+                data=RevisionList(revisions=revisions).to_data(),
                 summary=summary,
                 timer=operation.timer,
             )

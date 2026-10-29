@@ -250,6 +250,11 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         stability="stable",
     ),
     "fleet.upgrade": None,
+    "fleet.history": CommandOutput(
+        data_schema="fleet-history",
+        outcomes=[_ok("the recorded revisions were listed"), *_FAILURES],
+        stability="preview",
+    ),
     "fleet.export": CommandOutput(
         data_schema="fleet-export",
         outcomes=[_ok("the fleet document was exported"), *_FAILURES],
@@ -323,6 +328,12 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
     "panel": None,
     "scan": None,
     "studio": None,
+    "migrate": None,
+    "backup.pull": None,
+    "backup.recovery-key": None,
+    "backup.devices": None,
+    "backup.revoke": None,
+    "restore": None,
     "update": None,
     "teardown": None,
     "api.schemas": CommandOutput(

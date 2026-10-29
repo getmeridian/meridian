@@ -1,4 +1,4 @@
-"""`meridian fleet history`: the control service's revisions, and a plain answer on a Remnawave fleet."""
+"""`meridian fleet history`: the control service's recorded revisions."""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ import pytest
 from typer.testing import CliRunner
 
 from meridian.cli import app
-from meridian.cli_catalog import public_commands
 from meridian.cluster import ClusterConfig
 from meridian.console import set_json_mode, set_quiet_mode
 from meridian.control.client import ControlClient
@@ -76,7 +75,7 @@ def test_history_lists_revisions_newest_first(tmp_home: Path, service_url: str) 
 
     envelope = _json(["fleet", "history", "--json"])
 
-    assert envelope["command"] == "fleet.history" and envelope["data"]["recorded"] is True
+    assert envelope["command"] == "fleet.history" and envelope["data"]["revisions"] is not None
     rows = [(item["number"], item["author"]["name"], item["status"]) for item in envelope["data"]["revisions"]]
     assert rows == [(2, "ci-bot", "proposed"), (1, "root", "applied")]
     assert envelope["data"]["revisions"][1]["plan_hash"] == "a" * 64
@@ -93,18 +92,6 @@ def test_history_table_shows_number_author_status_and_plan_prefix(tmp_home: Path
     assert "a" * 12 in result.output and "a" * 13 not in result.output
 
 
-def test_global_json_flag_reaches_the_hidden_command(tmp_home: Path, service_url: str) -> None:
+def test_global_json_flag_reaches_the_command(tmp_home: Path, service_url: str) -> None:
     _save("meridian", service_url)
     assert _json(["--json", "fleet", "history"])["data"]["revisions"] == []
-
-
-def test_a_remnawave_fleet_records_no_revisions(tmp_home: Path) -> None:
-    _save("remnawave")
-
-    human = runner.invoke(app, ["fleet", "history"])
-    assert human.exit_code == 0 and "only on control-service fleets" in human.output
-    assert _json(["fleet", "history", "--json"])["data"] == {"recorded": False, "revisions": []}
-
-
-def test_history_stays_hidden_while_the_control_backend_is() -> None:
-    assert "fleet.history" not in public_commands()

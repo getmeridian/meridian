@@ -1,7 +1,6 @@
-"""Hidden `meridian backup` sub-app and `meridian restore` (#95), mounted by `meridian.cli`.
+"""`meridian backup` sub-app and `meridian restore`, mounted by `meridian.cli`.
 
-Hidden while the control-service backend is: they stay out of the command catalog
-and need no locale docs. Imports are deferred so `--help` stays fast.
+Imports are deferred so `--help` stays fast.
 """
 
 from __future__ import annotations
