@@ -149,6 +149,7 @@
   "person.status_expired": "The end date passed. Move it later to let them back in.",
   "person.clear_expiry": "Remove end date",
   "person.saved_toast": "Saved.",
+  "person.nothing_changed": "Nothing changed.",
   "person.danger": "Links and removal",
   "person.reissue": "Issue a new link",
   "person.reissue_text": "For a link that leaked. The old link and QR code stop working at once.",

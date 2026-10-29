@@ -24,6 +24,7 @@
 - An unconfigured service shows its notice before a setup link's form, and `check_setup_link` refuses too; the form once took a password only for setup to answer `ui_unconfigured`.
 - `M.busy` ignores a `cancelled` step-up — closing the password check once showed a generic error.
 - Treat page input as hostile: decode the hash through `M.route()`'s guard (a bare `%` threw at boot, and retry reloaded the same hash) and read name maps with `M.has()` (a person named `toString` broke People).
+- Saving a person PATCHes only the fields edited, and the limit field shows bytes unrounded (`M.gbText`) — a CLI quota of 4 MB rounded to "0" GB, so saving the expiry sent 0: unlimited.
 - Adding a person is one `POST /api/users` carrying expiry and limits (`ControlService.create_user`, one transaction, 409 `user_exists`); create-then-PATCH left an active, unlimited person whenever the PATCH never landed, and a retry only met `user_exists`.
 - Judge "declared" from the person's own share view, never only the fleet list fetched at boot — a console reissue once moved a declared person's UUID while their page stayed under the old one (the service cannot write `/var/www/private/`), and a stale list offered Remove.
 - Keep each script under 800 lines and every `M.t("…")` key in `en.json`; the asset tests read literal keys only.

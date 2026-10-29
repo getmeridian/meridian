@@ -149,6 +149,7 @@
   "person.status_expired": "已过截止日期。将日期延后即可恢复。",
   "person.clear_expiry": "移除截止日期",
   "person.saved_toast": "已保存。",
+  "person.nothing_changed": "没有更改。",
   "person.danger": "链接与移除",
   "person.reissue": "签发新链接",
   "person.reissue_text": "用于链接泄露的情况。旧链接和二维码会立即失效。",

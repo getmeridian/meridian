@@ -149,6 +149,7 @@
   "person.status_expired": "Срок доступа истёк. Продлите его, чтобы вернуть доступ.",
   "person.clear_expiry": "Убрать срок",
   "person.saved_toast": "Сохранено.",
+  "person.nothing_changed": "Ничего не изменилось.",
   "person.danger": "Ссылки и удаление",
   "person.reissue": "Выпустить новую ссылку",
   "person.reissue_text": "Если ссылка утекла. Старая ссылка и QR-код сразу перестанут работать.",

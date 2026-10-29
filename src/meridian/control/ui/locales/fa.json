@@ -149,6 +149,7 @@
   "person.status_expired": "تاریخ پایان گذشته است. آن را عقب‌تر ببرید تا دوباره وصل شود.",
   "person.clear_expiry": "حذف تاریخ پایان",
   "person.saved_toast": "ذخیره شد.",
+  "person.nothing_changed": "چیزی تغییر نکرد.",
   "person.danger": "پیوندها و حذف",
   "person.reissue": "صدور پیوند جدید",
   "person.reissue_text": "برای پیوندی که لو رفته است. پیوند و کد QR قبلی بی‌درنگ از کار می‌افتند.",

@@ -1,7 +1,7 @@
-"""The console's revision diff (`M.intentDiff` in `ui/fleet.js`), run under node.
+"""Console logic run under node: the revision diff (`M.intentDiff` in `ui/fleet.js`) and the limit form.
 
-The asset tests read the scripts as text; this executes the one piece of logic whose
-mistakes read as "no change" between two revisions.
+The asset tests read the scripts as text; this executes the pieces whose mistakes
+read as "no change" between two revisions, or save a limit nobody touched.
 """
 
 from __future__ import annotations
@@ -56,3 +56,43 @@ def test_list_items_and_unchanged_intents() -> None:
     older = {"access": {"users": ["alice"]}}
     assert diff(older, {"access": {"users": ["alice", "bob"]}}) == [{"path": "access.users[1]", "after": '"bob"'}]
     assert diff(older, older) == []
+
+
+_PEOPLE_HARNESS = """
+const fs = require("fs");
+global.window = {};
+const h = (tag, attrs) => ({ tag: tag, value: (attrs && attrs.value) || "" });
+window.M = { h: h, has: (o, k) => Object.prototype.hasOwnProperty.call(o, k), field: () => ({}), t: (k) => k };
+eval(fs.readFileSync(process.argv[1], "utf8"));
+const [user, gb, strategy] = JSON.parse(process.argv[2]);
+const fields = window.M.limitFields(user);
+const shown = fields.gb.value;
+fields.strategy.value = user ? user.traffic_limit_strategy : "month";
+if (gb !== null) fields.gb.value = gb;
+if (strategy !== null) fields.strategy.value = strategy;
+process.stdout.write(JSON.stringify([shown, fields.value()]));
+"""
+
+
+def limit_form(user: dict[str, Any] | None, gb: str | None = None, strategy: str | None = None) -> list[Any]:
+    """What the limit field shows for `user`, then what saving sends after typing `gb` or picking `strategy`."""
+    result = subprocess.run(
+        ["node", "-e", _PEOPLE_HARNESS, str(UI_DIR / "people.js"), json.dumps([user, gb, strategy])],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return list(json.loads(result.stdout))
+
+
+def test_an_untouched_small_limit_is_shown_exactly_and_never_sent() -> None:
+    """A CLI quota of 4 MB rounded to "0" GB, and saving the expiry then sent 0: unlimited."""
+    user = {"traffic_limit_bytes": 4194304, "traffic_limit_strategy": "month"}
+    shown, change = limit_form(user)
+    assert shown == "0.004194304" and change == {}
+    assert limit_form(user, gb="1")[1] == {"traffic_limit_bytes": 10**9}
+    assert limit_form(user, strategy="day")[1] == {"traffic_limit_strategy": "day"}
+
+
+def test_a_new_person_sends_both_limit_fields() -> None:
+    assert limit_form(None) == ["", {"traffic_limit_bytes": 0, "traffic_limit_strategy": "month"}]

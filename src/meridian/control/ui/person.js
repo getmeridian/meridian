@@ -106,7 +106,11 @@
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var change = limits.value();
-      change.expire_at = M.endOfDay(expiry.value);
+      if (expiry.value !== M.dateValue(user.expire_at)) change.expire_at = M.endOfDay(expiry.value);
+      if (!Object.keys(change).length) {
+        M.toast(M.t("person.nothing_changed"));
+        return;
+      }
       M.busy(form, function () { return M.api("PATCH", path(name), change); }).then(function () {
         M.toast(M.t("person.saved_toast"));
         reload(name);

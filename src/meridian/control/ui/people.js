@@ -98,10 +98,16 @@
       }, function (e) { M.mount(list, h("div", { class: "notice notice-err", text: M.errorText(e) })); });
   };
 
-  /* Limits as a form block, shared by "add" and the person screen. */
+  /* A byte limit as the GB field's text, unrounded: a CLI quota of 4 MB once showed as 0, which saves as unlimited. */
+  M.gbText = function (bytes) {
+    return bytes ? String(bytes / GB) : "";
+  };
+
+  /* Limits as a form block, shared by "add" and the person screen. With a person, `value()`
+   * holds only what was edited, so saving another field never rewrites the limit. */
   M.limitFields = function (user) {
-    var gb = h("input", { type: "number", min: "0", step: "0.1", inputmode: "decimal",
-      value: user && user.traffic_limit_bytes ? String(+(user.traffic_limit_bytes / GB).toFixed(2)) : "" });
+    var gb = h("input", { type: "number", min: "0", step: "any", inputmode: "decimal",
+      value: user ? M.gbText(user.traffic_limit_bytes) : "" });
     var strategy = h("select", {},
       ["no_reset", "day", "week", "month"].map(function (s) {
         return h("option", { value: s, selected: user ? user.traffic_limit_strategy === s : s === "month",
@@ -114,8 +120,12 @@
         M.field(M.t("people.limit_gb"), gb, M.t("people.limit_hint")),
         M.field(M.t("people.reset"), strategy)),
       value: function () {
-        var bytes = Math.round((parseFloat(gb.value) || 0) * GB);
-        return { traffic_limit_bytes: Math.max(0, bytes), traffic_limit_strategy: strategy.value };
+        var change = {};
+        if (!user || gb.value !== M.gbText(user.traffic_limit_bytes)) {
+          change.traffic_limit_bytes = Math.max(0, Math.round((parseFloat(gb.value) || 0) * GB));
+        }
+        if (!user || strategy.value !== user.traffic_limit_strategy) change.traffic_limit_strategy = strategy.value;
+        return change;
       },
     };
   };
