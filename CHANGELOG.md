@@ -153,6 +153,8 @@ that dials out to it.
 - `check` now reports background enforcement and blob mirror failures with safe error codes and attempt times; service warnings are rate-limited and contain no exception text.
 - Fleet and node CLI rows now carry the control service's counted node traffic instead of always showing zero.
 - Server health now includes reported checks, core versions and uptime, memory, disk, and load; `fleet status` and `check` flag unhealthy runtimes and treat stale reports as unavailable evidence.
+- Removing a person now erases their traffic totals and replay baselines as well
+  as daily history; delayed reports cannot recreate those records.
 - An exit whose first apply failed is now cleaned up when you remove it: its
   agent and firewall rules no longer stay behind, and `--forget-unreachable`
   forgets them when the server is already gone.

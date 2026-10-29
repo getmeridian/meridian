@@ -11,7 +11,7 @@ _RENDERER_MANIFEST = {
     "agent-spec": "service-blob-v1",
     "control-subscriptions": "refresh-interval-v7",
     "pwa": "quiet-account-v23",
-    "control-service": "convergence-status-v11",
+    "control-service": "traffic-cleanup-v12",
     "control-api": "people-expiry-v3",
     "firewall": "ufw-comment-v2",
     "nginx": "connection-noindex-v11",

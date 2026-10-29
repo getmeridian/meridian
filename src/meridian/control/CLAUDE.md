@@ -43,6 +43,7 @@
 - Background enforcement and blob mirroring keep attempt/success times and fixed error codes only in memory; warn at most once per task per five minutes and never log exception text.
 - NodeStatus traffic is the ledger's node total, carried into the CLI's Node; never reconstruct it from user totals or leave the adapter's default zero.
 - Agent polls refresh reachability only; judge runtime health and convergence from a report younger than the live window, and keep stale reports as unavailable evidence.
+- Removing a person erases lifetime totals, per-user baselines, and daily history in the user's transaction; node report sequences and epochs stay, and the ledger itself drops unknown IDs before comparing counters so a late report cannot recreate them.
 - nginx answers 502/503/504 for a stopped or hung service — `ControlClient` raises those as retryable unreachable errors; as plain refusals, a stopped ctld failed the fence at once with "refused: HTTP 502". A write the backup hook counts as maybe-committed (a lost reply, any 5xx) raises `ControlServiceUncertain`, which Meridian drivers turn into `UnknownResourceOutcome`.
 - `serve` is a daemon: the root callback skips the beta banner and the update check for it (it once printed the banner into journald and phoned out on every start).
 - Decode the path before routing — `ControlClient` percent-encodes IDs, so `:` in endpoint IDs arrives as `%3A` and every endpoint PUT 404'd; node routes match only topology IDs (`_NODE`), or a grant stored `main:exit` before its response refused it and broke the fleet view.

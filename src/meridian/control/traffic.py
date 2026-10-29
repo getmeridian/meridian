@@ -126,7 +126,10 @@ class TrafficLedger:
             )
         }
         growth: list[tuple[str, int, int, int, int]] = []
+        known = {row["user_id"] for row in self._store.rows("SELECT user_id FROM users")}
         for user in report.users:
+            if user.user_id not in known:
+                continue
             base_up, base_down = baselines.get(user.user_id, (0, 0))
             up, down = user.uplink_bytes - base_up, user.downlink_bytes - base_down
             if up < 0 or down < 0:
@@ -170,6 +173,14 @@ class TrafficLedger:
         )
         self._retire_beyond_kept(node_id)
         return StatsAck(counter_epoch=epoch, acked_seq=report.seq)
+
+    def forget_user(self, user_id: str) -> None:
+        """Erase a removed person's counters in the caller's user-deletion transaction.
+
+        Node report sequences and epochs still deduplicate every other person's growth.
+        """
+        for table in ("traffic_totals", "traffic_counters", "traffic_daily"):
+            self._store.db.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
 
     def _retire_beyond_kept(self, node_id: str) -> None:
         db = self._store.db

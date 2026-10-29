@@ -166,3 +166,103 @@ def test_traffic_holds_usernames_and_counters_only(service: ControlService) -> N
         "downlink_bytes",
         "last_seen_at",
     }
+
+
+def test_removing_a_user_erases_only_their_accounting_evidence(service: ControlService) -> None:
+    from meridian.control.models import PrivacySettings
+
+    service.set_privacy(PrivacySettings(usage_history="daily"), author="root")
+    first = _report(service, EPOCH_A, 1, alice=(10, 20), bob=(1, 2))
+    late = _report(service, EPOCH_A, 2, alice=(100, 200), bob=(3, 4))
+    alice = service.get_user("alice")
+    assert alice is not None
+    service.record_stats("main", first)
+    service.record_stats("edge", _report(service, EPOCH_B, 1, alice=(5, 6)))
+
+    service.delete_user("alice")
+
+    for table in ("traffic_totals", "traffic_counters", "traffic_daily"):
+        assert not service.traffic._store.rows(f"SELECT * FROM {table} WHERE user_id = ?", (alice.user_id,))
+    assert len(service.traffic._store.rows("SELECT * FROM traffic_reports")) == 2
+    assert service.traffic._store.rows("SELECT * FROM node_traffic_daily")
+    service.record_stats("main", late)
+    service.traffic.record("edge", late)
+    for table in ("traffic_totals", "traffic_counters", "traffic_daily"):
+        assert not service.traffic._store.rows(f"SELECT * FROM {table} WHERE user_id = ?", (alice.user_id,))
+    assert _totals(service) == {"bob": (6, 8)}
+    recreated = service.put_user("alice")
+    assert recreated.user_id != alice.user_id
+    assert recreated.used_traffic_bytes == recreated.lifetime_traffic_bytes == 0
+
+
+def test_removing_a_user_rolls_back_their_accounting_with_the_user(
+    service: ControlService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from meridian.control.models import PrivacySettings
+
+    service.set_privacy(PrivacySettings(usage_history="daily"), author="root")
+    service.record_stats("main", _report(service, EPOCH_A, 1, alice=(10, 20)))
+    tables = ("users", "traffic_totals", "traffic_counters", "traffic_reports", "traffic_daily", "node_traffic_daily")
+    before = {table: [tuple(row) for row in service.traffic._store.rows(f"SELECT * FROM {table}")] for table in tables}
+
+    def refused() -> None:
+        raise RuntimeError("composition refused")
+
+    monkeypatch.setattr(service, "_compose_all", refused)
+    with pytest.raises(RuntimeError, match="composition refused"):
+        service.delete_user("alice")
+
+    assert {
+        table: [tuple(row) for row in service.traffic._store.rows(f"SELECT * FROM {table}")] for table in tables
+    } == before
+
+
+@pytest.mark.parametrize("report_first", [True, False], ids=["report-holds-lock", "delete-holds-lock"])
+def test_a_report_racing_user_removal_cannot_leave_orphan_accounting(
+    service: ControlService, report_first: bool
+) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+
+    from meridian.control.models import PrivacySettings
+
+    service.set_privacy(PrivacySettings(usage_history="daily"), author="root")
+    report = _report(service, EPOCH_A, 1, alice=(10, 20), bob=(1, 2))
+    alice = service.get_user("alice")
+    assert alice is not None
+    entered, release, waiting = Event(), Event(), Event()
+
+    def hold() -> None:
+        entered.set()
+        assert release.wait(5)
+
+    def first() -> None:
+        with service.conditions(hold):
+            if report_first:
+                service.record_stats("main", report)
+            else:
+                service.delete_user("alice")
+
+    def second() -> None:
+        waiting.set()
+        if report_first:
+            service.delete_user("alice")
+        else:
+            service.record_stats("main", report)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first_done = executor.submit(first)
+        try:
+            assert entered.wait(5)
+            second_done = executor.submit(second)
+            assert waiting.wait(5)
+        finally:
+            release.set()
+        first_done.result(timeout=5)
+        second_done.result(timeout=5)
+
+    assert service.get_user("alice") is None
+    for table in ("traffic_totals", "traffic_counters", "traffic_daily"):
+        assert not service.traffic._store.rows(f"SELECT * FROM {table} WHERE user_id = ?", (alice.user_id,))
+    assert _totals(service) == {"bob": (1, 2)}
+    assert service.record_stats("main", report).acked_seq == 1

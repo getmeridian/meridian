@@ -581,7 +581,7 @@ class ControlService:
         with self._transaction():
             user = self.get_user(username)
             if user is not None:
-                self._db.execute("DELETE FROM traffic_daily WHERE user_id = ?", (user.user_id,))
+                self.traffic.forget_user(user.user_id)
             self._db.execute("DELETE FROM users WHERE username = ?", (username,))
             self._compose_all()
 
