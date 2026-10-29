@@ -1,14 +1,14 @@
 """Drivers for Meridian's own control service and node agent (#95 walking skeleton).
 
-The control service owns users and signs node documents; these drivers enroll
-agents over SSH and keep the service's node specs, endpoints, users, and
-settings equal to the reviewed plan. A workload converges only when its agent
+The control service owns users and signs node documents; these drivers install
+agents over SSH with a single-use enrollment token minted over the admin API,
+and keep the service's node specs, endpoints, users, and settings equal to the
+reviewed plan. A workload converges only when its agent
 reports the current document applied with no failed resource.
 """
 
 from __future__ import annotations
 
-import base64
 import json
 import time
 from collections.abc import Callable, Mapping
@@ -27,16 +27,11 @@ from meridian.compiler.models import (
     ServiceSettingsPayload,
 )
 from meridian.control.client import ControlClient
-from meridian.control.models import ClientEndpoint, NodeBootstrap, NodeSpec, NodeStatus, ServiceSettings
+from meridian.control.models import ClientEndpoint, NodeSpec, NodeStatus, ServiceSettings
 from meridian.control_artifacts import AgentBinary
-from meridian.core.agent_types import canonical_sha256
-from meridian.host_runtime import (
-    AGENT_BINARY,
-    AGENT_BOOTSTRAP,
-    AGENT_STATE_DIR,
-    AGENT_UNIT,
-    CONTROL_SERVICE_PUBLIC_KEY,
-)
+from meridian.core.agent_protocol import AgentBootstrap
+from meridian.core.agent_types import AGENT_PROTOCOL, canonical_sha256
+from meridian.host_runtime import AGENT_BINARY, AGENT_BOOTSTRAP, AGENT_STATE_DIR, AGENT_UNIT
 from meridian.reconciler.agent_spec import build_node_spec
 from meridian.reconciler.resources import (
     ResourceAction,
@@ -72,7 +67,6 @@ class MeridianDriverContext:
     connection_for: Callable[[str], ServerConnection]
     server_addresses: Mapping[str, str]
     agent_binary: Callable[[str], AgentBinary]
-    control_ref: str
     sleep: Callable[[float], None] = time.sleep
 
     def address(self, server_ref: str) -> str:
@@ -111,7 +105,13 @@ def build_meridian_drivers(context: MeridianDriverContext) -> ResourceDrivers:
 
 
 class AgentRuntimeDriver:
-    """Install the agent binary, write its bootstrap with a fresh node token, and run it."""
+    """Install the agent binary, write its bootstrap with a fresh enrollment token, and run it.
+
+    The agent generates its node key, enrolls with the token, and rewrites the
+    bootstrap with the token nulled, so observation compares only the identity
+    fields. Bare-IP control servers serve a Let's Encrypt IP certificate, so the
+    agent verifies TLS through WebPKI and `tls_pin_sha256` stays null.
+    """
 
     def __init__(self, context: MeridianDriverContext) -> None:
         self.context = context
@@ -124,11 +124,12 @@ class AgentRuntimeDriver:
         installed = _run(conn, f"sha256sum {AGENT_BINARY} 2>/dev/null || true", "hash the agent").split()
         active = conn.run(f"systemctl is-active {AGENT_UNIT}", timeout=15).stdout.strip() == "active"
         bootstrap = conn.run(f"cat {AGENT_BOOTSTRAP} 2>/dev/null", timeout=15, sensitive=True).stdout
-        expected = self._bootstrap_fields(payload)
-        current = _bootstrap_fields(bootstrap)
-        in_place = bool(installed) and installed[0] == binary.sha256 and active and current == expected
         with self.context.client() as client:
+            ca_sha256 = client.fleet_authority().ca_sha256
             status = client.node(payload.workload_ref)
+        expected = self._identity(payload, ca_sha256)
+        current = _bootstrap_identity(bootstrap)
+        in_place = bool(installed) and installed[0] == binary.sha256 and active and current == expected
         seen = status is not None and status.is_live()
         return _observation(action, exists=in_place, connected=in_place and seen, remote_id=payload.workload_ref)
 
@@ -138,15 +139,16 @@ class AgentRuntimeDriver:
         arch = _run(conn, "uname -m", "read the architecture").strip()
         binary = self.context.agent_binary(arch)
         _ok(conn.put_bytes(AGENT_BINARY, binary.data, mode="755", timeout=180), "upload the agent")
-        public_key = self._service_public_key()
         with self.context.client() as client:
-            token = client.mint_token(payload.workload_ref).node_token
-            bootstrap = NodeBootstrap(
+            grant = client.grant_enrollment(payload.workload_ref)
+            bootstrap = AgentBootstrap(
                 service_url=self.context.service_url(),
                 fleet_id=self.context.cluster.fleet_id,
                 node_id=payload.workload_ref,
-                node_token=token,
-                service_public_key=public_key,
+                enrollment_token=grant.enrollment_token,
+                token_expires_at=grant.token_expires_at,
+                ca_sha256=grant.ca_sha256,
+                tls_pin_sha256=None,
             )
             body = json.dumps(bootstrap.model_dump(mode="json"), indent=2) + "\n"
             _ok(
@@ -187,20 +189,15 @@ class AgentRuntimeDriver:
             timeout=30,
         )
 
-    def _bootstrap_fields(self, payload: AgentRuntimePayload) -> dict[str, str]:
+    def _identity(self, payload: AgentRuntimePayload, ca_sha256: str) -> dict[str, Any]:
         return {
+            "protocol": AGENT_PROTOCOL,
             "service_url": self.context.service_url(),
             "fleet_id": self.context.cluster.fleet_id,
             "node_id": payload.workload_ref,
-            "service_public_key": self._service_public_key(),
+            "ca_sha256": ca_sha256,
+            "tls_pin_sha256": None,
         }
-
-    def _service_public_key(self) -> str:
-        control = self.context.connection_for(self.context.control_ref)
-        key = _run(control, f"cat {CONTROL_SERVICE_PUBLIC_KEY}", "read the service signing key").strip()
-        if len(base64.b64decode(key, validate=True)) != 32:
-            raise ResourceReconcileError("The control service's signing key is malformed.")
-        return key
 
 
 class NodeWorkloadDriver:
@@ -395,14 +392,18 @@ def _service_id(logical_id: str) -> str:
     return logical_id.removeprefix("endpoint:")
 
 
-def _bootstrap_fields(text: str) -> dict[str, str]:
+_IDENTITY_FIELDS = ("protocol", "service_url", "fleet_id", "node_id", "ca_sha256", "tls_pin_sha256")
+
+
+def _bootstrap_identity(text: str) -> dict[str, Any]:
+    """The bootstrap fields that name the node and its service; the token is spent once enrolled."""
     try:
         data: Any = json.loads(text)
     except ValueError:
         return {}
-    if not isinstance(data, dict):
+    if not isinstance(data, dict) or not set(_IDENTITY_FIELDS) <= set(data):
         return {}
-    return {name: str(data.get(name, "")) for name in ("service_url", "fleet_id", "node_id", "service_public_key")}
+    return {name: data[name] for name in _IDENTITY_FIELDS}
 
 
 def _agent_unit() -> str:

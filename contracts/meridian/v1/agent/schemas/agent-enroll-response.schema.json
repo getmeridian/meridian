@@ -53,7 +53,7 @@
       "type": "string"
     },
     "service_certificate_pem": {
-      "description": "Certificate of the service signing key that signs desired state and commands.",
+      "description": "Certificate of the service signing key that signs desired state and commands: issued by the CA, with URI SAN `meridian-service://<fleet_id>`. The agent accepts no other certificate as the service's, so a node certificate can never sign desired state.",
       "maxLength": 8192,
       "minLength": 64,
       "pattern": "^-----BEGIN CERTIFICATE-----\\n[A-Za-z0-9+/=\\n]+-----END CERTIFICATE-----\\n?$",

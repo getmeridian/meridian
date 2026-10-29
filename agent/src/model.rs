@@ -1,4 +1,4 @@
-//! Typed `meridian.agent/v1` bodies and resources used by the skeleton.
+//! Typed `meridian.agent/v1` bodies and resources the agent speaks.
 //!
 //! Desired state is verified as a `serde_json::Value` first (see `verify`);
 //! these structs are filled only afterwards. Every outgoing field is always
@@ -366,4 +366,101 @@ fn check_hash(hash: &str) -> Result<(), String> {
     } else {
         Err("sha256 is not lowercase hex".into())
     }
+}
+
+// ---- Enrollment, sessions, and stats ---------------------------------------------
+
+#[derive(Serialize, Debug)]
+pub struct EnrollRequest {
+    #[serde(rename = "type")]
+    pub kind: &'static str,
+    pub protocol: &'static str,
+    pub fleet_id: String,
+    pub node_id: String,
+    pub enrollment_token: String,
+    pub csr_pem: String,
+    pub agent_version: &'static str,
+    pub arch: &'static str,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct EnrollResponse {
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub protocol: String,
+    pub fleet_id: String,
+    pub node_id: String,
+    pub fleet_epoch: u64,
+    pub certificate_pem: String,
+    pub certificate_expires_at: String,
+    pub ca_certificate_pem: String,
+    pub service_certificate_pem: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct PollSettings {
+    pub max_wait_seconds: u64,
+    pub report_interval_seconds: u64,
+    pub stats_interval_seconds: u64,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct HelloResponse {
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub protocol: String,
+    pub fleet_epoch: u64,
+    pub capabilities: Vec<String>,
+    pub session_token: String,
+    pub session_expires_at: String,
+    pub server_time: String,
+    pub poll: PollSettings,
+    pub renew_after: String,
+    pub service_certificate_pem: String,
+}
+
+#[derive(Serialize, Debug)]
+pub struct RenewRequest {
+    #[serde(rename = "type")]
+    pub kind: &'static str,
+    pub csr_pem: String,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct RenewResponse {
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub certificate_pem: String,
+    pub certificate_expires_at: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct UserTraffic {
+    pub user_id: String,
+    pub uplink_bytes: u64,
+    pub downlink_bytes: u64,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct StatsReport {
+    #[serde(rename = "type")]
+    pub kind: &'static str,
+    pub counter_epoch: String,
+    pub seq: u64,
+    pub collected_at: String,
+    pub users: Vec<UserTraffic>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct StatsAck {
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub counter_epoch: String,
+    pub acked_seq: u64,
 }

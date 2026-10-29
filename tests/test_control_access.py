@@ -12,9 +12,10 @@ from meridian.adapters.cluster import topology_from_cluster
 from meridian.cluster import ClusterConfig
 from meridian.connectivity import create_verification_panel, select_active_client, verification_panel_factory
 from meridian.control.client import ControlClient, ControlServiceAuthError
+from meridian.control.enrollment import token_sha256
 from meridian.control.models import ClientEndpoint, NodeSpec
 from meridian.control.server import ControlServer
-from meridian.control.service import ControlService, token_sha256
+from meridian.control.service import ControlService
 from meridian.control_access import ServiceAccessPanel, ServiceFleetPanel, access_panel, fleet_panel
 from meridian.remnawave import (
     XRAY_JSON_CLIENT_TYPE,

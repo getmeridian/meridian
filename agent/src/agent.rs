@@ -1,27 +1,36 @@
-//! The agent loop: poll for desired state, verify, hold, apply, report.
+//! The agent loop: enroll, hello, poll for desired state, verify, hold, apply, report, stats.
 
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::apply::Engine;
 use crate::bootstrap::Bootstrap;
 use crate::fetch::{Client, HttpError};
+use crate::fsutil::host_path;
+use crate::identity::Identity;
 use crate::model::{
     NodeStateRef, ObservedStateReport, PollRequest, PollResponse, ReportAck, Resource,
-    ResourceObservation,
+    ResourceObservation, Spec, StatsAck,
 };
+use crate::session::{self, Session};
 use crate::state::State;
+use crate::stats::{self, TrafficStore};
 use crate::system::Exec;
-use crate::timeutil::now_rfc3339;
-use crate::verify::{Admission, admit, verify_desired};
+use crate::timeutil::{now_rfc3339, now_unix};
+use crate::verify::{Admission, Trust, admit, verify_desired};
 use crate::{debug, info, report};
 
+/// Report and stats cadence before the first hello names the service's.
 pub const REPORT_INTERVAL: Duration = Duration::from_secs(60);
 /// Drift re-check and retry of failed resources between new documents.
 pub const RECONCILE_INTERVAL: Duration = Duration::from_secs(300);
 const MAX_BACKOFF: Duration = Duration::from_secs(60);
+/// After a failed renewal, try again this much later (the certificate outlives several tries).
+const RENEW_RETRY_SECONDS: u64 = 3600;
 
 pub struct Options {
     pub bootstrap: PathBuf,
@@ -30,6 +39,7 @@ pub struct Options {
     /// Plain-HTTP service and sources, for tests only.
     pub allow_http: bool,
     pub settle: Duration,
+    /// Longest poll the agent asks for; the session's `max_wait_seconds` caps it.
     pub wait_seconds: u64,
 }
 
@@ -41,7 +51,7 @@ impl Options {
             root: PathBuf::from("/"),
             allow_http: false,
             settle: Duration::from_secs(2),
-            wait_seconds: 25,
+            wait_seconds: 55,
         }
     }
 }
@@ -63,6 +73,13 @@ pub struct Agent<'a> {
     pub bootstrap: Bootstrap,
     pub state: State,
     pub client: Client,
+    identity: Option<Identity>,
+    /// The service certificate's key, once credentials exist; nothing applies without it.
+    trust: Option<Trust>,
+    session: Option<Session>,
+    /// The service revoked this node's certificate: only a fresh enrollment token helps.
+    revoked: bool,
+    traffic: TrafficStore,
     exec: &'a dyn Exec,
     opts: Options,
     resources: Vec<Resource>,
@@ -70,50 +87,296 @@ pub struct Agent<'a> {
     commands_logged: bool,
 }
 
+fn typed<T: DeserializeOwned>(body: Value, expected: &str) -> Result<T, HttpError> {
+    let kind = body.get("type").and_then(Value::as_str).unwrap_or_default();
+    if kind != expected {
+        return Err(HttpError::Protocol(format!(
+            "expected {expected}, got {kind:?}"
+        )));
+    }
+    serde_json::from_value(body).map_err(|err| HttpError::Protocol(err.to_string()))
+}
+
+fn revoked_error() -> HttpError {
+    HttpError::Status {
+        status: 403,
+        retry_after: None,
+        code: Some("credential_revoked".into()),
+    }
+}
+
 impl<'a> Agent<'a> {
     pub fn new(opts: Options, exec: &'a dyn Exec) -> Result<Agent<'a>, String> {
         let bootstrap = Bootstrap::load(&opts.bootstrap, opts.allow_http)?;
-        let mut state = State::load(&opts.state_dir)?;
-        // A held document that no longer verifies (re-bootstrap with a new service key, or
-        // another node's state) is dropped; the epoch floor and the ledger survive, so the
-        // next document still retires what this one installed.
-        let resources = match state
-            .held
-            .as_ref()
-            .map(|held| verify_desired(held, &bootstrap))
-        {
-            Some(Ok(verified)) => verified.resources,
-            Some(Err(err)) => {
-                info!("dropping held desired state: {err}");
-                state.held = None;
-                state.applied = None;
-                Vec::new()
-            }
-            None => Vec::new(),
-        };
-        let client = Client::new(&bootstrap, opts.allow_http);
-        Ok(Agent {
+        let state = State::load(&opts.state_dir)?;
+        let identity = Identity::load(
+            &opts.state_dir,
+            &bootstrap.ca_sha256,
+            &bootstrap.fleet_id,
+            &bootstrap.node_id,
+            now_unix(),
+        )?;
+        let traffic = TrafficStore::load(&opts.state_dir)?;
+        let client = Client::new(&bootstrap.service_url, opts.allow_http);
+        let mut agent = Agent {
             bootstrap,
             state,
             client,
+            identity: None,
+            trust: None,
+            session: None,
+            revoked: false,
+            traffic,
             exec,
             opts,
-            resources,
+            resources: Vec::new(),
             observations: Vec::new(),
             commands_logged: false,
-        })
+        };
+        if let Some(identity) = identity {
+            agent.adopt(identity);
+        }
+        Ok(agent)
     }
 
     pub fn has_held(&self) -> bool {
         self.state.held.is_some()
     }
 
+    pub fn is_enrolled(&self) -> bool {
+        self.identity.is_some() && !self.revoked
+    }
+
+    pub fn session(&self) -> Option<&Session> {
+        self.session.as_ref()
+    }
+
+    pub fn traffic(&self) -> &TrafficStore {
+        &self.traffic
+    }
+
     pub fn observations(&self) -> &[ResourceObservation] {
         &self.observations
     }
 
+    /// Use these credentials: trust their service certificate and re-check the held document.
+    fn adopt(&mut self, identity: Identity) {
+        self.trust = Some(identity.trust(&self.bootstrap.fleet_id, &self.bootstrap.node_id));
+        self.identity = Some(identity);
+        self.reload_held();
+    }
+
+    /// A held document that no longer verifies (a new service certificate, or another node's
+    /// state) is dropped; the epoch floor and the ledger survive, so the next document still
+    /// retires what this one installed.
+    fn reload_held(&mut self) {
+        let (Some(held), Some(trust)) = (self.state.held.as_ref(), self.trust.as_ref()) else {
+            self.resources = Vec::new();
+            return;
+        };
+        match verify_desired(held, trust) {
+            Ok(verified) => self.resources = verified.resources,
+            Err(err) => {
+                info!("dropping held desired state: {err}");
+                self.state.held = None;
+                self.state.applied = None;
+                self.resources = Vec::new();
+                if let Err(err) = self.state.save(&self.opts.state_dir) {
+                    info!("{err}");
+                }
+            }
+        }
+    }
+
+    // ---- enrollment and sessions --------------------------------------------------------
+
+    /// Make sure there is an open session: enroll if the bootstrap holds a token, say hello
+    /// when the session is missing or about to expire, and renew the certificate when due.
+    pub fn connect(&mut self) -> Result<(), HttpError> {
+        let now = now_unix();
+        if let Some(session) = &self.session
+            && session.fresh(now)
+            && self.client.has_session()
+        {
+            if now >= session.renew_after {
+                self.renew_certificate(now);
+            }
+            return Ok(());
+        }
+        self.forget_session();
+        if !self.is_enrolled() {
+            self.reload_bootstrap();
+        }
+        if self.bootstrap.enrollment_token.is_some() {
+            self.enroll(now)?;
+        }
+        let Some(identity) = self.identity.as_ref() else {
+            return Err(HttpError::Protocol(
+                "not enrolled and the bootstrap holds no enrollment token; run `meridian apply`"
+                    .into(),
+            ));
+        };
+        if self.revoked {
+            return Err(revoked_error());
+        }
+        let opened = session::hello(
+            &self.client,
+            &self.bootstrap,
+            identity,
+            self.state.highest_epoch,
+            self.state.applied.as_ref(),
+            now,
+        );
+        let (session, service) = match opened {
+            Ok(opened) => opened,
+            Err(err) => {
+                // An expired or revoked node certificate needs a new token over SSH.
+                if matches!(
+                    err.code(),
+                    Some("credential_revoked" | "credential_expired")
+                ) {
+                    info!("the service refused this node's certificate; run `meridian apply`");
+                    self.revoked = true;
+                }
+                return Err(err);
+            }
+        };
+        if service.key_id != identity.service.key_id {
+            info!("the service presented a new signing certificate");
+            let mut updated = identity.clone();
+            updated.service = service;
+            updated
+                .save(&self.opts.state_dir)
+                .map_err(HttpError::Protocol)?;
+            self.adopt(updated);
+        }
+        debug!("session open until {}", session.expires_at);
+        let due = now >= session.renew_after;
+        self.session = Some(session);
+        if due {
+            self.renew_certificate(now);
+        }
+        Ok(())
+    }
+
+    fn forget_session(&mut self) {
+        self.session = None;
+        self.client.set_session(None);
+    }
+
+    /// The deployer rewrites the bootstrap to enroll the node again; pick it up without a restart.
+    fn reload_bootstrap(&mut self) {
+        let fresh = match Bootstrap::load(&self.opts.bootstrap, self.opts.allow_http) {
+            Ok(fresh) if fresh != self.bootstrap => fresh,
+            Ok(_) => return,
+            Err(err) => {
+                debug!("{err}");
+                return;
+            }
+        };
+        if fresh.service_url != self.bootstrap.service_url {
+            self.client = Client::new(&fresh.service_url, self.opts.allow_http);
+        }
+        let identity = Identity::load(
+            &self.opts.state_dir,
+            &fresh.ca_sha256,
+            &fresh.fleet_id,
+            &fresh.node_id,
+            now_unix(),
+        );
+        self.bootstrap = fresh;
+        self.identity = None;
+        self.trust = None;
+        match identity {
+            Ok(Some(identity)) => self.adopt(identity),
+            Ok(None) => self.reload_held(),
+            Err(err) => info!("{err}"),
+        }
+    }
+
+    fn enroll(&mut self, now: u64) -> Result<(), HttpError> {
+        match session::enroll(&self.client, &self.bootstrap, now) {
+            Ok(identity) => {
+                identity
+                    .save(&self.opts.state_dir)
+                    .map_err(HttpError::Protocol)?;
+                info!(
+                    "enrolled node {} under CA {}",
+                    self.bootstrap.node_id,
+                    &identity.ca.sha256[..12]
+                );
+                self.revoked = false;
+                self.adopt(identity);
+            }
+            // Spent by this agent before it could null the token (a crash in between).
+            Err(err) if err.code() == Some("enrollment_token_invalid") && self.is_enrolled() => {
+                info!("the enrollment token is spent; using the stored credentials");
+            }
+            Err(err) => return Err(err),
+        }
+        if let Err(err) = self.bootstrap.spend_token(&self.opts.bootstrap) {
+            info!("{err}");
+        }
+        Ok(())
+    }
+
+    /// Certify a fresh key; a failure only postpones the next try (the certificate is still good).
+    fn renew_certificate(&mut self, now: u64) {
+        let Some(identity) = self.identity.as_ref() else {
+            return;
+        };
+        match session::renew(&self.client, &self.bootstrap, identity) {
+            Ok(renewed) => match renewed.save(&self.opts.state_dir) {
+                Ok(()) => {
+                    info!("renewed the node certificate");
+                    self.identity = Some(renewed);
+                    // The open session stays bound to the old certificate until it expires.
+                    if let Some(session) = &mut self.session {
+                        session.renew_after = session.expires_at;
+                    }
+                }
+                Err(err) => info!("{err}"),
+            },
+            Err(err) => {
+                info!("certificate renewal failed: {err}");
+                if let Some(session) = &mut self.session {
+                    session.renew_after = now + RENEW_RETRY_SECONDS;
+                }
+            }
+        }
+    }
+
+    /// Run `call` on an open session; a session the service no longer knows is reopened once.
+    fn with_session<T>(
+        &mut self,
+        call: impl Fn(&Client, &Session) -> Result<T, HttpError>,
+    ) -> Result<T, HttpError> {
+        self.connect()?;
+        let first = call(&self.client, self.session.as_ref().expect("connected"));
+        match first {
+            Err(HttpError::Status { status: 401, .. }) => {
+                self.forget_session();
+                self.connect()?;
+                call(&self.client, self.session.as_ref().expect("connected"))
+            }
+            Err(err) if err.code() == Some("credential_revoked") => {
+                info!("the service revoked this node's certificate; run `meridian apply`");
+                self.revoked = true;
+                self.forget_session();
+                Err(err)
+            }
+            other => other,
+        }
+    }
+
+    // ---- apply and report ---------------------------------------------------------------
+
     /// Apply the held document once (idempotent: unchanged resources are only re-checked).
+    /// Without trusted credentials nothing applies: an unverified document never touches the host.
     pub fn apply_held(&mut self) -> Result<(), String> {
+        if self.trust.is_none() {
+            return Ok(());
+        }
         let Some(target) = self.state.held_ref() else {
             return Ok(());
         };
@@ -174,38 +437,92 @@ impl<'a> Agent<'a> {
         }
     }
 
-    pub fn send_report(&self) -> Result<(), HttpError> {
-        let body = self.client.report(&self.build_report())?;
-        let ack: ReportAck =
-            serde_json::from_value(body).map_err(|err| HttpError::Protocol(err.to_string()))?;
-        if ack.kind != "report_ack" {
-            return Err(HttpError::Protocol(format!(
-                "expected report_ack, got {}",
-                ack.kind
-            )));
-        }
-        Ok(())
+    pub fn send_report(&mut self) -> Result<(), HttpError> {
+        let report = self.build_report();
+        let body = self.with_session(|client, _| client.call("report", &report))?;
+        typed::<ReportAck>(body, "report_ack").map(|_| ())
     }
+
+    // ---- traffic ------------------------------------------------------------------------
+
+    /// The installed Xray binary and its API address, once the held document names both.
+    fn xray_api(&self) -> Option<(String, String)> {
+        let binary = self.resources.iter().find_map(|r| match &r.spec {
+            Spec::BinaryPin(pin) if pin.name == "xray" => {
+                Some(host_path(&self.opts.root, &pin.install_path))
+            }
+            _ => None,
+        })?;
+        let api = self.resources.iter().find_map(|r| match &r.spec {
+            Spec::XrayConfig(config) => Some(config.api_address.clone()),
+            _ => None,
+        })?;
+        binary
+            .is_file()
+            .then(|| (binary.to_string_lossy().into_owned(), api))
+    }
+
+    fn managed_users(&self) -> BTreeSet<String> {
+        let mut users = BTreeSet::new();
+        for resource in &self.resources {
+            match &resource.spec {
+                Spec::XrayUsers(spec) => users.extend(spec.users.iter().map(|u| u.user_id.clone())),
+                Spec::Hysteria2Users(spec) => {
+                    users.extend(spec.users.iter().map(|u| u.user_id.clone()))
+                }
+                _ => {}
+            }
+        }
+        users
+    }
+
+    /// Fold Xray's counters into the store and send the totals. `Ok(false)` when the session
+    /// does not use `traffic_stats` or no Xray runs here yet.
+    pub fn send_stats(&mut self) -> Result<bool, HttpError> {
+        self.connect()?;
+        let uses = self
+            .session
+            .as_ref()
+            .is_some_and(|s| s.uses("traffic_stats"));
+        let Some((xray, api)) = self.xray_api().filter(|_| uses) else {
+            return Ok(false);
+        };
+        match stats::query(self.exec, &xray, &api) {
+            Ok(deltas) => self.traffic.fold(&deltas),
+            // Stored totals still go out: the service counts only growth.
+            Err(err) => debug!("traffic counters unavailable: {err}"),
+        }
+        let report = self.traffic.next_report(now_rfc3339());
+        self.traffic
+            .save(&self.opts.state_dir)
+            .map_err(HttpError::Protocol)?;
+        let body = self.with_session(|client, _| client.call("stats", &report))?;
+        let ack: StatsAck = typed(body, "stats_ack")?;
+        if self.traffic.acknowledged(&ack, &self.managed_users())
+            && let Err(err) = self.traffic.save(&self.opts.state_dir)
+        {
+            info!("{err}");
+        }
+        Ok(true)
+    }
+
+    // ---- desired state ------------------------------------------------------------------
 
     /// One long-poll; a new document is verified, held, applied, and reported.
     pub fn poll_once(&mut self) -> Result<PollOutcome, HttpError> {
-        let request = PollRequest {
-            kind: "poll",
-            have: self.state.held_ref(),
-            wait_seconds: self.opts.wait_seconds,
-        };
-        let body = self.client.poll(&request)?;
-        let response: PollResponse =
-            serde_json::from_value(body).map_err(|err| HttpError::Protocol(err.to_string()))?;
-        if response.kind != "poll_result" {
-            return Err(HttpError::Protocol(format!(
-                "expected poll_result, got {}",
-                response.kind
-            )));
-        }
+        let have = self.state.held_ref();
+        let wanted = self.opts.wait_seconds;
+        let body = self.with_session(|client, session| {
+            client.poll(&PollRequest {
+                kind: "poll",
+                have: have.clone(),
+                wait_seconds: wanted.min(session.max_wait_seconds),
+            })
+        })?;
+        let response: PollResponse = typed(body, "poll_result")?;
         if !response.commands.is_empty() && !self.commands_logged {
             debug!(
-                "ignoring {} command(s): the skeleton runs none",
+                "ignoring {} command(s): this agent runs none",
                 response.commands.len()
             );
             self.commands_logged = true;
@@ -228,14 +545,17 @@ impl<'a> Agent<'a> {
         })
     }
 
-    fn report_logged(&self) {
+    fn report_logged(&mut self) {
         if let Err(err) = self.send_report() {
             info!("report failed: {err}");
         }
     }
 
     fn accept(&mut self, desired: Value) -> Accepted {
-        let verified = match verify_desired(&desired, &self.bootstrap) {
+        let Some(trust) = self.trust.as_ref() else {
+            return Accepted::Refused;
+        };
+        let verified = match verify_desired(&desired, trust) {
             Ok(verified) => verified,
             Err(err) => {
                 info!("refused desired state: {err}");
@@ -290,15 +610,27 @@ impl<'a> Agent<'a> {
         );
     }
 
+    fn intervals(&self) -> (Duration, Duration) {
+        self.session
+            .as_ref()
+            .map_or((REPORT_INTERVAL, REPORT_INTERVAL), |s| {
+                (s.report_interval, s.stats_interval)
+            })
+    }
+
     /// Run forever.
     pub fn run(&mut self) -> ! {
         let mut backoff = Backoff::new();
+        if let Err(err) = self.connect() {
+            info!("cannot reach the control service yet: {err}");
+        }
         if self.has_held()
             && let Err(err) = self.apply_held()
         {
             info!("{err}");
         }
         let mut next_report = Instant::now();
+        let mut next_stats = Instant::now();
         let mut next_reconcile = Instant::now() + RECONCILE_INTERVAL;
         loop {
             if Instant::now() >= next_reconcile {
@@ -309,11 +641,23 @@ impl<'a> Agent<'a> {
                 next_report = Instant::now();
             }
             if Instant::now() >= next_report {
+                let result = self.send_report();
                 next_report = Instant::now()
-                    + match self.send_report() {
-                        Ok(()) => REPORT_INTERVAL,
+                    + match result {
+                        Ok(()) => self.intervals().0,
                         Err(err) => {
                             debug!("report failed: {err}");
+                            Duration::from_secs(15)
+                        }
+                    };
+            }
+            if Instant::now() >= next_stats {
+                let result = self.send_stats();
+                next_stats = Instant::now()
+                    + match result {
+                        Ok(_) => self.intervals().1,
+                        Err(err) => {
+                            debug!("stats failed: {err}");
                             Duration::from_secs(15)
                         }
                     };
@@ -325,14 +669,12 @@ impl<'a> Agent<'a> {
                 }
                 Ok(PollOutcome::Applied(after)) | Ok(PollOutcome::Recorded(after)) => {
                     backoff.reset();
-                    next_report = Instant::now() + REPORT_INTERVAL;
+                    next_report = Instant::now() + self.intervals().0;
                     after
                 }
                 Ok(PollOutcome::Refused) => backoff.next(None),
-                Err(HttpError::Status {
-                    status: 401 | 403, ..
-                }) => {
-                    info!("node token refused; run `meridian apply` to re-enroll");
+                Err(err) if !self.is_enrolled() => {
+                    info!("{err}; waiting for a new enrollment token");
                     MAX_BACKOFF
                 }
                 Err(err) => {

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import hashlib
 import json
 from types import TracebackType
@@ -13,10 +12,18 @@ import pytest
 from meridian.cluster import ClusterConfig
 from meridian.compiler import compile_topology
 from meridian.compiler.models import ResourcePlan
-from meridian.control.models import ClientEndpoint, MintedToken, NodeSpec, NodeStatus, ServiceSettings
+from meridian.control.models import (
+    ClientEndpoint,
+    EnrollmentGrant,
+    FleetAuthority,
+    NodeSpec,
+    NodeStatus,
+    ServiceSettings,
+)
 from meridian.control_artifacts import AgentBinary
+from meridian.core.agent_protocol import AgentBootstrap
 from meridian.core.agent_types import NodeStateRef, canonical_sha256
-from meridian.host_runtime import AGENT_BINARY, AGENT_BOOTSTRAP, CONTROL_SERVICE_PUBLIC_KEY
+from meridian.host_runtime import AGENT_BINARY, AGENT_BOOTSTRAP
 from meridian.reconciler.meridian_drivers import MeridianDriverContext, build_meridian_drivers
 from meridian.reconciler.resources import (
     ResourceAction,
@@ -29,7 +36,8 @@ from meridian.setup.single_server import single_server_intent
 from tests.support.mock_connection import MockConnection
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
-SERVICE_KEY = base64.b64encode(bytes(range(32))).decode()
+CA_SHA256 = "c" * 64
+CA_PEM = "-----BEGIN CERTIFICATE-----\n" + "A" * 64 + "\n-----END CERTIFICATE-----\n"
 BINARY = AgentBinary(data=b"\x7fELF-agent", sha256=hashlib.sha256(b"\x7fELF-agent").hexdigest())
 
 
@@ -61,9 +69,17 @@ class FakeControl:
         self.specs[node_id] = spec
         return self._status(node_id)
 
-    def mint_token(self, node_id: str) -> MintedToken:
-        self.tokens.append(f"node-token-{len(self.tokens):032d}")
-        return MintedToken(node_id=node_id, node_token=self.tokens[-1])
+    def grant_enrollment(self, node_id: str) -> EnrollmentGrant:
+        self.tokens.append(f"enrollment-token-{len(self.tokens):032d}")
+        return EnrollmentGrant(
+            node_id=node_id,
+            enrollment_token=self.tokens[-1],
+            token_expires_at="2999-01-01T00:00:00Z",
+            ca_sha256=CA_SHA256,
+        )
+
+    def fleet_authority(self) -> FleetAuthority:
+        return FleetAuthority(ca_sha256=CA_SHA256, ca_certificate_pem=CA_PEM)
 
     def get_endpoint(self, endpoint_id: str) -> ClientEndpoint | None:
         return self.endpoints.get(endpoint_id)
@@ -115,7 +131,6 @@ def _setup(plan: ResourcePlan, conn: MockConnection | None = None):
             connection_for=lambda _ref: conn or MockConnection(),
             server_addresses={"srv-a": "198.51.100.10"},
             agent_binary=lambda _arch: BINARY,
-            control_ref="srv-a",
             sleep=lambda _s: None,
         )
     )
@@ -169,33 +184,72 @@ def test_reality_endpoint_publishes_the_workload_public_identity(plan: ResourceP
     assert observation_converges(action, drivers["client_endpoint"].observe(action, None))
 
 
-def test_agent_bootstrap_pins_the_service_key_and_a_fresh_token(plan: ResourcePlan) -> None:
+def test_agent_bootstrap_is_the_contract_file_with_a_fresh_enrollment_token(plan: ResourcePlan) -> None:
     conn = MockConnection()
     conn.when("uname -m", stdout="x86_64\n")
-    conn.when(f"cat {CONTROL_SERVICE_PUBLIC_KEY}", stdout=f"{SERVICE_KEY}\n")
     drivers, control, _cluster = _setup(plan, conn)
     control.reports = [{"last_seen_at": "2999-01-01T00:00:00Z"}]
 
     drivers["agent_runtime"].apply(_action(plan, "agent:main"), None)
 
-    bootstrap = json.loads(conn.write_map[AGENT_BOOTSTRAP])
-    assert bootstrap["service_public_key"] == SERVICE_KEY
-    assert bootstrap["node_token"] == control.tokens[-1]
-    assert bootstrap["service_url"] == "https://198.51.100.10/secret"
+    bootstrap = AgentBootstrap.model_validate_json(conn.write_map[AGENT_BOOTSTRAP])
+    assert bootstrap.enrollment_token == control.tokens[-1]
+    assert bootstrap.ca_sha256 == CA_SHA256
+    assert bootstrap.tls_pin_sha256 is None
+    assert (bootstrap.service_url, bootstrap.fleet_id, bootstrap.node_id) == (
+        "https://198.51.100.10/secret",
+        FLEET_ID,
+        "main",
+    )
     assert conn.write_map[AGENT_BINARY] == BINARY.data
     write = next(kwargs for path, _data, kwargs in conn.writes if path == AGENT_BOOTSTRAP)
     assert write["mode"] == "600"
+    assert not any("signing.pub" in call for call in conn.calls), "the CA hash comes from the admin API"
 
 
-def test_agent_refuses_a_malformed_service_key(plan: ResourcePlan) -> None:
+def _enrolled_bootstrap(**changes: object) -> str:
+    body = {
+        "protocol": "meridian.agent/v1",
+        "service_url": "https://198.51.100.10/secret",
+        "fleet_id": FLEET_ID,
+        "node_id": "main",
+        "enrollment_token": None,
+        "token_expires_at": None,
+        "ca_sha256": CA_SHA256,
+        "tls_pin_sha256": None,
+    }
+    return json.dumps({**body, **changes})
+
+
+@pytest.mark.parametrize(
+    ("bootstrap", "binary", "active", "seen", "exists", "connected"),
+    [
+        (_enrolled_bootstrap(), BINARY.sha256, "active", "2999-01-01T00:00:00Z", True, True),
+        (_enrolled_bootstrap(), BINARY.sha256, "active", "2000-01-01T00:00:00Z", True, False),
+        (_enrolled_bootstrap(ca_sha256="d" * 64), BINARY.sha256, "active", "2999-01-01T00:00:00Z", False, False),
+        (_enrolled_bootstrap(tls_pin_sha256="e" * 64), BINARY.sha256, "active", "2999-01-01T00:00:00Z", False, False),
+        ("{not json", BINARY.sha256, "active", "2999-01-01T00:00:00Z", False, False),
+        (_enrolled_bootstrap(), "f" * 64, "active", "2999-01-01T00:00:00Z", False, False),
+        (_enrolled_bootstrap(), BINARY.sha256, "failed", "2999-01-01T00:00:00Z", False, False),
+    ],
+    ids=["enrolled", "not-seen", "other-ca", "pinned-tls", "malformed", "other-binary", "unit-down"],
+)
+def test_agent_observation_is_fail_closed(
+    plan: ResourcePlan, bootstrap: str, binary: str, active: str, seen: str, exists: bool, connected: bool
+) -> None:
     conn = MockConnection()
     conn.when("uname -m", stdout="x86_64\n")
-    conn.when(f"cat {CONTROL_SERVICE_PUBLIC_KEY}", stdout=base64.b64encode(b"short").decode())
+    conn.when("sha256sum", stdout=f"{binary}  {AGENT_BINARY}\n")
+    conn.when("systemctl is-active", stdout=f"{active}\n")
+    conn.when(f"cat {AGENT_BOOTSTRAP}", stdout=bootstrap)
     drivers, control, _cluster = _setup(plan, conn)
+    control.reports = [{"last_seen_at": seen}]
+    action = _action(plan, "agent:main")
 
-    with pytest.raises(ResourceReconcileError, match="malformed"):
-        drivers["agent_runtime"].apply(_action(plan, "agent:main"), None)
-    assert control.tokens == []
+    observation = drivers["agent_runtime"].observe(action, None)
+
+    assert observation.exists is exists
+    assert observation_converges(action, observation) is connected
 
 
 def test_settings_carry_the_public_base_of_pages_and_subscriptions(plan: ResourcePlan) -> None:

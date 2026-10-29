@@ -1,8 +1,7 @@
-"""Models the control service shares with the deployer and the node agent.
+"""Models of the control service's admin API, shared with the deployer.
 
-The walking skeleton authenticates agents with a per-node bearer token and pins
-the service's raw Ed25519 public key; enrollment with a CSR and the fleet's
-internal CA (`AgentBootstrap`, `EnrollRequest`) replaces both in M2.
+The agent side speaks the `meridian.agent/v1` contract (`core/agent_protocol.py`);
+these models are what the deployer stores and reads over `/api`.
 """
 
 from __future__ import annotations
@@ -14,10 +13,8 @@ from pydantic import Field
 
 from meridian.core.agent_desired import AgentResource
 from meridian.core.agent_types import (
-    AGENT_PROTOCOL,
-    AgentModel,
-    AgentProtocol,
-    Base64,
+    CertificatePem,
+    Count,
     FleetEpoch,
     FleetId,
     InboundTag,
@@ -25,29 +22,11 @@ from meridian.core.agent_types import (
     NodeStateRef,
     OpaqueToken,
     Revision,
+    Sha256Hex,
     Timestamp,
     Version,
 )
 from meridian.core.models import CoreModel
-
-ServiceUrl = Field(
-    max_length=512,
-    pattern=r"^https://[^\s/]+/[A-Za-z0-9._~-]+(?:/[A-Za-z0-9._~-]+)*$",
-    description="Base URL of the control service: scheme, host, and secret path, without a trailing slash.",
-)
-
-
-class NodeBootstrap(AgentModel):
-    """The file SSH bootstrap writes at `/etc/netagent/bootstrap.json` (mode 0600)."""
-
-    protocol: AgentProtocol = AGENT_PROTOCOL
-    service_url: str = ServiceUrl
-    fleet_id: FleetId
-    node_id: NodeId
-    node_token: OpaqueToken = Field(description="Sent as `Authorization: Bearer <token>` on every request.")
-    service_public_key: Base64 = Field(
-        min_length=44, max_length=44, description="The service's raw 32-byte Ed25519 public key in base64."
-    )
 
 
 class ManagedInbound(CoreModel):
@@ -176,9 +155,33 @@ class ServiceHealth(CoreModel):
     fleet_epoch: FleetEpoch
 
 
-class MintedToken(CoreModel):
+class EnrollmentGrant(CoreModel):
+    """A single-use, short-lived enrollment token for one node, and the CA the node pins."""
+
     node_id: NodeId
-    node_token: OpaqueToken
+    enrollment_token: OpaqueToken
+    token_expires_at: Timestamp
+    ca_sha256: Sha256Hex
+
+
+class FleetAuthority(CoreModel):
+    """The fleet's internal CA, as SSH bootstrap pins it."""
+
+    ca_sha256: Sha256Hex
+    ca_certificate_pem: CertificatePem
+
+
+class UserTrafficTotal(CoreModel):
+    """Cumulative traffic of one user over every node; never a client address."""
+
+    username: str
+    uplink_bytes: Count
+    downlink_bytes: Count
+    last_seen_at: Timestamp | None = Field(description="When a node last counted traffic for the user.")
+
+
+class TrafficSummary(CoreModel):
+    users: list[UserTrafficTotal]
 
 
 class ServiceConfig(CoreModel):

@@ -1,7 +1,8 @@
 """HTTP front of the control service, on loopback behind nginx's secret path.
 
 nginx strips the secret path, so this server sees `/api/...` (admin token),
-`/agent/v1/...` (node token), and `/sub/...` (the connection-page route). The
+`/agent/v1/...` (the auth `AGENT_HTTP_SURFACE` declares per endpoint), and
+`/sub/...` (the connection-page route). The
 standard library's threading server is enough here: a thread per waiting
 long-poll costs little at fleet sizes Meridian targets.
 """
@@ -12,6 +13,7 @@ import hmac
 import json
 import re
 import threading
+import time
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -21,10 +23,13 @@ from urllib.parse import unquote
 from pydantic import BaseModel, ValidationError
 
 from meridian import __version__
+from meridian.control.enrollment import Session, token_sha256
+from meridian.control.errors import ServiceError, agent_error
 from meridian.control.models import ClientEndpoint, NodeSpec, ServiceConfig, ServiceSettings, UserUpdate
-from meridian.control.service import ControlService, ServiceError, token_sha256, utc_now
+from meridian.control.service import ControlService
+from meridian.control.times import utc_now
 from meridian.core.agent_http import AGENT_HTTP_SURFACE
-from meridian.core.agent_protocol import ObservedStateReport, PollRequest
+from meridian.core.agent_protocol import EnrollRequest, ObservedStateReport, PollRequest, RenewRequest, StatsReport
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 MAX_BODY_BYTES = AGENT_HTTP_SURFACE.max_request_bytes
@@ -104,9 +109,9 @@ class _Handler(BaseHTTPRequestHandler):
             raise ServiceError("unauthenticated", "Authentication required.", 401)
         return self.server.service
 
-    def _node(self) -> tuple[ControlService, str]:
+    def _session(self) -> tuple[ControlService, Session]:
         service = self.server.service
-        return service, service.authenticate_node(self._bearer())
+        return service, service.authority.authenticate(self._bearer())
 
     # -- bodies --------------------------------------------------------------------------
 
@@ -118,6 +123,13 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _model(self, model: type[ModelT]) -> ModelT:
         return model.model_validate_json(self._body())
+
+    def _raw(self) -> tuple[bytes, Any]:
+        body = self._body()
+        try:
+            return body, json.loads(body)
+        except ValueError as exc:
+            raise agent_error("invalid_request", "The body is not JSON.") from exc
 
     def _json(self, status: int, body: Any) -> None:
         if isinstance(body, BaseModel):
@@ -175,8 +187,14 @@ class _Handler(BaseHTTPRequestHandler):
         self._admin().delete_node(match[1])
         return {"deleted": match[1]}
 
-    def mint_token(self, match: re.Match[str]) -> Any:
-        return self._admin().mint_token(match[1])
+    def grant_enrollment(self, match: re.Match[str]) -> Any:
+        return self._admin().grant_enrollment(match[1])
+
+    def fleet_authority(self, _match: re.Match[str]) -> Any:
+        return self._admin().authority.fleet_authority()
+
+    def traffic(self, _match: re.Match[str]) -> Any:
+        return self._admin().traffic.summary()
 
     def list_users(self, _match: re.Match[str]) -> Any:
         return {"users": [user.model_dump(mode="json") for user in self._admin().list_users()]}
@@ -215,18 +233,40 @@ class _Handler(BaseHTTPRequestHandler):
 
     # -- agent API -------------------------------------------------------------------------
 
+    def agent_enroll(self, _match: re.Match[str]) -> Any:
+        return self.server.service.authority.enroll(self._model(EnrollRequest))
+
+    def agent_hello(self, _match: re.Match[str]) -> Any:
+        service = self.server.service
+        _, raw = self._raw()
+        if not isinstance(raw, dict):
+            raise agent_error("invalid_request", "The body is not a JSON object.")
+        request, welcome = service.authority.hello(raw)
+        service.node_seen(request.node_id, request.agent_version)
+        return welcome
+
+    def agent_renew(self, _match: re.Match[str]) -> Any:
+        service, session = self._session()
+        return service.authority.renew(session, self._model(RenewRequest))
+
     def agent_poll(self, _match: re.Match[str]) -> Any:
-        service, node_id = self._node()
-        return service.poll(node_id, self._model(PollRequest))
+        service, session = self._session()
+        # Answer before the session expires, so the agent's next request is a fresh hello.
+        remaining = session.expires_at - time.time() - 5
+        return service.poll(session.node_id, self._model(PollRequest), max_wait=remaining)
 
     def agent_report(self, _match: re.Match[str]) -> Any:
-        service, node_id = self._node()
-        raw = self._body()
-        report = ObservedStateReport.model_validate_json(raw)
-        return service.report(node_id, report, json.loads(raw))
+        service, session = self._session()
+        body, raw = self._raw()
+        report = ObservedStateReport.model_validate_json(body)
+        return service.report(session.node_id, report, raw)
+
+    def agent_stats(self, _match: re.Match[str]) -> Any:
+        service, session = self._session()
+        return service.traffic.record(session.node_id, self._model(StatsReport))
 
     def agent_blob(self, _match: re.Match[str]) -> Any:
-        self._node()
+        self._session()
         raise ServiceError("not_found", "Unknown blob.", 404)
 
     # -- subscriptions -----------------------------------------------------------------------
@@ -248,7 +288,9 @@ _ROUTES: list[Route] = [
     ("GET", re.compile(rf"/api/nodes/{_NAME}"), _Handler.get_node),
     ("PUT", re.compile(rf"/api/nodes/{_NAME}"), _Handler.put_node),
     ("DELETE", re.compile(rf"/api/nodes/{_NAME}"), _Handler.delete_node),
-    ("POST", re.compile(rf"/api/nodes/{_NAME}/token"), _Handler.mint_token),
+    ("POST", re.compile(rf"/api/nodes/{_NAME}/enrollment"), _Handler.grant_enrollment),
+    ("GET", re.compile(r"/api/ca"), _Handler.fleet_authority),
+    ("GET", re.compile(r"/api/traffic"), _Handler.traffic),
     ("GET", re.compile(r"/api/users"), _Handler.list_users),
     ("GET", re.compile(rf"/api/users/{_USERNAME}"), _Handler.get_user),
     ("PUT", re.compile(rf"/api/users/{_USERNAME}"), _Handler.put_user),
@@ -258,8 +300,12 @@ _ROUTES: list[Route] = [
     ("GET", re.compile(rf"/api/endpoints/{_NAME}"), _Handler.get_endpoint),
     ("PUT", re.compile(rf"/api/endpoints/{_NAME}"), _Handler.put_endpoint),
     ("DELETE", re.compile(rf"/api/endpoints/{_NAME}"), _Handler.delete_endpoint),
+    ("POST", re.compile(r"/agent/v1/enroll"), _Handler.agent_enroll),
+    ("POST", re.compile(r"/agent/v1/hello"), _Handler.agent_hello),
+    ("POST", re.compile(r"/agent/v1/renew"), _Handler.agent_renew),
     ("POST", re.compile(r"/agent/v1/poll"), _Handler.agent_poll),
     ("POST", re.compile(r"/agent/v1/report"), _Handler.agent_report),
+    ("POST", re.compile(r"/agent/v1/stats"), _Handler.agent_stats),
     ("GET", re.compile(r"/agent/v1/blobs/([0-9a-f]{64})"), _Handler.agent_blob),
     ("GET", re.compile(r"/sub/([A-Za-z0-9_-]{16,64})(?:/(json|mihomo|singbox))?"), _Handler.subscription),
 ]
@@ -278,7 +324,6 @@ def serve(config_path: Path) -> None:
     config = ServiceConfig.model_validate_json(config_path.read_text(encoding="utf-8"))
     state_dir = Path(config.state_dir)
     service = ControlService(state_dir / "control.db", fleet_id=config.fleet_id, version=__version__)
-    service.write_public_key(state_dir / "signing.pub")
     server = ControlServer((config.listen_host, config.listen_port), service, config.admin_token_sha256)
     stop = threading.Event()
     threading.Thread(target=_enforce_forever, args=(service, stop), daemon=True).start()

@@ -11,12 +11,21 @@ use base64::engine::general_purpose::STANDARD;
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde_json::Value;
 
-use crate::bootstrap::Bootstrap;
 use crate::jcs;
 use crate::model::{DesiredDocument, NodeStateRef, PROTOCOL, Resource};
 
 pub const DESIRED_STATE_CONTEXT: &[u8] = b"meridian.agent/v1 desired-state";
 pub const MAX_RESOURCES: usize = 1024;
+
+/// Whose documents the agent accepts: this node's, signed by the service certificate's key.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Trust {
+    pub fleet_id: String,
+    pub node_id: String,
+    pub public_key: [u8; 32],
+    /// SHA-256 of the service certificate's DER.
+    pub key_id: String,
+}
 
 /// A desired-state document whose signature, hashes, and identity checked out.
 #[derive(Clone, Debug)]
@@ -38,7 +47,7 @@ pub fn signed_bytes(document: &Value) -> Result<Vec<u8>, String> {
     Ok(out)
 }
 
-/// Check the signature member against the pinned service key.
+/// Check the signature member against the service certificate's key.
 pub fn verify_signature(
     document: &Value,
     public_key: &[u8; 32],
@@ -67,15 +76,15 @@ pub fn verify_signature(
 }
 
 /// Verify a desired-state document received from the service (or reloaded from state).
-pub fn verify_desired(document: &Value, bootstrap: &Bootstrap) -> Result<Verified, String> {
+pub fn verify_desired(document: &Value, trust: &Trust) -> Result<Verified, String> {
     jcs::check_no_floats(document)?;
-    verify_signature(document, &bootstrap.public_key, &bootstrap.key_id)?;
+    verify_signature(document, &trust.public_key, &trust.key_id)?;
     let typed: DesiredDocument = serde_json::from_value(document.clone())
         .map_err(|err| format!("desired state is malformed: {err}"))?;
     if typed.protocol != PROTOCOL {
         return Err(format!("unsupported protocol {:?}", typed.protocol));
     }
-    if typed.fleet_id != bootstrap.fleet_id || typed.node_id != bootstrap.node_id {
+    if typed.fleet_id != trust.fleet_id || typed.node_id != trust.node_id {
         return Err("desired state is for another fleet or node".into());
     }
     if typed.fleet_epoch == 0 || typed.revision == 0 {

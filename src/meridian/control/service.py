@@ -1,34 +1,33 @@
 """The control service's state and logic, independent of HTTP.
 
-One SQLite file holds the fleet identity, the signing key, node specs and the
-signed documents composed from them, user records, and client endpoints. Every
-change that alters a node's resources composes a new revision, signs it, and
-wakes that node's waiting poll.
+One SQLite file holds the fleet identity, the CA and signing key
+(`enrollment.NodeAuthority`), node specs and the signed documents composed from
+them, user records, client endpoints, and traffic totals (`traffic.TrafficLedger`).
+Every change that alters a node's resources composes a new revision, signs it,
+and wakes that node's waiting poll.
 """
 
 from __future__ import annotations
 
-import base64
-import hashlib
-import hmac
 import json
 import secrets
 import sqlite3
-import threading
 import time
 import uuid as uuid_module
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from meridian.control.enrollment import NodeAuthority
+from meridian.control.errors import ServiceError
 from meridian.control.formats.entries import SubscriptionUser
 from meridian.control.formats.selector import SUFFIX_FORMATS, select_format
 from meridian.control.models import (
     ClientEndpoint,
+    EnrollmentGrant,
     ManagedInbound,
-    MintedToken,
     NodeSpec,
     NodeStatus,
     ServiceHealth,
@@ -37,10 +36,13 @@ from meridian.control.models import (
     UserUpdate,
     users_resource_id,
 )
+from meridian.control.store import Store
 from meridian.control.subscriptions import SubscriptionResponse, render_subscription, unknown_subscription
+from meridian.control.times import utc_now
+from meridian.control.traffic import TrafficLedger
 from meridian.core.agent_desired import DesiredNodeState
 from meridian.core.agent_protocol import ObservedStateReport, PollRequest
-from meridian.core.agent_signing import DESIRED_STATE_CONTEXT, generate_signing_key, public_key, sign
+from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 
 SCHEMA_VERSION = 2
@@ -50,7 +52,6 @@ CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS secrets (name TEXT PRIMARY KEY, value BLOB NOT NULL);
 CREATE TABLE IF NOT EXISTS nodes (
     node_id TEXT PRIMARY KEY,
-    token_sha256 TEXT,
     spec TEXT,
     spec_sha256 TEXT,
     revision INTEGER,
@@ -88,35 +89,16 @@ _USER_COLUMNS = (
 )
 
 
-class ServiceError(Exception):
-    """A refused request: `code` is an agent error code, `status` its HTTP status."""
-
-    def __init__(self, code: str, message: str, status: int) -> None:
-        super().__init__(message)
-        self.code = code
-        self.status = status
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def token_sha256(token: str) -> str:
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()
-
-
 class ControlService:
     """Thread-safe service state over one SQLite database."""
 
-    def __init__(self, database: Path, *, fleet_id: str, version: str) -> None:
+    def __init__(self, database: Path, *, fleet_id: str, version: str, clock: Callable[[], float] = time.time) -> None:
         self._version = version
-        self._lock = threading.RLock()
-        self._changed = threading.Condition(self._lock)
-        database.parent.mkdir(parents=True, exist_ok=True)
-        self._db = sqlite3.connect(database, check_same_thread=False, isolation_level=None)
-        self._db.execute("PRAGMA journal_mode=WAL")
-        self._db.execute("PRAGMA foreign_keys=ON")
-        self._db.executescript(_SCHEMA)
+        self._store = Store(database)
+        self._lock = self._store.lock
+        self._changed = self._store.changed
+        self._db = self._store.db
+        self._store.create(_SCHEMA)
         with self._transaction():
             stored = self._meta("fleet_id")
             if stored and stored != fleet_id:
@@ -127,23 +109,18 @@ class ControlService:
                 self._set_meta("fleet_epoch", "1")
             if not self._meta("profile_title"):
                 self._set_meta("profile_title", "Meridian")
-            if self._secret("signing_key") is None:
-                self._db.execute("INSERT INTO secrets VALUES ('signing_key', ?)", (generate_signing_key(),))
         self.fleet_id = fleet_id
+        self.authority = NodeAuthority(self._store, fleet_id, clock=clock)
+        self.traffic = TrafficLedger(self._store)
+        with self._transaction():
+            # Documents signed by an earlier signing certificate are signed again.
+            self._compose_all()
 
     # -- identity -----------------------------------------------------------------
 
     @property
     def fleet_epoch(self) -> int:
-        return int(self._meta("fleet_epoch") or "1")
-
-    def public_key(self) -> bytes:
-        return public_key(self._signing_key())
-
-    def write_public_key(self, path: Path) -> None:
-        """Publish the raw public key in base64 for SSH bootstrap to pin."""
-        path.write_text(base64.b64encode(self.public_key()).decode("ascii") + "\n", encoding="ascii")
-        path.chmod(0o644)
+        return self._store.fleet_epoch
 
     def health(self) -> ServiceHealth:
         return ServiceHealth(version=self._version, fleet_id=self.fleet_id, fleet_epoch=self.fleet_epoch)
@@ -161,14 +138,6 @@ class ControlService:
 
     # -- nodes ----------------------------------------------------------------------
 
-    def mint_token(self, node_id: str) -> MintedToken:
-        """Issue a fresh node token; the previous one stops working."""
-        token = secrets.token_urlsafe(32)
-        with self._transaction():
-            self._ensure_node(node_id)
-            self._db.execute("UPDATE nodes SET token_sha256 = ? WHERE node_id = ?", (token_sha256(token), node_id))
-        return MintedToken(node_id=node_id, node_token=token)
-
     def put_node_spec(self, node_id: str, spec: NodeSpec) -> NodeStatus:
         body = spec.model_dump(mode="json")
         with self._transaction():
@@ -183,6 +152,21 @@ class ControlService:
     def delete_node(self, node_id: str) -> None:
         with self._transaction():
             self._db.execute("DELETE FROM nodes WHERE node_id = ?", (node_id,))
+            self.authority.forget_node(node_id)
+
+    def grant_enrollment(self, node_id: str) -> EnrollmentGrant:
+        with self._transaction():
+            self._ensure_node(node_id)
+        return self.authority.grant_enrollment(node_id)
+
+    def node_seen(self, node_id: str, agent_version: str) -> None:
+        """Record a hello: the agent is alive and runs `agent_version`."""
+        with self._transaction():
+            self._ensure_node(node_id)
+            self._db.execute(
+                "UPDATE nodes SET last_seen_at = ?, agent_version = ? WHERE node_id = ?",
+                (utc_now(), agent_version, node_id),
+            )
 
     def node_status(self, node_id: str) -> NodeStatus:
         row = self._node(node_id)
@@ -213,18 +197,9 @@ class ControlService:
             errors=errors,
         )
 
-    def authenticate_node(self, token: str) -> str:
-        digest = token_sha256(token)
-        with self._lock:
-            rows = self._db.execute("SELECT node_id, token_sha256 FROM nodes WHERE token_sha256 IS NOT NULL").fetchall()
-        for node_id, stored in rows:
-            if hmac.compare_digest(stored, digest):
-                return str(node_id)
-        raise ServiceError("unauthenticated", "Unknown node token.", 401)
-
-    def poll(self, node_id: str, request: PollRequest) -> dict[str, Any]:
-        """Wait up to `wait_seconds` for a document newer than `have`; return the poll response."""
-        deadline = time.monotonic() + min(request.wait_seconds, MAX_WAIT_SECONDS)
+    def poll(self, node_id: str, request: PollRequest, *, max_wait: float = MAX_WAIT_SECONDS) -> dict[str, Any]:
+        """Wait up to `wait_seconds` (at most `max_wait`) for a document newer than `have`; return the response."""
+        deadline = time.monotonic() + max(0.0, min(request.wait_seconds, MAX_WAIT_SECONDS, max_wait))
         with self._changed:
             self._touch(node_id)
             while True:
@@ -417,7 +392,8 @@ class ControlService:
         spec = NodeSpec.model_validate_json(row["spec"])
         resources = _with_users(spec, self.list_users())
         resources_sha = canonical_sha256(resources)
-        if resources_sha == row["doc_sha256"]:
+        signed_by = json.loads(row["document"])["signature"]["key_id"] if row["document"] else None
+        if resources_sha == row["doc_sha256"] and signed_by == self.authority.service_key_id:
             return
         revision = (row["revision"] or 0) + 1
         document: dict[str, Any] = {
@@ -430,7 +406,7 @@ class ControlService:
             "issued_at": utc_now(),
             "resources": resources,
         }
-        document["signature"] = sign(document, DESIRED_STATE_CONTEXT, self._signing_key())
+        document["signature"] = self.authority.sign(document, DESIRED_STATE_CONTEXT)
         DesiredNodeState.model_validate_json(json.dumps(document))
         self._db.execute(
             "UPDATE nodes SET revision = ?, document = ?, doc_sha256 = ? WHERE node_id = ?",
@@ -451,34 +427,14 @@ class ControlService:
 
     @contextmanager
     def _transaction(self) -> Iterator[None]:
-        with self._lock:
-            self._db.execute("BEGIN IMMEDIATE")
-            try:
-                yield
-            except BaseException:
-                self._db.execute("ROLLBACK")
-                raise
-            self._db.execute("COMMIT")
+        with self._store.transaction():
+            yield
 
     def _meta(self, key: str) -> str | None:
-        row = self._db.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
-        return str(row[0]) if row else None
+        return self._store.meta(key)
 
     def _set_meta(self, key: str, value: str) -> None:
-        self._db.execute(
-            "INSERT INTO meta VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value)
-        )
-
-    def _secret(self, name: str) -> bytes | None:
-        row = self._db.execute("SELECT value FROM secrets WHERE name = ?", (name,)).fetchone()
-        return bytes(row[0]) if row else None
-
-    def _signing_key(self) -> bytes:
-        with self._lock:
-            key = self._secret("signing_key")
-        if key is None:
-            raise ServiceError("internal", "The signing key is missing.", 500)
-        return key
+        self._store.set_meta(key, value)
 
     def _ensure_node(self, node_id: str) -> None:
         self._db.execute("INSERT OR IGNORE INTO nodes (node_id) VALUES (?)", (node_id,))
@@ -487,10 +443,7 @@ class ControlService:
         self._db.execute("UPDATE nodes SET last_seen_at = ? WHERE node_id = ?", (utc_now(), node_id))
 
     def _node(self, node_id: str) -> sqlite3.Row | None:
-        cursor = self._db.cursor()
-        cursor.row_factory = sqlite3.Row  # type: ignore[assignment]  # typeshed omits Row as a factory
-        row: sqlite3.Row | None = cursor.execute("SELECT * FROM nodes WHERE node_id = ?", (node_id,)).fetchone()
-        return row
+        return self._store.row("SELECT * FROM nodes WHERE node_id = ?", (node_id,))
 
 
 def _differs(have: NodeStateRef | None, fleet_epoch: int, row: sqlite3.Row) -> bool:

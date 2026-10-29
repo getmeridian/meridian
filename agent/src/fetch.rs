@@ -1,12 +1,12 @@
-//! HTTP: the control-service client (poll, report, blobs) and artifact downloads.
+//! HTTP: the control-service client (enroll, hello, session endpoints, blobs) and artifact downloads.
 
 use std::io::{self, Write};
+use std::sync::Mutex;
 use std::time::Duration;
 
+use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-
-use crate::bootstrap::Bootstrap;
 
 /// Largest JSON body the agent accepts (the contract's `max_response_bytes`).
 pub const MAX_RESPONSE_BYTES: u64 = 32 * 1024 * 1024;
@@ -15,7 +15,7 @@ const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(600);
 
 /// Downloads an artifact into a writer.
 pub trait Fetch {
-    /// `source` is `service` (the blob endpoint, with the node token) or an https URL
+    /// `source` is `service` (the blob endpoint, with the session token) or an https URL
     /// (never sent the token). At most `limit` bytes are accepted.
     fn fetch(
         &self,
@@ -40,6 +40,16 @@ pub enum HttpError {
     Protocol(String),
 }
 
+impl HttpError {
+    /// The contract error code of a refusal, if the service sent one.
+    pub fn code(&self) -> Option<&str> {
+        match self {
+            HttpError::Status { code, .. } => code.as_deref(),
+            _ => None,
+        }
+    }
+}
+
 impl std::fmt::Display for HttpError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -53,18 +63,19 @@ impl std::fmt::Display for HttpError {
     }
 }
 
-/// Talks to `{service_url}/agent/v1/...` with the bootstrap bearer token.
+/// Talks to `{service_url}/agent/v1/...`; session endpoints carry the session bearer token.
 pub struct Client {
     agent: ureq::Agent,
     base: String,
     service_url: String,
-    token: String,
+    session: Mutex<Option<String>>,
     allow_http: bool,
 }
 
 impl Client {
-    /// `allow_http` exists for tests; production requires https everywhere.
-    pub fn new(bootstrap: &Bootstrap, allow_http: bool) -> Client {
+    /// `allow_http` exists for tests; production requires https everywhere. TLS is verified
+    /// against the WebPKI roots (the control server serves a Let's Encrypt certificate).
+    pub fn new(service_url: &str, allow_http: bool) -> Client {
         let agent = ureq::Agent::config_builder()
             .http_status_as_error(false)
             .https_only(!allow_http)
@@ -74,11 +85,27 @@ impl Client {
             .new_agent();
         Client {
             agent,
-            base: format!("{}/agent/v1", bootstrap.service_url),
-            service_url: bootstrap.service_url.clone(),
-            token: bootstrap.node_token.clone(),
+            base: format!("{service_url}/agent/v1"),
+            service_url: service_url.to_string(),
+            session: Mutex::new(None),
             allow_http,
         }
+    }
+
+    /// Use `token` on session endpoints from now on (`None` forgets the session).
+    pub fn set_session(&self, token: Option<String>) {
+        *self.session.lock().unwrap_or_else(|e| e.into_inner()) = token;
+    }
+
+    pub fn has_session(&self) -> bool {
+        self.session_token().is_some()
+    }
+
+    fn session_token(&self) -> Option<String> {
+        self.session
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
     /// Scrub the secret service path from an error message.
@@ -86,21 +113,26 @@ impl Client {
         message.replace(&self.service_url, "<service>")
     }
 
+    /// POST a JSON body; `session` adds the bearer token (enroll and hello authenticate in the body).
     pub fn post(
         &self,
         endpoint: &str,
-        body: &Value,
+        body: &impl Serialize,
         timeout: Duration,
+        session: bool,
     ) -> Result<Value, HttpError> {
         let bytes = serde_json::to_vec(body).map_err(|err| HttpError::Protocol(err.to_string()))?;
-        let response = self
+        let mut request = self
             .agent
             .post(format!("{}/{endpoint}", self.base))
             .config()
             .timeout_global(Some(timeout))
             .build()
-            .header("Authorization", format!("Bearer {}", self.token))
-            .header("Content-Type", "application/json")
+            .header("Content-Type", "application/json");
+        if session && let Some(token) = self.session_token() {
+            request = request.header("Authorization", format!("Bearer {token}"));
+        }
+        let response = request
             .send(&bytes[..])
             .map_err(|err| HttpError::Network(self.scrub(err.to_string())))?;
         let status = response.status().as_u16();
@@ -131,20 +163,23 @@ impl Client {
         serde_json::from_slice(&body).map_err(|err| HttpError::Protocol(err.to_string()))
     }
 
-    pub fn poll(&self, request: &crate::model::PollRequest) -> Result<Value, HttpError> {
-        let body =
-            serde_json::to_value(request).map_err(|err| HttpError::Protocol(err.to_string()))?;
-        self.post(
-            "poll",
-            &body,
-            Duration::from_secs(request.wait_seconds + 10),
-        )
+    /// A session endpoint with the default timeout (`renew`, `report`, `stats`).
+    pub fn call(&self, endpoint: &str, body: &impl Serialize) -> Result<Value, HttpError> {
+        self.post(endpoint, body, REQUEST_TIMEOUT, true)
     }
 
-    pub fn report(&self, report: &crate::model::ObservedStateReport) -> Result<Value, HttpError> {
-        let body =
-            serde_json::to_value(report).map_err(|err| HttpError::Protocol(err.to_string()))?;
-        self.post("report", &body, REQUEST_TIMEOUT)
+    /// `enroll` or `hello`: authenticated by the body, never by a bearer token.
+    pub fn open(&self, endpoint: &str, body: &impl Serialize) -> Result<Value, HttpError> {
+        self.post(endpoint, body, REQUEST_TIMEOUT, false)
+    }
+
+    pub fn poll(&self, request: &crate::model::PollRequest) -> Result<Value, HttpError> {
+        self.post(
+            "poll",
+            request,
+            Duration::from_secs(request.wait_seconds + 10),
+            true,
+        )
     }
 }
 
@@ -160,9 +195,11 @@ impl Fetch for Client {
             if !crate::jcs::is_sha256_hex(sha256) {
                 return Err("invalid blob hash".into());
             }
-            self.agent
-                .get(format!("{}/blobs/{sha256}", self.base))
-                .header("Authorization", format!("Bearer {}", self.token))
+            let request = self.agent.get(format!("{}/blobs/{sha256}", self.base));
+            match self.session_token() {
+                Some(token) => request.header("Authorization", format!("Bearer {token}")),
+                None => request,
+            }
         } else if source.starts_with("https://")
             || (self.allow_http && source.starts_with("http://"))
         {

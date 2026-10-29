@@ -222,10 +222,76 @@ fn a_full_document_applies_and_a_second_pass_changes_nothing() {
     );
 }
 
+fn changed(pass: &PassResult) -> Vec<&str> {
+    pass.changed.iter().map(String::as_str).collect()
+}
+
+fn clients(host: &Host, inbound: usize) -> Value {
+    let config: Value = serde_json::from_slice(&host.read("/etc/netagent/core.json")).unwrap();
+    config["inbounds"][inbound]["settings"]["clients"].clone()
+}
+
 #[test]
-fn a_user_change_rewrites_the_config_and_restarts_the_unit() {
+fn a_vless_user_change_goes_through_the_xray_api_without_a_restart() {
     let mut host = Host::new(fetcher());
     host.apply(&full_document(&[("u-a", UUID_A, "xtls-rprx-vision")]));
+    host.exec.clear();
+
+    let added = full_document(&[("u-a", UUID_A, "xtls-rprx-vision"), ("u-b", UUID_B, "")]);
+    let pass = host.apply(&added);
+    assert!(pass.converged, "{:?}", pass.observations);
+    assert!(pass.changed.is_empty(), "{:?}", pass.changed);
+    assert_eq!(host.exec.count("systemctl restart netcore.service"), 0);
+    let calls = host.exec.calls();
+    let api: Vec<&String> = calls
+        .iter()
+        .filter(|c| c.starts_with("netcore api"))
+        .collect();
+    assert_eq!(api.len(), 1, "{calls:?}");
+    assert!(api[0].starts_with("netcore api adu --server=127.0.0.1:10085 "));
+    let body = host.exec.added.lock().unwrap()[0].clone();
+    assert_eq!(body["inbounds"][0]["tag"], "vless-reality");
+    assert_eq!(
+        body["inbounds"][0]["settings"]["clients"],
+        json!([{"id": UUID_B, "email": "u-b"}]),
+        "only the added user goes to adu"
+    );
+    assert!(
+        !host.state.path().join("cache").exists(),
+        "the adu file holding UUIDs is gone"
+    );
+    // The file on disk still carries every user, for the next restart.
+    assert_eq!(clients(&host, 0)[1], json!({"id": UUID_B, "email": "u-b"}));
+
+    // Removal and a changed UUID: remove both, add the new credentials back.
+    host.exec.clear();
+    let pass = host.apply(&full_document(&[("u-a", UUID_B, "xtls-rprx-vision")]));
+    assert!(pass.changed.is_empty(), "{:?}", pass.changed);
+    assert_eq!(
+        host.exec
+            .count("netcore api rmu --server=127.0.0.1:10085 -tag=vless-reality u-a u-b"),
+        1,
+        "{:?}",
+        host.exec.calls()
+    );
+    assert_eq!(
+        host.exec.added.lock().unwrap()[1]["inbounds"][0]["settings"]["clients"],
+        json!([{"id": UUID_B, "email": "u-a", "flow": "xtls-rprx-vision"}])
+    );
+    assert_eq!(clients(&host, 0).as_array().unwrap().len(), 1);
+
+    // Nothing left to do on the next pass.
+    host.exec.clear();
+    let again = host.apply(&full_document(&[("u-a", UUID_B, "xtls-rprx-vision")]));
+    assert!(again.changed.is_empty());
+    assert!(host.exec.calls().iter().all(|c| !c.contains(" api ")));
+}
+
+#[test]
+fn a_failing_xray_api_falls_back_to_a_restart() {
+    let mut host = Host::new(fetcher());
+    host.apply(&full_document(&[("u-a", UUID_A, "xtls-rprx-vision")]));
+    *host.exec.api_down.lock().unwrap() = true;
     host.exec.clear();
 
     let pass = host.apply(&full_document(&[
@@ -233,14 +299,67 @@ fn a_user_change_rewrites_the_config_and_restarts_the_unit() {
         ("u-b", UUID_B, ""),
     ]));
     assert!(pass.converged);
-    let changed: Vec<&str> = pass.changed.iter().map(String::as_str).collect();
-    assert_eq!(changed, ["unit:netcore", "users:vless", "xray:config"]);
-    assert_eq!(host.exec.count("systemctl restart netcore.service"), 1);
-    let config: Value = serde_json::from_slice(&host.read("/etc/netagent/core.json")).unwrap();
     assert_eq!(
-        config["inbounds"][0]["settings"]["clients"][1],
-        json!({"id": UUID_B, "email": "u-b"})
+        changed(&pass),
+        ["unit:netcore", "users:vless", "xray:config"]
     );
+    assert_eq!(host.exec.count("systemctl restart netcore.service"), 1);
+    assert_eq!(clients(&host, 0)[1], json!({"id": UUID_B, "email": "u-b"}));
+}
+
+#[test]
+fn hysteria2_users_and_config_changes_restart_instead_of_using_the_api() {
+    let mut host = Host::new(fetcher());
+    host.apply(&full_document(&[("u-a", UUID_A, "xtls-rprx-vision")]));
+
+    // Xray's adu cannot add Hysteria2 users.
+    host.exec.clear();
+    let mut doc = full_document(&[("u-a", UUID_A, "xtls-rprx-vision")]);
+    doc[7] = hy2_users(&[
+        ("u-a", "0123456789abcdef0123"),
+        ("u-b", "abcdef0123456789abcd"),
+    ]);
+    let pass = host.apply(&doc);
+    assert_eq!(changed(&pass), ["unit:netcore", "users:hy2", "xray:config"]);
+    assert_eq!(host.exec.count("systemctl restart netcore.service"), 1);
+    assert!(host.exec.calls().iter().all(|c| !c.contains(" api ")));
+    assert_eq!(clients(&host, 1).as_array().unwrap().len(), 2);
+
+    // A config change rides along with a user change: one restart, no API.
+    host.exec.clear();
+    let mut doc = full_document(&[("u-b", UUID_B, "")]);
+    doc[7] = hy2_users(&[
+        ("u-a", "0123456789abcdef0123"),
+        ("u-b", "abcdef0123456789abcd"),
+    ]);
+    doc[5]["config"]["log"]["loglevel"] = json!("info");
+    let pass = host.apply(&doc);
+    assert_eq!(
+        changed(&pass),
+        ["unit:netcore", "users:vless", "xray:config"]
+    );
+    assert_eq!(host.exec.count("systemctl restart netcore.service"), 1);
+    assert!(host.exec.calls().iter().all(|c| !c.contains(" api ")));
+}
+
+#[test]
+fn a_stopped_xray_gets_the_new_users_from_its_file() {
+    let mut host = Host::new(fetcher());
+    host.apply(&full_document(&[("u-a", UUID_A, "xtls-rprx-vision")]));
+    host.exec
+        .units
+        .lock()
+        .unwrap()
+        .get_mut("netcore.service")
+        .unwrap()
+        .active = false;
+    host.exec.clear();
+
+    let pass = host.apply(&full_document(&[("u-b", UUID_B, "")]));
+    assert!(pass.converged);
+    assert!(host.exec.calls().iter().all(|c| !c.contains(" api ")));
+    assert!(host.exec.unit("netcore.service").active);
+    assert_eq!(clients(&host, 0), json!([{"id": UUID_B, "email": "u-b"}]));
 }
 
 #[test]

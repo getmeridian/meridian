@@ -59,9 +59,9 @@ fn run(opts: Options) -> ExitCode {
         }
     };
     info!(
-        "netagent {VERSION} starting for node {} (key {})",
+        "netagent {VERSION} starting for node {} (CA {})",
         agent.bootstrap.node_id,
-        &agent.bootstrap.key_id[..12]
+        &agent.bootstrap.ca_sha256[..12]
     );
     agent.run()
 }

@@ -92,7 +92,7 @@
       "type": "string"
     },
     "service_certificate_pem": {
-      "description": "One X.509 certificate in PEM.",
+      "description": "As in `EnrollResponse`; the agent re-checks it.",
       "maxLength": 8192,
       "minLength": 64,
       "pattern": "^-----BEGIN CERTIFICATE-----\\n[A-Za-z0-9+/=\\n]+-----END CERTIFICATE-----\\n?$",

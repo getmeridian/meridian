@@ -54,7 +54,6 @@ def meridian_drivers(
     persist: PersistCluster,
     connections: Mapping[str, ServerConnection],
     addresses: Mapping[str, str],
-    control_ref: str,
 ) -> ResourceDrivers:
     return build_meridian_drivers(
         MeridianDriverContext(
@@ -65,7 +64,6 @@ def meridian_drivers(
             connection_for=connections.__getitem__,
             server_addresses=addresses,
             agent_binary=agent_binary,
-            control_ref=control_ref,
         )
     )
 

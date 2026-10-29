@@ -14,13 +14,15 @@ from typing import Any
 
 import pytest
 
+from meridian.control.enrollment import token_sha256
 from meridian.control.models import ClientEndpoint, ManagedInbound, NodeSpec, ServiceSettings, users_resource_id
 from meridian.control.server import ControlServer
-from meridian.control.service import ControlService, ServiceError, token_sha256
+from meridian.control.service import ControlService, ServiceError
 from meridian.core.agent_desired import DesiredNodeState
 from meridian.core.agent_protocol import ObservedStateReport, PollRequest
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT, verify
 from meridian.core.agent_types import NodeStateRef
+from tests.support.agent_node import FakeNode
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
 ADMIN_TOKEN = "admin-token-for-tests-only-0123456789"
@@ -94,7 +96,8 @@ def test_document_inserts_users_after_the_xray_config_and_verifies(service: Cont
     alice = service.get_user("alice")
     assert alice is not None
     assert users["users"] == [{"user_id": alice.user_id, "uuid": alice.uuid, "flow": "xtls-rprx-vision"}]
-    assert verify(document, DESIRED_STATE_CONTEXT, service.public_key())
+    authority = service.authority
+    assert verify(document, DESIRED_STATE_CONTEXT, authority.service_public_key(), authority.service_key_id)
     DesiredNodeState.model_validate_json(json.dumps(document))
 
 
@@ -147,14 +150,6 @@ def test_report_records_the_applied_revision_and_failures(service: ControlServic
     assert status.agent_version == "0.1.0"
     assert status.failed == ["core-unit"]
     assert status.errors == ["core-unit: unit exited"]
-
-
-def test_a_new_token_replaces_the_old_one(service: ControlService) -> None:
-    first = service.mint_token("main").node_token
-    second = service.mint_token("main").node_token
-    assert service.authenticate_node(second) == "main"
-    with pytest.raises(ServiceError):
-        service.authenticate_node(first)
 
 
 def test_a_database_refuses_another_fleet(tmp_path: Path) -> None:
@@ -325,16 +320,43 @@ def test_admin_api_needs_the_admin_token(http: str) -> None:
 def test_agent_round_trip_over_http(http: str, service: ControlService) -> None:
     spec = _spec().model_dump(mode="json")
     assert _request(f"{http}/api/nodes/main", "PUT", spec, ADMIN_TOKEN)[0] == 200
-    status, minted = _request(f"{http}/api/nodes/main/token", "POST", {}, ADMIN_TOKEN)
-    assert status == 200
-    token = minted["node_token"]
+    assert _request(f"{http}/api/nodes/main/enrollment", "POST", {})[0] == 401
+    status, grant = _request(f"{http}/api/nodes/main/enrollment", "POST", {}, ADMIN_TOKEN)
+    assert status == 200 and grant["ca_sha256"] == _request(f"{http}/api/ca", token=ADMIN_TOKEN)[1]["ca_sha256"]
+
+    node = FakeNode()
+    status, enrolled = _request(f"{http}/agent/v1/enroll", "POST", node.enroll_request(grant["enrollment_token"]))
+    assert status == 200 and enrolled["type"] == "enrolled"
+    node.certificate_pem = enrolled["certificate_pem"]
+    stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    status, welcome = _request(f"{http}/agent/v1/hello", "POST", node.hello(stamp))
+    assert status == 200 and welcome["type"] == "welcome"
+    token = welcome["session_token"]
 
     status, poll = _request(f"{http}/agent/v1/poll", "POST", {"type": "poll", "have": None, "wait_seconds": 0}, token)
     assert status == 200 and poll["desired"]["revision"] == 1
     status, ack = _request(f"{http}/agent/v1/report", "POST", _report(poll["desired"]), token)
     assert status == 200 and ack == {"type": "report_ack", "applied_revision": 1}
-    status, node = _request(f"{http}/api/nodes/main", token=ADMIN_TOKEN)
-    assert node["applied"]["revision"] == 1
+    stats = {
+        "type": "stats",
+        "counter_epoch": "5b0c8a52-6c1d-4e8b-9a7f-2b5d4c3e1f00",
+        "seq": 1,
+        "collected_at": stamp,
+        "users": [],
+    }
+    status, stats_ack = _request(f"{http}/agent/v1/stats", "POST", stats, token)
+    assert status == 200 and stats_ack == {"type": "stats_ack", "counter_epoch": stats["counter_epoch"], "acked_seq": 1}
+    assert _request(f"{http}/api/traffic", token=ADMIN_TOKEN) == (200, {"users": []})
+    status, status_body = _request(f"{http}/api/nodes/main", token=ADMIN_TOKEN)
+    assert status_body["applied"]["revision"] == 1 and status_body["agent_version"] == "0.1.0"
+
+
+def test_a_spent_enrollment_token_is_refused_over_http(http: str) -> None:
+    _, grant = _request(f"{http}/api/nodes/main/enrollment", "POST", {}, ADMIN_TOKEN)
+    body = FakeNode().enroll_request(grant["enrollment_token"])
+    assert _request(f"{http}/agent/v1/enroll", "POST", body)[0] == 200
+    status, error = _request(f"{http}/agent/v1/enroll", "POST", body)
+    assert status == 401 and error["error"]["code"] == "enrollment_token_invalid"
 
 
 def test_agent_errors_use_the_protocol_envelope(http: str) -> None:
