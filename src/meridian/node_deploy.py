@@ -242,14 +242,13 @@ def deploy_node_container(
     else:
         logger.warning("Node container issue: %s", deploy_result.detail)
         # Health timeout means the container might still be running
-        # (deploy_result.logs is non-empty if we got past docker compose up)
         node_healthy = False
 
     # Allow Docker internal traffic to reach the node API port
     # (panel in bridge network → node on host via gateway IP)
     # Open UFW even on health timeout (container may still come up);
     # skip only on total deploy failure (mkdir/pull/compose-up).
-    deploy_reached_containers = deploy_result.changed or "healthy" in deploy_result.detail
+    deploy_reached_containers = deploy_result.started
     if deploy_reached_containers:
         q_port = shlex.quote(str(effective_port))
         # UFW keeps an identical rule's old comment, so drop the pre-rename one first.

@@ -128,7 +128,12 @@ def test_node_api_rule_replaces_the_pre_rename_comment(_sleep: MagicMock, caplog
     [
         ("mkdir", "Permission denied", _NODE_DIR, "docker compose"),
         ("docker compose pull", "error", "pull", "docker compose up"),
-        ("docker compose up", "port already allocated", "compose up failed: port already allocated", "docker inspect"),
+        (
+            "docker compose up",
+            "port already allocated",
+            "compose up failed: port already allocated",
+            "docker inspect netagent",
+        ),
     ],
 )
 @patch("meridian.health.time.sleep")

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from meridian.provision.containers import EnvFile, deploy_compose_stack
+from meridian.provision.containers import EnvFile, compose_error, deploy_compose_stack
 from tests.support.mock_connection import MockConnection
 
 SAMPLE_COMPOSE = """\
@@ -124,3 +124,40 @@ def test_stop_first_runs_down() -> None:
 
     assert _deploy(conn, stop_first=True).changed is True
     conn.assert_called_with_pattern("docker compose down")
+
+
+def test_compose_error_keeps_the_cause_after_a_long_progress_narration() -> None:
+    progress = "".join(f" Container ctlsvc-{n}  Creating\n Container ctlsvc-{n}  Created\n" for n in range(20))
+    stderr = (
+        " Network ctlsvc-net  Creating\n" + progress + "dependency failed to start: container ctlsvc-db is unhealthy\n"
+    )
+
+    assert compose_error(stderr) == "dependency failed to start: container ctlsvc-db is unhealthy"
+
+
+def test_failed_up_reports_container_state_oom_kills_and_the_newest_logs() -> None:
+    conn = MockConnection()
+    conn.when("docker compose up", rc=1, stderr=" Volume ctlsvc-data  Created\nError: container ctlsvc-db exited (137)")
+    conn.when("docker inspect --format", stdout="/ctlsvc-db: exited, exit 137, OOM-killed true, restarts 0\n")
+    conn.when("journalctl -k", stdout="Out of memory: Killed process 4242 (postgres)\n")
+    conn.when("docker compose logs", stdout="early line\n" * 400 + "ctlsvc-db | FATAL: the last word\n")
+
+    result = _deploy(conn)
+
+    assert "Error: container ctlsvc-db exited (137)" in result.detail
+    assert "OOM-killed true" in result.detail
+    assert "Killed process 4242 (postgres)" in result.detail
+    assert result.detail.rstrip().endswith("FATAL: the last word")
+    assert result.started is False
+
+
+def test_health_timeout_says_the_stack_started_and_why_it_is_not_healthy() -> None:
+    conn = MockConnection()
+    conn.when(
+        "docker inspect --format", stdout="/app: running, exit 0, OOM-killed false, restarts 4, health unhealthy\n"
+    )
+
+    result = _deploy(conn, health_check=lambda: False, health_timeout=0.1, health_interval=0.05)
+
+    assert result.started is True
+    assert "restarts 4, health unhealthy" in result.detail

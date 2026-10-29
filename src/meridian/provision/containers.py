@@ -6,6 +6,7 @@ Used by DeployRemnawavePanel, deploy_node_container, and future container steps.
 
 from __future__ import annotations
 
+import re
 import shlex
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -27,7 +28,22 @@ class ComposeDeployResult:
 
     changed: bool
     detail: str = ""
-    logs: str = ""  # Container logs on failure
+    logs: str = ""  # Container states, kernel OOM lines, and log tails on failure
+    started: bool = False  # `docker compose up` succeeded, even if health never came
+
+
+# Compose narrates progress on stderr before the line that says what failed.
+_COMPOSE_PROGRESS = re.compile(
+    r"^\W*(Network|Volume|Container|Image)\s+\S+\s+"
+    r"(Creating|Created|Starting|Started|Waiting|Healthy|Pulling|Pulled|Running|Recreate|Recreated|"
+    r"Stopping|Stopped|Removing|Removed)\s*$"
+)
+# One line per container: what `docker compose up` alone never says.
+_STATE_FORMAT = (
+    "{{.Name}}: {{.State.Status}}, exit {{.State.ExitCode}}, OOM-killed {{.State.OOMKilled}}, "
+    "restarts {{.RestartCount}}{{if .State.Health}}, health {{.State.Health.Status}}{{end}}"
+)
+_LOG_TAIL_CHARS = 1500
 
 
 def deploy_compose_stack(
@@ -144,10 +160,10 @@ def deploy_compose_stack(
     # -- Bring stack up --
     result = conn.run("docker compose up -d", cwd=work_dir, timeout=120)
     if result.returncode != 0:
-        logs = _collect_logs(conn, work_dir)
+        logs = collect_stack_diagnostics(conn, work_dir)
         return ComposeDeployResult(
             changed=False,
-            detail=(f"docker compose up failed: {result.stderr.strip()[:200]}\nContainer logs:\n{logs}"),
+            detail=f"docker compose up failed: {compose_error(result.stderr)}\n{logs}",
             logs=logs,
         )
 
@@ -163,20 +179,42 @@ def deploy_compose_stack(
                 description=service_name or "stack",
             )
         except ReadinessTimeout:
-            logs = _collect_logs(conn, work_dir)
+            logs = collect_stack_diagnostics(conn, work_dir)
             label = service_name or "stack"
             return ComposeDeployResult(
                 changed=False,
-                detail=f"{label} did not become healthy after {health_timeout:.0f}s",
+                detail=f"{label} did not become healthy after {health_timeout:.0f}s\n{logs}",
                 logs=logs,
+                started=True,
             )
 
-    return ComposeDeployResult(changed=True)
+    return ComposeDeployResult(changed=True, started=True)
 
 
-def _collect_logs(conn: Any, work_dir: str) -> str:
-    """Collect recent container logs for diagnostics."""
-    result = conn.run("docker compose logs --tail 50", cwd=work_dir, timeout=15)
-    if result.returncode == 0:
-        return result.stdout.strip()[:500]
-    return "no logs available"
+def compose_error(stderr: str, *, limit: int = 600) -> str:
+    """The end of Compose's stderr without its progress lines: the cause comes last."""
+    lines = [line for line in stderr.strip().splitlines() if line.strip() and not _COMPOSE_PROGRESS.match(line)]
+    text = "\n".join(lines) or stderr.strip() or "no error output"
+    return text[-limit:]
+
+
+def collect_stack_diagnostics(conn: Any, work_dir: str) -> str:
+    """Each container's state, kernel OOM kills, and the newest log lines, for the failure the user sees."""
+    parts: list[str] = []
+    states = conn.run(
+        f"docker compose ps -aq | xargs -r docker inspect --format {shlex.quote(_STATE_FORMAT)}",
+        cwd=work_dir,
+        timeout=15,
+    )
+    if states.returncode == 0 and states.stdout.strip():
+        parts.append("Containers:\n" + states.stdout.strip())
+    oom = conn.run(
+        "journalctl -k --no-pager -q 2>/dev/null | grep -iE 'out of memory|oom-kill' | tail -n 3",
+        timeout=15,
+    )
+    if oom.returncode == 0 and oom.stdout.strip():
+        parts.append("Kernel OOM kills:\n" + oom.stdout.strip())
+    logs = conn.run("docker compose logs --no-color --tail 20", cwd=work_dir, timeout=20)
+    if logs.returncode == 0 and logs.stdout.strip():
+        parts.append("Container logs (newest last):\n" + logs.stdout.strip()[-_LOG_TAIL_CHARS:])
+    return "\n".join(parts) or "no container state or logs available"
