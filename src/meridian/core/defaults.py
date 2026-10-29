@@ -18,6 +18,10 @@ REALITY_SNI_CANDIDATES: tuple[str, ...] = ("www.google.com", "dl.google.com", "w
 CONTROL_TLS_PORT: int = 8443
 CONTROL_PROXY_TLS_PORT: int = 8444
 
+# The shared support page (templates/pwa/support.html), under the connection-page path;
+# apps open it as the `support-url` header with the subscription's short ID as fragment.
+SUPPORT_PAGE: str = "pwa/support.html"
+
 # Device/server clock drift worth a warning. Nothing Meridian deploys checks the
 # clock to the second: Reality's `maxTimeDiff` is left unset (Xray then skips the
 # client timestamp check), and VLESS and Hysteria2 carry no timestamps. A wrong

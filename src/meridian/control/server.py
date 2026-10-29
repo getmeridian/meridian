@@ -232,8 +232,13 @@ class _Handler(BaseHTTPRequestHandler):
     # -- subscriptions -----------------------------------------------------------------------
 
     def subscription(self, match: re.Match[str]) -> None:
-        content_type, body, headers = self.server.service.subscription(match[1], match[2] or "")
-        self._send(200, content_type, body.encode("utf-8"), headers)
+        response = self.server.service.subscription(
+            match[1],
+            match[2] or "",
+            user_agent=self.headers.get("User-Agent"),
+            accept=self.headers.get("Accept"),
+        )
+        self._send(response.status, response.content_type, response.body.encode("utf-8"), response.headers)
 
 
 _ROUTES: list[Route] = [
@@ -256,7 +261,7 @@ _ROUTES: list[Route] = [
     ("POST", re.compile(r"/agent/v1/poll"), _Handler.agent_poll),
     ("POST", re.compile(r"/agent/v1/report"), _Handler.agent_report),
     ("GET", re.compile(r"/agent/v1/blobs/([0-9a-f]{64})"), _Handler.agent_blob),
-    ("GET", re.compile(r"/sub/([A-Za-z0-9_-]{16,64})(?:/(json))?"), _Handler.subscription),
+    ("GET", re.compile(r"/sub/([A-Za-z0-9_-]{16,64})(?:/(json|mihomo|singbox))?"), _Handler.subscription),
 ]
 
 

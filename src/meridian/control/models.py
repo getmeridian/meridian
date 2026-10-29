@@ -104,6 +104,11 @@ class ClientEndpoint(CoreModel):
     host: str = ""
     path: str = ""
     salamander_password: str = ""
+    fingerprint_copy: bool = Field(
+        default=False,
+        description="Another fingerprint of an entry listed before it: Base64 and Mihomo list it, failover groups "
+        "skip it, Xray JSON gives copies their own Automatic config, and sing-box omits it.",
+    )
 
 
 UserStatus = Literal["active", "disabled", "limited", "expired"]
@@ -139,6 +144,13 @@ class UserUpdate(CoreModel):
 
 class ServiceSettings(CoreModel):
     profile_title: str = Field(min_length=1, max_length=100)
+    public_url: str = Field(
+        default="",
+        max_length=512,
+        pattern=r"^(?:https://[^\s/]+(?:/[A-Za-z0-9._~-]+)*)?$",
+        description="Public base of subscriptions and connection pages (scheme, host, connection-page path), "
+        "without a trailing slash; empty leaves out the links built from it.",
+    )
 
 
 class ServiceHealth(CoreModel):

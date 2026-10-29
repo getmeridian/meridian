@@ -23,6 +23,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from meridian.control.formats.entries import SubscriptionUser
+from meridian.control.formats.selector import SUFFIX_FORMATS, select_format
 from meridian.control.models import (
     ClientEndpoint,
     ManagedInbound,
@@ -35,7 +37,7 @@ from meridian.control.models import (
     UserUpdate,
     users_resource_id,
 )
-from meridian.control.subscriptions import base64_subscription, xray_json_subscription
+from meridian.control.subscriptions import SubscriptionResponse, render_subscription, unknown_subscription
 from meridian.core.agent_desired import DesiredNodeState
 from meridian.core.agent_protocol import ObservedStateReport, PollRequest
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT, generate_signing_key, public_key, sign
@@ -149,10 +151,13 @@ class ControlService:
     def put_settings(self, settings: ServiceSettings) -> ServiceSettings:
         with self._transaction():
             self._set_meta("profile_title", settings.profile_title)
+            self._set_meta("public_url", settings.public_url)
         return settings
 
     def settings(self) -> ServiceSettings:
-        return ServiceSettings(profile_title=self._meta("profile_title") or "Meridian")
+        return ServiceSettings(
+            profile_title=self._meta("profile_title") or "Meridian", public_url=self._meta("public_url") or ""
+        )
 
     # -- nodes ----------------------------------------------------------------------
 
@@ -373,21 +378,25 @@ class ControlService:
         with self._transaction():
             self._db.execute("DELETE FROM endpoints WHERE endpoint_id = ?", (endpoint_id,))
 
-    def subscription(self, sub_token: str, document: str) -> tuple[str, str, dict[str, str]]:
-        """Return (content type, body, headers) of a user's subscription document."""
+    def subscription(
+        self, sub_token: str, suffix: str = "", *, user_agent: str | None = None, accept: str | None = None
+    ) -> SubscriptionResponse:
+        """Answer a subscription request: the document a suffix names, else the one the app reads."""
         with self._lock:
             row = self._db.execute(f"SELECT {_USER_COLUMNS} FROM users WHERE sub_token = ?", (sub_token,)).fetchone()
             bodies = [item[0] for item in self._db.execute("SELECT body FROM endpoints").fetchall()]
-        user = _user(row) if row else None
-        if user is None or user.status != "active":
-            raise ServiceError("not_found", "Unknown subscription.", 404)
+            settings = self.settings()
+        if row is None:
+            return unknown_subscription()
+        record = _user(row)
+        user = SubscriptionUser(
+            username=record.username, uuid=record.uuid, short_id=record.sub_token, status=record.status
+        )
         endpoints = [ClientEndpoint.model_validate_json(body) for body in bodies]
-        title = base64.b64encode(self.settings().profile_title.encode("utf-8")).decode("ascii")
-        headers = {"profile-title": f"base64:{title}", "profile-update-interval": "6"}
-        if document == "json":
-            body = json.dumps(xray_json_subscription(endpoints, user.uuid), ensure_ascii=False)
-            return "application/json; charset=utf-8", body, headers
-        return "text/plain; charset=utf-8", base64_subscription(endpoints, user.uuid), headers
+        document = SUFFIX_FORMATS[suffix] if suffix else select_format(user_agent, accept)
+        return render_subscription(
+            user, endpoints, document, profile_title=settings.profile_title, public_url=settings.public_url
+        )
 
     # -- composition -------------------------------------------------------------------
 
