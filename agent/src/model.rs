@@ -312,9 +312,12 @@ fn parse_spec(kind: &str, raw: &Value) -> Spec {
             if !s.config.is_object() {
                 return Err("config must be an object".into());
             }
+            check_loopback(&s.api_address)?;
             Ok(Spec::XrayConfig(s))
         }),
         "xray_users" => typed::<XrayUsersSpec>(raw).and_then(|s| {
+            check_tag(&s.inbound_tag)?;
+            s.users.iter().try_for_each(|u| check_user_id(&u.user_id))?;
             if s.users
                 .iter()
                 .any(|u| !u.flow.is_empty() && u.flow != "xtls-rprx-vision")
@@ -323,7 +326,11 @@ fn parse_spec(kind: &str, raw: &Value) -> Spec {
             }
             Ok(Spec::XrayUsers(s))
         }),
-        "hysteria2_users" => typed::<Hysteria2UsersSpec>(raw).map(Spec::Hysteria2Users),
+        "hysteria2_users" => typed::<Hysteria2UsersSpec>(raw).and_then(|s| {
+            check_tag(&s.inbound_tag)?;
+            s.users.iter().try_for_each(|u| check_user_id(&u.user_id))?;
+            Ok(Spec::Hysteria2Users(s))
+        }),
         "binary_pin" => typed::<BinaryPinSpec>(raw).and_then(|s| {
             check_mode(&s.mode)?;
             check_hash(&s.sha256)?;
@@ -357,6 +364,40 @@ fn check_mode(mode: &str) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!("invalid mode {mode:?}"))
+    }
+}
+
+/// `InboundTag` in `meridian.core.agent_types`: it names a cache file and an `xray api` argument.
+fn check_tag(tag: &str) -> Result<(), String> {
+    let mut bytes = tag.bytes();
+    let first = bytes.next().is_some_and(|b| b.is_ascii_alphanumeric());
+    if first && tag.len() <= 64 && bytes.all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b)) {
+        Ok(())
+    } else {
+        Err(format!("invalid inbound tag {tag:?}"))
+    }
+}
+
+/// `UserId` in `meridian.core.agent_types`.
+fn check_user_id(user_id: &str) -> Result<(), String> {
+    let allowed = |b: u8| b.is_ascii_lowercase() || b.is_ascii_digit();
+    let mut bytes = user_id.bytes();
+    let first = bytes.next().is_some_and(allowed);
+    if first && user_id.len() <= 64 && bytes.all(|b| allowed(b) || b"_-".contains(&b)) {
+        Ok(())
+    } else {
+        Err(format!("invalid user id {user_id:?}"))
+    }
+}
+
+/// The Xray API speaks plaintext gRPC, so it may only listen on loopback.
+fn check_loopback(address: &str) -> Result<(), String> {
+    let port = address
+        .strip_prefix("127.0.0.1:")
+        .and_then(|p| p.parse::<u16>().ok());
+    match port {
+        Some(port) if port > 0 => Ok(()),
+        _ => Err(format!("api_address {address:?} is not 127.0.0.1:PORT")),
     }
 }
 
@@ -463,4 +504,53 @@ pub struct StatsAck {
     pub kind: String,
     pub counter_epoch: String,
     pub acked_seq: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn users(tag: &str, user_id: &str) -> Value {
+        json!({
+            "id": "users", "kind": "xray_users", "depends_on": [], "inbound_tag": tag,
+            "users": [{"user_id": user_id, "uuid": "00000000-0000-4000-8000-000000000000", "flow": ""}],
+        })
+    }
+
+    #[test]
+    fn names_that_reach_paths_or_xray_arguments_are_refused() {
+        assert!(matches!(
+            Resource::parse(&users("vless-reality", "u1a"))
+                .unwrap()
+                .spec,
+            Spec::XrayUsers(_)
+        ));
+        for (tag, user_id) in [
+            ("x/../../etc/cron.d/pwn", "u1a"),
+            ("-server=198.51.100.9:80", "u1a"),
+            ("vless-reality", "--server=198.51.100.9:80"),
+            ("vless-reality", "U1A"),
+        ] {
+            let spec = Resource::parse(&users(tag, user_id)).unwrap().spec;
+            assert!(matches!(spec, Spec::Invalid(_)), "{tag} / {user_id}");
+        }
+    }
+
+    #[test]
+    fn the_xray_api_listens_only_on_loopback() {
+        for (address, valid) in [
+            ("127.0.0.1:10085", true),
+            ("198.51.100.9:10085", false),
+            ("127.0.0.1:0", false),
+            ("127.0.0.1:", false),
+        ] {
+            let raw = json!({
+                "id": "core", "kind": "xray_config", "depends_on": [], "path": "/etc/netagent/core.json",
+                "config": {}, "api_address": address,
+            });
+            let spec = Resource::parse(&raw).unwrap().spec;
+            assert_eq!(matches!(spec, Spec::XrayConfig(_)), valid, "{address}");
+        }
+    }
 }

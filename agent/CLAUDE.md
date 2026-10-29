@@ -20,7 +20,7 @@
 ## Pitfalls
 - **ureq's body limit errors at exactly the limit** — downloads pass `size + 1` and `HashingWriter` enforces the exact size.
 - **Never send the session token to a `sources` URL** — only `service` goes to `blobs/{sha256}` with the bearer.
-- **Option fields deserialize when missing** — serde reads an absent `Option` as `null`; don't rely on the agent to catch omissions.
+- **Re-check in Rust whatever reaches a path, an argument, or a socket** — inbound tags, user IDs, the loopback API address, and the reserved `bootstrap.json` are validated again though Python checked them; serde reads an absent `Option` as `null`, so omissions still pass.
 - **`xray api adu`/`rmu` exit 0 when a user fails** — check the `Added/Removed N user(s)` line; the adu and adi files hold credentials (0600, deleted at once).
 - **`adu` cannot build Hysteria2 users** — Xray 26.7.28's CLI has no hysteria case (prints "unsupported inbound type", `Added 0`), and a VLESS-shaped account would panic the hysteria validator; `rmi`/`adi` exit 1 on failure, and a failed `adi` leaves the inbound gone until the fallback restart.
 - **A returning user resumes their retired totals** — the service keeps every baseline, so restarting a re-enabled user at zero was a `counter_regression` that refused the whole report.

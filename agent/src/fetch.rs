@@ -136,9 +136,13 @@ impl Client {
             .clone()
     }
 
-    /// Scrub the secret service path from an error message.
+    /// Scrub the secret service path from an error message, with or without the origin before it.
     fn scrub(&self, message: String) -> String {
-        message.replace(&self.service_url, "<service>")
+        let message = message.replace(&self.service_url, "<service>");
+        match secret_path(&self.service_url) {
+            Some(path) => message.replace(path, "/<service-path>"),
+            None => message,
+        }
     }
 
     /// POST a JSON body; `session` adds the bearer token (enroll and hello authenticate in the body).
@@ -304,5 +308,32 @@ impl<W: Write> Write for HashingWriter<W> {
 
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
+    }
+}
+
+/// The path after the origin of `https://host/secret`, if there is one.
+fn secret_path(service_url: &str) -> Option<&str> {
+    let rest = service_url
+        .split_once("://")
+        .map_or(service_url, |(_, rest)| rest);
+    rest.find('/')
+        .map(|at| &rest[at..])
+        .filter(|path| path.len() > 1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn errors_lose_the_secret_path_however_they_spell_the_origin() {
+        let client = Client::new("https://198.51.100.1/s3cr3tpath", false, None);
+        let message = "https://198.51.100.1/s3cr3tpath/agent/v1/poll and https://198.51.100.1:443/s3cr3tpath/agent/v1/hello";
+        assert_eq!(
+            client.scrub(message.into()),
+            "<service>/agent/v1/poll and https://198.51.100.1:443/<service-path>/agent/v1/hello"
+        );
+        assert_eq!(secret_path("https://198.51.100.1"), None);
+        assert_eq!(secret_path("https://198.51.100.1/"), None);
     }
 }

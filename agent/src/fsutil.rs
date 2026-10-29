@@ -9,6 +9,8 @@ use sha2::{Digest, Sha256};
 
 /// The only directories the agent writes desired files into.
 pub const ALLOWED_PREFIXES: [&str; 2] = ["/etc/netagent/", "/usr/local/lib/netagent/"];
+/// The bootstrap SSH writes names the service the agent trusts; desired state never touches it.
+pub const RESERVED_PATHS: [&str; 1] = ["/etc/netagent/bootstrap.json"];
 pub const UNIT_DIR: &str = "/etc/systemd/system";
 /// The agent's own unit, which desired state must never manage.
 pub const AGENT_UNIT: &str = "netagent.service";
@@ -22,7 +24,9 @@ pub fn check_path(path: &str) -> Result<(), String> {
         .split('/')
         .skip(1)
         .all(|segment| !segment.is_empty() && !segment.starts_with('.') && !segment.contains('\0'));
-    if inside && clean {
+    if RESERVED_PATHS.contains(&path) {
+        Err(format!("{path} belongs to the agent's bootstrap"))
+    } else if inside && clean {
         Ok(())
     } else {
         Err(format!(
@@ -207,6 +211,7 @@ mod tests {
             "/etc/netagent//x",
             "/usr/local/lib/netagentx/y",
             "etc/netagent/core.json",
+            "/etc/netagent/bootstrap.json",
         ] {
             assert!(check_path(bad).is_err(), "{bad} should be refused");
         }
