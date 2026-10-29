@@ -393,6 +393,11 @@ def load_cluster(path: Path | None = None) -> ClusterConfig:
     return cfg
 
 
+def dump_cluster(cfg: ClusterConfig) -> str:
+    """cluster.yml's text for `cfg`, exactly as `save_cluster()` writes it."""
+    return yaml.dump(_serialize_cluster(cfg), default_flow_style=False, sort_keys=False)
+
+
 def save_cluster(cfg: ClusterConfig, path: Path | None = None) -> None:
     """Write ClusterConfig to cluster.yml (atomic via tempfile+rename).
 

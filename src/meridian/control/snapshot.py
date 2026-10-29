@@ -115,13 +115,6 @@ def public_key_of(secret: str) -> str:
         ) from exc
 
 
-def validate_public_key(text: str) -> str:
-    try:
-        return str(x25519.Recipient.from_str(text.strip()))
-    except pyrage.RecipientError as exc:
-        raise SnapshotError(f"Not an X25519 public key: {text[:20]!r}") from exc
-
-
 def encrypt_snapshot(header: SnapshotHeader, files: dict[str, bytes]) -> bytes:
     """Seal `files` to every recipient the header names."""
     canonical = header.canonical()

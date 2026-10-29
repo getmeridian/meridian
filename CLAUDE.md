@@ -61,6 +61,7 @@ src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── engine/CLAUDE.md                    — local Engine use-case boundary
 ├── control/CLAUDE.md                   — `meridian serve`: signed node documents, users, subscriptions
 ├── migrate/CLAUDE.md                   — hidden `meridian migrate`: Remnawave fleet onto the control service
+├── backup/CLAUDE.md                    — device keys, snapshot pulls after every change, restore
 ├── i18n/CLAUDE.md                      — CLI message catalog, language detection
 └── templates/pwa/CLAUDE.md             — PWA security model, vanilla JS rationale
 
