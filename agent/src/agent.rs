@@ -617,14 +617,14 @@ impl<'a> Agent<'a> {
             Admission::AlreadyHeld => Accepted::Nothing,
             Admission::RecordRevision => {
                 let previous = held.expect("a revision is recorded only over a held document");
-                if self.state.applied.as_ref() == Some(&previous) {
-                    self.state.applied = Some(reference.clone());
+                let mut next = self.state.clone();
+                if next.applied.as_ref() == Some(&previous) {
+                    next.applied = Some(reference.clone());
                 }
-                self.hold(desired, &reference);
+                if !self.hold(next, desired, &reference) {
+                    return Accepted::Refused;
+                }
                 self.resources = verified.resources;
-                if let Err(err) = self.state.save(&self.opts.state_dir) {
-                    info!("{err}");
-                }
                 Accepted::Recorded
             }
             Admission::Apply => {
@@ -632,11 +632,10 @@ impl<'a> Agent<'a> {
                     "received revision {}/{}",
                     reference.fleet_epoch, reference.revision
                 );
-                self.hold(desired, &reference);
-                self.resources = verified.resources;
-                if let Err(err) = self.state.save(&self.opts.state_dir) {
-                    info!("{err}");
+                if !self.hold(self.state.clone(), desired, &reference) {
+                    return Accepted::Refused;
                 }
+                self.resources = verified.resources;
                 if let Err(err) = self.apply_held() {
                     info!("{err}");
                 }
@@ -645,14 +644,17 @@ impl<'a> Agent<'a> {
         }
     }
 
-    fn hold(&mut self, desired: Value, reference: &NodeStateRef) {
-        self.state.held = Some(desired);
-        self.state.highest_epoch = Some(
-            self.state
-                .highest_epoch
-                .unwrap_or(0)
-                .max(reference.fleet_epoch),
-        );
+    /// Hold a new document only once `state.json` says so: applying one that was never saved
+    /// would let a restart reconcile the older cached document and undo it (revoked users back).
+    fn hold(&mut self, mut next: State, desired: Value, reference: &NodeStateRef) -> bool {
+        next.held = Some(desired);
+        next.highest_epoch = Some(next.highest_epoch.unwrap_or(0).max(reference.fleet_epoch));
+        if let Err(err) = next.save(&self.opts.state_dir) {
+            info!("not holding revision {}: {err}", reference.revision);
+            return false;
+        }
+        self.state = next;
+        true
     }
 
     fn intervals(&self) -> (Duration, Duration) {

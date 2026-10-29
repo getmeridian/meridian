@@ -25,6 +25,7 @@
 - **`adu` cannot build Hysteria2 users** — Xray 26.7.28's CLI has no hysteria case (prints "unsupported inbound type", `Added 0`), and a VLESS-shaped account would panic the hysteria validator; `rmi`/`adi` exit 1 on failure, and a failed `adi` leaves the inbound gone until the fallback restart.
 - **A returning user resumes their retired totals** — the service keeps every baseline, so restarting a re-enabled user at zero was a `counter_regression` that refused the whole report.
 - **`statsquery` is protobuf JSON** — int64 values arrive as strings; zeros and empty lists are omitted.
+- **Save a document before holding or applying it** — applying an unsaved one let a restart reconcile the older cached document and bring revoked users back; a failed save refuses it.
 - **Save credentials before nulling the token** — after a crash in between, `enrollment_token_invalid` falls back to the stored credentials.
 - **`run -test` needs a `.json` name** — the temp config is `.<name>.netagent-test.json`.
 - **Xray must run as root** — the composed config holds Reality keys and UUIDs at 0600; `User=`/`DynamicUser=` units cannot read it.

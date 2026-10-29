@@ -248,6 +248,39 @@ fn a_converged_document_is_recorded_and_same_content_bumps_only_the_revision() {
 }
 
 #[test]
+fn a_document_that_cannot_be_saved_is_neither_held_nor_applied() {
+    let pki = TestPki::new();
+    let service = service(&pki);
+    service.push(document(1, 1, &supported(), &pki));
+    let node = Node::new(&service.url(), &pki);
+    let exec = FakeExec::default();
+    let mut agent = Agent::new(node.options(), &exec).unwrap();
+    agent.poll_once().unwrap();
+
+    // The revision that revokes the only user.
+    let mut without_users = supported();
+    without_users[2] = vless_users(&[]);
+    service.push(document(1, 2, &without_users, &pki));
+    service.push(document(1, 2, &without_users, &pki));
+    exec.clear();
+    let state_dir = node.state.path();
+    std::fs::set_permissions(state_dir, std::fs::Permissions::from_mode(0o500)).unwrap();
+    let refused = agent.poll_once();
+    std::fs::set_permissions(state_dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+    assert_eq!(refused.unwrap(), PollOutcome::Refused);
+    assert_eq!(agent.state.held_ref().unwrap().revision, 1);
+    assert!(exec.calls().is_empty(), "{:?}", exec.calls());
+
+    assert_eq!(
+        agent.poll_once().unwrap(),
+        PollOutcome::Applied(Duration::ZERO)
+    );
+    let saved: Value =
+        serde_json::from_slice(&std::fs::read(state_dir.join("state.json")).unwrap()).unwrap();
+    assert_eq!(saved["held"]["revision"], 2);
+}
+
+#[test]
 fn a_document_signed_by_another_certificate_is_refused_and_nothing_is_held() {
     let pki = TestPki::new();
     let service = service(&pki);
