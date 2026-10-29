@@ -458,6 +458,16 @@ def fleet_inventory_cmd(
     run_inventory()
 
 
+@fleet_app.command("history", hidden=True)
+def fleet_history_cmd(
+    _json: Json = False,
+) -> None:
+    """List the reviewed applies the control service recorded (control-service fleets)"""
+    from meridian.commands.fleet_history import run_history
+
+    run_history()
+
+
 @fleet_app.command("upgrade")
 def fleet_upgrade_cmd(
     yes: Yes = False,
