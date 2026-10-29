@@ -5,6 +5,45 @@ const fs = require('node:fs');
 const { createBrowser, response } = require('./support/pwa_browser.cjs');
 
 const cases = {
+  test_single_platform_labels_follow_persian: async function(data) {
+    const browser = createBrowser(data.config, data.catalog, { info: data.info });
+    await browser.start();
+    browser.context.page.switchLang('fa');
+    const choice = browser.document.getElementById('app-choice');
+    choice.value = 'v2rayNG'; browser.fire('change', choice);
+    assert.match(browser.document.querySelector('.app-row-text').textContent, /اندروید/);
+  },
+  test_error_document_title_uses_the_saved_language: async function(data) {
+    const browser = createBrowser(data.config, data.catalog, {
+      storage: { 'meridian-lang': 'fa' }, fetch: () => Promise.reject(new Error('offline')),
+    });
+    browser.document.title = 'Connection Setup';
+    await browser.start();
+    assert.equal(browser.document.title, 'تنظیم اتصال');
+  },
+  test_account_formats_persian_numbers_and_calendar: async function(data) {
+    data.info.user.expiresAt = '2030-01-01T12:00:00.000Z';
+    const browser = createBrowser(data.config, data.catalog, { info: data.info });
+    await browser.start(); browser.context.page.switchLang('fa');
+    const text = browser.document.getElementById('account-panel').textContent;
+    assert.ok(text.includes('۱۴۰۸'), 'expiry must use the Persian calendar');
+    assert.ok(text.includes('۱٫۵'), 'traffic must use Persian digits and decimal separator');
+    assert.ok(text.includes('۷ روز'), 'days left must use Intl numbers');
+  },
+  test_account_not_found_is_verified_and_disables_import: async function(data) {
+    let missing = false;
+    const browser = createBrowser(data.config, data.catalog, { fetch(url) {
+      if (url.endsWith('/info')) return Promise.resolve(missing ? response({ isFound: false, statusCode: 404, message: 'Resource not found' }, 404) : response(data.info));
+      return Promise.resolve(response(url.endsWith('config.json') ? data.config : data.catalog));
+    } });
+    await browser.start(); missing = true;
+    browser.fire('click', browser.document.querySelector('[data-action="account-refresh"]'));
+    await browser.flush();
+    const panel = browser.document.getElementById('account-panel');
+    assert.match(panel.textContent, /no longer available/);
+    assert.ok(!panel.textContent.includes('unverified'));
+    assert.equal(browser.document.querySelector('[data-import]').getAttribute('aria-disabled'), 'true');
+  },
   test_account_loads_info_without_cache_and_refreshes_on_return: async function(data) {
     const browser = createBrowser(data.config, data.catalog, { info: data.info });
     await browser.start();

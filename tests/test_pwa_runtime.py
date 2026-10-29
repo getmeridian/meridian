@@ -171,3 +171,16 @@ def test_long_connection_lists_reveal_locally_in_subscription_order(page_data: d
 
 def test_suspended_account_also_dims_individual_imports(page_data: dict[str, object]) -> None:
     run_case("test_suspended_account_also_dims_individual_imports", page_data)
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "test_single_platform_labels_follow_persian",
+        "test_error_document_title_uses_the_saved_language",
+        "test_account_formats_persian_numbers_and_calendar",
+        "test_account_not_found_is_verified_and_disables_import",
+    ],
+)
+def test_locale_and_account_boundaries(page_data: dict[str, object], case: str) -> None:
+    run_case(case, page_data)

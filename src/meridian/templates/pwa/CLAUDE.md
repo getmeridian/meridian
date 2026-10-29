@@ -30,6 +30,6 @@ Server-hosted PWA; Meridian's only connection-page implementation.
 - **No inline styles** — CSP drops `style=`; use classes (CSSOM `el.style` works).
 - **Self-check evidence** — requests skip caches; a reused warm connection makes a pass weaker evidence than a freeze.
 - **Country names are data** — validate ISO codes, use Intl.DisplayNames, and refresh after language changes; never put `data-t` on a remark or other user data.
-- **Locale state is in memory** — re-detecting after a failed localStorage write reverts the choice; translate fixed catalog display and accessibility labels.
+- **Locale state is in memory** — re-detecting after a failed localStorage write reverts the choice; translate every fixed platform label, accessibility label, and error title.
 - **Clipboard recovery** — catch missing APIs, throws, and rejected promises; provide selectable text for both URLs and reports.
 - **Suspended imports stay disabled** — apply account state after catalog, platform, or connection-list updates, before any iOS handler can navigate.

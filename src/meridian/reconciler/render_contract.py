@@ -9,7 +9,7 @@ _RENDERER_MANIFEST = {
     "compiler": COMPILER_VERSION,
     "agent-runtime": "staged-upgrade-v1",
     "agent-spec": "service-blob-v1",
-    "pwa": "connection-noindex-v20",
+    "pwa": "localized-account-v21",
     "firewall": "ufw-comment-v2",
     "nginx": "connection-noindex-v11",
     "realm": "neutral-systemd-musl-v3",

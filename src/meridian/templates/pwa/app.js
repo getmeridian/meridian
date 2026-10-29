@@ -852,6 +852,8 @@ function renderAppRow(a, key) {
   html += renderAppMark(a, 40);
   html += '<span class="app-row-text"><strong>' + escapeHtml(a.name) + '</strong>';
   var labels = { 'All platforms': 'apps.all', 'Desktop': 'apps.desktop',
+    'iOS': 'platform.ios', 'Android': 'platform.android', 'Windows': 'platform.windows',
+    'macOS': 'platform.macos', 'Linux': 'platform.linux',
     'Android, desktop': 'apps.android.desktop', 'iOS, Android': 'apps.ios.android',
     'iOS, Android, macOS': 'apps.ios.android.macos' };
   html += '<span>' + escapeHtml(labels[a.platform] ? text(labels[a.platform], a.platform) : a.platform) + '</span></span>';
@@ -1387,6 +1389,7 @@ function init() {
       if (app) {
         var dict = currentLang && T[currentLang];
         var errTitle = (dict && dict['error.title']) || 'Connection Setup';
+        document.title = errTitle;
         var errMsg = (dict && dict['error.msg']) || 'Could not load configuration. Please reload the page.';
         var errRetry = (dict && dict['error.retry']) || 'Retry';
         app.innerHTML = '<div class="load-error"><h1>' + escapeHtml(errTitle) + '</h1>' +

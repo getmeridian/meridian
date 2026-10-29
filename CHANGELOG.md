@@ -75,6 +75,8 @@ that dials out to it.
   the snapshot and the recovery key, restore brings the fleet files back too.
 
 ### Changed
+- Single-platform app labels and load-error titles follow the selected
+  connection-page language, with polished Russian expiry text.
 - Connection-page shells and their nginx location send noindex, nofollow,
   and noarchive directives while retaining the existing security headers.
 - Long connection lists start with three entries and an accessible “Show all”
