@@ -74,6 +74,22 @@
           "title": "Expires At",
           "type": "string"
         },
+        "first_traffic_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the service first accepted traffic growth; unknown for historical use.",
+          "title": "First Traffic At"
+        },
         "id": {
           "title": "Id",
           "type": "string"
@@ -81,6 +97,22 @@
         "last_seen": {
           "title": "Last Seen",
           "type": "string"
+        },
+        "last_traffic_node": {
+          "anyOf": [
+            {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The node whose latest accepted growth set the user's last traffic time.",
+          "title": "Last Traffic Node"
         },
         "status": {
           "title": "Status",

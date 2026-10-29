@@ -512,6 +512,10 @@ def test_node_and_relay_list_results_preserve_command_wire_shapes() -> None:
     assert nodes.to_data() == {
         "nodes": [
             {
+                "traffic_counting_since": None,
+                "active_users": None,
+                "active_report_at": None,
+                "active_report_received_at": None,
                 "ip": "198.51.100.1",
                 "name": "exit-a",
                 "uuid": "node-a",

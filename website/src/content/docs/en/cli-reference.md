@@ -134,6 +134,8 @@ meridian client remove NAME [--yes] [--json]
 
 **`client show`** — prints the connection page, subscription URL, status, traffic against the limit with its reset period, expiry, and last-seen time. `--repair-page` republishes a missing page; if that fails, the links are still shown with a warning and exit `3`.
 
+First reported traffic and the last reporting node come from accepted traffic growth (`first_traffic_at` and `last_traffic_node` in JSON). Historical first use can be unknown; these are aggregate counters, with no sessions or client addresses.
+
 **`client list`** — lists clients with status, traffic, expiry, and last seen, including people added in the web console (`declared: false` in JSON). With `--json`, returns `data.summary` counts and `data.clients[]`.
 
 **`client set`** — changes a client's traffic limit, reset period, or expiry; only the options you pass change, and at least one is required. A client their limit or expiry has cut off (status `limited` or `expired`) can connect again as soon as the new values allow it. Changes take effect at once, and applies never touch them. A bad value exits `2` before Meridian connects anywhere. With `--json`, returns the client as the control service now has it in `data.client`, including `traffic_limit_bytes`, `traffic_reset`, and `expires_at` (empty means never).
@@ -313,6 +315,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 | `--forget-unreachable` | | `fleet import`: forget what was deployed on a removed server whose SSH port does not answer |
 
 **`fleet status`** — control service health, each agent's last report and whether it applied the current configuration, relay listeners, and client counts. Missing declared clients degrade health; disabled, limited, or expired clients are counted but are your choice, not a fault. A reachable relay listener only proves TCP, so unverified relay routes keep health `unknown`; use `meridian test` to check the full path. Exit `0` means healthy, `4` degraded, and `3` unknown.
+
+The `active` column counts people with growth in the last report, with its collection time shown below. A delayed older window cannot replace newer activity. Node byte totals survive counter epochs; `traffic_counting_since` marks complete durable accounting, with only retained evidence backfilled from before migration.
 
 **`fleet inventory`** — your configured servers, roles, nodes, and relays, with live status when the control service is reachable. It never prints API tokens or secret paths. If live status is unavailable, the configured inventory is still shown, with warnings, and the command exits `3`. Use `plan --json` to decide whether apply has work to do.
 

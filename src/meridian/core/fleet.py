@@ -10,6 +10,7 @@ from pydantic import Field
 from meridian.control.models import NodeRuntime
 from meridian.core.models import CoreModel
 from meridian.core.topology import ProtocolKind
+from meridian.core.traffic import NodeTrafficEvidence
 
 NodeRole = Literal["exit", "routing_gateway"]
 ServerRole = Literal["panel", "exit", "relay", "routing_gateway"]
@@ -206,7 +207,7 @@ class PanelStatus(CoreModel):
     healthy: bool
 
 
-class FleetStatusNode(CoreModel):
+class FleetStatusNode(NodeTrafficEvidence):
     ip: str
     name: str
     uuid: str
@@ -330,7 +331,9 @@ def node_api_status(api_node: ApiNodeLike | None) -> NodeStatus:
     return "unknown"
 
 
-def _status_node(node: TopologyNode, api_node: ApiNodeLike | None) -> FleetStatusNode:
+def _status_node(
+    node: TopologyNode, api_node: ApiNodeLike | None, evidence: NodeTrafficEvidence | None = None
+) -> FleetStatusNode:
     return FleetStatusNode(
         ip=node.ip,
         name=node.name,
@@ -346,6 +349,7 @@ def _status_node(node: TopologyNode, api_node: ApiNodeLike | None) -> FleetStatu
         in_sync=getattr(api_node, "in_sync", None),
         failed=getattr(api_node, "failed", []),
         errors=getattr(api_node, "errors", []),
+        **(evidence or NodeTrafficEvidence()).model_dump(),
     )
 
 
@@ -443,6 +447,7 @@ def build_fleet_status(
     api_users: Sequence[ApiUserLike] | None = None,
     relay_health: Mapping[tuple[str, int], bool] | None = None,
     sources: FleetSources | None = None,
+    node_evidence: Mapping[str, NodeTrafficEvidence] | None = None,
 ) -> FleetStatus:
     """Build fleet health status from local state plus live observations."""
     api_by_uuid = {node.uuid: node for node in api_nodes or []}
@@ -452,7 +457,7 @@ def build_fleet_status(
     nodes = []
     for node in topology.nodes:
         api_node = api_by_uuid.get(node.uuid)
-        nodes.append(_status_node(node, api_node))
+        nodes.append(_status_node(node, api_node, (node_evidence or {}).get(node.uuid)))
 
     relays = []
     for relay in topology.relays:

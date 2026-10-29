@@ -33,6 +33,7 @@ from meridian.core.defaults import SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import validate_ip_address_value
 from meridian.core.models import CoreModel
 from meridian.core.topology import ProtocolKind, SubscriptionUpdateIntervalHours
+from meridian.core.traffic import NodeTrafficEvidence, UserTrafficEvidence
 
 
 class ManagedInbound(CoreModel):
@@ -81,7 +82,7 @@ class NodeRuntime(CoreModel):
         return self.health.status != "healthy" or any(check.status != "pass" for check in self.health.checks)
 
 
-class NodeStatus(CoreModel):
+class NodeStatus(NodeTrafficEvidence):
     """The service's view of one node."""
 
     node_id: NodeId
@@ -184,7 +185,7 @@ class UserDevices(ClientDevicesResult):
     level: DeviceLimitLevel
 
 
-class UserRecord(CoreModel):
+class UserRecord(UserTrafficEvidence):
     """One access user as the service stores it.
 
     The operator sets `active` or `disabled`; the service's enforcement turns an

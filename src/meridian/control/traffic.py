@@ -15,7 +15,7 @@ Nothing here records where a client connected from.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from meridian.control.errors import ServiceError, agent_error
 from meridian.control.models import (
@@ -32,6 +32,7 @@ from meridian.control.privacy import history_cutoff, prune_history_rows, read_pr
 from meridian.control.store import Store
 from meridian.control.times import utc_now
 from meridian.core.agent_protocol import StatsAck, StatsReport
+from meridian.core.traffic import NodeTrafficEvidence
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS traffic_totals (
@@ -87,14 +88,43 @@ DAILY_TABLES: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS traffic_daily_day ON traffic_daily (day);",
     "CREATE INDEX IF NOT EXISTS node_traffic_daily_day ON node_traffic_daily (day);",
 )
+NODE_TOTALS_TABLE = """CREATE TABLE IF NOT EXISTS node_traffic_totals (
+    node_id TEXT PRIMARY KEY,
+    uplink_bytes INTEGER NOT NULL,
+    downlink_bytes INTEGER NOT NULL,
+    counting_since TEXT NOT NULL,
+    active_users INTEGER,
+    active_report_at TEXT,
+    active_report_received_at TEXT
+)"""
+TRAFFIC_EVIDENCE_COLUMNS = (
+    "ALTER TABLE traffic_totals ADD COLUMN first_traffic_at TEXT",
+    "ALTER TABLE traffic_totals ADD COLUMN last_traffic_node TEXT",
+)
+ACCOUNTING_MIGRATION: tuple[str, ...] = (
+    *TRAFFIC_EVIDENCE_COLUMNS,
+    NODE_TOTALS_TABLE,
+    "INSERT OR IGNORE INTO node_traffic_totals (node_id, uplink_bytes, downlink_bytes, counting_since)"
+    " SELECT node_id, SUM(uplink_bytes), SUM(downlink_bytes), strftime('%Y-%m-%dT%H:%M:%SZ', 'now')"
+    " FROM traffic_counters GROUP BY node_id",
+    # Preserve aggregate node evidence before minimizing orphan per-person records from older deletions.
+    *(
+        f"DELETE FROM {table} WHERE user_id NOT IN (SELECT user_id FROM users)"
+        for table in ("traffic_totals", "traffic_counters", "traffic_daily")
+    ),
+)
 
 
 class TrafficLedger:
     def __init__(self, store: Store) -> None:
         self._store = store
         store.create(_SCHEMA)
+        if store.meta("schema_version") is None:
+            for statement in TRAFFIC_EVIDENCE_COLUMNS:
+                store.create(statement)
         for statement in DAILY_TABLES:
             store.create(statement)
+        store.create(NODE_TOTALS_TABLE)
 
     def record(self, node_id: str, report: StatsReport) -> StatsAck:
         """Count one stats report idempotently and acknowledge the highest counted `seq` of its epoch."""
@@ -147,12 +177,22 @@ class TrafficLedger:
                 (node_id, epoch, user_id, total_up, total_down),
             )
             if up or down:
+                previous = self._store.row("SELECT last_seen_at FROM traffic_totals WHERE user_id = ?", (user_id,))
+                recent = (
+                    previous is None
+                    or previous["last_seen_at"] is None
+                    or (datetime.fromisoformat(now) >= datetime.fromisoformat(previous["last_seen_at"]))
+                )
                 db.execute(
-                    "INSERT INTO traffic_totals VALUES (?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET"
+                    "INSERT INTO traffic_totals (user_id, uplink_bytes, downlink_bytes, last_seen_at,"
+                    " first_traffic_at, last_traffic_node) VALUES (?, ?, ?, ?, ?, ?)"
+                    " ON CONFLICT(user_id) DO UPDATE SET"
                     " uplink_bytes = uplink_bytes + excluded.uplink_bytes,"
                     " downlink_bytes = downlink_bytes + excluded.downlink_bytes,"
-                    " last_seen_at = excluded.last_seen_at",
-                    (user_id, up, down, now),
+                    " first_traffic_at = COALESCE(first_traffic_at, excluded.first_traffic_at),"
+                    " last_seen_at = CASE WHEN ? THEN excluded.last_seen_at ELSE last_seen_at END,"
+                    " last_traffic_node = CASE WHEN ? THEN excluded.last_traffic_node ELSE last_traffic_node END",
+                    (user_id, up, down, now, now, node_id, recent, recent),
                 )
                 if history:
                     db.execute(
@@ -165,6 +205,14 @@ class TrafficLedger:
                         " bytes = bytes + excluded.bytes",
                         (node_id, day, up + down),
                     )
+        db.execute(
+            "INSERT INTO node_traffic_totals (node_id, uplink_bytes, downlink_bytes, counting_since)"
+            " VALUES (?, ?, ?, ?) ON CONFLICT(node_id) DO UPDATE SET"
+            " uplink_bytes = uplink_bytes + excluded.uplink_bytes,"
+            " downlink_bytes = downlink_bytes + excluded.downlink_bytes",
+            (node_id, sum(item[3] for item in growth), sum(item[4] for item in growth), now),
+        )
+        self._record_activity(node_id, report, sum(1 for item in growth if item[3] or item[4]), now)
         db.execute(
             "INSERT INTO traffic_reports VALUES (?, ?, ?,"
             " (SELECT COALESCE(MAX(arrival), 0) + 1 FROM traffic_reports WHERE node_id = ?))"
@@ -203,14 +251,30 @@ class TrafficLedger:
             )
 
     def node_totals(self) -> dict[str, int]:
-        """Bytes each node counted in its current counter epoch (an agent that lost its counter store starts over)."""
-        rows = self._store.rows(
-            "SELECT c.node_id, SUM(c.uplink_bytes + c.downlink_bytes) AS total FROM traffic_counters c"
-            " JOIN traffic_reports r ON r.node_id = c.node_id AND r.counter_epoch = c.counter_epoch"
-            " WHERE r.arrival = (SELECT MAX(arrival) FROM traffic_reports WHERE node_id = c.node_id)"
-            " GROUP BY c.node_id"
-        )
+        """Durable accepted bytes per node, independent of counter epochs and baseline retention."""
+        rows = self._store.rows("SELECT node_id, uplink_bytes + downlink_bytes AS total FROM node_traffic_totals")
         return {str(row["node_id"]): int(row["total"] or 0) for row in rows}
+
+    def node_evidence(self, node_id: str) -> NodeTrafficEvidence:
+        row = self._store.row("SELECT * FROM node_traffic_totals WHERE node_id = ?", (node_id,))
+        if row is None:
+            return NodeTrafficEvidence()
+        return NodeTrafficEvidence(
+            traffic_counting_since=row["counting_since"],
+            active_users=row["active_users"],
+            active_report_at=row["active_report_at"],
+            active_report_received_at=row["active_report_received_at"],
+        )
+
+    def _record_activity(self, node_id: str, report: StatsReport, active: int, now: str) -> None:
+        held = self.node_evidence(node_id).active_report_at
+        # A delayed epoch can add bytes without replacing a newer collection window.
+        if held is None or datetime.fromisoformat(report.collected_at) >= datetime.fromisoformat(held):
+            self._store.db.execute(
+                "UPDATE node_traffic_totals SET active_users = ?, active_report_at = ?, active_report_received_at = ?"
+                " WHERE node_id = ?",
+                (active, report.collected_at, now, node_id),
+            )
 
     def summary(self) -> TrafficSummary:
         """Every user's totals across nodes, zero for users no node has counted yet."""

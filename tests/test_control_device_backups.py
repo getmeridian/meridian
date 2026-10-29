@@ -11,7 +11,7 @@ from meridian.control.models import DeviceKeyCreate, PrivacyChange, PrivacySetti
 from meridian.control.restore import stage_restored_database
 from meridian.control.service import SCHEMA_VERSION, ControlService
 from meridian.control.snapshot import decrypt_snapshot, generate_key_pair
-from tests.support.control_service import FLEET_ID, drop_token_expiry_schema, write_privacy
+from tests.support.control_service import FLEET_ID, drop_operations_schema, drop_token_expiry_schema, write_privacy
 
 
 @pytest.mark.parametrize(
@@ -111,6 +111,7 @@ def test_schema_eleven_keeps_users_privacy_and_history_tables(tmp_path: Path, ol
     settings = PrivacySettings(device_limits="private", default_device_limit=7)
     write_privacy(path, settings)
     with sqlite3.connect(path) as db:
+        drop_operations_schema(db)
         db.execute("DROP TABLE devices")
         db.execute("ALTER TABLE users DROP COLUMN device_limit")
         drop_token_expiry_schema(db)

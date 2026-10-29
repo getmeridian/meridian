@@ -24,18 +24,20 @@ USER_SELECT = (
     "SELECT "
     + ", ".join(f"u.{name}" for name in USER_FIELDS)
     + ", COALESCE(t.uplink_bytes + t.downlink_bytes, 0) + u.traffic_carried_bytes AS lifetime,"
-    " u.traffic_offset_bytes, t.last_seen_at"
+    " u.traffic_offset_bytes, t.last_seen_at, t.first_traffic_at, t.last_traffic_node"
     " FROM users u LEFT JOIN traffic_totals t ON t.user_id = u.user_id"
 )
 
 
 def user_record(row: Any) -> UserRecord:
-    *stored, lifetime, offset, online_at = tuple(row)
+    *stored, lifetime, offset, online_at, first_traffic_at, last_traffic_node = tuple(row)
     return UserRecord.model_validate(
         {
             **dict(zip(USER_FIELDS, stored, strict=True)),
             "lifetime_traffic_bytes": lifetime,
             "used_traffic_bytes": max(0, lifetime - offset),
             "online_at": online_at,
+            "first_traffic_at": first_traffic_at,
+            "last_traffic_node": last_traffic_node,
         }
     )

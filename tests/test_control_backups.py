@@ -18,7 +18,13 @@ from meridian.control.snapshot import SnapshotError, decrypt_snapshot, generate_
 from meridian.control.store import Store
 from meridian.core.agent_protocol import EnrollRequest
 from tests.support.agent_node import FakeNode
-from tests.support.control_service import ADMIN_TOKEN, FLEET_ID, drop_token_expiry_schema, serve_control
+from tests.support.control_service import (
+    ADMIN_TOKEN,
+    FLEET_ID,
+    drop_operations_schema,
+    drop_token_expiry_schema,
+    serve_control,
+)
 from tests.test_control_service import _spec
 
 
@@ -211,6 +217,7 @@ def test_staging_a_schema_seven_snapshot_from_before_the_web_console(tmp_path: P
     service, _node = _enrolled_service(tmp_path / "live.db")
     service.close()
     db = sqlite3.connect(tmp_path / "live.db")
+    drop_operations_schema(db)
     for table in ("ui_owner", "ui_sessions", "ui_setup_links", "devices", "privacy_changes", "privacy"):
         db.execute(f"DROP TABLE {table}")
     db.execute("ALTER TABLE users DROP COLUMN device_limit")

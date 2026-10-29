@@ -37,6 +37,7 @@ from meridian.control.models import (
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientLimitChange, TrafficReset
 from meridian.core.fleet import FleetTopology
+from meridian.core.traffic import NodeTrafficEvidence
 from meridian.remnawave import (
     XRAY_JSON_CLIENT_TYPE,
     Host,
@@ -177,6 +178,8 @@ class ServiceAccessPanel:
             expire_at=record.expire_at or "",
             created_at=record.created_at,
             online_at=record.online_at or "",
+            first_traffic_at=record.first_traffic_at,
+            last_traffic_node=record.last_traffic_node,
             hwid_device_limit=record.device_limit,
         )
 
@@ -233,6 +236,15 @@ class ServiceFleetPanel(ServiceAccessPanel):
                     Host(uuid=endpoint_id, remark=endpoint.remark, address=endpoint.address, port=endpoint.port)
                 )
         return hosts
+
+    def node_evidence(self) -> dict[str, NodeTrafficEvidence]:
+        """Aggregate activity for status readers, kept beside the existing fleet projection."""
+        evidence: dict[str, NodeTrafficEvidence] = {}
+        for node_id in self._node_ids:
+            status = _translated(partial(self._client.node, node_id))
+            if status is not None:
+                evidence[node_id] = status.traffic_evidence()
+        return evidence
 
 
 AccessPanel = ServiceAccessPanel

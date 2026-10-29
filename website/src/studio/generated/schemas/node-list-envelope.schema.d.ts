@@ -10,6 +10,18 @@
  */
 export type NodeListOutputEnvelope = _NodeListSuccessEnvelope | _NodeListTerminalEnvelope;
 export type Command = "node.list";
+/**
+ * The last report's collection window time.
+ */
+export type ActiveReportAt = string | null;
+/**
+ * When the service accepted that report; duplicates leave it unchanged.
+ */
+export type ActiveReportReceivedAt = string | null;
+/**
+ * People with accepted growth in the last report; null before any report.
+ */
+export type ActiveUsers = number | null;
 export type Errors = string[];
 export type Failed = string[];
 export type InSync = boolean | null;
@@ -62,6 +74,10 @@ export type Xray = string | null;
 export type RuntimeAvailable = boolean | null;
 export type Status2 = "connected" | "failed" | "disconnected" | "disabled" | "unknown";
 export type TrafficBytes = number;
+/**
+ * Complete durable node accounting starts here. Retained counters from before a migration may also be included; earlier pruned traffic cannot be reconstructed.
+ */
+export type TrafficCountingSince = string | null;
 export type Uuid = string;
 export type XrayVersion = string;
 export type Nodes = FleetStatusNode[];
@@ -120,6 +136,9 @@ export interface NodeListResult {
   nodes?: Nodes;
 }
 export interface FleetStatusNode {
+  active_report_at?: ActiveReportAt;
+  active_report_received_at?: ActiveReportReceivedAt;
+  active_users?: ActiveUsers;
   errors?: Errors;
   failed?: Failed;
   in_sync?: InSync;
@@ -132,6 +151,7 @@ export interface FleetStatusNode {
   runtime_available?: RuntimeAvailable;
   status: Status2;
   traffic_bytes: TrafficBytes;
+  traffic_counting_since?: TrafficCountingSince;
   uuid: Uuid;
   xray_version: XrayVersion;
 }

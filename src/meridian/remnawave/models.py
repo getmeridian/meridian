@@ -31,6 +31,9 @@ class User:
     expire_at: str = ""
     created_at: str = ""
     online_at: str = ""
+    # Aggregate evidence from the control service; historical panel data leaves these unknown.
+    first_traffic_at: str | None = None
+    last_traffic_node: str | None = None
     sub_revoked_at: str = ""
     subscription_url: str = ""
     active_internal_squad_uuids: list[str] = field(default_factory=list)

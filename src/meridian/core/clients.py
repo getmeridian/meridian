@@ -10,6 +10,7 @@ from pydantic import Field
 from meridian.control.models import UserUsage
 from meridian.core.client_limits import canonical_expiry, traffic_reset_from_strategy
 from meridian.core.models import CoreModel
+from meridian.core.traffic import UserTrafficEvidence
 
 
 class PanelUserLike(Protocol):
@@ -56,7 +57,7 @@ class PanelUserLike(Protocol):
     def hwid_device_limit(self) -> int | None: ...
 
 
-class ClientRecord(CoreModel):
+class ClientRecord(UserTrafficEvidence):
     """Redacted client metadata suitable for list views."""
 
     username: str
@@ -197,6 +198,8 @@ def build_client_record(user: PanelUserLike, *, declared: bool = True) -> Client
         expires_at=canonical_expiry(user.expire_at),
         created_at=user.created_at,
         last_seen=user.online_at,
+        first_traffic_at=getattr(user, "first_traffic_at", None),
+        last_traffic_node=getattr(user, "last_traffic_node", None),
         device_limit=user.hwid_device_limit,
         declared=declared,
     )

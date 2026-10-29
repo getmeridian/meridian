@@ -158,6 +158,52 @@
     "FleetStatusNode": {
       "additionalProperties": false,
       "properties": {
+        "active_report_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The last report's collection window time.",
+          "title": "Active Report At"
+        },
+        "active_report_received_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the service accepted that report; duplicates leave it unchanged.",
+          "title": "Active Report Received At"
+        },
+        "active_users": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "People with accepted growth in the last report; null before any report.",
+          "title": "Active Users"
+        },
         "errors": {
           "items": {
             "type": "string"
@@ -254,6 +300,22 @@
         "traffic_bytes": {
           "title": "Traffic Bytes",
           "type": "integer"
+        },
+        "traffic_counting_since": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Complete durable node accounting starts here. Retained counters from before a migration may also be included; earlier pruned traffic cannot be reconstructed.",
+          "title": "Traffic Counting Since"
         },
         "uuid": {
           "title": "Uuid",

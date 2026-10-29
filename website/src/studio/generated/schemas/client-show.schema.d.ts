@@ -18,8 +18,16 @@ export type DeviceLimit = number | null;
  * UTC timestamp; empty means never.
  */
 export type ExpiresAt = string;
+/**
+ * When the service first accepted traffic growth; unknown for historical use.
+ */
+export type FirstTrafficAt = string | null;
 export type Id = string;
 export type LastSeen = string;
+/**
+ * The node whose latest accepted growth set the user's last traffic time.
+ */
+export type LastTrafficNode = string | null;
 /**
  * Lifetime use, unaffected by traffic resets.
  */
@@ -73,8 +81,10 @@ export interface ClientDetail {
   declared?: Declared;
   device_limit?: DeviceLimit;
   expires_at: ExpiresAt;
+  first_traffic_at?: FirstTrafficAt;
   id: Id;
   last_seen: LastSeen;
+  last_traffic_node?: LastTrafficNode;
   lifetime_traffic_bytes?: LifetimeTrafficBytes;
   status: Status;
   traffic_limit_bytes: TrafficLimitBytes;

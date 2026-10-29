@@ -62,7 +62,7 @@ from meridian.control.subscriptions import (
 )
 from meridian.control.times import utc_now
 from meridian.control.tokens import API_TOKENS_TABLE_V4, TokenRegistry
-from meridian.control.traffic import DAILY_TABLES, PER_EPOCH_BASELINES, TrafficLedger
+from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPOCH_BASELINES, TrafficLedger
 from meridian.control.user_lifecycle import extend_user_expiry
 from meridian.control.user_policy import enforced_status, period_began, whole_seconds
 from meridian.control.users import USER_SELECT, user_record
@@ -72,7 +72,7 @@ from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 from meridian.core.client_devices import DevicesRemoved
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 MAX_WAIT_SECONDS = 55
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -132,6 +132,8 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (DEVICES_TABLE, "ALTER TABLE users ADD COLUMN device_limit INTEGER"),
     # 11 -> 12: optional expiry of scoped API tokens; existing tokens never expire.
     ("ALTER TABLE api_tokens ADD COLUMN expires_at TEXT",),
+    # 12 -> 13: durable accounting and aggregate activity evidence.
+    ACCOUNTING_MIGRATION,
 )
 # meta key prefix: the last revision a deleted node was signed at.
 _RETIRED_REVISION = "retired_revision:"
@@ -294,6 +296,7 @@ class ControlService:
             errors=errors,
             runtime=project_runtime(report),
             traffic_bytes=self.traffic.node_totals().get(node_id, 0),
+            **self.traffic.node_evidence(node_id).model_dump(),
         )
 
     def list_nodes(self) -> list[NodeStatus]:

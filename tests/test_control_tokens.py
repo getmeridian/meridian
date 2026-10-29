@@ -35,7 +35,7 @@ from meridian.control.server import ROUTES, ControlServer
 from meridian.control.service import SCHEMA_VERSION, ControlService
 from meridian.control.snapshot import generate_key_pair
 from meridian.control.tokens import LAST_USED_RESOLUTION_SECONDS, ROOT, Caller
-from tests.support.control_service import drop_device_privacy_schema
+from tests.support.control_service import drop_device_privacy_schema, drop_operations_schema
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
 ADMIN_TOKEN = "admin-token-for-tests-only-0123456789"
@@ -504,6 +504,7 @@ def test_step_twelve_preserves_existing_tokens_without_expiry_and_migrates_once(
     issued = service.tokens.issue(TokenCreate(name="existing", scope="read"), issuer=ROOT)
     service.close()
     with sqlite3.connect(path) as db:
+        drop_operations_schema(db)
         if "expires_at" in {column[1] for column in db.execute("PRAGMA table_info(api_tokens)")}:
             db.execute("ALTER TABLE api_tokens DROP COLUMN expires_at")
         db.execute("UPDATE meta SET value = '11' WHERE key = 'schema_version'")

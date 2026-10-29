@@ -9,6 +9,7 @@ from pydantic import Field
 from meridian.control.models import NodeRuntime
 from meridian.core.agent_types import OpaqueToken
 from meridian.core.models import CoreModel
+from meridian.core.traffic import NodeTrafficEvidence
 
 # Long enough for any passphrase the policy accepts; longer bodies are refused before hashing.
 _PASSWORD = Field(min_length=1, max_length=1024)
@@ -76,7 +77,7 @@ class TotpEnrollment(CoreModel):
     qr_svg: str = Field(description="The URI as an SVG `data:` URI QR code.")
 
 
-class ServerView(CoreModel):
+class ServerView(NodeTrafficEvidence):
     """One agent node as the Servers screen shows it; read-only (topology changes stay in the CLI)."""
 
     node_id: str
@@ -90,7 +91,9 @@ class ServerView(CoreModel):
     in_sync: bool
     failed: list[str]
     errors: list[str]
-    traffic_bytes: int = Field(description="Bytes the node counted since its agent's counters began.")
+    traffic_bytes: int = Field(
+        description="Durable bytes accepted across counter epochs; retained evidence is backfilled."
+    )
     runtime: NodeRuntime | None = None
     runtime_available: bool = False
 

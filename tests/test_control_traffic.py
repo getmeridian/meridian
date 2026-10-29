@@ -12,7 +12,7 @@ from meridian.control.service import ControlService
 from meridian.control.traffic import KEPT_EPOCHS, REMEMBERED_RETIRED_EPOCHS
 from meridian.core.agent_protocol import StatsReport
 from tests.support.agent_node import FLEET_ID
-from tests.support.control_service import drop_device_privacy_schema
+from tests.support.control_service import drop_device_privacy_schema, drop_operations_schema, drop_token_expiry_schema
 
 EPOCH_A = "5b0c8a52-6c1d-4e8b-9a7f-2b5d4c3e1f00"
 EPOCH_B = "6c1d8a52-6c1d-4e8b-9a7f-2b5d4c3e1f00"
@@ -77,7 +77,7 @@ def test_a_delayed_report_from_an_unseen_epoch_never_retires_the_live_one(servic
     service.traffic.record("main", _report(service, EPOCH_B, 3, alice=(2010, 0)))
 
     assert _totals(service)["alice"] == (2110, 0)
-    assert service.traffic.node_totals() == {"main": 2010}
+    assert service.traffic.node_totals() == {"main": 2110}
 
 
 def test_only_the_most_recent_epochs_keep_baselines_and_older_ones_never_count_again(
@@ -266,3 +266,119 @@ def test_a_report_racing_user_removal_cannot_leave_orphan_accounting(
         assert not service.traffic._store.rows(f"SELECT * FROM {table} WHERE user_id = ?", (alice.user_id,))
     assert _totals(service) == {"bob": (1, 2)}
     assert service.record_stats("main", report).acked_seq == 1
+
+
+def test_node_totals_never_fall_when_an_old_epoch_arrives_late(service: ControlService) -> None:
+    service.record_stats("main", _report(service, EPOCH_A, 1, alice=(10, 90)))
+    service.record_stats("main", _report(service, EPOCH_B, 1, alice=(100, 800)))
+    assert service.traffic.node_totals() == {"main": 1000}
+
+    old = _report(service, EPOCH_A, 2, alice=(20, 90))
+    service.record_stats("main", old)
+    assert service.traffic.node_totals() == {"main": 1010}
+    service.record_stats("main", old)
+    assert service.traffic.node_totals() == {"main": 1010}
+    assert sum(_totals(service)["alice"]) == 1010
+
+
+def test_node_totals_outlive_baseline_retention_user_removal_and_history_off(service: ControlService) -> None:
+    from meridian.control.models import PrivacySettings
+
+    service.set_privacy(PrivacySettings(usage_history="daily"), author="root")
+    count = KEPT_EPOCHS + REMEMBERED_RETIRED_EPOCHS + 5
+    for index in range(count):
+        service.record_stats("main", _report(service, f"{index:08x}-6c1d-4e8b-9a7f-2b5d4c3e1f00", 1, alice=(2, 3)))
+    service.delete_user("alice")
+    service.set_privacy(PrivacySettings(), author="root")
+    service.delete_node("main")
+    assert service.traffic.node_totals() == {"main": count * 5}
+
+
+def test_first_traffic_and_last_node_change_only_with_accepted_growth(service: ControlService) -> None:
+    first, second, third = "2026-11-01T12:00:00Z", "2026-11-01T12:01:00Z", "2026-11-01T12:02:00Z"
+    unused = service.get_user("alice")
+    assert unused is not None
+    assert unused.first_traffic_at is unused.last_traffic_node is None
+    report = _report(service, EPOCH_A, 1, alice=(10, 20))
+    service.record_stats("main", report, now=first)
+    service.record_stats("edge", _report(service, EPOCH_B, 1, alice=(2, 3)), now=second)
+    service.record_stats("main", report, now=third)
+    service.record_stats("main", _report(service, EPOCH_A, 2, alice=(10, 20)), now=third)
+    user = service.get_user("alice")
+    assert user is not None
+    assert (user.first_traffic_at, user.online_at, user.last_traffic_node) == (first, second, "edge")
+    service.reset_user_traffic("alice")
+    service.reissue_user("alice")
+    assert service.get_user("alice").first_traffic_at == first
+    assert service.get_user("alice").last_traffic_node == "edge"
+
+
+def test_node_activity_is_growth_in_the_latest_report_window_and_replays_leave_it_alone(
+    service: ControlService,
+) -> None:
+    from meridian.control.models import NodeSpec
+
+    service.put_node_spec("main", NodeSpec(resources=[]))
+    assert service.node_status("main").active_users is None
+    first = _report(service, EPOCH_A, 1, alice=(10, 20), bob=(0, 0))
+    service.record_stats("main", first, now="2026-11-01T12:00:01Z")
+    status = service.node_status("main")
+    assert (status.active_users, status.active_report_at, status.active_report_received_at) == (
+        1,
+        first.collected_at,
+        "2026-11-01T12:00:01Z",
+    )
+    service.record_stats("main", first, now="2026-11-01T12:00:02Z")
+    assert service.node_status("main").active_report_received_at == "2026-11-01T12:00:01Z"
+    empty = _report(service, EPOCH_A, 2, alice=(10, 20)).model_copy(update={"collected_at": "2026-11-01T12:01:00Z"})
+    service.record_stats("main", empty, now="2026-11-01T12:01:01Z")
+    assert service.node_status("main").active_users == 0
+    # Accepted growth from an older collected window still counts bytes, but cannot replace newer activity.
+    service.record_stats("main", _report(service, EPOCH_B, 1, bob=(1, 2)), now="2026-11-01T12:02:00Z")
+    assert service.node_status("main").active_users == 0
+    assert service.node_status("main").active_report_at == empty.collected_at
+
+
+def test_refused_growth_rolls_back_node_totals_and_activity_with_user_accounting(service: ControlService) -> None:
+    from meridian.control.models import NodeSpec
+
+    service.put_node_spec("main", NodeSpec(resources=[]))
+    service.record_stats("main", _report(service, EPOCH_A, 1, alice=(100, 100), bob=(1, 1)))
+    before = service.node_status("main")
+    with pytest.raises(ServiceError, match="went down"):
+        service.record_stats("main", _report(service, EPOCH_A, 2, bob=(9, 9), alice=(50, 200)))
+    assert service.traffic.node_totals() == {"main": 202}
+    assert service.node_status("main") == before
+    assert _totals(service) == {"alice": (100, 100), "bob": (1, 1)}
+
+
+@pytest.mark.parametrize("old_version", [11, 12], ids=["from-eleven", "from-twelve"])
+def test_schema_thirteen_backfills_retained_node_evidence_once_and_marks_the_accounting_start(
+    tmp_path: Path, old_version: int
+) -> None:
+    from datetime import datetime
+
+    path = tmp_path / "control.db"
+    service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
+    service.put_user("alice")
+    for index in range(KEPT_EPOCHS + 2):
+        service.record_stats("main", _report(service, f"{index:08x}-6c1d-4e8b-9a7f-2b5d4c3e1f00", 1, alice=(4, 6)))
+    service.close()
+    with sqlite3.connect(path) as db:
+        drop_operations_schema(db)
+        if old_version < 12:
+            drop_token_expiry_schema(db)
+        db.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(old_version),))
+    since = None
+    for _ in range(2):
+        service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
+        assert service.traffic.node_totals() == {"main": KEPT_EPOCHS * 10}
+        row = service._store.row("SELECT * FROM node_traffic_totals WHERE node_id = 'main'")
+        assert datetime.fromisoformat(row["counting_since"]).tzinfo is not None
+        assert since is None or since == row["counting_since"]
+        since = row["counting_since"]
+        assert service.get_user("alice").first_traffic_at is None
+        assert service.get_user("alice").last_traffic_node is None
+        assert service.get_user("alice").lifetime_traffic_bytes == (KEPT_EPOCHS + 2) * 10
+        assert service._store.meta("schema_version") == "13"
+        service.close()

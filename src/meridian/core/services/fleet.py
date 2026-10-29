@@ -18,6 +18,7 @@ from meridian.core.fleet import (
     build_fleet_status,
 )
 from meridian.core.models import CoreModel, ErrorModel
+from meridian.core.traffic import NodeTrafficEvidence
 
 PanelErrorKind = Literal["auth", "system", "bug"]
 
@@ -38,6 +39,7 @@ class FleetPanelClient(Protocol):
 
 PanelErrorClassifier = Callable[[Exception], PanelErrorKind]
 RelayHealthChecker = Callable[[list[TopologyRelay]], Mapping[tuple[str, int], bool]]
+NodeEvidenceReader = Callable[[], Mapping[str, NodeTrafficEvidence]]
 
 
 class FleetStatusServiceResult(CoreModel):
@@ -86,6 +88,7 @@ class _PanelObservation:
     sources: FleetSources
     healthy: bool = False
     nodes: list[ApiNodeLike] = field(default_factory=list)
+    node_evidence: dict[str, NodeTrafficEvidence] = field(default_factory=dict)
     users: list[ApiUserLike] = field(default_factory=list)
     warnings: list[ErrorModel] = field(default_factory=list)
 
@@ -98,6 +101,7 @@ def _observe_panel(
     unreachable: str,
     access_users: list[str] | None = None,
     with_users: bool,
+    read_node_evidence: NodeEvidenceReader | None = None,
 ) -> _PanelObservation:
     """Ping the panel and list nodes (and users); auth and bug errors propagate."""
     observed = _PanelObservation(sources=sources)
@@ -121,6 +125,8 @@ def _observe_panel(
             observed.sources = observed.sources.model_copy(update={"panel": "available"})
             try:
                 observed.nodes = list(panel.list_nodes())
+                if read_node_evidence is not None:
+                    observed.node_evidence = dict(read_node_evidence())
                 observed.sources = observed.sources.model_copy(update={"nodes": "available"})
             except Exception as exc:  # Protocol adapter — concrete exception type unknown
                 _handle_error(exc, classify_error)
@@ -189,6 +195,7 @@ def collect_fleet_status(
     *,
     check_relays: RelayHealthChecker,
     classify_error: PanelErrorClassifier,
+    read_node_evidence: NodeEvidenceReader | None = None,
 ) -> FleetStatusServiceResult:
     """Collect fleet health overview with partial-failure warnings."""
     relay_source: Literal["available", "not_requested"] = "available" if topology.relays else "not_requested"
@@ -199,6 +206,7 @@ def collect_fleet_status(
         unreachable="Cannot reach panel API -- node and user data may be stale",
         access_users=topology.access_users,
         with_users=True,
+        read_node_evidence=read_node_evidence,
     )
     sources = panel.sources
     warnings = panel.warnings
@@ -224,6 +232,7 @@ def collect_fleet_status(
             api_users=panel.users,
             relay_health=relay_health,
             sources=sources,
+            node_evidence=panel.node_evidence,
         ),
         warnings=warnings,
     )

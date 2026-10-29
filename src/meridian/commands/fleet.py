@@ -22,6 +22,7 @@ from meridian.core.models import ErrorModel, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.services.fleet import collect_fleet_inventory, collect_fleet_status
 from meridian.health import tcp_connect
+from meridian.i18n import t
 from meridian.remnawave import RemnawaveAuthError, RemnawaveError
 from meridian.renderers import emit_json
 
@@ -164,8 +165,15 @@ def _render_status(status: FleetStatus) -> None:
     err_console.print(f"  [bold]Panel[/bold]   {escape(status.panel.url)} {panel_state}")
 
     if status.nodes:
+        from rich.table import Table
+
         err_console.print()
         err_console.print("  [bold]Nodes[/bold]")
+        table = Table(box=None, padding=(0, 1), caption=t("fleet.active_report"))
+        table.add_column(t("fleet.label.node"))
+        table.add_column(t("client.label.status"))
+        table.add_column(t("client.label.traffic"))
+        table.add_column(t("fleet.label.active"), justify="right")
 
         for node in status.nodes:
             label = escape(node.name or node.ip)
@@ -175,17 +183,29 @@ def _render_status(status: FleetStatus) -> None:
 
             if node.status == "connected":
                 xray = f"  Xray {escape(node.xray_version)}" if node.xray_version else ""
-                traffic = f"  {format_traffic(node.traffic_bytes)}" if node.traffic_bytes else ""
-                err_console.print(f"    {escape(node.ip)}  {label}{role}  [green]connected[/green]{xray}{traffic}")
+                state = f"[green]connected[/green]{xray}"
             elif node.status == "disabled":
-                err_console.print(f"    {escape(node.ip)}  {label}{role}  [dim]disabled[/dim]")
+                state = "[dim]disabled[/dim]"
             elif node.status == "disconnected":
-                err_console.print(f"    {escape(node.ip)}  {label}{role}  [red]DISCONNECTED[/red]")
+                state = "[red]DISCONNECTED[/red]"
             elif node.status == "failed":
-                err_console.print(f"    {escape(node.ip)}  {label}{role}  [red]FAILED[/red] [dim]meridian check[/dim]")
+                state = "[red]FAILED[/red] [dim]meridian check[/dim]"
             else:
-                err_console.print(f"    {escape(node.ip)}  {label}{role}  [dim]unknown[/dim]")
+                state = "[dim]unknown[/dim]"
+            table.add_row(
+                f"{escape(node.ip)}  {label}{role}",
+                state,
+                format_traffic(node.traffic_bytes),
+                str(node.active_users) if node.active_users is not None else "-",
+            )
+        err_console.print(table)
+        for node in status.nodes:
+            if node.active_report_at is not None:
+                err_console.print(
+                    f"  [dim]{escape(t('fleet.active_at', node=node.name or node.ip, at=node.active_report_at))}[/dim]"
+                )
             if node.runtime_available is not None:
+                err_console.print(f"    {escape(node.name or node.ip)}")
                 reachable = "live" if node.live else "unavailable"
                 runtime = (
                     (
@@ -268,11 +288,13 @@ def _run_status(*, operation: OperationContext) -> int:
     except LocalStateError as exc:
         fail(exc)
     try:
+        panel = fleet_panel(cluster, topology)
         result = collect_fleet_status(
             topology,
-            fleet_panel(cluster, topology),
+            panel,
             check_relays=_check_relays_health,
             classify_error=_classify_panel_error,
+            read_node_evidence=panel.node_evidence,
         )
     except MeridianError as exc:
         fail(exc)

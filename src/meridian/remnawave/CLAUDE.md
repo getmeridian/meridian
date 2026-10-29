@@ -1,6 +1,7 @@
 # Remnawave adapter
 
 ## Design decisions
+- `User` also carries the control service's optional first-traffic time and last reporting node so CLI adapters keep the shared user shape; legacy panel users leave them unknown.
 
 - `__init__.py` is the compatibility facade consumed by Meridian; resource behavior stays in `client.py` and `control_plane.py`.
 - Raw REST over one `httpx.Client`, no SDK: the official SDK stalled at 2.8 and Meridian needs only a few dozen endpoints. `_request` owns retry, typed errors, and envelope unwrapping.

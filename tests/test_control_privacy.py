@@ -165,7 +165,10 @@ def test_daily_to_off_deletes_both_histories_and_preserves_lifetime_traffic(serv
     _history(service)
     user = service.get_user("alice")
     assert user is not None
-    service._db.execute("INSERT INTO traffic_totals VALUES (?, 10, 20, ?)", (user.user_id, NOW))
+    service._db.execute(
+        "INSERT INTO traffic_totals (user_id, uplink_bytes, downlink_bytes, last_seen_at) VALUES (?, 10, 20, ?)",
+        (user.user_id, NOW),
+    )
     result = service.set_privacy(PrivacySettings(), author="owner")
     assert result.deleted.model_dump() == {"devices": 0, "traffic_daily": 1, "node_traffic_daily": 1}
     assert service._store.rows("SELECT * FROM traffic_daily") == []
@@ -204,9 +207,15 @@ def test_schema_nine_migrates_once_through_steps_ten_and_eleven_without_changing
     path = tmp_path / "control.db"
     service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
     user = service.put_user("alice")
-    service._db.execute("INSERT INTO traffic_totals VALUES (?, 3, 7, ?)", (user.user_id, NOW))
+    service._db.execute(
+        "INSERT INTO traffic_totals (user_id, uplink_bytes, downlink_bytes, last_seen_at) VALUES (?, 3, 7, ?)",
+        (user.user_id, NOW),
+    )
     service.close()
     with sqlite3.connect(path) as db:
+        from tests.support.control_service import drop_operations_schema
+
+        drop_operations_schema(db)
         for table in ("privacy", "privacy_changes", "traffic_daily", "node_traffic_daily", "devices"):
             db.execute(f"DROP TABLE {table}")
         db.execute("ALTER TABLE users DROP COLUMN device_limit")

@@ -39,6 +39,11 @@ that dials out to it.
 - **Extend access by duration** — `client extend NAME --days N` and `POST /api/users/{name}/extend` add 1–3650 days after the later of now and the current expiry, returning the effective status. Declared and console-created people are supported; operator disable and traffic limits remain enforced.
 - **People API tokens** — the console can issue a token that manages people and their credentials without access to servers, revisions, backups, enrollment, tokens, privacy, or settings. Declared people still require the CLI to remove or reissue.
 - **Atomic CLI account creation** — `client add` creates expiry, traffic limits, reset strategy, and device caps together with the account. Interrupted applies resume with those settings, and later applies keep operator edits.
+- **Traffic evidence** — node totals now survive late counter epochs and baseline
+  retention. The service marks when complete counting starts and backfills retained
+  counters. People expose first reported use and their last reporting node in the
+  API and `client show`; node status and `fleet status` show people active in the
+  last report and that report's time.
 - **Privacy settings** — device limits and usage history default to off.
   `meridian privacy show|set` and Settings → Privacy disclose what each level
   stores and what a seized control server reveals. Changes record the author,
