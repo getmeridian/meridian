@@ -120,3 +120,21 @@ def test_other_apt_failures_return_at_once(clock) -> None:
 
     assert result.returncode == 100 and len(conn.calls) == 1
     assert ensure.apt_failure(result) == "E: Unable to locate package nope"
+
+
+def test_update_and_install_retries_only_the_install_on_a_dpkg_lock(clock) -> None:
+    """dpkg's lock can be held while the lists' is free; a joined command downloaded the lists every retry."""
+    conn = _AptSequence((0, ""), (100, _LOCKED), (0, ""))
+
+    result = ensure.apt_update_and_install(conn, "-y -qq nginx", timeout=60)
+
+    assert result.returncode == 0
+    assert [call.split()[1] for call in conn.calls] == ["update", "install", "install"]
+
+
+def test_update_and_install_stops_when_the_update_fails(clock) -> None:
+    conn = _AptSequence((100, "E: The repository is not signed."))
+
+    result = ensure.apt_update_and_install(conn, "-y -qq nginx", timeout=60)
+
+    assert result.returncode == 100 and len(conn.calls) == 1

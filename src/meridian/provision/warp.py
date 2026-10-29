@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from meridian.facts import ServerFacts
 from meridian.provision.apt_keys import verify_apt_key
-from meridian.provision.ensure import apt_failure, run_apt
+from meridian.provision.ensure import apt_failure, apt_update_and_install
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.ssh import ServerConnection
 
@@ -66,7 +66,7 @@ class InstallWarp:
             if result.returncode != 0:
                 return StepResult(name=self.name, status="failed", detail="Failed to add APT repository")
 
-            result = run_apt(conn, "apt-get update -qq && apt-get install -y -qq cloudflare-warp", timeout=120)
+            result = apt_update_and_install(conn, "-y -qq cloudflare-warp", timeout=120)
             if result.returncode != 0:
                 detail = f"Failed to install cloudflare-warp: {apt_failure(result)}"
                 return StepResult(name=self.name, status="failed", detail=detail)

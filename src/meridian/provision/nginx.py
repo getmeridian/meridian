@@ -11,7 +11,7 @@ import shlex
 
 from meridian.config import ACME_SH_SHA256, ACME_SH_VERSION, REMNAWAVE_PANEL_PORT, REMNAWAVE_SUBSCRIPTION_PAGE_PORT
 from meridian.provision.apt_keys import verify_apt_key
-from meridian.provision.ensure import apt_failure, apt_lock_held, resolve_ctx, run_apt
+from meridian.provision.ensure import apt_failure, apt_lock_held, apt_update_and_install, resolve_ctx, run_apt
 from meridian.provision.nginx_render import (
     render_nginx_http_config,
     render_nginx_ip_config,
@@ -160,7 +160,7 @@ class InstallNginx:
                 timeout=15,
             )
 
-            result = run_apt(conn, f"apt-get update -qq && apt-get install -y {_APT_KEEP_CONFIG} nginx", timeout=180)
+            result = apt_update_and_install(conn, f"-y {_APT_KEEP_CONFIG} nginx", timeout=180)
             if result.returncode != 0:
                 return StepResult(
                     name=self.name,
@@ -180,20 +180,20 @@ class InstallNginx:
             conn.run(_ENSURE_SITES_INCLUDE, timeout=15)
 
         # -- Ensure stream module is available --
-        # nginx.org builds have stream built in and no such package; the check below decides.
-        stream = run_apt(conn, "apt-get install -y -qq libnginx-mod-stream", timeout=120)
-        if apt_lock_held(stream):
-            return StepResult(name=self.name, status="failed", detail=apt_failure(stream))
-        check = conn.run(
-            "test -f /usr/lib/nginx/modules/ngx_stream_module.so || nginx -V 2>&1 | grep -q 'with-stream '",
-            timeout=15,
-        )
-        if check.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail="nginx stream module not available — install libnginx-mod-stream",
-            )
+        # Check first: this step runs on every certificate and nginx apply, and nginx.org builds have
+        # stream built in while the distro still offers a conflicting libnginx-mod-stream, so an
+        # unconditional install failed every time and could wait out another package manager's lock.
+        stream_check = "test -f /usr/lib/nginx/modules/ngx_stream_module.so || nginx -V 2>&1 | grep -q 'with-stream '"
+        if conn.run(stream_check, timeout=15).returncode != 0:
+            stream = run_apt(conn, "apt-get install -y -qq libnginx-mod-stream", timeout=120)
+            if conn.run(stream_check, timeout=15).returncode != 0:
+                detail = apt_failure(stream) if stream.returncode != 0 else "the module is still missing"
+                return StepResult(
+                    name=self.name,
+                    status="failed",
+                    detail=f"nginx stream module not available: {detail} — install libnginx-mod-stream",
+                )
+            changed = True
 
         # -- Create directories --
         conn.run(

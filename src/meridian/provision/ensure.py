@@ -88,6 +88,18 @@ def apt_failure(result: CommandResult) -> str:
     )
 
 
+def apt_update_and_install(conn: ServerConnection, arguments: str, *, timeout: int) -> CommandResult:
+    """`apt-get update`, then `apt-get install ARGUMENTS`, each with its own lock wait and timeout.
+
+    One `update && install` command would download the lists again on every lock retry (dpkg's lock
+    can be held while the lists' is free) and share one timeout between a slow mirror and the install.
+    """
+    update = run_apt(conn, "apt-get update -qq", timeout=180, operation_name="apt update")
+    if update.returncode != 0:
+        return update
+    return run_apt(conn, f"apt-get install {arguments}", timeout=timeout, operation_name="apt install")
+
+
 def ensure_packages(
     conn: ServerConnection,
     packages: list[str],

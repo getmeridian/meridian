@@ -249,6 +249,24 @@ class TestInstallNginx:
         assert result.status == "ok"
         conn.assert_called_with_pattern("acme.sh --install-cronjob")
 
+    def test_a_working_stream_module_never_reaches_apt(self):
+        """This step runs on every certificate and nginx apply; nginx.org builds have stream built in."""
+        conn = _installed_nginx()
+        InstallNginx().run(conn, ProvisionContext(ip="198.51.100.1"))
+        assert not [call for call in conn.calls if "libnginx-mod-stream" in call]
+
+    def test_a_stream_module_apt_cannot_install_fails_with_apts_error(self):
+        conn = MockConnection()
+        conn.when("ngx_stream_module.so", rc=1)
+        conn.when("libnginx-mod-stream", rc=100, stderr="E: Unable to locate package libnginx-mod-stream")
+        conn.when("dpkg -l nginx", stdout="ii  nginx")
+        conn.when("nginx -v", stdout="nginx version: nginx/1.27.3")
+
+        result = InstallNginx().run(conn, ProvisionContext(ip="198.51.100.1"))
+
+        assert result.status == "failed"
+        assert "Unable to locate package libnginx-mod-stream" in result.detail
+
     def test_distro_nginx_older_than_1_25_is_replaced_from_nginx_org(self):
         # Ubuntu 24.04 ships nginx 1.24, which rejects the rendered `http2 on;`.
         conn = MockConnection()
