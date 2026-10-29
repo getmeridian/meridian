@@ -15,6 +15,7 @@ pub mod compose;
 pub mod fetch;
 pub mod fsutil;
 pub mod identity;
+pub mod instance;
 pub mod jcs;
 pub mod log;
 pub mod model;

@@ -5,6 +5,7 @@ use std::process::ExitCode;
 
 use meridian_agent::agent::{Agent, Options};
 use meridian_agent::fetch::load_roots;
+use meridian_agent::instance::InstanceLock;
 use meridian_agent::selfcheck::self_check;
 use meridian_agent::system::RealExec;
 use meridian_agent::{VERSION, info, log};
@@ -82,6 +83,13 @@ fn check(opts: &Options) -> ExitCode {
 }
 
 fn run(opts: Options) -> ExitCode {
+    let _instance = match InstanceLock::acquire(&opts.state_dir) {
+        Ok(lock) => lock,
+        Err(err) => {
+            eprintln!("netagent: {err}");
+            return ExitCode::from(1);
+        }
+    };
     let exec = RealExec;
     let mut agent = match Agent::new(opts, &exec) {
         Ok(agent) => agent,

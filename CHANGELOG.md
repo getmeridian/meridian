@@ -82,6 +82,8 @@ that dials out to it.
   stays on the tested version or what you already upgraded to.
 
 ### Fixed
+- A second `netagent run` now exits clearly instead of racing the running
+  agent; staged upgrade checks continue to work while the old agent runs.
 - Node health now warns when traffic collection fails and fails after three
   minutes without a successful query, while stored totals keep being sent.
 - Core starts and restarts now wait for the Xray API and restore the previous
