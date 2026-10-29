@@ -60,7 +60,10 @@ def run(
     except MeridianError as exc:
         fail(exc)
     _render(review, registry)
-    if not yes and not confirm("Restore the control service now?", default=False):
+    question = "Restore the control service now?"
+    if review.takeover:
+        question = f"Take this fleet over from context {', '.join(sorted(review.takeover))} and restore now?"
+    if not yes and not confirm(question, default=False):
         if not has_tty():
             err_console.print("  [dim]No terminal to confirm on; pass --yes to restore without asking.[/dim]")
         raise typer.Exit(1)
@@ -150,7 +153,8 @@ def _fleet_state(cluster: ClusterConfig, snapshot: Snapshot | None) -> ClusterCo
                 fail(
                     "This machine's copy of the fleet is behind the snapshot's",
                     hint=f"The snapshot holds generation {deposited.generation}, this copy "
-                    f"{cluster.active_generation}. Restore into a new context, which takes the snapshot's copy: "
+                    f"{cluster.active_generation}. Restore into a new context, which takes the snapshot's copy "
+                    f"and, once you confirm, takes the servers over from {config.CONTEXT!r}: "
                     "meridian restore --to NEW-SERVER --context NAME",
                     hint_type="user",
                 )
@@ -224,6 +228,15 @@ def _render(review: RestoreReview, registry: ServerRegistry) -> None:
     for binding in review.setup.retiring:
         where = label(binding.server_ref) if binding.server_ref else "service"
         print_(f"    [red]remove[/red] {escape(binding.logical_id)} [dim]({where})[/dim]")
+    for name, hosts in sorted(review.takeover.items()):
+        print_(
+            f"  [bold yellow]Takes over from context {escape(name)}[/bold yellow] "
+            f"(an older copy of this fleet): {escape(', '.join(hosts))}."
+        )
+        print_(
+            f"  {escape(name)} is marked superseded and refuses to change the fleet; its files stay until "
+            f"`meridian context remove {escape(name)}`."
+        )
     print_()
 
 

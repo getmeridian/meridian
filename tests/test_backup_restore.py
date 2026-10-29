@@ -435,7 +435,7 @@ def test_a_target_another_context_holds_is_refused_at_review(
 
     monkeypatch.setattr(restore_steps, "service_answers", lambda url, token: False)
 
-    def claimed(hosts: Any) -> None:
+    def claimed(hosts: Any, **_: Any) -> None:
         if NEW in set(hosts):
             raise LocalStateError(f"{NEW} already belongs to the fleet in context 'other'", category="user")
 

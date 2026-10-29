@@ -297,5 +297,8 @@
   "context.renamed": "Renamed context {old} to {new}",
   "context.remove_confirm": "{name} still has {count} server(s). Delete only this machine's copy of its fleet? The servers keep running, but this machine can no longer manage them.",
   "context.remove_confirm_unreadable": "{name}'s files cannot be read, so it may still have servers. Delete only this machine's copy? The servers keep running.",
-  "context.removed": "Removed context {name}; its servers were not touched"
+  "context.removed": "Removed context {name}; its servers were not touched",
+  "context.superseded": "superseded by {by}: read-only",
+  "context.clear_default_confirm": "Delete the default context's copy of its fleet (cluster.yml, servers.json, snapshots, device key)? Your SSH key and settings stay, and the servers keep running.",
+  "context.cleared_default": "Removed the default context's copy of its fleet; its servers were not touched"
 }

@@ -38,7 +38,7 @@ from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
-from meridian.fleet_contexts import refuse_servers_claimed_elsewhere
+from meridian.fleet_contexts import refuse_if_superseded, refuse_servers_claimed_elsewhere
 from meridian.handoff import HandoffLinks, publish_connection_pages
 from meridian.reconciler.fence import ApplyFence, local_fence_view
 from meridian.reconciler.remnawave_drivers import (
@@ -327,6 +327,7 @@ class SetupRuntime:
                 hint="Review the current plan before applying it.",
             )
 
+        refuse_if_superseded()
         validate_resource_plan_transition(review.plan, cluster)
         targets = sorted(review.plan.deployment_contract.server_targets)
         entries = {

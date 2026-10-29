@@ -25,6 +25,10 @@ export type Relays = number;
  * ok: a deployed fleet; empty: nothing deployed yet; unreadable: local files need repair
  */
 export type State = "ok" | "empty" | "unreadable";
+/**
+ * The context a restore moved this fleet to ('?' when unknown); this copy no longer changes it
+ */
+export type SupersededBy = string;
 export type Contexts = ContextSummary[];
 /**
  * MERIDIAN_HOME pins one fleet; contexts are unavailable
@@ -50,4 +54,5 @@ export interface ContextSummary {
   path: Path;
   relays?: Relays;
   state: State;
+  superseded_by?: SupersededBy;
 }

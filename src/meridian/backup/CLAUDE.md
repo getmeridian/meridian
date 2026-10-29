@@ -17,7 +17,7 @@
 
 ## Pitfalls
 
-- **A copy behind the snapshot's deposited generation must not restore** — its intent would retire what newer applies added; it is sent to a fresh context, which takes the snapshot's copy.
+- **A copy behind the snapshot's deposited generation must not restore** — its intent would retire what newer applies added; it is sent to a fresh context, which takes the snapshot's copy and, after the review names who loses which servers and the user confirms, takes the servers over: the stale context (same `fleet_id`) gets `superseded.json` and refuses changes, and its files stay until `meridian context remove`.
 - **Refuse while the old control server answers** — two services at once split the fleet; only `--force` overrides it.
 - **Open the control service's firewall rules before its bootstrap** — restore installs before the plan runs, so a fresh server's SSH-only UFW kept port 80 closed and the ACME challenge timed out; `open_control_ports()` installs ufw (stock Debian has none) and applies the rules `control:service` depends on.
 - **Mark the new server's fence.json handed over on load** — the snapshot carries the fence, but a missing file reads as a service that never came up, so an apply during an outage took the lease over SSH around it.

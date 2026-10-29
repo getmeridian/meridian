@@ -13,8 +13,10 @@ binds its result to the path globals every command reads.
 
 from __future__ import annotations
 
+import json
 import os
 import re
+import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,6 +28,12 @@ DEFAULT_CONTEXT = "default"
 CONTEXT_ENV = "MERIDIAN_CONTEXT"
 CONTEXTS_DIR = "contexts"
 CURRENT_CONTEXT_FILE = "current-context"
+# Beside a fleet's files once a restore in another context took that fleet's servers over.
+SUPERSEDED_FILE = "superseded.json"
+# What `default` holds of its fleet (any other context is its whole directory). Clearing it keeps
+# the person's files (SSH key, sockets, preferences, cache) and migration `backups/`.
+DEFAULT_FLEET_FILES = ("cluster.yml", "cluster.yml.bak", "servers.json", "setup.json", "device.key", SUPERSEDED_FILE)
+DEFAULT_FLEET_DIRS = ("snapshots", "restore")
 # Lowercase only: macOS and Windows file systems would treat `Work` and `work` as one directory.
 _NAME = re.compile(r"[a-z0-9][a-z0-9_-]{0,31}")
 
@@ -110,6 +118,48 @@ def save_context(install_home: Path, name: str) -> None:
     except BaseException:
         Path(tmp).unlink(missing_ok=True)
         raise
+
+
+@dataclass(frozen=True)
+class Superseded:
+    """A context whose fleet a restore in context ``by`` took over at ``at``; it no longer changes the fleet."""
+
+    by: str
+    at: str
+
+
+def superseded(home: Path) -> Superseded | None:
+    """The marker in ``home``, if any; an unreadable one still counts (``by`` empty), so nothing applies from it."""
+    try:
+        data = json.loads((home / SUPERSEDED_FILE).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError):
+        return Superseded(by="", at="")
+    if not isinstance(data, dict):
+        return Superseded(by="", at="")
+    return Superseded(by=str(data.get("by", "")), at=str(data.get("at", "")))
+
+
+def mark_superseded(home: Path, marker: Superseded) -> None:
+    """Record in ``home`` that context ``marker.by`` now holds this fleet."""
+    fd, tmp = tempfile.mkstemp(dir=str(home), prefix=".superseded.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps({"by": marker.by, "at": marker.at}) + "\n")
+        os.replace(tmp, home / SUPERSEDED_FILE)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
+def clear_default_fleet(install_home: Path) -> None:
+    """Delete the ``default`` context's copy of its fleet, keeping the person's files in the install home."""
+    for name in DEFAULT_FLEET_FILES:
+        (install_home / name).unlink(missing_ok=True)
+    for name in DEFAULT_FLEET_DIRS:
+        if (install_home / name).is_dir():
+            shutil.rmtree(install_home / name)
 
 
 def resolve_context(

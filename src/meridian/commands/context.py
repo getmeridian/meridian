@@ -19,11 +19,13 @@ from meridian.console import (
     is_json_mode,
     ok,
     set_json_mode,
+    warn,
 )
 from meridian.contexts import (
     CONTEXT_ENV,
     DEFAULT_CONTEXT,
     ContextError,
+    clear_default_fleet,
     context_exists,
     context_home,
     context_names,
@@ -31,6 +33,7 @@ from meridian.contexts import (
     resolve_context,
     save_context,
     saved_context,
+    superseded,
     validate_name,
 )
 from meridian.core.contexts import ContextListResult, ContextSummary
@@ -44,6 +47,29 @@ from meridian.renderers import emit_json
 CREATES_FLEET = frozenset({"", "deploy", "setup", "studio", "restore"})
 # Command groups that never read a fleet, so a missing or malformed selection must not stop them.
 FLEET_FREE = frozenset({"context", "help", "update", "api", "serve"})
+# What a superseded context may still run (with a warning): commands that change nothing. Anything
+# not listed, a new command included, refuses there.
+READS_ONLY = frozenset(
+    {
+        "check",
+        "client.list",
+        "client.show",
+        "doctor",
+        "fleet.export",
+        "fleet.history",
+        "fleet.inventory",
+        "fleet.status",
+        "logs",
+        "node.list",
+        "plan",
+        "probe",
+        "relay.list",
+        "route.list",
+        "scan",
+        "server.list",
+        "test",
+    }
+)
 
 
 def select_for_invocation(
@@ -65,12 +91,31 @@ def select_for_invocation(
             if fleet_free or help_requested:
                 return
             fail(exc)
-        if fleet_free or help_requested or context_exists(config.INSTALL_HOME, selection.name):
+        if fleet_free or help_requested:
+            return
+        if context_exists(config.INSTALL_HOME, selection.name):
+            _gate_superseded(command)
             return
         if command not in CREATES_FLEET:
             fail(missing_context_error(config.INSTALL_HOME, selection))
         if not is_json_mode():
             info(t("context.creating", name=selection.name))
+
+
+def _gate_superseded(command: str) -> None:
+    """A context a restore took over only reads: read-only commands warn, every other one refuses."""
+    if config.PINNED_HOME:
+        return
+    marker = superseded(config.FLEET_HOME)
+    if marker is None:
+        return
+    from meridian.fleet_contexts import superseded_message
+
+    message, hint = superseded_message(marker, config.CONTEXT)
+    if command not in READS_ONLY:
+        fail(message, hint=hint, hint_type="user")
+    if not is_json_mode():
+        warn(f"{message}. {hint}")
 
 
 def _current_name() -> str:
@@ -153,6 +198,8 @@ def run_list() -> None:
                 "empty": f"[dim]{escape(t('context.empty'))}[/dim]",
                 "unreadable": f"[warn]{escape(t('context.unreadable'))}[/warn]",
             }[summary.state]
+            if summary.superseded_by:
+                detail = f"[warn]{escape(t('context.superseded', by=summary.superseded_by))}[/warn]"
             control = escape(summary.control or "-")
             err_console.print(f"  {marker} {escape(summary.name):<{width}}  {control:<15}  {detail}")
         err_console.print()
@@ -209,7 +256,10 @@ def run_remove(name: str, *, yes: bool = False) -> None:
 
     with error_context("context.remove"):
         _refuse_pinned()
-        if name == DEFAULT_CONTEXT:
+        home = context_home(config.INSTALL_HOME, name)
+        # The default context is the Meridian home itself: only a superseded copy of its fleet goes.
+        clearing_default = name == DEFAULT_CONTEXT
+        if clearing_default and superseded(home) is None:
             fail(
                 "The default context cannot be removed",
                 hint="It is the Meridian home itself. Remove only contexts created with --context.",
@@ -217,12 +267,23 @@ def run_remove(name: str, *, yes: bool = False) -> None:
             )
         _require(name)
         if name in {_current_name(), _saved_or_default(), config.CONTEXT}:
+            marker = superseded(home)
             fail(
                 f"{name!r} is the current context",
-                hint="Switch first: meridian context use default",
+                hint=f"Switch first: meridian context use {marker.by if marker and marker.by else 'default'}",
                 hint_type="user",
             )
-        home = context_home(config.INSTALL_HOME, name)
+        if clearing_default:
+            if not yes and not confirm(t("context.clear_default_confirm"), default=False):
+                if not has_tty():
+                    err_console.print("  [dim]No terminal to confirm on; pass --yes.[/dim]")
+                raise typer.Exit(1)
+            try:
+                clear_default_fleet(config.INSTALL_HOME)
+            except OSError as exc:
+                fail(f"Could not remove the default context's fleet files: {exc}", hint_type="system")
+            ok(t("context.cleared_default"))
+            return
         try:
             servers = len(fleet_server_hosts(home))
         except (LocalStateError, OSError, ValueError):

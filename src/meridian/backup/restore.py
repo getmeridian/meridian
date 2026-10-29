@@ -21,7 +21,7 @@ import hashlib
 import json
 import secrets
 import shlex
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -32,6 +32,7 @@ from meridian.backup.pull import saved_snapshots
 from meridian.cluster import ClusterConfig, ControlRestore, RestoreStep
 from meridian.compiler.deployment import deployment_server_refs
 from meridian.compiler.models import ControlServicePayload, FirewallRulePayload, ResourcePlan
+from meridian.contexts import Superseded, context_home, mark_superseded, superseded
 from meridian.control.client import ControlClient, ControlServiceAuthError, ControlServiceError
 from meridian.control.restore import stage_restored_database
 from meridian.control.snapshot import Snapshot, SnapshotError, SnapshotHeader, read_header
@@ -39,7 +40,7 @@ from meridian.core.errors import LocalStateError
 from meridian.core.inputs import is_ip
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
-from meridian.fleet_contexts import refuse_servers_claimed_elsewhere
+from meridian.fleet_contexts import copies_of_this_fleet, refuse_servers_claimed_elsewhere
 from meridian.handoff import HandoffLinks
 from meridian.host_runtime import CONTROL_SERVICE_CONFIG, CONTROL_SERVICE_STATE_DIR, CONTROL_SERVICE_UNIT
 from meridian.provision.control_service import SERVICE_USER_COMMAND
@@ -88,6 +89,8 @@ class RestoreReview:
     moved_exits: tuple[str, ...]
     fleet_epoch: int = 0  # the epoch already staged when resuming; 0 before staging
     epoch_floor: int = 0  # the newest epoch this machine has seen; the restore goes one above it
+    # Other contexts holding a copy of this fleet on these servers (name -> hosts): superseded once it runs.
+    takeover: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
     @property
     def header(self) -> SnapshotHeader | None:
@@ -175,12 +178,15 @@ class ControlRestorer:
                 hint="Remove that relay or gateway first (meridian relay remove / route), then restore.",
                 category="user",
             ) from exc
-        # The apply refuses these too, but only after the upload and install changed the new server.
-        refuse_servers_claimed_elsewhere(
+        hosts = [
             entry.host
             for entry in (self._registry.find(ref) for ref in deployment_server_refs(updated))
             if entry is not None
-        )
+        ]
+        # A copy of this fleet left behind in another context gives its servers up once the restore starts.
+        takeover = copies_of_this_fleet(hosts, self.cluster.fleet_id)
+        # The apply refuses these too, but only after the upload and install changed the new server.
+        refuse_servers_claimed_elsewhere(hosts, taking_over=takeover)
         setup = SetupRuntime(self._registry, cluster_loader=lambda: self.cluster).review(
             SetupDraft.from_intent(updated), cluster=self.cluster
         )
@@ -201,6 +207,7 @@ class ControlRestorer:
             moved_exits=moved,
             fleet_epoch=restore.fleet_epoch if restore is not None and restore.reached("staged") else 0,
             epoch_floor=self._highest_known_epoch(source),
+            takeover={name: tuple(held) for name, held in takeover.items()},
         )
 
     def _highest_known_epoch(self, source: RestoreSource) -> int:
@@ -236,6 +243,7 @@ class ControlRestorer:
 
     def run(self, review: RestoreReview, apply: ApplyIntent) -> RestoreOutcome:
         restore = self._start(review)
+        self._take_over(review)
         conn = self._connection(review.target)
         target = review.target.name or review.target.host
         if not restore.reached("staged"):
@@ -280,6 +288,17 @@ class ControlRestorer:
         restore.finished_at = _iso(self._now())
         self._checkpoint(restore, "done")
         return RestoreOutcome(links=links, links_change=restore.links_change, fleet_epoch=restore.fleet_epoch)
+
+    def _take_over(self, review: RestoreReview) -> None:
+        """Mark each context holding a stale copy of this fleet superseded, before anything changes remotely.
+
+        Its files stay for the operator to remove; from now on it claims no server and refuses to change the fleet.
+        """
+        at = _iso(self._now())
+        for name in review.takeover:
+            home = context_home(config.INSTALL_HOME, name)
+            if superseded(home) is None:
+                mark_superseded(home, Superseded(by=config.CONTEXT, at=at))
 
     def _start(self, review: RestoreReview) -> ControlRestore:
         restore = self.in_progress

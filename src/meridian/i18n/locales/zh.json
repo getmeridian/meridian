@@ -297,5 +297,8 @@
   "context.renamed": "已将上下文 {old} 重命名为 {new}",
   "context.remove_confirm": "{name} 仍有 {count} 台服务器。只删除本机保存的副本吗？服务器会继续运行，但本机将无法再管理它们。",
   "context.remove_confirm_unreadable": "无法读取 {name} 的文件，它可能仍有服务器。只删除本机保存的副本吗？服务器会继续运行。",
-  "context.removed": "已删除上下文 {name}；其服务器未受影响"
+  "context.removed": "已删除上下文 {name}；其服务器未受影响",
+  "context.superseded": "已由 {by} 取代：只读",
+  "context.clear_default_confirm": "删除默认上下文保存的集群副本（cluster.yml、servers.json、快照、设备密钥）吗？你的 SSH 密钥和设置会保留，服务器会继续运行。",
+  "context.cleared_default": "已删除默认上下文保存的集群副本；其服务器未受影响"
 }

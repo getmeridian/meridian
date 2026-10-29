@@ -22,6 +22,10 @@ class ContextSummary(CoreModel):
     state: Literal["ok", "empty", "unreadable"] = Field(
         description="ok: a deployed fleet; empty: nothing deployed yet; unreadable: local files need repair"
     )
+    superseded_by: str = Field(
+        default="",
+        description="The context a restore moved this fleet to ('?' when unknown); this copy no longer changes it",
+    )
 
 
 class ContextListResult(CoreModel):

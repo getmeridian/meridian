@@ -309,7 +309,7 @@ meridian context remove NAME [--yes]
 
 **`context rename`** — renames a context; its fleet and servers are untouched.
 
-**`context remove`** — deletes the context's files from this machine and never contacts a server: the servers keep running, but this machine can no longer manage them. It refuses the current context, and while the fleet still has servers it asks first (`--yes` skips the question). The `default` context is Meridian's home directory itself, so it can be neither renamed nor removed.
+**`context remove`** — deletes the context's files from this machine and never contacts a server: the servers keep running, but this machine can no longer manage them. It refuses the current context, and while the fleet still has servers it asks first (`--yes` skips the question). The `default` context is Meridian's home directory itself, so it cannot be renamed, and it can be removed only once another context has taken its fleet over. Such a copy is marked superseded in `context list` and refuses every change; removing `default` then deletes only the fleet's files and keeps the SSH key and preferences.
 
 ### meridian check
 

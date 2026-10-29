@@ -2,18 +2,19 @@
 
 `meridian.contexts` knows where contexts live; this module opens their `cluster.yml` and
 `servers.json` to summarize them for `meridian context` and to stop an apply that would
-put a server another context's fleet already uses into this one.
+put a server another context's fleet already uses into this one. A context a restore
+took over (`superseded.json`) claims nothing and changes nothing.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from pathlib import Path
 
 from meridian import config
 from meridian.cluster import ClusterConfig
 from meridian.compiler.deployment import deployment_server_refs
-from meridian.contexts import context_home, context_names
+from meridian.contexts import Superseded, context_home, context_names, superseded
 from meridian.core.contexts import ContextSummary
 from meridian.core.errors import LocalStateError
 from meridian.servers import ServerRegistry
@@ -50,20 +51,28 @@ def summarize_context(name: str, *, current: str) -> ContextSummary:
     home = context_home(config.INSTALL_HOME, name)
     path = config.display_path(home)
     is_current = name == current
+    marker = superseded(home) if not config.PINNED_HOME else None
+    taken_by = (marker.by or "?") if marker is not None else ""
     try:
         cluster, registry = _fleet(home)
         intent = cluster.topology_intent
         if intent is None:
             return ContextSummary(
-                name=name, current=is_current, path=path, control=cluster.panel.server_ip, state="empty"
+                name=name,
+                current=is_current,
+                path=path,
+                control=cluster.panel.server_ip,
+                state="empty",
+                superseded_by=taken_by,
             )
         control = registry.find(intent.control.server_ref)
     except (LocalStateError, OSError, ValueError):
-        return ContextSummary(name=name, current=is_current, path=path, state="unreadable")
+        return ContextSummary(name=name, current=is_current, path=path, state="unreadable", superseded_by=taken_by)
     return ContextSummary(
         name=name,
         current=is_current,
         path=path,
+        superseded_by=taken_by,
         control=control.host if control is not None else (cluster.panel.server_ip or intent.control.server_ref),
         exits=len(intent.exits),
         relays=len(intent.transparent_relays),
@@ -72,18 +81,22 @@ def summarize_context(name: str, *, current: str) -> ContextSummary:
     )
 
 
-def refuse_servers_claimed_elsewhere(hosts: Iterable[str]) -> None:
+def refuse_servers_claimed_elsewhere(hosts: Iterable[str], *, taking_over: Collection[str] = ()) -> None:
     """Refuse when another context's fleet already holds a role on one of ``hosts``.
 
     Two fleets on one server would each rewrite its firewall, nginx, and Xray as their own,
     so a server belongs to one fleet's intent at a time. A pinned home has no other contexts.
-    A context whose files cannot be read refuses too: it may hold any of them.
+    A context whose files cannot be read refuses too: it may hold any of them. A superseded
+    context claims nothing, and neither do the contexts in ``taking_over`` (a restore that
+    supersedes them once it starts).
     """
     if config.PINNED_HOME:
         return
     wanted = {_same_host(host) for host in hosts}
     for name in context_names(config.INSTALL_HOME):
-        if name == config.CONTEXT:
+        if name == config.CONTEXT or name in taking_over:
+            continue
+        if superseded(context_home(config.INSTALL_HOME, name)) is not None:
             continue
         try:
             claimed = wanted & {
@@ -108,6 +121,52 @@ def refuse_servers_claimed_elsewhere(hosts: Iterable[str]) -> None:
                 ),
                 category="user",
             )
+
+
+def copies_of_this_fleet(hosts: Iterable[str], fleet_id: str) -> dict[str, list[str]]:
+    """Other contexts holding a copy of fleet ``fleet_id`` on any of ``hosts``, with the hosts each holds.
+
+    What a restore takes over: a copy left behind while the fleet moved on. Unreadable and
+    superseded contexts are skipped here; `refuse_servers_claimed_elsewhere()` judges them.
+    """
+    if config.PINNED_HOME or not fleet_id:
+        return {}
+    wanted = {_same_host(host) for host in hosts}
+    copies: dict[str, list[str]] = {}
+    for name in context_names(config.INSTALL_HOME):
+        home = context_home(config.INSTALL_HOME, name)
+        if name == config.CONTEXT or superseded(home) is not None:
+            continue
+        try:
+            if ClusterConfig.load(home / "cluster.yml").fleet_id != fleet_id:
+                continue
+            held = sorted(wanted & {_same_host(host) for host in fleet_server_hosts(home)})
+        except (LocalStateError, OSError, ValueError):
+            continue
+        if held:
+            copies[name] = held
+    return copies
+
+
+def superseded_message(marker: Superseded, context: str) -> tuple[str, str]:
+    """The refusal (message, hint) for context ``context``, which ``marker`` says another one took over."""
+    where = f"context {marker.by!r}" if marker.by else "another context"
+    remove = f"meridian context remove {context}"
+    switch = f"meridian context use {marker.by}" if marker.by else "meridian context list"
+    return (
+        f"This fleet now lives in {where}; this copy in {context!r} no longer changes it",
+        f"Work there ({switch}), then remove this copy with `{remove}`. The servers keep running.",
+    )
+
+
+def refuse_if_superseded() -> None:
+    """Refuse a change from the current context once a restore elsewhere took its fleet over."""
+    if config.PINNED_HOME:
+        return
+    marker = superseded(config.FLEET_HOME)
+    if marker is not None:
+        message, hint = superseded_message(marker, config.CONTEXT)
+        raise LocalStateError(message, hint=hint, category="user")
 
 
 def _same_host(host: str) -> str:
