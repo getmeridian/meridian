@@ -281,8 +281,8 @@ def test_settings_carry_the_public_url_into_subscription_headers(service: Contro
     assert headers["support-url"] == f"https://198.51.100.7/connect/pwa/support.html#{user.sub_token}"
 
 
-def _fetch(url: str, headers: dict[str, str]) -> tuple[int, str, dict[str, str]]:
-    request = urllib.request.Request(url, headers=headers)
+def _fetch(url: str, headers: dict[str, str], method: str = "GET") -> tuple[int, str, dict[str, str]]:
+    request = urllib.request.Request(url, headers=headers, method=method)
     try:
         with urllib.request.urlopen(request, timeout=10) as response:
             return response.status, response.read().decode(), {k.lower(): v for k, v in response.headers.items()}
@@ -315,9 +315,23 @@ def test_subscription_route_passes_the_request_to_the_renderer(
     assert served["cache-control"] == "no-store" and "referrer-policy" not in served
 
 
-def test_subscription_route_answers_an_unknown_token_with_404(http: str) -> None:
-    status, body, _ = _fetch(f"{http}/sub/{'x' * 24}", {"User-Agent": "Happ/3.2.1"})
+@pytest.mark.parametrize("path", [f"/sub/{'x' * 24}", "/sub/", "/sub/short", f"/sub/{'x' * 24}/clash"])
+def test_subscription_route_answers_an_unknown_token_with_404(http: str, path: str) -> None:
+    """A mistyped link must get the same answer as an unknown token, never the admin API's error shape."""
+    status, body, _ = _fetch(f"{http}{path}", {"User-Agent": "Happ/3.2.1"})
     assert status == 404 and json.loads(body) == {"isFound": False, "statusCode": 404, "message": "Resource not found"}
+
+
+def test_head_and_unknown_methods_answer_like_nginx(http: str, service: ControlService) -> None:
+    """http.server's own error page would name the backend to anyone probing a subscription link."""
+    user = service.put_user("alice")
+    head = urllib.request.Request(f"{http}/sub/{user.sub_token}", method="HEAD", headers={"User-Agent": "curl/8"})
+    with urllib.request.urlopen(head, timeout=10) as response:
+        assert response.status == 200 and response.read() == b""
+
+    status, body, _ = _fetch(f"{http}/sub/{user.sub_token}", {}, method="OPTIONS")
+    assert status == 501 and "<center>nginx</center>" in body
+    assert "Error response" not in body and "Python" not in body
 
 
 @pytest.fixture
@@ -340,6 +354,17 @@ def _request(url: str, method: str = "GET", body: Any = None, token: str = "") -
             return response.status, json.loads(response.read() or b"null")
     except urllib.error.HTTPError as exc:
         return exc.code, json.loads(exc.read() or b"null")
+
+
+@pytest.mark.parametrize(
+    ("path", "refused"), [("/agent/v1/hello", True), ("/agent/v1/enroll", True), ("/api/users", False)]
+)
+def test_routes_read_before_authentication_take_only_small_bodies(http: str, path: str, refused: bool) -> None:
+    host, port = http.removeprefix("http://").split(":")
+    with socket.create_connection((host, int(port)), timeout=10) as conn:
+        conn.sendall(f"POST {path} HTTP/1.1\r\nHost: x\r\nContent-Length: 100000\r\n\r\n".encode())
+        status_line = conn.recv(256).split(b"\r\n", 1)[0]
+    assert (b" 413 " in status_line) is refused, status_line
 
 
 def test_admin_api_needs_the_admin_token(http: str) -> None:

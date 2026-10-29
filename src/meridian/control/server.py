@@ -19,6 +19,7 @@ import threading
 import time
 from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
+from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, TypeVar
@@ -55,6 +56,7 @@ from meridian.control.models import (
 )
 from meridian.control.owner import OwnerSession
 from meridian.control.service import ControlService
+from meridian.control.subscriptions import unknown_subscription
 from meridian.control.times import utc_now
 from meridian.control.tokens import ROOT, WEB_OWNER, Caller, unauthenticated
 from meridian.control.ui_routes import UI_ROUTES, UiContext, owner_session
@@ -64,6 +66,9 @@ from meridian.core.agent_protocol import EnrollRequest, ObservedStateReport, Pol
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 MAX_BODY_BYTES = AGENT_HTTP_SURFACE.max_request_bytes
+# Routes read before anyone is authenticated: an enrollment, a hello, a sign-in, or a setup step is a few KiB.
+UNAUTHENTICATED_BODY_BYTES = 64 * 1024
+_UNAUTHENTICATED_BODIES = re.compile(r"/auth/.*|/agent/v1/(?:enroll|hello|renew|poll)")
 ENFORCE_INTERVAL_SECONDS = 30
 _NAME = r"([a-z0-9][a-z0-9_.:-]{0,127})"
 # A node ID is a topology ID (`core.inputs`); an endpoint ID may also carry `.` and `:`.
@@ -128,6 +133,21 @@ class _Handler(BaseHTTPRequestHandler):
     def do_PATCH(self) -> None:
         self._dispatch("PATCH")
 
+    def do_HEAD(self) -> None:
+        # Subscription apps probe with HEAD; `_send` drops the body.
+        self._dispatch("GET")
+
+    def send_error(self, code: int, message: str | None = None, explain: str | None = None) -> None:
+        """Answer malformed requests and unknown methods as nginx would, never with http.server's page."""
+        try:
+            title = f"{code} {HTTPStatus(code).phrase}"
+        except ValueError:
+            title = str(code)
+        page = f"<html>\r\n<head><title>{title}</title></head>\r\n<body>\r\n<center><h1>{title}</h1></center>\r\n"
+        page += "<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n"
+        self.close_connection = True
+        self._send(code, "text/html", page.encode("ascii"), {"Connection": "close"})
+
     def log_message(self, format: str, *args: Any) -> None:
         """Keep no request log: paths carry subscription tokens and the secret path."""
 
@@ -155,6 +175,11 @@ class _Handler(BaseHTTPRequestHandler):
                     if result is not None:
                         self._json(200, result)
                     return
+            if path.startswith("/sub/"):
+                # What a mistyped link gets must not differ from an unknown token's answer.
+                unknown = unknown_subscription()
+                self._send(unknown.status, unknown.content_type, unknown.body.encode("utf-8"), unknown.headers)
+                return
             raise ServiceError("not_found", "Not found.", 404)
         except ServiceError as exc:
             self._error(exc, agent=agent)
@@ -219,7 +244,9 @@ class _Handler(BaseHTTPRequestHandler):
             # `read(-1)` would read to EOF, past the limit below.
             raise ServiceError("invalid_request", "Content-Length is not a byte count.", 400)
         length = int(declared)
-        if length > MAX_BODY_BYTES:
+        path = unquote(self.path.split("?", 1)[0])
+        limit = UNAUTHENTICATED_BODY_BYTES if _UNAUTHENTICATED_BODIES.fullmatch(path) else MAX_BODY_BYTES
+        if length > limit:
             raise ServiceError("payload_too_large", "Request body is too large.", 413)
         return self.rfile.read(length) if length else b""
 
