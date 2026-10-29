@@ -68,6 +68,8 @@ COMMAND_SECTIONS: dict[str, str] = {
     "fleet status": "### meridian fleet",
     "fleet inventory": "### meridian fleet",
     "fleet upgrade": "### meridian fleet",
+    "fleet export": "### meridian fleet",
+    "fleet import": "### meridian fleet",
     "api schemas": "### meridian api",
     "api commands": "### meridian api",
     "api schema": "### meridian api",

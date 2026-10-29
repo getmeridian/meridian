@@ -250,6 +250,26 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         stability="stable",
     ),
     "fleet.upgrade": None,
+    "fleet.export": CommandOutput(
+        data_schema="fleet-export",
+        outcomes=[_ok("the fleet document was exported"), *_FAILURES],
+        stability="preview",
+    ),
+    "fleet.import": CommandOutput(
+        data_schema="fleet-import",
+        outcomes=[
+            _ok("the file matches the fleet", status="no_changes"),
+            _ok("dry run: the changes and their review were shown"),
+            _ok("the changes were applied", status="changed"),
+            _ok(
+                "the changes were applied but a client's connection page was not updated", exit_code=3, status="changed"
+            ),
+            _user("invalid or unsupported file, unknown server, refused edit, or confirmation missing"),
+            _system("apply, panel, or local-state failure"),
+            _BUG,
+        ],
+        stability="preview",
+    ),
     "server.add": None,
     "server.list": None,
     "server.remove": None,

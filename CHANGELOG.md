@@ -124,6 +124,14 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   apply it. The old name is replaced, not kept alongside; apps switch at their
   next subscription refresh (every 6 hours) or a manual refresh. They, `node
   add --sni`, and `relay add --sni` refuse Apple names and `www.microsoft.com`.
+- **Edit the fleet as a file** — `meridian fleet export > fleet.yml` prints the
+  topology as YAML with saved server names and no keys, credentials, links, or
+  transport paths. `meridian fleet import fleet.yml` shows each change
+  (`+ client carol`, `~ exit-2 sni www.example.com -> www.example.org`), then
+  applies the same review `apply` would; an unedited file is a no-op. Removed
+  clients go as with `client remove`. `--dry-run` only shows the changes, and
+  import refuses unsaved servers and edits that need their own command (moving
+  an exit or the control server).
 - **`meridian fleet upgrade`** — compares the Remnawave images each server runs
   with this CLI's pins, applies the reviewed plan, then runs `meridian check`.
   Newer or floating tags you chose are kept, and PostgreSQL never moves to a new

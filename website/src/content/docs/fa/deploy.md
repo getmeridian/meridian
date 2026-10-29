@@ -139,6 +139,26 @@ meridian deploy 198.51.100.10 --display-name "VPN علی" --icon 🚀 --color su
 
 `meridian deploy` فقط سروری را بازاستقرار می‌کند که قبلاً exit در ناوگان شما است. برای اضافه کردن سرور دیگر، از `meridian node add NEW_IP` استفاده کنید.
 
+## ویرایش ناوگان با یک فایل
+
+برای تغییر چند چیز با هم، یا نگه‌داشتن چیدمان ناوگان در کنترل نسخه، آن را صادر کنید، ویرایش کنید و دوباره وارد کنید:
+
+```bash
+meridian fleet export > fleet.yml
+$EDITOR fleet.yml
+meridian fleet import fleet.yml
+```
+
+وارد کردن پیش از هر کاری هر تغییر را نشان می‌دهد:
+
+```
+  + client carol
+  ~ exit-2 sni www.example.com -> www.example.org
+  → اعمال شود؟ [y/N]
+```
+
+فایل سرورها را با نام ذخیره‌شده‌شان می‌آورد و هیچ کلید، اطلاعات ورود، پیوند یا مسیر انتقالی ندارد، پس نگه‌داشتنش در مخزن امن است. سرورهایی که نام می‌برد باید از قبل ذخیره شده باشند (`meridian server add`). آنچه رد می‌شود در [`fleet import`](/fa/cli-reference/#meridian-fleet) آمده است.
+
 ## بررسی پیش از نصب
 
 مطمئن نیستید که سرور مناسب است؟

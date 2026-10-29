@@ -260,19 +260,27 @@ meridian route remove EXIT ROUTE [--yes] [--json]
 meridian fleet status [--json]
 meridian fleet inventory [--json]
 meridian fleet upgrade [--tested] [--yes]
+meridian fleet export [--json]
+meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 ```
 
 | پرچم | پیش‌فرض | توضیح |
 |------|---------|-------------|
-| `--json` | | نتیجه را به عنوان پاکت `meridian.output/v1` ارسال کنید (`status`, `inventory`) |
+| `--json` | | نتیجه را به عنوان پاکت `meridian.output/v1` ارسال کنید (`status`, `inventory`, `export`, `import`) |
 | `--tested` | | `fleet upgrade`: نه از Docker Hub می‌پرسد نه از GitHub؛ Remnawave به نسخه‌هایی برمی‌گردد که این نسخه Meridian با آن‌ها تست شده و Realm که قبلاً ارتقا داده‌اید می‌ماند |
-| `--yes`, `-y` | | `fleet upgrade`: تأیید را رد کنید |
+| `--yes`, `-y` | | `fleet upgrade`، `fleet import`: تأیید را رد کنید |
+| `--dry-run` | | `fleet import`: تغییرات و بازبینی را نشان می‌دهد و چیزی اعمال نمی‌کند |
+| `--forget-unreachable` | | `fleet import`: آنچه روی سرور حذف‌شده‌ای که درگاه SSH آن پاسخ نمی‌دهد مستقر شده فراموش می‌شود |
 
 **`fleet status`** — سلامتی panel، heartbeats گره، relay listeners و تعداد کلاینت. کلاینت‌های اعلام‌شده missing سلامتی را کاهش می‌دهند؛ کلاینت‌های غیرفعال، محدود یا منقضی شده شمرده می‌شوند اما انتخاب شما هستند، نه خرابی. relay listener قابل دسترس فقط TCP را ثابت می‌کند، پس مسیر relay غیر‌تأیید‌شده سلامتی را `unknown` نگه می‌دارد؛ از `meridian test` برای بررسی مسیر کامل استفاده کنید. Exit `0` سلامت، `4` کاهش و `3` نامعلوم است.
 
 **`fleet inventory`** — سرورها، نقش‌ها، گره‌ها و relayهای پیکربندی‌شدهٔ شما را همراه با وضعیت لحظه‌ای panel (در صورت در دسترس بودن) نشان می‌دهد. هرگز API token یا مسیرهای مخفی panel را چاپ نمی‌کند. اگر وضعیت لحظه‌ای در دسترس نباشد، موجودی پیکربندی‌شده همچنان همراه با هشدار نشان داده می‌شود و دستور با کد `3` خارج می‌شود. از `plan --json` برای بررسی اینکه آیا `apply` کاری برای انجام دارد استفاده کنید.
 
 **`fleet upgrade`** — Remnawave را بدون انتظار برای به‌روزرسانی Meridian به جدیدترین نسخه‌اش می‌برد. از Docker Hub جدیدترین نسخه‌های backend، node و subscription page را در همان major که این نسخه Meridian پشتیبانی می‌کند می‌پرسد (pre-release‌ها و majorهای دیگر نادیده گرفته می‌شوند)، هر کدام را با digest چندمعماری‌اش pin می‌کند و انتخاب را در `cluster.yml` ذخیره می‌کند تا applyهای بعدی آن را نگه دارند. pin جدیدتر در نسخه بعدی Meridian دوباره جایگزین می‌شود. `--tested` روی نسخه‌هایی می‌ماند که این نسخه با آن‌ها تست شده است. PostgreSQL و Valkey همیشه روی pinهای Meridian می‌مانند. اگر ناوگان relay داشته باشد، همین کار را برای Realm هم می‌کند: جدیدترین نسخهٔ GitHub در همان major تست‌شده، همراه با sha256 که GitHub برای هر آرشیو منتشر می‌کند ذخیره می‌شود و هر relay پیش از نصب آن را بررسی می‌کند. سپس image‌های backend، subscription page، PostgreSQL، Valkey و node را که هر سرور اجرا می‌کند می‌خواند (read-only `docker inspect` روی SSH) و هر یک را `current`، `upgrade`، `install` یا نگه‌داشته نشان می‌دهد. سیاست نسخه برابر setup است: نسخهٔ tag جدیدتر یا tag floating (`latest`، `3`) که انتخاب کردید نگه داشته می‌شود و گزارش می‌شود، هرگز downgrade نمی‌شود. یک PostgreSQL major هرگز در جای خود منتقل نمی‌شود — major قدیم اجرا را نگاه می‌دارد و دستور dump-and-restore آن را نیاز دارد توضیح می‌دهد. بعد از تأیید، برنامهٔ بررسی‌شده را اعمال می‌کند و `meridian check` را روی هر سرور اجرا می‌کند. سروری که تصاویر آن نمی‌توانند خوانده شود دستور را با exit `3` متوقف می‌کند قبل از هیچ تغییری؛ اگر اعمال همگرا شود اما سرور هنوز تصویر قدیمی اجرا می‌کند، exit `3` هم می‌شود.
+
+**`fleet export`** — توپولوژی بازبینی‌شدهٔ ناوگان شما را به شکل یک فایل YAML قابل ویرایش چاپ می‌کند: خروجی‌ها و مسیرهای پروتکل آن‌ها، relayها، دروازه‌ها، استخرهای خروجی، قواعد مسیریابی، routeها، کاربران و تنظیمات ناوگان. سرورها با نام ذخیره‌شده‌شان (یا نشانی، اگر نامی ندارند) می‌آیند، نه با شناسهٔ داخلی، و فایل با `schema: meridian.fleet/v1` شروع می‌شود. کلیدهای Reality، اطلاعات ورود پنل، پیوندهای کاربران و مسیرهای انتقال XHTTP و WSS در Meridian می‌مانند و در فایل نیستند. `--json` همین سند را زیر `data.document` برمی‌گرداند.
+
+**`fleet import`** — فایل ویرایش‌شده (یا `-` برای ورودی استاندارد) را می‌خواند و تغییرات آن را هر کدام در یک خط نشان می‌دهد: `+` افزودن، `-` حذف و `~` تغییر یک فیلد (`~ exit-2 sni www.example.com -> www.example.org`). سپس هر منبعی را که تغییر حذف می‌کند و هش بازبینی را فهرست می‌کند، تأیید می‌خواهد و دقیقاً همان بازبینی را مانند `apply` اعمال می‌کند. فایلی بدون ویرایش «تغییری نیست» چاپ می‌کند. حذف یک کاربر از `access.users` او را مانند `client remove` حذف می‌کند: پیوندهایش از کار می‌افتند و صفحهٔ اتصالش پاک می‌شود. افزودن کاربر او را مانند `client add` می‌سازد و صفحه‌اش را منتشر می‌کند؛ `client show NAME` پیوندها را چاپ می‌کند. SNIهای استتار تازه همان بررسی‌های `node sni` را می‌گذرانند. وارد کردن این‌ها را رد می‌کند: `schema` دیگر، سروری که ذخیره نکرده‌اید (با `meridian server add` ذخیره‌اش کنید)، مسیرهای انتقال در فایل، تغییر سرور کنترل، دامنه یا بک‌اند آن، حذف یا تغییر نام خروجیِ روی سرور کنترل، و انتقال یک خروجی به سرور دیگر (از `node replace` استفاده کنید). کلیدها و اطلاعات ورود همان‌طور می‌مانند. بدون ترمینال `--yes` بدهید؛ `--dry-run` تغییرات و بازبینی را بدون اعمال نشان می‌دهد.
 
 ### meridian check
 
@@ -470,7 +478,7 @@ meridian help [agents | COMMAND...]
 | `--install-completion` | shell completion برای shell فعلی نصب کنید |
 | `--show-completion` | completion script برای shell فعلی چاپ کنید |
 
-JSON output پاکت `meridian.output/v1` را استفاده می‌کند (`schema`، `command`، `operation_id`، `status`، `summary`، `data`، `warnings`، `errors`). هر دستوری که `--json` دارد از آن پشتیبانی می‌کند: deploy، plan، apply، check، test، probe، تمام client و route commands، fleet status/inventory، node/relay list و api commands. `--json` سراسری و `--json` خود دستور به‌جای هم قابل استفاده‌اند. اسرار قبل از JSON خروج process redacted می‌شوند. `meridian api commands --json` را برای اکتشاف قرارداد اجرا کنید.
+JSON output پاکت `meridian.output/v1` را استفاده می‌کند (`schema`، `command`، `operation_id`، `status`، `summary`، `data`، `warnings`، `errors`). هر دستوری که `--json` دارد از آن پشتیبانی می‌کند: deploy، plan، apply، check، test، probe، تمام client و route commands، fleet status/inventory/export/import، node/relay list و api commands. `--json` سراسری و `--json` خود دستور به‌جای هم قابل استفاده‌اند. اسرار قبل از JSON خروج process redacted می‌شوند. `meridian api commands --json` را برای اکتشاف قرارداد اجرا کنید.
 
 ## گزینه‌های سرور معمول
 

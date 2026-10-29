@@ -260,19 +260,27 @@ Fleet-wide health and inventory from the live panel, and Remnawave upgrades.
 meridian fleet status [--json]
 meridian fleet inventory [--json]
 meridian fleet upgrade [--tested] [--yes]
+meridian fleet export [--json]
+meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--json` | | Emit the result as a `meridian.output/v1` envelope (`status`, `inventory`) |
+| `--json` | | Emit the result as a `meridian.output/v1` envelope (`status`, `inventory`, `export`, `import`) |
 | `--tested` | | `fleet upgrade`: ask neither Docker Hub nor GitHub; Remnawave returns to the versions this Meridian release was tested with, and a Realm you already upgraded stays |
-| `--yes`, `-y` | | `fleet upgrade`: skip the confirmation |
+| `--yes`, `-y` | | `fleet upgrade`, `fleet import`: skip the confirmation |
+| `--dry-run` | | `fleet import`: show the changes and the review, apply nothing |
+| `--forget-unreachable` | | `fleet import`: forget what was deployed on a removed server whose SSH port does not answer |
 
 **`fleet status`** — panel health, node heartbeats, relay listeners, and client counts. Missing declared clients degrade health; disabled, limited, or expired clients are counted but are your choice, not a fault. A reachable relay listener only proves TCP, so unverified relay routes keep health `unknown`; use `meridian test` to check the full path. Exit `0` means healthy, `4` degraded, and `3` unknown.
 
 **`fleet inventory`** — your configured servers, roles, nodes, and relays, with live panel status when reachable. It never prints the panel API token or secret paths. If live status is unavailable, the configured inventory is still shown, with warnings, and the command exits `3`. Use `plan --json` to decide whether apply has work to do.
 
 **`fleet upgrade`** — moves Remnawave to its newest release without waiting for a Meridian update. It asks Docker Hub for the newest backend, node, and subscription page releases within the major this Meridian release supports (pre-releases and other majors are skipped), pins each by its multi-arch digest, and saves the choice in `cluster.yml` so later applies keep it. A newer pin in a later Meridian release takes over again. `--tested` sticks to the versions this release was tested with. PostgreSQL and Valkey always stay on Meridian's pins. With relays in the fleet it does the same for Realm: GitHub's newest release in the tested major, recorded with the sha256 GitHub publishes for each archive, which every relay checks before installing. It then reads the backend, subscription page, PostgreSQL, Valkey, and node images each server runs (read-only `docker inspect` over SSH) and shows each one as `current`, `upgrade`, `install`, or kept. The version policy is the one setup uses: a newer version tag or a floating tag (`latest`, `3`) you chose is kept and reported, never downgraded. A PostgreSQL major is never moved in place — the old major keeps running and the command explains the dump-and-restore it needs. After you confirm, it applies the reviewed plan and runs `meridian check` on every server. A server whose images cannot be read stops the command with exit `3` before anything changes; if the apply converges but a server still runs an old image, it exits `3` too.
+
+**`fleet export`** — prints your fleet's reviewed topology as a YAML file you can edit: exits and their protocol paths, relays, gateways, egress pools, routing rules, routes, clients, and fleet settings. Servers appear by their saved name (or address when unnamed), never by internal ID, and the file starts with `schema: meridian.fleet/v1`. Reality keys, panel credentials, client links, and the XHTTP and WSS transport paths stay in Meridian and are not listed. `--json` returns the same document under `data.document`.
+
+**`fleet import`** — reads an edited file (or `-` for standard input) and shows what it changes, one line each: `+` adds, `-` removes, and `~` changes a field (`~ exit-2 sni www.example.com -> www.example.org`). It then lists every resource the change deletes and the review hash, asks, and applies exactly that review, like `apply`. A file with no edits prints "No changes". Removing a client from `access.users` removes them like `client remove`: their links stop working and their connection page is deleted. Adding one creates them like `client add` and publishes their page; `client show NAME` prints their links. New camouflage SNIs get the checks `node sni` runs. Import refuses another `schema`, a server you haven't saved (save it with `meridian server add`), transport paths in the file, changes to the control server, its domain, or its backend, removing or renaming the exit on the control server, and moving an exit to another server (use `node replace`). Keys and credentials stay as they are. Without a terminal, pass `--yes`; `--dry-run` shows the changes and the review without applying anything.
 
 ### meridian check
 
@@ -470,7 +478,7 @@ Global options go before the command, for example `meridian --quiet doctor`. Com
 | `--install-completion` | Install shell completion for the current shell |
 | `--show-completion` | Print the completion script for the current shell |
 
-JSON output uses the `meridian.output/v1` envelope (`schema`, `command`, `operation_id`, `status`, `summary`, `data`, `warnings`, `errors`). It is supported by every command that lists `--json`: deploy, plan, apply, check, test, probe, all client and route commands, fleet status/inventory, node/relay list, and the api commands. The global `--json` and a command's own `--json` are interchangeable. Secrets are redacted before JSON leaves the process. Run `meridian api commands --json` to discover the contracts.
+JSON output uses the `meridian.output/v1` envelope (`schema`, `command`, `operation_id`, `status`, `summary`, `data`, `warnings`, `errors`). It is supported by every command that lists `--json`: deploy, plan, apply, check, test, probe, all client and route commands, fleet status/inventory/export/import, node/relay list, and the api commands. The global `--json` and a command's own `--json` are interchangeable. Secrets are redacted before JSON leaves the process. Run `meridian api commands --json` to discover the contracts.
 
 ## Common server options
 

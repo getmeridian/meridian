@@ -33,7 +33,7 @@ relay_app = typer.Typer(
     help="Add, list, or remove relays that forward traffic to an exit, or change their SNI", no_args_is_help=True
 )
 route_app = typer.Typer(help="Send chosen destinations through WARP, directly, or nowhere", no_args_is_help=True)
-fleet_app = typer.Typer(help="Fleet status, inventory, and image upgrades", no_args_is_help=True)
+fleet_app = typer.Typer(help="Fleet status, inventory, image upgrades, and the fleet as a file", no_args_is_help=True)
 api_app = typer.Typer(help="Machine-readable contracts for scripts and UIs", no_args_is_help=True)
 dev_app = typer.Typer(help="Developer tools for testing and debugging", no_args_is_help=True)
 
@@ -501,6 +501,48 @@ def fleet_inventory_cmd(
     from meridian.commands.fleet import run_inventory
 
     run_inventory()
+
+
+@fleet_app.command("export")
+def fleet_export_cmd(
+    _json: Json = False,
+) -> None:
+    """Print the fleet's topology as a YAML file you can edit
+
+    Lists exits, protocol paths, relays, gateways, pools, rules, clients, and
+    settings, with saved server names instead of IDs. Reality keys,
+    credentials, and transport paths stay in Meridian.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian fleet export > fleet.yml[/cyan]
+    """
+    from meridian.commands.fleet_transfer import run_export
+
+    run_export()
+
+
+@fleet_app.command("import")
+def fleet_import_cmd(
+    file: str = typer.Argument(..., metavar="FILE", help="Fleet file from `meridian fleet export`, or - for stdin"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show the changes and the review, apply nothing"),
+    yes: Yes = False,
+    forget_unreachable: ForgetUnreachable = False,
+    _json: Json = False,
+) -> None:
+    """Apply an edited fleet file
+
+    Shows what the file adds, changes, and removes, plus every resource the
+    change deletes, then applies exactly that review. Clients removed from the
+    file are removed as with `client remove`.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian fleet import fleet.yml[/cyan]
+      [cyan]meridian fleet import fleet.yml --dry-run[/cyan]
+      [cyan]meridian fleet import fleet.yml --yes --json[/cyan]
+    """
+    from meridian.commands.fleet_transfer import run_import
+
+    run_import(file, dry_run=dry_run, yes=yes, forget_unreachable=forget_unreachable)
 
 
 @fleet_app.command("history", hidden=True)

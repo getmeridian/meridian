@@ -139,6 +139,26 @@ At the end of every deploy, Meridian prints the exact redeploy command with your
 
 `meridian deploy` only redeploys a server that is already an exit in your fleet. To add another server, use `meridian node add NEW_IP`.
 
+## Edit the fleet as a file
+
+To change several things at once, or to keep your fleet's layout in version control, export it, edit it, and import it back:
+
+```bash
+meridian fleet export > fleet.yml
+$EDITOR fleet.yml
+meridian fleet import fleet.yml
+```
+
+Import shows each change before anything happens:
+
+```
+  + client carol
+  ~ exit-2 sni www.example.com -> www.example.org
+  → Apply? [y/N]
+```
+
+The file names servers by their saved names and holds no keys, credentials, links, or transport paths, so it is safe to keep in a repository. Servers it names must be saved first (`meridian server add`). See [`fleet import`](/en/cli-reference/#meridian-fleet) for what it refuses.
+
 ## Pre-flight check
 
 Not sure a server is suitable?
