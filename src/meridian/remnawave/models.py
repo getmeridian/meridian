@@ -55,7 +55,9 @@ class User:
     username: str = ""
     vless_uuid: str = ""  # VLESS protocol UUID (used by Xray, differs from account UUID)
     status: str = ""  # "ACTIVE", "DISABLED", "LIMITED", "EXPIRED"
-    used_traffic_bytes: int = 0
+    used_traffic_bytes: int = 0  # this traffic period's use
+    lifetime_used_traffic_bytes: int = 0
+    last_traffic_reset_at: str = ""
     traffic_limit_bytes: int = 0
     traffic_limit_strategy: str = ""  # "NO_RESET", "DAY", "WEEK", "MONTH", "MONTH_ROLLING"
     expire_at: str = ""  # Meridian's "never" is NEVER_EXPIRES_AT
@@ -66,6 +68,11 @@ class User:
     active_internal_squad_uuids: list[str] = field(default_factory=list)
     external_squad_uuid: str = ""
     description: str = ""
+    # Panel-only user settings `meridian migrate` reports as not carried over.
+    tag: str = ""
+    email: str = ""
+    telegram_id: str = ""
+    hwid_device_limit: int | None = None
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -268,6 +275,8 @@ def parse_user(data: Any) -> User:
         vless_uuid=str(raw.get("vlessUuid") or ""),
         status=str(raw.get("status") or ""),
         used_traffic_bytes=int(traffic.get("usedTrafficBytes") or 0),
+        lifetime_used_traffic_bytes=int(traffic.get("lifetimeUsedTrafficBytes") or 0),
+        last_traffic_reset_at=str(raw.get("lastTrafficResetAt") or ""),
         traffic_limit_bytes=int(raw.get("trafficLimitBytes") or 0),
         traffic_limit_strategy=str(raw.get("trafficLimitStrategy") or ""),
         expire_at=str(raw.get("expireAt") or ""),
@@ -278,6 +287,10 @@ def parse_user(data: Any) -> User:
         active_internal_squad_uuids=[str(item.get("uuid") if isinstance(item, dict) else item) for item in squads],
         external_squad_uuid=str(raw.get("externalSquadUuid") or ""),
         description=str(raw.get("description") or ""),
+        tag=str(raw.get("tag") or ""),
+        email=str(raw.get("email") or ""),
+        telegram_id=str(raw.get("telegramId") or ""),
+        hwid_device_limit=raw["hwidDeviceLimit"] if isinstance(raw.get("hwidDeviceLimit"), int) else None,
         _raw=raw,
     )
 

@@ -131,6 +131,20 @@ class TestParseUser:
         assert user.online_at.startswith("2026-04-15")
         assert user.active_internal_squad_uuids == ["sq-1"]
 
+    def test_reads_what_migration_carries_and_reports(self) -> None:
+        user = parse_user(
+            {
+                "lastTrafficResetAt": "2026-10-01T00:00:00.000Z",
+                "hwidDeviceLimit": 3,
+                "tag": "FAMILY",
+                "telegramId": 1000001,
+                "userTraffic": {"usedTrafficBytes": 10, "lifetimeUsedTrafficBytes": 99},
+            }
+        )
+        assert (user.used_traffic_bytes, user.lifetime_used_traffic_bytes) == (10, 99)
+        assert user.last_traffic_reset_at == "2026-10-01T00:00:00.000Z"
+        assert (user.hwid_device_limit, user.tag, user.telegram_id) == (3, "FAMILY", "1000001")
+
     def test_id_zero_is_preserved(self) -> None:
         assert parse_user({"id": 0}).id == "0"
 

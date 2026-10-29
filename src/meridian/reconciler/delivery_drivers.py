@@ -28,6 +28,7 @@ from meridian.remnawave import (
     SubscriptionTemplate,
     User,
 )
+from meridian.remnawave.control_plane import ACCESS_USER_DESCRIPTION
 from meridian.remnawave.models import SEEDED_SUPPORT_URL, SUPPORT_URL_HEADER
 
 ValueT = TypeVar("ValueT")
@@ -97,7 +98,7 @@ class AccessUserDriver:
         else:
             if (
                 binding is None
-                and existing.description != "Managed by Meridian access"
+                and existing.description != ACCESS_USER_DESCRIPTION
                 and "MERIDIAN_ACCESS" not in _user_tags(existing)
                 and not self.context.was_managed(action.resource.logical_id, existing.id)
             ):
