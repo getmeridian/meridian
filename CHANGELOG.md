@@ -75,6 +75,9 @@ that dials out to it.
   the snapshot and the recovery key, restore brings the fleet files back too.
 
 ### Changed
+- Connection setup follows your chosen platform and app through installation,
+  manual or one-tap import, and localized Connect steps, including TUN on
+  Clash desktop apps. Apps without an import scheme show their manual route.
 - Unicode subscription URLs work with raw, percent-encoded, and Base64 import
   links; an invalid app action leaves the page and manual URL available.
 - Failed copies of connection links or diagnostic reports offer localized

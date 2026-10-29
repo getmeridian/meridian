@@ -7,6 +7,23 @@
  * ----------------------------------------------------------------------- */
 var T = {
   en: {
+    'platform.choice': 'Platform',
+    'sub.label': 'Subscription URL',
+    'app.choice': 'App',
+    'platform.ios': 'iOS',
+    'platform.android': 'Android',
+    'platform.windows': 'Windows',
+    'platform.macos': 'macOS',
+    'platform.linux': 'Linux',
+    'manual.import': 'Import manually',
+    'manual.desc': 'Copy the URL, then use this menu in {name}:',
+    'manual.generic': 'Add a subscription or remote profile from a URL.',
+    'manual.copy': 'Copy URL',
+    'step.connect': 'Connect',
+    'connect.permission': 'Allow VPN permission if your device asks.',
+    'connect.profile': 'Select the imported profile, then choose a server.',
+    'connect.start': 'Tap the connect or power button.',
+    'apps.none': 'No apps for this platform. Choose another platform above.',
     'copy.error': 'Could not copy automatically. Select the text below and copy it.',
     'copy.text': 'Text to copy',
     'apps.desktop': 'Desktop',
@@ -16,6 +33,22 @@ var T = {
     language: 'Language', close: 'Close', copy: 'Copy', 'qr.code': 'QR code',
   },
   ru: {
+    'platform.choice': 'Платформа',
+    'app.choice': 'Приложение',
+    'platform.ios': 'iOS',
+    'platform.android': 'Android',
+    'platform.windows': 'Windows',
+    'platform.macos': 'macOS',
+    'platform.linux': 'Linux',
+    'manual.import': 'Добавить вручную',
+    'manual.desc': 'Скопируйте URL, затем откройте это меню в {name}:',
+    'manual.generic': 'Добавьте подписку или удалённый профиль по URL.',
+    'manual.copy': 'Скопировать URL',
+    'step.connect': 'Подключитесь',
+    'connect.permission': 'Если устройство запросит разрешение на VPN, разрешите.',
+    'connect.profile': 'Выберите добавленный профиль, затем сервер.',
+    'connect.start': 'Нажмите кнопку подключения или включения.',
+    'apps.none': 'Для этой платформы нет приложений. Выберите другую платформу выше.',
     'copy.error': 'Не удалось скопировать автоматически. Выделите текст ниже и скопируйте его.',
     'copy.text': 'Текст для копирования',
     'apps.desktop': 'Для компьютера',
@@ -58,7 +91,7 @@ var T = {
     'error.slow': 'Загрузка занимает больше времени, чем обычно\u2026',
     'hero.title': 'Ваше подключение',
     'hero.for': 'Для кого: {name}',
-    'hero.sub': 'Два шага, около минуты.',
+    'hero.sub': 'Три шага, около минуты.',
     'step.install': 'Установите приложение',
     'app.get': 'Скачать',
     'step.add': 'Добавьте подключение',
@@ -75,6 +108,22 @@ var T = {
     'open.short': 'Открыть',
   },
   fa: {
+    'platform.choice': 'پلتفرم',
+    'app.choice': 'برنامه',
+    'platform.ios': 'iOS',
+    'platform.android': 'اندروید',
+    'platform.windows': 'ویندوز',
+    'platform.macos': 'macOS',
+    'platform.linux': 'لینوکس',
+    'manual.import': 'افزودن دستی',
+    'manual.desc': 'نشانی را کپی کنید، سپس این منو را در {name} باز کنید:',
+    'manual.generic': 'اشتراک یا پروفایل راه دور را از طریق نشانی اضافه کنید.',
+    'manual.copy': 'کپی نشانی',
+    'step.connect': 'وصل شوید',
+    'connect.permission': 'اگر دستگاه اجازهٔ VPN خواست، آن را تأیید کنید.',
+    'connect.profile': 'پروفایل اضافه‌شده و سپس یک سرور را انتخاب کنید.',
+    'connect.start': 'دکمهٔ اتصال یا روشن‌کردن را بزنید.',
+    'apps.none': 'برای این پلتفرم برنامه‌ای نیست. از بالا پلتفرم دیگری را انتخاب کنید.',
     'copy.error': 'کپی خودکار ممکن نشد. متن زیر را انتخاب و کپی کنید.',
     'copy.text': 'متن برای کپی',
     'apps.desktop': 'رایانه',
@@ -117,7 +166,7 @@ var T = {
     'error.slow': '\u0628\u0627\u0631\u06AF\u0630\u0627\u0631\u06CC \u0628\u06CC\u0634 \u0627\u0632 \u062D\u062F \u0645\u0639\u0645\u0648\u0644 \u0637\u0648\u0644 \u0645\u06CC\u200C\u06A9\u0634\u062F\u2026',
     'hero.title': 'اتصال شما',
     'hero.for': 'تنظیم‌شده برای {name}',
-    'hero.sub': 'دو مرحله، حدود یک دقیقه.',
+    'hero.sub': 'سه مرحله، حدود یک دقیقه.',
     'step.install': 'یک برنامه نصب کنید',
     'app.get': 'دریافت',
     'step.add': 'اتصال خود را اضافه کنید',
@@ -134,6 +183,22 @@ var T = {
     'open.short': 'باز کردن',
   },
   zh: {
+    'platform.choice': '平台',
+    'app.choice': '应用',
+    'platform.ios': 'iOS',
+    'platform.android': 'Android',
+    'platform.windows': 'Windows',
+    'platform.macos': 'macOS',
+    'platform.linux': 'Linux',
+    'manual.import': '手动导入',
+    'manual.desc': '复制 URL，然后在 {name} 中打开以下菜单：',
+    'manual.generic': '通过 URL 添加订阅或远程配置。',
+    'manual.copy': '复制 URL',
+    'step.connect': '连接',
+    'connect.permission': '如果设备请求 VPN 权限，请允许。',
+    'connect.profile': '选择导入的配置，再选择一个服务器。',
+    'connect.start': '点击连接或电源按钮。',
+    'apps.none': '此平台暂无应用，请在上方选择其他平台。',
     'copy.error': '无法自动复制。请选择下方文本并手动复制。',
     'copy.text': '待复制文本',
     'apps.desktop': '电脑',
@@ -176,7 +241,7 @@ var T = {
     'error.slow': '加载时间比预期更长\u2026',
     'hero.title': '您的连接',
     'hero.for': '已为 {name} 设置好',
-    'hero.sub': '只需两步，大约一分钟。',
+    'hero.sub': '只需三步，大约一分钟。',
     'step.install': '安装应用',
     'app.get': '获取',
     'step.add': '添加您的连接',
@@ -460,6 +525,14 @@ function importTemplate(value) {
   return !!scheme && schemes.indexOf(scheme[1]) !== -1 && /\{url(?:_raw|_b64)?\}/.test(value) &&
     !/[{}]/.test(value.replace(/\{(?:url_raw|url_b64|url|name)\}/g, ''));
 }
+function localizedRecord(value, steps) {
+  if (!object(value)) return false;
+  return ['en', 'ru', 'fa', 'zh'].every(function(lang) {
+    var entry = value[lang];
+    return steps ? Array.isArray(entry) && entry.length >= 3 && entry.length <= 8 &&
+      entry.every(function(line) { return string(line, 360); }) : string(entry, 360);
+  });
+}
 function validApps(apps) {
   if (!Array.isArray(apps) || !apps.length || apps.length > 64) return false;
   var names = [];
@@ -473,6 +546,9 @@ function validApps(apps) {
       return platforms.indexOf(key) !== -1 && webUrl(app.urls[key], true);
     }))) return false;
     if (app.deeplink !== undefined && !importTemplate(app.deeplink)) return false;
+    if (app.manual !== undefined && !localizedRecord(app.manual, false)) return false;
+    if (app.connect !== undefined && !localizedRecord(app.connect, true)) return false;
+    if (app.tun !== undefined && !localizedRecord(app.tun, false)) return false;
     return app.icon === undefined || imageSource(app.icon);
   });
 }
@@ -644,7 +720,7 @@ function renderHero(config) {
   if (isPersonalName(config.client_name)) {
     html += '<p data-t="hero.for">Set up for ' + escapeHtml(capitalize(config.client_name)) + '</p>';
   } else {
-    html += '<p data-t="hero.sub">Two steps, about a minute.</p>';
+    html += '<p data-t="hero.sub">Three steps, about a minute.</p>';
   }
   return html + '</div></header>';
 }
@@ -710,88 +786,102 @@ function renderImportButton(a, subUrl, serverName, primary) {
   return html + '</a>';
 }
 
-function renderDisclosure(label, body, key) {
-  return '<details class="disclose"' + (key ? ' data-disclosure="' + key + '"' : '') + '><summary>' + label + ICON_CHEVRON + '</summary>' +
+function renderDisclosure(label, body, key, cls) {
+  return '<details class="disclose' + (cls ? ' ' + cls : '') + '"' + (key ? ' data-disclosure="' + key + '"' : '') + '><summary>' + label + ICON_CHEVRON + '</summary>' +
     '<div class="disclose-body">' + body + '</div></details>';
 }
 
-function renderSubUrl(subUrl) {
+function renderSubUrl(subUrl, compact) {
   return '<button class="sub-url" data-ui-key="subscription-copy" data-action="copy" data-url="' + escapeHtml(subUrl) + '">' +
-    '<span class="sub-url-value">' + escapeHtml(subUrl) + '</span>' + ICON_COPY + '</button>';
+    '<span class="sub-url-value"' + (compact ? ' data-t="manual.copy"' : '') + '>' + (compact ? 'Copy URL' : escapeHtml(subUrl)) + '</span>' + ICON_COPY + '</button>';
 }
 
 function renderQr(b64, cls) {
   return '<div class="qr ' + cls + '"><img src="data:image/png;base64,' + b64 + '" data-t-alt="qr.code" alt="QR code" width="200" height="200"></div>';
 }
 
+function chooseApp(apps, key) {
+  var groups = appsFor(apps, key, false);
+  var available = groups.rec.concat(groups.more);
+  for (var i = 0; i < available.length; i++) if (available[i].name === selectedApp) return available[i];
+  var app = available[0] || null;
+  selectedApp = app ? app.name : '';
+  return app;
+}
+
+function renderPickers(apps, platform, chosen) {
+  var html = '<div class="setup-pickers"><label for="platform-choice"><span data-t="platform.choice">Platform</span>';
+  html += '<select id="platform-choice" data-ui-key="platform-choice">';
+  for (var i = 0; i < PLATFORM_ORDER.length; i++) {
+    var key = PLATFORM_ORDER[i];
+    html += '<option value="' + key + '"' + (key === platform ? ' selected' : '') + '>' +
+      escapeHtml(text('platform.' + key, PLATFORM_KEYS[key])) + '</option>';
+  }
+  html += '</select></label><label for="app-choice"><span data-t="app.choice">App</span>';
+  html += '<select id="app-choice" data-ui-key="app-choice"' + (!chosen ? ' disabled' : '') + '>';
+  var groups = appsFor(apps, PLATFORM_KEYS[platform], false);
+  var lists = [groups.rec, groups.more];
+  for (var j = 0; j < lists.length; j++) {
+    if (!lists[j].length) continue;
+    html += '<optgroup label="' + escapeHtml(j ? text('apps.other', 'More apps') : text('primary.rec', 'Recommended')) + '">';
+    for (var k = 0; k < lists[j].length; k++) {
+      var app = lists[j][k];
+      html += '<option value="' + escapeHtml(app.name) + '"' + (chosen && app.name === chosen.name ? ' selected' : '') + '>' + escapeHtml(app.name) + '</option>';
+    }
+    html += '</optgroup>';
+  }
+  return html + '</select></label></div>';
+}
+
+function renderManualImport(app, subUrl, direct) {
+  var menu = app && app.manual && app.manual[currentLang];
+  var body = '<p class="muted">' + escapeHtml(text('manual.desc').replace('{name}', app ? app.name : text('app.choice'))) + '</p>';
+  body += '<p class="manual-path">' + escapeHtml(menu || text('manual.generic')) + '</p>';
+  body += '<textarea class="manual-url" data-ui-key="manual-url" data-action="select-text" data-t-aria="sub.label" aria-label="Subscription URL" dir="ltr" readonly rows="2">' + escapeHtml(subUrl) + '</textarea>';
+  body += renderSubUrl(subUrl, true);
+  var label = '<span data-t="manual.import">Import manually</span>';
+  return direct ? '<div class="manual-import manual-direct"><strong>' + label + '</strong>' + body + '</div>' :
+    renderDisclosure(label, body, 'manual-import', 'manual-import');
+}
+
+function renderConnectSteps(app, mobile) {
+  var steps = app && app.connect && app.connect[currentLang];
+  steps = steps ? steps.slice() : [text('connect.permission'), text('connect.profile'), text('connect.start')];
+  if (!mobile && app && app.tun && app.tun[currentLang]) steps.splice(steps.length - 1, 0, app.tun[currentLang]);
+  var html = '<div class="step"><span class="step-num">3</span><div class="step-body">';
+  html += '<h2 data-t="step.connect">Connect</h2><ol class="connect-steps">';
+  for (var i = 0; i < steps.length; i++) html += '<li>' + escapeHtml(steps[i]) + '</li>';
+  return html + '</ol></div></div>';
+}
+
 function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
   var key = PLATFORM_KEYS[platform] || 'Linux';
   var mobile = platform === 'ios' || platform === 'android';
-  var install = appsFor(apps, key, false);
+  var chosen = chooseApp(apps, key);
   var hasQr = subUrl && isValidBase64(subQrB64);
   var aside = hasQr && !mobile;
   var html = '<section id="setup-card" class="card setup' + (aside ? ' setup-wide' : '') + '"><div class="setup-steps">';
-
-  /* Step 1 — install */
   html += '<div class="step"><span class="step-num">1</span><div class="step-body">';
-  html += '<h2 data-t="step.install">Install an app</h2>';
-  html += '<div class="app-list">';
-  for (var i = 0; i < install.rec.length; i++) html += renderAppRow(install.rec[i], key);
-  html += '</div>';
-  if (install.more.length) {
-    var more = '<div class="app-list">';
-    for (var j = 0; j < install.more.length; j++) more += renderAppRow(install.more[j], key);
-    html += renderDisclosure('<span data-t="apps.other">More apps</span>', more + '</div>', 'install-more');
-  }
-  var others = '';
-  for (var p = 0; p < PLATFORM_ORDER.length; p++) {
-    var otherKey = PLATFORM_KEYS[PLATFORM_ORDER[p]];
-    if (otherKey === key) continue;
-    var otherApps = appsFor(apps, otherKey, false).rec;
-    if (!otherApps.length) continue;
-    others += '<div class="list-heading">' + escapeHtml(otherKey) + '</div><div class="app-list">';
-    for (var q = 0; q < otherApps.length; q++) others += renderAppRow(otherApps[q], otherKey);
-    others += '</div>';
-  }
-  if (others) html += renderDisclosure('<span data-t="apps.more">Other platforms</span>', others, 'platform-more');
+  html += '<h2 data-t="step.install">Install an app</h2>' + renderPickers(apps, platform, chosen);
+  html += chosen ? '<div class="app-list">' + renderAppRow(chosen, key) + '</div>' :
+    '<p class="muted" data-t="apps.none">No apps for this platform. Choose another platform above.</p>';
   html += '</div></div>';
-
-  /* Step 2 — add the subscription (pages without one go straight to the links) */
   if (subUrl) {
-    var imports = appsFor(apps, key, true);
     html += '<div class="step"><span class="step-num">2</span><div class="step-body">';
     html += '<h2 data-t="step.add">Add your connection</h2>';
-    html += '<p class="muted import-status" id="import-status" role="status" hidden></p>';
     html += '<p class="muted" data-t="step.add.desc">One tap adds every server, and the app keeps them up to date.</p>';
-    if (imports.rec.length) {
-      html += '<div class="import-list">';
-      for (var k = 0; k < imports.rec.length; k++) html += renderImportButton(imports.rec[k], subUrl, serverName, k === 0);
-      html += '</div>';
-    } else {
-      html += '<p class="muted" data-t="sub.desc">Add this URL as a subscription in your app for automatic updates.</p>';
-      html += renderSubUrl(subUrl);
-    }
+    html += '<p class="muted import-status" id="import-status" role="status" hidden></p>';
+    var button = chosen && chosen.deeplink ? renderImportButton(chosen, subUrl, serverName, true) : '';
+    html += '<div class="import-actions">' + button + renderManualImport(chosen, subUrl, !button) + '</div>';
     if (hasQr && mobile) html += renderDisclosure('<span data-t="show.qr">Show QR code</span>', renderQr(subQrB64, 'qr-inline'), 'subscription-qr');
-    if (imports.rec.length) {
-      var rest = imports.more.concat(imports.other);
-      var body = '';
-      if (rest.length) {
-        body += '<div class="import-list">';
-        for (var m = 0; m < rest.length; m++) body += renderImportButton(rest[m], subUrl, serverName, false);
-        body += '</div>';
-      }
-      body += '<div class="list-heading" data-t="import.manual">Copy subscription URL</div>' + renderSubUrl(subUrl);
-      html += renderDisclosure('<span data-t="import.more">Using another app?</span>', body, 'import-more');
-    }
     html += '</div></div>';
+    html += renderConnectSteps(chosen, mobile);
   }
   html += '</div>';
-
   if (aside) {
     html += '<aside class="setup-qr">' + renderQr(subQrB64, 'qr-aside');
     html += '<strong data-t="qr.title">Setting up a phone?</strong>';
-    html += '<span data-t="qr.desc">In the app on your phone, add a subscription from a QR code and scan this one.</span>';
-    html += '</aside>';
+    html += '<span data-t="qr.desc">In the app on your phone, add a subscription from a QR code and scan this one.</span></aside>';
   }
   return html + '</section>';
 }
@@ -805,13 +895,18 @@ function updateSetup(config) {
   old.querySelectorAll('[data-disclosure]').forEach(function(el) { open[el.dataset.disclosure] = el.open; });
   var active = document.activeElement;
   var focusKey = active && old.contains(active) && active.getAttribute('data-ui-key');
+  var selection = focusKey && typeof active.selectionStart === 'number' ? [active.selectionStart, active.selectionEnd] : null;
   var holder = document.createElement('div');
   holder.innerHTML = renderSetup(config.apps, selectedPlatform, config.subscription_url || '', config.server_name || 'Meridian', config.subscription_qr_b64);
   var fresh = holder.firstElementChild;
   old.parentNode.replaceChild(fresh, old);
   fresh.querySelectorAll('[data-disclosure]').forEach(function(el) { el.open = !!open[el.dataset.disclosure]; });
   applyI18n(config.client_name, config.server_name);
-  if (focusKey) fresh.querySelectorAll('[data-ui-key]').forEach(function(el) { if (el.dataset.uiKey === focusKey) el.focus(); });
+  if (focusKey) fresh.querySelectorAll('[data-ui-key]').forEach(function(el) {
+    if (el.dataset.uiKey !== focusKey) return;
+    el.focus();
+    if (selection && el.setSelectionRange) el.setSelectionRange(selection[0], selection[1]);
+  });
   document.dispatchEvent(new Event('meridian-setup'));
 }
 
@@ -852,7 +947,7 @@ function renderConnections(config, platform, open) {
   var count = protocols.length;
   for (var i = 0; i < count; i++) rows += renderConnection(protocols[i], platform);
   if (!count) return '';
-  var html = '<details class="panel"' + (open ? ' open' : '') + '><summary>';
+  var html = '<details id="connections-panel" class="panel"' + (open ? ' open' : '') + '><summary>';
   html += '<span class="panel-icon">' + ICON_LIST + '</span>';
   html += '<span class="panel-text"><strong data-t="conns">All connections</strong>';
   html += '<span data-t="conns.desc">Already in your app. Use one directly only if you need to.</span></span>';
@@ -1040,6 +1135,8 @@ document.addEventListener('click', function(e) {
   if (action === 'copy') {
     var url = target.getAttribute('data-url');
     if (url) copyToClipboard(url);
+  } else if (action === 'select-text') {
+    target.select();
   } else if (action === 'dismiss-copy') {
     dismissCopyFallback();
   } else if (action === 'toggle-qr') {
@@ -1059,6 +1156,25 @@ document.addEventListener('click', function(e) {
     dismissInstallBanner();
   } else if (action === 'retry') {
     init();
+  }
+});
+
+document.addEventListener('change', function(event) {
+  var config = window._meridianConfig;
+  if (!config) return;
+  if (event.target.id === 'platform-choice' && Object.prototype.hasOwnProperty.call(PLATFORM_KEYS, event.target.value)) {
+    selectedPlatform = event.target.value; selectedApp = '';
+    updateSetup(config);
+    var old = document.getElementById('connections-panel');
+    if (old) {
+      var holder = document.createElement('div');
+      iosButtonIndex = 0;
+      holder.innerHTML = renderConnections(config, selectedPlatform, old.open);
+      old.parentNode.replaceChild(holder.firstElementChild, old);
+      applyI18n(config.client_name, config.server_name);
+    }
+  } else if (event.target.id === 'app-choice') {
+    selectedApp = event.target.value; updateSetup(config);
   }
 });
 

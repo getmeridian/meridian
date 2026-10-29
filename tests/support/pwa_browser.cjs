@@ -44,7 +44,11 @@ class Element {
   set open(value) { if (value) this.setAttribute('open', ''); else this.removeAttribute('open'); }
   get disabled() { return this.hasAttribute('disabled'); }
   set disabled(value) { if (value) this.setAttribute('disabled', ''); else this.removeAttribute('disabled'); }
-  get value() { return this._value === undefined ? (this.getAttribute('value') || this.textContent) : this._value; }
+  get value() {
+    if (this._value !== undefined) return this._value;
+    if (this.tagName === 'SELECT') { const option = this.querySelector('option[selected]') || this.querySelector('option'); return option ? option.value : ''; }
+    return this.getAttribute('value') || this.textContent;
+  }
   set value(value) { this._value = String(value); }
   get textContent() { return this.nodeType === 3 ? this.text : this.children.map(child => child.textContent).join(''); }
   set textContent(text) { this.children = []; this.appendChild(this.ownerDocument.createTextNode(String(text))); }

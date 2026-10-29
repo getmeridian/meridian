@@ -215,12 +215,16 @@ def test_optional_catalog_never_blocks_config_or_resets_open_content(page_data: 
         } });
         await browser.start();
         assert.ok(browser.document.querySelector('[data-import]'), 'a stalled optional catalog must not block setup');
-        const disclosure = browser.document.querySelector('[data-disclosure="import-more"]');
+        const choice = browser.document.getElementById('app-choice');
+        choice.value = 'FlClashX'; browser.fire('change', choice);
+        const disclosure = browser.document.querySelector('[data-disclosure="manual-import"]');
         disclosure.open = true;
         const copy = browser.document.querySelector('.sub-url'); copy.focus();
         browser.document.getElementById('selfcheck-results').textContent = 'Saved self-check';
         release(response(data.catalog)); await browser.flush();
-        assert.ok(browser.document.querySelector('[data-disclosure="import-more"]').open);
+        assert.ok(browser.document.querySelector('[data-disclosure="manual-import"]').open);
+        assert.equal(browser.document.getElementById('app-choice').value, 'FlClashX');
+        assert.equal(browser.document.getElementById('platform-choice').value, 'android');
         assert.equal(browser.document.activeElement.getAttribute('data-ui-key'), copy.getAttribute('data-ui-key'));
         assert.equal(browser.document.getElementById('selfcheck-results').textContent, 'Saved self-check');
         assert.ok(browser.document.querySelector('.app-mark').getAttribute('src'), 'late catalog should supply icons');
@@ -248,7 +252,7 @@ def test_catalog_timeout_ignores_late_answers_without_abort_support(page_data: d
     )
 
 
-@pytest.mark.parametrize("bad", ["version", "app", "installer", "icon", "scheme"])
+@pytest.mark.parametrize("bad", ["version", "app", "installer", "icon", "scheme", "guide"])
 def test_bad_optional_catalog_keeps_valid_embedded_apps(page_data: dict[str, object], bad: str) -> None:
     page_data["bad"] = bad
     run_page(
@@ -258,9 +262,10 @@ def test_bad_optional_catalog_keeps_valid_embedded_apps(page_data: dict[str, obj
         if (data.bad === 'installer') data.catalog.apps[0].urls.Android = 'javascript:alert(1)';
         if (data.bad === 'icon') data.catalog.apps[0].icon = 'https://198.51.100.2/icon.svg';
         if (data.bad === 'scheme') data.catalog.apps[0].deeplink = 'javascript:alert("{url}")';
+        if (data.bad === 'guide') data.catalog.apps[0].manual = { en: 'incomplete' };
         const browser = createBrowser(data.config, data.catalog, { info: data.info }); await browser.start();
         assert.ok(browser.document.querySelector('[data-import]'), 'malformed optional data must not break setup');
-        assert.equal(JSON.stringify(browser.context._meridianConfig.apps), JSON.stringify(data.config.apps), 'embedded catalog must survive invalid optional data');
+        assert.equal(JSON.stringify(browser.context._meridianConfig.apps) === JSON.stringify(data.config.apps), true, 'embedded catalog must survive invalid optional data');
         assert.ok(!browser.document.querySelector('.load-error'));
         """,
         page_data,
@@ -394,7 +399,92 @@ def test_one_invalid_import_action_cannot_replace_the_page_with_an_error(page_da
         await browser.start();
         assert.ok(!browser.document.querySelector('.load-error'), 'an invalid handler must not break the whole page');
         assert.ok(browser.document.querySelector('[data-import]'));
+        const choice = browser.document.getElementById('app-choice'); choice.value = 'Throne'; browser.fire('change', choice);
+        assert.ok(!browser.document.querySelector('.load-error'));
+        assert.ok(!browser.document.querySelector('[data-import]'));
         assert.ok(browser.document.querySelector('.sub-url'), 'the canonical manual URL must remain accessible');
+        """,
+        page_data,
+    )
+
+
+def test_recommended_app_has_three_localized_connect_steps(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog, { info: data.info }); await browser.start();
+        const steps = browser.document.querySelector('.connect-steps');
+        assert.ok(steps, 'import must be followed by connection instructions');
+        assert.equal(steps.querySelectorAll('li').length, 3);
+        assert.match(steps.textContent, /VPN/); assert.match(steps.textContent, /server|profile/);
+        for (const app of data.catalog.apps.filter(app => app.recommended)) {
+          for (const lang of ['en', 'ru', 'fa', 'zh']) assert.ok(app.connect && app.connect[lang].length >= 3, app.name + ' lacks ' + lang + ' instructions');
+        }
+        """,
+        page_data,
+    )
+
+
+def test_manual_import_has_selectable_url_and_the_chosen_apps_menu(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog, { info: data.info }); await browser.start();
+        const manual = browser.document.querySelector('.manual-import');
+        assert.ok(manual, 'manual import must be beside the chosen app action');
+        assert.equal(manual.querySelector('textarea').value, data.config.subscription_url);
+        assert.ok(manual.querySelector('textarea').hasAttribute('readonly'));
+        assert.ok(manual.querySelector('.manual-path').textContent.length > 5);
+        assert.match(manual.textContent, /Import manually/);
+        """,
+        page_data,
+    )
+
+
+def test_platform_picker_drives_apps_and_resets_choice(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog, { info: data.info }); await browser.start();
+        let platform = browser.document.getElementById('platform-choice');
+        assert.ok(platform, 'a detected platform needs a manual override'); assert.equal(platform.value, 'android');
+        let app = browser.document.getElementById('app-choice'); app.value = 'FlClashX'; browser.fire('change', app);
+        assert.match(browser.document.querySelector('[data-import]').textContent, /FlClashX/);
+        platform = browser.document.getElementById('platform-choice'); platform.value = 'ios'; browser.fire('change', platform);
+        app = browser.document.getElementById('app-choice'); assert.equal(app.value, 'Happ');
+        const choices = app.querySelectorAll('option').map(option => option.value);
+        assert.ok(choices.includes('ShadowRocket')); assert.ok(!choices.includes('FlClashX'));
+        assert.ok(browser.document.querySelector('.app-row').getAttribute('href').includes('apps.apple.com'));
+        browser.context.page.switchLang('fa');
+        assert.equal(browser.document.getElementById('platform-choice').value, 'ios');
+        """,
+        page_data,
+    )
+
+
+def test_app_without_import_scheme_shows_manual_route_directly(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog, { userAgent: 'Windows', info: data.info }); await browser.start();
+        const choice = browser.document.getElementById('app-choice'); assert.ok(choice, 'app choice is missing');
+        choice.value = 'v2rayN'; browser.fire('change', choice);
+        assert.ok(!browser.document.querySelector('[data-import]'));
+        const manual = browser.document.querySelector('.manual-import');
+        assert.ok(manual && manual.tagName !== 'DETAILS', 'v2rayN must show the manual URL directly');
+        assert.equal(manual.querySelector('textarea').value, data.config.subscription_url);
+        assert.match(manual.querySelector('.manual-path').textContent, /Subscription group/);
+        """,
+        page_data,
+    )
+
+
+def test_clash_desktop_steps_include_tun_while_mobile_steps_do_not(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog, { userAgent: 'Windows', info: data.info }); await browser.start();
+        let choice = browser.document.getElementById('app-choice'); choice.value = 'FlClashX'; browser.fire('change', choice);
+        assert.match(browser.document.querySelector('.connect-steps').textContent, /TUN/);
+        assert.equal(browser.document.querySelector('.connect-steps').querySelectorAll('li').length, 4);
+        const platform = browser.document.getElementById('platform-choice'); platform.value = 'android'; browser.fire('change', platform);
+        choice = browser.document.getElementById('app-choice'); choice.value = 'FlClashX'; browser.fire('change', choice);
+        assert.ok(!browser.document.querySelector('.connect-steps').textContent.includes('TUN'));
         """,
         page_data,
     )

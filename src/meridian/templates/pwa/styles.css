@@ -375,3 +375,23 @@ svg{flex-shrink:0}
   width:100%;padding:10px;resize:vertical;border:1px solid var(--br);border-radius:var(--r);
   font: .8rem/1.5 ui-monospace,'SF Mono',monospace;color:var(--tx);background:var(--sf2);
 }
+
+/* Chosen platform and app, with a nearby manual import route. */
+.setup-pickers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.setup-pickers label{display:flex;flex-direction:column;gap:5px;font-size:.78rem;color:var(--tx2);min-width:0}
+.setup-pickers select{
+  width:100%;min-height:44px;padding:8px 10px;border:1px solid var(--br2);border-radius:var(--r);
+  background:var(--sf2);color:var(--tx);font:inherit;font-size:.9rem;
+}
+.import-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:12px}
+.manual-import{min-width:0}
+.manual-import > summary{min-height:44px}
+.manual-import[open],.manual-direct{grid-column:1/-1}
+.manual-direct{display:flex;flex-direction:column;gap:10px}
+.manual-path{font-size:.84rem;line-height:1.5;overflow-wrap:anywhere;color:var(--tx2)}
+.manual-url{
+  width:100%;padding:10px 12px;resize:vertical;min-height:64px;border-radius:var(--r);border:1px solid var(--br);
+  font:.76rem/1.5 ui-monospace,'SF Mono',monospace;background:var(--sf2);color:var(--tx2);direction:ltr;
+}
+.connect-steps{padding-inline-start:20px;display:flex;flex-direction:column;gap:7px;font-size:.86rem;line-height:1.5;color:var(--tx2)}
+@media (max-width:479px){.import-actions{grid-template-columns:1fr}.setup-pickers{gap:8px}}
