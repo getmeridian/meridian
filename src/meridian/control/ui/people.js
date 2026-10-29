@@ -162,7 +162,8 @@
           }).then(function () {
             var change = limits.value();
             if (expiry.value) change.expire_at = M.endOfDay(expiry.value);
-            if (!change.traffic_limit_bytes && !change.expire_at) return null;
+            var defaults = !change.traffic_limit_bytes && change.traffic_limit_strategy === "no_reset";
+            if (defaults && !change.expire_at) return null; // what a new person starts with already
             return M.api("PATCH", "api/users/" + encodeURIComponent(username), change);
           });
         }).then(function () {
