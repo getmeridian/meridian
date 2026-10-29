@@ -23,6 +23,7 @@ from pathlib import Path
 from meridian.cluster import ClusterConfig, ControlMigration, ManagedResourceBinding, MigrationStep
 from meridian.compiler.meridian_backend import validate_meridian_backend
 from meridian.compiler.models import AgentRuntimePayload, ResourcePlan
+from meridian.control.models import UserImportBatch
 from meridian.control_artifacts import agent_binary
 from meridian.core.errors import LocalStateError
 from meridian.core.setup import SetupDraft
@@ -181,6 +182,9 @@ class ControlMigrator:
                 self._checkpoint(migration, "backed_up", fence)
             if not migration.reached("imported"):
                 self._import(migration, review, control, fence)
+            elif not migration.reached("cut_over"):
+                # The panel kept serving since that import: carry what changed there before it stops.
+                self._import(migration, review, control, fence, refresh=True)
             if not migration.reached("cut_over"):
                 self._cut_over(migration, review, control, fence)
             if not migration.reached("applied"):
@@ -214,7 +218,13 @@ class ControlMigrator:
         return migration
 
     def _import(
-        self, migration: ControlMigration, review: MigrationReview, control: ServerConnection, fence: Renewable
+        self,
+        migration: ControlMigration,
+        review: MigrationReview,
+        control: ServerConnection,
+        fence: Renewable,
+        *,
+        refresh: bool = False,
     ) -> None:
         if not migration.service_token:
             migration.service_token = secrets.token_urlsafe(32)
@@ -228,9 +238,10 @@ class ControlMigrator:
         # The links users hold now, from the panel's own address: the apply must keep every one.
         links = {user.username: self.cluster.panel.subscription_url(user.sub_token) for user in carried.batch.users}
         write_snapshot(backup, LINKS_NAME, json.dumps(links, indent=2, sort_keys=True))
-        self._on_step(f"Importing {len(carried.batch.users)} users")
-        result = import_over_ssh(control, carried.batch, migration.service_token)
-        migration.imported_users = sorted([*result.created, *result.unchanged])
+        self._on_step(f"{'Refreshing' if refresh else 'Importing'} {len(carried.batch.users)} users")
+        batch = UserImportBatch(users=carried.batch.users, replace=refresh)
+        result = import_over_ssh(control, batch, migration.service_token)
+        migration.imported_users = sorted([*result.created, *result.unchanged, *result.replaced])
         self._checkpoint(migration, "imported", fence)
 
     def _cut_over(

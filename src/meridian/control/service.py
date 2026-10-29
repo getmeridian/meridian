@@ -334,17 +334,19 @@ class ControlService:
 
         All or nothing, and idempotent: a user that already exists with the same UUID and
         token is left as it is (the first import wins); one with other credentials, or
-        credentials another user holds, refuses the whole batch.
+        credentials another user holds, refuses the whole batch. With `replace` the batch
+        overwrites users that exist (the source still serves and changed them since).
         """
         created: list[str] = []
         unchanged: list[str] = []
+        replaced: list[str] = []
         with self._transaction():
             now = utc_now()
             for item in batch.users:
                 # Kept as given: Hysteria2 authenticates with the exact string (VLESS parses it either way).
                 uuid, sub_token = item.uuid, item.sub_token
                 existing = self.get_user(item.username)
-                if existing is not None:
+                if existing is not None and not batch.replace:
                     if (existing.uuid.lower(), existing.sub_token) != (uuid.lower(), sub_token):
                         raise ServiceError(
                             "conflict", f"User {item.username!r} already exists with other credentials.", 409
@@ -352,7 +354,8 @@ class ControlService:
                     unchanged.append(item.username)
                     continue
                 holder = self._db.execute(
-                    "SELECT username FROM users WHERE lower(uuid) = ? OR sub_token = ?", (uuid.lower(), sub_token)
+                    "SELECT username FROM users WHERE (lower(uuid) = ? OR sub_token = ?) AND username != ?",
+                    (uuid.lower(), sub_token, item.username),
                 ).fetchone()
                 if holder is not None:
                     raise ServiceError(
@@ -360,29 +363,41 @@ class ControlService:
                     )
                 # Carried use counts as lifetime traffic; the offset leaves exactly the period's use toward the limit.
                 carried = max(item.lifetime_traffic_bytes, item.used_traffic_bytes)
-                self._db.execute(
-                    "INSERT INTO users (username, user_id, uuid, sub_token, status, created_at, expire_at,"
-                    " traffic_limit_bytes, traffic_limit_strategy, traffic_offset_bytes, traffic_reset_at,"
-                    " traffic_carried_bytes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (
-                        item.username,
-                        f"u{secrets.token_hex(8)}",
-                        uuid,
-                        sub_token,
-                        item.status,
-                        _whole_seconds(item.created_at) or now,
-                        _whole_seconds(item.expire_at),
-                        item.traffic_limit_bytes,
-                        item.traffic_limit_strategy,
-                        carried - item.used_traffic_bytes,
-                        _period_began(item, now),
-                        carried,
-                    ),
+                values = (
+                    uuid,
+                    sub_token,
+                    item.status,
+                    _whole_seconds(item.created_at) or now,
+                    _whole_seconds(item.expire_at),
+                    item.traffic_limit_bytes,
+                    item.traffic_limit_strategy,
+                    _period_began(item, now),
+                    carried,
                 )
-                created.append(item.username)
+                if existing is None:
+                    self._db.execute(
+                        "INSERT INTO users (uuid, sub_token, status, created_at, expire_at, traffic_limit_bytes,"
+                        " traffic_limit_strategy, traffic_reset_at, traffic_carried_bytes, traffic_offset_bytes,"
+                        " username, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (*values, carried - item.used_traffic_bytes, item.username, f"u{secrets.token_hex(8)}"),
+                    )
+                    created.append(item.username)
+                    continue
+                # What the ledger already counted stays counted, beside the newly carried use.
+                (old_carried,) = self._db.execute(
+                    "SELECT traffic_carried_bytes FROM users WHERE username = ?", (item.username,)
+                ).fetchone()
+                counted = existing.lifetime_traffic_bytes - old_carried
+                self._db.execute(
+                    "UPDATE users SET uuid = ?, sub_token = ?, status = ?, created_at = ?, expire_at = ?,"
+                    " traffic_limit_bytes = ?, traffic_limit_strategy = ?, traffic_reset_at = ?,"
+                    " traffic_carried_bytes = ?, traffic_offset_bytes = ? WHERE username = ?",
+                    (*values, counted + carried - item.used_traffic_bytes, item.username),
+                )
+                replaced.append(item.username)
             self._enforce(now)
             self._compose_all()
-        return UserImportResult(created=created, unchanged=unchanged)
+        return UserImportResult(created=created, unchanged=unchanged, replaced=replaced)
 
     def update_user(self, username: str, update: UserUpdate) -> UserRecord:
         """Apply the operator's change; extending an expiry or raising a limit makes the user active again."""

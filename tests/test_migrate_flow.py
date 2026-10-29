@@ -313,6 +313,20 @@ def _foreign_lease(fleet: Fleet) -> None:
     fleet.control.fence.files[FENCE_FILE] = json.dumps(record | {"lease_expires_at": until})
 
 
+def test_a_resume_before_the_cut_over_carries_what_changed_in_the_panel_since_the_import(fleet: Fleet) -> None:
+    fleet.control.when("docker update --restart=no", rc=1, stderr="daemon gone")
+    with pytest.raises(MigrationError, match="Could not stop the panel"):
+        _run(fleet)
+    (first,) = fleet.imports
+    assert not first.replace
+
+    migrator = fleet.migrator()
+    with pytest.raises(MigrationError, match="Could not stop the panel"):
+        migrator.run(migrator.review(), fleet.apply)
+
+    assert [batch.replace for batch in fleet.imports] == [False, True]
+
+
 def test_a_lease_taken_after_the_review_stops_the_run_before_anything_changes(fleet: Fleet) -> None:
     migrator = fleet.migrator()
     review = migrator.review()

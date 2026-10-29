@@ -181,6 +181,10 @@ class UserImportBatch(CoreModel):
     """Users imported in one transaction: all of them or none."""
 
     users: list[UserImport] = Field(max_length=10_000)
+    replace: bool = Field(
+        default=False,
+        description="Overwrite users that exist: the source still serves and changed them since the last import.",
+    )
 
     @model_validator(mode="after")
     def _unique(self) -> UserImportBatch:
@@ -194,6 +198,7 @@ class UserImportBatch(CoreModel):
 class UserImportResult(CoreModel):
     created: list[str] = Field(description="Users the import created.")
     unchanged: list[str] = Field(description="Users that already existed with the same credentials; kept as they are.")
+    replaced: list[str] = Field(default_factory=list, description="Users a replacing import overwrote.")
 
 
 class ServiceSettings(CoreModel):

@@ -138,6 +138,36 @@ def test_importing_the_same_users_again_changes_nothing(service: ControlService)
     assert service.get_user("alice").used_traffic_bytes == 0  # type: ignore[union-attr]
 
 
+def test_a_replacing_import_carries_what_the_source_changed_since(service: ControlService) -> None:
+    service.import_users(UserImportBatch(users=[_alice(used_traffic_bytes=GB), _bob()]))
+    reissued = "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b"
+
+    again = UserImportBatch(
+        users=[_alice(uuid=reissued, sub_token="NewShortUuid0001", used_traffic_bytes=2 * GB), _bob(status="disabled")],
+        replace=True,
+    )
+    result = service.import_users(again)
+
+    assert (result.created, result.unchanged, result.replaced) == ([], [], ["alice", "bob"])
+    alice = service.get_user("alice")
+    assert alice is not None and (alice.uuid, alice.sub_token, alice.used_traffic_bytes) == (
+        reissued,
+        "NewShortUuid0001",
+        2 * GB,
+    )
+    assert service.subscription(ALICE_SHORT).status == 404
+    assert service.get_user("bob").status == "disabled"  # type: ignore[union-attr]
+
+
+def test_a_replacing_import_still_refuses_credentials_another_user_holds(service: ControlService) -> None:
+    service.import_users(UserImportBatch(users=[_alice(), _bob()]))
+
+    with pytest.raises(ServiceError) as error:
+        service.import_users(UserImportBatch(users=[_bob(sub_token=ALICE_SHORT)], replace=True))
+
+    assert error.value.status == 409
+
+
 @pytest.mark.parametrize(
     "clash",
     [
