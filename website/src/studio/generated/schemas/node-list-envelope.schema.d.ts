@@ -10,11 +10,57 @@
  */
 export type NodeListOutputEnvelope = _NodeListSuccessEnvelope | _NodeListTerminalEnvelope;
 export type Command = "node.list";
+export type Errors = string[];
+export type Failed = string[];
+export type InSync = boolean | null;
 export type Ip = string;
 export type IsPanelHost = boolean;
+export type Live = boolean | null;
 export type Name = string;
 export type Role = "exit" | "routing_gateway";
-export type Status = "connected" | "failed" | "disconnected" | "disabled" | "unknown";
+/**
+ * Operator-facing text. Never carries secrets, client addresses, or raw command lines.
+ */
+export type Message = string;
+export type Name1 = string;
+export type Status = "pass" | "warn" | "fail";
+/**
+ * @maxItems 32
+ */
+export type Checks = HealthCheck[];
+/**
+ * Free bytes on the filesystem holding the agent's state.
+ */
+export type DiskFreeBytes = number;
+/**
+ * One-minute load average times 1000.
+ */
+export type Load1Milli = number;
+export type MemoryAvailableBytes = number;
+export type Status1 = "healthy" | "degraded" | "unhealthy";
+export type UptimeSeconds = number;
+/**
+ * RFC 3339 timestamp in UTC, ending in Z.
+ */
+export type ObservedAt = string;
+/**
+ * Version string as its upstream publishes it, for example 26.7.11 or v2.9.6.
+ */
+export type Agent = string;
+export type Kernel = string;
+export type Nginx = string | null;
+/**
+ * `ID` from /etc/os-release.
+ */
+export type OsId = string;
+/**
+ * `VERSION_ID`.
+ */
+export type OsVersion = string;
+export type Realm = string | null;
+export type Xray = string | null;
+export type RuntimeAvailable = boolean | null;
+export type Status2 = "connected" | "failed" | "disconnected" | "disabled" | "unknown";
 export type TrafficBytes = number;
 export type Uuid = string;
 export type XrayVersion = string;
@@ -23,20 +69,20 @@ export type DurationMs = number;
 /**
  * @maxItems 0
  */
-export type Errors = [];
+export type Errors1 = [];
 export type ExitCode = number;
 export type MeridianVersion = string;
 export type OperationId = string;
 export type Schema = "meridian.output/v1";
 export type StartedAt = string;
-export type Status1 = "ok";
+export type Status3 = "ok";
 export type Changed = boolean;
 export type Text = string;
 export type Category = "user" | "system" | "bug" | "cancelled";
 export type Code = string;
 export type ExitCode1 = number;
 export type Hint = string;
-export type Message = string;
+export type Message1 = string;
 export type Retryable = boolean;
 export type Warnings = MeridianError[];
 export type Command1 = "node.list";
@@ -44,26 +90,26 @@ export type DurationMs1 = number;
 /**
  * @minItems 1
  */
-export type Errors1 = [MeridianError, ...MeridianError[]];
+export type Errors2 = [MeridianError, ...MeridianError[]];
 export type ExitCode2 = number;
 export type MeridianVersion1 = string;
 export type OperationId1 = string;
 export type Schema1 = "meridian.output/v1";
 export type StartedAt1 = string;
-export type Status2 = "failed";
+export type Status4 = "failed";
 export type Warnings1 = MeridianError[];
 
 export interface _NodeListSuccessEnvelope {
   command: Command;
   data: NodeListResult;
   duration_ms: DurationMs;
-  errors: Errors;
+  errors: Errors1;
   exit_code: ExitCode;
   meridian_version: MeridianVersion;
   operation_id: OperationId;
   schema: Schema;
   started_at: StartedAt;
-  status: Status1;
+  status: Status3;
   summary: Summary;
   warnings: Warnings;
 }
@@ -74,14 +120,59 @@ export interface NodeListResult {
   nodes?: Nodes;
 }
 export interface FleetStatusNode {
+  errors?: Errors;
+  failed?: Failed;
+  in_sync?: InSync;
   ip: Ip;
   is_panel_host: IsPanelHost;
+  live?: Live;
   name: Name;
   role?: Role;
-  status: Status;
+  runtime?: NodeRuntime | null;
+  runtime_available?: RuntimeAvailable;
+  status: Status2;
   traffic_bytes: TrafficBytes;
   uuid: Uuid;
   xray_version: XrayVersion;
+}
+/**
+ * Runtime evidence from one agent report; polls refresh reachability, never this evidence.
+ */
+export interface NodeRuntime {
+  health: NodeHealth;
+  observed_at: ObservedAt;
+  versions: NodeVersions;
+}
+/**
+ * Aggregate node health. Resource figures are integers to keep the protocol float-free.
+ */
+export interface NodeHealth {
+  checks: Checks;
+  disk_free_bytes: DiskFreeBytes;
+  load1_milli: Load1Milli;
+  memory_available_bytes: MemoryAvailableBytes;
+  status: Status1;
+  uptime_seconds: UptimeSeconds;
+}
+/**
+ * One local health probe (for example `xray`, `nginx`, `disk`).
+ */
+export interface HealthCheck {
+  message: Message;
+  name: Name1;
+  status: Status;
+}
+/**
+ * Versions of what runs on the node; `null` for software that is not installed.
+ */
+export interface NodeVersions {
+  agent: Agent;
+  kernel: Kernel;
+  nginx: Nginx;
+  os_id: OsId;
+  os_version: OsVersion;
+  realm: Realm;
+  xray: Xray;
 }
 /**
  * Structured summary shown in JSON envelopes and UI dashboards.
@@ -104,7 +195,7 @@ export interface MeridianError {
   details?: Details;
   exit_code?: ExitCode1;
   hint?: Hint;
-  message: Message;
+  message: Message1;
   retryable?: Retryable;
 }
 export interface Cause {
@@ -117,13 +208,13 @@ export interface _NodeListTerminalEnvelope {
   command: Command1;
   data: EmptyData;
   duration_ms: DurationMs1;
-  errors: Errors1;
+  errors: Errors2;
   exit_code: ExitCode2;
   meridian_version: MeridianVersion1;
   operation_id: OperationId1;
   schema: Schema1;
   started_at: StartedAt1;
-  status: Status2;
+  status: Status4;
   summary: Summary;
   warnings: Warnings1;
 }

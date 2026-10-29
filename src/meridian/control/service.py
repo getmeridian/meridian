@@ -47,6 +47,7 @@ from meridian.control.models import (
     UserUpdate,
     users_resource_id,
 )
+from meridian.control.node_health import project_runtime
 from meridian.control.owner import UI_TABLES, OwnerAuth
 from meridian.control.periods import period_start
 from meridian.control.privacy import PRIVACY_TABLES, PrivacyLedger, read_privacy
@@ -286,6 +287,7 @@ class ControlService:
             agent_version=row["agent_version"],
             failed=failed,
             errors=errors,
+            runtime=project_runtime(report),
         )
 
     def list_nodes(self) -> list[NodeStatus]:

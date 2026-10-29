@@ -7,6 +7,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import Field
 
+from meridian.control.models import NodeRuntime
 from meridian.core.models import CoreModel
 from meridian.core.topology import ProtocolKind
 
@@ -214,6 +215,12 @@ class FleetStatusNode(CoreModel):
     status: NodeStatus
     xray_version: str
     traffic_bytes: int
+    live: bool | None = None
+    runtime: NodeRuntime | None = None
+    runtime_available: bool | None = None
+    in_sync: bool | None = None
+    failed: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
 
 
 class NodeListResult(CoreModel):
@@ -306,12 +313,38 @@ def node_api_status(api_node: ApiNodeLike | None) -> NodeStatus:
     disabled = getattr(api_node, "is_disabled", None)
     if disabled is True:
         return "disabled"
+    if getattr(api_node, "runtime_available", None) is False:
+        return "unknown"
     if connected is True:
         # A control-service agent that polls but could not apply its document is no healthy node.
-        return "failed" if getattr(api_node, "apply_failed", False) is True else "connected"
+        runtime = getattr(api_node, "runtime", None)
+        return (
+            "failed"
+            if getattr(api_node, "apply_failed", False) is True or (runtime and runtime.degraded)
+            else "connected"
+        )
     if connected is False or disabled is False:
         return "disconnected"
     return "unknown"
+
+
+def _status_node(node: TopologyNode, api_node: ApiNodeLike | None) -> FleetStatusNode:
+    return FleetStatusNode(
+        ip=node.ip,
+        name=node.name,
+        uuid=node.uuid,
+        is_panel_host=node.is_panel_host,
+        role=node.role,
+        status=node_api_status(api_node),
+        xray_version=api_node.xray_version if api_node else "",
+        traffic_bytes=api_node.traffic_used if api_node else 0,
+        live=api_node.is_connected if api_node else None,
+        runtime=getattr(api_node, "runtime", None),
+        runtime_available=getattr(api_node, "runtime_available", None),
+        in_sync=getattr(api_node, "in_sync", None),
+        failed=getattr(api_node, "failed", []),
+        errors=getattr(api_node, "errors", []),
+    )
 
 
 def build_node_list_result(
@@ -320,21 +353,7 @@ def build_node_list_result(
 ) -> NodeListResult:
     """Build a node list from configured topology and live panel observations."""
     api_by_uuid = {node.uuid: node for node in api_nodes}
-    return NodeListResult(
-        nodes=[
-            FleetStatusNode(
-                ip=node.ip,
-                name=node.name,
-                uuid=node.uuid,
-                is_panel_host=node.is_panel_host,
-                role=node.role,
-                status=node_api_status(api_by_uuid.get(node.uuid)),
-                xray_version=(api_by_uuid[node.uuid].xray_version if node.uuid in api_by_uuid else ""),
-                traffic_bytes=(api_by_uuid[node.uuid].traffic_used if node.uuid in api_by_uuid else 0),
-            )
-            for node in nodes
-        ]
-    )
+    return NodeListResult(nodes=[_status_node(node, api_by_uuid.get(node.uuid)) for node in nodes])
 
 
 def build_relay_list_result(
@@ -431,19 +450,7 @@ def build_fleet_status(
     nodes = []
     for node in topology.nodes:
         api_node = api_by_uuid.get(node.uuid)
-        status = node_api_status(api_node)
-        nodes.append(
-            FleetStatusNode(
-                ip=node.ip,
-                name=node.name,
-                uuid=node.uuid,
-                is_panel_host=node.is_panel_host,
-                role=node.role,
-                status=status,
-                xray_version=getattr(api_node, "xray_version", "") if api_node else "",
-                traffic_bytes=getattr(api_node, "traffic_used", 0) if api_node else 0,
-            )
-        )
+        nodes.append(_status_node(node, api_node))
 
     relays = []
     for relay in topology.relays:

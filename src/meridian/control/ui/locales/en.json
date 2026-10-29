@@ -331,5 +331,17 @@
   "devices.first_seen": "First fetched",
   "devices.last_seen": "Last fetched",
   "devices.unknown": "Not provided",
-  "devices.pending": "After the next refresh"
+  "devices.pending": "After the next refresh",
+  "servers.health_healthy": "Runtime healthy",
+  "servers.health_degraded": "Runtime degraded",
+  "servers.health_unhealthy": "Runtime unhealthy",
+  "servers.health_unavailable": "Runtime report unavailable",
+  "servers.memory": "Memory available",
+  "servers.disk": "Disk free",
+  "servers.load": "1-minute load average",
+  "servers.uptime": "Server uptime",
+  "servers.core_uptime": "Core uptime",
+  "servers.core_version": "Core version",
+  "servers.stats_stalled": "Traffic counting stalled",
+  "servers.convergence_unavailable": "Apply report unavailable"
 }

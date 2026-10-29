@@ -12,6 +12,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BeforeValidator, Field, field_validator, model_validator
 
 from meridian.core.agent_desired import AgentResource
+from meridian.core.agent_protocol import NodeHealth, NodeVersions
 from meridian.core.agent_types import (
     CertificatePem,
     Count,
@@ -62,6 +63,23 @@ class NodeSpec(CoreModel):
 AGENT_SEEN_SECONDS = 90
 
 
+class NodeRuntime(CoreModel):
+    """Runtime evidence from one agent report; polls refresh reachability, never this evidence."""
+
+    health: NodeHealth
+    versions: NodeVersions
+    observed_at: Timestamp
+
+    def is_fresh(self, now: datetime | None = None) -> bool:
+        age = ((now or datetime.now(UTC)) - datetime.fromisoformat(self.observed_at)).total_seconds()
+        # The authenticated agent protocol allows up to five minutes of clock skew.
+        return -300 <= age < AGENT_SEEN_SECONDS
+
+    @property
+    def degraded(self) -> bool:
+        return self.health.status != "healthy" or any(check.status != "pass" for check in self.health.checks)
+
+
 class NodeStatus(CoreModel):
     """The service's view of one node."""
 
@@ -75,6 +93,7 @@ class NodeStatus(CoreModel):
     agent_version: Version | None
     failed: list[str] = Field(default_factory=list, description="Resource IDs the last report marked failed.")
     errors: list[str] = Field(default_factory=list, description="Operator-facing messages of failed resources.")
+    runtime: NodeRuntime | None = Field(default=None, description="The last report's health and version evidence.")
 
     def unseen_seconds(self, now: datetime | None = None) -> float | None:
         """Seconds since the agent last reached the service; None if it never did."""
@@ -85,6 +104,9 @@ class NodeStatus(CoreModel):
     def is_live(self, now: datetime | None = None) -> bool:
         unseen = self.unseen_seconds(now)
         return unseen is not None and unseen < AGENT_SEEN_SECONDS
+
+    def runtime_available(self, now: datetime | None = None) -> bool:
+        return self.is_live(now) and self.runtime is not None and self.runtime.is_fresh(now)
 
     @property
     def in_sync(self) -> bool:

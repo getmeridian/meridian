@@ -185,6 +185,31 @@ def _render_status(status: FleetStatus) -> None:
                 err_console.print(f"    {escape(node.ip)}  {label}{role}  [red]FAILED[/red] [dim]meridian check[/dim]")
             else:
                 err_console.print(f"    {escape(node.ip)}  {label}{role}  [dim]unknown[/dim]")
+            if node.runtime_available is not None:
+                reachable = "live" if node.live else "unavailable"
+                runtime = (
+                    (
+                        "degraded"
+                        if node.runtime.degraded and node.runtime.health.status == "healthy"
+                        else node.runtime.health.status
+                    )
+                    if node.runtime_available and node.runtime
+                    else "unavailable"
+                )
+                convergence = (
+                    ("failed" if node.failed else "in sync" if node.in_sync else "pending")
+                    if node.runtime_available
+                    else "unavailable"
+                )
+                err_console.print(f"      Reachability: {reachable} · Runtime: {runtime} · Convergence: {convergence}")
+                if node.runtime_available and node.runtime:
+                    for check in node.runtime.health.checks:
+                        if check.status != "pass":
+                            label = "Traffic counting stalled (stats)" if check.name == "stats" else check.name
+                            err_console.print(f"      {escape(label)}: {escape(check.message)}")
+                if node.runtime_available:
+                    for error in node.errors or node.failed:
+                        err_console.print(f"      {escape(error)}")
 
     if status.relays:
         err_console.print()

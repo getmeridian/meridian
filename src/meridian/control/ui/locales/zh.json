@@ -331,5 +331,17 @@
   "devices.first_seen": "首次获取",
   "devices.last_seen": "最近获取",
   "devices.unknown": "未提供",
-  "devices.pending": "下次刷新后显示"
+  "devices.pending": "下次刷新后显示",
+  "servers.health_healthy": "运行正常",
+  "servers.health_degraded": "运行状态异常",
+  "servers.health_unhealthy": "运行故障",
+  "servers.health_unavailable": "暂无最新运行报告",
+  "servers.memory": "可用内存",
+  "servers.disk": "磁盘可用空间",
+  "servers.load": "1 分钟平均负载",
+  "servers.uptime": "服务器运行时长",
+  "servers.core_uptime": "核心运行时长",
+  "servers.core_version": "核心版本",
+  "servers.stats_stalled": "流量统计已停滞",
+  "servers.convergence_unavailable": "暂无最新应用报告"
 }

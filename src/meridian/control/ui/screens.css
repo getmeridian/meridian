@@ -160,3 +160,6 @@
   .danger-row { flex-direction: column; align-items: stretch; }
   .search { max-width: none; }
 }
+/* Keep the three independent server verdicts readable in compact cards. */
+.server-badges { display: flex; flex-wrap: wrap; gap: .5rem; margin-block-end: 1rem; }
+.health-checks { padding-inline-start: 1.8rem; overflow-wrap: anywhere; }

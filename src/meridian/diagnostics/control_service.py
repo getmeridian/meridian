@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from meridian.control.models import NodeStatus
-from meridian.core.verification import VerificationFinding
+from meridian.core.verification import VerificationFinding, VerificationStatus
 from meridian.core.version_skew import agent_version_differs, newer_service_hint, service_skew
 from meridian.diagnostics.checks import CheckResult, command_evidence_unavailable
 from meridian.diagnostics.evidence import finding
@@ -21,6 +21,8 @@ if TYPE_CHECKING:
     from meridian.core.execution import ServerConnection
 
 # Agents also re-check what they applied every 5 minutes and repair drift, such as a stopped core.
+RUNTIME_STATUS: dict[str, VerificationStatus] = {"healthy": "passed", "degraded": "warning", "unhealthy": "failed"}
+CHECK_STATUS: dict[str, VerificationStatus] = {"pass": "passed", "warn": "warning", "fail": "failed"}
 
 
 def check_unit_active(conn: ServerConnection, unit: str, *, remediation: str) -> CheckResult:
@@ -53,7 +55,7 @@ def agent_finding(status: NodeStatus | None, *, logs_hint: str, now: datetime | 
     if not status.is_live(now):
         return finding(
             "agent",
-            "failed",
+            "skipped",
             f"The node agent last reached the control service {_ago(status.unseen_seconds(now) or 0)} ago",
             f"Check the agent: {logs_hint}",
         )
@@ -73,6 +75,43 @@ def agent_finding(status: NodeStatus | None, *, logs_hint: str, now: datetime | 
             f"Wait a minute and re-run the check; if it stays behind, read: {logs_hint}",
         )
     return finding("agent", "passed", f"The node agent applied revision {applied}")
+
+
+def agent_findings(
+    status: NodeStatus | None,
+    *,
+    logs_hint: str,
+    now: datetime | None = None,
+) -> list[VerificationFinding]:
+    """Judge reachability, fresh runtime evidence, and document convergence independently."""
+    if status is None or not status.is_live(now):
+        return [agent_finding(status, logs_hint=logs_hint, now=now)]
+    reachability = finding("agent_reachability", "passed", "The node agent reaches the control service")
+    if not status.runtime_available(now) or status.runtime is None:
+        return [
+            reachability,
+            finding(
+                "runtime",
+                "skipped",
+                "No recent runtime health report is available",
+                f"Wait for a fresh report, then re-run the check; read: {logs_hint}",
+            ),
+        ]
+    runtime = status.runtime
+    runtime_status = RUNTIME_STATUS[runtime.health.status]
+    checks = [reachability, finding("runtime", runtime_status, f"Reported runtime health is {runtime.health.status}")]
+    for check in runtime.health.checks:
+        label = "Traffic counting stalled (stats)" if check.name == "stats" and check.status != "pass" else check.name
+        checks.append(
+            finding(
+                check.name,
+                CHECK_STATUS[check.status],
+                f"{label}: {check.message}",
+                f"Read: {logs_hint}" if check.status != "pass" else "",
+            )
+        )
+    checks.append(agent_finding(status, logs_hint=logs_hint, now=now))
+    return checks
 
 
 def service_version_finding(cli_version: str, service_version: str) -> VerificationFinding:

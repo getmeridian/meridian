@@ -26,6 +26,7 @@
 - Reporter primitives let provision, apply, and deploy emit typed events without choosing a renderer.
 
 ## Pitfalls
+- Fleet results carry live reachability, fresh typed runtime evidence, and convergence separately; a live poll never makes an old health report available.
 - Never emit raw SSH commands, panel tokens, private keys, database URLs, or subscription secrets.
 - `redact_string()` is the only secret masker (SSH debug logs included); teach it a new secret form instead of adding a local regex.
 - Generated JSON Schemas are public data; redact values without destroying schema `properties`.

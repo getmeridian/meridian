@@ -15,6 +15,7 @@
 - Disk, port, TLS, and firewall primitives are shared by every check scope and testable without CLI scaffolding.
 
 ## Pitfalls
+- Agent runtime and convergence findings require a fresh report; an old unhealthy report is skipped evidence even while the agent keeps polling.
 
 - **Execution failure is not negative evidence** — a command timeout, SSH drop, or missing inspection tool returns skipped, never failed.
 - **Protocol shape controls checks** — never require TCP/443 or HTTPS from a UDP-only Hysteria2 endpoint; full canonical traffic is the UDP authority.

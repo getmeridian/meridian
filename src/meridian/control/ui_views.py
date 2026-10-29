@@ -86,6 +86,8 @@ def fleet_view(service: ControlService) -> FleetView:
                 failed=list(status.failed),
                 errors=list(status.errors),
                 traffic_bytes=traffic.get(status.node_id, 0),
+                runtime=status.runtime,
+                runtime_available=status.runtime_available(),
             )
         )
     settings = service.settings()

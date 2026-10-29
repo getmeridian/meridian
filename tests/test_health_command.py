@@ -14,7 +14,7 @@ from meridian import __version__
 from meridian.cluster import ClusterConfig, SubscriptionPageConfig
 from meridian.commands import health
 from meridian.control.client import ControlServiceError
-from meridian.control.models import NodeStatus, ServiceHealth
+from meridian.control.models import NodeRuntime, NodeStatus, ServiceHealth
 from meridian.control.service import utc_now
 from meridian.core.agent_types import NodeStateRef
 from meridian.core.fleet import TopologyNode
@@ -25,6 +25,7 @@ from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.editor import add_relay_to_intent
 from meridian.setup.single_server import single_server_intent
 from meridian.verification import VerificationHttpsRoute
+from tests.support.node_runtime import node_report
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
 OTHER_FLEET_ID = "1f1e2d3c-4b5a-4968-8776-655443322110"
@@ -74,6 +75,9 @@ def fleet(servers_file: Path) -> SimpleNamespace:
         applied=NodeStateRef(fleet_epoch=1, revision=2, sha256="a" * 64),
         last_seen_at=utc_now(),
         agent_version="0.1.0",
+        runtime=NodeRuntime.model_validate(
+            {key: node_report(utc_now())[key] for key in ("health", "versions", "observed_at")}
+        ),
     )
     conn = MagicMock(local_mode=False, user="root")
     deployment = SimpleNamespace(
@@ -261,3 +265,30 @@ def test_a_service_answering_for_another_fleet_is_a_finding(fleet: SimpleNamespa
         _run(fleet, "exit-a")
 
     assert exc_info.value.exit_code == 4
+
+
+@pytest.mark.parametrize(
+    ("health_status", "check", "stamp", "exit_code"),
+    [
+        ("unhealthy", "pass", None, 4),
+        ("healthy", "fail", None, 4),
+        ("unhealthy", "fail", "2026-01-01T00:00:00Z", 3),
+    ],
+)
+def test_check_uses_fresh_runtime_health(
+    fleet: SimpleNamespace,
+    health_status: str,
+    check: str,
+    stamp: str | None,
+    exit_code: int,
+) -> None:
+    report = node_report(stamp or utc_now(), health=health_status, check=check)
+    fleet.client.node.return_value = NodeStatus.model_validate(
+        {
+            **fleet.client.node.return_value.model_dump(),
+            "runtime": {key: report[key] for key in ("health", "versions", "observed_at")},
+        }
+    )
+    with pytest.raises(typer.Exit) as raised:
+        _run(fleet, "exit-a")
+    assert raised.value.exit_code == exit_code

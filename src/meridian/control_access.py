@@ -201,7 +201,18 @@ class ServiceFleetPanel(ServiceAccessPanel):
             if status is not None:
                 live = status.is_live()
                 nodes.append(
-                    Node(uuid=node_id, name=node_id, is_connected=live, apply_failed=live and bool(status.failed))
+                    Node(
+                        uuid=node_id,
+                        name=node_id,
+                        is_connected=live,
+                        apply_failed=live and bool(status.failed),
+                        runtime=status.runtime,
+                        runtime_available=status.runtime_available(),
+                        in_sync=status.in_sync,
+                        failed=status.failed,
+                        errors=status.errors,
+                        xray_version=status.runtime.versions.xray or "" if status.runtime else "",
+                    )
                 )
         return nodes
 

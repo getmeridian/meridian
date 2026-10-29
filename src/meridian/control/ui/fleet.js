@@ -41,15 +41,28 @@
   };
 
   function serverCard(server) {
-    var sync = server.in_sync
+    var sync = !server.runtime_available ? M.pill("muted", M.t("servers.convergence_unavailable"))
+      : server.failed && server.failed.length ? M.pill("err", M.t("servers.failed")) : server.in_sync
       ? M.pill("ok", M.t("servers.in_sync"))
       : server.applied_revision ? M.pill("warn", M.t("servers.applying")) : M.pill("muted", M.t("servers.waiting"));
+    var runtime = server.runtime_available ? server.runtime : null;
+    var health = runtime && runtime.health;
+    var checks = health ? health.checks || [] : [];
+    var faults = checks.filter(function (check) { return check.status !== "pass"; });
+    var healthStatus = health ? health.status : "unavailable";
+    if (healthStatus === "healthy" && faults.length) healthStatus = "degraded";
+    var coreUptime = checks.find(function (check) { return check.name === "xray.uptime"; });
+    var up = coreUptime && /^up (\d+)\s*s$/.exec(coreUptime.message);
     return h("section", { class: "card server" },
       h("div", { class: "card-head" },
         h("div", { class: "server-name" },
           h("span", { class: "dot " + (server.live ? "dot-ok" : "dot-err"), "aria-hidden": "true" }),
           h("h2", { class: "mono", text: server.node_id })),
         M.pill("muted", M.t("role." + server.role))),
+      h("div", { class: "server-badges" },
+        M.pill(server.live ? "ok" : "muted", M.t(server.live ? "servers.online" : "servers.offline")),
+        M.pill({ healthy: "ok", degraded: "warn", unhealthy: "err", unavailable: "muted" }[healthStatus],
+          M.t("servers.health_" + healthStatus)), sync),
       h("dl", { class: "facts" },
         server.region ? [h("dt", { text: M.t("servers.country") }), h("dd", { text: country(server.region) })] : null,
         h("dt", { text: M.t("servers.agent") }),
@@ -57,12 +70,29 @@
           M.t("servers.seen", { when: M.ago(server.last_seen_at) })),
         h("dt", { text: M.t("servers.version") }), h("dd", { class: "mono", text: server.agent_version || "—" }),
         h("dt", { text: M.t("servers.revision") }),
-        h("dd", {}, sync, " ", M.t("servers.revisions", {
+        h("dd", {}, M.t("servers.revisions", {
           applied: M.count(server.applied_revision), current: M.count(server.revision) })),
-        h("dt", { text: M.t("servers.traffic") }), h("dd", { text: M.bytes(server.traffic_bytes) })),
-      server.errors && server.errors.length ? h("div", { class: "notice notice-err" },
+        h("dt", { text: M.t("servers.traffic") }), h("dd", { text: M.bytes(server.traffic_bytes) }),
+        health ? [
+          h("dt", { text: M.t("servers.memory") }), h("dd", { text: M.bytes(health.memory_available_bytes) }),
+          h("dt", { text: M.t("servers.disk") }), h("dd", { text: M.bytes(health.disk_free_bytes) }),
+          h("dt", { text: M.t("servers.load") }), h("dd", { dir: "ltr", text: M.count(health.load1_milli / 1000) }),
+          h("dt", { text: M.t("servers.uptime") }), h("dd", { text: M.uptime(health.uptime_seconds) }),
+          coreUptime ? [h("dt", { text: M.t("servers.core_uptime") }),
+            h("dd", { text: up ? M.uptime(Number(up[1])) : coreUptime.message })] : null,
+          h("dt", { text: M.t("servers.core_version") }),
+          h("dd", { class: "mono", text: "Xray " + (runtime.versions.xray || "—") }),
+        ] : null),
+      !runtime ? h("p", { class: "notice notice-warn small", text: M.t("servers.health_unavailable") }) : null,
+      faults.length ? h("ul", { class: "notice notice-warn health-checks" }, faults.map(function (check) {
+        return h("li", {}, h("strong", { text: check.name === "stats" ? M.t("servers.stats_stalled") + " (stats)" : check.name }),
+          " · ", h("span", { text: check.message }));
+      })) : null,
+      runtime && server.failed && server.failed.length ? h("div", { class: "notice notice-err" },
         h("p", { class: "strong", text: M.t("servers.failed") }),
-        h("ul", {}, server.errors.map(function (line) { return h("li", { class: "mono small", text: line }); })))
+        h("ul", {}, (server.errors && server.errors.length ? server.errors : server.failed).map(function (line) {
+          return h("li", { class: "mono small", text: line });
+        })))
         : null);
   }
 

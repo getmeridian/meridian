@@ -520,6 +520,12 @@ def test_node_and_relay_list_results_preserve_command_wire_shapes() -> None:
                 "status": "connected",
                 "xray_version": "25.12.1",
                 "traffic_bytes": 1024,
+                "live": True,
+                "runtime": None,
+                "runtime_available": None,
+                "in_sync": None,
+                "failed": [],
+                "errors": [],
             }
         ]
     }

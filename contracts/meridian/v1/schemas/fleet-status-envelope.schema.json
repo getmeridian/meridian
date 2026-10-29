@@ -158,6 +158,32 @@
     "FleetStatusNode": {
       "additionalProperties": false,
       "properties": {
+        "errors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Errors",
+          "type": "array"
+        },
+        "failed": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Failed",
+          "type": "array"
+        },
+        "in_sync": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "In Sync"
+        },
         "ip": {
           "title": "Ip",
           "type": "string"
@@ -165,6 +191,18 @@
         "is_panel_host": {
           "title": "Is Panel Host",
           "type": "boolean"
+        },
+        "live": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Live"
         },
         "name": {
           "title": "Name",
@@ -178,6 +216,29 @@
           ],
           "title": "Role",
           "type": "string"
+        },
+        "runtime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NodeRuntime"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "runtime_available": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Runtime Available"
         },
         "status": {
           "enum": [
@@ -379,6 +440,216 @@
         "unknown_relays"
       ],
       "title": "FleetStatusSummary",
+      "type": "object"
+    },
+    "HealthCheck": {
+      "additionalProperties": false,
+      "description": "One local health probe (for example `xray`, `nginx`, `disk`).",
+      "properties": {
+        "message": {
+          "description": "Operator-facing text. Never carries secrets, client addresses, or raw command lines.",
+          "maxLength": 1000,
+          "title": "Message",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_.-]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "warn",
+            "fail"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "status",
+        "message"
+      ],
+      "title": "HealthCheck",
+      "type": "object"
+    },
+    "NodeHealth": {
+      "additionalProperties": false,
+      "description": "Aggregate node health. Resource figures are integers to keep the protocol float-free.",
+      "properties": {
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/HealthCheck"
+          },
+          "maxItems": 32,
+          "title": "Checks",
+          "type": "array"
+        },
+        "disk_free_bytes": {
+          "description": "Free bytes on the filesystem holding the agent's state.",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Disk Free Bytes",
+          "type": "integer"
+        },
+        "load1_milli": {
+          "description": "One-minute load average times 1000.",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Load1 Milli",
+          "type": "integer"
+        },
+        "memory_available_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Memory Available Bytes",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "healthy",
+            "degraded",
+            "unhealthy"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "uptime_seconds": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Uptime Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "status",
+        "checks",
+        "uptime_seconds",
+        "load1_milli",
+        "memory_available_bytes",
+        "disk_free_bytes"
+      ],
+      "title": "NodeHealth",
+      "type": "object"
+    },
+    "NodeRuntime": {
+      "additionalProperties": false,
+      "description": "Runtime evidence from one agent report; polls refresh reachability, never this evidence.",
+      "properties": {
+        "health": {
+          "$ref": "#/$defs/NodeHealth"
+        },
+        "observed_at": {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "versions": {
+          "$ref": "#/$defs/NodeVersions"
+        }
+      },
+      "required": [
+        "health",
+        "versions",
+        "observed_at"
+      ],
+      "title": "NodeRuntime",
+      "type": "object"
+    },
+    "NodeVersions": {
+      "additionalProperties": false,
+      "description": "Versions of what runs on the node; `null` for software that is not installed.",
+      "properties": {
+        "agent": {
+          "description": "Version string as its upstream publishes it, for example 26.7.11 or v2.9.6.",
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$",
+          "title": "Agent",
+          "type": "string"
+        },
+        "kernel": {
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9._+~-]+$",
+          "title": "Kernel",
+          "type": "string"
+        },
+        "nginx": {
+          "anyOf": [
+            {
+              "description": "Version string as its upstream publishes it, for example 26.7.11 or v2.9.6.",
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Nginx"
+        },
+        "os_id": {
+          "description": "`ID` from /etc/os-release.",
+          "maxLength": 32,
+          "pattern": "^[a-z0-9._-]+$",
+          "title": "Os Id",
+          "type": "string"
+        },
+        "os_version": {
+          "description": "`VERSION_ID`.",
+          "maxLength": 32,
+          "pattern": "^[A-Za-z0-9._-]*$",
+          "title": "Os Version",
+          "type": "string"
+        },
+        "realm": {
+          "anyOf": [
+            {
+              "description": "Version string as its upstream publishes it, for example 26.7.11 or v2.9.6.",
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Realm"
+        },
+        "xray": {
+          "anyOf": [
+            {
+              "description": "Version string as its upstream publishes it, for example 26.7.11 or v2.9.6.",
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Xray"
+        }
+      },
+      "required": [
+        "agent",
+        "xray",
+        "realm",
+        "nginx",
+        "os_id",
+        "os_version",
+        "kernel"
+      ],
+      "title": "NodeVersions",
       "type": "object"
     },
     "PanelStatus": {

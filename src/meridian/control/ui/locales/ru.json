@@ -331,5 +331,17 @@
   "devices.first_seen": "Первое обновление",
   "devices.last_seen": "Последнее обновление",
   "devices.unknown": "Не указано",
-  "devices.pending": "После следующего обновления"
+  "devices.pending": "После следующего обновления",
+  "servers.health_healthy": "Службы работают",
+  "servers.health_degraded": "Сбои в работе служб",
+  "servers.health_unhealthy": "Службы неисправны",
+  "servers.health_unavailable": "Нет свежего отчёта о работе служб",
+  "servers.memory": "Доступная память",
+  "servers.disk": "Свободное место на диске",
+  "servers.load": "Средняя нагрузка за 1 минуту",
+  "servers.uptime": "Время работы сервера",
+  "servers.core_uptime": "Время работы ядра",
+  "servers.core_version": "Версия ядра",
+  "servers.stats_stalled": "Подсчёт трафика остановился",
+  "servers.convergence_unavailable": "Нет свежего отчёта о применении"
 }

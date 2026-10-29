@@ -35,6 +35,7 @@
 - Empty supported endpoint sets use inert availability placeholders in all four locales, with existing status notices taking priority; filter Stash XHTTP and sing-box XHTTP/copies before checking availability.
 - Allocate unique presentation names before filtering endpoints, reserving generated groups and direct/reject labels; preserve original suffix-shaped remarks and use the same names in proxies, tags, and copy exclusions.
 - Derive subscription suffix routing from formats.selector.SUFFIX_FORMATS; aliases override Accept and User-Agent, and Stash retains its own dialect.
+- Agent polls refresh reachability only; judge runtime health and convergence from a report younger than the live window, and keep stale reports as unavailable evidence.
 - nginx answers 502/503/504 for a stopped or hung service — `ControlClient` raises those as retryable unreachable errors; as plain refusals, a stopped ctld failed the fence at once with "refused: HTTP 502". A write the backup hook counts as maybe-committed (a lost reply, any 5xx) raises `ControlServiceUncertain`, which Meridian drivers turn into `UnknownResourceOutcome`.
 - `serve` is a daemon: the root callback skips the beta banner and the update check for it (it once printed the banner into journald and phoned out on every start).
 - Decode the path before routing — `ControlClient` percent-encodes IDs, so `:` in endpoint IDs arrives as `%3A` and every endpoint PUT 404'd; node routes match only topology IDs (`_NODE`), or a grant stored `main:exit` before its response refused it and broke the fleet view.

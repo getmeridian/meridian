@@ -41,7 +41,7 @@ from meridian.diagnostics.checks import (
     check_tls_certificate,
 )
 from meridian.diagnostics.control_service import (
-    agent_finding,
+    agent_findings,
     agent_version_finding,
     check_unit_active,
     service_version_finding,
@@ -254,14 +254,14 @@ class _ServiceSession:
         started = time.monotonic()
         status = self._read(lambda client: client.node(node.name))
         if self.error:
-            found = finding("agent", "skipped", f"Control service unreachable: {self.error}")
+            findings = [finding("agent", "skipped", f"Control service unreachable: {self.error}")]
         else:
-            found = agent_finding(status, logs_hint=f"meridian logs {node.ip} --component node")
+            findings = agent_findings(status, logs_hint=f"meridian logs {node.ip} --component node")
             expected = expected_agent_version(status.agent_version if status is not None else None)
-            version = agent_version_finding(expected, status)
+            version = agent_version_finding(expected, status) if status and status.runtime_available() else None
             if version is not None:
-                return finish_check("agent", "Node agent", [found, version], started)
-        return finish_check("agent", "Node agent", [found], started)
+                findings.append(version)
+        return finish_check("agent", "Node agent", findings, started)
 
     def _read(self, call: Callable[[ControlClient], T]) -> T | None:
         if self.error:

@@ -172,6 +172,19 @@
       .format(minutes);
   };
 
+  M.uptime = function (seconds) {
+    var remaining = Math.max(0, Math.floor(Number(seconds) || 0));
+    var parts = [];
+    [[86400, "day"], [3600, "hour"], [60, "minute"], [1, "second"]].forEach(function (step) {
+      var value = Math.floor(remaining / step[0]);
+      remaining %= step[0];
+      if (value || (!parts.length && step[0] === 1)) {
+        parts.push(new Intl.NumberFormat(M.i18n.locale(), { style: "unit", unit: step[1], unitDisplay: "short" }).format(value));
+      }
+    });
+    return "\u2068" + parts.slice(0, 2).join(" ") + "\u2069";
+  };
+
   // -- feedback ----------------------------------------------------------------------------
 
   var toastTimer = null;

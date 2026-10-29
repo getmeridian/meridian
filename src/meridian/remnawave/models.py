@@ -7,6 +7,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from meridian.control.models import NodeRuntime
+
 
 @dataclass
 class User:
@@ -55,6 +57,11 @@ class Node:
     is_disabled: bool = False
     # Set only by the control service: the agent reports but its last apply failed.
     apply_failed: bool = False
+    runtime: NodeRuntime | None = None
+    runtime_available: bool | None = None
+    in_sync: bool | None = None
+    failed: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
     xray_version: str = ""
     traffic_used: int = 0
     country_code: str = ""

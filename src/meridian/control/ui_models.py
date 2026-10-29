@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import Field
 
+from meridian.control.models import NodeRuntime
 from meridian.core.agent_types import OpaqueToken
 from meridian.core.models import CoreModel
 
@@ -90,6 +91,8 @@ class ServerView(CoreModel):
     failed: list[str]
     errors: list[str]
     traffic_bytes: int = Field(description="Bytes the node counted since its agent's counters began.")
+    runtime: NodeRuntime | None = None
+    runtime_available: bool = False
 
 
 class FleetView(CoreModel):

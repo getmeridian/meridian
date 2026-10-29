@@ -331,5 +331,17 @@
   "devices.first_seen": "اولین دریافت",
   "devices.last_seen": "آخرین دریافت",
   "devices.unknown": "ارائه نشده",
-  "devices.pending": "پس از تازه‌سازی بعدی"
+  "devices.pending": "پس از تازه‌سازی بعدی",
+  "servers.health_healthy": "سرویس‌ها سالم هستند",
+  "servers.health_degraded": "اختلال در سرویس‌ها",
+  "servers.health_unhealthy": "سرویس‌ها ناسالم هستند",
+  "servers.health_unavailable": "گزارش تازه‌ای از وضعیت سرویس‌ها در دسترس نیست",
+  "servers.memory": "حافظهٔ در دسترس",
+  "servers.disk": "فضای آزاد دیسک",
+  "servers.load": "میانگین بار در ۱ دقیقه",
+  "servers.uptime": "مدت کارکرد سرور",
+  "servers.core_uptime": "مدت کارکرد هسته",
+  "servers.core_version": "نسخهٔ هسته",
+  "servers.stats_stalled": "شمارش ترافیک متوقف شده است",
+  "servers.convergence_unavailable": "گزارش اعمال پیکربندی در دسترس نیست"
 }

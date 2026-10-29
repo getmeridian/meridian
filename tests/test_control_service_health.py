@@ -41,7 +41,7 @@ def _status(**changes: object) -> NodeStatus:
         (_status(), "passed", "applied revision 3"),
         (None, "failed", "not registered"),
         (_status(last_seen_at=None, applied=None), "failed", "never reached"),
-        (_status(last_seen_at="2026-10-29T11:49:30.25Z"), "failed", "10 min ago"),
+        (_status(last_seen_at="2026-10-29T11:49:30.25Z"), "skipped", "10 min ago"),
         (_status(failed=["core-config"], errors=["core-config: bad json"]), "failed", "core-config: bad json"),
         (_status(applied=NodeStateRef(fleet_epoch=1, revision=2, sha256="c" * 64)), "warning", "revision 2 of 3"),
         (_status(applied=None), "warning", "revision none of 3"),
