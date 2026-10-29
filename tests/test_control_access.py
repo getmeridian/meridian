@@ -179,6 +179,15 @@ def test_fleet_panel_marks_a_live_agent_whose_apply_failed(monkeypatch: pytest.M
     assert (node.is_connected, node.apply_failed) == (True, True)
 
 
+def test_fleet_panel_ping_raises_a_refused_token_and_is_false_only_when_unreachable(url: str) -> None:
+    """A refused token is the operator's to fix (exit 2); reading it as unreachable made status degraded (4)."""
+    with ServiceFleetPanel(url, "not-the-token", node_ids=[], endpoint_ids=[]) as panel:
+        with pytest.raises(RemnawaveAuthError):
+            panel.ping()
+    with ServiceFleetPanel("https://127.0.0.1:9/p/", ADMIN_TOKEN, node_ids=[], endpoint_ids=[]) as panel:
+        assert panel.ping() is False
+
+
 def test_fleet_projection_names_service_nodes_and_relays_by_their_service_ids(servers_file: Path) -> None:
     registry = ServerRegistry(servers_file)
     registry.add(ServerEntry(host="198.51.100.10", name="exit-a"))

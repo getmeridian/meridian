@@ -16,7 +16,12 @@ from functools import partial
 from typing import Self, TypeVar
 
 from meridian.cluster import ClusterConfig
-from meridian.control.client import ControlClient, ControlServiceAuthError, ControlServiceError
+from meridian.control.client import (
+    ControlClient,
+    ControlServiceAuthError,
+    ControlServiceError,
+    ControlServiceScopeError,
+)
 from meridian.control.models import LimitStrategy, UserRecord, UserUpdate
 from meridian.core.client_limits import ClientLimitChange, TrafficReset
 from meridian.core.fleet import FleetTopology
@@ -136,7 +141,12 @@ class ServiceFleetPanel(ServiceAccessPanel):
         self._endpoint_ids = list(endpoint_ids)
 
     def ping(self) -> bool:
-        return self._client.ping()
+        """False only when the service cannot be reached; a refused token raises, so status stops on it."""
+        try:
+            _translated(self._client.health)
+        except RemnawaveNetworkError:
+            return False
+        return True
 
     def list_nodes(self) -> list[Node]:
         nodes: list[Node] = []
@@ -186,7 +196,7 @@ def fleet_panel(cluster: ClusterConfig, topology: FleetTopology) -> FleetPanel:
 def _translated(call: Callable[[], T]) -> T:
     try:
         return call()
-    except ControlServiceAuthError as exc:
+    except (ControlServiceAuthError, ControlServiceScopeError) as exc:
         raise RemnawaveAuthError(str(exc), hint=exc.hint, category="user") from exc
     except ControlServiceError as exc:
         if exc.retryable:
