@@ -14,7 +14,7 @@
 <p align="center"><b>Deploy it right. Share it easily.</b><br>One command turns a fresh VPS into a hardened VLESS+Reality proxy and gives you a link to share.</p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/getmeridian/meridian/main/website/public/img/overview.webp" width="760" alt="meridian deploy sets up the firewall, SSH, nginx SNI routing on port 443, Xray (Reality, XHTTP, Hysteria2), the Remnawave panel, and a Let's Encrypt IP certificate, then gives your people a connection page and subscription URL">
+  <img src="https://raw.githubusercontent.com/getmeridian/meridian/main/website/public/img/overview.webp" width="760" alt="meridian deploy sets up the firewall, SSH, nginx SNI routing on port 443, Xray (Reality, XHTTP, Hysteria2), Meridian's control service, and a Let's Encrypt IP certificate, then gives your people a connection page and subscription URL">
 </p>
 
 A proxy that works can still give itself away: an open admin port, a self-signed certificate, a container that skips the firewall. Meridian sets up every layer correctly, tests the server with real traffic, and hands each person a connection page with a QR code. When an address gets blocked, add or move a server; apps pick up the change on their next refresh.
@@ -57,7 +57,8 @@ Re-run `deploy` at any time: keys, paths, and clients are kept. `meridian setup`
 - **Methods:** VLESS+Reality and XHTTP on TCP 443, Hysteria2 on UDP 443 with salamander. Every subscription lists all of them, and capable apps switch on their own.
 - **Camouflage:** nginx routes TCP 443 by SNI without decrypting. A probe without the key reaches a real website and gets its genuine certificate. Deploy picks the target from the server's own network.
 - **Hardening:** key-only SSH, fail2ban, UFW opening only SSH and 443, no public container ports, a Let's Encrypt certificate for the IP. No domain needed.
-- **Panel:** Remnawave on a secret HTTPS path. Shared links never reveal it.
+- **Control service:** Meridian's own, on a secret HTTPS path: users, subscriptions, and a web console. Shared links never reveal it, and each server's agent dials out to it, so nodes open no extra ports. No Docker, no third-party panel.
+- **Backups:** after every change your machine pulls an encrypted snapshot of the control service. If the control server is lost or seized, `meridian restore` rebuilds it on another server.
 
 Options worth knowing:
 
@@ -77,7 +78,7 @@ meridian node replace EXIT_ID 198.51.100.30           # move a blocked exit, key
 meridian setup                                        # any shape: relay chains, routing gateways
 ```
 
-Every change edits one topology in `~/.config/meridian/cluster.yml`. `meridian plan` shows what would change; `meridian apply` applies exactly that, with checkpoints, so an interrupted run resumes. Back up that folder: it holds your keys and panel access.
+Every change edits one topology in `~/.config/meridian/cluster.yml`. `meridian plan` shows what would change; `meridian apply` applies exactly that, with checkpoints, so an interrupted run resumes. Back up that folder and the recovery key deploy shows once: together they bring the fleet back on a new machine.
 
 ## When something breaks
 
@@ -100,7 +101,8 @@ IP blocked? Follow the [recovery guide](https://getmeridian.org/en/recovery/). U
 | `route add\|list\|remove` | Send chosen sites through WARP, directly, or nowhere |
 | `plan`, `apply` | Review and apply the topology |
 | `test`, `check`, `scan`, `doctor`, `logs` | Verify, inspect, find camouflage targets, report |
-| `fleet status\|inventory\|upgrade`, `panel` | Fleet overview, Remnawave upgrades, panel access |
+| `fleet status\|inventory\|history\|upgrade`, `panel` | Fleet overview, applied revisions, Realm upgrades, the web console |
+| `backup`, `restore`, `migrate` | Snapshots and the recovery key, rebuild a lost control server, move a Remnawave fleet across |
 | `teardown`, `update` | Remove Meridian from a server; update the CLI |
 | `help agents` | Explain Meridian to an AI agent |
 
@@ -128,7 +130,7 @@ prints a guide for Claude Code, Codex, Cursor, and other agents: how Meridian wo
 ## More
 
 - **Docs:** [getmeridian.org](https://getmeridian.org) · [connection page demo](https://getmeridian.org/demo) · [architecture](https://getmeridian.org/en/architecture/)
-- **Upgrading from 3.x:** Meridian 4 replaces 3x-ui with Remnawave and is not an in-place upgrade; every user gets a new link. [How to move](https://getmeridian.org/en/installation/#upgrading-from-3x).
+- **Upgrading from 3.x:** Meridian 4 replaces 3x-ui with its own control service and is not an in-place upgrade; every user gets a new link. [How to move](https://getmeridian.org/en/installation/#upgrading-from-3x). A fleet on an earlier Meridian 4 release that runs Remnawave moves in place with `meridian migrate`, keeping every link.
 - **Security:** [SECURITY.md](SECURITY.md) covers the threat model, including what Meridian does not protect against.
 - **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) · [issues](https://github.com/getmeridian/meridian/issues) (attach `meridian doctor` output)
 - **License:** [MIT](LICENSE)
