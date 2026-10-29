@@ -34,11 +34,12 @@ def run(yes: bool = False) -> None:
             err_console.print("  [dim]No terminal to confirm on; pass --yes to migrate without asking.[/dim]")
         raise typer.Exit(1)
 
-    def apply(state: ClusterConfig, intent: SetupIntent) -> None:
+    def apply(state: ClusterConfig, intent: SetupIntent, fence_holder: str) -> None:
         apply_reviewed_intent(
             state,
             registry,
             intent,
+            fence_holder=fence_holder,
             failure="The Meridian backend did not finish applying",
             hint="Run `meridian migrate` again; it continues from here.",
         )

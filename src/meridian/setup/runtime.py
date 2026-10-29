@@ -187,6 +187,7 @@ class SetupRuntime:
         reporter: Reporter | None = None,
         operation: OperationContext | None = None,
         fence_factory: FenceFactory | None = None,
+        fence_holder: str | None = None,
     ) -> None:
         self._registry = registry
         self._cluster_loader = cluster_loader
@@ -197,6 +198,8 @@ class SetupRuntime:
         self._reporter: Reporter = reporter or NoopReporter()
         self._operation = operation or OperationContext()
         self._fence_factory: FenceFactory = fence_factory or self._default_fence
+        # A caller already holding the lease (`meridian migrate`) applies under the same holder.
+        self._fence_holder = fence_holder
         self._control_bootstrap = control_bootstrap or partial(
             bootstrap_control_plane,
             cancellation=cancellation,
@@ -411,11 +414,11 @@ class SetupRuntime:
         """fence.json on a Remnawave fleet; the control service, recording the revision, on a Meridian one."""
         on_stall = stall_event_notice(self._reporter, self._operation)
         if review.intent.control.backend != "meridian":
-            return SSHApplyFence(connection, on_stall=on_stall)
+            return SSHApplyFence(connection, holder=self._fence_holder, on_stall=on_stall)
         draft = RevisionDraft.from_intent(
             review.intent, plan_hash=review.plan.plan_hash, review_hash=review.review_hash
         )
-        return ControlServiceFence(connection, cluster, draft, on_stall=on_stall)
+        return ControlServiceFence(connection, cluster, draft, holder=self._fence_holder, on_stall=on_stall)
 
     def _build_drivers(
         self,

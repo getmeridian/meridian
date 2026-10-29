@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -30,11 +31,13 @@ from meridian.host_runtime import NODE_DIR
 from meridian.migrate import MigrationError
 from meridian.migrate.flow import ControlMigrator, MigrationReview
 from meridian.node_deploy import panel_base_url
+from meridian.reconciler.fence import FleetFenceError
 from meridian.remnawave import User
 from meridian.remnawave.models import NEVER_EXPIRES_AT
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.single_server import single_server_intent
 from meridian.state_fence import FENCE_FILE
+from tests.support.fence_host import FenceHost
 from tests.support.mock_connection import MockConnection
 
 CONTROL, RELAY = "198.51.100.12", "198.51.100.21"
@@ -128,6 +131,28 @@ class FakePanel:
         pass
 
 
+class ControlHost(MockConnection):
+    """Scripted SSH for the control server, with fence.json behind a real compare-and-swap."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.fence = FenceHost()
+
+    def run(self, command: str, timeout: int = 30, **kwargs: object) -> Any:
+        if FENCE_FILE in command:
+            return self.fence.run(command, timeout)
+        return super().run(command, timeout, **kwargs)
+
+    def put_text(self, path: str, text: str, timeout: int = 30, **kwargs: object) -> Any:
+        if path.startswith(FENCE_FILE):
+            return self.fence.put_text(path, text, timeout, **kwargs)
+        return super().put_text(path, text, timeout, **kwargs)
+
+    def lease_holder(self) -> str:
+        body = self.fence.files.get(FENCE_FILE)
+        return str(json.loads(body)["lease_holder"]) if body else ""
+
+
 class Fleet:
     """Local state, saved servers, scripted SSH, and fakes for what needs a live service."""
 
@@ -136,8 +161,7 @@ class Fleet:
         self.registry.add(ServerEntry(host=CONTROL, name="control", id="srv-a", auth_state="validated"))
         self.registry.add(ServerEntry(host=RELAY, name="relay", id="srv-relay", auth_state="validated"))
         _remnawave_fleet(intent or _intent()).save()
-        self.control = MockConnection()
-        self.control.when(FENCE_FILE, stdout="absent\n")
+        self.control = ControlHost()
         self.control.when("pg_dump", stdout=f"{hashlib.sha256(DUMP).hexdigest()}\nbackup-done\n")
         self.control.when("base64 /var/backups/", stdout=base64.encodebytes(DUMP).decode())
         self.control.when("panel.env", stdout="APP_SECRET=secret-for-tests\n")
@@ -146,6 +170,7 @@ class Fleet:
         self.installs: list[str] = []
         self.imports: list[UserImportBatch] = []
         self.applied: list[SetupIntent] = []
+        self.apply_holders: list[tuple[str, str]] = []
         self.fail_apply = False
         monkeypatch.setattr("meridian.migrate.flow.install_beside_panel", self._install)
         monkeypatch.setattr("meridian.migrate.flow.import_over_ssh", self._import)
@@ -164,8 +189,9 @@ class Fleet:
             connection_builder=lambda entry: connections[entry.id],  # type: ignore[arg-type,return-value]
         )
 
-    def apply(self, cluster: ClusterConfig, intent: SetupIntent) -> None:
+    def apply(self, cluster: ClusterConfig, intent: SetupIntent, fence_holder: str) -> None:
         self.applied.append(intent)
+        self.apply_holders.append((fence_holder, self.control.lease_holder()))
         if self.fail_apply:
             raise MigrationError("apply failed in the test")
         # The service bootstrap saves its URL where the panel's was, without the trailing slash.
@@ -271,6 +297,46 @@ def test_a_node_an_unfinished_apply_installed_is_removed_too(fleet: Fleet) -> No
     assert any(f"{NODE_DIR}/docker-compose.yml" in call for call in fleet.relay.calls)
     assert sum(f"{NODE_DIR}/docker-compose.yml" in call for call in fleet.control.calls) >= 1
     assert "node-runtime:relay@2" not in ClusterConfig.load().managed_bindings
+
+
+def test_the_migration_holds_the_lease_and_the_apply_continues_it(fleet: Fleet) -> None:
+    _run(fleet)
+
+    ((holder, held),) = fleet.apply_holders
+    assert holder and held == holder
+    assert fleet.control.lease_holder() == "", "released at the end"
+
+
+def _foreign_lease(fleet: Fleet) -> None:
+    until = (datetime.now(UTC) + timedelta(minutes=20)).isoformat()
+    record = {"fleet_id": ClusterConfig.load().fleet_id, "generation": 1, "lease_holder": "elsewhere:0:1:ab"}
+    fleet.control.fence.files[FENCE_FILE] = json.dumps(record | {"lease_expires_at": until})
+
+
+def test_a_lease_taken_after_the_review_stops_the_run_before_anything_changes(fleet: Fleet) -> None:
+    migrator = fleet.migrator()
+    review = migrator.review()
+    _foreign_lease(fleet)
+
+    with pytest.raises(FleetFenceError, match="Another apply is running"):
+        migrator.run(review, fleet.apply)
+
+    assert not any("pg_dump" in call or "docker" in call for call in fleet.control.calls)
+
+
+def test_a_resumed_migration_takes_the_lease_again_before_stopping_the_panel(fleet: Fleet) -> None:
+    fleet.control.when("docker update --restart=no", rc=1, stderr="daemon gone")
+    with pytest.raises(MigrationError, match="Could not stop the panel"):
+        _run(fleet)
+    assert ClusterConfig.load().control_migration.step == "imported"  # type: ignore[union-attr]
+    _foreign_lease(fleet)
+    stops = sum("docker update --restart=no" in call for call in fleet.control.calls)
+
+    migrator = fleet.migrator()
+    with pytest.raises(FleetFenceError, match="Another apply is running"):
+        migrator.run(migrator.review(), fleet.apply)
+
+    assert sum("docker update --restart=no" in call for call in fleet.control.calls) == stops
 
 
 def test_cut_over_forgets_panel_objects_and_the_end_drops_panel_only_state(fleet: Fleet) -> None:

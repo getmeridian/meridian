@@ -120,12 +120,22 @@ def persist_reviewed_apply(cluster: ClusterConfig) -> None:
 
 
 def reviewed_runtime(
-    registry: ServerRegistry, cluster: ClusterConfig, reporter: Reporter | None = None
+    registry: ServerRegistry,
+    cluster: ClusterConfig,
+    reporter: Reporter | None = None,
+    *,
+    fence_holder: str | None = None,
 ) -> SetupRuntime:
     """A setup runtime bound to an already-loaded cluster that persists every checkpoint."""
     from meridian.setup.runtime import SetupRuntime
 
-    return SetupRuntime(registry, cluster_loader=lambda: cluster, persist=persist_reviewed_apply, reporter=reporter)
+    return SetupRuntime(
+        registry,
+        cluster_loader=lambda: cluster,
+        persist=persist_reviewed_apply,
+        reporter=reporter,
+        fence_holder=fence_holder,
+    )
 
 
 def apply_reviewed_intent(
@@ -137,14 +147,16 @@ def apply_reviewed_intent(
     hint: str,
     expected_plan_hash: str | None = None,
     on_unsaved: Callable[[ReviewedApplyPersistenceError], NoReturn] | None = None,
+    fence_holder: str | None = None,
 ) -> ResourceExecutionResult:
     """Apply an edited intent with progress, failing with ``failure`` unless every resource converged.
 
-    ``on_unsaved`` lets a command report partial results when remote state changed but local state was not saved.
+    ``on_unsaved`` lets a command report partial results when remote state changed but local state was not saved;
+    ``fence_holder`` continues a lease the caller already holds.
     """
     try:
         with apply_progress(registry=registry) as reporter:
-            result = reviewed_runtime(registry, cluster, reporter).apply_intent(
+            result = reviewed_runtime(registry, cluster, reporter, fence_holder=fence_holder).apply_intent(
                 intent, expected_plan_hash=expected_plan_hash
             )
     except MeridianError as exc:

@@ -49,15 +49,17 @@ from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.control_service import verify_control_service
 from meridian.setup.runtime import SetupReview, SetupRuntime
 from meridian.ssh import ServerConnection
-from meridian.state_fence import SSHApplyFence
+from meridian.state_fence import SSHApplyFence, apply_holder
 
 SNAPSHOT_NAME = "users.json"
 LINKS_NAME = "links.json"
 PanelFactory = Callable[[str, str], MeridianPanel]
 ConnectionBuilder = Callable[[ServerEntry], ServerConnection]
-# Applies the flipped intent through the reviewed apply path; raises (or exits) unless it converged.
-ApplyIntent = Callable[[ClusterConfig, SetupIntent], None]
+# Applies the flipped intent through the reviewed apply path, continuing the migration's lease
+# (the third argument is its holder); raises (or exits) unless it converged.
+ApplyIntent = Callable[[ClusterConfig, SetupIntent, str], None]
 Persist = Callable[[ClusterConfig], None]
+Renewable = SSHApplyFence | None
 
 
 @dataclass(frozen=True)
@@ -114,6 +116,7 @@ class ControlMigrator:
         self._on_step = on_step or (lambda _message: None)
         self._now = clock or (lambda: datetime.now(UTC))
         self._connections: dict[str, ServerConnection] = {}
+        self._holder = apply_holder()
 
     # -- review -----------------------------------------------------------------------
 
@@ -164,22 +167,32 @@ class ControlMigrator:
             return self.finished_outcome()
         migration = self._start()
         control = self._control_connection(review.intent)
-        if not migration.reached("backed_up"):
-            self._on_step("Backing up the panel database")
-            local, remote = backup_panel(control, _stamp(migration.started_at))
-            migration.backup_dir, migration.server_backup_dir = str(local), remote
-            self._checkpoint(migration, "backed_up")
-        if not migration.reached("imported"):
-            self._import(migration, review, control)
-        if not migration.reached("cut_over"):
-            self._cut_over(migration, review, control)
-        if not migration.reached("applied"):
-            self._on_step("Applying the Meridian backend")
-            apply(self.cluster, review.intent)
-            urls = self._verify(migration, review)
-            self._checkpoint(migration, "applied")
-        else:
-            urls = {}
+        # Until the cut-over the panel's fence.json guards the fleet: hold its lease through every
+        # change and hand it to the apply under the same holder, so no other apply slips between.
+        # Once cut over, the apply fences itself on the service.
+        fence = None if migration.reached("cut_over") else SSHApplyFence(control, holder=self._holder)
+        try:
+            if fence is not None:
+                self.cluster.fleet_id = fence.acquire(local_fence_view(self.cluster))
+            if not migration.reached("backed_up"):
+                self._on_step("Backing up the panel database")
+                local, remote = backup_panel(control, _stamp(migration.started_at))
+                migration.backup_dir, migration.server_backup_dir = str(local), remote
+                self._checkpoint(migration, "backed_up", fence)
+            if not migration.reached("imported"):
+                self._import(migration, review, control, fence)
+            if not migration.reached("cut_over"):
+                self._cut_over(migration, review, control, fence)
+            if not migration.reached("applied"):
+                self._on_step("Applying the Meridian backend")
+                apply(self.cluster, review.intent, self._holder)
+                urls = self._verify(migration, review)
+                self._checkpoint(migration, "applied")
+            else:
+                urls = {}
+        finally:
+            if fence is not None:
+                fence.release()  # a no-op conflict once the apply has handed the fence to the service
         self._on_step("Removing Remnawave")
         remove_panel(control)
         drop_panel_state(self.cluster)
@@ -200,7 +213,9 @@ class ControlMigrator:
         self._persist(self.cluster)
         return migration
 
-    def _import(self, migration: ControlMigration, review: MigrationReview, control: ServerConnection) -> None:
+    def _import(
+        self, migration: ControlMigration, review: MigrationReview, control: ServerConnection, fence: Renewable
+    ) -> None:
         if not migration.service_token:
             migration.service_token = secrets.token_urlsafe(32)
             self._persist(self.cluster)
@@ -216,9 +231,11 @@ class ControlMigrator:
         self._on_step(f"Importing {len(carried.batch.users)} users")
         result = import_over_ssh(control, carried.batch, migration.service_token)
         migration.imported_users = sorted([*result.created, *result.unchanged])
-        self._checkpoint(migration, "imported")
+        self._checkpoint(migration, "imported", fence)
 
-    def _cut_over(self, migration: ControlMigration, review: MigrationReview, control: ServerConnection) -> None:
+    def _cut_over(
+        self, migration: ControlMigration, review: MigrationReview, control: ServerConnection, fence: Renewable
+    ) -> None:
         self._on_step("Stopping the panel")
         stop_panel(control)
         nodes = node_runtime_bindings(self.cluster)
@@ -229,7 +246,7 @@ class ControlMigrator:
             self.cluster.panel.api_token = migration.service_token
             migration.service_token = ""
         self.cluster.topology_intent = review.intent
-        self._checkpoint(migration, "cut_over")
+        self._checkpoint(migration, "cut_over", fence)
 
     def _verify(self, migration: ControlMigration, review: MigrationReview) -> dict[str, str]:
         """Every imported user's link answers from the service and is the link they already had."""
@@ -258,9 +275,11 @@ class ControlMigrator:
                 hint="Restore it from the backup directory, then run `meridian migrate` again.",
             ) from exc
 
-    def _checkpoint(self, migration: ControlMigration, step: MigrationStep) -> None:
+    def _checkpoint(self, migration: ControlMigration, step: MigrationStep, fence: Renewable = None) -> None:
         migration.step = step
         self._persist(self.cluster)
+        if fence is not None:
+            fence.renew()  # only rewrites once the lease is old enough
 
     def _outcome(self, *, urls: Mapping[str, str] | None = None, already_done: bool = False) -> MigrationOutcome:
         migration = self.cluster.control_migration
