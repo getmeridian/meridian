@@ -50,11 +50,13 @@ def lab_dir(fleet_id: str) -> Path:
     return LABS / f"lab-{fleet_id[:8]}"
 
 
-def _parse_node(item: str) -> tuple[str, str, str]:
+def _parse_node(item: str, default_size: str) -> tuple[str, str, str, str]:
+    """NAME:REGION[:IMAGE[:SIZE]]; SIZE (e.g. cax11 for an ARM VM) defaults to --size."""
     parts = item.split(":")
-    if len(parts) not in (2, 3) or not all(parts):
-        raise SystemExit(f"  ✗ Expected NAME:REGION[:IMAGE], got {item!r}")
-    return parts[0], parts[1], parts[2] if len(parts) == 3 else DEFAULT_IMAGE
+    if len(parts) not in (2, 3, 4) or not all(parts):
+        raise SystemExit(f"  ✗ Expected NAME:REGION[:IMAGE[:SIZE]], got {item!r}")
+    image = parts[2] if len(parts) >= 3 else DEFAULT_IMAGE
+    return parts[0], parts[1], image, parts[3] if len(parts) == 4 else default_size
 
 
 def _pin_host_keys(ip: str, known_hosts: Path, timeout_sec: int = 120) -> None:
@@ -112,12 +114,12 @@ def _write_lab_files(root: Path, vms: dict[str, str]) -> None:
 
 
 def cmd_up(args: argparse.Namespace) -> int:
-    nodes = [_parse_node(item) for item in args.nodes]
+    nodes = [_parse_node(item, args.size) for item in args.nodes]
     if len(nodes) > 5:
         raise SystemExit("  ✗ A lab holds at most 5 VMs.")
     provider = make_provider(args.provider)
     first_region, first_image = nodes[0][1], nodes[0][2]
-    everyone = [{"name": name} for name, _, _ in nodes]
+    everyone = [{"name": name} for name, *_ in nodes]
     confirm_cost(provider, Topology("lab", args.provider, first_region, args.size, first_image, everyone), hours=2)
 
     fleet_id = str(uuid.uuid4())
@@ -130,10 +132,10 @@ def cmd_up(args: argparse.Namespace) -> int:
 
     instances: list[VMInstance] = []
     try:
-        for name, region, image in nodes:
-            topology = Topology("lab", args.provider, region, args.size, image, [{"name": name}])
+        for name, region, image, size in nodes:
+            topology = Topology("lab", args.provider, region, size, image, [{"name": name}])
             instances += provision(provider, topology, fleet_id)
-        vms = {name: instance.public_ipv4 or "" for (name, _, _), instance in zip(nodes, instances, strict=True)}
+        vms = {name: instance.public_ipv4 or "" for (name, *_), instance in zip(nodes, instances, strict=True)}
         for ip in vms.values():
             _pin_host_keys(ip, root / "known_hosts")
         _write_lab_files(root, vms)
@@ -190,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m tests.realvm.lab", description=__doc__.splitlines()[0])
     parser.add_argument("--provider", default="hetzner")
     sub = parser.add_subparsers(dest="cmd", required=True)
-    up = sub.add_parser("up", help="Create named VMs: NAME:REGION[:IMAGE] ...")
+    up = sub.add_parser("up", help="Create named VMs: NAME:REGION[:IMAGE[:SIZE]] ...")
     up.add_argument("nodes", nargs="+")
     up.add_argument("--size", default=DEFAULT_SIZE)
     up.set_defaults(func=cmd_up)
