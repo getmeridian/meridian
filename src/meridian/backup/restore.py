@@ -38,6 +38,7 @@ from meridian.core.errors import LocalStateError
 from meridian.core.inputs import is_ip
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
+from meridian.fleet_contexts import refuse_servers_claimed_elsewhere
 from meridian.handoff import HandoffLinks
 from meridian.host_runtime import CONTROL_SERVICE_CONFIG, CONTROL_SERVICE_STATE_DIR, CONTROL_SERVICE_UNIT
 from meridian.provision.control_service import SERVICE_USER_COMMAND
@@ -165,6 +166,12 @@ class ControlRestorer:
                 hint="Remove that relay or gateway first (meridian relay remove / route), then restore.",
                 category="user",
             ) from exc
+        # The apply refuses these too, but only after the upload and install changed the new server.
+        refuse_servers_claimed_elsewhere(
+            entry.host
+            for entry in (self._registry.find(ref) for ref in deployment_server_refs(updated))
+            if entry is not None
+        )
         setup = SetupRuntime(self._registry, cluster_loader=lambda: self.cluster).review(
             SetupDraft.from_intent(updated), cluster=self.cluster
         )

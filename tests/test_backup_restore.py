@@ -399,3 +399,23 @@ def test_a_failed_save_after_the_upload_keeps_the_staged_database_for_the_rerun(
     outcome = resumed.run(resumed.review(target, RestoreSource(snapshot, None)), new_server.apply)
 
     assert new_server.uploads == 2 and outcome.fleet_epoch == 2
+
+
+def test_a_target_another_context_holds_is_refused_at_review(
+    fleet: tuple[ClusterConfig, Path], new_server: NewServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from meridian.core.errors import LocalStateError
+
+    monkeypatch.setattr(restore_steps, "service_answers", lambda url, token: False)
+
+    def claimed(hosts: Any) -> None:
+        if NEW in set(hosts):
+            raise LocalStateError(f"{NEW} already belongs to the fleet in context 'other'", category="user")
+
+    monkeypatch.setattr(restore_steps, "refuse_servers_claimed_elsewhere", claimed)
+    cluster, snapshot = fleet
+    restorer, target = _restorer(cluster)
+
+    with pytest.raises(LocalStateError, match="context 'other'"):
+        restorer.review(target, _source(snapshot))
+    assert new_server.uploads == 0 and ClusterConfig.load().control_restore is None
