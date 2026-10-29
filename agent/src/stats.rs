@@ -11,19 +11,88 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::ErrorKind;
 use std::path::Path;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::identity::random_uuid;
-use crate::model::{StatsAck, StatsReport, UserTraffic};
+use crate::model::{HealthCheck, StatsAck, StatsReport, UserTraffic};
 use crate::system::Exec;
+use crate::timeutil::format_unix;
 
 pub const TRAFFIC_FILE: &str = "traffic.json";
 /// The contract's `Count` ceiling (2^53 − 1): totals saturate there.
 const MAX_COUNT: u64 = (1 << 53) - 1;
 const MAX_USERS: usize = 10_000;
+const COLLECTION_STALE: Duration = Duration::from_secs(180);
+const WARN_INTERVAL: Duration = Duration::from_secs(60);
+
+/// Collection evidence is independent of durable totals and service delivery. Keeping it in
+/// memory leaves traffic.json readable by a previous build during an upgrade rollback.
+pub(crate) struct CollectionHealth {
+    started: Instant,
+    last_success: Option<(Instant, u64)>,
+    failed: bool,
+    last_warned: Option<Instant>,
+}
+
+impl CollectionHealth {
+    pub(crate) fn new(started: Instant) -> Self {
+        Self {
+            started,
+            last_success: None,
+            failed: false,
+            last_warned: None,
+        }
+    }
+
+    pub(crate) fn success(&mut self, now: Instant, timestamp: u64) {
+        self.last_success = Some((now, timestamp));
+        self.failed = false;
+    }
+
+    /// Return whether this failure should produce a warning, at most once per minute.
+    pub(crate) fn failure(&mut self, now: Instant) -> bool {
+        self.failed = true;
+        if self
+            .last_warned
+            .is_some_and(|last| now.saturating_duration_since(last) < WARN_INTERVAL)
+        {
+            return false;
+        }
+        self.last_warned = Some(now);
+        true
+    }
+
+    pub(crate) fn check(&self, now: Instant) -> HealthCheck {
+        let age =
+            now.saturating_duration_since(self.last_success.map_or(self.started, |(at, _)| at));
+        let status = if age >= COLLECTION_STALE {
+            "fail"
+        } else if self.failed || self.last_success.is_none() {
+            "warn"
+        } else {
+            "pass"
+        };
+        let collected = self.last_success.map_or_else(
+            || "not collected yet".into(),
+            |(_, timestamp)| format!("last collected {}", format_unix(timestamp)),
+        );
+        let message = if self.failed {
+            format!("collection failed; {collected}")
+        } else if age >= COLLECTION_STALE {
+            format!("collection stale; {collected}")
+        } else {
+            collected
+        };
+        HealthCheck {
+            name: "stats".into(),
+            status,
+            message,
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -253,6 +322,39 @@ fn is_user_id(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn collection_warnings_are_rate_limited_even_when_queries_flap() {
+        let start = Instant::now();
+        let mut health = CollectionHealth::new(start);
+        health.success(start, 1_793_268_245);
+        assert!(health.failure(start + Duration::from_secs(1)));
+        for seconds in [2, 15, 30, 60] {
+            assert!(!health.failure(start + Duration::from_secs(seconds)));
+        }
+        assert!(health.failure(start + Duration::from_secs(61)));
+        health.success(start + Duration::from_secs(62), 1_793_268_307);
+        assert_eq!(health.check(start + Duration::from_secs(62)).status, "pass");
+        assert!(!health.failure(start + Duration::from_secs(63)));
+        assert!(health.failure(start + Duration::from_secs(121)));
+    }
+
+    #[test]
+    fn collection_becomes_stale_even_without_a_new_failure() {
+        let start = Instant::now();
+        let mut health = CollectionHealth::new(start);
+        health.success(start, 1_793_268_245);
+        assert_eq!(
+            health.check(start + Duration::from_secs(179)).status,
+            "pass"
+        );
+        let stale = health.check(start + Duration::from_secs(180));
+        assert_eq!(stale.status, "fail");
+        assert_eq!(
+            stale.message,
+            "collection stale; last collected 2026-10-29T10:04:05Z"
+        );
+    }
 
     fn deltas(items: &[(&str, u64, u64)]) -> BTreeMap<String, Totals> {
         items

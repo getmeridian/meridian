@@ -20,6 +20,12 @@ macro_rules! info {
     ($($arg:tt)*) => { eprintln!($($arg)*) };
 }
 
+/// The syslog prefix makes journald record warning priority without a logging dependency.
+#[macro_export]
+macro_rules! warn {
+    ($($arg:tt)*) => { eprintln!("<4>warning: {}", format_args!($($arg)*)) };
+}
+
 #[macro_export]
 macro_rules! debug {
     ($($arg:tt)*) => {

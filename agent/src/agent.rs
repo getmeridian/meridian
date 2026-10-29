@@ -18,11 +18,11 @@ use crate::model::{
 };
 use crate::session::{self, Session};
 use crate::state::State;
-use crate::stats::{self, TrafficStore};
+use crate::stats::{self, CollectionHealth, TrafficStore};
 use crate::system::Exec;
 use crate::timeutil::{now_rfc3339, now_unix};
 use crate::verify::{Admission, Trust, admit, verify_desired};
-use crate::{debug, info, report};
+use crate::{debug, info, report, warn};
 
 /// Report and stats cadence before the first hello names the service's.
 pub const REPORT_INTERVAL: Duration = Duration::from_secs(60);
@@ -89,6 +89,7 @@ pub struct Agent<'a> {
     /// The service refused this agent's protocol; no hello is sent before this instant.
     protocol_refused_until: Option<Instant>,
     traffic: TrafficStore,
+    collection_health: CollectionHealth,
     roots: Option<RootCerts>,
     exec: &'a dyn Exec,
     opts: Options,
@@ -156,6 +157,7 @@ impl<'a> Agent<'a> {
             revoked: false,
             protocol_refused_until: None,
             traffic,
+            collection_health: CollectionHealth::new(exec.now()),
             roots,
             exec,
             opts,
@@ -472,6 +474,10 @@ impl<'a> Agent<'a> {
     }
 
     pub fn build_report(&self) -> ObservedStateReport {
+        let collection: Vec<_> = crate::xray_health::wanted(&self.resources)
+            .then(|| self.collection_health.check(self.exec.now()))
+            .into_iter()
+            .collect();
         ObservedStateReport {
             kind: "report",
             fleet_id: self.bootstrap.fleet_id.clone(),
@@ -479,12 +485,13 @@ impl<'a> Agent<'a> {
             applied: self.state.applied.clone(),
             target: self.state.held_ref(),
             resources: self.observations.clone(),
-            health: report::health(
+            health: report::health_with_checks(
                 &self.opts.root,
                 &self.opts.state_dir,
                 self.exec,
                 &self.resources,
                 &self.observations,
+                &collection,
             ),
             versions: report::versions(&self.opts.root, &self.resources, &self.observations),
             observed_at: now_rfc3339(),
@@ -526,15 +533,22 @@ impl<'a> Agent<'a> {
         let api = self.xray_api();
         if let Some((xray, api)) = &api {
             match stats::query(self.exec, xray, api) {
-                Ok(deltas) if !deltas.is_empty() => {
-                    self.traffic.fold(&deltas);
-                    if let Err(err) = self.traffic.save(&self.opts.state_dir) {
-                        info!("{err}");
+                Ok(deltas) => {
+                    self.collection_health.success(self.exec.now(), now_unix());
+                    if !deltas.is_empty() {
+                        self.traffic.fold(&deltas);
+                        if let Err(err) = self.traffic.save(&self.opts.state_dir) {
+                            info!("{err}");
+                        }
                     }
                 }
-                Ok(_) => {}
                 // Stored totals still go out: the service counts only growth.
-                Err(err) => debug!("traffic counters unavailable: {err}"),
+                Err(_) => {
+                    let now = self.exec.now();
+                    if self.collection_health.failure(now) {
+                        warn!("stats: {}", self.collection_health.check(now).message);
+                    }
+                }
             }
         }
         self.connect()?;

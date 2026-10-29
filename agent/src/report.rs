@@ -17,8 +17,23 @@ pub fn health(
     resources: &[Resource],
     observations: &[ResourceObservation],
 ) -> NodeHealth {
-    let mut checks: Vec<_> = crate::xray_health::api_check(root, exec, resources)
-        .into_iter()
+    health_with_checks(root, state_dir, exec, resources, observations, &[])
+}
+
+/// Reserve collection checks before unit checks so the protocol's 32-check bound keeps them.
+pub(crate) fn health_with_checks(
+    root: &Path,
+    state_dir: &Path,
+    exec: &dyn Exec,
+    resources: &[Resource],
+    observations: &[ResourceObservation],
+    extra_checks: &[HealthCheck],
+) -> NodeHealth {
+    let mut checks: Vec<_> = extra_checks
+        .iter()
+        .cloned()
+        .chain(crate::xray_health::api_check(root, exec, resources))
+        .take(MAX_CHECKS)
         .collect();
     for resource in resources {
         let Spec::Unit(unit) = &resource.spec else {

@@ -1,6 +1,8 @@
 //! enroll → hello → poll → verify → apply → report → stats against an in-process fake service.
 
 mod common;
+#[path = "roundtrip/stats_health.rs"]
+mod stats_health;
 
 use std::os::unix::fs::PermissionsExt;
 use std::time::Duration;
