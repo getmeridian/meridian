@@ -516,6 +516,16 @@ def test_a_person_an_apply_is_declaring_stays_the_clis(fleet: Fleet, outcome: st
         assert refused.status == 409 and refused.body["error"]["code"] == "declared_user"
 
 
+def test_a_merely_proposed_revision_declares_no_one(fleet: Fleet) -> None:
+    """A `propose` token could otherwise lock the owner out of removing or relinking their own people."""
+    fleet.set_up()
+    fleet.service.put_user("dave")
+    proposal = RevisionProposal(intent={"access": {"users": ["dave"]}}, plan_hash="1" * 64, review_hash="2" * 64)
+    fleet.service.revisions.propose(proposal, caller=ROOT)
+
+    assert fleet.ui("POST", "/api/users/dave/reissue", {}).status == 200
+
+
 def test_a_person_declared_between_the_check_and_the_write_keeps_their_link(
     fleet: Fleet, monkeypatch: pytest.MonkeyPatch
 ) -> None:

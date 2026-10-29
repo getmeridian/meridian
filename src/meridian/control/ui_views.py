@@ -44,8 +44,12 @@ def is_declared(service: ControlService, username: str) -> bool:
     An apply creates its people while its revision is still approved, so the applied
     intent alone would leave them to the console until the apply finished; one that
     failed elsewhere has still created them, and the CLI's retry reuses their links.
+    A merely proposed revision declares no one: a `propose` token must not lock the
+    owner out of their own people.
     """
     for summary in service.revisions.list_revisions().revisions:
+        if summary.status == "proposed":
+            continue
         if username in declared_users(service.revisions.get(summary.number).intent):
             return True
         if summary.status == "applied":
