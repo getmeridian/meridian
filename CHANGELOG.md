@@ -61,6 +61,20 @@ that dials out to it.
   in place, keeping each node's identity). `--tested` skips GitHub, so Realm
   stays on the tested version or what you already upgraded to.
 
+### Fixed
+- An exit whose first apply failed is now cleaned up when you remove it: its
+  agent and firewall rules no longer stay behind, and `--forget-unreachable`
+  forgets them when the server is already gone.
+- `meridian apply` no longer retries the removal of a deleted server on every
+  run after an interrupted apply.
+- A server that already ran nginx from nginx.org now gets Meridian's sites
+  included, so certificates and connection pages work there.
+- Hardening from a security review: the agent re-checks every name that
+  reaches a file path, an Xray argument, or its API address; the service
+  answers probes the way nginx does, takes small bodies before sign-in, drops
+  traffic reports for unknown users, re-checks a node's session before handing
+  it a document, and keeps its files private (`UMask=0077`).
+
 ### Removed
 - Remnawave, its database, Valkey, the subscription page container, and Docker
   on new fleets.
