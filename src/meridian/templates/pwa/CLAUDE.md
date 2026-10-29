@@ -9,7 +9,7 @@ Server-hosted Progressive Web App and the only connection-page implementation.
 **Shared/per-client split** — static assets (`app.js`, `selfcheck.js`, `styles.css`, `sw.js`, `icon.svg`, `support.html`/`support.js`, generated `apps.json` and `probe.bin`) deploy once to `/pwa/`; per-client shell and config live in `/{uuid}/`.
 **Support page** — `support.html#<short id>` is the panel's `support-url`: `support.js` reads the person's own subscription for their UUID (VLESS or Hysteria2 link, or Xray JSON) and redirects to their page, or says the page is unavailable. The id stays in the fragment, out of server and CDN logs.
 **Security model** — all user/config data goes through `escapeHtml()`; QR base64 is validated before `<img src>` injection; iOS deep links live in `data-` attributes, never inline JS strings.
-**App catalog** — `_PWA_APPS` entries carry `platforms` (where it runs) and `recommended` (where the page features it), in recommendation order. The page reads the shared, icon-bearing `pwa/apps.json` and falls back to `config.apps`, so catalog edits reach old pages with the next asset upload.
+**App catalog** — render `config.apps` immediately; apply the shared icon-bearing `pwa/apps.json` within 5 seconds, replacing only setup and preserving selection, focus, and disclosures. Catalog edits reach old pages with the next asset upload.
 **Self-check** — `selfcheck.js` (injected by `app.js`, so older shells get it) runs from the visitor's network: clock vs the server `Date` header, a stream of the 96 KB `probe.bin` (freeze window and timeouts mirror `diagnostics/blocking.py`), and the subscription's HTTP status. "Copy report" yields English text without links, hostnames, or UUIDs.
 **Account information** — `account.js` reads same-origin subscription `/info` on open, return, and refresh; its saved projection holds status, traffic, expiry, and check time only, and is labelled unverified until checked again.
 **i18n** — English HTML with `data-t` swaps; choose the saved locale before loading, always set lang/dir, and rebuild to return to English. Support follows the same preference.
@@ -27,6 +27,7 @@ Server-hosted Progressive Web App and the only connection-page implementation.
 - **Nested `<details>` CSS** — always use the `> summary` child combinator; bare `summary` leaks parent styles into nested toggles.
 - **`<details>` markers need three rules** — `list-style:none`, `::-webkit-details-marker{display:none}`, `::marker{content:none}`.
 - **The SW caches stale files** — develop with `meridian dev preview --watch` (disables the SW, injects a reload script).
+- **Catalog timeouts must work without AbortController** — ignore late answers as well as aborting supported requests; optional data never gates config rendering.
 - **`_PWA_APPS` must match `website/src/data/apps.json`** field for field and in order; CI validates.
 - **Deep links follow each app's own handler** — v2rayNG names a subscription from the `#fragment`, Throne's `addsub` takes standard Base64 only, and v2rayN has no import scheme (no button).
 - **The CSP has no `style-src 'unsafe-inline'`** — `style=` attributes are silently dropped; use classes (CSSOM `el.style` still works).

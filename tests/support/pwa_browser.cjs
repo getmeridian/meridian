@@ -75,6 +75,13 @@ class Element {
     if (child.tagName === 'SCRIPT' && child.src && this.ownerDocument.onScript) this.ownerDocument.onScript(child);
     return child;
   }
+  get firstElementChild() { return this.children.find(child => child.nodeType === 1) || null; }
+  contains(node) { return node === this || this.children.some(child => child.contains(node)); }
+  replaceChild(child, old) {
+    const index = this.children.indexOf(old);
+    if (index < 0) throw new Error('NotFoundError');
+    this.children[index] = child; child.parentNode = this; old.parentNode = null; return old;
+  }
   remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter(child => child !== this); this.parentNode = null; }
   focus() { this.ownerDocument.activeElement = this; }
   select() { this.focus(); this.selected = true; }

@@ -205,6 +205,8 @@ function detectPlatform() {
 var PLATFORM_KEYS = { ios: 'iOS', android: 'Android', windows: 'Windows', macos: 'macOS', linux: 'Linux' };
 var PLATFORM_ORDER = ['android', 'ios', 'windows', 'macos', 'linux'];
 var ALL_PLATFORMS = ['iOS', 'Android', 'Windows', 'macOS', 'Linux'];
+var selectedPlatform = detectPlatform();
+var selectedApp = '';
 var ROUTER_DOCS = 'https://getmeridian.org/{lang}/routers/';
 
 function appPlatforms(a) {
@@ -431,7 +433,7 @@ try {
 function renderPage(config) {
   var app = document.getElementById('app');
   if (!app) return;
-  var platform = detectPlatform();
+  var platform = selectedPlatform;
   iosButtonIndex = 0;
   var html = '';
 
@@ -570,7 +572,7 @@ function renderAppMark(a, size) {
 }
 
 function renderAppRow(a, key) {
-  var html = '<a class="app-row" href="' + escapeHtml(appUrl(a, key)) + '" target="_blank" rel="noopener">';
+  var html = '<a class="app-row" data-ui-key="install-' + escapeHtml(a.name + '-' + key) + '" href="' + escapeHtml(appUrl(a, key)) + '" target="_blank" rel="noopener">';
   html += renderAppMark(a, 40);
   html += '<span class="app-row-text"><strong>' + escapeHtml(a.name) + '</strong>';
   var labels = { 'All platforms': 'apps.all', 'Desktop': 'apps.desktop',
@@ -583,19 +585,19 @@ function renderAppRow(a, key) {
 
 function renderImportButton(a, subUrl, serverName, primary) {
   var href = buildDeepLink(a.deeplink, subUrl, serverName);
-  var html = '<a data-import class="btn btn-block ' + (primary ? 'btn-primary' : 'btn-soft') + '" href="' + escapeHtml(href) + '">';
+  var html = '<a data-import data-ui-key="import-' + escapeHtml(a.name) + '" class="btn btn-block ' + (primary ? 'btn-primary' : 'btn-soft') + '" href="' + escapeHtml(href) + '">';
   html += a.icon ? renderAppMark(a, 22) : ICON_PLUS;
   html += '<span data-t="import.add" data-t-name="' + escapeHtml(a.name) + '">Add to ' + escapeHtml(a.name) + '</span>';
   return html + '</a>';
 }
 
-function renderDisclosure(label, body) {
-  return '<details class="disclose"><summary>' + label + ICON_CHEVRON + '</summary>' +
+function renderDisclosure(label, body, key) {
+  return '<details class="disclose"' + (key ? ' data-disclosure="' + key + '"' : '') + '><summary>' + label + ICON_CHEVRON + '</summary>' +
     '<div class="disclose-body">' + body + '</div></details>';
 }
 
 function renderSubUrl(subUrl) {
-  return '<button class="sub-url" data-action="copy" data-url="' + escapeHtml(subUrl) + '">' +
+  return '<button class="sub-url" data-ui-key="subscription-copy" data-action="copy" data-url="' + escapeHtml(subUrl) + '">' +
     '<span class="sub-url-value">' + escapeHtml(subUrl) + '</span>' + ICON_COPY + '</button>';
 }
 
@@ -609,7 +611,7 @@ function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
   var install = appsFor(apps, key, false);
   var hasQr = subUrl && isValidBase64(subQrB64);
   var aside = hasQr && !mobile;
-  var html = '<section class="card setup' + (aside ? ' setup-wide' : '') + '"><div class="setup-steps">';
+  var html = '<section id="setup-card" class="card setup' + (aside ? ' setup-wide' : '') + '"><div class="setup-steps">';
 
   /* Step 1 — install */
   html += '<div class="step"><span class="step-num">1</span><div class="step-body">';
@@ -620,7 +622,7 @@ function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
   if (install.more.length) {
     var more = '<div class="app-list">';
     for (var j = 0; j < install.more.length; j++) more += renderAppRow(install.more[j], key);
-    html += renderDisclosure('<span data-t="apps.other">More apps</span>', more + '</div>');
+    html += renderDisclosure('<span data-t="apps.other">More apps</span>', more + '</div>', 'install-more');
   }
   var others = '';
   for (var p = 0; p < PLATFORM_ORDER.length; p++) {
@@ -632,7 +634,7 @@ function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
     for (var q = 0; q < otherApps.length; q++) others += renderAppRow(otherApps[q], otherKey);
     others += '</div>';
   }
-  if (others) html += renderDisclosure('<span data-t="apps.more">Other platforms</span>', others);
+  if (others) html += renderDisclosure('<span data-t="apps.more">Other platforms</span>', others, 'platform-more');
   html += '</div></div>';
 
   /* Step 2 — add the subscription (pages without one go straight to the links) */
@@ -650,7 +652,7 @@ function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
       html += '<p class="muted" data-t="sub.desc">Add this URL as a subscription in your app for automatic updates.</p>';
       html += renderSubUrl(subUrl);
     }
-    if (hasQr && mobile) html += renderDisclosure('<span data-t="show.qr">Show QR code</span>', renderQr(subQrB64, 'qr-inline'));
+    if (hasQr && mobile) html += renderDisclosure('<span data-t="show.qr">Show QR code</span>', renderQr(subQrB64, 'qr-inline'), 'subscription-qr');
     if (imports.rec.length) {
       var rest = imports.more.concat(imports.other);
       var body = '';
@@ -660,7 +662,7 @@ function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
         body += '</div>';
       }
       body += '<div class="list-heading" data-t="import.manual">Copy subscription URL</div>' + renderSubUrl(subUrl);
-      html += renderDisclosure('<span data-t="import.more">Using another app?</span>', body);
+      html += renderDisclosure('<span data-t="import.more">Using another app?</span>', body, 'import-more');
     }
     html += '</div></div>';
   }
@@ -673,6 +675,25 @@ function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
     html += '</aside>';
   }
   return html + '</section>';
+}
+
+/* Refresh only setup when the optional catalog arrives: a self-check may be
+   running, and the visitor may have opened instructions or focused an action. */
+function updateSetup(config) {
+  var old = document.getElementById('setup-card');
+  if (!old) return;
+  var open = {};
+  old.querySelectorAll('[data-disclosure]').forEach(function(el) { open[el.dataset.disclosure] = el.open; });
+  var active = document.activeElement;
+  var focusKey = active && old.contains(active) && active.getAttribute('data-ui-key');
+  var holder = document.createElement('div');
+  holder.innerHTML = renderSetup(config.apps, selectedPlatform, config.subscription_url || '', config.server_name || 'Meridian', config.subscription_qr_b64);
+  var fresh = holder.firstElementChild;
+  old.parentNode.replaceChild(fresh, old);
+  fresh.querySelectorAll('[data-disclosure]').forEach(function(el) { el.open = !!open[el.dataset.disclosure]; });
+  applyI18n(config.client_name, config.server_name);
+  if (focusKey) fresh.querySelectorAll('[data-ui-key]').forEach(function(el) { if (el.dataset.uiKey === focusKey) el.focus(); });
+  document.dispatchEvent(new Event('meridian-setup'));
 }
 
 /* -----------------------------------------------------------------------
@@ -928,7 +949,10 @@ window.copyToClipboard = copyToClipboard;
 /* -----------------------------------------------------------------------
  * Init
  * ----------------------------------------------------------------------- */
+var initId = 0;
+var CATALOG_TIMEOUT_MS = 5000;
 function init() {
+  var id = ++initId;
   registerSW();
   requestPersistentStorage();
 
@@ -942,10 +966,24 @@ function init() {
     app.appendChild(el);
   }, 10000);
 
-  /* The shared catalog (with icons) wins; config.apps is the offline fallback */
-  var catalog = fetch('../pwa/apps.json')
+  var catalog = null, catalogDone = false, configLoaded = false;
+  var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  var catalogTimer = setTimeout(function() {
+    catalogDone = true;
+    if (controller) controller.abort();
+  }, CATALOG_TIMEOUT_MS);
+  function applyCatalog() {
+    if (!configLoaded || !catalog || id !== initId) return;
+    window._meridianConfig.apps = catalog.apps;
+    updateSetup(window._meridianConfig);
+  }
+  fetch('../pwa/apps.json', { signal: controller ? controller.signal : undefined })
     .then(function(r) { return r.ok ? r.json() : null; })
-    .catch(function() { return null; });
+    .then(function(value) {
+      if (catalogDone || id !== initId) return;
+      catalogDone = true; clearTimeout(catalogTimer);
+      if (value && value.apps && value.apps.length) { catalog = value; applyCatalog(); }
+    }, function() { catalogDone = true; clearTimeout(catalogTimer); });
 
   fetch('config.json')
     .then(function(r) {
@@ -953,18 +991,16 @@ function init() {
       return r.json();
     })
     .then(function(config) {
-      return catalog.then(function(c) {
-        if (c && c.apps && c.apps.length) config.apps = c.apps;
-        return config;
-      });
-    })
-    .then(function(config) {
       clearTimeout(slowTimer);
+      if (id !== initId) return;
       window._meridianConfig = config;
       renderPage(config);
+      configLoaded = true;
+      applyCatalog();
     })
     .catch(function() {
       clearTimeout(slowTimer);
+      if (id !== initId) return;
       if (app) {
         var dict = currentLang && T[currentLang];
         var errTitle = (dict && dict['error.title']) || 'Connection Setup';

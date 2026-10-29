@@ -75,6 +75,9 @@ that dials out to it.
   the snapshot and the recovery key, restore brings the fleet files back too.
 
 ### Changed
+- Connection setup opens as soon as its configuration is ready, even when
+  the optional app catalog stalls; later catalog updates preserve open
+  instructions and focus.
 - Connection pages reset text direction when switching languages, translate
   setup and accessibility labels, and use the saved language on errors and
   support pages.

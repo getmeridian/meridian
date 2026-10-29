@@ -213,6 +213,7 @@ function bindPage() {
 }
 
 document.addEventListener('meridian-render', bindPage);
+document.addEventListener('meridian-setup', applyImportState);
 document.addEventListener('visibilitychange', function() { if (document.visibilityState === 'visible') refresh(); });
 window.addEventListener('pageshow', function(event) { if (event.persisted) refresh(); });
 document.addEventListener('click', function(event) {

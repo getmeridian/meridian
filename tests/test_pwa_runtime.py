@@ -203,3 +203,46 @@ def test_support_page_honors_saved_language(page_data: dict[str, object]) -> Non
         """,
         page_data,
     )
+
+
+def test_optional_catalog_never_blocks_config_or_resets_open_content(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        let release;
+        const browser = createBrowser(data.config, data.catalog, { fetch(url) {
+          if (url.endsWith('apps.json')) return new Promise(resolve => { release = resolve; });
+          return Promise.resolve(response(url.endsWith('config.json') ? data.config : data.info));
+        } });
+        await browser.start();
+        assert.ok(browser.document.querySelector('[data-import]'), 'a stalled optional catalog must not block setup');
+        const disclosure = browser.document.querySelector('[data-disclosure="import-more"]');
+        disclosure.open = true;
+        const copy = browser.document.querySelector('.sub-url'); copy.focus();
+        browser.document.getElementById('selfcheck-results').textContent = 'Saved self-check';
+        release(response(data.catalog)); await browser.flush();
+        assert.ok(browser.document.querySelector('[data-disclosure="import-more"]').open);
+        assert.equal(browser.document.activeElement.getAttribute('data-ui-key'), copy.getAttribute('data-ui-key'));
+        assert.equal(browser.document.getElementById('selfcheck-results').textContent, 'Saved self-check');
+        assert.ok(browser.document.querySelector('.app-mark').getAttribute('src'), 'late catalog should supply icons');
+        """,
+        page_data,
+    )
+
+
+def test_catalog_timeout_ignores_late_answers_without_abort_support(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        let release;
+        const browser = createBrowser(data.config, data.catalog, { fetch(url) {
+          if (url.endsWith('apps.json')) return new Promise(resolve => { release = resolve; });
+          return Promise.resolve(response(url.endsWith('config.json') ? data.config : data.info));
+        } });
+        browser.context.AbortController = undefined;
+        await browser.start();
+        assert.ok(browser.document.querySelector('[data-import]'), 'fallback configuration should render immediately');
+        await browser.advance(5001);
+        data.catalog.apps[0].name = 'Late catalog'; release(response(data.catalog)); await browser.flush();
+        assert.ok(!browser.document.getElementById('app').textContent.includes('Late catalog'));
+        """,
+        page_data,
+    )

@@ -299,7 +299,7 @@ class TestPWATemplateSource:
 
     def test_app_js_prefers_the_shared_catalog(self) -> None:
         app_js = Path("src/meridian/templates/pwa/app.js").read_text()
-        assert "fetch('../pwa/apps.json')" in app_js
+        assert "fetch('../pwa/apps.json'," in app_js
 
     def test_every_data_t_key_is_translated(self) -> None:
         app_js = Path("src/meridian/templates/pwa/app.js").read_text()
