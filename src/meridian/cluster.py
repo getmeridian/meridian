@@ -219,7 +219,42 @@ class ControlMigration:
 
     def reached(self, step: MigrationStep) -> bool:
         """Whether `step` has finished."""
-        return MIGRATION_STEPS.index(self.step) >= MIGRATION_STEPS.index(step)
+        return step_reached(MIGRATION_STEPS, self.step, step)
+
+
+# `meridian restore` checkpoints, in order: each names the last step that finished.
+RestoreStep = Literal["started", "staged", "loaded", "installed", "applied", "done"]
+RESTORE_STEPS: tuple[RestoreStep, ...] = ("started", "staged", "loaded", "installed", "applied", "done")
+
+
+@dataclass
+class ControlRestore:
+    """Progress of rebuilding the control service on another server from a snapshot (`meridian restore`).
+
+    A re-run continues after `step`; once `done`, the next restore starts a new record.
+    `staged_database` (plaintext, 0600 on the deployer) exists only between `staged` and `loaded`.
+    """
+
+    step: RestoreStep = "started"
+    started_at: str = ""
+    finished_at: str = ""
+    snapshot: str = ""  # the snapshot file restored from
+    from_server_ref: str = ""
+    from_address: str = ""
+    to_server_ref: str = ""
+    fleet_epoch: int = 0  # the epoch the restored service starts at
+    staged_database: str = ""
+    staged_sha256: str = ""
+    links_change: bool = False  # bare-IP control: every subscription URL names the new address
+    _extra: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    def reached(self, step: RestoreStep) -> bool:
+        return step_reached(RESTORE_STEPS, self.step, step)
+
+
+def step_reached(steps: tuple[str, ...], current: str, step: str) -> bool:
+    """Whether checkpoint `step` has finished when `current` is the last one that did."""
+    return steps.index(current) >= steps.index(step)
 
 
 ActionCheckpointStatus = Literal["pending", "running", "unknown", "succeeded", "failed", "skipped", "cancelled"]
@@ -259,6 +294,8 @@ class ClusterConfig:
     telegram: TelegramConfig | None = None
     # `meridian migrate` checkpoints (None = never started).
     control_migration: ControlMigration | None = None
+    # `meridian restore` checkpoints (None = never restored).
+    control_restore: ControlRestore | None = None
     # Workload-scoped topology and durable compiled-resource state.
     topology_intent: SetupIntent | None = None
     workloads: list[WorkloadBinding] = field(default_factory=list)
@@ -419,6 +456,8 @@ class ClusterConfig:
             errors.append("cluster generations cannot be negative")
         if self.control_migration is not None and self.control_migration.step not in MIGRATION_STEPS:
             errors.append(f"control_migration.step is unknown: {self.control_migration.step}")
+        if self.control_restore is not None and self.control_restore.step not in RESTORE_STEPS:
+            errors.append(f"control_restore.step is unknown: {self.control_restore.step}")
 
         return errors
 

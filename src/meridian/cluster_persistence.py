@@ -23,6 +23,7 @@ from meridian.cluster import (
     ClusterConfig,
     ClusterConfigExternallyModifiedError,
     ControlMigration,
+    ControlRestore,
     PanelConfig,
     SubscriptionPageConfig,
     TelegramConfig,
@@ -141,6 +142,8 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
 
     if cfg.control_migration is not None:
         out["control_migration"] = _serialize_dataclass(cfg.control_migration)
+    if cfg.control_restore is not None:
+        out["control_restore"] = _serialize_dataclass(cfg.control_restore)
 
     if cfg.connection_page_markers:
         out["connection_page_markers"] = list(cfg.connection_page_markers)
@@ -264,6 +267,10 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
             transforms={"imported_users": lambda value: [str(item) for item in value or []]},
         )
 
+    control_restore: ControlRestore | None = None
+    if data.get("control_restore") is not None:
+        control_restore = _load_dataclass(data["control_restore"], ControlRestore, _public_fields(ControlRestore))
+
     connection_page_markers = _load_string_list(data, "connection_page_markers")
     raw_fleet_id = data.get("fleet_id")
     fleet_id = raw_fleet_id if isinstance(raw_fleet_id, str) else ""
@@ -286,6 +293,7 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         subscription_page=subscription_page,
         telegram=telegram,
         control_migration=control_migration,
+        control_restore=control_restore,
         topology_intent=v3.topology_intent,
         workloads=v3.workloads,
         managed_bindings=v3.managed_bindings,
