@@ -34,7 +34,6 @@ def _invoke(args: list[str]):
 
 def test_dry_run_compiles_a_single_server_topology_without_touching_state(tmp_home: Path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
 
     result = _invoke(["deploy", "198.51.100.10", "--domain", "vpn.example.com", "--dry-run", "--json"])
 
@@ -49,7 +48,6 @@ def test_dry_run_compiles_a_single_server_topology_without_touching_state(tmp_ho
 
 def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
     conn = MagicMock(port=22, identity_file="")
     resolved = SimpleNamespace(ip="198.51.100.10", user="root", port=22, machine_id="", conn=conn)
     runtime = MagicMock()
@@ -112,7 +110,6 @@ def _deploy_with(runtime: MagicMock, traffic, targets=("www.google.com", "dl.goo
 
 def test_dead_camouflage_target_falls_back_to_the_next_candidate(tmp_home: Path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
     runtime = _fake_runtime()
 
     result = _deploy_with(runtime, [("failed", "connection reset"), ("ok", "exit IP 198.51.100.10")])
@@ -124,7 +121,6 @@ def test_dead_camouflage_target_falls_back_to_the_next_candidate(tmp_home: Path,
 
 def test_explicit_sni_is_never_swapped_and_dead_traffic_fails(tmp_home: Path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
     runtime = _fake_runtime()
 
     result = _deploy_with(runtime, [("failed", "connection reset")], args=("--sni", "www.example.com"))
@@ -137,7 +133,6 @@ def test_explicit_sni_is_never_swapped_and_dead_traffic_fails(tmp_home: Path, mo
 
 def test_egress_mismatch_and_inconclusive_evidence_do_not_fail_a_deploy(tmp_home: Path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
 
     for outcome in (("egress_mismatch", "exit IP 203.0.113.1 does not match"), ("inconclusive", "no observer")):
         result = _deploy_with(_fake_runtime(), [outcome])
@@ -182,7 +177,6 @@ def test_traffic_check_waits_for_node_warm_up_before_declaring_failure(monkeypat
 
 def test_cancel_file_present_before_start_reports_cancelled_without_ssh(tmp_home: Path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
     cancel_file = tmp_home / "cancel"
     cancel_file.touch()
 
@@ -202,7 +196,6 @@ def test_cancel_during_apply_stops_before_verification_and_handoff(tmp_home: Pat
     from meridian.core.cancellation import OperationCancellation, OperationCancelledError
 
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
     runtime = _fake_runtime()
     runtime.apply_intent.side_effect = OperationCancelledError(
         OperationCancellation(
@@ -239,7 +232,6 @@ def test_deploy_offers_key_setup_only_without_yes_and_saves_the_key(
     tmp_home: Path, monkeypatch, yes: bool, offer: bool
 ) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
     key_path = str(tmp_home / "ssh" / "meridian_ed25519")
     resolved = SimpleNamespace(
         ip="198.51.100.10", user="root", port=22, machine_id="", conn=MagicMock(port=22, identity_file=key_path)

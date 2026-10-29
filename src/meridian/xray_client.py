@@ -24,7 +24,6 @@ from typing import Any
 from meridian.config import (
     CONNECT_TEST_URLS_IPV4,
     CONNECT_TEST_URLS_IPV6,
-    MERIDIAN_HOME,
     XRAY_ASSET_MAP,
     XRAY_GITHUB_URL,
     XRAY_SHA256,
@@ -71,8 +70,10 @@ class ConnectionAttempt:
 
 
 def _xray_bin_path() -> Path:
-    """Return the cached xray binary path."""
-    return MERIDIAN_HOME / "bin" / f"xray-{XRAY_VERSION}"
+    """Return the cached xray binary path (one runtime per install, whichever fleet runs it)."""
+    from meridian.config import INSTALL_HOME
+
+    return INSTALL_HOME / "bin" / f"xray-{XRAY_VERSION}"
 
 
 def _xray_asset_version_path(bin_path: Path) -> Path:

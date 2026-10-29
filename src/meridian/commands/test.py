@@ -7,9 +7,9 @@ from dataclasses import replace
 import typer
 from rich.markup import escape
 
+from meridian import config
 from meridian.cluster import ClusterConfig
 from meridian.commands.check_render import emit_verification_json, render_verification
-from meridian.config import SERVER_PROFILES_FILE
 from meridian.connectivity import collect_connectivity_checks
 from meridian.console import err_console, error_context, fail, is_json_mode
 from meridian.core.errors import LocalStateError, MeridianError
@@ -103,7 +103,7 @@ def fleet_test_targets(
     topology is saved; those cases keep single-target resolution. One entry means
     the fleet shrank while other servers stay saved; `run` tests just that one.
     """
-    registry = registry or ServerRegistry(SERVER_PROFILES_FILE)
+    registry = registry or ServerRegistry(config.SERVER_PROFILES_FILE)
     if local_entry(registry) is not None or len(registry.list()) < 2:
         return []
     try:
@@ -146,7 +146,7 @@ def collect_test_result(
             hint="Remove --client or run the full test without --basic.",
         )
     timeout = normalize_verification_timeout(timeout)
-    registry = registry or ServerRegistry(SERVER_PROFILES_FILE)
+    registry = registry or ServerRegistry(config.SERVER_PROFILES_FILE)
     try:
         if domain:
             domain = validate_hostname_value(domain)

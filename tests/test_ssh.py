@@ -64,7 +64,7 @@ class TestServerConnectionRun:
         assert _spawned(conn, "echo hello")[0] == expected
 
     def test_control_socket_path_fits_macos_limit_for_ipv6_targets(self, monkeypatch) -> None:
-        monkeypatch.setattr(ssh, "MERIDIAN_HOME", Path("/Users/someone/.meridian-v4"))
+        monkeypatch.setattr(ssh.config, "INSTALL_HOME", Path("/Users/someone/.meridian-v4"))
         opts = ssh.multiplex_opts("a-long-deploy-user", "2001:db8:1234:5678:9abc:def0:1234:5678", 2222)
 
         path = next(opt.split("=", 1)[1] for opt in opts if opt.startswith("ControlPath="))
@@ -72,7 +72,7 @@ class TestServerConnectionRun:
         assert ":" not in Path(path).name
 
     def test_too_deep_home_disables_multiplexing_instead_of_breaking_ssh(self, monkeypatch) -> None:
-        monkeypatch.setattr(ssh, "MERIDIAN_HOME", Path("/Users/someone/" + "nested/" * 12 + ".meridian"))
+        monkeypatch.setattr(ssh.config, "INSTALL_HOME", Path("/Users/someone/" + "nested/" * 12 + ".meridian"))
 
         assert ssh.multiplex_opts("root", "198.51.100.10", 22) == []
 
@@ -180,7 +180,7 @@ class TestStalledConnection:
     @pytest.fixture
     def socket_path(self, monkeypatch: pytest.MonkeyPatch) -> Any:
         home = Path(tempfile.mkdtemp(prefix="mh", dir="/tmp"))  # short enough for a control socket
-        monkeypatch.setattr(ssh, "MERIDIAN_HOME", home)
+        monkeypatch.setattr(ssh.config, "INSTALL_HOME", home)
         path = ssh.control_path("root", "198.51.100.10", 22)
         assert path is not None
         path.parent.mkdir(parents=True)

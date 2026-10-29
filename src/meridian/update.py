@@ -12,13 +12,8 @@ from pathlib import Path
 
 from packaging.version import InvalidVersion, Version
 
-from meridian.config import (
-    CACHE_DIR,
-    GITHUB_REPO,
-    PYPI_JSON_URL,
-    PYPI_PACKAGE,
-    UPDATE_CHECK_INTERVAL,
-)
+from meridian import config
+from meridian.config import GITHUB_REPO, PYPI_JSON_URL, PYPI_PACKAGE, UPDATE_CHECK_INTERVAL
 from meridian.console import err_console, info, ok, warn
 
 _RELEASES_URL = f"{GITHUB_REPO}/releases"
@@ -71,9 +66,9 @@ def newer_major(current: Version, releases: list[Version]) -> Version | None:
 
 def _should_check() -> bool:
     """Return True if enough time has passed since last check."""
-    check_file = CACHE_DIR / "last_update_check"
+    check_file = config.CACHE_DIR / "last_update_check"
     try:
-        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        config.CACHE_DIR.mkdir(parents=True, exist_ok=True)
         if check_file.exists():
             last_check = int(check_file.read_text().strip() or "0")
             if time.time() - last_check < UPDATE_CHECK_INTERVAL:
@@ -246,9 +241,8 @@ def run_self_update(major: bool = False) -> int:
         upgraded = False
     if upgraded and verify_installed_version(latest):
         ok(f"Updated to v{latest}")
-        from meridian.config import CLUSTER_CONFIG
 
-        if CLUSTER_CONFIG.exists():
+        if config.CLUSTER_CONFIG.exists():
             info("Run `meridian fleet upgrade` to roll its pinned images out to your servers")
         else:
             info("Run `meridian deploy` to set up your first server")

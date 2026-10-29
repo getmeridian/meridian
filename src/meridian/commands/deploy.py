@@ -19,6 +19,7 @@ import typer
 from pydantic import ValidationError
 from rich.markup import escape
 
+from meridian import config
 from meridian.adapters.cancellation import FileCancellationToken
 from meridian.adapters.reporters import JsonlReporter
 from meridian.branding import normalize_icon
@@ -28,7 +29,6 @@ from meridian.commands.apply_progress import apply_progress
 from meridian.commands.client_handoff import print_handoff_links
 from meridian.commands.port_check import check_ports
 from meridian.commands.resolve import ensure_server_connection, resolve_server
-from meridian.config import HOME_DISPLAY, SERVER_PROFILES_FILE
 from meridian.console import (
     err_console,
     error_context,
@@ -212,7 +212,7 @@ def _execute(
     operation: OperationContext | None = None,
 ) -> DeployResult:
     raise_if_cancelled(cancellation, phase="preflight", message="Deploy was cancelled before connecting to the server.")
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     try:
         target = resolve_deploy_target(request, registry)
     except EngineError as exc:
@@ -241,7 +241,7 @@ def _execute(
     if entry is None or not entry.id:
         fail(
             "Could not save the server profile",
-            hint=f"Check {HOME_DISPLAY}/servers.json permissions.",
+            hint=f"Check {config.HOME_DISPLAY}/servers.json permissions.",
             hint_type="system",
         )
     # Without --sni, a fresh deploy tries sites next to the server first, then known-good
@@ -466,7 +466,7 @@ def _report_traffic(outcome: TrafficOutcome, detail: str, server_ip: str) -> Non
 
 def _dry_run(request: DeployRequest) -> DeployPlan:
     """Compile the intent a deploy would apply, without SSH or local writes."""
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     try:
         target = resolve_deploy_target(request, registry)
     except EngineError as exc:
@@ -503,7 +503,7 @@ def _refuse_pre_topology_cluster(cluster: ClusterConfig) -> None:
     if cluster.is_configured and cluster.topology_intent is None:
         fail(
             "This cluster.yml was written by a Meridian 4.0 development build",
-            hint=f"Move {HOME_DISPLAY}/cluster.yml aside, then deploy again to rebuild it from scratch.",
+            hint=f"Move {config.HOME_DISPLAY}/cluster.yml aside, then deploy again to rebuild it from scratch.",
             hint_type="user",
         )
 
@@ -648,7 +648,7 @@ def _split_target(ip: str, user: str, ssh_port: int) -> tuple[str, str, str, int
         fail(str(exc), hint="Use IP, saved name, user@host[:port], or 'local'.", hint_type="user")
     if target.local:
         return ip, "", target.user, target.port
-    if not is_ip(target.host) and ServerRegistry(SERVER_PROFILES_FILE).find(target.host) is not None:
+    if not is_ip(target.host) and ServerRegistry(config.SERVER_PROFILES_FILE).find(target.host) is not None:
         return "", target.host, target.user, target.port
     return target.host, "", target.user, target.port
 

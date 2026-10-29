@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING
 import typer
 from rich.markup import escape
 
+from meridian import config
 from meridian.binary_pins import UPGRADABLE_BINARIES, BinaryPin, effective_binary_pins
 from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, require_intent, reviewed_runtime
-from meridian.config import HOME_DISPLAY
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.errors import LocalStateError, MeridianError
 from meridian.diagnostics.images import (
@@ -44,12 +44,11 @@ _STATUS_TEXT: dict[ImageStatus, str] = {
 
 def run_upgrade(*, yes: bool = False, tested: bool = False) -> None:
     """Resolve target images, compare them with what runs, apply the reviewed plan, then check every server."""
-    from meridian.config import SERVER_PROFILES_FILE
     from meridian.servers import ServerRegistry
 
     cluster = load_topology_cluster()
     intent = require_intent(cluster)
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
 
     targets = _target_pins(cluster, tested=tested)
     observed = _observe(registry, intent, targets)
@@ -223,7 +222,11 @@ def _save_pins(cluster: ClusterConfig, overrides: dict[str, str], binary_overrid
     try:
         cluster.save()
     except OSError as exc:
-        fail(f"Could not save the image pins: {exc}", hint=f"Check {HOME_DISPLAY} permissions.", hint_type="system")
+        fail(
+            f"Could not save the image pins: {exc}",
+            hint=f"Check {config.HOME_DISPLAY} permissions.",
+            hint_type="system",
+        )
 
 
 def _observe(registry: ServerRegistry, intent: SetupIntent, pins: dict[str, str] | None = None) -> list[ServerImages]:

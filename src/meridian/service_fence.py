@@ -25,8 +25,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal, TypeVar
 
+from meridian import config
 from meridian.cluster import ClusterConfig
-from meridian.config import HOME_DISPLAY
 from meridian.control.client import ControlClient, ControlServiceConflict, ControlServiceError
 from meridian.control.models import (
     ApplyFenceRecord,
@@ -250,7 +250,7 @@ class ControlServiceFence:
             if handed_over(stored):
                 raise FleetFenceError(
                     "This fleet's control service keeps its apply fence, and this copy cannot reach it.",
-                    hint=f"Copy {HOME_DISPLAY} from the machine that manages this fleet, then retry.",
+                    hint=f"Copy {config.HOME_DISPLAY} from the machine that manages this fleet, then retry.",
                     category="user",
                 )
             return _Located("ssh", stored)

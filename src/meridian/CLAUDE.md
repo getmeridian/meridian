@@ -23,6 +23,7 @@
 - **A handed-over fence.json is never a fallback** — once the service keeps the fence, an unreachable service is retried and refused; falling back to the file would let a stale copy apply around it.
 - **Local state is fail-closed** — only missing `cluster.yml`/`servers.json` means fresh; malformed files need recovery, and `srv-*` IDs survive connection edits.
 - **Never hard-code the home in messages** — print `config.HOME_DISPLAY`; a literal `~/.meridian` sent 4.x users into 3.x's directory.
+- **Read paths as `config.NAME` at call time** — a module-level `from meridian.config import CLUSTER_CONFIG` keeps the fleet chosen at import and ignores `--context` (architecture-tested).
 - **Rendered inputs are typed** — validate and canonicalize hostname, SNI, port, and transport path before nginx, Xray, or Remnawave serialization.
 - **Shared links never use the panel path** — build subscription URLs with `PanelConfig.subscription_url()` (connection-page path + `/sub/`); `SUB_PUBLIC_DOMAIN` matches it.
 - **Local mode follows the saved profile** — `ServerEntry.runs_here()` matches the recorded `/etc/machine-id` or a bindable address, never the outbound IP (a laptop on the server's VPN shares it); open saved servers with `resolve.connection_for_entry()`.

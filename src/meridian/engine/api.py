@@ -14,10 +14,10 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
+from meridian import config
 from meridian.adapters.deploy_process import run_deploy_process
 from meridian.adapters.server_engine import default_server_connection_factory
 from meridian.cluster import ClusterConfig
-from meridian.config import SERVER_PROFILES_FILE
 from meridian.core.validation import validation_errors_hint
 from meridian.engine.assets import STUDIO_ASSET_ROOTS
 from meridian.engine.operations import OperationManager, OperationRunner
@@ -157,7 +157,9 @@ def create_engine_app(
 
     default_store_factory = server_store_factory
     app.state.server_store_factory = (
-        default_store_factory if default_store_factory is not None else lambda: ServerProfileStore(SERVER_PROFILES_FILE)
+        default_store_factory
+        if default_store_factory is not None
+        else lambda: ServerProfileStore(config.SERVER_PROFILES_FILE)
     )
 
     app.add_middleware(

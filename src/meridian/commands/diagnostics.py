@@ -7,10 +7,11 @@ import shlex
 
 import typer
 
+from meridian import config
 from meridian.adapters.cluster import topology_from_local_cluster
 from meridian.commands._helpers import load_cluster
 from meridian.commands.resolve import ensure_server_connection, resolve_server
-from meridian.config import DEFAULT_SNI, SERVER_PROFILES_FILE
+from meridian.config import DEFAULT_SNI
 from meridian.console import err_console, fail, line
 from meridian.core.errors import LocalStateError
 from meridian.core.execution import ServerConnection as ServerConnectionLike
@@ -88,7 +89,7 @@ def run(
             sni = validate_hostname_value(sni)
         except ValueError as exc:
             fail(str(exc), hint_type="user")
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     resolved = resolve_server(registry, explicit_ip=ip, user=user, port=ssh_port)
 
     resolved = ensure_server_connection(resolved)

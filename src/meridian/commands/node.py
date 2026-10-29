@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 import typer
 from rich.markup import escape
 
+from meridian import config
 from meridian.adapters.cluster import topology_from_local_cluster
 from meridian.commands._helpers import (
     apply_reviewed_intent,
@@ -20,7 +21,6 @@ from meridian.commands._helpers import (
     require_intent,
 )
 from meridian.commands._validation import validate_command_input
-from meridian.config import HOME_DISPLAY
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.control_access import fleet_panel
 from meridian.core.command_inputs import NodeAddRequest, NodeTargetRequest
@@ -54,11 +54,11 @@ def run_add(
         ensure_server_connection,
         resolve_server,
     )
-    from meridian.config import DEFAULT_SNI, SERVER_PROFILES_FILE
+    from meridian.config import DEFAULT_SNI
     from meridian.servers import ServerEntry, ServerRegistry
     from meridian.setup.editor import add_exit_to_intent
 
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     target = resolve_server(registry, explicit_ip=ip, user=user, port=ssh_port)
     try:
         saved = registry.find(target.ip)
@@ -112,7 +112,7 @@ def run_add(
     except OSError as exc:
         fail(
             f"Could not save the server profile: {exc}",
-            hint=f"Check {HOME_DISPLAY} permissions and disk space, then retry.",
+            hint=f"Check {config.HOME_DISPLAY} permissions and disk space, then retry.",
             hint_type="system",
         )
     try:
@@ -293,13 +293,12 @@ def run_remove(ip_or_name: str, yes: bool = False, force: bool = False, forget_u
     """Remove a server's exit or routing-gateway role, then apply the reviewed removal."""
     request = validate_command_input(NodeTargetRequest, "Invalid node remove request", ip_or_name=ip_or_name)
     from meridian.commands.topology_removal import apply_topology_removal
-    from meridian.config import SERVER_PROFILES_FILE
     from meridian.servers import ServerRegistry
 
     cluster = load_topology_cluster()
     intent = require_intent(cluster)
     try:
-        entry = ServerRegistry(SERVER_PROFILES_FILE).find(request.ip_or_name)
+        entry = ServerRegistry(config.SERVER_PROFILES_FILE).find(request.ip_or_name)
     except LocalStateError as exc:
         fail(exc)
     server_ref = entry.id if entry is not None else ""

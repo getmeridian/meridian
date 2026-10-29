@@ -15,8 +15,8 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Protocol
 
+from meridian import config
 from meridian.cluster import ClusterConfig
-from meridian.config import HOME_DISPLAY
 from meridian.core.errors import MeridianError
 
 LEASE_DURATION = timedelta(minutes=30)
@@ -110,8 +110,8 @@ def decide_acquire(
             raise FleetFenceError(
                 "This control server belongs to a different copy of the fleet.",
                 hint=(
-                    f"Your {HOME_DISPLAY} was not copied from the machine that manages this fleet. "
-                    f"Copy {HOME_DISPLAY} from that machine, then retry."
+                    f"Your {config.HOME_DISPLAY} was not copied from the machine that manages this fleet. "
+                    f"Copy {config.HOME_DISPLAY} from that machine, then retry."
                 ),
                 category="user",
             )
@@ -133,7 +133,7 @@ def decide_acquire(
         raise FleetFenceError(
             f"Another machine changed this fleet (generation {remote.generation}; your copy is at "
             f"{local.active_generation}). Applying from this copy would undo its changes.",
-            hint=f"Copy {HOME_DISPLAY} from the machine that applied last, then retry.",
+            hint=f"Copy {config.HOME_DISPLAY} from the machine that applied last, then retry.",
             category="user",
         )
     return replace(

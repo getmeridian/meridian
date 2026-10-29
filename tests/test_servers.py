@@ -290,7 +290,7 @@ def test_server_add_invalid_port_prints_readable_validation_error(capsys: pytest
 
 def test_server_add_persists_custom_port(servers_file: Path) -> None:
     with (
-        patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
+        patch("meridian.config.SERVER_PROFILES_FILE", servers_file),
         patch("meridian.commands.resolve.ServerConnection", new=_connection_factory()) as mock_connection,
     ):
         run_add("198.51.100.10", name="edge-a", user="ubuntu", ssh_port=2222)
@@ -310,7 +310,7 @@ def test_server_add_rejects_name_retarget_before_ssh(servers_file: Path) -> None
     registry.add(ServerEntry("198.51.100.10", "root", "edge"))
 
     with (
-        patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
+        patch("meridian.config.SERVER_PROFILES_FILE", servers_file),
         patch("meridian.commands.resolve.ServerConnection", new=_connection_factory()) as connection,
         pytest.raises(typer.Exit) as exc_info,
     ):
@@ -323,7 +323,7 @@ def test_server_add_rejects_name_retarget_before_ssh(servers_file: Path) -> None
 
 def test_server_add_reports_registry_save_failure_after_ssh(servers_file: Path) -> None:
     with (
-        patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
+        patch("meridian.config.SERVER_PROFILES_FILE", servers_file),
         patch("meridian.commands.resolve.ServerConnection", new=_connection_factory()),
         patch("meridian.commands.server.ServerRegistry.add", side_effect=OSError("disk full")),
         pytest.raises(typer.Exit) as exc_info,
@@ -335,7 +335,7 @@ def test_server_add_reports_registry_save_failure_after_ssh(servers_file: Path) 
 
 def test_server_list_reports_malformed_registry(servers_file: Path) -> None:
     with (
-        patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
+        patch("meridian.config.SERVER_PROFILES_FILE", servers_file),
         patch(
             "meridian.commands.server.ServerRegistry.list",
             side_effect=LocalStateCorruptedError("Malformed servers.json"),
@@ -352,7 +352,7 @@ def test_server_remove_requires_confirmation(servers_file: Path) -> None:
     registry.add(ServerEntry("198.51.100.10", "root", "edge"))
 
     with (
-        patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
+        patch("meridian.config.SERVER_PROFILES_FILE", servers_file),
         patch("meridian.commands.server.confirm", return_value=False),
         pytest.raises(typer.Exit) as exc_info,
     ):
@@ -367,7 +367,7 @@ def test_server_remove_yes_skips_confirmation(servers_file: Path) -> None:
     registry.add(ServerEntry("198.51.100.10", "root", "edge"))
 
     with (
-        patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
+        patch("meridian.config.SERVER_PROFILES_FILE", servers_file),
         patch("meridian.commands.server.confirm") as mock_confirm,
         patch("meridian.commands.server.ClusterConfig.load", return_value=ClusterConfig()),
     ):
@@ -447,7 +447,7 @@ class TestServerProfileStore:
 
 def test_server_add_local_records_this_machine_without_ssh(servers_file: Path) -> None:
     with (
-        patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
+        patch("meridian.config.SERVER_PROFILES_FILE", servers_file),
         patch("meridian.commands.resolve._resolve_lib.detect_public_ip", return_value="198.51.100.30"),
         patch("meridian.commands.resolve._resolve_lib.current_login", return_value="root"),
         patch("meridian.commands.resolve.ServerConnection", new=_connection_factory()) as connection,

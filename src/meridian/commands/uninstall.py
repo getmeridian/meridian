@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import typer
 
+from meridian import config
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import load_cluster, load_topology_cluster, make_panel
 from meridian.commands.resolve import (
@@ -11,7 +12,6 @@ from meridian.commands.resolve import (
     resolve_server,
 )
 from meridian.compiler.deployment import deployment_server_refs
-from meridian.config import HOME_DISPLAY, SERVER_PROFILES_FILE
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.errors import LocalStateError
 from meridian.remnawave import RemnawaveError, RemnawaveNotFoundError
@@ -31,7 +31,7 @@ def _remove_saved_server_or_fail(registry: ServerRegistry, server_ip: str) -> No
     except OSError as exc:
         fail(
             "Remote teardown completed, but the saved server profile was retained",
-            hint=f"{exc} Check {HOME_DISPLAY} permissions, then run `meridian server remove {server_ip}`.",
+            hint=f"{exc} Check {config.HOME_DISPLAY} permissions, then run `meridian server remove {server_ip}`.",
             hint_type="system",
         )
 
@@ -87,7 +87,7 @@ def run(
     ssh_port: int = 0,
 ) -> None:
     """Uninstall Meridian from a server."""
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
 
     resolved = resolve_server(registry, explicit_ip=ip, user=user, port=ssh_port)
 
@@ -151,15 +151,13 @@ def run(
     # Reconcile panel and local topology only after remote uninstall succeeds.
     # A failed panel delete leaves the local node entry as the retry record;
     # rerunning the remote uninstall is idempotent.
-    from meridian.config import CLUSTER_CONFIG, SETUP_DRAFT_FILE
-
     if cluster.is_configured:
         if is_panel_host:
             # Panel host torn down — entire cluster config is invalid
             try:
                 cluster.backup()
-                CLUSTER_CONFIG.unlink(missing_ok=True)
-                SETUP_DRAFT_FILE.unlink(missing_ok=True)
+                config.CLUSTER_CONFIG.unlink(missing_ok=True)
+                config.SETUP_DRAFT_FILE.unlink(missing_ok=True)
             except (LocalStateError, OSError) as exc:
                 fail(
                     "Remote panel-host teardown completed, but cluster.yml could not be archived or removed",

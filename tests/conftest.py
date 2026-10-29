@@ -15,6 +15,17 @@ os.environ["MERIDIAN_HOME"] = tempfile.mkdtemp(prefix="meridian-test-home-")
 os.environ["MERIDIAN_DISABLE_UPDATE_CHECK"] = "1"
 
 
+CONTEXT_BOUND = (
+    "CONTEXT",
+    "FLEET_HOME",
+    "HOME_DISPLAY",
+    "CLUSTER_CONFIG",
+    "CLUSTER_BACKUP",
+    "SERVER_PROFILES_FILE",
+    "SETUP_DRAFT_FILE",
+)
+
+
 @pytest.fixture
 def tmp_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Set MERIDIAN_HOME to a temporary directory."""
@@ -25,14 +36,15 @@ def tmp_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     # Re-import config to pick up the new env var
     import meridian.config as cfg
 
-    monkeypatch.setattr(cfg, "MERIDIAN_HOME", home)
-    monkeypatch.setattr(cfg, "CLUSTER_CONFIG", home / "cluster.yml")
-    monkeypatch.setattr(cfg, "CLUSTER_BACKUP", home / "cluster.yml.bak")
+    monkeypatch.setattr(cfg, "PINNED_HOME", True)
+    monkeypatch.setattr(cfg, "INSTALL_HOME", home)
     monkeypatch.setattr(cfg, "CACHE_DIR", home / "cache")
-    monkeypatch.setattr(cfg, "SERVER_PROFILES_FILE", home / "servers.json")
-    monkeypatch.setattr(cfg, "SETUP_DRAFT_FILE", home / "setup.json")
     monkeypatch.setattr(cfg, "PREFERENCES_FILE", home / "preferences.json")
     monkeypatch.setattr(cfg, "MERIDIAN_SSH_KEY_FILE", home / "ssh" / "meridian_ed25519")
+    # Per-fleet paths: setattr each so monkeypatch restores them, then let bind_context fill them in.
+    for name in CONTEXT_BOUND:
+        monkeypatch.setattr(cfg, name, getattr(cfg, name))
+    cfg.select_context()
 
     return home
 
