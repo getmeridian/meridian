@@ -355,6 +355,17 @@ def _ufw(conn: MockConnection, status: str = "Status: active") -> None:
 
 
 class TestConfigureFirewall:
+    def test_a_failed_ufw_install_says_why(self, mock_conn: MockConnection, base_ctx):
+        mock_conn.when("which ufw", rc=1)
+        mock_conn.when("dpkg-query", rc=1)
+        mock_conn.when("apt-get update", stdout="")
+        mock_conn.when("apt-get install", rc=100, stderr="E: Unable to locate package ufw")
+
+        result = ConfigureFirewall().run(mock_conn, base_ctx)
+
+        assert result.status == "failed"
+        assert "Unable to locate package ufw" in result.detail
+
     def test_ufw_not_found_returns_failed(self, mock_conn: MockConnection, base_ctx):
         mock_conn.when("which ufw", rc=1)
         mock_conn.when("apt-get update", stdout="")

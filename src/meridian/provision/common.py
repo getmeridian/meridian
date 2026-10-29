@@ -460,7 +460,7 @@ class ConfigureFirewall:
                 return StepResult(
                     name=self.name,
                     status="failed",
-                    detail="ufw not available — install it manually: apt-get install ufw",
+                    detail=f"ufw could not be installed: {install.detail}",
                     commands=commands,
                 )
             recheck = conn.run("which ufw", timeout=15)
