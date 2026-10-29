@@ -4,7 +4,7 @@ Rebuilds a fleet's control service on another server from a snapshot, for when t
 control server died or was seized. Steps, each saved in `ClusterConfig.control_restore`
 once it finishes (the pattern `meridian migrate` uses):
 
-1. ``staged`` — the snapshot decrypted and staged on this machine: epoch + 1, a new fleet CA
+1. ``staged`` — the snapshot decrypted and staged on this machine: the next epoch, a new fleet CA
    (`control.restore`), and a new root admin token saved in `cluster.yml`.
 2. ``loaded`` — the topology names the new server (the control plane and every exit that ran
    beside it), and the staged database sits in the new server's state directory.
@@ -28,12 +28,13 @@ from pathlib import Path
 
 from meridian import __version__, config
 from meridian.backup import BackupError
+from meridian.backup.pull import saved_snapshots
 from meridian.cluster import ClusterConfig, ControlRestore, RestoreStep
 from meridian.compiler.deployment import deployment_server_refs
 from meridian.compiler.models import ControlServicePayload, FirewallRulePayload, ResourcePlan
 from meridian.control.client import ControlClient, ControlServiceAuthError, ControlServiceError
 from meridian.control.restore import stage_restored_database
-from meridian.control.snapshot import Snapshot, SnapshotHeader
+from meridian.control.snapshot import Snapshot, SnapshotError, SnapshotHeader, read_header
 from meridian.core.errors import LocalStateError
 from meridian.core.inputs import is_ip
 from meridian.core.setup import SetupDraft
@@ -83,10 +84,16 @@ class RestoreReview:
     old_reachable: bool  # the old server's SSH answers, so its resources retire instead of being forgotten
     dns_names: tuple[str, ...]
     moved_exits: tuple[str, ...]
+    fleet_epoch: int = 0  # the epoch already staged when resuming; 0 before staging
+    epoch_floor: int = 0  # the newest epoch this machine has seen; the restore goes one above it
 
     @property
     def header(self) -> SnapshotHeader | None:
         return self.source.snapshot.header if self.source.snapshot is not None else None
+
+    @property
+    def next_epoch(self) -> int:
+        return self.fleet_epoch or self.epoch_floor + 1
 
 
 @dataclass
@@ -190,7 +197,27 @@ class ControlRestorer:
             old_reachable=from_ref == target.id or (from_entry is not None and ssh_answers(from_entry)),
             dns_names=_dns_names(updated, target.id),
             moved_exits=moved,
+            fleet_epoch=restore.fleet_epoch if restore is not None and restore.reached("staged") else 0,
+            epoch_floor=self._highest_known_epoch(source),
         )
+
+    def _highest_known_epoch(self, source: RestoreSource) -> int:
+        """The newest fleet epoch this machine has seen: agents refuse any epoch below one they accepted.
+
+        An older snapshot (or one from before an earlier restore) would otherwise restore below
+        the epoch the agents hold, and none of them would ever connect again.
+        """
+        epochs = [source.snapshot.header.fleet_epoch] if source.snapshot is not None else []
+        if self.cluster.control_restore is not None:
+            epochs.append(self.cluster.control_restore.fleet_epoch)
+        for path in saved_snapshots():
+            try:
+                header = read_header(path.read_bytes())
+            except (OSError, SnapshotError):
+                continue
+            if header.fleet_id == self.cluster.fleet_id:
+                epochs.append(header.fleet_epoch)
+        return max(epochs, default=0)
 
     def _check_snapshot(self, source: RestoreSource) -> None:
         if source.snapshot is None:
@@ -216,7 +243,11 @@ class ControlRestorer:
                 raise BackupError("No snapshot to restore from.", category="user")
             path = config.FLEET_HOME / STAGING_DIR / "control.db"
             staged = stage_restored_database(
-                snapshot.database, path, fleet_id=self.cluster.fleet_id, version=__version__
+                snapshot.database,
+                path,
+                fleet_id=self.cluster.fleet_id,
+                version=__version__,
+                minimum_epoch=review.epoch_floor,
             )
             restore.fleet_epoch, restore.staged_sha256 = staged.fleet_epoch, staged.sha256
             restore.staged_database = str(path)

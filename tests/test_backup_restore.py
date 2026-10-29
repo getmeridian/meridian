@@ -419,3 +419,22 @@ def test_a_target_another_context_holds_is_refused_at_review(
     with pytest.raises(LocalStateError, match="context 'other'"):
         restorer.review(target, _source(snapshot))
     assert new_server.uploads == 0 and ClusterConfig.load().control_restore is None
+
+
+def test_an_older_snapshot_restores_above_the_newest_epoch_this_machine_has_seen(
+    fleet: tuple[ClusterConfig, Path], new_server: NewServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Agents keep the highest epoch they accepted; a restore below it would never be trusted."""
+    from meridian.cluster import ControlRestore
+
+    monkeypatch.setattr(restore_steps, "service_answers", lambda url, token: False)
+    cluster, snapshot = fleet  # taken at epoch 1
+    cluster.control_restore = ControlRestore(step="done", fleet_epoch=3, to_server_ref="srv-a")
+    restorer, target = _restorer(cluster)
+
+    review = restorer.review(target, _source(snapshot))
+    outcome = restorer.run(review, new_server.apply)
+
+    assert review.next_epoch == 4 and outcome.fleet_epoch == 4
+    with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
+        assert client.health().fleet_epoch == 4

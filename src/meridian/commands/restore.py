@@ -183,7 +183,7 @@ def _render(review: RestoreReview, registry: ServerRegistry) -> None:
     if header is not None:
         print_(
             f"  From {escape(review.source.path.name)}: taken {escape(header.created_at)}, revision {header.revision}; "
-            f"the fleet moves from epoch {header.fleet_epoch} to {header.fleet_epoch + 1}"
+            f"the fleet moves from epoch {header.fleet_epoch} to {review.next_epoch}"
         )
     old = label(review.from_server_ref)
     if review.from_server_ref != review.target.id:

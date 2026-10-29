@@ -48,9 +48,19 @@ def read_deployer_state(database: bytes) -> DeployerState | None:
 
 
 def stage_restored_database(
-    database: bytes, path: Path, *, fleet_id: str, version: str, clock: Callable[[], float] = time.time
+    database: bytes,
+    path: Path,
+    *,
+    fleet_id: str,
+    version: str,
+    minimum_epoch: int = 0,
+    clock: Callable[[], float] = time.time,
 ) -> StagedDatabase:
-    """Write the database to `path` with the next epoch and a new fleet CA; one file, no WAL beside it."""
+    """Write the database to `path` with the next epoch and a new fleet CA; one file, no WAL beside it.
+
+    The next epoch is one above both the snapshot's and `minimum_epoch` (the newest the deployer has
+    seen): agents keep the highest epoch they accepted and refuse any service below it.
+    """
     for stale in (path, path.with_name(path.name + "-wal"), path.with_name(path.name + "-shm")):
         stale.unlink(missing_ok=True)
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -62,7 +72,7 @@ def stage_restored_database(
             if store.meta("fleet_id") != fleet_id:
                 raise RestoreError("The snapshot belongs to another fleet.", category="user")
             with store.transaction():
-                epoch = store.fleet_epoch + 1
+                epoch = max(store.fleet_epoch, minimum_epoch) + 1
                 store.set_meta("fleet_epoch", str(epoch))
                 strip_unsnapshotted(store.db)  # before migrations: an older snapshot lacks newer tables
                 store.db.execute(
