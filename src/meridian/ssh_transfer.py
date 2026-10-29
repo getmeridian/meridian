@@ -233,8 +233,15 @@ class _FileTransferMixin:
 
         mode_s = f"{mode:o}" if isinstance(mode, int) else str(mode) if mode is not None else ""
         precreate_mode = "600" if sensitive else mode_s
+        q_write = shlex.quote(write_path)
+
+        def abandon(failed: CommandResult) -> CommandResult:
+            # A half-written temporary copy may already hold the secret; never leave it beside the target.
+            if atomic:
+                self.run(f"rm -f {q_write}", timeout=5, sudo=use_sudo, sensitive=True)
+            return failed
+
         if precreate_mode:
-            q_write = shlex.quote(write_path)
             create = self.run(
                 f"install -m {shlex.quote(precreate_mode)} /dev/null {q_write}",
                 timeout=timeout,
@@ -243,7 +250,7 @@ class _FileTransferMixin:
                 operation_name=f"{operation_name}: create target",
             )
             if create.returncode != 0:
-                return create
+                return abandon(create)
 
         result = self._write_bytes_direct(
             write_path,
@@ -254,9 +261,8 @@ class _FileTransferMixin:
             operation_name=operation_name,
         )
         if result.returncode != 0:
-            return result
+            return abandon(result)
 
-        q_write = shlex.quote(write_path)
         if mode is not None:
             chmod = self.run(
                 f"chmod {shlex.quote(mode_s)} {q_write}",
@@ -266,7 +272,7 @@ class _FileTransferMixin:
                 operation_name=f"{operation_name}: chmod",
             )
             if chmod.returncode != 0:
-                return chmod
+                return abandon(chmod)
 
         if owner:
             chown = self.run(
@@ -277,7 +283,7 @@ class _FileTransferMixin:
                 operation_name=f"{operation_name}: chown",
             )
             if chown.returncode != 0:
-                return chown
+                return abandon(chown)
 
         if atomic:
             mv = self.run(
@@ -287,10 +293,7 @@ class _FileTransferMixin:
                 sensitive=sensitive,
                 operation_name=f"{operation_name}: move",
             )
-            if mv.returncode != 0:
-                self.run(f"rm -f {q_write}", timeout=5, sudo=use_sudo, sensitive=True)
-                return mv
-            return mv
+            return abandon(mv) if mv.returncode != 0 else mv
 
         return result
 

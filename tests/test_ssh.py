@@ -173,6 +173,21 @@ class TestServerConnectionRun:
         create_index = next(i for i, command in enumerate(commands) if "install -m 600 /dev/null" in command)
         assert create_index < write_index
 
+    @pytest.mark.parametrize("failing", ["chown", "chmod", "mv "])
+    def test_a_failed_atomic_write_removes_its_temporary_copy(self, failing: str) -> None:
+        """The copy may already hold the secret; leaving it beside the target kept it on disk."""
+        conn = ServerConnection(ip="198.51.100.10", user="root")
+
+        def run(cmd: list[str], **_kwargs: Any) -> Any:
+            return _done(returncode=1) if failing in " ".join(cmd) else _done()
+
+        with patch("meridian.ssh.subprocess.run", side_effect=run) as mock_run:
+            result = conn.put_text("/etc/x/secret.env", "TOKEN=1\n", mode="600", owner="root:x", sensitive=True)
+
+        assert result.returncode == 1
+        last = " ".join(mock_run.call_args_list[-1][0][0])
+        assert "rm -f /etc/x/secret.env.tmp." in last
+
 
 class TestStalledConnection:
     """A stalled control connection is dropped so the next command dials a fresh one (no real ssh)."""
