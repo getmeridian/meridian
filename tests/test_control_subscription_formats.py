@@ -11,10 +11,11 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 import pytest
 import yaml
@@ -99,6 +100,103 @@ def _render(
     return render_subscription(
         person, fleet.endpoints, document, profile_title=fleet.title, public_url=fleet.public_url
     )
+
+
+def _render_endpoints(endpoints: list[ClientEndpoint], document: DocumentFormat) -> SubscriptionResponse:
+    person = SubscriptionUser(username="person", uuid=UUID, short_id=SHORT_ID)
+    return render_subscription(person, endpoints, document, profile_title="Meridian")
+
+
+def _colliding_endpoints() -> list[ClientEndpoint]:
+    remarks = (
+        "Repeated",
+        "Repeated",
+        "Repeated (2)",
+        "Automatic",
+        "Meridian",
+        "direct",
+        "DIRECT",
+        "REJECT",
+        "Automatic · Firefox",
+        "Repeated",
+    )
+    endpoint = FLEETS["single"].endpoints[0]
+    return [
+        endpoint.model_copy(
+            update={
+                "remark": remark,
+                "position": position,
+                "fingerprint_copy": position == len(remarks) - 1,
+                "fingerprint": "firefox" if position == len(remarks) - 1 else "chrome",
+            }
+        )
+        for position, remark in enumerate(remarks)
+    ]
+
+
+@pytest.mark.parametrize("document", ["base64", "browser", "mihomo", "stash", "singbox"])
+def test_presentation_names_are_unique_and_reserve_generated_groups(document: DocumentFormat) -> None:
+    endpoints = _colliding_endpoints()
+    original = [endpoint.model_dump() for endpoint in endpoints]
+    response = _render_endpoints(endpoints, document)
+    expected = [
+        "Repeated",
+        "Repeated (3)",
+        "Repeated (2)",
+        "Automatic (2)",
+        "Meridian (2)",
+        "direct (2)",
+        "DIRECT (2)",
+        "REJECT (2)",
+        "Automatic · Firefox (2)",
+        "Repeated (4)",
+    ]
+    if document in ("base64", "browser"):
+        lines = (
+            base64.b64decode(response.body).decode().splitlines()
+            if document == "base64"
+            else json.loads(response.body)["links"]
+        )
+        names = [unquote(urlsplit(line).fragment) for line in lines]
+    elif document == "singbox":
+        parsed = parse_singbox_subscription(response.body)
+        names = [outbound["tag"] for outbound in parsed["outbounds"][3:]]
+        expected = expected[:-1]
+        tags = [outbound["tag"] for outbound in parsed["outbounds"]]
+        assert len(tags) == len(set(tags))
+    else:
+        parsed = parse_mihomo_subscription(response.body)
+        names = [proxy["name"] for proxy in parsed["proxies"]]
+        group_names = [group["name"] for group in parsed["proxy-groups"]]
+        assert len(names + group_names) == len(set(names + group_names))
+        automatic = next(group for group in parsed["proxy-groups"] if group["name"] == "Automatic")
+        if document == "stash":
+            assert automatic["proxies"] == expected[:-1]
+        else:
+            assert [
+                name for name in automatic["proxies"] if not re.search(automatic["exclude-filter"], name)
+            ] == expected[:-1]
+    assert names == expected
+    assert [endpoint.model_dump() for endpoint in endpoints] == original
+
+
+def test_duplicate_names_have_a_stable_order_when_positions_tie() -> None:
+    endpoint = FLEETS["single"].endpoints[0]
+    endpoints = [
+        endpoint.model_copy(update={"remark": "Repeated", "position": 0, "address": f"198.51.100.{index}"})
+        for index in (10, 11, 12)
+    ]
+    assert _render_endpoints(endpoints, "base64").body == _render_endpoints(endpoints[::-1], "base64").body
+
+
+def test_disambiguated_names_keep_the_endpoint_remark_length_bound() -> None:
+    endpoint = FLEETS["single"].endpoints[0]
+    endpoints = [endpoint.model_copy(update={"remark": "я" * 100, "position": index}) for index in range(3)]
+    lines = base64.b64decode(_render_endpoints(endpoints, "base64").body).decode().splitlines()
+    names = [unquote(urlsplit(line).fragment) for line in lines]
+    assert len(set(names)) == 3
+    assert all(len(name) <= 100 for name in names)
+    assert names[1].endswith(" (2)") and names[2].endswith(" (3)")
 
 
 @pytest.mark.parametrize(("topology", "status"), CASES, ids=CASE_IDS)

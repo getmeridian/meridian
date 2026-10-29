@@ -17,6 +17,7 @@ from meridian.control.formats.entries import (
     AUTOMATIC,
     absolute,
     copy_groups,
+    presentation_endpoints,
     primaries,
     tls_fingerprint,
 )
@@ -30,6 +31,7 @@ def xray_json_document(
     endpoints: list[ClientEndpoint], uuid: str, placeholders: tuple[str, ...] = ()
 ) -> list[dict[str, Any]]:
     """Return the Xray JSON document: one config per automatic group (or per placeholder)."""
+    endpoints = presentation_endpoints(endpoints)
     if placeholders:
         return [_config([], uuid, remark) for remark in placeholders]
     configs = [_config(primaries(endpoints), uuid, AUTOMATIC)]

@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Literal
 
 from meridian.compiler.names import fingerprint_label
-from meridian.control.models import ClientEndpoint, LimitStrategy
+from meridian.control.models import ENDPOINT_REMARK_MAX_LENGTH, ClientEndpoint, LimitStrategy
 
 UserStatus = Literal["active", "disabled", "limited", "expired"]
 
@@ -28,6 +28,7 @@ PLACEHOLDER_PORT = 1
 # Xray JSON and Mihomo; Base64 links keep it empty, and sing-box Reality needs one too.
 DEFAULT_FINGERPRINT = "chrome"
 AUTOMATIC = "Automatic"
+RESERVED_NAMES = frozenset({AUTOMATIC, "Meridian", "direct", "DIRECT", "REJECT"})
 
 
 @dataclass(frozen=True)
@@ -56,7 +57,32 @@ class SubscriptionUser:
 
 def ordered(endpoints: list[ClientEndpoint]) -> list[ClientEndpoint]:
     """Endpoints in view order: the order every format lists them in."""
-    return sorted(endpoints, key=lambda endpoint: (endpoint.position, endpoint.remark))
+    return sorted(endpoints, key=lambda endpoint: (endpoint.position, endpoint.remark, endpoint.model_dump_json()))
+
+
+def presentation_endpoints(endpoints: list[ClientEndpoint]) -> list[ClientEndpoint]:
+    """Unique, bounded display names in stable order, without changing stored endpoints."""
+    listed = ordered(endpoints)
+    reserved = RESERVED_NAMES | {remark for remark, _ in copy_groups(listed)}
+    original_names = {endpoint.remark for endpoint in listed}
+    used = set(reserved)
+    next_suffix: dict[str, int] = {}
+    result = []
+    for endpoint in listed:
+        name = endpoint.remark
+        if name in used:
+            index = next_suffix.get(name, 2)
+            while True:
+                suffix = f" ({index})"
+                candidate = name[: ENDPOINT_REMARK_MAX_LENGTH - len(suffix)] + suffix
+                if candidate not in used and candidate not in original_names:
+                    break
+                index += 1
+            next_suffix[name] = index + 1
+            name = candidate
+        used.add(name)
+        result.append(endpoint if name == endpoint.remark else endpoint.model_copy(update={"remark": name}))
+    return result
 
 
 def primaries(endpoints: list[ClientEndpoint]) -> list[ClientEndpoint]:

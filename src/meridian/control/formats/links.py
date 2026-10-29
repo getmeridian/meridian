@@ -15,7 +15,7 @@ from meridian.control.formats.entries import (
     PLACEHOLDER_PORT,
     PLACEHOLDER_UUID,
     absolute,
-    ordered,
+    presentation_endpoints,
 )
 from meridian.control.models import ClientEndpoint
 
@@ -24,7 +24,7 @@ def links(endpoints: list[ClientEndpoint], uuid: str, placeholders: tuple[str, .
     """Every entry's link in view order, or only the placeholders when there are any."""
     if placeholders:
         return [placeholder_uri(remark) for remark in placeholders]
-    return [share_uri(endpoint, uuid) for endpoint in ordered(endpoints)]
+    return [share_uri(endpoint, uuid) for endpoint in presentation_endpoints(endpoints)]
 
 
 def base64_document(endpoints: list[ClientEndpoint], uuid: str, placeholders: tuple[str, ...] = ()) -> str:

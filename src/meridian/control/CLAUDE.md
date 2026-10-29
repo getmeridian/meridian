@@ -29,6 +29,7 @@
 - A proposal whose intent has a secret-shaped key or value (`secret_paths()`, keys per `core.redaction`) is refused, never stored; so is one whose `access` block is malformed (the console reads `access.users` on every person screen, and a `null` there broke them all).
 
 ## Pitfalls
+- Allocate unique presentation names before filtering endpoints, reserving generated groups and direct/reject labels; preserve original suffix-shaped remarks and use the same names in proxies, tags, and copy exclusions.
 - Derive subscription suffix routing from formats.selector.SUFFIX_FORMATS; aliases override Accept and User-Agent, and Stash retains its own dialect.
 - `/sub/<token>/info` always serves subscription-info JSON, including for native-app headers, and never registers a device; HEAD and unknown tokens share the ordinary subscription response path.
 - nginx answers 502/503/504 for a stopped or hung service — `ControlClient` raises those as retryable unreachable errors; as plain refusals, a stopped ctld failed the fence at once with "refused: HTTP 502". A write the backup hook counts as maybe-committed (a lost reply, any 5xx) raises `ControlServiceUncertain`, which Meridian drivers turn into `UnknownResourceOutcome`.

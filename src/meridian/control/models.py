@@ -94,6 +94,9 @@ class NodeStatus(CoreModel):
         ) == (self.fleet_epoch, self.revision, self.sha256)
 
 
+ENDPOINT_REMARK_MAX_LENGTH = 100
+
+
 class ClientEndpoint(CoreModel):
     """One public way into an exit, as subscriptions publish it.
 
@@ -101,7 +104,7 @@ class ClientEndpoint(CoreModel):
     `path`, and on a domain their `address` is that domain, so they can ride a CDN.
     """
 
-    remark: str = Field(min_length=1, max_length=100)
+    remark: str = Field(min_length=1, max_length=ENDPOINT_REMARK_MAX_LENGTH)
     protocol: ProtocolKind
     address: str = Field(min_length=1, max_length=253)
     port: int = Field(ge=1, le=65535)

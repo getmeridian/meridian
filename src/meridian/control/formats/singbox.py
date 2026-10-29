@@ -16,7 +16,7 @@ from meridian.control.formats.entries import (
     PLACEHOLDER_PORT,
     PLACEHOLDER_UUID,
     absolute,
-    primaries,
+    presentation_endpoints,
     tls_fingerprint,
 )
 from meridian.control.models import ClientEndpoint
@@ -24,11 +24,14 @@ from meridian.control.models import ClientEndpoint
 
 def singbox_document(endpoints: list[ClientEndpoint], uuid: str, placeholders: tuple[str, ...] = ()) -> dict[str, Any]:
     """Return the sing-box document for one user."""
+    endpoints = presentation_endpoints(endpoints)
     if placeholders:
         proxies = [placeholder_outbound(remark) for remark in placeholders]
     else:
         proxies = [
-            singbox_outbound(endpoint, uuid) for endpoint in primaries(endpoints) if endpoint.protocol != "xhttp"
+            singbox_outbound(endpoint, uuid)
+            for endpoint in endpoints
+            if not endpoint.fingerprint_copy and endpoint.protocol != "xhttp"
         ]
     names = [proxy["tag"] for proxy in proxies]
     document = copy.deepcopy(singbox_template())
