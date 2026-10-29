@@ -1,13 +1,14 @@
 # control — Meridian's own control service (`meridian serve`)
 
 ## Design decisions
-- **Replaces Remnawave, walking skeleton first** — one exit on the control server, users, signed node documents, and Base64/Xray JSON subscriptions; hidden behind `--control=meridian` until it reaches parity (#95).
+- **Replaces Remnawave, walking skeleton first** — one exit on the control server, users, signed node documents, and every subscription format; hidden behind `--control=meridian` until it reaches parity (#95).
 - **Service owns users, deployer owns topology (for now)** — the reconciler's Meridian drivers PUT node specs, endpoints, and users over the admin API; the service composes each node's whole document (spec + one users resource per managed inbound, right after the `xray_config`), signs it, and serves it to the agent.
 - **Signed from day one** — every document carries an Ed25519 signature (`core/agent_signing.py`); SSH bootstrap pins the raw public key from `signing.pub`, so TLS interception can't inject state. `key_id` is the key's SHA-256 until the M2 internal CA.
 - **Skeleton auth** — admin and node tokens are bearer tokens stored only as SHA-256; minting a node token revokes the previous one. Enroll/hello with CSRs replaces node tokens in M2.
 - **Stdlib HTTP on loopback** — `ThreadingHTTPServer` behind nginx's secret path; a thread per waiting long-poll is cheap at Meridian's fleet sizes. nginx strips the secret path, so routes are `/api`, `/agent/v1`, `/sub`.
 - **One SQLite file** — fleet identity, signing key (`secrets` table), nodes, users, endpoints; WAL mode, one process-wide lock, a condition variable wakes polls on a new revision.
-- **Subscriptions follow the golden corpus** — URI order, remarks, and Xray outbound shapes match `tests/systemlab/golden/`; Hysteria2 auth is the VLESS UUID, as Remnawave delivered it.
+- **Subscriptions follow the golden corpus** — `formats/` renders Base64, Xray JSON (a list: "Automatic", then fingerprint copies' own config), Mihomo, Stash, sing-box, and a browser's status JSON by filling `compiler/delivery.py`'s templates; `formats/selector.py` picks by suffix, Accept, then User-Agent. `tests/test_control_subscription_corpus.py` diffs every corpus request, each deliberate fix a named row (plain Clash/Stash get Meridian's Mihomo, Hiddify sing-box, an empty User-Agent Base64; no panel security headers). Hysteria2 auth is the VLESS UUID, as Remnawave delivered it.
+- **Renderer takes plain values** — `SubscriptionUser` (UUID, short ID, status `active|disabled|limited|expired`, expiry, traffic) and `ClientEndpoint`s; a suspended user gets Remnawave's status placeholder entries in every format. `ServiceSettings.public_url` feeds `support-url`/`profile-web-page-url`; `ClientEndpoint.fingerprint_copy` marks copies.
 
 ## What's done well
 - A revision is signed only when the resources' hash changes, so repeated applies never wake agents.
@@ -19,3 +20,6 @@
 - `executescript()` commits on its own — run the schema outside `_transaction()`.
 - Hash and sign the document as JSON values, never re-serialized typed models (the agent verifies the bytes it received).
 - `control/` never imports the deployer (CLI, SSH, panel, provision, reconciler); architecture-tested.
+- Never compress or send Referrer-Policy on `/sub/` — nginx gzips JSON/Base64 (YAML stays plain, as `gzip_types` has none) and adds its own Referrer-Policy; the panel's duplicate was a corpus defect.
+- A fingerprint copy without `fingerprint_copy` lands in the primary balancer and failover groups, mixing fingerprints toward one server (TSPU escalates); sing-box omits copies entirely.
+- Stash spells fields its own way (`sni`, Hysteria2 `auth`) and has no `exclude-filter` or `GEOIP,private`; Remnawave's Stash and Clash answers had no failover at all.

@@ -10,7 +10,7 @@ uv run pytest tests/systemlab/ -q
 **Nested Docker** — exits run their own Docker daemon and pull the pinned Remnawave backend, database, Valkey, subscription-page, and node images.
 **Deterministic topology** — a fixed `172.30.0.0/24` bridge keeps SSH host keys, deploy targets, the local Pebble CA, and relay routing repeatable.
 **Small fail-fast stages** — the controller runs bootstrap, single deploy, fleet deploy, subscription, golden capture, resilience, and removal scripts under `scripts/stages/`; Make always tears Compose down. Pure contract tests run in normal pytest.
-**Golden subscription corpus** — `scripts/capture-golden.py` records what the public subscription URL serves each `golden_agents.py` User-Agent, per topology, into gitignored `output/golden-raw/`; `golden_corpus.py` normalizes that into `golden/` (never hand-edited) and diffs new captures against it, the reference for #95.
+**Golden subscription corpus** — `scripts/capture-golden.py` records what the public subscription URL serves each `golden_agents.py` User-Agent, per topology, into gitignored `output/golden-raw/`; `golden_corpus.py` normalizes that into `golden/` (never hand-edited) and diffs new captures against it, the reference for #95: `tests/test_control_subscription_corpus.py` replays every request against the control service's renderer.
 
 ## What's done well
 

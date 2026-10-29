@@ -17,6 +17,7 @@ from typing import Any, Literal, Self
 from urllib.parse import quote, urlsplit
 
 from meridian.binary_pins import BinaryPin
+from meridian.core.defaults import SUPPORT_PAGE
 from meridian.core.inputs import is_ip, validate_optional_transport_path_value
 from meridian.core.topology import SetupIntent
 
@@ -32,8 +33,6 @@ def _load_warning(message: str, *, details: list[str] | None = None) -> None:
 
 
 CURRENT_CLUSTER_VERSION = 3
-# The shared support page (templates/pwa/support.html), under the connection-page path.
-SUPPORT_PAGE = "pwa/support.html"
 
 
 class ClusterConfigExternallyModifiedError(RuntimeError):

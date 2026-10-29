@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from meridian.control.models import ClientEndpoint, ManagedInbound, NodeSpec, users_resource_id
+from meridian.control.models import ClientEndpoint, ManagedInbound, NodeSpec, ServiceSettings, users_resource_id
 from meridian.control.server import ControlServer
 from meridian.control.service import ControlService, ServiceError, token_sha256
 from meridian.core.agent_desired import DesiredNodeState
@@ -208,8 +208,8 @@ def test_base64_subscription_matches_the_golden_uri_shapes(service: ControlServi
     user = service.put_user("alice")
     for index, endpoint in enumerate(_endpoints()):
         service.put_endpoint(f"e{index}", endpoint)
-    _, body, headers = service.subscription(user.sub_token, "")
-    lines = base64.b64decode(body).decode().splitlines()
+    response = service.subscription(user.sub_token, user_agent="curl/8.5.0")
+    lines = base64.b64decode(response.body).decode().splitlines()
     host, uuid = "198.51.100.7", user.uuid
     assert lines == [
         f"vless://{uuid}@{host}:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality"
@@ -220,7 +220,7 @@ def test_base64_subscription_matches_the_golden_uri_shapes(service: ControlServi
         "&fm=%7B%22udp%22%3A%5B%7B%22type%22%3A%22salamander%22%2C%22settings%22%3A%7B%22password%22%3A%22SALT"
         "%22%7D%7D%5D%7D#Hysteria2%20%C2%B7%20UDP",
     ]
-    assert headers["profile-title"] == "base64:" + base64.b64encode(b"Meridian").decode()
+    assert response.headers["profile-title"] == "base64:" + base64.b64encode(b"Meridian").decode()
 
 
 def test_xray_json_subscription_is_the_automatic_config_test_runs(service: ControlService) -> None:
@@ -229,8 +229,7 @@ def test_xray_json_subscription_is_the_automatic_config_test_runs(service: Contr
     user = service.put_user("alice")
     for index, endpoint in enumerate(_endpoints()):
         service.put_endpoint(f"e{index}", endpoint)
-    _, body, _ = service.subscription(user.sub_token, "json")
-    config = parse_xray_subscription(body)
+    config = parse_xray_subscription(service.subscription(user.sub_token, "json").body)
     assert [item["tag"] for item in proxy_outbounds(config)] == [
         "MERIDIAN_PROXY",
         "MERIDIAN_PROXY-2",
@@ -242,9 +241,56 @@ def test_xray_json_subscription_is_the_automatic_config_test_runs(service: Contr
 
 
 def test_an_unknown_subscription_is_not_found(service: ControlService) -> None:
-    with pytest.raises(ServiceError) as raised:
-        service.subscription("x" * 24, "")
-    assert raised.value.status == 404
+    response = service.subscription("x" * 24)
+    assert response.status == 404 and json.loads(response.body)["isFound"] is False
+
+
+def test_settings_carry_the_public_url_into_subscription_headers(service: ControlService) -> None:
+    user = service.put_user("alice")
+    assert "support-url" not in service.subscription(user.sub_token).headers
+    service.put_settings(ServiceSettings(profile_title="Meridian", public_url="https://198.51.100.7/connect"))
+    headers = service.subscription(user.sub_token).headers
+    assert headers["profile-web-page-url"] == f"https://198.51.100.7/connect/sub/{user.sub_token}"
+    assert headers["support-url"] == f"https://198.51.100.7/connect/pwa/support.html#{user.sub_token}"
+
+
+def _fetch(url: str, headers: dict[str, str]) -> tuple[int, str, dict[str, str]]:
+    request = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return response.status, response.read().decode(), {k.lower(): v for k, v in response.headers.items()}
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read().decode(), {k.lower(): v for k, v in exc.headers.items()}
+
+
+@pytest.mark.parametrize(
+    ("suffix", "headers", "content_type", "marker"),
+    [
+        ("", {"User-Agent": "Happ/3.2.1"}, "application/json", '"remarks":"Automatic"'),
+        ("", {"User-Agent": "FlClash X/v0.3.1 Platform/android"}, "text/yaml", "proxy-groups:"),
+        ("", {"User-Agent": "SFA/1.12.9"}, "application/json", '"type":"urltest"'),
+        ("", {"User-Agent": ""}, "text/plain", ""),
+        ("", {"User-Agent": "Mozilla/5.0", "Accept": "text/html"}, "application/json", '"isFound":true'),
+        ("/mihomo", {"User-Agent": "curl/8.5.0"}, "text/yaml", "proxy-groups:"),
+        ("/singbox", {"User-Agent": "curl/8.5.0"}, "application/json", '"type":"urltest"'),
+    ],
+    ids=["happ", "mihomo", "sing-box", "empty-ua", "browser", "suffix-mihomo", "suffix-singbox"],
+)
+def test_subscription_route_passes_the_request_to_the_renderer(
+    http: str, service: ControlService, suffix: str, headers: dict[str, str], content_type: str, marker: str
+) -> None:
+    user = service.put_user("alice")
+    for index, endpoint in enumerate(_endpoints()):
+        service.put_endpoint(f"e{index}", endpoint)
+    status, body, served = _fetch(f"{http}/sub/{user.sub_token}{suffix}", headers)
+    assert status == 200 and served["content-type"].startswith(content_type)
+    assert marker in body if marker else base64.b64decode(body).decode().startswith("vless://")
+    assert served["cache-control"] == "no-store" and "referrer-policy" not in served
+
+
+def test_subscription_route_answers_an_unknown_token_with_404(http: str) -> None:
+    status, body, _ = _fetch(f"{http}/sub/{'x' * 24}", {"User-Agent": "Happ/3.2.1"})
+    assert status == 404 and json.loads(body) == {"isFound": False, "statusCode": 404, "message": "Resource not found"}
 
 
 @pytest.fixture
