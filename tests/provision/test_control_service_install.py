@@ -70,6 +70,25 @@ def test_converged_install_changes_and_restarts_nothing() -> None:
     conn.assert_not_called_with_pattern("systemctl restart")
 
 
+def test_a_service_older_than_its_files_is_restarted_though_nothing_changes_now() -> None:
+    """A run whose reply was lost after installing never restarted; the retry finds every file current."""
+    install = _install()
+    conn = MockConnection()
+    conn.when("bin/uv --version", stdout=f"uv {UV_VERSION} (x86_64-unknown-linux-musl)\n")
+    conn.when(f"cat {INSTALLED_MARKER}", stdout=f"{PYPI.identity}\n")
+    conn.when("systemctl is-active", stdout="active\n")
+    config = json.dumps(install.install.config.model_dump(mode="json"), indent=2) + "\n"
+    conn.when("cat /etc/ctld/config.json", stdout=config)
+    conn.when("cat /etc/systemd/system/ctld.service", stdout=render_service_unit())
+    conn.when("ps -o etimes=", stdout="outdated\n")
+
+    result = install.run(conn, _ctx())
+
+    assert result.status == "changed"
+    conn.assert_not_called_with_pattern("tool install")
+    conn.assert_called_with_pattern("systemctl restart ctld")
+
+
 def test_dev_build_uploads_the_wheel_and_installs_that_file() -> None:
     wheel = ServicePackage(requirement="", wheel=b"PK\x03\x04wheel", wheel_name="meridian_vpn-4.0.0-py3-none-any.whl")
     conn = MockConnection()

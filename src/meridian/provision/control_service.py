@@ -175,7 +175,7 @@ class InstallControlService:
             return f"could not write {path}: {written.detail}"
         self._changed |= written.changed
         active = conn.run(f"systemctl is-active {CONTROL_SERVICE_UNIT}", timeout=15).stdout.strip() == "active"
-        if active and not self._changed:
+        if active and not self._changed and not self._outdated(conn, path):
             return ""
         # A new package, config, or unit only takes effect after a restart.
         restart = conn.run(
@@ -187,6 +187,22 @@ class InstallControlService:
         return (
             "" if restart.returncode == 0 else f"could not start {CONTROL_SERVICE_UNIT}: {restart.stderr.strip()[:200]}"
         )
+
+    def _outdated(self, conn: ServerConnection, unit: str) -> bool:
+        """Whether the running service started before its package, config, or unit last changed.
+
+        A run whose reply was lost after writing them never restarted; the retry finds them
+        current and must still restart. An unreadable answer restarts too: it costs a second.
+        """
+        files = " ".join(shlex.quote(path) for path in (INSTALLED_MARKER, CONTROL_SERVICE_CONFIG, unit))
+        result = conn.run(
+            f'pid=$(systemctl show -p MainPID --value {CONTROL_SERVICE_UNIT}); [ "${{pid:-0}}" != 0 ] || exit 0; '
+            'started=$(( $(date +%s) - $(ps -o etimes= -p "$pid") )); '
+            f"for f in {files}; do "
+            '[ -e "$f" ] && [ "$(stat -c %Y "$f")" -gt "$started" ] && echo outdated; done; exit 0',
+            timeout=15,
+        )
+        return result.returncode != 0 or "outdated" in result.stdout
 
     def _ready(self, conn: ServerConnection) -> str:
         port = self.install.config.listen_port

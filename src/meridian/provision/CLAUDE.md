@@ -42,4 +42,5 @@
 - **"Installed" means `install ok installed`** — `ServerFacts.installed_packages()` reads `${Status}`; `dpkg-query -W` also lists removed packages.
 - **Ubuntu and Debian both** — use `bind9-dnsutils` (Debian 13's `dnsutils` is virtual) and read the codename from `ServerFacts.os_release()`, not `lsb_release`.
 - **An unread install record stops the control-service install** — only an absent marker means a fresh server; read as empty, a lost reply let `uv tool install --force` downgrade a newer service.
+- **Restart `ctld` when it started before its marker, config, or unit last changed** — a run whose reply was lost after writing them never restarted, and the retry found every file current.
 - **Generated file content stays off shell commands** — use `conn.put_text()`/`put_bytes()` with mode/owner/sensitive flags, not heredocs or `printf`.
