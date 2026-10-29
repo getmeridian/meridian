@@ -49,17 +49,14 @@ def validate_meridian_backend(intent: SetupIntent) -> None:
     """Refuse what the control service cannot run yet.
 
     Exits (bare-IP or domain, WSS, self-steal, egress overrides, WARP), Realm relays, routing
-    gateways with pools and routes, and a control domain run; their nginx, certificates, and
-    firewall rules are shared server kinds, and WARP installs over SSH with the agent
-    (`AgentRuntimePayload.warp`). Client IP forwarding changes the PROXY protocol chain in
-    front of every workload and waits for its own review.
+    gateways with pools and routes, a control domain, and a control server without an exit (its
+    bootstrap falls back to default backend ports, as a panel-only server's does) run; their
+    nginx, certificates, and firewall rules are shared server kinds, and WARP installs over SSH
+    with the agent (`AgentRuntimePayload.warp`). Client IP forwarding changes the PROXY protocol
+    chain in front of every workload and waits for its own review.
     """
-    unsupported = ["client IP forwarding"] if intent.forward_client_ips else []
-    if not any(exit_.server_ref == intent.control.server_ref for exit_ in intent.exits):
-        # The control bootstrap takes its nginx Reality route from the exit beside it.
-        unsupported.append("a control server without an exit")
-    if unsupported:
-        raise TopologyCompileError("Meridian's control service does not support " + ", ".join(unsupported) + " yet.")
+    if intent.forward_client_ips:
+        raise TopologyCompileError("Meridian's control service does not support client IP forwarding yet.")
 
 
 def to_meridian_backend(builder: PlanBuilder) -> PlanBuilder:

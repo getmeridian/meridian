@@ -1,7 +1,7 @@
 # control — Meridian's own control service (`meridian serve`)
 
 ## Design decisions
-- **Replaces Remnawave, walking skeleton first** — one exit on the control server, users, signed node documents, and every subscription format; hidden behind `--control=meridian` until it reaches parity (#95).
+- **Replaces Remnawave** — every fleet shape but client-IP forwarding (exits anywhere, relays, routing gateways as agent nodes, WARP, a control server without an exit), users, signed node documents, and every subscription format; hidden behind `--control=meridian` until it reaches parity (#95).
 - **Service owns users, deployer owns topology (for now)** — the reconciler's Meridian drivers PUT node specs, endpoints, and users over the admin API; the service composes each node's whole document (spec + one users resource per managed inbound, right after the `xray_config`), signs it, and serves it to the agent.
 - **Fleet CA from the first start** — `NodeAuthority` (`enrollment.py`) creates an Ed25519 CA (`pki.py`; keys in the `secrets` table) and certifies the signing key with URI SAN `meridian-service://<fleet>`; `key_id` is that certificate's DER SHA-256. Documents signed under another certificate are signed again at start.
 - **Enrollment and sessions follow the contract** — the admin API mints one single-use, 30-minute enrollment token per node; `enroll` trades it and a CSR for a 90-day certificate (SAN `meridian-agent://<fleet>/<node>`) and revokes the node's earlier certificates and sessions; `hello` checks chain, revocation, SAN, ±300 s, and nonce, then opens a one-hour session. Every token is stored only as SHA-256; the 443 handshake never asks for a client certificate.

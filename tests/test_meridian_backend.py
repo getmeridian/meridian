@@ -17,7 +17,7 @@ from meridian.compiler.models import (
 )
 from meridian.core.deploy import DeployRequest
 from meridian.core.errors import LocalStateError
-from meridian.core.topology import EgressOverrideIntent, ExitIntent, TransparentRelayIntent
+from meridian.core.topology import EgressOverrideIntent, ExitIntent, RoutingGatewayIntent, TransparentRelayIntent
 from meridian.setup.default_paths import default_exit_paths
 from meridian.setup.single_server import request_intent, single_server_intent
 from tests.support.topology import GATEWAY_SERVERS, gateway_fleet_intent
@@ -196,12 +196,39 @@ def test_control_service_readiness_requires_the_url_on_its_domain(host: str, obs
     assert bool(conn.calls) is observed  # only a matching URL goes on to read the attestation
 
 
-def test_meridian_backend_refuses_a_control_server_without_an_exit() -> None:
-    intent = _intent()
-    moved = intent.exits[0].model_copy(update={"server_ref": "srv-b"})
+def _control_only_fleet():
+    """The control server runs only the service: exit `de` behind a relay and a routing gateway."""
+    relay = TransparentRelayIntent(id="r1", hop_server_refs=["srv-r"], exit_ref="de", protocol_path_ref="de-reality")
+    gateway = RoutingGatewayIntent(id="gw", server_ref="srv-g", bridge_path_ref="de-reality")
+    return _intent(
+        exits=[_second_exit()], default_egress_ref="de", transparent_relays=[relay], routing_gateways=[gateway]
+    )
 
-    with pytest.raises(TopologyCompileError, match="control server without an exit"):
-        compile_topology(intent.model_copy(update={"exits": [moved]}))
+
+def _on_remnawave(intent):
+    return intent.model_copy(update={"control": intent.control.model_copy(update={"backend": "remnawave"})})
+
+
+def test_a_control_server_without_an_exit_runs_only_the_service() -> None:
+    """Its bootstrap and 443 stream match a panel-only server's: no Reality route, default backend ports."""
+    from meridian.setup.control_plane import bootstrap_profile_values
+
+    meridian = compile_topology(_control_only_fleet())
+    panel = compile_topology(_on_remnawave(_control_only_fleet()))
+
+    def control_stream(plan):
+        return next(
+            item.payload
+            for item in plan.resources
+            if isinstance(item.payload, NginxArtifactPayload) and item.payload.server_ref == "srv-a"
+        )
+
+    on_control = {
+        item.payload.kind for item in meridian.resources if getattr(item.payload, "server_ref", "") == "srv-a"
+    }
+    assert on_control == {"server_baseline", "firewall_rule", "control_service", "nginx_artifact"}
+    assert control_stream(meridian) == control_stream(panel)
+    assert bootstrap_profile_values(meridian) == bootstrap_profile_values(panel)
 
 
 def test_every_exit_gets_its_own_agent_and_workload() -> None:
@@ -325,6 +352,7 @@ PARITY_FLEETS = {
     "control-domain": _control_domain_fleet,
     "warp": _warp_fleet,
     "gateway": _gateway_fleet,
+    "control-only": _control_only_fleet,
 }
 # The domain exit sits on the control server: its WSS and XHTTP routes are on the domain.
 DOMAIN_SHAPES = {"domain", "self-steal-on-domain", "self-steal-own-name", "control-domain"}
@@ -345,7 +373,7 @@ def test_verification_sees_a_control_service_fleet_like_a_panel_fleet(tmp_path, 
     for ref, host in SERVERS.items():
         registry.add(ServerEntry(host=host, user="root", id=ref))
     meridian = PARITY_FLEETS[shape]()
-    panel = meridian.model_copy(update={"control": meridian.control.model_copy(update={"backend": "remnawave"})})
+    panel = _on_remnawave(meridian)
 
     contexts = []
     for intent in (meridian, panel):
