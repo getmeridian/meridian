@@ -96,6 +96,25 @@ def requests_machine_output(ctx: click.Context, name: str, command: click.Comman
     )
 
 
+def requests_help(ctx: click.Context, args: list[str], command: click.Command | None, rest: list[str]) -> bool:
+    """Whether `args` ask for help: a group's `--help`, or a leaf's as Click parses it.
+
+    A raw scan would take an option's value for a request (`--context --help`), and a run that
+    reads as help skips context validation, so a leaf's own arguments go through its parser.
+    """
+    consumed = args[: len(args) - len(rest)]
+    if any(arg in ctx.help_option_names for arg in consumed):
+        return True
+    if command is None or isinstance(command, click.Group):
+        return any(arg in ctx.help_option_names for arg in rest)
+    parsed = command.make_context(command.name or "", [], parent=ctx, resilient_parsing=True)
+    help_option = command.get_help_option(parsed)
+    if help_option is None:
+        return False
+    options, _arguments, _order = command.make_parser(parsed).parse_args(list(rest))
+    return help_option.name in options
+
+
 def requested_context(ctx: click.Context, name: str, command: click.Command, args: list[str]) -> str:
     """The `--context` value given after the command, parsed leniently before the root callback runs."""
     from meridian.cli_options import LEAF_CONTEXT

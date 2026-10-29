@@ -12,7 +12,7 @@ from typer.core import TyperGroup
 from meridian import __version__
 from meridian import cli_types as click
 from meridian.cli_backup import backup_app, restore_cmd
-from meridian.cli_catalog import command_path, requested_context, requests_machine_output, supports_json
+from meridian.cli_catalog import command_path, requested_context, requests_help, requests_machine_output, supports_json
 from meridian.cli_groups import (
     api_app,
     client_app,
@@ -118,7 +118,7 @@ class _SectionedGroup(TyperGroup):
                 name=".".join(path),
                 supports_json=leaf is not None and supports_json(leaf),
                 machine_output=leaf is not None and requests_machine_output(ctx, path[-1], leaf, rest),
-                help_requested=any(arg in ctx.help_option_names for arg in args),
+                help_requested=requests_help(ctx, args, command, rest),
                 context=requested_context(ctx, path[-1], leaf, rest) if leaf is not None else "",
             )
         return super().resolve_command(ctx, args)

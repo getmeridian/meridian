@@ -353,6 +353,32 @@ def test_a_server_stays_claimed_until_its_retirement_finishes(install: Path) -> 
     refuse_servers_claimed_elsewhere(["198.51.100.41"])
 
 
+def test_a_context_value_that_looks_like_help_is_no_help_request(install: Path) -> None:
+    """Click takes `--help` as --context's value; reading it as help skipped the context check."""
+    _fleet(install, control="198.51.100.40")
+
+    result = _cli("client", "list", "--context", "--help", "--json")
+
+    assert result.exit_code == 2, result.output
+    assert "Invalid context name" in result.output
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["client", "list", "--context", "nosuch", "--help"],
+        ["client", "--help"],
+        ["--context", "nosuch", "node", "--help"],
+    ],
+    ids=["leaf", "group", "root-context"],
+)
+def test_real_help_needs_no_valid_context(install: Path, argv: list[str]) -> None:
+    result = _cli(*argv)
+
+    assert result.exit_code == 0, result.output
+    assert "Usage" in result.output
+
+
 def test_every_public_leaf_accepts_context_except_the_context_group() -> None:
     from meridian.cli_catalog import long_options, public_commands
 
