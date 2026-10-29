@@ -310,9 +310,11 @@ class CertificateDriver(retirement.CertificateRetirement):
         )
         valid = assertion_matches(action.resource.logical_id, result, "certificate validation")
         san = f"IP Address:{payload.hostname}" if is_ip(payload.hostname) else f"DNS:{payload.hostname}"
-        matches = valid and san in result.stdout
+        # Whole entries only: as a substring, 198.51.100.1 matched a certificate for 198.51.100.10.
+        named = san in {entry.strip() for entry in result.stdout.replace("\n", ",").split(",")}
+        matches = valid and named
         mismatches = [] if valid else ["the certificate expires within a day"]
-        if san not in result.stdout:
+        if not named:
             mismatches.append(f"the certificate does not name {payload.hostname}")
         return build_observation(
             action,

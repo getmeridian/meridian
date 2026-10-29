@@ -330,6 +330,24 @@ def test_certificate_expiry_is_drift_after_readable_file_was_proven() -> None:
     assert not observation_converges(action, observation)
 
 
+@pytest.mark.parametrize(
+    ("names", "converges"),
+    [
+        ("DNS:vpn.example.test", True),
+        ("DNS:www.example.test, DNS:vpn.example.test", True),
+        ("DNS:vpn.example.test.old", False),
+        ("DNS:old-vpn.example.test", False),
+    ],
+)
+def test_certificate_must_name_the_host_as_a_whole_entry(names: str, converges: bool) -> None:
+    driver, action, connection = _certificate_case()
+    connection.get_text.return_value = _result(stdout="certificate bytes")
+    stdout = f"Certificate will not expire\nX509v3 Subject Alternative Name: \n    {names}\n"
+    connection.run.return_value = _result(stdout=stdout)
+
+    assert observation_converges(action, driver.observe(action, None)) is converges
+
+
 @pytest.mark.parametrize("returncode", [3, 4, 124, 127, 255])
 def test_certificate_rejects_unavailable_openssl_evidence(returncode: int) -> None:
     driver, action, connection = _certificate_case()
