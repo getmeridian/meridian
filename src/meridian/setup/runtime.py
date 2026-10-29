@@ -207,9 +207,9 @@ class SetupRuntime:
 
     def review(self, draft: SetupDraft, *, cluster: ClusterConfig | None = None) -> SetupReview:
         """Compile the draft and list the saved resources the new plan would remove."""
-        intent = _draft_intent(draft)
-        entries = self._entries(sorted(deployment_server_refs(intent)))
         cluster = cluster if cluster is not None else self._cluster_loader()
+        intent = _with_fleet_backend(_draft_intent(draft), cluster)
+        entries = self._entries(sorted(deployment_server_refs(intent)))
         images = effective_pins(cluster.image_pins)
         realm = effective_binary_pins(cluster.binary_pins)["realm"]
         contract = DeploymentContract(
@@ -604,6 +604,18 @@ def _draft_intent(draft: SetupDraft) -> SetupIntent:
             str(exc),
             hint="Complete every setup choice before review.",
         ) from exc
+
+
+def _with_fleet_backend(intent: SetupIntent, cluster: ClusterConfig) -> SetupIntent:
+    """Keep a control-service fleet on its backend when a draft leaves it unset.
+
+    The wizard re-asks roles without the backend (chosen once, at deploy), and an intent file
+    omits the default; either would otherwise compile a Remnawave plan for a service fleet.
+    """
+    if not cluster.runs_control_service or intent.control.backend == "meridian":
+        return intent
+    control = intent.control.model_copy(update={"backend": "meridian"})
+    return SetupIntent.model_validate({**intent.model_dump(), "control": control.model_dump()})
 
 
 def _inspection_bootstrap_error() -> None:

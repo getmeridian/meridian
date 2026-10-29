@@ -184,6 +184,20 @@ def test_review_ignores_selected_servers_that_have_no_topology_role(tmp_path) ->
     assert set(review.plan.deployment_contract.server_targets) == {"srv-control", "srv-exit"}
 
 
+def test_review_keeps_a_control_service_fleet_on_its_backend_when_the_draft_omits_it(tmp_path) -> None:
+    registry = ServerRegistry(tmp_path / "servers.json")
+    _add_servers(registry)
+    service_intent = _intent().model_copy(
+        update={"control": _intent().control.model_copy(update={"backend": "meridian"})}
+    )
+    cluster = ClusterConfig(topology_intent=service_intent)
+
+    review = SetupRuntime(registry).review(SetupDraft.from_intent(_intent()), cluster=cluster)
+
+    assert review.intent.control.backend == "meridian"
+    assert any(resource.payload.kind == "control_service" for resource in review.plan.resources)
+
+
 def test_inspect_intent_reports_unavailable_control_ssh_as_observation_error(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,

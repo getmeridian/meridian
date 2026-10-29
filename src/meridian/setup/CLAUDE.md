@@ -27,6 +27,7 @@
 - **Control bootstrap values come from the exit on the control server** — taking the first exit in plan order re-ran the bootstrap whenever an exit that sorts earlier was added, and fed another server's ports to the control nginx.
 - **A control-domain bootstrap renders no WSS location** — the service has no WSS listener, and an empty path rendered a second `location /` to port 0, failing `nginx -t`; compiled artifacts own WSS.
 - **A self-steal exit bootstraps with the default SNI** — the interim legacy 443 fallback dials the bootstrap SNI, and the operator's own name would point the server at itself.
+- **Review keeps a control-service fleet on its backend** — the wizard re-asks roles without `backend` and intent files omit the default, so `review` takes it from the committed intent; otherwise re-running `setup` compiled a Remnawave plan for a service fleet.
 - Never add credential-shaped fields to `SetupDraft`.
 - Preserve relay `listen_port` and exit `egress_overrides` in both `SetupDraft.from_intent()` and `to_intent()` (and when the wizard re-asks roles); otherwise review silently drops them.
 - Do not skip stages; presentation adapters must call `SetupDraftService`.
