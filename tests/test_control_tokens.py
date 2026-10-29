@@ -254,3 +254,16 @@ def test_a_version_three_database_gains_api_tokens(tmp_path: Path) -> None:
     assert [user.username for user in service.list_users()] == ["alice"]
     issued = service.tokens.issue(TokenCreate(name="laptop", scope="read"), issuer=Caller(None, "admin"))
     assert service.tokens.authenticate(issued.token).scope == "read"
+
+
+@pytest.mark.parametrize(("scope", "sees"), [("read", False), ("propose", False), ("approve", False), ("admin", True)])
+def test_only_admin_reads_the_credentials_that_connect_as_a_user(fleet: Fleet, scope: str, sees: bool) -> None:
+    alice = fleet.service.put_user("alice")
+    token = _mint(fleet, scope)["token"]
+
+    _status, listed = _request(f"{fleet.url}/api/users", token=token)
+    _status, one = _request(f"{fleet.url}/api/users/alice", token=token)
+
+    for record in (listed["users"][0], one):
+        assert record["username"] == "alice"
+        assert (record["uuid"], record["sub_token"]) == ((alice.uuid, alice.sub_token) if sees else ("", ""))

@@ -36,6 +36,7 @@ from meridian.control.models import (
     ServiceSettings,
     TokenCreate,
     TokenScope,
+    UserRecord,
     UserUpdate,
     scope_covers,
 )
@@ -234,13 +235,19 @@ class _Handler(BaseHTTPRequestHandler):
         return self._service.traffic.summary()
 
     def list_users(self, _match: re.Match[str]) -> Any:
-        return {"users": [user.model_dump(mode="json") for user in self._service.list_users()]}
+        return {"users": [self._visible(user).model_dump(mode="json") for user in self._service.list_users()]}
 
     def get_user(self, match: re.Match[str]) -> Any:
         user = self._service.get_user(match[1])
         if user is None:
             raise ServiceError("not_found", "Unknown user.", 404)
-        return user
+        return self._visible(user)
+
+    def _visible(self, user: UserRecord) -> UserRecord:
+        """A user as this caller may see them: the VLESS UUID and subscription token connect as the user."""
+        if self.caller is not None and scope_covers(self.caller.scope, "admin"):
+            return user
+        return user.model_copy(update={"uuid": "", "sub_token": ""})
 
     def put_user(self, match: re.Match[str]) -> Any:
         return self._service.put_user(match[1])
