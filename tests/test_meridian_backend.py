@@ -7,6 +7,7 @@ import pytest
 from meridian.compiler import compile_topology
 from meridian.compiler.errors import TopologyCompileError
 from meridian.compiler.models import (
+    AgentRuntimePayload,
     CertificatePayload,
     ClientEndpointPayload,
     ControlServicePayload,
@@ -91,18 +92,43 @@ def _second_exit() -> ExitIntent:
     return ExitIntent(id="de", server_ref="srv-b", paths=default_exit_paths("de", address="198.51.100.20"))
 
 
+def test_meridian_backend_refuses_client_ip_forwarding() -> None:
+    """It changes the PROXY protocol chain in front of every workload and needs its own review."""
+    with pytest.raises(TopologyCompileError, match="client IP forwarding"):
+        compile_topology(_intent(forward_client_ips=True))
+
+
+def _warp_exit(*, default: bool, overrides: tuple[str, ...] = ()) -> ExitIntent:
+    return _intent().exits[0].model_copy(update={"warp": default, "egress_overrides": _overrides(*overrides)})
+
+
 @pytest.mark.parametrize(
-    ("changes", "named"),
+    ("exit_", "outbound_tags", "rules"),
     [
-        ({"forward_client_ips": True}, "client IP forwarding"),
-        ({"exits": [_intent().exits[0].model_copy(update={"warp": True})]}, "WARP"),
-        ({"exits": [_intent().exits[0].model_copy(update={"egress_overrides": _overrides("warp")})]}, "WARP"),
+        (_warp_exit(default=True), ["warp"], []),
+        (_warp_exit(default=False, overrides=("warp",)), ["direct", "warp"], ["warp"]),
+        (_warp_exit(default=True, overrides=("direct", "block")), ["warp"], ["direct", "block"]),
     ],
-    ids=["client-ips", "warp", "warp-override"],
+    ids=["warp-default", "warp-override", "warp-default-with-overrides"],
 )
-def test_meridian_backend_refuses_what_the_service_cannot_run(changes: dict[str, object], named: str) -> None:
-    with pytest.raises(TopologyCompileError, match=named):
-        compile_topology(_intent(**changes))
+def test_warp_installs_with_the_agent_and_routes_in_the_workload(
+    exit_: ExitIntent, outbound_tags: list[str], rules: list[str]
+) -> None:
+    plan = compile_topology(_intent(exits=[exit_]))
+    agent = next(item.payload for item in plan.resources if isinstance(item.payload, AgentRuntimePayload))
+    workload = next(item.payload for item in plan.resources if isinstance(item.payload, NodeWorkloadPayload))
+
+    assert agent.warp is True
+    assert workload.profile.outbound_tags == outbound_tags
+    assert [rule.target_tag for rule in workload.profile.routing_rules] == rules
+
+
+def test_an_agent_without_warp_keeps_its_reviewed_hash() -> None:
+    """Existing fleets must not re-apply because the payload grew a field."""
+    plan = compile_topology(_intent())
+    agent = next(item.payload for item in plan.resources if isinstance(item.payload, AgentRuntimePayload))
+
+    assert "warp" not in agent.model_dump(mode="json")
 
 
 @pytest.mark.parametrize(
@@ -244,35 +270,49 @@ def _domain_fleet(sni: str):
     return build
 
 
+def _warp_fleet():
+    """WARP as one exit's default egress and as another's per-destination override."""
+    fleet = _fleet()
+    main, de = fleet.exits
+    return fleet.model_copy(
+        update={
+            "exits": [
+                main.model_copy(update={"warp": True}),
+                de.model_copy(update={"egress_overrides": _overrides("warp", "direct")}),
+            ]
+        }
+    )
+
+
+SERVERS = {"srv-a": ADDRESS, "srv-b": "198.51.100.20", "srv-r": "198.51.100.30"}
+ROLES = {ADDRESS: "control", "198.51.100.20": "exit", "198.51.100.30": "relay"}
+PARITY_FLEETS = {
+    "ip": _fleet,
+    "domain": _domain_fleet(""),
+    "self-steal-on-domain": _domain_fleet(DOMAIN),
+    "self-steal-own-name": _domain_fleet("www.example.com"),
+    "control-domain": _control_domain_fleet,
+    "warp": _warp_fleet,
+}
+# The domain exit sits on the control server: its WSS and XHTTP routes are on the domain.
+DOMAIN_SHAPES = {"domain", "self-steal-on-domain", "self-steal-own-name", "control-domain"}
+
+
 @pytest.mark.parametrize(
-    ("fleet", "target"),
-    [
-        (fleet, target)
-        for fleet in (
-            _fleet,
-            _domain_fleet(""),
-            _domain_fleet(DOMAIN),
-            _domain_fleet("www.example.com"),
-            _control_domain_fleet,
-        )
-        for target in (ADDRESS, "198.51.100.20", "198.51.100.30")
-    ],
-    ids=[
-        f"{shape}-{role}"
-        for shape in ("ip", "domain", "self-steal-on-domain", "self-steal-own-name", "control-domain")
-        for role in ("control", "exit", "relay")
-    ],
+    ("shape", "target"),
+    [(shape, target) for shape in PARITY_FLEETS for target in ROLES],
+    ids=[f"{shape}-{role}" for shape in PARITY_FLEETS for role in ROLES.values()],
 )
-def test_verification_sees_a_control_service_fleet_like_a_panel_fleet(tmp_path, fleet, target: str) -> None:
+def test_verification_sees_a_control_service_fleet_like_a_panel_fleet(tmp_path, shape: str, target: str) -> None:
     """`meridian test` dropped route checks on a control-service fleet until it read client endpoints."""
     from meridian.cluster import ClusterConfig
     from meridian.servers import ServerEntry, ServerRegistry
     from meridian.verification import resolve_deployment_verification_context
 
     registry = ServerRegistry(tmp_path / "servers.json")
-    for ref, host in (("srv-a", ADDRESS), ("srv-b", "198.51.100.20"), ("srv-r", "198.51.100.30")):
+    for ref, host in SERVERS.items():
         registry.add(ServerEntry(host=host, user="root", id=ref))
-    meridian = fleet()
+    meridian = PARITY_FLEETS[shape]()
     panel = meridian.model_copy(update={"control": meridian.control.model_copy(update={"backend": "remnawave"})})
 
     contexts = []
@@ -283,7 +323,6 @@ def test_verification_sees_a_control_service_fleet_like_a_panel_fleet(tmp_path, 
 
     assert contexts[0] == contexts[1]
     assert contexts[0].https_routes
-    # The domain exit sits on the control server: its WSS and XHTTP routes are on the domain.
-    assert ("wss" in contexts[0].protocols) == (fleet is not _fleet and target == ADDRESS)
-    assert (DOMAIN in contexts[0].domains) == (fleet is not _fleet and target == ADDRESS)
-    assert (PANEL in contexts[0].domains) == (fleet is _control_domain_fleet and target == ADDRESS)
+    assert ("wss" in contexts[0].protocols) == (shape in DOMAIN_SHAPES and target == ADDRESS)
+    assert (DOMAIN in contexts[0].domains) == (shape in DOMAIN_SHAPES and target == ADDRESS)
+    assert (PANEL in contexts[0].domains) == (shape == "control-domain" and target == ADDRESS)

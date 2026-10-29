@@ -459,6 +459,8 @@ class AgentRuntimePayload(CoreModel):
     kind: Literal["agent_runtime"] = "agent_runtime"
     workload_ref: str
     server_ref: str
+    # Cloudflare WARP in SOCKS proxy mode beside the agent, installed over SSH like a panel node's.
+    warp: bool = Field(default=False, exclude_if=lambda enabled: not enabled)
 
 
 class NodeWorkloadPayload(CoreModel):

@@ -1,7 +1,7 @@
 # provision — Pure-Python step pipeline
 ## Design decisions
 **Steps over scripts** — each step is a class with `run(conn, ctx) → StepResult` (ok/changed/skipped/failed); the pipeline stops on the first failure.
-**Recipes are ordered lists** — `build_server_baseline_steps()` (OS, SSH-safe UFW, optional Docker; paired with read-only `build_server_baseline_checks()`) and `build_setup_steps()` (swap, control plane, nginx, TLS) return steps in execution order, gated by plain `if`; keep each step after what it depends on. WARP installs through the reconciler's node-runtime driver.
+**Recipes are ordered lists** — `build_server_baseline_steps()` (OS, SSH-safe UFW, optional Docker; paired with read-only `build_server_baseline_checks()`) and `build_setup_steps()` (swap, control plane, nginx, TLS) return steps in execution order, gated by plain `if`; keep each step after what it depends on. WARP installs through the reconciler's node-runtime or agent-runtime driver.
 **Typed context** — `ProvisionContext` has explicit fields for configuration and inter-step data; no dictionary escape hatches.
 **Remnawave containers** — the panel stack runs in a bridge network on `127.0.0.1:3000` behind nginx; the node (`node_deploy.py`) runs host-network with `cap_add: NET_ADMIN`, without which the panel's node plugins and IP Control silently do nothing.
 **SSH for infrastructure, REST for configuration** — steps deploy containers; panel, user, and profile setup happens over the API once they run.

@@ -303,3 +303,33 @@ def test_an_installed_agent_that_never_returns_is_enrolled_again(plan: ResourceP
 
     assert len(control.tokens) == 1
     assert conn.write_map[AGENT_BINARY] == BINARY.data
+
+
+def _warp_plan() -> ResourcePlan:
+    intent = single_server_intent(None, server_ref="srv-a", address="198.51.100.10", control="meridian")
+    return compile_topology(intent.model_copy(update={"exits": [intent.exits[0].model_copy(update={"warp": True})]}))
+
+
+@pytest.mark.parametrize(("status", "converges"), [("Status update: Connected", True), ("Disconnected", False)])
+def test_an_agent_with_warp_converges_only_while_warp_is_connected(status: str, converges: bool) -> None:
+    plan = _warp_plan()
+    drivers, control, conn = _installed_agent(plan)
+    conn.when("warp-cli --accept-tos status", stdout=status)
+    control.reports = [{"last_seen_at": "2999-01-01T00:00:00Z"}]
+    action = _action(plan, "agent:main")
+
+    assert observation_converges(action, drivers["agent_runtime"].observe(action, None)) is converges
+
+
+def test_warp_repair_never_re_enrolls_a_healthy_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("time.sleep", lambda _seconds: None)
+    plan = _warp_plan()
+    drivers, control, conn = _installed_agent(plan)
+    conn.when("warp-cli --accept-tos status", stdout="Disconnected")
+    control.reports = [{"last_seen_at": "2999-01-01T00:00:00Z"}]
+
+    drivers["agent_runtime"].apply(_action(plan, "agent:main"), None)
+
+    assert "warp-cli --accept-tos connect" in conn.calls
+    assert control.tokens == []
+    assert AGENT_BINARY not in conn.write_map

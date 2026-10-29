@@ -44,8 +44,9 @@ SERVICE_SETTINGS_ID = "settings:service"
 def validate_meridian_backend(intent: SetupIntent) -> None:
     """Refuse what the control service cannot run yet.
 
-    Exits (bare-IP or domain, WSS, self-steal, direct/block egress overrides), Realm relays,
-    and a control domain run; their nginx, certificates, and firewall rules are shared server kinds.
+    Exits (bare-IP or domain, WSS, self-steal, egress overrides, WARP), Realm relays, and a
+    control domain run; their nginx, certificates, and firewall rules are shared server kinds,
+    and WARP installs over SSH with the agent (`AgentRuntimePayload.warp`).
     """
     unsupported = [
         name
@@ -54,7 +55,6 @@ def validate_meridian_backend(intent: SetupIntent) -> None:
             ("egress pools", bool(intent.egress_pools)),
             ("routes", bool(intent.routes)),
             ("client IP forwarding", intent.forward_client_ips),
-            ("WARP", any(exit_.needs_warp for exit_ in intent.exits)),
         )
         if present
     ]
@@ -104,7 +104,7 @@ def to_meridian_backend(builder: PlanBuilder) -> PlanBuilder:
             assert isinstance(profile, ConfigProfilePayload)
             agent_id = f"agent:{exit_id}"
             replacements[agent_id] = (
-                AgentRuntimePayload(workload_ref=exit_id, server_ref=payload.server_ref),
+                AgentRuntimePayload(workload_ref=exit_id, server_ref=payload.server_ref, warp=payload.warp),
                 [CONTROL_SERVICE_ID, *(dep for dep in resource.dependencies if dep.startswith("baseline:"))],
                 _connected(agent_id),
             )

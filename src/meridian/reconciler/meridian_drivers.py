@@ -43,6 +43,7 @@ from meridian.reconciler.resources import (
     payload_of,
     postcondition_key,
 )
+from meridian.reconciler.server_support import ensure_warp, warp_connected
 from meridian.reconciler.workloads import WorkloadStateManager
 from meridian.ssh import ServerConnection
 from meridian.xray_workload import salamander_password
@@ -109,6 +110,9 @@ def build_meridian_drivers(context: MeridianDriverContext) -> ResourceDrivers:
 class AgentRuntimeDriver:
     """Install the agent binary, write its bootstrap with a fresh enrollment token, and run it.
 
+    WARP, when the exit uses it, is installed over SSH first, exactly as on a panel node: it is
+    an apt package with its own daemon and registration, outside the agent's resource kinds.
+
     The agent generates its node key, enrolls with the token, and rewrites the
     bootstrap with the token nulled, so observation compares only the identity
     fields. Bare-IP control servers serve a Let's Encrypt IP certificate, so the
@@ -121,15 +125,20 @@ class AgentRuntimeDriver:
     def observe(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceObservation:
         payload = payload_of(action, AgentRuntimePayload)
         in_place, seen = self._inspect(payload)
+        if in_place and payload.warp:
+            in_place = warp_connected(action.resource.logical_id, self.context.connection_for(payload.server_ref))
         return _observation(action, exists=in_place, connected=in_place and seen, remote_id=payload.workload_ref)
 
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
         payload = payload_of(action, AgentRuntimePayload)
-        in_place, seen = self._inspect(payload)
-        if in_place and not seen and self._reconnects(payload):
-            # A service outage leaves a healthy agent unseen until its backoff ends; re-enrolling it is churn.
-            return ResourceApplyReceipt(remote_id=payload.workload_ref)
         conn = self.context.connection_for(payload.server_ref)
+        if payload.warp:
+            ensure_warp(conn, self.context.address(payload.server_ref))
+        in_place, seen = self._inspect(payload)
+        if in_place and (seen or self._reconnects(payload)):
+            # Only WARP needed repair, or a service outage left a healthy agent unseen until its
+            # backoff ends; re-enrolling it is churn.
+            return ResourceApplyReceipt(remote_id=payload.workload_ref)
         arch = _run(conn, "uname -m", "read the architecture").strip()
         binary = self.context.agent_binary(arch)
         _ok(conn.put_bytes(AGENT_BINARY, binary.data, mode="755", timeout=180), "upload the agent")
