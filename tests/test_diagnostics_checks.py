@@ -135,6 +135,42 @@ def test_tls_check_quotes_the_host_and_uses_the_requested_local_port() -> None:
     assert any("'evil; rm -rf /'" in c and "127.0.0.1:7443" in c for c in conn.calls)
 
 
+@pytest.mark.parametrize(
+    ("host", "sni"),
+    [("198.51.100.1", "-noservername"), ("vpn.example.com", "-servername vpn.example.com")],
+    ids=["ip-sends-no-sni", "hostname-sends-its-sni"],
+)
+def test_tls_check_asks_for_the_certificate_as_a_client_would(host: str, sni: str) -> None:
+    conn = _conn("openssl", stdout="notAfter=Dec 30 00:00:00 2099 GMT")
+
+    check_tls_certificate(conn, host)
+
+    (command,) = [c for c in conn.calls if "s_client" in c]
+    assert sni in command
+
+
+def _dates(issued: datetime, lifetime: timedelta) -> str:
+    stamp = "%b %d %H:%M:%S %Y GMT"
+    return f"notBefore={issued.strftime(stamp)}\nnotAfter={(issued + lifetime).strftime(stamp)}\n"
+
+
+_NOW = datetime.now(timezone.utc)
+
+
+@pytest.mark.parametrize(
+    ("stdout", "status"),
+    [
+        (_dates(_NOW - timedelta(days=3), timedelta(days=6, hours=16)), "passed"),
+        (_dates(_NOW - timedelta(days=6, hours=10), timedelta(days=6, hours=16)), "warning"),
+        (_dates(_NOW - timedelta(days=85), timedelta(days=90)), "warning"),
+        (_dates(_NOW - timedelta(days=30), timedelta(days=90)), "passed"),
+    ],
+    ids=["short-lived-mid-life", "short-lived-hours-left", "long-lived-last-week", "long-lived-mid-life"],
+)
+def test_certificate_expiry_warning_scales_with_its_lifetime(stdout: str, status: str) -> None:
+    assert check_tls_certificate(_conn("openssl", stdout=stdout), "198.51.100.1").status == status
+
+
 def _plugin_host(*, kernel: str = "6.8.0-45-generic\n", kernel_rc: int = 0) -> MockConnection:
     return MockConnection().when("uname -r", stdout=kernel, rc=kernel_rc)
 

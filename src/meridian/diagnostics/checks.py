@@ -7,8 +7,10 @@ Commands own rendering; this module owns the check logic.
 
 from __future__ import annotations
 
+import ipaddress
 import shlex
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Literal
 
 from meridian.core.verification import VerificationStatus
@@ -169,17 +171,17 @@ def check_port_listening(
 
 
 def check_tls_certificate(conn: ServerConnection, host: str, *, port: int = 443) -> CheckResult:
-    """Check TLS certificate validity and expiry via openssl on the server.
+    """Check the certificate nginx serves on the local *port*, as a client would ask for it.
 
-    Connects to the local *port* with the given *host* as SNI to inspect
-    the certificate that nginx serves locally.
+    A hostname goes as SNI. An IP address goes as none, as clients send it: on an exit an
+    IP SNI reaches the Reality camouflage site (so the check once judged its certificate),
+    and a control server without an exit rejects it.
     """
-    q_host = shlex.quote(host)
-    q_port = shlex.quote(str(port))
+    server_name = "-noservername" if _is_ip_address(host) else f"-servername {shlex.quote(host)}"
     result = conn.run(
         "command -v openssl >/dev/null 2>&1 || exit 127; "
-        f"echo | openssl s_client -connect 127.0.0.1:{q_port} -servername {q_host} 2>/dev/null"
-        " | openssl x509 -noout -enddate 2>/dev/null",
+        f"echo | openssl s_client -connect 127.0.0.1:{shlex.quote(str(port))} {server_name} 2>/dev/null"
+        " | openssl x509 -noout -dates 2>/dev/null",
         timeout=15,
     )
 
@@ -199,15 +201,22 @@ def check_tls_certificate(conn: ServerConnection, host: str, *, port: int = 443)
         )
 
     raw = result.stdout.strip()
-    if "notAfter" not in raw:
+    dates = dict(line.split("=", 1) for line in raw.splitlines() if "=" in line)
+    if "notAfter" not in dates:
         return CheckResult(
             name="tls_certificate",
             status="warning",
             detail=f"Unexpected openssl output: {raw!r}",
         )
+    return _evaluate_cert_expiry(dates["notAfter"].strip(), not_before=dates.get("notBefore", "").strip())
 
-    date_str = raw.split("=", 1)[1].strip()
-    return _evaluate_cert_expiry(date_str)
+
+def _is_ip_address(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return True
 
 
 def _unavailable_detail(returncode: int, operation: str) -> str:
@@ -219,42 +228,57 @@ def _unavailable_detail(returncode: int, operation: str) -> str:
     return f"{operation} was interrupted by the SSH transport"
 
 
-def _evaluate_cert_expiry(date_str: str) -> CheckResult:
-    """Parse an openssl notAfter date and classify as passed/warning/failed."""
-    from datetime import datetime, timezone
+def _evaluate_cert_expiry(date_str: str, *, not_before: str = "") -> CheckResult:
+    """Classify an openssl notAfter date as passed, warning, or failed.
+
+    A long-lived certificate warns inside its last week. A short-lived one (Let's Encrypt
+    IP certificates last about six days and renew with a day or so left) warns only in its
+    last twentieth, or it would warn for its whole life.
+    """
+
+    def parse(value: str) -> datetime:
+        return datetime.strptime(value, "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
 
     try:
-        expiry = datetime.strptime(date_str, "%b %d %H:%M:%S %Y %Z").replace(
-            tzinfo=timezone.utc,
-        )
+        expiry = parse(date_str)
     except (ValueError, IndexError):
         return CheckResult(
             name="tls_certificate",
             status="warning",
             detail=f"Unparseable cert date: {date_str!r}",
         )
+    try:
+        lifetime = expiry - parse(not_before)
+    except (ValueError, IndexError):
+        lifetime = timedelta(days=90)
 
-    now = datetime.now(timezone.utc)
-    days_left = (expiry - now).days
+    left = expiry - datetime.now(timezone.utc)
     expiry_fmt = expiry.strftime("%Y-%m-%d")
+    margin = timedelta(days=7) if lifetime >= timedelta(days=30) else lifetime / 20
 
-    if days_left < 0:
+    if left < timedelta(0):
         return CheckResult(
             name="tls_certificate",
             status="failed",
             detail=f"Certificate expired on {expiry_fmt}",
             remediation="Redeploy to renew the certificate: meridian deploy",
         )
-    if days_left < 7:
+    if left < margin:
         return CheckResult(
             name="tls_certificate",
             status="warning",
-            detail=f"Certificate expires in {days_left} days ({expiry_fmt})",
+            detail=f"Certificate expires in {_remaining(left)} ({expiry_fmt})",
             remediation="Certificate renewal needed soon",
         )
 
     return CheckResult(
         name="tls_certificate",
         status="passed",
-        detail=f"Valid until {expiry_fmt} ({days_left} days)",
+        detail=f"Valid until {expiry_fmt} ({_remaining(left)})",
     )
+
+
+def _remaining(left: timedelta) -> str:
+    if left.days >= 2:
+        return f"{left.days} days"
+    return f"{int(left.total_seconds() // 3600)} h"

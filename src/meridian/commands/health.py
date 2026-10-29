@@ -374,10 +374,16 @@ def _server_report(
             checks.append(check_from_result(f"internal:{port_number}", f"Internal {port_number} ({purpose})", result))
         default_host = (node.domain or node.sni) if node is not None else ""
         for port_number in deployment.public_tls_ports:
-            route = next((item for item in deployment.https_routes if item.port == port_number), None)
+            # Meridian's own certificate first: a Reality port otherwise answers with the camouflage site's.
+            routes = sorted(
+                (item for item in deployment.https_routes if item.port == port_number),
+                key=lambda item: item.kind == "camouflage",
+            )
+            route = routes[0] if routes else None
             host = (route.tls_sni or route.host_header) if route is not None else default_host
             result = check_tls_certificate(conn, host or entry.host, port=port_number)
-            checks.append(check_from_result(f"tls:{port_number}", f"TLS certificate on {port_number}", result))
+            tls_label = "Camouflage site TLS" if route is not None and route.kind == "camouflage" else "TLS certificate"
+            checks.append(check_from_result(f"tls:{port_number}", f"{tls_label} on {port_number}", result))
         if not conn.local_mode:
             # Deployer-vantage throughput: only meaningful (and only run) from another machine.
             checks.extend(job() for job in blocking_jobs(entry.host, deployment, differential=False))

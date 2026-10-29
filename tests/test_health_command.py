@@ -24,6 +24,7 @@ from meridian.remnawave import RemnawaveError
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.editor import add_relay_to_intent
 from meridian.setup.single_server import single_server_intent
+from meridian.verification import VerificationHttpsRoute
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
 OTHER_FLEET_ID = "1f1e2d3c-4b5a-4968-8776-655443322110"
@@ -73,7 +74,7 @@ def fleet(servers_file: Path) -> SimpleNamespace:
         public_udp_ports=(),
         internal_ports={},
         public_tls_ports=(443,),
-        https_routes=(SimpleNamespace(port=443, tls_sni="www.example.com", host_header=""),),
+        https_routes=(VerificationHttpsRoute(kind="camouflage", port=443, tls_sni="www.example.com"),),
     )
     return SimpleNamespace(cluster=cluster, node=node, panel=panel, conn=conn, deployment=deployment)
 
@@ -210,7 +211,7 @@ def test_listener_checks_follow_compiled_public_and_internal_ports(fleet: Simple
         public_udp_ports=(9443,),
         internal_ports={"exit-a/reality": 39001},
         public_tls_ports=(7443,),
-        https_routes=(SimpleNamespace(port=7443, tls_sni="edge.example.com", host_header=""),),
+        https_routes=(VerificationHttpsRoute(kind="managed", port=7443, tls_sni="edge.example.com"),),
     )
     mocks = _run(fleet, "exit-a")
 
@@ -220,6 +221,20 @@ def test_listener_checks_follow_compiled_public_and_internal_ports(fleet: Simple
         call(fleet.conn, 39001, transport="any"),
     ]
     mocks.tls.assert_called_once_with(fleet.conn, "edge.example.com", port=7443)
+
+
+def test_tls_check_reads_meridians_certificate_before_the_camouflage_sites(fleet: SimpleNamespace) -> None:
+    fleet.deployment.https_routes = (
+        VerificationHttpsRoute(kind="camouflage", port=443, tls_sni="www.example.com"),
+        VerificationHttpsRoute(kind="managed", port=443, tls_sni="198.51.100.10", host_header="198.51.100.10"),
+    )
+    with patch.object(health, "health_report", wraps=health.health_report) as report:
+        mocks = _run(fleet, "exit-a")
+
+    mocks.tls.assert_called_once_with(fleet.conn, "198.51.100.10", port=443)
+    title, _scope, checks = report.call_args.args
+    assert not title.startswith("TLS")  # the server's heading keeps its name
+    assert "TLS certificate on 443" in [check.name for check in checks]
 
 
 def test_remote_check_measures_data_flow_from_the_deployer_without_the_differential(fleet: SimpleNamespace) -> None:
