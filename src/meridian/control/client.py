@@ -18,6 +18,7 @@ from meridian.control.models import (
     IssuedToken,
     NodeSpec,
     NodeStatus,
+    OwnerStatus,
     RevisionList,
     RevisionProposal,
     RevisionRecord,
@@ -25,6 +26,8 @@ from meridian.control.models import (
     RevisionSummary,
     ServiceHealth,
     ServiceSettings,
+    SetupLinkGrant,
+    SetupLinkRequest,
     TokenCreate,
     TokenList,
     TokenRecord,
@@ -174,6 +177,15 @@ class ControlClient:
     def revoke_token(self, token_id: str) -> TokenRecord:
         """Revoke a token from its next request on (revoking the calling token is allowed)."""
         return TokenRecord.model_validate(self._call("DELETE", f"api/tokens/{_segment(token_id)}"))
+
+    def owner_status(self) -> OwnerStatus:
+        """Whether the web UI has an owner; `ControlServiceNotFound` from a service older than the UI."""
+        return OwnerStatus.model_validate(self._call("GET", "api/owner"))
+
+    def issue_setup_link(self, *, reset: bool = False) -> SetupLinkGrant:
+        """A one-time UI setup token (root token only); `reset` replaces an existing owner's password."""
+        body = SetupLinkRequest(reset=reset).model_dump(mode="json")
+        return SetupLinkGrant.model_validate(self._call("POST", "api/owner/setup-link", body))
 
     def revisions(self) -> list[RevisionSummary]:
         """Every recorded revision, newest first, without intent snapshots."""

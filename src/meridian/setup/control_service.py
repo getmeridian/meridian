@@ -123,6 +123,8 @@ def bootstrap_control_service(
             fleet_id=cluster.fleet_id,
             admin_token_sha256=hashlib.sha256(cluster.panel.api_token.encode("utf-8")).hexdigest(),
             listen_port=payload.service_port,
+            # The web console's session cookie is scoped to the path nginx strips.
+            public_path=f"/{cluster.panel.secret_path}",
         ),
     )
     results = Provisioner(build_setup_steps(ctx)).run(
