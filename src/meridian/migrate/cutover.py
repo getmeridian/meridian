@@ -106,7 +106,7 @@ def remove_node_runtime(conn: ServerConnection) -> None:
         f"if [ -f {compose} ]; then docker compose -f {compose} down --remove-orphans --volumes || exit 1; fi;"
         f' for c in {names}; do if docker inspect --type container "$c" >/dev/null 2>&1;'
         ' then docker rm -f "$c" >/dev/null || exit 1; fi; done;'
-        f' rm -rf {directories} && for d in {directories}; do test ! -e "$d" || exit 1; done;'
+        f' rm -rf {directories} || exit 1; for d in {directories}; do test ! -e "$d" || exit 1; done;'
         # Images still used by another container refuse removal; that is fine.
         f" ids=$(docker images -q {shlex.quote(_NODE_REPOSITORY)} 2>/dev/null | sort -u);"
         ' if [ -n "$ids" ]; then docker image rm $ids >/dev/null 2>&1; fi; true',

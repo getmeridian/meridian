@@ -256,7 +256,8 @@ def test_node_removal_deletes_the_container_compose_dir_image_and_api_rule_under
     command, rule_cleanup = conn.calls
     assert f"docker compose -f {NODE_DIR}/docker-compose.yml down" in command
     assert "netagent" in command and "remnawave-node" in command
-    assert f"rm -rf {NODE_DIR} {LEGACY_NODE_DIR}" in command
+    # A failed delete stops the step: the trailing `true` once turned it into a success.
+    assert f"rm -rf {NODE_DIR} {LEGACY_NODE_DIR} || exit 1;" in command
     # The control plane's directories are a separate project and stay.
     assert "/opt/remnawave" not in command and "/opt/ctlsvc" not in command
     # The pulled node image goes too; Docker itself (baseline-installed, maybe operator-used) stays.
