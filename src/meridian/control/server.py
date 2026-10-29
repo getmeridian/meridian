@@ -30,7 +30,10 @@ from meridian.control.models import (
     SUB_TOKEN_PATTERN,
     ApplyFenceSwap,
     ClientEndpoint,
+    DeployerStateDeposit,
+    DeviceKeyCreate,
     NodeSpec,
+    RecoveryKeyUpdate,
     RevisionProposal,
     RevisionResult,
     ServiceConfig,
@@ -321,6 +324,30 @@ class _Handler(BaseHTTPRequestHandler):
             raise unauthenticated()
         return self.caller
 
+    # -- backups (`backups.py`) --------------------------------------------------------------
+
+    def list_device_keys(self, _match: re.Match[str]) -> Any:
+        return self._service.backups.list_devices()
+
+    def register_device_key(self, _match: re.Match[str]) -> Any:
+        return self._service.backups.register_device(self._model(DeviceKeyCreate))
+
+    def revoke_device_key(self, match: re.Match[str]) -> Any:
+        return self._service.backups.revoke_device(match[1])
+
+    def get_recovery_key(self, _match: re.Match[str]) -> Any:
+        return self._service.backups.recovery_key()
+
+    def put_recovery_key(self, _match: re.Match[str]) -> Any:
+        return self._service.backups.set_recovery_key(self._model(RecoveryKeyUpdate))
+
+    def deposit_deployer_state(self, _match: re.Match[str]) -> Any:
+        state = self._service.backups.deposit(self._model(DeployerStateDeposit))
+        return {"generation": state.generation, "deposited_at": state.deposited_at}
+
+    def snapshot(self, _match: re.Match[str]) -> None:
+        self._send(200, "application/octet-stream", self._service.snapshot())
+
     # -- agent API -------------------------------------------------------------------------
 
     def agent_enroll(self, _match: re.Match[str]) -> Any:
@@ -403,6 +430,14 @@ ROUTES: list[Route] = [
     ("POST", re.compile(rf"/api/revisions/{_REVISION}/result"), WRITE, _Handler.record_revision_result),
     ("GET", re.compile(r"/api/fence"), "read", _Handler.get_fence),
     ("PUT", re.compile(r"/api/fence"), WRITE, _Handler.swap_fence),
+    # Backups: every route is `admin`, as a snapshot holds every credential the service keeps.
+    ("GET", re.compile(r"/api/backup/devices"), "admin", _Handler.list_device_keys),
+    ("POST", re.compile(r"/api/backup/devices"), "admin", _Handler.register_device_key),
+    ("DELETE", re.compile(rf"/api/backup/devices/{_TOKEN_ID}"), "admin", _Handler.revoke_device_key),
+    ("GET", re.compile(r"/api/backup/recovery-key"), "admin", _Handler.get_recovery_key),
+    ("PUT", re.compile(r"/api/backup/recovery-key"), "admin", _Handler.put_recovery_key),
+    ("PUT", re.compile(r"/api/backup/deployer-state"), "admin", _Handler.deposit_deployer_state),
+    ("GET", re.compile(r"/api/backup/snapshot"), "admin", _Handler.snapshot),
     ("POST", re.compile(r"/agent/v1/enroll"), None, _Handler.agent_enroll),
     ("POST", re.compile(r"/agent/v1/hello"), None, _Handler.agent_hello),
     ("POST", re.compile(r"/agent/v1/renew"), None, _Handler.agent_renew),

@@ -21,6 +21,7 @@ from meridian.control.errors import ServiceError
 from meridian.control.models import TOKEN_SCOPES, ClientEndpoint, TokenCreate, TokenRecord
 from meridian.control.server import ROUTES, ControlServer
 from meridian.control.service import SCHEMA_VERSION, ControlService
+from meridian.control.snapshot import generate_key_pair
 from meridian.control.tokens import LAST_USED_RESOLUTION_SECONDS, Caller
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
@@ -86,6 +87,7 @@ def _mint(fleet: Fleet, scope: str, name: str = "device") -> dict[str, Any]:
     return issued
 
 
+BACKUP_KEY = generate_key_pair().public
 # The scope each `/api` route needs; `{victim}` is another token's ID.
 SCOPE_MATRIX = [
     ("GET", "/api/health", None, "read"),
@@ -114,6 +116,16 @@ SCOPE_MATRIX = [
     ("GET", "/api/tokens", None, "admin"),
     ("POST", "/api/tokens", {"name": "laptop", "scope": "read"}, "admin"),
     ("DELETE", "/api/tokens/{victim}", None, "admin"),
+    ("GET", "/api/backup/devices", None, "admin"),
+    ("POST", "/api/backup/devices", {"name": "laptop", "public_key": BACKUP_KEY}, "admin"),
+    ("GET", "/api/backup/recovery-key", None, "admin"),
+    ("PUT", "/api/backup/recovery-key", {"public_key": BACKUP_KEY}, "admin"),
+    (
+        "PUT",
+        "/api/backup/deployer-state",
+        {"cluster_yml": "version: 3\n", "servers_json": "[]", "generation": 0},
+        "admin",
+    ),
 ]
 
 
