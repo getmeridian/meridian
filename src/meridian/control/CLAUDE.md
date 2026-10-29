@@ -14,6 +14,7 @@
 - Agent errors use the protocol's `AgentErrorResponse`; admin errors a plain `{"error": {...}}`.
 
 ## Pitfalls
+- Decode the path before routing — `ControlClient` percent-encodes IDs, so `:` in endpoint IDs arrives as `%3A` and every endpoint PUT 404'd.
 - Never log requests: paths carry the secret path and subscription tokens (`log_message` is silenced).
 - `executescript()` commits on its own — run the schema outside `_transaction()`.
 - Hash and sign the document as JSON values, never re-serialized typed models (the agent verifies the bytes it received).

@@ -15,6 +15,7 @@ from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, TypeVar
+from urllib.parse import unquote
 
 from pydantic import BaseModel, ValidationError
 
@@ -26,7 +27,7 @@ from meridian.core.agent_protocol import ObservedStateReport, PollRequest
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 MAX_BODY_BYTES = AGENT_HTTP_SURFACE.max_request_bytes
-_NAME = r"([a-z0-9][a-z0-9_.-]{0,63})"
+_NAME = r"([a-z0-9][a-z0-9_.:-]{0,127})"
 _USERNAME = r"([A-Za-z0-9_.-]{1,64})"
 
 
@@ -65,7 +66,8 @@ class _Handler(BaseHTTPRequestHandler):
     # -- dispatch --------------------------------------------------------------------
 
     def _dispatch(self, method: str) -> None:
-        path = self.path.split("?", 1)[0]
+        # Clients percent-encode IDs (`main%3Amain-reality`); names never contain `/`, so decoding first is safe.
+        path = unquote(self.path.split("?", 1)[0])
         agent = path.startswith("/agent/")
         try:
             for route_method, pattern, handler in _ROUTES:
@@ -152,6 +154,9 @@ class _Handler(BaseHTTPRequestHandler):
     def health(self, _match: re.Match[str]) -> Any:
         return self._admin().health()
 
+    def get_settings(self, _match: re.Match[str]) -> Any:
+        return self._admin().settings()
+
     def put_settings(self, _match: re.Match[str]) -> Any:
         return self._admin().put_settings(self._model(ServiceSettings))
 
@@ -222,6 +227,7 @@ class _Handler(BaseHTTPRequestHandler):
 
 _ROUTES: list[Route] = [
     ("GET", re.compile(r"/api/health"), _Handler.health),
+    ("GET", re.compile(r"/api/settings"), _Handler.get_settings),
     ("PUT", re.compile(r"/api/settings"), _Handler.put_settings),
     ("GET", re.compile(rf"/api/nodes/{_NAME}"), _Handler.get_node),
     ("PUT", re.compile(rf"/api/nodes/{_NAME}"), _Handler.put_node),
