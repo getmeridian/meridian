@@ -422,3 +422,10 @@ def test_declared_people_are_the_clis_to_remove_or_relink(fleet: Fleet) -> None:
     assert fleet.ui("DELETE", "/api/users/bob").status == 200
     assert fleet.call("POST", "/api/users/alice/reissue", {}, bearer=ADMIN_TOKEN).status == 200  # the CLI may
     assert fleet.call("DELETE", "/api/users/alice", bearer=ADMIN_TOKEN).status == 200
+
+
+@pytest.mark.parametrize("username", [".", "..", ".hidden"])
+def test_a_username_never_starts_with_a_dot(fleet: Fleet, username: str) -> None:
+    """The console builds relative URLs from usernames; `..` would resolve to another route."""
+    fleet.set_up()
+    assert fleet.call("PUT", f"/api/users/{username}", {}, bearer=ADMIN_TOKEN).status == 404

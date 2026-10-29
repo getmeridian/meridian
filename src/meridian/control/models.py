@@ -150,6 +150,9 @@ class UserUpdate(CoreModel):
 
 
 SUB_TOKEN_PATTERN = r"^[A-Za-z0-9_-]{16,64}$"
+# A username never starts with a dot: the console builds relative URLs from it, and "." or ".." would
+# resolve away from the user. Dots elsewhere stay valid for people added before this rule.
+USERNAME_PATTERN = r"[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}"
 
 
 class UserImport(CoreModel):
@@ -161,7 +164,7 @@ class UserImport(CoreModel):
     `traffic_reset_at` is when the source last reset the period, if it knows.
     """
 
-    username: str = Field(pattern=r"^[A-Za-z0-9_.-]{1,64}$")
+    username: str = Field(pattern=rf"^{USERNAME_PATTERN}$")
     uuid: str = Field(pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
     sub_token: str = Field(pattern=SUB_TOKEN_PATTERN)
     status: UserStatus = "active"

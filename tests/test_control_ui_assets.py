@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from meridian.control.models import LimitStrategy, RevisionStatus, TokenScope, UserStatus
+from meridian.control.models import USERNAME_PATTERN, LimitStrategy, RevisionStatus, TokenScope, UserStatus
 from meridian.control.server import ALL_ROUTES, OWNER_ROUTES
 from meridian.control.ui_models import PasskeyState, ServerView
 from meridian.control.ui_routes import UI_DIR
@@ -133,3 +133,7 @@ def test_every_refusal_the_sign_in_routes_raise_has_a_message() -> None:
 def test_farsi_is_the_only_rtl_locale() -> None:
     assert 'code === "fa" ? "rtl" : "ltr"' in JS["i18n.js"]
     assert 'lang === "fa" ? "rtl" : "ltr"' in JS["boot.js"]
+
+
+def test_the_console_checks_usernames_with_the_services_pattern() -> None:
+    assert f"/^{USERNAME_PATTERN}$/" in JS["people.js"]

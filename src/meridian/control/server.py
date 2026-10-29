@@ -33,6 +33,7 @@ from meridian.control.errors import ServiceError, agent_error
 from meridian.control.login_limits import LockedOut
 from meridian.control.models import (
     SUB_TOKEN_PATTERN,
+    USERNAME_PATTERN,
     ApplyFenceSwap,
     ClientEndpoint,
     DeployerStateDeposit,
@@ -63,7 +64,7 @@ ModelT = TypeVar("ModelT", bound=BaseModel)
 MAX_BODY_BYTES = AGENT_HTTP_SURFACE.max_request_bytes
 ENFORCE_INTERVAL_SECONDS = 30
 _NAME = r"([a-z0-9][a-z0-9_.:-]{0,127})"
-_USERNAME = r"([A-Za-z0-9_.-]{1,64})"
+_USERNAME = f"({USERNAME_PATTERN})"
 _TOKEN_ID = r"([0-9a-f]{12})"
 _REVISION = r"([1-9][0-9]{0,15})"
 _SUB_TOKEN = "(" + SUB_TOKEN_PATTERN.removeprefix("^").removesuffix("$") + ")"

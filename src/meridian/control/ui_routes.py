@@ -30,7 +30,7 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel
 
 from meridian.control.errors import ServiceError
-from meridian.control.models import OwnerStatus, SetupLinkGrant, SetupLinkRequest, TokenScope
+from meridian.control.models import USERNAME_PATTERN, OwnerStatus, SetupLinkGrant, SetupLinkRequest, TokenScope
 from meridian.control.owner import ABSOLUTE_SECONDS, OwnerSession
 from meridian.control.service import ControlService
 from meridian.control.tokens import ROOT, Caller
@@ -342,7 +342,7 @@ def issue_setup_link(request: UiRequest, _match: re.Match[str]) -> SetupLinkGran
     return request.ui.service.owner.issue_setup_link(reset=body.reset)
 
 
-_USERNAME = r"([A-Za-z0-9_.-]{1,64})"
+_USERNAME = f"({USERNAME_PATTERN})"
 UiHandler = Callable[[Any, re.Match[str]], Any]
 # (method, path, the `/api` scope it needs or None where the handler authenticates, handler)
 UI_ROUTES: list[tuple[str, re.Pattern[str], TokenScope | None, UiHandler]] = [
