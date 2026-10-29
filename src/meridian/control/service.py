@@ -288,6 +288,7 @@ class ControlService:
             failed=failed,
             errors=errors,
             runtime=project_runtime(report),
+            traffic_bytes=self.traffic.node_totals().get(node_id, 0),
         )
 
     def list_nodes(self) -> list[NodeStatus]:

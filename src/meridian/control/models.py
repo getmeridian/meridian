@@ -94,6 +94,7 @@ class NodeStatus(CoreModel):
     failed: list[str] = Field(default_factory=list, description="Resource IDs the last report marked failed.")
     errors: list[str] = Field(default_factory=list, description="Operator-facing messages of failed resources.")
     runtime: NodeRuntime | None = Field(default=None, description="The last report's health and version evidence.")
+    traffic_bytes: Count = Field(default=0, description="Total traffic counted by the service for this node.")
 
     def unseen_seconds(self, now: datetime | None = None) -> float | None:
         """Seconds since the agent last reached the service; None if it never did."""

@@ -137,6 +137,7 @@ that dials out to it.
   yet” entries in English, Russian, Persian, and Chinese instead of empty documents.
 - Duplicate connection names and names matching automatic groups now receive
   readable, stable suffixes, keeping Mihomo proxy names and sing-box tags unique.
+- Fleet and node CLI rows now carry the control service's counted node traffic instead of always showing zero.
 - Server health now includes reported checks, core versions and uptime, memory, disk, and load; `fleet status` and `check` flag unhealthy runtimes and treat stale reports as unavailable evidence.
 - An exit whose first apply failed is now cleaned up when you remove it: its
   agent and firewall rules no longer stay behind, and `--forget-unreachable`
