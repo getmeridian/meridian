@@ -23,7 +23,7 @@
 - Agent errors use the protocol's `AgentErrorResponse` with the status `AGENT_HTTP_SURFACE` maps (`errors.agent_error`); admin errors a plain `{"error": {...}}`.
 - An API token's public ID (`mrd_<id>_<secret>`) finds its row, so the hash is compared once with `hmac.compare_digest`, against a dummy when no row matches.
 - A refused CSR rolls back with its transaction, so a bad request never burns the enrollment token.
-- A proposal whose intent has a secret-shaped key or value (`secret_paths()`, keys per `core.redaction`) is refused, never stored.
+- A proposal whose intent has a secret-shaped key or value (`secret_paths()`, keys per `core.redaction`) is refused, never stored; so is one whose `access` block is malformed (the console reads `access.users` on every person screen, and a `null` there broke them all).
 
 ## Pitfalls
 - nginx answers 502/503/504 for a stopped or hung service — `ControlClient` raises those as retryable unreachable errors; as plain refusals, a stopped ctld failed the fence at once with "refused: HTTP 502".

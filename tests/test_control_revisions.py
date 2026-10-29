@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from meridian.control.client import (
     ControlClient,
@@ -22,6 +23,7 @@ from meridian.control.models import ApplyFenceRecord, RevisionProposal, Revision
 from meridian.control.revisions import secret_paths
 from meridian.control.server import ControlServer
 from meridian.control.service import SCHEMA_VERSION, ControlService
+from meridian.control.ui_views import declared_users
 from tests.support.topology import single_exit_intent
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
@@ -165,6 +167,29 @@ def test_an_intent_with_a_secret_is_refused(fleet: Fleet, intent: dict[str, Any]
 
 def test_a_real_topology_intent_is_secret_free() -> None:
     assert secret_paths(single_exit_intent().model_dump(mode="json")) == []
+
+
+@pytest.mark.parametrize(
+    ("access", "declared"),
+    [
+        (None, []),
+        ([], []),
+        ({"users": None}, []),
+        ({"users": "alice"}, []),
+        ({"users": [1]}, []),
+        ({"users": ["alice"], "display_names": ["x"]}, ["alice"]),
+    ],
+    ids=["null", "list", "null-users", "string-users", "number-user", "list-names"],
+)
+def test_a_malformed_access_block_is_refused_at_proposal(access: object, declared: list[str]) -> None:
+    """The console reads `access.users` on every person screen; a bad shape there broke all of them."""
+    with pytest.raises(ValidationError, match="access"):
+        RevisionProposal(intent={"access": access}, plan_hash=PLAN, review_hash=REVIEW)
+    assert declared_users({"access": access}) == declared  # a row stored before the check still reads
+
+
+def test_a_real_topology_intent_is_a_valid_proposal() -> None:
+    RevisionProposal(intent=single_exit_intent().model_dump(mode="json"), plan_hash=PLAN, review_hash=REVIEW)
 
 
 def test_the_fence_swaps_only_from_the_version_read(fleet: Fleet) -> None:

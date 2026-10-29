@@ -34,7 +34,8 @@ def applied_intent(service: ControlService) -> tuple[int | None, dict[str, Any]]
 
 def declared_users(intent: dict[str, Any]) -> list[str]:
     """The people an applied intent declares: the deployer's CLI owns their existence and links."""
-    return [str(name) for name in _access(intent).get("users", []) if isinstance(name, str)]
+    users = _access(intent).get("users")
+    return [name for name in users if isinstance(name, str)] if isinstance(users, list) else []
 
 
 def is_declared(service: ControlService, username: str) -> bool:

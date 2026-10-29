@@ -325,6 +325,22 @@ class RevisionProposal(CoreModel):
     plan_hash: Sha256Hex
     review_hash: Sha256Hex
 
+    @model_validator(mode="after")
+    def _access_shape(self) -> RevisionProposal:
+        """The console reads who the CLI declares from `access`; only its shape is checked, not the whole intent."""
+        if "access" not in self.intent:
+            return self
+        access = self.intent["access"]
+        if not isinstance(access, dict):
+            raise ValueError("intent.access must be an object")
+        users = access.get("users", [])
+        if not isinstance(users, list) or not all(isinstance(name, str) for name in users):
+            raise ValueError("intent.access.users must be a list of usernames")
+        names = access.get("display_names", {})
+        if not isinstance(names, dict) or not all(isinstance(name, str) for name in names.values()):
+            raise ValueError("intent.access.display_names must map usernames to names")
+        return self
+
 
 class RevisionResult(CoreModel):
     status: Literal["applied", "failed"]
