@@ -277,6 +277,7 @@ class OwnerAuth:
 
     def revoke_others(self, current: OwnerSession) -> int:
         with self._store.transaction():
+            self.hold_live(current)  # authenticated before; another device may have signed it out since
             cursor = self._store.db.execute("DELETE FROM ui_sessions WHERE session_id != ?", (current.session_id,))
         return int(cursor.rowcount)
 

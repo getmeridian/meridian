@@ -478,6 +478,18 @@ def test_session_ends_after_idle_and_absolute_limits(owner: OwnerAuth, clock: Cl
     assert clock.now - 1_800_000_000.0 >= ABSOLUTE_SECONDS
 
 
+def test_a_session_revoked_after_authorizing_cannot_sign_out_the_one_that_revoked_it(owner: OwnerAuth) -> None:
+    stale = owner.authenticate(set_up(owner))
+    survivor = owner.login(PASSWORD, "").token
+    owner.revoke_others(owner.authenticate(survivor))
+
+    with pytest.raises(ServiceError) as error:
+        owner.revoke_others(stale)
+
+    assert error.value.status == 401
+    owner.authenticate(survivor)
+
+
 def test_sessions_store_only_token_hashes_and_no_address(owner: OwnerAuth, tmp_path: Path) -> None:
     token = set_up(owner)
     with sqlite3.connect(tmp_path / "control.db") as db:
