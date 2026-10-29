@@ -16,7 +16,7 @@
 
 **Attested lazy control plane** — panel construction waits for checkpointed bootstrap; readiness binds the reviewed host, URL, listener, and only the bootstrap's own inputs (control target, runtime pins, renderer contract, profile ports/SNI, hardening) to a remote marker, so editing another server never re-runs the panel provisioner.
 
-**Two control backends** — `control_service.py` mirrors the panel bootstrap and saves the service URL and admin token in `cluster.panel`, so subscription links keep their shape; verify dispatches on the payload; handoff, `client` commands, and `meridian test` reach users through `control_access.access_panel()`, which serves the panel subset from the service.
+**Two control backends** — `control_service.py` mirrors the panel bootstrap and saves the service URL and admin token in `cluster.panel`, so subscription links keep their shape; like the panel's, the URL takes the control domain when there is one (readiness refuses a URL on another name); verify dispatches on the payload; handoff, `client` commands, and `meridian test` reach users through `control_access.access_panel()`, which serves the panel subset from the service.
 
 ## What's done well
 - Downstream answers are invalidated whenever an earlier stage changes.
@@ -25,6 +25,7 @@
 
 ## Pitfalls
 - **Control bootstrap values come from the exit on the control server** — taking the first exit in plan order re-ran the bootstrap whenever an exit that sorts earlier was added, and fed another server's ports to the control nginx.
+- **A control-domain bootstrap renders no WSS location** — the service has no WSS listener, and an empty path rendered a second `location /` to port 0, failing `nginx -t`; compiled artifacts own WSS.
 - **A self-steal exit bootstraps with the default SNI** — the interim legacy 443 fallback dials the bootstrap SNI, and the operator's own name would point the server at itself.
 - Never add credential-shaped fields to `SetupDraft`.
 - Preserve relay `listen_port` and exit `egress_overrides` in both `SetupDraft.from_intent()` and `to_intent()` (and when the wizard re-asks roles); otherwise review silently drops them.

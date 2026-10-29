@@ -53,6 +53,10 @@ CONFIGS = {
     "ip_control_service": render_nginx_ip_config(**_IP, control_service=True),
     "domain": render_nginx_http_config(**_DOMAIN),
     "domain_xhttp": render_nginx_http_config(**_DOMAIN, xhttp_path="xh-def456", xhttp_internal_port=29500),
+    # A control-service domain: the bootstrap has no WSS listener (compiled artifacts own WSS).
+    "domain_control_service": render_nginx_http_config(
+        **{**_DOMAIN, "ws_path": "", "wss_internal_port": 0}, control_service=True
+    ),
 }
 
 _SECURITY_HEADERS = ("X-Frame-Options", "X-Content-Type-Options", "Referrer-Policy")
@@ -83,6 +87,7 @@ PRESENT = {
         "proxy_socket_keepalive on",
     ),
     "stream_domain": ("example.com  nginx_https", "198.51.100.1  nginx_https"),
+    "domain_control_service": ("server_name example.com;", "proxy_pass http://127.0.0.1:2053/sub/", "return 301"),
     "ip_control_service": ("proxy_buffering off", "proxy_read_timeout 90s", "proxy_pass http://127.0.0.1:2053/sub/"),
     "ip": (
         "ssl_certificate",
@@ -135,6 +140,8 @@ PRESENT = {
 }
 
 ABSENT = {
+    # An empty WSS path rendered a second `location /` to port 0, which fails `nginx -t`.
+    "domain_control_service": ("VLESS+WSS", "127.0.0.1:0", "location / {\n            proxy_pass"),
     "ip_control_service": ("sub_filter_types", "/api/sub/;"),
     "stream": ("example.com", "blackhole"),
     # IP mode never redirects port 80 to HTTPS: a redirect to a 403 is a contradiction.

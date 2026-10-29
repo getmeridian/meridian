@@ -21,6 +21,7 @@ import yaml
 
 from meridian.control.formats.entries import STATUS_REMARKS, SubscriptionUser, UserStatus
 from meridian.control.formats.selector import DocumentFormat, select_format
+from meridian.control.models import ClientEndpoint
 from meridian.control.subscriptions import SubscriptionResponse, render_subscription
 from meridian.xray_client import parse_xray_subscription, proxy_outbounds
 from tests.systemlab.subscription_client import (
@@ -30,17 +31,69 @@ from tests.systemlab.subscription_client import (
     parse_mihomo_subscription,
     parse_singbox_subscription,
 )
-from tests.test_control_subscription_corpus import FLEETS, SHORT_ID, UUID
+from tests.test_control_subscription_corpus import EXIT_B, FLEETS, KEYS, SALAMANDER, SHORT_ID, UUID, Fleet
+
+# Domain mode, which the corpus never captured: self-steal Reality on the domain, XHTTP and
+# WSS dialing the domain (so a CDN may front them), and Hysteria2 dialing the server itself.
+DOMAIN = "vpn.example.com"
+WS_PATH = "w5j7k9m2n4p6"
+_TLS = {"port": 443, "tls_sni": DOMAIN, "host": DOMAIN, "address": DOMAIN}
+WSS = ClientEndpoint(remark="WebSocket · CDN", protocol="wss", position=10, fingerprint="chrome", path=WS_PATH, **_TLS)
+DOMAIN_FLEET = Fleet(
+    "solo",
+    "Meridian",
+    EXIT_B,
+    [
+        *(
+            ClientEndpoint(
+                remark=f"Reality · {label}",
+                protocol="reality",
+                address=EXIT_B,
+                port=443,
+                position=position,
+                fingerprint=label.lower(),
+                reality_sni=DOMAIN,
+                reality_public_key=KEYS["exit-b"][0],
+                reality_short_id=KEYS["exit-b"][1],
+                fingerprint_copy=label != "Chrome",
+            )
+            for position, label in enumerate(("Chrome", "Firefox"))
+        ),
+        *(
+            ClientEndpoint(
+                remark=f"XHTTP · {label}",
+                protocol="xhttp",
+                position=6 + position,
+                fingerprint=label.lower(),
+                path="x9k2m4n6p8q1",
+                fingerprint_copy=label != "Chrome",
+                **_TLS,
+            )
+            for position, label in enumerate(("Chrome", "Firefox"))
+        ),
+        WSS,
+        ClientEndpoint(
+            remark="Hysteria2 · UDP",
+            protocol="hysteria2",
+            address=EXIT_B,
+            port=443,
+            position=12,
+            tls_sni=DOMAIN,
+            salamander_password=SALAMANDER,
+        ),
+    ],
+)
+ALL_FLEETS = {**FLEETS, "domain": DOMAIN_FLEET}
 
 STATUSES: tuple[UserStatus, ...] = ("active", "disabled", "limited", "expired")
-CASES = [(topology, status) for topology in FLEETS for status in STATUSES]
+CASES = [(topology, status) for topology in ALL_FLEETS for status in STATUSES]
 CASE_IDS = [f"{topology}-{status}" for topology, status in CASES]
 
 
 def _render(
     topology: str, document: DocumentFormat, status: UserStatus = "active", **user: Any
 ) -> SubscriptionResponse:
-    fleet = FLEETS[topology]
+    fleet = ALL_FLEETS[topology]
     person = SubscriptionUser(username=fleet.username, uuid=UUID, short_id=SHORT_ID, status=status, **user)
     return render_subscription(
         person, fleet.endpoints, document, profile_title=fleet.title, public_url=fleet.public_url
@@ -85,6 +138,90 @@ def test_userinfo_carries_traffic_limit_and_expiry() -> None:
         "1.50 KiB",
         "0",
     )
+
+
+# The corpus holds no WebSocket entry, so these rows follow Remnawave 3.4.5's generators
+# (`src/modules/subscription-template/generators/`) for a Host Meridian compiles for WSS:
+# its fields in their order, the Host as Mihomo's and sing-box's `Host` header, and Xray's
+# empty `headers`. Stash reads Mihomo's WebSocket options under its own `sni`.
+_WS_PROXY = {
+    "name": WSS.remark,
+    "type": "vless",
+    "server": DOMAIN,
+    "port": 443,
+    "network": "ws",
+    "udp": True,
+    "uuid": UUID,
+    "packet-encoding": "xudp",
+    "tls": True,
+    "servername": DOMAIN,
+    "ws-opts": {"path": f"/{WS_PATH}", "headers": {"Host": DOMAIN}},
+    "client-fingerprint": "chrome",
+}
+WSS_ENTRIES: dict[DocumentFormat, Any] = {
+    "base64": f"vless://{UUID}@{DOMAIN}:443?encryption=none&type=ws&path=%2F{WS_PATH}&host={DOMAIN}"
+    f"&security=tls&sni={DOMAIN}&fp=chrome#WebSocket%20%C2%B7%20CDN",
+    "xray-json": {
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{"address": DOMAIN, "port": 443, "users": [{"id": UUID, "encryption": "none", "flow": ""}]}]
+        },
+        "streamSettings": {
+            "network": "ws",
+            "wsSettings": {"path": f"/{WS_PATH}", "host": DOMAIN, "headers": {}},
+            "security": "tls",
+            "tlsSettings": {"serverName": DOMAIN, "enableSessionResumption": False, "fingerprint": "chrome"},
+        },
+    },
+    "mihomo": _WS_PROXY,
+    "stash": {("sni" if key == "servername" else key): value for key, value in _WS_PROXY.items()},
+    "singbox": {
+        "type": "vless",
+        "tag": WSS.remark,
+        "server": DOMAIN,
+        "server_port": 443,
+        "uuid": UUID,
+        "transport": {"type": "ws", "path": f"/{WS_PATH}", "headers": {"Host": DOMAIN}},
+        "tls": {"enabled": True, "server_name": DOMAIN, "utls": {"enabled": True, "fingerprint": "chrome"}},
+    },
+}
+
+
+def _wss_entry(document: DocumentFormat, body: str) -> Any:
+    if document == "base64":
+        return next(line for line in base64.b64decode(body).decode().splitlines() if "type=ws&" in line)
+    if document == "xray-json":
+        outbounds = json.loads(body)[0]["outbounds"]
+        found = next(item for item in outbounds if item.get("streamSettings", {}).get("network") == "ws")
+        return {key: value for key, value in found.items() if key != "tag"}
+    if document == "singbox":
+        return next(item for item in json.loads(body)["outbounds"] if item["tag"] == WSS.remark)
+    return next(proxy for proxy in yaml.safe_load(body)["proxies"] if proxy["name"] == WSS.remark)
+
+
+@pytest.mark.parametrize("document", sorted(WSS_ENTRIES))
+def test_wss_entries_match_remnawave_generators(document: DocumentFormat) -> None:
+    entry = _wss_entry(document, _render("domain", document).body)
+    expected = WSS_ENTRIES[document]
+    assert entry == expected
+    if isinstance(expected, dict):
+        assert list(entry) == list(expected)
+
+
+def test_wss_joins_every_failover_group() -> None:
+    """WSS is a primary entry: unlike XHTTP, sing-box and Stash speak it too."""
+    mihomo = yaml.safe_load(_render("domain", "mihomo").body)
+    stash = yaml.safe_load(_render("domain", "stash").body)
+    for document in (mihomo, stash):
+        assert (
+            WSS.remark in next(group for group in document["proxy-groups"] if group["name"] == "Automatic")["proxies"]
+        )
+    singbox = json.loads(_render("domain", "singbox").body)
+    assert WSS.remark in next(item for item in singbox["outbounds"] if item["type"] == "urltest")["outbounds"]
+    automatic = json.loads(_render("domain", "xray-json").body)[0]
+    balancer = automatic["routing"]["balancers"][0]["selector"]
+    ws_tag = next(item["tag"] for item in proxy_outbounds(automatic) if item["streamSettings"]["network"] == "ws")
+    assert any(ws_tag.startswith(prefix) for prefix in balancer)
 
 
 def test_links_from_the_public_url_are_left_out_without_one() -> None:

@@ -293,7 +293,7 @@ class ClientEndpointDriver:
         address = payload.address or self.context.address(payload.address_server_ref)
         return ClientEndpoint(
             remark=payload.remark,
-            protocol=payload.protocol,  # type: ignore[arg-type]  # WSS is refused before compile
+            protocol=payload.protocol,
             address=address,
             port=payload.public_port,
             position=payload.position,

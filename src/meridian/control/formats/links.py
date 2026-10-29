@@ -33,7 +33,7 @@ def base64_document(endpoints: list[ClientEndpoint], uuid: str, placeholders: tu
 
 
 def share_uri(endpoint: ClientEndpoint, uuid: str) -> str:
-    """Return the `vless://` or `hysteria2://` URI of one endpoint."""
+    """Return the `vless://` (Reality, XHTTP, WSS) or `hysteria2://` URI of one endpoint."""
     authority = f"{quote(uuid, safe='')}@{_uri_host(endpoint.address)}:{endpoint.port}"
     fragment = quote(endpoint.remark, safe="")
     if endpoint.protocol == "hysteria2":
@@ -59,15 +59,10 @@ def share_uri(endpoint: ClientEndpoint, uuid: str) -> str:
             "sid": endpoint.reality_short_id,
         }
     else:
-        params |= {
-            "type": "xhttp",
-            "path": absolute(endpoint.path),
-            "host": endpoint.host,
-            "mode": "packet-up",
-            "security": "tls",
-            "sni": endpoint.tls_sni,
-            "fp": endpoint.fingerprint,
-        }
+        # Remnawave's order: transport (type, path, host, XHTTP's mode), then security.
+        params |= {"type": "ws" if endpoint.protocol == "wss" else "xhttp", "path": absolute(endpoint.path)}
+        params |= {"host": endpoint.host, "mode": "packet-up" if endpoint.protocol == "xhttp" else ""}
+        params |= {"security": "tls", "sni": endpoint.tls_sni, "fp": endpoint.fingerprint}
     query = urlencode({key: value for key, value in params.items() if value}, quote_via=quote)
     return f"vless://{authority}?{query}#{fragment}"
 
