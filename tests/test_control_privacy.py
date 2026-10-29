@@ -13,8 +13,8 @@ from pydantic import ValidationError
 
 from meridian.control.backups import strip_unsnapshotted
 from meridian.control.client import ControlClient, ControlServiceScopeError
+from meridian.control.devices import DEVICE_HMAC_SECRET
 from meridian.control.models import DeviceKeyCreate, PrivacySettings, ServiceSettings
-from meridian.control.privacy import DEVICE_HMAC_SECRET
 from meridian.control.restore import stage_restored_database
 from meridian.control.service import ControlService
 from meridian.control.snapshot import decrypt_snapshot, generate_key_pair
@@ -62,7 +62,7 @@ def test_absent_privacy_is_off_and_putting_the_defaults_back_records_no_change(s
     result = service.set_privacy(PrivacySettings(), author="root")
     assert result.changed is False and result.changes == []
     assert service._store.row("SELECT * FROM privacy") is None
-    assert service._store.row("SELECT name FROM sqlite_master WHERE name = 'devices'") is None
+    assert service._store.row("SELECT 1 FROM devices") is None
     assert service._store.secret(DEVICE_HMAC_SECRET) is None
 
 
@@ -116,10 +116,11 @@ def test_change_order_is_insertion_order_even_when_the_clock_ties_and_only_fifty
         ("full", "private", 0, 1),
         ("full", "off", 1, 0),
         ("private", "off", 1, 0),
-        ("private", "full", 1, 0),
+        ("private", "full", 0, 0),
     ],
+    ids=["full-to-private-rekeys", "full-to-off-deletes", "private-to-off-deletes", "private-to-full-keeps-slots"],
 )
-def test_lowering_devices_removes_metadata_and_raising_irreversible_hashes_starts_registrations_again(
+def test_lowering_devices_removes_metadata_and_raising_to_full_keeps_every_registration(
     service: ControlService,
     before: str,
     after: str,
@@ -136,6 +137,9 @@ def test_lowering_devices_removes_metadata_and_raising_irreversible_hashes_start
         assert secret is not None
         assert rows[0]["device_key"] == hmac.digest(secret, b"device-id", "sha256").hex()
         assert tuple(rows[0][name] for name in ("platform", "os_version", "model", "user_agent")) == (None,) * 4
+    elif after == "full":
+        # A fingerprint keeps its slot until the device's next fetch tells full mode its raw ID.
+        assert [row["device_key"] for row in rows] == ["device-id"]
     else:
         assert rows == []
     assert service.set_privacy(result.settings, author="root").changed is False
@@ -196,19 +200,20 @@ def test_lowering_retention_prunes_in_the_settings_transaction(service: ControlS
     assert service._db.execute("SELECT day FROM traffic_daily").fetchall() == [("2026-10-23",)]
 
 
-def test_schema_nine_migrates_once_to_the_full_step_ten_without_changing_totals(tmp_path: Path) -> None:
+def test_schema_nine_migrates_once_through_steps_ten_and_eleven_without_changing_totals(tmp_path: Path) -> None:
     path = tmp_path / "control.db"
     service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
     user = service.put_user("alice")
     service._db.execute("INSERT INTO traffic_totals VALUES (?, 3, 7, ?)", (user.user_id, NOW))
     service.close()
     with sqlite3.connect(path) as db:
-        for table in ("privacy", "privacy_changes", "traffic_daily", "node_traffic_daily"):
+        for table in ("privacy", "privacy_changes", "traffic_daily", "node_traffic_daily", "devices"):
             db.execute(f"DROP TABLE {table}")
+        db.execute("ALTER TABLE users DROP COLUMN device_limit")
         db.execute("UPDATE meta SET value = '9' WHERE key = 'schema_version'")
     for _ in range(2):
         migrated = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
-        assert migrated._store.meta("schema_version") == "10"
+        assert migrated._store.meta("schema_version") == "11"
         assert migrated.privacy() == PrivacySettings()
         assert migrated.get_user("alice").lifetime_traffic_bytes == 10
         migrated.close()

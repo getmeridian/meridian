@@ -1,36 +1,51 @@
-# commands — CLI adapters
+# commands — One module per subcommand
 
 ## Design decisions
-- CLI wiring lives in `cli.py`, `cli_groups.py`, and focused `cli_*` modules; imports defer to command modules so help and contract discovery do no work.
-- Fleet edits change intent, review it, then apply through `_helpers.apply_reviewed_intent`. Operator-owned client status/limits/expiry and `privacy.py` change service state directly; applies leave them alone. `control_access` is the service adapter.
-- Every JSON switch is `cli_options.Json`; Click resolves argv, parent options, context copies, and default group actions. Bare `privacy` is `privacy.show`, including JSON and read-only context gating.
-- Context selection happens before I/O: explicit names must exist unless a command creates a fleet; superseded contexts admit `READS_ONLY`, and Remnawave contexts admit only the migration/export/removal gate.
-- Shared targets/options live in `cli_options` and `resolve`; wizard presentation uses `i18n`, `wizard_prompts`, and terminal pickers while setup/compile/apply logic stays in libraries.
-- Health rendering gives negative evidence exit 4, missing evidence 3, full pass 0. `check`, `test`, `probe`, and fleet upgrade inspect what the intent actually runs.
-- Public commands need help panels, command output mappings, schemas for JSON, and four locale references. Hidden serve/dev stay outside the catalog. Retired spellings fail with a pointer.
-- Privacy reviews disclose storage/seizure costs before confirmation, describe deletion on lowering, preserve omitted settings, and require --yes for JSON changes. Usage reads include console people; client show adds seven days only when enabled.
+
+**One file per command** — `cli.py` registers top-level commands and the root callback, `cli_groups.py` the sub-apps; both parse flags and defer to the command module.
+**Commands edit intent** — fleet commands load `cluster.yml` through `load_topology_cluster()`. `client`, `node`, `relay`, and `route` add/remove edit `topology_intent` and apply it through `_helpers.apply_reviewed_intent()` (progress from `apply_progress()`); removals let reviewed retirement delete what vanished (`topology_removal.py`, `node_replace.py`). `fleet import` (`fleet_transfer.py`) applies a whole edited `fleet export` file the same way, after printing `core.fleet_document.intent_changes()`. `node sni`/`relay sni` (`sni.py`) replace a camouflage SNI outright: a Reality listener imitates one site, so a lingering old name would answer with the new site's certificate. Never mutate panel or server state beside the compiled plan, except each client's operator-owned status, limits, device cap, and expiry (`client enable|disable|set|reset-traffic|devices`; `client_limits.py`) and the service's privacy levels (`privacy.py`), which applies never touch.
+**One target vocabulary** — `cli_options.py` owns the shared `SERVER` argument and option types; `meridian.resolve.parse_target()`/`merge_target()` read `[user@]host[:port]`, saved names, and `local` like ssh. `resolve.py` adds prompts around the cascade: target, local mode, single saved server, else fail with candidates.
+**One JSON switch** — every `--json` is `cli_options.Json` and every JSON-implying flag uses `enable_json_output`, so bodies only read `is_json_mode()`. The root callback resolves argv through Click (`cli_catalog`); global `--json` works exactly where the command declares it. Never re-parse argv by hand.
+**One context switch** — the root `--context` and the copy `cli_options.add_context_option()` adds to every leaf (so `deploy IP --context work` works) are read through Click in `resolve_command`; the root callback calls `context.select_for_invocation()` before any command, refusing a missing context with candidates except for creators (`deploy`, `setup`, `studio`) and fleet-free groups. A superseded context runs only `context.READS_ONLY` commands (with a warning); the rest refuse with where the fleet went. Leaf copies never reach command functions. Help requests come from Click's parse too (`cli_catalog.requests_help`): a raw scan read `--context --help` as help and ran the command on the bound fleet.
+**Machine deploy mode** — `deploy --json`, `--events=jsonl`, `--request FILE`, and `--dry-run` serve UI clients: no prompts or Rich, the final `meridian.output/v1` envelope on stdout, JSONL on stderr. Hidden `--cancel-file` stops at the next safe point with a `cancelled` envelope (exit 5).
+**Health surface** — `check` (`health.py`) dispatches by role to preflight, server, or relay (`relay_check.py`) scopes; `test` runs one active client's delivered Xray JSON end to end, once per public entry when bare (`--probe`, or `probe`, for the censor view; `--basic` refuses `--client`); `doctor` bundles a report. All render through `check_render.py`: negative evidence exits 4, unavailable evidence 3, full pass 0. `logs` prints plain tails of what the server's roles run (`diagnostics/logs.py`) and exits 3 when one is unreadable.
+**Presentation-only wizard** — `setup_v4.py` and `setup_wizard.py` collect resumable choices with text from `meridian.i18n` and prompts from `wizard_prompts.py`; smart defaults replace questions, and compile/apply/verify stay in `meridian.setup`. `wizard_terminal.py` adds prompt_toolkit lists, checklists, and validated text fields (the `Pickers` protocol); `wizard_io()` falls back to numbered prompts without a capable terminal or with `MERIDIAN_PLAIN_PROMPTS`.
+**Privacy reviews** — `privacy set` prints what each raised level stores and what a seized control server reveals, and what a lowering deletes, before it confirms (`--yes`; JSON requires it); omitted options keep their values, and bare `privacy` is `privacy show`. `client usage`/`fleet usage` read daily history (console people included), and `client show` adds the last seven days only while it is on.
+**Devices** — `client devices` reads through `control_access`: private shows a count (JSON lists the removable fingerprints), full the details; `--remove`/`--clear` are exclusive and idempotent, keep credentials, and `client reissue` clears registrations.
+**Agent guide** — `meridian help agents` prints `data/agents.md` as plain Markdown; `test_help_command.py` fails if it names a missing command. Keep it free of release talk.
+**Retired spellings** — `cli.RENAMED`/`RENAMED_OPTIONS` refuse old commands and flags with exit 2 and a pointer to the new spelling.
 
 ## What's done well
-- `fleet upgrade` raises pins through the reviewed plan, then checks the fleet; it never mutates beside the plan.
-- Changed or uncertain service writes trigger the backup hook; typed partial results describe remote changes a local save could not record.
+
+- **`fleet upgrade` never mutates beside the plan** — it reads images (`diagnostics/images.py`) and each relay's running Realm (never the saved pin, which a failed upgrade leaves ahead), applies the unchanged intent (new pins ride the render contract), then runs the fleet `check`.
 
 ## Pitfalls
-- Convert `MeridianError` at entry points with `fail`; it exits (user 2, system 3, bug 1). Wrap validation errors before rendering.
-- Reach Click only through `meridian.cli_types`; Typer vendors it.
-- `confirm` returns bool: false must raise `typer.Exit(1)`.
-- Validate typed inputs before SSH/service access. Keep numeric timeout/limit/history flags as strings when bad input needs a JSON envelope; never rebuild untrusted models with model_copy.
-- Reissue deletes the old page before changing credentials, then publishes the new page; applies cannot repair a page under an abandoned UUID.
-- Removal checks control-server/dependent roles before review; teardown saves profile deletion for last, and forgetting unreachable servers persists only after confirmation.
-- Exact service usernames beat case-folded/display matches; ambiguous people refuse. Mutations target declared access users, while reads also show console people.
-- Enabling reports the service's actual status, including still-expired or still-limited.
-- Failed local persistence after a remote change exits 3 with typed partial data and a repair hint.
-- Never render admin credentials. Handoff links appear only in their producing result via HANDOFF_LINK_KEYS; diagnostic text uses redact_diagnostic_text with saved secrets, never Rich markup.
-- Save the identity file returned by key setup, and offer setup only with a terminal, without --yes/JSON. Unknown bare targets never dial; test/probe check saved names before DNS.
-- Setup needs a terminal unless --yes; stage errors offer back/retry/save instead of looping. Pickers use os.ttyname, accept Ctrl+J, and validate through Prompter.ask.
-- Re-adding declared nodes/relays resumes matching intent and refuses conflicts; an address is not a friendly name.
-- Node replacement refuses the control server and already-used hosts; preserve the bare-IP certificate SNI/Host correctly and check roles before dialing.
-- Remnawave fleets migrate explicitly; deploy offers it only in a terminal and refuses silent --yes/JSON moves.
-- `panel --setup-link` alone requests an owner reset; bare panel never resets. Its ControlClient uses report_mutations=False because owner setup is unsnapshotted.
-- Validate page icons and use core.inputs.PAGE_PALETTES; a redeploy merges saved unnamed branding flags.
-- Port preflight covers all nginx listeners, including loopback ports. Own-domain SNI checks use own_hostname rather than probing a certificate before apply.
-- Check agent versions against control_artifacts.expected_agent_version, which accepts every shipped build. Doctor reads netcore from systemd and the journal, never an old Docker container.
+- `console.fail()` always exits (user=2, system=3, bug=1); entry points convert library `MeridianError`s with `fail(exc)`, or the user sees a traceback.
+- Reach Click only through `meridian.cli_types` — Typer ≥ 0.26 vendors it and production has no `click` package (architecture-tested).
+- `confirm()` returns a bool; callers must `raise typer.Exit(1)` on False.
+- Build core request models and render wrapped validation errors before opening SSH or panel connections; rebuild a model from untrusted data, never `model_copy(update=...)`.
+- Teardown refuses a server that still holds intent roles (only a whole single-server fleet goes in one step) and deletes the saved profile last.
+- `client reissue` deletes the old page before revoking: the page directory is the old VLESS UUID, which the revoke replaces, so a page left behind could never be found again.
+- Removals refuse the control server and its dependents before review; `node remove --force` only extends the edit to relay chains into that exit.
+- `forget_unreachable_servers()` forgets in memory only; the confirmed apply saves it (a declined `fleet import` once left bindings forgotten on disk).
+- `client enable` reports the status the control service answers (`expired`/`limited` when expiry or quota still holds), never the requested one.
+- Post-mutation local save failures exit 3, say remote state changed, and keep typed partial data where the contract allows.
+- Client mutations and tests act only on `topology_intent.access.users`; `client list`/`show` also read people added in a control service's console (`declared: false`, every user there is the fleet's), never a Remnawave panel's other users. There an exact service username wins over a case-folded or display-name match, and a name folding onto two people is refused (`show alice` once returned declared `Alice`'s link).
+- `panel` prints the web console and a one-time setup link only while it has no owner or with hidden `--setup-link` (a reset: new password, code off, every device signed out).
+- Never render saved admin credentials; handoff links (`HANDOFF_LINK_KEYS`) appear only in the producing command's final output (`emit_json(..., reveal=...)`); doctor and `logs` pass free-form text through `redact_diagnostic_text()` with `ClusterConfig.secret_values()` (bare request paths match no pattern) and never through Rich markup.
+- A bare word that is neither a saved name nor an address is refused, never dialed; `test`/`probe` targets check saved names before DNS (a dot-less name was refused as a domain); keep `--timeout` a string so bad values still get the JSON error envelope.
+- `ensure_server_connection(offer_key_setup=True)` (deploy without `--yes`, setup) may return a target pinned to Meridian's new key; save `resolved.conn.identity_file` as the profile's `key_path`. Never offer it without a terminal or in JSON mode.
+- The wizard needs a terminal (`prompt()` returns defaults without `/dev/tty`); `setup` refuses without one unless `--yes`.
+- An error in a setup stage that asks nothing (review, apply, verify) offers back/retry/save, and `--yes` raises it; re-running the stage looped forever on the same error.
+- Pickers open the terminal's real device (`os.ttyname`), never the `/dev/tty` alias (macOS kqueue refuses it with EOFError), and accept Ctrl+J as Enter (pexpect and some terminals send a bare line feed); validate through `Prompter.ask(validate=)` so both modes re-ask.
+- Re-running `node add` or `relay add` for a declared server resumes it and refuses a conflicting SNI, domain, exit, or port; never add a second entry. A saved name equal to the server's address is no title: re-adding a removed exit by IP once failed exit-name validation.
+- `node replace` refuses the control server (subscription URLs would change) and a new server that already holds a role; check roles before dialing. A bare-IP exit's certificate SNI/Host follow it to the new IP (keeping them failed every move), and a rerun on the current server repairs one a pre-b9 move left behind.
+- Bare `test` follows the intent, not the saved-server count: removed servers stay saved.
+- A new public command needs a `_HELP_LAYOUT` entry, a `rich_help_panel`, and a `core.command_catalog.COMMAND_OUTPUTS` entry (`None` unless it declares `--json`); `test_cli_catalog.py` enforces it. Hidden commands (`serve`, which systemd runs on the control server, and `dev`) stay out of the catalog, so their `--json` envelope is unvalidated and they need no locale docs.
+- A Remnawave fleet runs only `REMNAWAVE_FLEET_COMMANDS` (move, remove, server profiles, export); `deploy` offers `migrate` in a terminal and refuses with the pointer under `--yes`, JSON, or no terminal, since a silent move would stop the panel unasked.
+- `deploy` port preflight (`port_check.py`) covers every port nginx binds, including loopback 8443/8444; a missed one failed mid-deploy on `nginx -t`.
+- `panel` asks for a reset link only with `--setup-link` (a bare one racing an owner's setup would wipe their password) and builds its `ControlClient` with `report_mutations=False`: a setup link is no state a backup keeps.
+- Page palettes live in `core.inputs.PAGE_PALETTES` (tested against `app.js`); normalize `--icon` with `branding.normalize_icon()` before SSH, and a redeploy merges unnamed branding flags from saved values.
+- `check` and `fleet upgrade` compare a node's agent with `control_artifacts.expected_agent_version()`, which accepts any shipped build: a checkout that rebuilt one target carries two IDs, and an ARM node on its own build read as outdated.
+- `doctor` reads the core from the `netcore` unit (`systemctl show -p MainPID`) and its logs from the journal; looking inside the old Docker node container reported Xray not running on every control-service exit.
+- Device caps take 1–100 or `default` (sent as an explicit null); an omitted flag keeps a person's override.

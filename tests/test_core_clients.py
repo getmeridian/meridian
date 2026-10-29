@@ -29,6 +29,7 @@ class PanelUser:
     expire_at: str = "2026-12-31T23:59:59.000Z"
     created_at: str = "2026-04-01T12:00:00Z"
     online_at: str = "2026-04-02T12:00:00Z"
+    hwid_device_limit: int | None = None
 
 
 class PanelClient:

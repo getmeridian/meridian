@@ -18,6 +18,8 @@ export * as CheckFailureSchema from "./check-failure.schema";
 export * as CheckSchema from "./check.schema";
 export * as ClientAddEnvelopeSchema from "./client-add-envelope.schema";
 export * as ClientAddSchema from "./client-add.schema";
+export * as ClientDevicesEnvelopeSchema from "./client-devices-envelope.schema";
+export * as ClientDevicesSchema from "./client-devices.schema";
 export * as ClientDisableEnvelopeSchema from "./client-disable-envelope.schema";
 export * as ClientEnableEnvelopeSchema from "./client-enable-envelope.schema";
 export * as ClientLimitsSchema from "./client-limits.schema";

@@ -1,0 +1,171 @@
+{
+  "$defs": {
+    "ClientDevice": {
+      "additionalProperties": false,
+      "description": "An ID that can be removed; private mode exposes no metadata.",
+      "properties": {
+        "device_key": {
+          "maxLength": 64,
+          "minLength": 10,
+          "pattern": "^[A-Za-z0-9=-]{10,64}$",
+          "title": "Device Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "device_key"
+      ],
+      "title": "ClientDevice",
+      "type": "object"
+    },
+    "ClientDeviceDetails": {
+      "additionalProperties": false,
+      "description": "Details collected only with full device limits.",
+      "properties": {
+        "device_key": {
+          "maxLength": 64,
+          "minLength": 10,
+          "pattern": "^[A-Za-z0-9=-]{10,64}$",
+          "title": "Device Key",
+          "type": "string"
+        },
+        "first_seen_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "First Seen At"
+        },
+        "last_seen_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Seen At"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model"
+        },
+        "os_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Os Version"
+        },
+        "platform": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Platform"
+        },
+        "user_agent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "User Agent"
+        }
+      },
+      "required": [
+        "device_key",
+        "platform",
+        "os_version",
+        "model",
+        "user_agent",
+        "first_seen_at",
+        "last_seen_at"
+      ],
+      "title": "ClientDeviceDetails",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "count": {
+      "minimum": 0,
+      "title": "Count",
+      "type": "integer"
+    },
+    "devices": {
+      "items": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/ClientDeviceDetails"
+          },
+          {
+            "$ref": "#/$defs/ClientDevice"
+          }
+        ]
+      },
+      "title": "Devices",
+      "type": "array"
+    },
+    "level": {
+      "description": "off, private, or full; the service's device privacy level.",
+      "title": "Level",
+      "type": "string"
+    },
+    "limit": {
+      "description": "The person's cap, or the fleet default when none is set.",
+      "maximum": 100,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+    },
+    "removed": {
+      "default": 0,
+      "description": "Rows removed by this command; zero on a read.",
+      "minimum": 0,
+      "title": "Removed",
+      "type": "integer"
+    },
+    "username": {
+      "title": "Username",
+      "type": "string"
+    }
+  },
+  "required": [
+    "username",
+    "level",
+    "count",
+    "limit"
+  ],
+  "title": "ClientDevicesResult",
+  "type": "object"
+}

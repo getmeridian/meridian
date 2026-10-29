@@ -23,6 +23,7 @@ from meridian.control.server import ControlServer
 from meridian.control.service import ControlService
 from meridian.control.tokens import ROOT
 from meridian.control.ui_routes import CONTENT_SECURITY_POLICY, SESSION_COOKIE, UI_DIR, passkey_state
+from tests.support.control_service import write_privacy
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
 ADMIN_TOKEN = "admin-token-for-tests-only-0123456789"
@@ -128,6 +129,27 @@ def cheap_scrypt(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture
 def fleet(tmp_path: Path) -> Iterator[Fleet]:
     yield from _serve(tmp_path, PUBLIC_PATH)
+
+
+@pytest.mark.parametrize("level", ["private", "full"])
+def test_the_owner_can_manage_device_slots_with_csrf_but_no_new_credential(
+    fleet: Fleet,
+    tmp_path: Path,
+    level: str,
+) -> None:
+    user = fleet.service.put_user("alice")
+    write_privacy(tmp_path / "control.db", PrivacySettings(device_limits=level))  # type: ignore[arg-type]
+    fleet.set_up()
+    assert fleet.call("GET", f"/sub/{user.sub_token}", headers={"X-Hwid": "device-00000001"}).status == 200
+    view = fleet.ui("GET", "/api/users/alice/devices")
+    assert view.status == 200 and view.body["count"] == 1
+    key = view.body["devices"][0]["device_key"]
+    target = f"/api/users/alice/devices/{key}"
+    assert fleet.call("DELETE", target, session=True).status == 403
+    assert fleet.ui("PATCH", "/api/users/alice", {"device_limit": 2}).body["device_limit"] == 2
+    assert fleet.ui("DELETE", target).body == {"deleted": 1}
+    assert fleet.ui("DELETE", target).body == {"deleted": 0}
+    assert fleet.ui("DELETE", "/api/users/alice/devices").body == {"deleted": 0}
 
 
 # -- setup links ------------------------------------------------------------------------------

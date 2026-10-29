@@ -37,6 +37,12 @@ COMMON_HEADERS = {
     "access-control-allow-origin": "*",
 }
 _PLAIN_FILENAME = re.compile(r"^[A-Za-z0-9._-]+$")
+DEVICE_LIMIT_REMARKS = (
+    "Device limit reached: remove a device or ask for a higher limit",
+    "Достигнут лимит устройств: удалите устройство или попросите увеличить лимит",
+    "تعداد دستگاه‌ها به سقف رسیده است: یک دستگاه را حذف کنید یا درخواست افزایش سقف بدهید",
+    "已达到设备上限：请移除一台设备或申请提高上限",
+)
 
 
 @dataclass(frozen=True)
@@ -55,9 +61,11 @@ def render_subscription(
     profile_title: str,
     public_url: str = "",
     now: datetime | None = None,
+    placeholder_remarks: tuple[str, ...] | None = None,
+    extra_headers: dict[str, str] | None = None,
 ) -> SubscriptionResponse:
     """Render *document* for *user*; a suspended user's entries are status placeholders."""
-    placeholders = user.placeholders
+    placeholders = user.placeholders if placeholder_remarks is None else placeholder_remarks
     if document == "browser":
         info = subscription_info(
             user,
@@ -67,6 +75,7 @@ def render_subscription(
         )
         return SubscriptionResponse(200, JSON_TYPE, _json(info), dict(COMMON_HEADERS))
     headers = subscription_headers(user, profile_title=profile_title, public_url=public_url)
+    headers.update(extra_headers or {})
     if document == "xray-json":
         body = _json(xray_json_document(endpoints, user.uuid, placeholders))
         return SubscriptionResponse(200, JSON_TYPE, body, headers)

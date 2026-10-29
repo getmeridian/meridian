@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import sqlite3
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
 from meridian.control.enrollment import token_sha256
-from meridian.control.models import ServiceConfig
+from meridian.control.models import PrivacySettings, ServiceConfig
 from meridian.control.server import ControlServer
 from meridian.control.service import ControlService
 from meridian.control_artifacts import ServicePackage
@@ -17,6 +18,22 @@ from meridian.provision.steps import ProvisionContext
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
 ADMIN_TOKEN = "admin-token-for-tests-only-0123456789"
+
+
+def write_privacy(database: Path, settings: PrivacySettings) -> None:
+    """Set shared privacy settings directly; the other worker owns the production write API."""
+    with sqlite3.connect(database) as db:
+        db.execute(
+            "INSERT INTO privacy VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET settings = excluded.settings",
+            (settings.model_dump_json(),),
+        )
+
+
+def drop_device_privacy_schema(db: sqlite3.Connection) -> None:
+    """Remove device-era fields before a fixture rewinds to a schema from before privacy settings."""
+    for table in ("devices", "privacy_changes", "privacy"):
+        db.execute(f"DROP TABLE {table}")
+    db.execute("ALTER TABLE users DROP COLUMN device_limit")
 
 
 @contextmanager

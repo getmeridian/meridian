@@ -148,7 +148,7 @@ def _print_review(before: PrivacySettings, after: PrivacySettings) -> None:
 
 
 def deletion_disclosures(before: PrivacySettings, after: PrivacySettings) -> list[str]:
-    """What changing representation or retention removes; also covers irreversible private → full."""
+    """What changing representation or retention removes or starts recording."""
     lines: list[str] = []
     if before.device_limits != "off" and after.device_limits == "off":
         lines.append(t("privacy.delete_devices"))

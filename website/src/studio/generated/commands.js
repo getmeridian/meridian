@@ -381,6 +381,7 @@ export const commandCatalog = {
         "--limit",
         "--reset",
         "--expires",
+        "--devices",
         "--json",
         "--yes",
         "--context"
@@ -402,6 +403,64 @@ export const commandCatalog = {
           "category": "user",
           "exit_code": 2,
           "meaning": "invalid input or client conflict",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or panel failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "devices",
+        "NAME"
+      ],
+      "command": "client.devices",
+      "data_schema": "client-devices",
+      "description": "Show device counts or details, or forget a device so another can register",
+      "envelope_schema": "client-devices-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "device counts or details were returned, with any requested removals",
+        "1": "unexpected Meridian bug",
+        "2": "client not found, invalid device ID, or conflicting removal options",
+        "3": "system or panel failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--remove",
+        "--clear",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "device counts or details were returned, with any requested removals",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "client not found, invalid device ID, or conflicting removal options",
           "status": "failed"
         },
         {
@@ -796,6 +855,7 @@ export const commandCatalog = {
         "--limit",
         "--reset",
         "--expires",
+        "--devices",
         "--json",
         "--context"
       ],

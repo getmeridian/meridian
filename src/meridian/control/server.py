@@ -64,6 +64,7 @@ from meridian.control.ui_routes import UI_ROUTES, UiContext, owner_session
 from meridian.control.ui_views import is_declared
 from meridian.core.agent_http import AGENT_HTTP_SURFACE
 from meridian.core.agent_protocol import EnrollRequest, ObservedStateReport, PollRequest, RenewRequest, StatsReport
+from meridian.core.client_devices import DEVICE_KEY_PATTERN
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 MAX_BODY_BYTES = AGENT_HTTP_SURFACE.max_request_bytes
@@ -399,6 +400,15 @@ class _Handler(BaseHTTPRequestHandler):
     def reset_user_traffic(self, match: re.Match[str]) -> Any:
         return self._service.reset_user_traffic(match[1])
 
+    def user_devices(self, match: re.Match[str]) -> Any:
+        return self._service.user_devices(match[1])
+
+    def delete_user_device(self, match: re.Match[str]) -> Any:
+        return self._service.delete_user_devices(match[1], match[2])
+
+    def clear_user_devices(self, match: re.Match[str]) -> Any:
+        return self._service.delete_user_devices(match[1])
+
     def delete_user(self, match: re.Match[str]) -> Any:
         with self._refuse_declared(match[1], "meridian client remove"):
             self._service.delete_user(match[1])
@@ -574,6 +584,7 @@ class _Handler(BaseHTTPRequestHandler):
             match[2] or "",
             user_agent=self.headers.get("User-Agent"),
             accept=self.headers.get("Accept"),
+            device_headers=self.headers,
         )
         self._send(response.status, response.content_type, response.body.encode("utf-8"), response.headers)
 
@@ -601,6 +612,14 @@ ROUTES: list[Route] = [
     ("PATCH", re.compile(rf"/api/users/{_USERNAME}"), WRITE, _Handler.update_user),
     ("POST", re.compile(rf"/api/users/{_USERNAME}/reissue"), WRITE, _Handler.reissue_user),
     ("POST", re.compile(rf"/api/users/{_USERNAME}/reset-traffic"), WRITE, _Handler.reset_user_traffic),
+    ("GET", re.compile(rf"/api/users/{_USERNAME}/devices"), "read", _Handler.user_devices),
+    (
+        "DELETE",
+        re.compile(rf"/api/users/{_USERNAME}/devices/({DEVICE_KEY_PATTERN})"),
+        WRITE,
+        _Handler.delete_user_device,
+    ),
+    ("DELETE", re.compile(rf"/api/users/{_USERNAME}/devices"), WRITE, _Handler.clear_user_devices),
     ("DELETE", re.compile(rf"/api/users/{_USERNAME}"), WRITE, _Handler.delete_user),
     ("GET", re.compile(rf"/api/endpoints/{_NAME}"), "read", _Handler.get_endpoint),
     ("PUT", re.compile(rf"/api/endpoints/{_NAME}"), WRITE, _Handler.put_endpoint),
@@ -655,6 +674,9 @@ OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
         _Handler.update_user,
         _Handler.reissue_user,
         _Handler.reset_user_traffic,
+        _Handler.user_devices,
+        _Handler.delete_user_device,
+        _Handler.clear_user_devices,
         _Handler.delete_user,
         _Handler.list_tokens,
         _Handler.create_token,

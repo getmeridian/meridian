@@ -67,6 +67,12 @@ Expires = Annotated[
         show_default=False,
     ),
 ]
+DeviceLimit = Annotated[
+    str | None,
+    typer.Option(
+        "--devices", metavar="N|default", help="Device cap, 1–100; default uses the fleet's cap", show_default=False
+    ),
+]
 
 
 def enable_json_output(ctx: typer.Context, value: object) -> object:

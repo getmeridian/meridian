@@ -8,6 +8,7 @@
 - **Same locale approach as the PWA** — `locales/{en,ru,fa,zh}.json`, English fallback, `fa` sets `dir="rtl"`; numbers and sizes are bidi-isolated.
 - **Privacy and history** — Settings discloses every level before confirmation and PUT; M.api handles owner step-up. Usage charts and icons use SVG through M.h, with UTC day labels and an accessible totals table.
 - **Passkeys are a seam** — `PasskeyState` reports `no_domain` on a bare IP and `not_built` otherwise; py_webauthn would add pyOpenSSL, pyasn1, and cbor2 to every CLI install, and attestation is never parsed by hand.
+- **Device controls** — `devices.js` owns the person card: counts/clear in private, metadata/remove in full, no device data in off. Cap edits PATCH only `device_limit`; blank uses the fleet default. Confirmation explains that removed registrations can return; global privacy choices stay in Settings.
 
 ## What's done well
 - **CSP with no exceptions for script** — `default-src 'none'`, `script-src 'self'`, `frame-ancestors 'none'`, `Referrer-Policy: no-referrer` on every console response; `test_control_ui_assets.py` refuses inline script, style, handlers, HTML sinks, outside URLs, and locale drift.
@@ -31,3 +32,4 @@
 - Turning a privacy level off preserves its disabled numeric defaults; invalid unfinished edits must never block lowering a level.
 - Keep each script under 800 lines and every `M.t("…")` key in `en.json`; the asset tests read literal keys only.
 - A screen that re-requests on every pick wraps its request in `M.latestOnly()` and labels from the value it asked for — the revision diff once showed #2's reply under "1 to 3".
+- Reject invalid numeric cap input before treating blank as default; a browser's `badInput` must never clear an override.

@@ -52,6 +52,9 @@ meridian setup [--intent FILE|-] [--restart] [--yes]
 |------|---------|-------------|
 | `--intent FILE` | (无) | 从完整的拓扑 JSON 文档开始审核；用 `-` 表示 stdin |
 | `--restart` | | 启动前放弃保存的设置进度 |
+| `--devices N\|default` | 集群默认值 | 每人上限，1–100（`client add`、`client set`）；`default` 跟随集群上限 |
+| `--remove ID` | | 清除一条登记（`client devices`）；设备可在下次刷新时重新登记 |
+| `--clear` | | 清除全部登记（`client devices`）；不能与 `--remove` 同时使用 |
 | `--yes`, `-y` | | 批准审核并应用无需询问 |
 
 第一个问题是语言（English, Русский, فارسی, 中文），从你的终端预选并记住在 `~/.config/meridian/preferences.json`；`--lang` 或 `MERIDIAN_LANG` 跳过它。然后向导走过服务器（一个 IP、`user@IP:port` 或 `local` 用于此机器）、每个服务器做什么、连接方法、路由（仅当你有路由网关时才被提问：每条规则把匹配的流量发往出口或出口池、直接从网关发出，或不发送）、用户、平实语言摘要和应用。选项以列表形式呈现：用方向键移动（或按选项的编号），用空格键切换复选项，按 `?` 查看详情，按 Enter 确认，按 Esc 返回，按 Ctrl+C 退出。凡是列表提供“其他”的地方，你都可以输入自己的值。在文本字段中，你还可以输入 `back`、`details`、`save` 或 `quit`（或你的语言中的相同单词）。对于伪装网站，向导会先扫描出口所在的网络（约一分钟），并把这些网站排在知名网站之前。设置 `MERIDIAN_PLAIN_PROMPTS=1` 可使用编号提示（当终端无法绘制列表时会自动使用）。在终端中不带命令运行 `meridian`，在任何 VPN 存在之前，提供启动向导。进度在每个阶段后保存在 `~/.config/meridian/setup.json` 中，所以再次运行 `meridian setup` 继续；密码和私钥永不存储在那里。`--intent` 不会替换现有草稿除非也给出 `--restart`。当应用成功时，设置验证每个节点和订阅并打印每个用户的连接页面。
@@ -103,12 +106,13 @@ JSON `data` 包含 `plan_hash`、`generation` 和 `actions[]` 带 `status: "conv
 管理连接的人。
 
 ```
-meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--json]
+meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client show NAME [--repair-page] [--json]
 meridian client usage NAME [--days N] [--json]
 meridian client list [--json]
-meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client reset-traffic NAME [--json]
+meridian client devices NAME [--remove ID | --clear] [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
 meridian client reissue NAME [--yes] [--json]
@@ -142,6 +146,8 @@ meridian client remove NAME [--yes] [--json]
 **`client remove`** — 从拓扑中删除客户端，删除其在控制服务中的账户和连接页面。除非 `--yes`，否则要求确认。最后一个客户端无法删除。在网页控制台中添加的用户请在控制台中删除。
 
 **`client usage`** — 显示控制服务中任何人员（含控制台添加者）的每日上传、下载及总字节数。须在[隐私](/zh/privacy/)中开启每日历史；否则退出码为 `2`，并提示启用命令。历史开启时，`client show` 附最近七个 UTC 天（JSON 的 `data.usage`，关闭时为 `null`）。空白日期表示无记录的流量，不会补算过去用量。
+
+**`client devices`** — private 显示数量，full 显示设备详情；off 不读取设备。`--json` 返回 `username`、`level`、`count`、有效 `limit`、`devices` 和 `removed`。`--remove ID` 或 `--clear` 清除登记而不撤销凭证；重复操作报告零条删除。也可以查看控制台添加的用户，但应在控制台管理他们的登记。`client set --devices N` 设置上限，`--devices default` 使用集群上限。参见[设备限制](/zh/client-management/#限制设备数量)。重新签发链接会清除全部设备登记并保留上限。
 
 ### meridian privacy
 

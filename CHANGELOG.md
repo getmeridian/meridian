@@ -37,6 +37,12 @@ that dials out to it.
   reports count once and traffic from while history was off is not backfilled.
   `client usage`, seven days in `client show`, and `fleet usage` provide tables;
   the console has person and server charts in all four locales.
+- **Device limits, off by default** — opt into private HMAC fingerprints or full
+  device details, with a fleet default cap and per-person overrides. Subscription
+  fetches enforce caps; browsers and apps without a supported HWID stay uncounted.
+  `client add/set --devices` and `client devices --remove/--clear` manage caps and
+  registrations, as does the person's console view. Reissue clears registrations;
+  private registrations reset after restore. No client addresses are stored.
 - **One service on the control server** (`ctld`, running `meridian serve`)
   keeps users, traffic, and applied revisions in one SQLite file, serves every
   subscription format, and logs no requests. It sits behind nginx on a

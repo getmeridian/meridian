@@ -54,6 +54,21 @@
           "title": "Declared",
           "type": "boolean"
         },
+        "device_limit": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "None uses the fleet's default cap.",
+          "title": "Device Limit"
+        },
         "expires_at": {
           "description": "UTC timestamp; empty means never.",
           "title": "Expires At",

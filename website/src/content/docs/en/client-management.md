@@ -92,6 +92,36 @@ meridian client reset-traffic alice
 
 Apply, redeploys, and fleet changes never change a client's limits or expiry.
 
+## Limit devices
+
+Device limits are **off by default**: Meridian reads and stores no device information. Choose `private` or `full` in **Settings → Privacy** when you need a cap. The privacy level and each person's cap live in the control service; applies leave them alone.
+
+- **Private:** Each person's devices are counted by an unreadable fingerprint. Meridian stores no device names, systems, or apps. Someone who takes the control server can only check whether a device they already have was used.
+- **Full:** Meridian stores each device's ID, system, model, and app, and when it last fetched the subscription. Someone who takes the control server learns which devices each person uses. Addresses are never stored.
+
+Private mode also stores no first/last fetch times. Its fingerprints ride encrypted snapshots, but their fleet key stays on the control server. After a restore, private registrations are forgotten; devices register again on their next subscription refresh. Lowering from full to private replaces IDs with fingerprints and deletes their metadata; switching off deletes all registrations.
+
+Set a cap from 1 to 100, at creation or later. `default` uses the fleet cap (initially 3):
+
+```
+meridian client add alice --devices 2
+meridian client set alice --devices 4
+meridian client set alice --devices default
+```
+
+Read or forget registrations:
+
+```
+meridian client devices alice
+meridian client devices alice --json
+meridian client devices alice --remove ID
+meridian client devices alice --clear
+```
+
+Private mode shows only “N of M devices”; JSON also returns fingerprint IDs for removing one. Full mode lists IDs, systems and versions, models, apps, and first/last fetch times. The person's console view has the same count or list, with a clear button and, in full mode, individual remove buttons.
+
+A known device stays allowed when you lower its cap. A new device over the cap gets a subscription placeholder asking the person to remove a device or request a higher cap. Counting needs a valid `x-hwid` header from the app; browsers, connection-page fetches, and apps that send no supported HWID are always served and never counted. Removing a registration frees a slot; the device can register again on its next refresh. Limits govern subscription refreshes and do not revoke a configuration already imported into an app. `client reissue` replaces the credentials and clears all registrations while keeping the cap. Remnawave's device registrations are never imported by `migrate`.
+
 ## Suspend and resume a client
 
 ```
@@ -111,7 +141,7 @@ If a client's link or connection page reaches someone it shouldn't, replace it:
 meridian client reissue alice
 ```
 
-The control service gives the client a new subscription ID and new keys. The old subscription URL and connection page return 404, and the servers refuse the old keys. Meridian deletes the old page, publishes a new one, and prints the new page and subscription URL to send the client. They import the new link once: their apps can't follow a subscription URL that no longer exists. Everything else stays: status, traffic limit and usage, and expiry.
+The control service gives the client a new subscription ID and new keys. The old subscription URL and connection page return 404, and the servers refuse the old keys. Meridian deletes the old page, publishes a new one, and prints the new page and subscription URL to send the client. They import the new link once: their apps can't follow a subscription URL that no longer exists. Status, traffic limit and usage, expiry, and the device cap stay. Registered devices are cleared.
 
 With `--json`, pass `--yes`. The new links appear only in that command's output.
 

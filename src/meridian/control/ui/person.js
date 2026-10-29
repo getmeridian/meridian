@@ -42,6 +42,7 @@
       shareCard(share),
       h("div", { class: "cards" }, usageCard(user), accessCard(user)),
       M.personHistory(name),
+      M.devicesCard(user),
       dangerCard(user, share.declared),
     ]);
   }

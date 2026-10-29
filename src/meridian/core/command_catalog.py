@@ -165,6 +165,15 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         outcomes=[_ok("client traffic was reset"), _user("client not found or input error"), *_PANEL_FAILURES],
         stability="stable",
     ),
+    "client.devices": CommandOutput(
+        data_schema="client-devices",
+        outcomes=[
+            _ok("device counts or details were returned, with any requested removals"),
+            _user("client not found, invalid device ID, or conflicting removal options"),
+            *_PANEL_FAILURES,
+        ],
+        stability="stable",
+    ),
     "client.remove": CommandOutput(
         data_schema="client-remove",
         outcomes=[

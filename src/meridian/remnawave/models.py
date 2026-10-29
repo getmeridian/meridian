@@ -34,10 +34,11 @@ class User:
     active_internal_squad_uuids: list[str] = field(default_factory=list)
     external_squad_uuid: str = ""
     description: str = ""
-    # Panel-only user settings `meridian migrate` reports as not carried over.
+    # Panel-only settings `meridian migrate` reports as not carried over.
     tag: str = ""
     email: str = ""
     telegram_id: str = ""
+    # The control projection also uses this cap; migrate reports the panel's instead of importing it.
     hwid_device_limit: int | None = None
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
 

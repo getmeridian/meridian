@@ -65,8 +65,8 @@ _COLUMNS = "device_id, name, public_key, created_at, revoked_at"
 def strip_unsnapshotted(db: sqlite3.Connection, *, restoring: bool = False) -> None:
     """Empty every `NOT_SNAPSHOTTED` table `db` has; a snapshot from an older schema may lack some.
 
-    The web owner's tables arrived in schema 8, so a schema-7 snapshot has none of
-    them, and a restore strips the database before its migrations run.
+    Privacy settings and changes ride every snapshot; devices ride only while on.
+    On restore, private fingerprints cannot match the replacement HMAC key and go.
     """
     present = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     row = db.execute("SELECT settings FROM privacy WHERE id = 1").fetchone() if "privacy" in present else None
@@ -74,6 +74,9 @@ def strip_unsnapshotted(db: sqlite3.Connection, *, restoring: bool = False) -> N
     volatile = list(NOT_SNAPSHOTTED)
     if privacy.device_limits == "off" or (restoring and privacy.device_limits == "private"):
         volatile.append("devices")
+    elif restoring and "devices" in present:
+        # A raise to full may still hold private fingerprints awaiting their next fetch; their key is gone.
+        db.execute("DELETE FROM devices WHERE first_seen_at IS NULL")
     if privacy.usage_history == "off":
         volatile.extend(("traffic_daily", "node_traffic_daily"))
     for table in volatile:

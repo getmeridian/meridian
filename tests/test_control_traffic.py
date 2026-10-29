@@ -12,6 +12,7 @@ from meridian.control.service import ControlService
 from meridian.control.traffic import KEPT_EPOCHS, REMEMBERED_RETIRED_EPOCHS
 from meridian.core.agent_protocol import StatsReport
 from tests.support.agent_node import FLEET_ID
+from tests.support.control_service import drop_device_privacy_schema
 
 EPOCH_A = "5b0c8a52-6c1d-4e8b-9a7f-2b5d4c3e1f00"
 EPOCH_B = "6c1d8a52-6c1d-4e8b-9a7f-2b5d4c3e1f00"
@@ -119,6 +120,7 @@ def test_a_version_eight_database_keeps_each_nodes_live_baselines(tmp_path: Path
     service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
     alice = service.put_user("alice").user_id
     db = sqlite3.connect(path)
+    drop_device_privacy_schema(db)
     db.executescript(
         "DROP TABLE traffic_reports; DROP TABLE traffic_counters;"
         "CREATE TABLE traffic_reports (node_id TEXT PRIMARY KEY, counter_epoch TEXT NOT NULL, seq INTEGER NOT NULL);"
