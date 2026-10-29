@@ -33,6 +33,7 @@ pub(crate) fn health_with_checks(
         .iter()
         .cloned()
         .chain(crate::xray_health::api_check(root, exec, resources))
+        .chain(crate::xray_health::uptime_check(root, exec, resources))
         .take(MAX_CHECKS)
         .collect();
     for resource in resources {

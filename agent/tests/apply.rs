@@ -3,6 +3,8 @@
 mod common;
 #[path = "apply/readiness.rs"]
 mod readiness;
+#[path = "apply/uptime.rs"]
+mod uptime;
 
 use std::os::unix::fs::PermissionsExt;
 use std::time::Duration;
