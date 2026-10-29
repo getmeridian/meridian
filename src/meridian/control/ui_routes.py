@@ -244,6 +244,7 @@ def auth_state(request: UiRequest, _match: re.Match[str]) -> None:
 
 def check_setup_link(request: UiRequest, _match: re.Match[str]) -> None:
     require_same_origin(request)
+    _require_configured(request.ui)  # before the form: completing it would be refused anyway
     body: SetupLinkCheck = _body(request, SetupLinkCheck)
     purpose = request.ui.service.owner.check_setup_link(body.token)
     _send_json(request, {"purpose": purpose})

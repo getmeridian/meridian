@@ -39,8 +39,8 @@
     var auth = M.state.auth;
     document.title = (M.state.fleet && M.state.fleet.profile_title) || "Meridian";
     if (!auth) return;
-    if (setupToken) return renderSetupLink();
     if (!auth.configured) return M.renderNotice(root, "auth.unconfigured_title", "auth.unconfigured_text", "meridian apply");
+    if (setupToken) return renderSetupLink();
     if (!auth.owner_exists) return M.renderNotice(root, "auth.no_owner_title", "auth.no_owner_text", "meridian panel");
     if (!auth.signed_in) return M.renderLogin(root, auth, afterSignIn);
     renderShell();

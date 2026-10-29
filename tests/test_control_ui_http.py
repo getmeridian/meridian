@@ -175,6 +175,9 @@ def test_sign_in_stays_closed_without_the_secret_path(tmp_path: Path) -> None:
     for fleet in _serve(tmp_path, ""):
         link = fleet.call("POST", "/api/owner/setup-link", {}, bearer=ADMIN_TOKEN).body["token"]
         assert fleet.call("GET", "/auth/state").body["configured"] is False
+        # Checked before the password form, too: the owner once typed a password only to be refused.
+        checked = fleet.call("POST", "/auth/setup/check", {"token": link}, headers=UI)
+        assert checked.status == 503 and checked.body["error"]["code"] == "ui_unconfigured"
         refused = fleet.call("POST", "/auth/setup", {"token": link, "password": PASSWORD}, headers=UI)
         assert refused.status == 503 and refused.body["error"]["code"] == "ui_unconfigured"
 
