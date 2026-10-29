@@ -11,7 +11,7 @@ from typer.testing import CliRunner
 import meridian.cli as cli
 from meridian.cli import app
 from meridian.cluster import ClusterConfig, PanelConfig
-from meridian.control.client import ControlClient, ControlServiceNotFound
+from meridian.control.client import ControlClient, ControlServiceNotFound, add_mutation_listener
 from meridian.control.models import OwnerStatus
 from tests.support.control_service import ADMIN_TOKEN, serve_control
 
@@ -105,6 +105,30 @@ def test_panel_on_a_service_fleet_prints_the_console_and_a_one_time_setup_link(t
         assert "Works once, for 15 minutes" in output
         assert "Remnawave" not in output
         assert _check_link(url, _setup_token(output))["purpose"] == "setup"
+
+
+def test_bare_panel_asks_for_a_setup_link_never_a_reset_and_pulls_no_backup(tmp_home, monkeypatch) -> None:
+    """A bare `panel` that raced an owner's setup would have wiped their password; minting a link backs nothing up."""
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    asked: list[bool] = []
+    original = ControlClient.issue_setup_link
+
+    def recording(self, *, reset: bool):  # type: ignore[no-untyped-def]
+        asked.append(reset)
+        return original(self, reset=reset)
+
+    monkeypatch.setattr(ControlClient, "issue_setup_link", recording)
+    reported: list[str] = []
+    stop = add_mutation_listener(reported.append)
+    try:
+        with serve_control(tmp_home, public_path="/s3cret") as url:
+            _save_service_fleet(monkeypatch, url)
+            assert runner.invoke(app, ["panel"]).exit_code == 0
+            assert runner.invoke(app, ["panel", "--setup-link"]).exit_code == 0
+    finally:
+        stop()
+    assert asked == [False, True]
+    assert reported == []
 
 
 def test_panel_with_an_owner_prints_no_link_unless_asked(tmp_home, monkeypatch) -> None:

@@ -39,4 +39,5 @@
 - Bare `test` follows the intent, not the saved-server count: removed servers stay saved.
 - A new public command needs a `_HELP_LAYOUT` entry, a `rich_help_panel`, and a `core.command_catalog.COMMAND_OUTPUTS` entry (`None` unless it declares `--json`); `test_cli_catalog.py` enforces it. Hidden commands (`serve`, `migrate`, `backup`, `restore`, `fleet history` while the control backend is hidden; `cli_backup.py` mounts the backup pair) stay out of the catalog, so their `--json` envelope is unvalidated and they need no locale docs.
 - `deploy` port preflight (`port_check.py`) covers every port nginx binds, including loopback 8443/8444; a missed one failed mid-deploy on `nginx -t`.
+- `panel` asks for a reset link only with `--setup-link` (a bare one racing an owner's setup would wipe their password) and builds its `ControlClient` with `report_mutations=False`: a setup link is no state a backup keeps.
 - Page palettes live in `core.inputs.PAGE_PALETTES` (tested against `app.js`); normalize `--icon` with `branding.normalize_icon()` before SSH, and a redeploy merges unnamed branding flags from saved values.

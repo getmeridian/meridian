@@ -51,9 +51,11 @@ def _console(cluster: ClusterConfig, *, setup_link: bool) -> None:
     """The control service's web console: its URL, and a one-time setup link when one is due."""
     url = cluster.panel.display_url
     try:
-        with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
+        # Minting a link changes nothing a snapshot keeps (`ui_*` tables never ride one), so no backup pull follows.
+        with ControlClient(cluster.panel.url, cluster.panel.api_token, report_mutations=False) as client:
             owner = client.owner_status()
-            grant = client.issue_setup_link(reset=True) if setup_link or not owner.exists else None
+            # Only --setup-link asks for a reset: bare `panel` on a fresh service gets a setup link, never a reset.
+            grant = client.issue_setup_link(reset=setup_link) if setup_link or not owner.exists else None
     except ControlServiceNotFound:
         fail(
             "This control service predates the web console.",
