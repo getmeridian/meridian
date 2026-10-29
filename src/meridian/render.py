@@ -56,6 +56,26 @@ _PWA_APPS: list[dict[str, Any]] = [
             ],
             "zh": ["如果设备请求 VPN 权限，请允许。", "从导入的订阅中选择一个服务器。", "点击电源按钮连接。"],
         },
+        "installers": [
+            {
+                "platform": "Android",
+                "kind": "apk",
+                "arch": "universal",
+                "url": "https://github.com/Happ-proxy/happ-android/releases/latest/download/Happ.apk",
+            },
+            {
+                "platform": "iOS",
+                "kind": "appstore",
+                "region": "ru",
+                "url": "https://apps.apple.com/ru/app/happ-proxy-utility/id6783623643",
+            },
+            {
+                "platform": "Windows",
+                "kind": "exe",
+                "arch": "x64",
+                "url": "https://github.com/Happ-proxy/happ-desktop/releases/latest/download/setup-Happ.x64.exe",
+            },
+        ],
     },
     {
         "name": "FlClashX",
@@ -95,6 +115,62 @@ _PWA_APPS: list[dict[str, Any]] = [
             "fa": "حالت TUN را روشن کنید تا همهٔ برنامه\u200cها از این اتصال استفاده کنند.",
             "zh": "开启 TUN 模式，让所有应用都通过此连接上网。",
         },
+        "installers": [
+            {
+                "platform": "Android",
+                "kind": "apk",
+                "arch": "universal",
+                "url": "https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-android-universal.apk",
+            },
+            {
+                "platform": "Windows",
+                "kind": "exe",
+                "arch": "x64",
+                "url": "https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-windows-amd64-setup.exe",
+            },
+            {
+                "platform": "Windows",
+                "kind": "exe",
+                "arch": "arm64",
+                "url": "https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-windows-arm64-setup.exe",
+            },
+            {
+                "platform": "macOS",
+                "kind": "dmg",
+                "arch": "arm64",
+                "url": "https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-macos-arm64.dmg",
+            },
+            {
+                "platform": "macOS",
+                "kind": "dmg",
+                "arch": "x64",
+                "url": "https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-macos-amd64.dmg",
+            },
+            {
+                "platform": "Linux",
+                "kind": "deb",
+                "arch": "x64",
+                "url": "https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-linux-amd64.deb",
+            },
+            {
+                "platform": "Linux",
+                "kind": "appimage",
+                "arch": "x64",
+                "url": "https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-linux-amd64.AppImage",
+            },
+            {
+                "platform": "Linux",
+                "kind": "rpm",
+                "arch": "x64",
+                "url": "https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-linux-amd64.rpm",
+            },
+            {
+                "platform": "Linux",
+                "kind": "deb",
+                "arch": "arm64",
+                "url": "https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-linux-arm64.deb",
+            },
+        ],
     },
     {
         "name": "Clash Mi",
@@ -228,6 +304,14 @@ _PWA_APPS: list[dict[str, Any]] = [
             "fa": "منو، تنظیمات گروه اشتراک، + و سپس نشانی",
             "zh": "菜单 → 订阅分组设置 → ＋ → URL",
         },
+        "installers": [
+            {
+                "platform": "Android",
+                "kind": "apk",
+                "arch": "universal",
+                "url": "https://github.com/2dust/v2rayNG/releases/download/1.10.31/v2rayNG_1.10.31_universal.apk",
+            }
+        ],
     },
     {
         "name": "NekoBox",

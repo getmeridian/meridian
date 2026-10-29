@@ -75,6 +75,8 @@ that dials out to it.
   the snapshot and the recovery key, restore brings the fleet files back too.
 
 ### Changed
+- Connection pages offer labelled store and direct-install alternatives from
+  pinned app defaults, including desktop architecture and Linux package choices.
 - Connection setup follows your chosen platform and app through installation,
   manual or one-tap import, and localized Connect steps, including TUN on
   Clash desktop apps. Apps without an import scheme show their manual route.

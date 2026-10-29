@@ -7,6 +7,22 @@
  * ----------------------------------------------------------------------- */
 var T = {
   en: {
+    'install.other': 'Other install options',
+    'install.appstore': 'App Store',
+    'install.play': 'Google Play',
+    'install.apk': 'Official APK',
+    'install.exe': 'Windows installer',
+    'install.dmg': 'macOS installer',
+    'install.deb': 'DEB package',
+    'install.rpm': 'RPM package',
+    'install.appimage': 'AppImage',
+    'install.releases': 'Release downloads',
+    'arch.x64': 'x64 (Intel / AMD)',
+    'arch.arm64': 'ARM64',
+    'arch.universal': 'Universal',
+    'arch.apple': 'Apple Silicon',
+    'arch.intel': 'Intel',
+    'store.ru': 'Russia',
     'platform.choice': 'Platform',
     'sub.label': 'Subscription URL',
     'app.choice': 'App',
@@ -33,6 +49,22 @@ var T = {
     language: 'Language', close: 'Close', copy: 'Copy', 'qr.code': 'QR code',
   },
   ru: {
+    'install.other': 'Другие способы установки',
+    'install.appstore': 'App Store',
+    'install.play': 'Google Play',
+    'install.apk': 'Официальный APK',
+    'install.exe': 'Установщик для Windows',
+    'install.dmg': 'Установщик для macOS',
+    'install.deb': 'Пакет DEB',
+    'install.rpm': 'Пакет RPM',
+    'install.appimage': 'AppImage',
+    'install.releases': 'Выпуски приложения',
+    'arch.x64': 'x64 (Intel / AMD)',
+    'arch.arm64': 'ARM64',
+    'arch.universal': 'Универсальный',
+    'arch.apple': 'Apple Silicon',
+    'arch.intel': 'Intel',
+    'store.ru': 'Россия',
     'platform.choice': 'Платформа',
     'app.choice': 'Приложение',
     'platform.ios': 'iOS',
@@ -108,6 +140,22 @@ var T = {
     'open.short': 'Открыть',
   },
   fa: {
+    'install.other': 'روش‌های دیگر نصب',
+    'install.appstore': 'اپ استور',
+    'install.play': 'گوگل پلی',
+    'install.apk': 'APK رسمی',
+    'install.exe': 'نصب‌کنندهٔ ویندوز',
+    'install.dmg': 'نصب‌کنندهٔ macOS',
+    'install.deb': 'بستهٔ DEB',
+    'install.rpm': 'بستهٔ RPM',
+    'install.appimage': 'AppImage',
+    'install.releases': 'نسخه‌های منتشرشده',
+    'arch.x64': 'x64 (اینتل / AMD)',
+    'arch.arm64': 'ARM64',
+    'arch.universal': 'همهٔ معماری‌ها',
+    'arch.apple': 'اپل سیلیکون',
+    'arch.intel': 'اینتل',
+    'store.ru': 'روسیه',
     'platform.choice': 'پلتفرم',
     'app.choice': 'برنامه',
     'platform.ios': 'iOS',
@@ -183,6 +231,22 @@ var T = {
     'open.short': 'باز کردن',
   },
   zh: {
+    'install.other': '其他安装方式',
+    'install.appstore': 'App Store',
+    'install.play': 'Google Play',
+    'install.apk': '官方 APK',
+    'install.exe': 'Windows 安装程序',
+    'install.dmg': 'macOS 安装程序',
+    'install.deb': 'DEB 软件包',
+    'install.rpm': 'RPM 软件包',
+    'install.appimage': 'AppImage',
+    'install.releases': '应用发布页',
+    'arch.x64': 'x64（Intel / AMD）',
+    'arch.arm64': 'ARM64',
+    'arch.universal': '通用版',
+    'arch.apple': 'Apple 芯片',
+    'arch.intel': 'Intel',
+    'store.ru': '俄罗斯',
     'platform.choice': '平台',
     'app.choice': '应用',
     'platform.ios': 'iOS',
@@ -533,6 +597,14 @@ function localizedRecord(value, steps) {
       entry.every(function(line) { return string(line, 360); }) : string(entry, 360);
   });
 }
+function validInstallers(routes, platforms) {
+  return Array.isArray(routes) && routes.length <= 24 && routes.every(function(route) {
+    return object(route) && platforms.indexOf(route.platform) !== -1 && webUrl(route.url, true) &&
+      ['appstore', 'play', 'apk', 'exe', 'dmg', 'deb', 'rpm', 'appimage', 'releases'].indexOf(route.kind) !== -1 &&
+      (route.arch === undefined || ['x64', 'arm64', 'universal'].indexOf(route.arch) !== -1) &&
+      (route.region === undefined || route.region === 'ru');
+  });
+}
 function validApps(apps) {
   if (!Array.isArray(apps) || !apps.length || apps.length > 64) return false;
   var names = [];
@@ -549,6 +621,7 @@ function validApps(apps) {
     if (app.manual !== undefined && !localizedRecord(app.manual, false)) return false;
     if (app.connect !== undefined && !localizedRecord(app.connect, true)) return false;
     if (app.tun !== undefined && !localizedRecord(app.tun, false)) return false;
+    if (app.installers !== undefined && !validInstallers(app.installers, platforms)) return false;
     return app.icon === undefined || imageSource(app.icon);
   });
 }
@@ -776,6 +849,29 @@ function renderAppRow(a, key) {
   return html + '</a>';
 }
 
+function installerLabel(route) {
+  var label = text('install.' + route.kind);
+  if (route.arch) {
+    var arch = route.arch;
+    if (route.platform === 'macOS') arch = arch === 'arm64' ? 'apple' : 'intel';
+    label += ' · ' + text('arch.' + arch);
+  }
+  if (route.region === 'ru') label += ' · ' + text('store.ru');
+  return label;
+}
+
+function renderInstallAlternatives(app, platform) {
+  var routes = app.installers || [];
+  var links = '';
+  for (var i = 0; i < routes.length; i++) {
+    var route = routes[i];
+    if (route.platform !== platform || route.url === appUrl(app, platform)) continue;
+    links += '<li><a href="' + escapeHtml(route.url) + '" target="_blank" rel="noopener">' + escapeHtml(installerLabel(route)) + '</a></li>';
+  }
+  return links ? renderDisclosure('<span data-t="install.other">Other install options</span>',
+    '<ul class="install-routes">' + links + '</ul>', 'install-alternatives') : '';
+}
+
 function renderImportButton(a, subUrl, serverName, primary) {
   var href;
   try { href = buildDeepLink(a.deeplink, subUrl, serverName); }
@@ -865,6 +961,7 @@ function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
   html += '<h2 data-t="step.install">Install an app</h2>' + renderPickers(apps, platform, chosen);
   html += chosen ? '<div class="app-list">' + renderAppRow(chosen, key) + '</div>' :
     '<p class="muted" data-t="apps.none">No apps for this platform. Choose another platform above.</p>';
+  if (chosen) html += renderInstallAlternatives(chosen, key);
   html += '</div></div>';
   if (subUrl) {
     html += '<div class="step"><span class="step-num">2</span><div class="step-body">';

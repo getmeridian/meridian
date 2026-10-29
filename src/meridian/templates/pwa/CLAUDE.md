@@ -13,6 +13,7 @@ Server-hosted Progressive Web App and the only connection-page implementation.
 **Account information** — `account.js` reads same-origin subscription `/info` on open, return, and refresh; its saved projection holds status, traffic, expiry, and check time only, and is labelled unverified until checked again.
 **i18n** — English HTML with `data-t` swaps; choose the saved locale before loading, always set lang/dir, and rebuild to return to English. Support follows the same preference.
 **Three-step setup** — a native platform/app picker drives install, import (with a nearby manual URL and menu path), and plain-text Connect records in all four locales. Clash desktop guides include TUN; choices stay in memory.
+**Installer alternatives** — platform-scoped records label stores, official downloads, packages, and architecture without detecting the chip; new destinations come only from Meridian's catalog or Remnawave's pinned defaults.
 
 ## What's done well
 - **SW scope trick + graceful offline** — registered with `{scope: '../'}` to control sibling client dirs (needs nginx `Service-Worker-Allowed: "/"`); shell is stale-while-revalidate, config network-first with a 503 fallback.

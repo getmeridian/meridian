@@ -488,3 +488,26 @@ def test_clash_desktop_steps_include_tun_while_mobile_steps_do_not(page_data: di
         """,
         page_data,
     )
+
+
+def test_install_alternatives_are_labelled_and_platform_specific(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog, { info: data.info }); await browser.start();
+        let routes = browser.document.querySelector('.install-routes');
+        assert.ok(routes, 'a store must have its pinned direct-install alternative');
+        assert.match(routes.textContent, /Official APK/);
+        assert.ok(routes.querySelector('a').getAttribute('href').endsWith('/Happ.apk'));
+        let platform = browser.document.getElementById('platform-choice'); platform.value = 'windows'; browser.fire('change', platform);
+        const choice = browser.document.getElementById('app-choice'); choice.value = 'FlClashX'; browser.fire('change', choice);
+        routes = browser.document.querySelector('.install-routes');
+        assert.equal(routes.querySelectorAll('a').length, 2);
+        assert.match(routes.textContent, /x64/); assert.match(routes.textContent, /ARM64/);
+        assert.ok(routes.querySelectorAll('a').every(link => link.getAttribute('href').endsWith('.exe')));
+        platform = browser.document.getElementById('platform-choice'); platform.value = 'ios'; browser.fire('change', platform);
+        routes = browser.document.querySelector('.install-routes');
+        assert.match(routes.textContent, /App Store.*Russia/);
+        assert.ok(routes.querySelectorAll('a').every(link => link.getAttribute('href').includes('apps.apple.com')));
+        """,
+        page_data,
+    )

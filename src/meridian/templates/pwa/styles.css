@@ -394,4 +394,6 @@ svg{flex-shrink:0}
   font:.76rem/1.5 ui-monospace,'SF Mono',monospace;background:var(--sf2);color:var(--tx2);direction:ltr;
 }
 .connect-steps{padding-inline-start:20px;display:flex;flex-direction:column;gap:7px;font-size:.86rem;line-height:1.5;color:var(--tx2)}
+.install-routes{list-style:none;display:flex;flex-direction:column;gap:8px;font-size:.84rem;line-height:1.5}
+.install-routes a{display:block;min-height:36px;padding-block:6px;color:var(--accent);overflow-wrap:anywhere}
 @media (max-width:479px){.import-actions{grid-template-columns:1fr}.setup-pickers{gap:8px}}
