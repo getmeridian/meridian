@@ -90,12 +90,17 @@ def xray_outbound(endpoint: ClientEndpoint, uuid: str) -> dict[str, Any]:
             },
         }
         return outbound
-    outbound["streamSettings"] = {
-        "network": "xhttp",
-        "xhttpSettings": {"mode": "packet-up", "host": endpoint.host, "path": absolute(endpoint.path)},
-        "security": "tls",
-        "tlsSettings": _tls(endpoint),
-    }
+    if endpoint.protocol == "wss":
+        transport: dict[str, Any] = {
+            "network": "ws",
+            "wsSettings": {"path": absolute(endpoint.path), "host": endpoint.host, "headers": {}},
+        }
+    else:
+        transport = {
+            "network": "xhttp",
+            "xhttpSettings": {"mode": "packet-up", "host": endpoint.host, "path": absolute(endpoint.path)},
+        }
+    outbound["streamSettings"] = {**transport, "security": "tls", "tlsSettings": _tls(endpoint)}
     return outbound
 
 

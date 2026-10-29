@@ -35,6 +35,7 @@ _SELECT_GROUP = "Meridian"
 _STASH_PRIVATE_RULE = ("GEOIP,private,", "GEOIP,LAN,")
 # Stash's documented names for fields Mihomo spells otherwise.
 _STASH_FIELDS = {"servername": "sni", "password": "auth"}
+_NETWORKS = {"reality": "tcp", "xhttp": "xhttp", "wss": "ws"}
 
 
 def mihomo_document(
@@ -93,19 +94,21 @@ def mihomo_proxy(endpoint: ClientEndpoint, uuid: str) -> dict[str, Any]:
             "client-fingerprint": tls_fingerprint(endpoint),
             "alpn": ["h3"],
         }
-    proxy |= {
-        "type": "vless",
-        "network": "tcp" if endpoint.protocol == "reality" else "xhttp",
-        "udp": True,
-        "uuid": uuid,
-        "packet-encoding": "xudp",
-    }
+    network = _NETWORKS[endpoint.protocol]
+    proxy |= {"type": "vless", "network": network, "udp": True, "uuid": uuid, "packet-encoding": "xudp"}
     if endpoint.protocol == "reality":
         proxy |= {
             "flow": "xtls-rprx-vision",
             "tls": True,
             "servername": endpoint.reality_sni,
             "reality-opts": {"public-key": endpoint.reality_public_key, "short-id": endpoint.reality_short_id},
+        }
+    elif endpoint.protocol == "wss":
+        proxy |= {
+            "tls": True,
+            "servername": endpoint.tls_sni,
+            # Remnawave sends the WebSocket Host as a header, as Mihomo documents it.
+            "ws-opts": {"path": absolute(endpoint.path), "headers": {"Host": endpoint.host} if endpoint.host else {}},
         }
     else:
         proxy |= {

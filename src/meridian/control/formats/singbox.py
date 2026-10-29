@@ -15,6 +15,7 @@ from meridian.control.formats.entries import (
     PLACEHOLDER_ADDRESS,
     PLACEHOLDER_PORT,
     PLACEHOLDER_UUID,
+    absolute,
     primaries,
     tls_fingerprint,
 )
@@ -41,7 +42,7 @@ def singbox_document(endpoints: list[ClientEndpoint], uuid: str, placeholders: t
 
 
 def singbox_outbound(endpoint: ClientEndpoint, uuid: str) -> dict[str, Any]:
-    """Return one Reality or Hysteria2 endpoint as a sing-box outbound."""
+    """Return one Reality, WSS, or Hysteria2 endpoint as a sing-box outbound."""
     outbound: dict[str, Any] = {
         "type": endpoint.protocol,
         "tag": endpoint.remark,
@@ -53,6 +54,20 @@ def singbox_outbound(endpoint: ClientEndpoint, uuid: str) -> dict[str, Any]:
             "password": uuid,
             "tls": {"enabled": True, "server_name": endpoint.tls_sni, "alpn": ["h3"]},
             "obfs": {"type": "salamander", "password": endpoint.salamander_password},
+        }
+    if endpoint.protocol == "wss":
+        transport: dict[str, Any] = {"type": "ws", "path": absolute(endpoint.path)}
+        if endpoint.host:
+            transport["headers"] = {"Host": endpoint.host}
+        return outbound | {
+            "type": "vless",
+            "uuid": uuid,
+            "transport": transport,
+            "tls": {
+                "enabled": True,
+                "server_name": endpoint.tls_sni,
+                "utls": {"enabled": True, "fingerprint": tls_fingerprint(endpoint)},
+            },
         }
     tls: dict[str, Any] = {
         "enabled": True,

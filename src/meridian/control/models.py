@@ -27,6 +27,7 @@ from meridian.core.agent_types import (
     Version,
 )
 from meridian.core.models import CoreModel
+from meridian.core.topology import ProtocolKind
 
 
 class ManagedInbound(CoreModel):
@@ -84,10 +85,14 @@ class NodeStatus(CoreModel):
 
 
 class ClientEndpoint(CoreModel):
-    """One public way into an exit, as subscriptions publish it."""
+    """One public way into an exit, as subscriptions publish it.
+
+    TLS transports (XHTTP, WSS, Hysteria2) carry `tls_sni`; XHTTP and WSS add `host` and
+    `path`, and on a domain their `address` is that domain, so they can ride a CDN.
+    """
 
     remark: str = Field(min_length=1, max_length=100)
-    protocol: Literal["reality", "xhttp", "hysteria2"]
+    protocol: ProtocolKind
     address: str = Field(min_length=1, max_length=253)
     port: int = Field(ge=1, le=65535)
     position: int = Field(ge=0, le=10_000)
