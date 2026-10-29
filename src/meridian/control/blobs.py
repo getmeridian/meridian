@@ -23,6 +23,7 @@ from typing import BinaryIO
 
 import httpx
 
+from meridian.control.background_health import TaskHealth
 from meridian.control.models import NodeSpec
 from meridian.core.agent_desired import BinaryPinResource
 
@@ -93,6 +94,7 @@ class BlobStore:
         download: Download = download_https,
         spawn: Callable[[Callable[[], None]], None] = _start_thread,
         clock: Callable[[], float] = time.monotonic,
+        health: TaskHealth | None = None,
     ) -> None:
         self.root = root
         self._download = download
@@ -103,6 +105,8 @@ class BlobStore:
         self._pending: list[str] = []
         self._last_try: dict[str, float] = {}
         self._running = False
+        self.health = health or TaskHealth("blob_mirror", "blob_mirror_failed")
+        self._failed: set[str] = set()
 
     def path(self, sha256: str) -> Path | None:
         """The stored file for `sha256`, or None."""
@@ -161,12 +165,20 @@ class BlobStore:
                 self._mirror(artifact)
 
     def _mirror(self, artifact: Artifact) -> bool:
+        self.health.attempt()
         for url in artifact.urls:
             try:
                 self._write(artifact.sha256, lambda handle: self._download(url, handle, artifact.size), artifact.size)
+                with self._lock:
+                    self._failed.discard(artifact.sha256)
+                    clear_error = not self._failed
+                self.health.succeeded(clear_error=clear_error)
                 return True
             except Exception:  # noqa: BLE001 - try the next source; an agent's miss retries later
                 continue
+        with self._lock:
+            self._failed.add(artifact.sha256)
+        self.health.failed()
         return False
 
     def _write(self, digest: str, fill: Callable[[BinaryIO], object], size: int | None = None) -> None:

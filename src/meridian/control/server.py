@@ -106,6 +106,8 @@ class ControlServer(ThreadingHTTPServer):
         self.admin_token_sha256 = admin_token_sha256
         # Artifacts agents fetch with source `service`; without a store every blob is unknown.
         self.blobs = blobs
+        if blobs is not None:
+            service.background.blob_mirror = blobs.health
         self.ui = UiContext(service, public_path)
 
 
@@ -711,7 +713,7 @@ def serve(config_path: Path) -> None:
     config = ServiceConfig.model_validate_json(config_path.read_text(encoding="utf-8"))
     state_dir = Path(config.state_dir)
     service = ControlService(state_dir / "control.db", fleet_id=config.fleet_id, version=__version__)
-    blobs = BlobStore(state_dir / "blobs")
+    blobs = BlobStore(state_dir / "blobs", health=service.background.blob_mirror)
     blobs.want(artifact for spec in service.node_specs() for artifact in spec_artifacts(spec))
     server = ControlServer(
         (config.listen_host, config.listen_port),
@@ -732,7 +734,4 @@ def serve(config_path: Path) -> None:
 def _enforce_forever(service: ControlService, stop: threading.Event) -> None:
     """Expire users on time even when nothing else changes."""
     while not stop.wait(ENFORCE_INTERVAL_SECONDS):
-        try:
-            service.enforce()
-        except Exception:  # noqa: BLE001 - the next tick retries; the service must keep serving
-            continue
+        service.background.enforcement.run(service.enforce)

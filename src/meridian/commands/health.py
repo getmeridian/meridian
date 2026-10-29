@@ -43,6 +43,7 @@ from meridian.diagnostics.checks import (
 from meridian.diagnostics.control_service import (
     agent_findings,
     agent_version_finding,
+    background_findings,
     check_unit_active,
     service_version_finding,
 )
@@ -247,7 +248,9 @@ class _ServiceSession:
         else:
             found = finding("control_service", "passed", f"Control service {health.version} answers")
             version = service_version_finding(__version__, health.version)
-            return finish_check("control_service", "Control service", [found, version], started)
+            return finish_check(
+                "control_service", "Control service", [found, version, *background_findings(health)], started
+            )
         return finish_check("control_service", "Control service", [found], started)
 
     def node_check(self, node: TopologyNode) -> VerificationCheck:

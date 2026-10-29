@@ -11,7 +11,7 @@ import shlex
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from meridian.control.models import NodeStatus
+from meridian.control.models import NodeStatus, ServiceHealth
 from meridian.core.verification import VerificationFinding, VerificationStatus
 from meridian.core.version_skew import agent_version_differs, newer_service_hint, service_skew
 from meridian.diagnostics.checks import CheckResult, command_evidence_unavailable
@@ -135,6 +135,24 @@ def service_version_finding(cli_version: str, service_version: str) -> Verificat
     if skew == "unknown":
         return finding("service_version", "skipped", f"Cannot compare service {service_version} with {cli_version}")
     return finding("service_version", "passed", f"The control service runs this Meridian ({cli_version})")
+
+
+def background_findings(health: ServiceHealth) -> list[VerificationFinding]:
+    failures = [
+        finding(
+            "background:" + task.name,
+            "failed",
+            f"Background task {task.name} failed ({task.error_code}); "
+            f"last attempt: {task.last_attempt_at or 'none'}; "
+            f"last successful attempt: {task.last_success_at or 'none'}",
+            "Check the control service log: meridian logs --component panel",
+        )
+        for task in health.background_tasks
+        if task.error_code is not None
+    ]
+    if health.status == "degraded" and not failures:
+        failures.append(finding("background", "failed", "The control service reports a background task failure"))
+    return failures
 
 
 def agent_version_finding(expected: str, status: NodeStatus | None) -> VerificationFinding | None:

@@ -292,3 +292,25 @@ def test_check_uses_fresh_runtime_health(
     with pytest.raises(typer.Exit) as raised:
         _run(fleet, "exit-a")
     assert raised.value.exit_code == exit_code
+
+
+def test_check_flags_a_failed_enforcement_task(fleet: SimpleNamespace) -> None:
+    fleet.client.health.return_value = ServiceHealth.model_validate(
+        {
+            "version": __version__,
+            "fleet_id": FLEET_ID,
+            "fleet_epoch": 1,
+            "status": "degraded",
+            "background_tasks": [
+                {
+                    "name": "enforcement",
+                    "last_attempt_at": utc_now(),
+                    "last_success_at": None,
+                    "error_code": "enforcement_failed",
+                }
+            ],
+        }
+    )
+    with pytest.raises(typer.Exit) as raised:
+        _run(fleet, "exit-a")
+    assert raised.value.exit_code == 4

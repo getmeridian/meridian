@@ -21,6 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from meridian.control.background_health import BackgroundHealth
 from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE, BackupLedger
 from meridian.control.delivery_settings import save_update_interval_hours, update_interval_hours
 from meridian.control.devices import DEVICES_TABLE, DeviceLedger, HeaderReader, browser_request
@@ -139,6 +140,7 @@ class ControlService:
     def __init__(self, database: Path, *, fleet_id: str, version: str, clock: Callable[[], float] = time.time) -> None:
         self._version = version
         self._clock = clock
+        self.background = BackgroundHealth(clock=clock)
         self._store = Store(database)
         self._lock = self._store.lock
         self._changed = self._store.changed
@@ -182,7 +184,7 @@ class ControlService:
         return self.backups.snapshot(fleet_id=self.fleet_id, fleet_epoch=self.fleet_epoch, version=self._version)
 
     def health(self) -> ServiceHealth:
-        return ServiceHealth(version=self._version, fleet_id=self.fleet_id, fleet_epoch=self.fleet_epoch)
+        return self.background.health(version=self._version, fleet_id=self.fleet_id, fleet_epoch=self.fleet_epoch)
 
     def conditions(self, *checks: Callable[[], object]) -> AbstractContextManager[None]:
         """Checks every transaction in the block runs before its write (`Store.conditions`)."""

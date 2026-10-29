@@ -356,11 +356,25 @@ class TrafficDailySummary(CoreModel):
     nodes: list[NodeDailyUsage]
 
 
+BackgroundTaskName = Literal["enforcement", "blob_mirror"]
+BackgroundErrorCode = Literal["enforcement_failed", "blob_mirror_failed"]
+
+
+class BackgroundTaskState(CoreModel):
+    """Process-local task evidence; errors are fixed codes, never exception text."""
+
+    name: BackgroundTaskName
+    last_attempt_at: Timestamp | None = None
+    last_success_at: Timestamp | None = None
+    error_code: BackgroundErrorCode | None = None
+
+
 class ServiceHealth(CoreModel):
-    status: Literal["ok"] = "ok"
+    status: Literal["ok", "degraded"] = "ok"
     version: str
     fleet_id: FleetId
     fleet_epoch: FleetEpoch
+    background_tasks: list[BackgroundTaskState] = Field(default_factory=list)
 
 
 class EnrollmentGrant(CoreModel):
