@@ -280,3 +280,17 @@ def test_client_list_shows_console_people_only_where_every_user_is_the_fleets(
         {"alice": True, "carol": False} if listed else {"alice": True}
     )
     assert ("carol · console" in capsys.readouterr().err) is listed
+
+
+@pytest.mark.parametrize("username", ["ab", "a.b", "c" * 37], ids=["two-chars", "dotted", "37-chars"])
+def test_client_show_reads_a_console_name_outside_remnawaves_rules(
+    username: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The control service allows names Remnawave never did; `client list` shows them, so `show` must too."""
+    with _backend("meridian", tmp_path, json_mode=True) as fleet:
+        fleet.create(username)
+        with patch("meridian.commands.client.resolve_page_url", return_value=PageResolution()):
+            run_show(username)
+        client = _envelope(capsys, "client-show-envelope")["data"]["client"]
+
+    assert (client["username"], client["declared"]) == (username, False)

@@ -95,8 +95,9 @@ def run_show(name: str, repair_page: bool = False) -> None:
 
 def _show(*, name: str, repair_page: bool, operation: OperationContext) -> None:
     cluster = load_topology_cluster()
-    name = resolve_client_name(cluster, name)
-    validate_client_name(name)
+    name = resolve_client_name(cluster, name, console_people=True)
+    if not cluster.runs_control_service:  # there the name was checked against the service's own rule
+        validate_client_name(name)
     access_users = _access_users(cluster)
     repaired = False
     repair_persistence_error = ""

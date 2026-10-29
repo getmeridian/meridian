@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from rich.markup import escape
@@ -10,6 +11,7 @@ from meridian.cluster import ClusterConfig
 from meridian.commands._validation import validate_command_input
 from meridian.commands.client_state import persist_client_state
 from meridian.console import err_console, fail
+from meridian.control.models import USERNAME_PATTERN
 from meridian.control_access import AccessPanel
 from meridian.core.clients import PanelUserLike
 from meridian.core.command_inputs import ClientNameRequest
@@ -47,12 +49,18 @@ def validate_client_name(name: str) -> None:
     validate_command_input(ClientNameRequest, "Invalid client name", name=name)
 
 
-def resolve_client_name(cluster: ClusterConfig, name: str) -> str:
-    """The panel username a typed client name means: a username or a display name (Биба)."""
+def resolve_client_name(cluster: ClusterConfig, name: str, *, console_people: bool = False) -> str:
+    """The panel username a typed client name means: a username or a display name (Биба).
+
+    `console_people` (reads only) also accepts a name the control service allows, for a
+    person added in its console: such names may hold dots or fall outside Remnawave's lengths.
+    """
     intent = cluster.topology_intent
     found = intent.access.find_user(name) if intent is not None else None
     if found is not None:
         return found
+    if console_people and cluster.runs_control_service and re.fullmatch(USERNAME_PATTERN, name):
+        return name
     try:
         validate_access_username_value(name)
     except ValueError:
