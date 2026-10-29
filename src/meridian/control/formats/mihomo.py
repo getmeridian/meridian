@@ -25,8 +25,10 @@ from meridian.control.formats.entries import (
     PLACEHOLDER_PORT,
     PLACEHOLDER_UUID,
     absolute,
+    availability_placeholders,
     copies,
     presentation_endpoints,
+    primaries,
     tls_fingerprint,
 )
 from meridian.control.models import ClientEndpoint
@@ -47,7 +49,10 @@ def mihomo_document(
 ) -> str:
     """Return the Mihomo document, or its Stash variant."""
     endpoints = presentation_endpoints(endpoints)
-    exclude = sorted(endpoint.remark for endpoint in copies(endpoints))
+    if stash:
+        endpoints = [endpoint for endpoint in endpoints if endpoint.protocol != "xhttp"]
+    placeholders = availability_placeholders(primaries(endpoints), placeholders)
+    exclude = sorted(endpoint.remark for endpoint in copies(endpoints) if endpoint.remark not in placeholders)
     document: dict[str, Any] = yaml.safe_load(mihomo_template(exclude_from_failover=exclude))
     if placeholders:
         proxies = [placeholder_proxy(remark) for remark in placeholders]

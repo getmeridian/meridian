@@ -15,6 +15,7 @@ from meridian.control.formats.entries import (
     PLACEHOLDER_PORT,
     PLACEHOLDER_UUID,
     absolute,
+    availability_placeholders,
     presentation_endpoints,
 )
 from meridian.control.models import ClientEndpoint
@@ -22,6 +23,7 @@ from meridian.control.models import ClientEndpoint
 
 def links(endpoints: list[ClientEndpoint], uuid: str, placeholders: tuple[str, ...] = ()) -> list[str]:
     """Every entry's link in view order, or only the placeholders when there are any."""
+    placeholders = availability_placeholders(endpoints, placeholders)
     if placeholders:
         return [placeholder_uri(remark) for remark in placeholders]
     return [share_uri(endpoint, uuid) for endpoint in presentation_endpoints(endpoints)]

@@ -19,6 +19,12 @@ STATUS_REMARKS: dict[UserStatus, tuple[str, ...]] = {
     "limited": ("🚧 Subscription limited", "Contact support"),
     "expired": ("⌛ Subscription expired", "Contact support"),
 }
+NO_CONNECTIONS_REMARKS = (
+    "No connections available yet",
+    "Подключения пока недоступны",
+    "هنوز هیچ اتصالی در دسترس نیست",
+    "暂时没有可用连接",
+)
 # Placeholders point at 0.0.0.0:1 with a credential nobody holds; the support page
 # finds no connection page under it and says the page is unavailable.
 PLACEHOLDER_UUID = "00000000-0000-0000-0000-000000000000"
@@ -83,6 +89,11 @@ def presentation_endpoints(endpoints: list[ClientEndpoint]) -> list[ClientEndpoi
         used.add(name)
         result.append(endpoint if name == endpoint.remark else endpoint.model_copy(update={"remark": name}))
     return result
+
+
+def availability_placeholders(endpoints: list[ClientEndpoint], placeholders: tuple[str, ...]) -> tuple[str, ...]:
+    """Keep status notices, or explain an empty set of supported connections."""
+    return placeholders or (() if endpoints else NO_CONNECTIONS_REMARKS)
 
 
 def primaries(endpoints: list[ClientEndpoint]) -> list[ClientEndpoint]:

@@ -20,7 +20,7 @@ from urllib.parse import unquote, urlsplit
 import pytest
 import yaml
 
-from meridian.control.formats.entries import STATUS_REMARKS, SubscriptionUser, UserStatus
+from meridian.control.formats.entries import NO_CONNECTIONS_REMARKS, STATUS_REMARKS, SubscriptionUser, UserStatus
 from meridian.control.formats.selector import DocumentFormat, select_format
 from meridian.control.formats.xray_json import xray_json_document
 from meridian.control.models import ClientEndpoint
@@ -30,6 +30,7 @@ from tests.systemlab.subscription_client import (
     MIHOMO_CLIENT_TYPE,
     SINGBOX_CLIENT_TYPE,
     check_with_engine,
+    parse_base64_subscription,
     parse_mihomo_subscription,
     parse_singbox_subscription,
 )
@@ -102,8 +103,10 @@ def _render(
     )
 
 
-def _render_endpoints(endpoints: list[ClientEndpoint], document: DocumentFormat) -> SubscriptionResponse:
-    person = SubscriptionUser(username="person", uuid=UUID, short_id=SHORT_ID)
+def _render_endpoints(
+    endpoints: list[ClientEndpoint], document: DocumentFormat, status: UserStatus = "active"
+) -> SubscriptionResponse:
+    person = SubscriptionUser(username="person", uuid=UUID, short_id=SHORT_ID, status=status)
     return render_subscription(person, endpoints, document, profile_title="Meridian")
 
 
@@ -197,6 +200,89 @@ def test_disambiguated_names_keep_the_endpoint_remark_length_bound() -> None:
     assert len(set(names)) == 3
     assert all(len(name) <= 100 for name in names)
     assert names[1].endswith(" (2)") and names[2].endswith(" (3)")
+
+
+EMPTY_CASES: list[tuple[DocumentFormat, str]] = [
+    (document, "empty") for document in ("base64", "browser", "xray-json", "mihomo", "stash", "singbox")
+] + [
+    ("stash", "xhttp-only"),
+    ("singbox", "xhttp-only"),
+    ("mihomo", "copies-only"),
+    ("stash", "copies-only"),
+    ("singbox", "copies-only"),
+]
+
+
+def _unavailable_endpoints(case: str) -> list[ClientEndpoint]:
+    if case == "empty":
+        return []
+    if case == "xhttp-only":
+        return [endpoint for endpoint in DOMAIN_FLEET.endpoints if endpoint.protocol == "xhttp"]
+    return [
+        endpoint for endpoint in DOMAIN_FLEET.endpoints if endpoint.fingerprint_copy and endpoint.protocol == "reality"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("document", "case"), EMPTY_CASES, ids=[f"{document}-{case}" for document, case in EMPTY_CASES]
+)
+def test_empty_or_filtered_subscriptions_have_inert_placeholders(document: DocumentFormat, case: str) -> None:
+    response = _render_endpoints(_unavailable_endpoints(case), document)
+    if document in ("base64", "browser"):
+        lines = parse_base64_subscription(response.body) if document == "base64" else json.loads(response.body)["links"]
+        names = [unquote(urlsplit(line).fragment) for line in lines]
+        assert all(
+            urlsplit(line).hostname == "0.0.0.0"
+            and urlsplit(line).port == 1
+            and urlsplit(line).username == "00000000-0000-0000-0000-000000000000"
+            for line in lines
+        )
+    elif document == "xray-json":
+        configs = json.loads(response.body)
+        names = [config["remarks"] for config in configs]
+        assert all(not proxy_outbounds(config) for config in configs)
+    elif document == "singbox":
+        parsed = parse_singbox_subscription(response.body)
+        proxies = parsed["outbounds"][3:]
+        names = [proxy["tag"] for proxy in proxies]
+        assert all(
+            proxy["server"] == "0.0.0.0"
+            and proxy["server_port"] == 1
+            and proxy["uuid"] == "00000000-0000-0000-0000-000000000000"
+            for proxy in proxies
+        )
+    else:
+        parsed = parse_mihomo_subscription(response.body)
+        proxies = parsed["proxies"]
+        names = [proxy["name"] for proxy in proxies]
+        assert all(
+            proxy["server"] == "0.0.0.0"
+            and proxy["port"] == 1
+            and proxy["uuid"] == "00000000-0000-0000-0000-000000000000"
+            for proxy in proxies
+        )
+    assert names[0] == "No connections available yet"
+    assert len(names) == 4 and len(set(names)) == 4
+
+
+@pytest.mark.parametrize("status", ["disabled", "limited", "expired"])
+def test_status_notices_take_priority_over_no_connections(status: UserStatus) -> None:
+    lines = parse_base64_subscription(_render_endpoints([], "base64", status).body)
+    assert [unquote(urlsplit(line).fragment) for line in lines] == list(STATUS_REMARKS[status])
+
+
+@pytest.mark.parametrize("status", ["active", "disabled"])
+def test_mihomo_copy_exclusions_never_remove_placeholders(status: UserStatus) -> None:
+    remarks = NO_CONNECTIONS_REMARKS if status == "active" else STATUS_REMARKS[status]
+    prototype = DOMAIN_FLEET.endpoints[0]
+    endpoints = [
+        prototype.model_copy(update={"remark": remark, "position": position, "fingerprint_copy": True})
+        for position, remark in enumerate(remarks)
+    ]
+    parsed = parse_mihomo_subscription(_render_endpoints(endpoints, "mihomo", status).body)
+    automatic = next(group for group in parsed["proxy-groups"] if group["name"] == "Automatic")
+    pattern = automatic.get("exclude-filter")
+    assert [name for name in automatic["proxies"] if not pattern or not re.search(pattern, name)] == list(remarks)
 
 
 @pytest.mark.parametrize(("topology", "status"), CASES, ids=CASE_IDS)
@@ -423,3 +509,21 @@ def test_sing_box_accepts_the_documents(
     binary = _engine("MERIDIAN_TEST_SINGBOX")
     monkeypatch.setenv("PATH", f"{binary.parent}{os.pathsep}{os.environ['PATH']}")
     check_with_engine(SINGBOX_CLIENT_TYPE, _render(topology, "singbox", status).body, tmp_path)
+
+
+@pytest.mark.parametrize("document", ["mihomo", "stash", "singbox"])
+@pytest.mark.parametrize("case", ["empty", "xhttp-only", "copies-only", "duplicate-names"])
+def test_client_engines_accept_availability_and_name_collision_cases(
+    document: DocumentFormat, case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    singbox = document == "singbox"
+    binary = _engine("MERIDIAN_TEST_SINGBOX" if singbox else "MERIDIAN_TEST_MIHOMO")
+    monkeypatch.setenv("PATH", f"{binary.parent}{os.pathsep}{os.environ['PATH']}")
+    geodata = None if singbox else os.environ.get("MERIDIAN_TEST_MIHOMO_GEODATA")
+    endpoints = _colliding_endpoints() if case == "duplicate-names" else _unavailable_endpoints(case)
+    check_with_engine(
+        SINGBOX_CLIENT_TYPE if singbox else MIHOMO_CLIENT_TYPE,
+        _render_endpoints(endpoints, document).body,
+        tmp_path,
+        geodata_dir=Path(geodata) if geodata else None,
+    )

@@ -9,12 +9,14 @@ import subprocess
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 import pytest
 
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.control.client import ControlClient
+from meridian.control.formats.entries import PLACEHOLDER_ADDRESS, PLACEHOLDER_PORT, PLACEHOLDER_UUID
 from meridian.control.models import UserImport, UserImportBatch
 from meridian.host_runtime import LEGACY_NODE_DIR, NODE_DIR
 from meridian.migrate import MigrationError, service_import
@@ -25,6 +27,7 @@ from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.provision.uninstall import Uninstall, panel_stack_removal
 from tests.support.control_service import ADMIN_TOKEN, serve_control
 from tests.support.mock_connection import MockConnection
+from tests.systemlab.subscription_client import parse_base64_subscription
 
 DUMP = b"PGDMP fake custom-format dump"
 ALICE = UserImport(username="alice", uuid="3f2a9c4e-7b1d-4e6a-9c2f-1a2b3c4d5e6f", sub_token="Zq8xT3vNw2LmK7pR")
@@ -78,7 +81,13 @@ def test_the_import_reaches_the_service_from_the_control_server_and_leaves_no_to
     assert len(curls) == 2 and all(f"rm -f {path}" in call and kwargs["sensitive"] for call, kwargs in curls)
     assert all(ADMIN_TOKEN not in call for call, _ in curls), "the token never rides a command line"
     with ControlClient(service_url, ADMIN_TOKEN) as client:
-        assert client.fetch_subscription(ALICE.sub_token) == ""
+        links = parse_base64_subscription(client.fetch_subscription(ALICE.sub_token))
+        assert all(
+            urlsplit(link).username == PLACEHOLDER_UUID
+            and urlsplit(link).hostname == PLACEHOLDER_ADDRESS
+            and urlsplit(link).port == PLACEHOLDER_PORT
+            for link in links
+        )
 
 
 def test_a_disagreeing_import_is_a_user_error_with_the_services_reason(service_url: str) -> None:
