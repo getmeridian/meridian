@@ -6,6 +6,7 @@ import stat
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
+import httpx
 import pytest
 import yaml
 
@@ -192,3 +193,43 @@ def test_a_key_another_run_made_first_is_kept_and_used(fleet: ClusterConfig) -> 
 
     assert second == first and device_key_path().read_bytes() == before
     assert [path.name for path in device_key_path().parent.iterdir() if path.name.endswith(".tmp")] == []
+
+
+def _failing(error: Exception | None = None, status: int = 200) -> httpx.MockTransport:
+    def handle(request: httpx.Request) -> httpx.Response:
+        if error is not None:
+            raise error
+        return httpx.Response(status, json={"error": {"message": "boom"}})
+
+    return httpx.MockTransport(handle)
+
+
+@pytest.mark.parametrize(
+    ("transport", "reported"),
+    [
+        (_failing(httpx.ReadTimeout("lost")), True),
+        (_failing(httpx.RemoteProtocolError("closed")), True),
+        (_failing(status=504), True),
+        (_failing(status=500), True),
+        (_failing(httpx.ConnectError("refused")), False),
+        (_failing(status=409), False),
+    ],
+    ids=["reply-timed-out", "connection-dropped", "gateway-timeout", "server-error", "never-connected", "refused"],
+)
+def test_a_write_whose_outcome_is_unknown_still_counts_as_a_change(
+    transport: httpx.MockTransport, reported: bool
+) -> None:
+    """A lost reply after a committed write must still trigger the backup pull."""
+    from meridian.control.client import ControlServiceError, add_mutation_listener
+
+    seen: list[str] = []
+    stop = add_mutation_listener(seen.append)
+    client = ControlClient("https://198.51.100.10/secret", ADMIN_TOKEN)
+    client._client = httpx.Client(base_url="https://198.51.100.10/secret/", transport=transport)
+    try:
+        with client, pytest.raises(ControlServiceError):
+            client.put_user("bob")
+    finally:
+        stop()
+
+    assert seen == (["https://198.51.100.10/secret"] if reported else [])

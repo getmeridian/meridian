@@ -48,14 +48,16 @@ from meridian.control.models import (
 from meridian.core.errors import MeridianError
 
 _GATEWAY_FAILURES = frozenset({502, 503, 504})
-# Told the service URL after every request that changed the service's state, so the CLI
-# can pull one fresh snapshot once a command is done (`meridian.backup.hook`).
+# Transport errors raised before any request bytes left this machine.
+_NEVER_SENT = (httpx.ConnectError, httpx.ConnectTimeout, httpx.UnsupportedProtocol)
+# Told the service URL after every request that changed the service's state, or may have
+# (a lost reply or a 5xx), so the CLI can pull one fresh snapshot once a command is done.
 MutationListener = Callable[[str], None]
 _mutation_listeners: list[MutationListener] = []
 
 
 def add_mutation_listener(listener: MutationListener) -> Callable[[], None]:
-    """Call `listener(url)` after each successful write; returns the function that stops it."""
+    """Call `listener(url)` after each write that changed state or may have; returns the function that stops it."""
     _mutation_listeners.append(listener)
 
     def remove() -> None:
@@ -280,6 +282,8 @@ class ControlClient:
         try:
             response = self._client.request(method, path, json=body)
         except httpx.RequestError as exc:
+            if not isinstance(exc, _NEVER_SENT):
+                self._reported(method)  # the write may have committed before its reply was lost
             raise ControlServiceError(
                 f"Could not reach the control service: {type(exc).__name__}",
                 hint="Check that the control server answers on 443, then retry.",
@@ -302,6 +306,8 @@ class ControlClient:
                 hint="Restore the fleet's saved credentials (cluster.yml) or redeploy the control server.",
                 category="user",
             )
+        if response.status_code >= 500:
+            self._reported(method)  # a gateway timeout or a crash after the commit: perhaps changed
         if response.status_code in _GATEWAY_FAILURES:
             # nginx answers for a stopped or hung service: unreachable, not a refusal.
             raise ControlServiceError(
@@ -315,10 +321,14 @@ class ControlClient:
                 f"Control service error: {_message(response)}",
                 category="system" if response.status_code >= 500 else "user",
             )
+        self._reported(method)
+        return response
+
+    def _reported(self, method: str) -> None:
+        """Tell listeners this write changed, or may have changed, the service's state."""
         if method != "GET" and self._report_mutations:
             for listener in list(_mutation_listeners):
                 listener(self.url)
-        return response
 
 
 def _segment(value: str) -> str:
