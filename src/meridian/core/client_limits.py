@@ -14,9 +14,10 @@ from datetime import UTC, date, datetime, time
 from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from meridian.core.agent_types import Timestamp
+from meridian.core.calendar import month_date, shift_month
 from meridian.core.errors import MeridianError
 from meridian.core.models import CoreModel
 from meridian.core.person_metadata import PersonTag, PrivateNote, parse_note_option, parse_tag_option
@@ -60,6 +61,42 @@ class ClientExtendRequest(CoreModel):
     """Add whole days after the later of now and the person's current expiry."""
 
     days: int = Field(ge=1, le=3650, strict=True)
+
+
+class CalendarRenewalRequest(CoreModel):
+    """One- or three-month renewal preview; it never changes an account by itself."""
+
+    months: int = Field(ge=1, le=3, strict=True, json_schema_extra={"enum": [1, 3]})
+
+    @field_validator("months")
+    @classmethod
+    def supported_months(cls, value: int) -> int:
+        if value not in (1, 3):
+            raise ValueError("Choose +1 month or +3 months.")
+        return value
+
+
+class CalendarExpiryPreview(CoreModel):
+    """Whole-second UTC base and expiry for a calendar renewal."""
+
+    base_at: Timestamp
+    expire_at: Timestamp
+    months: int
+
+
+def preview_calendar_expiry(
+    current: str | None, request: CalendarRenewalRequest, *, now: datetime | None = None
+) -> CalendarExpiryPreview:
+    """Advance max(now, current expiry) by calendar months, retaining its UTC time."""
+    moment = (now or datetime.now(UTC)).astimezone(UTC)
+    current_moment = _parse_moment(current) if current else None
+    base = max(moment, current_moment or moment).replace(microsecond=0)
+    year, month = shift_month(base.year, base.month, request.months)
+    day = month_date(year, month, base.day)
+    renewed = base.replace(year=day.year, month=day.month, day=day.day)
+    expire_at = parse_expiry(renewed.isoformat(), now=moment)
+    assert expire_at is not None
+    return CalendarExpiryPreview(base_at=base.strftime(_TIMESTAMP_FORMAT), expire_at=expire_at, months=request.months)
 
 
 class ClientLimitChange(CoreModel):

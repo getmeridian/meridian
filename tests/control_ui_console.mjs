@@ -118,7 +118,7 @@ w.fetch = (url, options) => {
     server_usage: data?.server_usage || [], server_attention: data?.server_attention || [] }));
   throw new Error('Unexpected request: ' + url);
 };
-for (const script of ['core.js', 'qr-export.js', 'people.js', 'person-connections.js', 'fleet.js']) {
+for (const script of ['core.js', 'qr-export.js', 'people.js', 'expiry.js', 'person-connections.js', 'fleet.js']) {
   w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 }
 const M = w.M;
@@ -224,6 +224,16 @@ if (mode.startsWith('expiry-')) {
   const expiry = w.document.querySelector('input[type="date"]');
   expiry.value = data.date;
   expiry.dispatchEvent(new w.Event('input'));
+  if ('time' in data) {
+    const time = w.document.querySelector('input[type="time"]');
+    time.value = data.time;
+    time.dispatchEvent(new w.Event('input'));
+  }
+  if (!data.date) {
+    const never = w.document.querySelector('.expiry-fields input[type="checkbox"]');
+    never.checked = true;
+    never.dispatchEvent(new w.Event('change'));
+  }
   expiry.form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
   await settle();
   report.writes = writes;

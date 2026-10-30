@@ -121,21 +121,18 @@
   function accessCard(user, screen) {
     var name = user.username;
     var disabled = user.status === "disabled";
-    var expiry = M.expiryField(user.expire_at);
+    var expiry = M.expiryFields(user.expire_at, name);
     var limits = M.limitFields(user);
     var form = h("form", { class: "stack", novalidate: true },
-      M.field(M.t("people.expiry"), expiry, M.expiryText(user)),
+      expiry.nodes,
       limits.nodes,
       h("p", { class: "form-error", role: "alert" }),
       h("div", { class: "row-actions" },
-        h("button", { class: "btn btn-primary btn-sm", type: "submit" }, M.t("action.save")),
-        user.expire_at ? h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
-          act(screen, function () { return M.api("PATCH", path(name), { expire_at: null }); }, "person.saved_toast");
-        } }, M.t("person.clear_expiry")) : null));
+        h("button", { class: "btn btn-primary btn-sm", type: "submit" }, M.t("action.save"))));
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var change = limits.value();
-      if (expiry.value !== M.dateValue(user.expire_at)) change.expire_at = M.endOfDay(expiry.value);
+      Object.assign(change, expiry.change());
       if (!Object.keys(change).length) {
         M.toast(M.t("person.nothing_changed"));
         return;

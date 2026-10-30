@@ -670,6 +670,7 @@ OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
         _Handler.get_revision,
         ui_routes.fleet,
         ui_routes.share,
+        ui_routes.expiry_preview,
     }
 )
 

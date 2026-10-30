@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "One- or three-month renewal preview; it never changes an account by itself.",
+  "properties": {
+    "months": {
+      "enum": [
+        1,
+        3
+      ],
+      "maximum": 3,
+      "minimum": 1,
+      "title": "Months",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "months"
+  ],
+  "title": "CalendarRenewalRequest",
+  "type": "object"
+}

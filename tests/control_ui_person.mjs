@@ -40,6 +40,7 @@ w.fetch = (url, options = {}) => {
   if (url === 'auth/state') return Promise.resolve(reply({ configured: true, owner_exists: true, signed_in: true }));
   if (url === 'ui/api/fleet') return Promise.resolve(reply({ profile_title: 'Test fleet', declared_users: [],
     display_names: { sample: data.displayName || 'Sample person' }, servers: [] }));
+  if (url.startsWith('ui/api/people/sample/expiry')) return Promise.resolve(reply({ expire_at: data.preview, months: data.months }));
   if (url.startsWith('ui/api/people/')) return Promise.resolve(reply({ ...share, username: url.split('/')[3] }));
   if (url.startsWith('api/users/')) return Promise.resolve(reply({ ...user, username: decodeURIComponent(url.split('/')[2]) }));
   if (url === 'api/users') return Promise.resolve(reply({ users: [user] }));
@@ -62,6 +63,7 @@ M.personHistory = M.devicesCard = M.privacySection = M.cliHint = () => null;
 M.renderServers = view => M.mount(view, M.h('h1', { text: M.t('nav.servers') }));
 M.renderRevisions = M.renderTokens = () => null;
 load('people.js');
+load('expiry.js');
 load('person-connections.js');
 load('person.js');
 load('settings.js');
@@ -71,6 +73,35 @@ await settle();
 await settle();
 const view = () => w.document.getElementById('view');
 const button = key => [...view().querySelectorAll('button')].find(el => el.textContent.includes(M.t(key)));
+
+if (mode === 'person-expiry') {
+  const date = view().querySelector('input[type="date"]');
+  const time = view().querySelector('input[type="time"]');
+  const never = view().querySelector('.expiry-fields input[type="checkbox"]');
+  report.hasTime = !!time;
+  if (data.months) {
+    view().querySelector('[data-months="' + data.months + '"]')?.click();
+    await settle();
+  } else if (data.clear) {
+    if (never) { never.checked = true; never.dispatchEvent(new w.Event('change', { bubbles: true })); }
+  } else {
+    if ('date' in data && date) { date.value = data.date; date.dispatchEvent(new w.Event('input', { bubbles: true })); }
+    if ('time' in data && time) { time.value = data.time; time.dispatchEvent(new w.Event('input', { bubbles: true })); }
+    if (data.strategy) {
+      const strategy = [...view().querySelectorAll('.limit-fields select')].at(-1);
+      strategy.value = data.strategy;
+      strategy.dispatchEvent(new w.Event('change', { bubbles: true }));
+    }
+  }
+  report.zone = view().querySelector('.expiry-zone')?.textContent || '';
+  report.utc = view().querySelector('.expiry-utc')?.textContent || '';
+  report.beforeSave = writes.map(write => write.body);
+  date?.form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  report.writes = writes.map(write => write.body);
+  report.error = date?.validationMessage || time?.validationMessage || '';
+  report.previewReads = events.filter(event => event.url?.includes('/expiry?')).map(event => event.url);
+}
 
 if (mode === 'person-connections') {
   const disclosure = view().querySelector('.individual-connections');
@@ -148,7 +179,7 @@ if (mode === 'person-mutation') {
   M.confirmCutOffRemoval = () => Promise.resolve({ cut_off: false });
   const action = data.action || 'toggle';
   if (action === 'save') {
-    const strategy = view().querySelector('.limit-fields select:last-child');
+    const strategy = [...view().querySelectorAll('.limit-fields select')].at(-1);
     strategy.value = 'week';
     strategy.dispatchEvent(new w.Event('change', { bubbles: true }));
     strategy.form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
@@ -157,6 +188,11 @@ if (mode === 'person-mutation') {
     note.value = 'A private draft';
     note.dispatchEvent(new w.Event('input', { bubbles: true }));
     note.form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  } else if (action === 'clear') {
+    const never = view().querySelector('.expiry-fields input[type="checkbox"]');
+    never.checked = true;
+    never.dispatchEvent(new w.Event('change', { bubbles: true }));
+    never.form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
   } else {
     const key = { toggle: user.status === 'disabled' ? 'person.enable' : 'person.disable',
       reset: 'person.reset_traffic', clear: 'person.clear_expiry', reissue: 'person.reissue', remove: 'person.remove' }[action];

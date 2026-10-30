@@ -3,6 +3,7 @@
 ## Design decisions
 - **Admin HTTP contract** — `route_catalog.py` declares every `/api` method, named path, scopes, body/query and response models, errors, credential marker, and publication decision; `route_types.py` compiles the same parameter schemas for dispatch, and `openapi.py` uses Pydantic validation/serialization schemas for OpenAPI 3.1.
 - **HTTP route bindings** — `route_table.py` owns ordered route matching and scope bindings; the HTTP front binds its handler without importing the server back into routing.
+- `person_expiry.py` serves an owner/people/admin read-only month preview; choosing a preset stores nothing, and the person form saves the resulting UTC instant through its changed-field PATCH.
 - `person_connections.py` composes read-only credentials from the canonical `/info` renderer under one state lock; `/api/users/{name}/connections` admits people/admin and owner sessions, without new stored data.
 - Xray JSON deliberately extends the corpus: Automatic stays first, followed by one shared-routing profile per primary endpoint and the existing isolated fingerprint-copy groups.
 - Owner contact persists in the page-settings meta row inside the delivery transaction; native `support-url` prefers its link, page URLs remain personal, and short text joins status remarks only when every format's 100-character names remain bounded.

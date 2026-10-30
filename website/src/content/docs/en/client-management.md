@@ -195,6 +195,8 @@ Client accounts (keys, status, limits, traffic) live in the control service's da
 
 ## Web console
 
+Expiry editing uses native **Date** and **Time** fields in your browser's time zone and shows the exact UTC instant before saving. **+1 month** and **+3 months** fill a draft from the later of now and the account's current expiry, retaining UTC time and clamping the day to the end of a short month. Save applies only edited fields. **No expiry** saves `null`; a finite expiry must be in the future and before 2099.
+
 The subscription QR and each individual QR offer **Download PNG** and **Download SVG**, captioned with the person's name and your fleet title. **Copy QR image** appears where image clipboard support is available; if copying is refused, the PNG downloads instead. Export uses local browser rendering and makes no outside request.
 
 Open **Individual connections** beneath the main subscription handoff to copy a named connection or show its QR code in subscription order. The disclosure starts closed and also lists explicit Xray JSON, Mihomo, and sing-box URLs. These links and QR images grant access as that person; keep them private. `meridian client show NAME --connections` and `GET /api/users/{username}/connections` show the same list. The API requires people/admin scope or an owner session; ordinary read tokens cannot read the credentials.

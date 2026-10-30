@@ -40,7 +40,7 @@ from meridian.core.apply import (
 from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.cancellation import OperationCancellation
 from meridian.core.client_devices import ClientDevicesResult
-from meridian.core.client_limits import ClientExtendRequest
+from meridian.core.client_limits import CalendarExpiryPreview, CalendarRenewalRequest, ClientExtendRequest
 from meridian.core.clients import (
     ClientAddResult,
     ClientConnection,
@@ -663,6 +663,8 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "client-show": ClientShowResult,
     "client-connection": ClientConnection,
     "client-connections": ClientConnections,
+    "calendar-renewal-request": CalendarRenewalRequest,
+    "calendar-expiry-preview": CalendarExpiryPreview,
     "subscription-format-url": SubscriptionFormatUrl,
     "client-usage": UserUsage,
     "client-add": ClientAddResult,

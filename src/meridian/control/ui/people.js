@@ -8,7 +8,6 @@
   var USERNAME = /^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\.\.[A-Za-z0-9_.-]{1,62})$/;  // models.USERNAME_PATTERN
   var GIB = 1024 * 1024 * 1024;
   var QUOTA_UNITS = { GiB: GIB, TiB: GIB * 1024 };
-  var NEVER_EXPIRES_YEAR = 2099; // core.client_limits.NEVER_EXPIRES_YEAR
 
   M.displayName = function (username) {
     var names = (M.state.fleet && M.state.fleet.display_names) || {};
@@ -201,53 +200,15 @@
     };
   };
 
-  /* A date input's end of day, local time, as the protocol's whole-second UTC timestamp. */
-  M.endOfDay = function (dateText) {
-    if (!dateText) return null;
-    var parts = dateText.split("-").map(Number);
-    var d = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59);
-    return d.toISOString().replace(/\.\d{3}Z$/, "Z");
-  };
-
-  M.dateValue = function (timestamp) {
-    if (!timestamp) return "";
-    var d = new Date(timestamp);
-    var pad = function (n) { return (n < 10 ? "0" : "") + n; };
-    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
-  };
-
-  M.expiryField = function (timestamp) {
-    var input = h("input", { type: "date", max: (NEVER_EXPIRES_YEAR - 1) + "-12-31", value: M.dateValue(timestamp) });
-    function validate() {
-      var tooFar = input.value && new Date(M.endOfDay(input.value)).getUTCFullYear() >= NEVER_EXPIRES_YEAR;
-      var message = tooFar ? M.t("people.expiry_too_far") : "";
-      input.setCustomValidity(message);
-      input.setAttribute("aria-invalid", message ? "true" : "false");
-      return !message;
-    }
-    input.addEventListener("input", validate);
-    validate();
-    Promise.resolve().then(function () {
-      if (input.form) input.form.addEventListener("submit", function (event) {
-        if (validate()) return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        input.focus();
-        input.reportValidity();
-      }, true);
-    });
-    return input;
-  };
-
   function addPerson() {
     M.dialog(M.t("people.add_title"), function (close) {
       var name = h("input", { type: "text", required: true, maxlength: "64", pattern: "[A-Za-z0-9_.\\-]{1,64}",
         autocomplete: "off", autocapitalize: "off", spellcheck: "false" });
-      var expiry = M.expiryField();
+      var expiry = M.expiryFields();
       var limits = M.limitFields(null);
       var form = h("form", { class: "stack", novalidate: true },
         M.field(M.t("people.name"), name, M.t("people.name_hint")),
-        M.field(M.t("people.expiry"), expiry, M.t("people.expiry_hint")),
+        expiry.nodes,
         limits.nodes,
         h("p", { class: "form-error", role: "alert" }),
         h("div", { class: "actions" },
@@ -264,7 +225,7 @@
         // One request with the settings: create-then-PATCH left an unlimited person when the PATCH failed.
         var body = limits.value();
         body.username = username;
-        body.expire_at = M.endOfDay(expiry.value);
+        body.expire_at = expiry.value();
         M.busy(form, function () { return M.api("POST", "api/users", body); }).then(function () {
           close();
           M.toast(M.t("people.added_toast", { name: username }));

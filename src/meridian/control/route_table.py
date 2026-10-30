@@ -94,6 +94,7 @@ INTERNAL_UI_ROUTES: dict[tuple[str, str], str] = {
     ("POST", r"/auth/totp/disable"): "Console authenticator removal.",
     ("GET", r"/ui/api/fleet"): "Console-specific fleet projection.",
     ("GET", rf"/ui/api/people/({USERNAME_PATTERN})/share"): "Console-specific connection sharing.",
+    ("GET", rf"/ui/api/people/({USERNAME_PATTERN})/expiry"): "Console-specific expiry renewal preview.",
 }
 
 

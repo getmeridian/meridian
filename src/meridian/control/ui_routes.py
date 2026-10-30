@@ -32,6 +32,7 @@ from pydantic import BaseModel
 from meridian.control.errors import ServiceError
 from meridian.control.models import USERNAME_PATTERN, OwnerStatus, SetupLinkGrant, SetupLinkRequest, TokenScope
 from meridian.control.owner import ABSOLUTE_SECONDS, OwnerSession
+from meridian.control.person_expiry import expiry_preview
 from meridian.control.service import ControlService
 from meridian.control.tokens import ROOT, Caller
 from meridian.control.ui_models import (
@@ -99,6 +100,7 @@ class UiRequest(Protocol):
     """What these handlers need from the HTTP handler (`server._Handler` provides it)."""
 
     command: str
+    path: str
     headers: Message
     caller: Caller | None
     owner_session: OwnerSession | None
@@ -368,4 +370,5 @@ UI_ROUTES: list[tuple[str, re.Pattern[str], TokenScope | None, UiHandler]] = [
     ("GET", re.compile(r"/ui/api/fleet"), "read", fleet),
     # Share links carry the subscription token, which connects as the person: admin, like `_visible`.
     ("GET", re.compile(rf"/ui/api/people/{_USERNAME}/share"), "admin", share),
+    ("GET", re.compile(rf"/ui/api/people/{_USERNAME}/expiry"), "people", expiry_preview),
 ]

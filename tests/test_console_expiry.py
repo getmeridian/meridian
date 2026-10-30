@@ -20,11 +20,11 @@ def test_console_expiry_refuses_the_legacy_never_range_at_the_field(screen: str,
 
 
 @pytest.mark.parametrize("screen", ["add", "edit"])
-def test_console_checks_the_utc_expiry_after_local_end_of_day_conversion(
+def test_console_checks_the_utc_expiry_after_local_time_conversion(
     screen: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("TZ", "Pacific/Honolulu")
-    result = run_console("expiry-" + screen, data={"date": "2098-12-31"})
+    result = run_console("expiry-" + screen, data={"date": "2098-12-31", "time": "23:59:59"})
     assert result["writes"] == [] and result["error"] and result["invalid"] is True
 
 

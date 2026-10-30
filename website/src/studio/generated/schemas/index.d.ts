@@ -15,6 +15,8 @@ export * as ApplyEnvelopeSchema from "./apply-envelope.schema";
 export * as ApplyFailureSchema from "./apply-failure.schema";
 export * as AttentionThresholdsSchema from "./attention-thresholds.schema";
 export * as AttentionSchema from "./attention.schema";
+export * as CalendarExpiryPreviewSchema from "./calendar-expiry-preview.schema";
+export * as CalendarRenewalRequestSchema from "./calendar-renewal-request.schema";
 export * as CheckEnvelopeSchema from "./check-envelope.schema";
 export * as CheckFailureSchema from "./check-failure.schema";
 export * as CheckSchema from "./check.schema";
