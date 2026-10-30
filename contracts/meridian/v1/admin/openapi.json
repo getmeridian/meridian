@@ -6605,7 +6605,7 @@
   "info": {
     "description": "Scoped bearer-token operations behind the operator's private console address. The read, propose, and approve scopes form a chain; people is separate, and admin covers both. Node enrollment, agent, subscription, page, and console-session surfaces are internal or public and are excluded from this document.",
     "title": "Meridian admin API",
-    "version": "4.0.0b8"
+    "version": "4.0.0b9"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",

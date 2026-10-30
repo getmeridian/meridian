@@ -12,7 +12,7 @@
 
 **VERSION-driven releases** — read VERSION file, check if git tag exists. If missing: detect semver change, extract CHANGELOG section, push tag, create Release. Idempotent — safe to re-run.
 
-**Pre-releases from tags** — pushing `vX.Y.ZbN` (or `aN`/`rcN`) runs `release.yml` from the tagged commit: unit tests, a GitHub pre-release with `.github/BETA.md` plus the upcoming `X.Y.Z` CHANGELOG section, then the same PyPI gate. Stable releases still come only from main. A beta bump changes `VERSION` and the `v4_beta.yml` version placeholder, then pushes the tag. Installers and `meridian update` on stable builds never pick a pre-release.
+**Pre-releases from tags** — pushing `vX.Y.ZbN` (or `aN`/`rcN`) runs `release.yml` from the tagged commit: unit tests, a GitHub pre-release with `.github/BETA.md` plus the upcoming `X.Y.Z` CHANGELOG section, then the same PyPI gate. Stable releases still come only from main. A beta bump changes `VERSION` and the `v4_beta.yml` version placeholder and re-exports contracts (the OpenAPI document carries the version), then pushes the tag. Installers and `meridian update` on stable builds never pick a pre-release.
 
 **Verifiable installer** — stable and pre-release jobs attach `install.sh` and `SHA256SUMS` to the GitHub release (a second origin beside Pages); `install.sh` pins uv's installer by version and SHA-256, bumped together. While main's VERSION is a pre-release, deploy-pages sets `MERIDIAN_DEFAULT_VERSION` in the site's copy so it installs the beta it documents.
 
