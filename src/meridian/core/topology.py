@@ -5,10 +5,11 @@ from __future__ import annotations
 import ipaddress
 import re
 from collections.abc import Iterable, Sequence
-from typing import Final, Literal, Self
+from typing import Annotated, Final, Literal, Self
 
 from pydantic import Field, HttpUrl, ValidationInfo, field_validator, model_validator
 
+from meridian.core.defaults import SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import (
     AccessUsernameValue,
     DisplayNameValue,
@@ -57,6 +58,7 @@ EgressOverrideAction = Literal["warp", "direct", "block"]
 # v2fly geosite/geoip list names: "netflix", "category-ru", "geolocation-!cn", "google@cn".
 _GEO_LIST_NAME = re.compile(r"[a-z0-9][a-z0-9!@._-]{0,63}")
 DeliveryFormat = Literal["base64", "xray_json", "mihomo", "singbox"]
+SubscriptionUpdateIntervalHours = Annotated[int, Field(ge=1, le=168)]
 
 
 def _geo_list_name(kind: str, value: str) -> str:
@@ -362,6 +364,10 @@ class DeliveryIntent(CoreModel):
     profile_title: ServerTitleValue = "Meridian"
     template_name: TopologyIdValue = "meridian"
     formats: list[DeliveryFormat] = Field(default_factory=_default_delivery_formats, min_length=1)
+    update_interval_hours: SubscriptionUpdateIntervalHours = Field(
+        default=SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
+        exclude_if=lambda value: value == SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
+    )
 
     @field_validator("formats")
     @classmethod

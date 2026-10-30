@@ -11,6 +11,7 @@
 **Capability-specific fallback** — Xray JSON, Mihomo, and sing-box (urltest; Remnawave omits XHTTP) get managed health-checked templates; Base64 gets ordered alternatives without a failover claim.
 **Meridian backend (hidden, #95)** — `ControlPlaneIntent.backend == "meridian"` runs `meridian_backend.py` after the Remnawave compile: refuse only client IP forwarding (it changes the PROXY chain; domain exits, WSS, self-steal, egress overrides, a control domain, and a control server without an exit pass, as shared server kinds), then swap panel kinds for `control_service`, `agent_runtime` (carrying the node runtime's `warp`), `node_workload`, `client_endpoint`, `control_user`, `service_settings`. A routing gateway is one more agent node: its pools, routes, and gateway resource fold into its `node_workload`, and service users and bridge squads go (bridge IDs derive from the exit's keys). Certificates never depend on the workload (the workload needs them).
 ## What's done well
+- The reviewed delivery refresh interval reaches both panel and Meridian settings payloads, with Meridian's six-hour default omitted from its new payload field.
 - Ports, tags, listener routes, and dependency order are deterministic; Realm hops are emitted downstream-first.
 - Every unique server has one baseline resource, and every server mutation depends on it.
 - TCP paths terminate through typed nginx artifacts; Hysteria2 stays direct UDP.

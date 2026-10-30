@@ -22,6 +22,9 @@ CONTROL_PROXY_TLS_PORT: int = 8444
 # apps open it as the `support-url` header with the subscription's short ID as fragment.
 SUPPORT_PAGE: str = "pwa/support.html"
 
+# Hours between subscription refreshes (Happ and the Clash family read whole hours).
+SUBSCRIPTION_UPDATE_INTERVAL_HOURS: int = 6
+
 # Device/server clock drift worth a warning. Nothing Meridian deploys checks the
 # clock to the second: Reality's `maxTimeDiff` is left unset (Xray then skips the
 # client timestamp check), and VLESS and Hysteria2 carry no timestamps. A wrong

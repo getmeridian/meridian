@@ -20,6 +20,7 @@
 - **`fleet upgrade` never mutates beside the plan** — it reads images (`diagnostics/images.py`) and each relay's running Realm (never the saved pin, which a failed upgrade leaves ahead), applies the unchanged intent (new pins ride the render contract), then runs the fleet `check`.
 
 ## Pitfalls
+- SNI review advice reads the reviewed delivery refresh interval; fleets can override the six-hour default.
 - `console.fail()` always exits (user=2, system=3, bug=1); entry points convert library `MeridianError`s with `fail(exc)`, or the user sees a traceback.
 - Reach Click only through `meridian.cli_types` — Typer ≥ 0.26 vendors it and production has no `click` package (architecture-tested).
 - `confirm()` returns a bool; callers must `raise typer.Exit(1)` on False.

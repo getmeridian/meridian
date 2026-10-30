@@ -566,7 +566,9 @@ class ServiceSettingsDriver:
     def _settings(self, action: ResourceAction) -> ServiceSettings:
         payload = payload_of(action, ServiceSettingsPayload)
         return ServiceSettings(
-            profile_title=payload.profile_title, public_url=self.context.cluster.panel.public_base_url()
+            profile_title=payload.profile_title,
+            public_url=self.context.cluster.panel.public_base_url(),
+            update_interval_hours=payload.update_interval_hours,
         )
 
 

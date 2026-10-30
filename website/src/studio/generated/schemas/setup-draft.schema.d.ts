@@ -19,6 +19,7 @@ export type Formats = [
 ];
 export type ProfileTitle = string;
 export type TemplateName = string;
+export type UpdateIntervalHours = number;
 export type AppliedPlanHash = string;
 export type CompletedStages = (
   | "servers"
@@ -173,6 +174,7 @@ export interface DeliveryIntent {
   formats?: Formats;
   profile_title?: ProfileTitle;
   template_name?: TemplateName;
+  update_interval_hours?: UpdateIntervalHours;
 }
 /**
  * Complete protocol choices for all selected exits.

@@ -22,7 +22,6 @@ from meridian.commands._helpers import (
 )
 from meridian.commands._validation import validate_command_input
 from meridian.commands.relay import select_relay_chains
-from meridian.compiler.models import SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.command_inputs import CamouflageChangeRequest
 from meridian.core.errors import LocalStateError, MeridianError
@@ -180,7 +179,7 @@ def _review_and_apply(
         review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(updated), cluster=cluster)
     except MeridianError as exc:
         fail(exc)
-    refresh = t("sni.refresh", hours=SUBSCRIPTION_UPDATE_INTERVAL_HOURS)
+    refresh = t("sni.refresh", hours=updated.delivery.update_interval_hours)
     err_console.print()
     err_console.print(f"  [bold]{escape(t('sni.review_title', subject=subject, old=old, new=new))}[/bold]")
     for line in [*lines, refresh]:

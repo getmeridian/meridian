@@ -28,6 +28,7 @@ from meridian.core.redaction import is_sensitive_key, redact_diagnostic_text
 from meridian.core.topology import (
     AccessIntent,
     ControlPlaneIntent,
+    DeliveryIntent,
     EgressOverrideIntent,
     ExitIntent,
     ProtocolPathIntent,
@@ -193,6 +194,24 @@ def _applied(apply: MagicMock) -> SetupIntent:
 
 
 class TestExport:
+    @pytest.mark.parametrize("json_mode", [False, True])
+    def test_export_and_import_keep_the_subscription_refresh_interval(
+        self, registry: ServerRegistry, tmp_path: Path, capsys: pytest.CaptureFixture[str], json_mode: bool
+    ) -> None:
+        intent = _intent(delivery=DeliveryIntent(update_interval_hours=24))
+        with (
+            patch("meridian.commands.fleet_transfer.load_topology_cluster", return_value=_cluster(intent)),
+            patch("meridian.commands.fleet_transfer.is_json_mode", return_value=json_mode),
+        ):
+            run_export()
+        output = capsys.readouterr().out
+        document = json.loads(output)["data"]["document"] if json_mode else yaml.safe_load(output)
+        assert document["delivery"]["update_interval_hours"] == 24
+
+        apply, _cluster_after = _import(tmp_path, yaml.safe_dump(document), _cluster())
+
+        assert _applied(apply).delivery.update_interval_hours == 24
+
     def test_names_servers_by_saved_name_or_address(self, registry: ServerRegistry) -> None:
         document = yaml.safe_load(_document_text(registry))
 

@@ -19,6 +19,7 @@
 - **Two names per person** - `AccessIntent.users` are Remnawave usernames (Latin only); `display_names` keeps the typed name when it differs and is omitted when empty. `assign_access_usernames()` is the one place that maps typed names to usernames (known first, Latin names claim themselves, the rest transliterate via anyascii); look people up with `find_user()`.
 
 ## What's done well
+- Delivery refresh intervals use one integer contract (1–168 hours); the six-hour default is omitted from new intent and settings fields to preserve existing serialization.
 - No barrel re-exports in `__init__.py`; consumers import specific submodules.
 - Shared serializers keep JSON output stable and recurse through core models.
 - Fleet, client, node, and relay commands build typed, redacted results before any envelope or rendering.

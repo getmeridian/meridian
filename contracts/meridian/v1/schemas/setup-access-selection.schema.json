@@ -78,6 +78,13 @@
           "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Template Name",
           "type": "string"
+        },
+        "update_interval_hours": {
+          "default": 6,
+          "maximum": 168,
+          "minimum": 1,
+          "title": "Update Interval Hours",
+          "type": "integer"
         }
       },
       "title": "DeliveryIntent",

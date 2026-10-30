@@ -16,6 +16,7 @@ from meridian.compiler.names import (
     RemnawaveTemplateName,
     RemnawaveUsername,
 )
+from meridian.core.defaults import SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import (
     IPAddressValue,
     OptionalCountryCodeValue,
@@ -32,6 +33,7 @@ from meridian.core.topology import (
     EgressStrategy,
     ProtocolKind,
     RouteMatchKind,
+    SubscriptionUpdateIntervalHours,
     TlsFingerprint,
     TrafficRouteAction,
 )
@@ -309,13 +311,12 @@ class SubscriptionTemplatePayload(CoreModel):
 
 # Hours between automatic subscription refreshes, sent as ``profile-update-interval``
 # (Happ and the Clash family read whole hours). New exits and relays reach apps this fast.
-SUBSCRIPTION_UPDATE_INTERVAL_HOURS = 6
 
 
 class SubscriptionSettingsPayload(CoreModel):
     kind: Literal["subscription_settings"] = "subscription_settings"
     profile_title: str
-    update_interval_hours: int = Field(default=SUBSCRIPTION_UPDATE_INTERVAL_HOURS, ge=1)
+    update_interval_hours: SubscriptionUpdateIntervalHours = SUBSCRIPTION_UPDATE_INTERVAL_HOURS
     randomize_hosts: bool = False
     # Apps Remnawave knows read Xray JSON (Happ, v2rayNG, Streisand, ...) get it instead of
     # base64 links, and with it the automatic failover between entries.
@@ -501,6 +502,10 @@ class ControlUserPayload(CoreModel):
 class ServiceSettingsPayload(CoreModel):
     kind: Literal["service_settings"] = "service_settings"
     profile_title: str
+    update_interval_hours: SubscriptionUpdateIntervalHours = Field(
+        default=SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
+        exclude_if=lambda value: value == SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
+    )
 
 
 ResourcePayload: TypeAlias = Annotated[

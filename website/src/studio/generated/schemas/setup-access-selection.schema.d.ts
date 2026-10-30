@@ -19,6 +19,7 @@ export type Formats = [
 ];
 export type ProfileTitle = string;
 export type TemplateName = string;
+export type UpdateIntervalHours = number;
 
 /**
  * Human access and canonical subscription delivery choices.
@@ -52,4 +53,5 @@ export interface DeliveryIntent {
   formats?: Formats;
   profile_title?: ProfileTitle;
   template_name?: TemplateName;
+  update_interval_hours?: UpdateIntervalHours;
 }

@@ -12,7 +12,7 @@ import typer
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.commands.sni import run_exit_sni, run_relay_sni
 from meridian.compiler.models import InboundPayload
-from meridian.core.topology import SetupIntent
+from meridian.core.topology import DeliveryIntent, SetupIntent
 from meridian.diagnostics.camouflage import OwnHostname, camouflage_refusal
 from meridian.reconciler.resources import ResourceExecutionResult
 from meridian.servers import ServerEntry, ServerRegistry
@@ -164,6 +164,16 @@ def test_node_sni_checks_the_exit_then_applies_the_review(
     assert "change with it: relay-a" in output
     assert "remove inbound:exit-b:old" in output
     assert "every 6 hours" in output
+
+
+@pytest.mark.parametrize(("command", "target"), [("node", "exit-b"), ("relay", "relay-a")])
+def test_sni_review_reports_the_reviewed_refresh_interval(
+    registry: ServerRegistry, capsys: pytest.CaptureFixture[str], command: str, target: str
+) -> None:
+    intent = _intent().model_copy(update={"delivery": DeliveryIntent(update_interval_hours=24)})
+    code, runtime, _probed = _run(command, target, "new.example.net", intent=intent)
+    assert code == 0 and runtime.applied is not None
+    assert "every 24 hours" in capsys.readouterr().err
 
 
 def test_node_sni_names_relays_with_their_own_sni_and_gateways(

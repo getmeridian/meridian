@@ -27,9 +27,10 @@ from meridian.core.agent_types import (
     Version,
 )
 from meridian.core.client_devices import ClientDevicesResult
+from meridian.core.defaults import SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import validate_ip_address_value
 from meridian.core.models import CoreModel
-from meridian.core.topology import ProtocolKind
+from meridian.core.topology import ProtocolKind, SubscriptionUpdateIntervalHours
 
 
 class ManagedInbound(CoreModel):
@@ -261,6 +262,10 @@ class UserImportResult(CoreModel):
 
 class ServiceSettings(CoreModel):
     profile_title: str = Field(min_length=1, max_length=100)
+    update_interval_hours: SubscriptionUpdateIntervalHours = Field(
+        default=SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
+        exclude_if=lambda value: value == SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
+    )
     public_url: str = Field(
         default="",
         max_length=512,

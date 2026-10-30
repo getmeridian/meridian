@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from urllib.parse import quote
 
-from meridian.compiler.models import SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.control.formats.browser import NEVER_EXPIRES, not_found, subscription_info
 from meridian.control.formats.entries import SubscriptionUser
 from meridian.control.formats.links import base64_document, links
@@ -25,7 +24,7 @@ from meridian.control.formats.singbox import singbox_document
 from meridian.control.formats.xray_json import xray_json_document
 from meridian.control.models import ClientEndpoint
 from meridian.control.periods import next_period_start
-from meridian.core.defaults import SUPPORT_PAGE
+from meridian.core.defaults import SUBSCRIPTION_UPDATE_INTERVAL_HOURS, SUPPORT_PAGE
 
 JSON_TYPE = "application/json; charset=utf-8"
 TEXT_TYPE = "text/plain; charset=utf-8"
@@ -61,6 +60,7 @@ def render_subscription(
     *,
     profile_title: str,
     public_url: str = "",
+    update_interval_hours: int = SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
     now: datetime | None = None,
     placeholder_remarks: tuple[str, ...] | None = None,
     extra_headers: dict[str, str] | None = None,
@@ -76,7 +76,13 @@ def render_subscription(
             moment,
         )
         return SubscriptionResponse(200, JSON_TYPE, _json(info), dict(COMMON_HEADERS) | _refill_headers(user, moment))
-    headers = subscription_headers(user, profile_title=profile_title, public_url=public_url, now=moment)
+    headers = subscription_headers(
+        user,
+        profile_title=profile_title,
+        public_url=public_url,
+        update_interval_hours=update_interval_hours,
+        now=moment,
+    )
     headers.update(extra_headers or {})
     if document == "xray-json":
         body = _json(xray_json_document(endpoints, user.uuid, placeholders))
@@ -96,7 +102,12 @@ def unknown_subscription() -> SubscriptionResponse:
 
 
 def subscription_headers(
-    user: SubscriptionUser, *, profile_title: str, public_url: str = "", now: datetime | None = None
+    user: SubscriptionUser,
+    *,
+    profile_title: str,
+    public_url: str = "",
+    update_interval_hours: int = SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
+    now: datetime | None = None,
 ) -> dict[str, str]:
     """The headers apps read: name, traffic and expiry, refresh interval, and page links."""
     headers = dict(COMMON_HEADERS)
@@ -114,7 +125,7 @@ def subscription_headers(
     headers["profile-title"] = "base64:" + base64.b64encode(profile_title.encode("utf-8")).decode("ascii")
     if public_url:
         headers["profile-web-page-url"] = subscription_url(public_url, user.short_id)
-    headers["profile-update-interval"] = str(SUBSCRIPTION_UPDATE_INTERVAL_HOURS)
+    headers["profile-update-interval"] = str(update_interval_hours)
     return headers
 
 

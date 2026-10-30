@@ -26,6 +26,9 @@ that dials out to it.
   IP limits).
 
 ### Control service
+- **Subscription refresh interval** — delivery.update_interval_hours accepts 1–168
+  hours (default 6), round-trips through fleet export/import, and reaches native
+  apps in profile-update-interval.
 - Subscriptions expose the next UTC day, week, or month quota reset as Unix seconds
   in the subscription-refill-date header.
 - Subscription links accept /v2ray-json, /stash, and /clash alongside the

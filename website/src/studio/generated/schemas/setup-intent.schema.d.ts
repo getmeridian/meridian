@@ -24,6 +24,7 @@ export type Formats = [
 ];
 export type ProfileTitle = string;
 export type TemplateName = string;
+export type UpdateIntervalHours = number;
 /**
  * @minItems 1
  */
@@ -140,6 +141,7 @@ export interface DeliveryIntent {
   formats?: Formats;
   profile_title?: ProfileTitle;
   template_name?: TemplateName;
+  update_interval_hours?: UpdateIntervalHours;
 }
 /**
  * An ordered set of exits used for server-side failover.

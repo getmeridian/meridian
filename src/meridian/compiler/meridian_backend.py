@@ -151,7 +151,9 @@ def to_meridian_backend(builder: PlanBuilder) -> PlanBuilder:
         elif isinstance(payload, SubscriptionSettingsPayload):
             renamed[logical_id] = SERVICE_SETTINGS_ID
             replacements[SERVICE_SETTINGS_ID] = (
-                ServiceSettingsPayload(profile_title=payload.profile_title),
+                ServiceSettingsPayload(
+                    profile_title=payload.profile_title, update_interval_hours=payload.update_interval_hours
+                ),
                 [CONTROL_SERVICE_ID],
                 _exists(SERVICE_SETTINGS_ID),
             )

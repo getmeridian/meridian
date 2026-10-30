@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE, BackupLedger
+from meridian.control.delivery_settings import save_update_interval_hours, update_interval_hours
 from meridian.control.devices import DEVICES_TABLE, DeviceLedger, HeaderReader, browser_request
 from meridian.control.enrollment import NodeAuthority
 from meridian.control.errors import ServiceError
@@ -190,11 +191,14 @@ class ControlService:
         with self._transaction():
             self._set_meta("profile_title", settings.profile_title)
             self._set_meta("public_url", settings.public_url)
+            save_update_interval_hours(self._store, settings.update_interval_hours)
         return settings
 
     def settings(self) -> ServiceSettings:
         return ServiceSettings(
-            profile_title=self._meta("profile_title") or "Meridian", public_url=self._meta("public_url") or ""
+            profile_title=self._meta("profile_title") or "Meridian",
+            public_url=self._meta("public_url") or "",
+            update_interval_hours=update_interval_hours(self._store),
         )
 
     def privacy(self) -> PrivacySettings:
@@ -649,6 +653,7 @@ class ControlService:
             document,
             profile_title=settings.profile_title,
             public_url=settings.public_url,
+            update_interval_hours=settings.update_interval_hours,
             now=datetime.fromtimestamp(self._clock(), UTC),
             placeholder_remarks=DEVICE_LIMIT_REMARKS if "x-hwid-limit" in hwid_flags else None,
             extra_headers=hwid_flags,
