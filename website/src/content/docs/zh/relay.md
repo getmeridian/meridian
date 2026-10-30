@@ -15,7 +15,7 @@ Client → Relay (domestic IP) → Exit server (abroad) → Internet
 
 ## 中继如何工作
 
-中继运行 [Realm](https://github.com/zhboner/realm)，一个轻量的零拷贝 TCP 转发器。它监听端口 443（可配置），并将连接转发到出口的 Reality 监听端口。中继服务器上不运行其他任何东西：没有 agent，也没有控制服务。Meridian 通过 SSH 管理它。
+中继运行 [Realm](https://github.com/zhboner/realm)，一个轻量的零拷贝 TCP 转发器。它监听端口 443（可配置），并将连接转发到出口的 Reality 监听端口。仅承担中继角色的服务器不运行节点 agent 或控制服务。Meridian 通过 SSH 管理它。
 
 中继只承载 **Reality** 流量。XHTTP、WSS 和 Hysteria2 仍使用出口自己的地址和域名，并保留在同一份订阅中作为备用方式。
 
@@ -28,6 +28,7 @@ meridian relay add 203.0.113.10 --exit 198.51.100.10
 ```
 
 Meridian 会把中继添加到你的拓扑并应用：
+
 1. 准备中继服务器（系统软件包、BBR、SSH 加固，以及仅开放 SSH 和中继监听端口的防火墙）
 2. 将 Realm（版本固定并通过 SHA-256 校验）安装为 systemd 服务
 3. 将中继指向出口的 Reality 监听端口
@@ -57,7 +58,7 @@ meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-moscow \
 现有客户端会在下次订阅刷新时收到该中继，他们的连接页面也会列出它。新增客户端则会自动包含它：
 
 ```bash
-meridian client add alice   # 自动包含中继
+meridian client add guest   # 自动包含中继
 ```
 
 ## 管理中继
@@ -110,9 +111,19 @@ meridian relay add 203.0.113.11 --exit 198.51.100.10 --name ru-spb
 - **境外 CDN 地址通常不在移动网络白名单内。** 请把基于 Cloudflare 的[域名模式](/zh/domain-mode/)当作家庭宽带的备用方案，而不是应对移动白名单的办法。
 - **中继到出口的链路也可能受阻。** 即使中继本身能被用户连上，它到境外出口的连接仍可能中断。
 
+### 俄罗斯 CDN 上的网站
+
+某些俄罗斯 CDN 后的网站会继承 CDN 的白名单状态。2026 年 10 月的报告提到了 **Beeline、EdgeCenter、Beget、Timeweb 和 Yandex**。这些网络中的网站可能提供中继可用的 SNI。请在限制生效期间测试具体网站，结果可能因运营商、地区和子网而异。
+
+运营商只检查名称时，白名单 SNI 可能有效。如果同时检查目标 IP，中继地址也必须获准。借用 CDN 网站的名称，并不会把 Realm 放到该 CDN 后，也不会让任意 VPS 地址进入白名单。
+
+### 公开白名单
+
+社区在 [igareck/vpn-configs-for-russia](https://github.com/igareck/vpn-configs-for-russia) 维护 `WHITE-SNI-RU` 和 `WHITE-CIDR-RU`。请将它们作为待测试的候选，而不是运营商的官方名单。这是由你自行打开的普通链接；Meridian 不下载这些列表，也不访问白名单服务。
+
 ### 在白名单地址上部署中继
 
-在地址处于用户移动网络白名单内的境内云厂商租用一台小型服务器。社区有人维护可用网段列表，但只有在限制生效期间用真实移动网络实测才能确认。将其添加为中继并指定一个白名单内的域名：
+在境内主机商租用一台地址在用户移动网络中获准的小型服务器，参见[选择托管](/zh/hosting/)。只有在限制生效期间从该移动网络实测才能确认可用。然后添加中继并指定获准的名称：
 
 ```bash
 meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-mobile --sni allowed.example.com
@@ -152,7 +163,18 @@ meridian test
 
 ### 无法连接出口
 
-中继必须能够访问出口的 Reality 端口。运行 `meridian test` 进行端到端测试，并运行 `meridian check EXIT` 检查出口本身的状态。
+中继必须能访问出口的 Reality 端口。俄罗斯云主机可能失去到境外 VPS 的路由，而其境内地址仍可访问。此时用户会看到“已连接，但什么都打不开”：中继可达只说明第一段正常。
+
+从管理电脑检查两台服务器，再从受影响的网络测试实际流量：
+
+```bash
+meridian check 203.0.113.10  # 中继服务及通往出口的链路
+meridian check 198.51.100.10  # 出口服务、伪装目标和 DNS
+meridian test 203.0.113.10  # 经中继传输实际流量
+meridian test 198.51.100.10  # 直接向出口传输实际流量
+```
+
+如果出口检查通过且直连流量正常，而中继到下一跳的检查失败，请检查中继主机商的境外路由或防火墙。如果出口本身的服务或 DNS 检查失败，先恢复出口。需要中继的网络也可能直接封锁出口，因此应依据服务器发起的逐跳检查定位断点。添加另一网络中的第二个中继，或中继能够访问的第二个出口，避免一条境外链路故障导致所有路径失效。
 
 ### 中继服务未运行
 

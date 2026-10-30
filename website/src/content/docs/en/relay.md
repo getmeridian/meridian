@@ -15,7 +15,7 @@ Censors see traffic to a domestic IP. The relay forwards raw TCP to the exit; en
 
 ## How relays work
 
-A relay runs [Realm](https://github.com/zhboner/realm), a small zero-copy TCP forwarder. It listens on port 443 (configurable) and forwards to the exit's Reality listener. Nothing else runs on the relay: no agent and no control service. Meridian manages it over SSH.
+A relay runs [Realm](https://github.com/zhboner/realm), a small zero-copy TCP forwarder. It listens on port 443 (configurable) and forwards to the exit's Reality listener. A server with only the relay role runs no node agent or control service. Meridian manages it over SSH.
 
 Relays carry **Reality** traffic. XHTTP, WSS, and Hysteria2 stay on the exit's own address and domain, and remain in the same subscription as alternatives.
 
@@ -28,6 +28,7 @@ meridian relay add 203.0.113.10 --exit 198.51.100.10
 ```
 
 Meridian adds the relay to your topology and applies it:
+
 1. Prepares the relay server (packages, BBR, SSH hardening, a firewall that opens only SSH and the relay port)
 2. Installs Realm (version-pinned, SHA256-verified) as a systemd service
 3. Points the relay at the exit's Reality listener
@@ -57,7 +58,7 @@ meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-moscow \
 Existing clients receive the relay on their next subscription refresh, and their connection pages list it. New clients get it automatically:
 
 ```bash
-meridian client add alice   # relay included
+meridian client add guest   # relay included
 ```
 
 ## Manage relays
@@ -110,9 +111,19 @@ During some mobile internet restrictions in Russia, operators let through only a
 - **Foreign CDN addresses are generally not allowed on mobile networks.** Treat [domain mode](/en/domain-mode/) through Cloudflare as a fallback for home connections, not as a whitelist answer.
 - **The relay-to-exit link can be disrupted too.** A relay that reaches users can still lose its connection to a foreign exit.
 
+### Sites on Russian CDNs
+
+Sites behind some Russian CDNs inherit the CDN's whitelist status. October 2026 reports include **Beeline, EdgeCenter, Beget, Timeweb, and Yandex**. A site on one of these networks may provide an allowed SNI for a relay. Test the particular site while restrictions are active: the result can differ by operator, region, and subnet.
+
+An allowed SNI helps where the operator checks the name. Where it also checks the destination IP, your relay's address must be allowed too. Borrowing a CDN site's name does not put Realm behind that CDN or make an arbitrary VPS address allowed.
+
+### Public whitelist lists
+
+The community maintains `WHITE-SNI-RU` and `WHITE-CIDR-RU` in [igareck/vpn-configs-for-russia](https://github.com/igareck/vpn-configs-for-russia). Use them as candidates to test, not as an operator's official list. This is a link you open yourself; Meridian never fetches these lists or contacts a whitelist service.
+
 ### A relay on an allowed address
 
-Rent a small server on a domestic provider whose address is allowed on your users' mobile networks. Community-maintained lists of allowed ranges exist, but only a test from a mobile connection while restrictions are active proves it. Then add it as a relay and give it an allowed name:
+Rent a small server on a domestic provider whose address is allowed on your users' mobile networks; see [Choosing hosting](/en/hosting/). Only a test from a mobile connection while restrictions are active proves it. Then add it as a relay and give it an allowed name:
 
 ```bash
 meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-mobile --sni allowed.example.com
@@ -152,7 +163,18 @@ Make sure the relay port is open in your cloud provider's firewall or security g
 
 ### Exit unreachable
 
-The relay must reach the exit's Reality port. Run `meridian test` to check the route end to end, and `meridian check EXIT` to check the exit itself.
+The relay must reach the exit's Reality port. A Russian cloud can lose its route to a foreign VPS while its domestic address stays reachable. Users then see “connected, nothing loads”: reaching the relay proves only the first leg works.
+
+Check both servers from your managing machine, then test the route from the affected network:
+
+```bash
+meridian check 203.0.113.10  # relay services and the link toward the exit
+meridian check 198.51.100.10  # exit services, camouflage target, and DNS
+meridian test 203.0.113.10  # real traffic through the relay
+meridian test 198.51.100.10  # real traffic to the exit directly
+```
+
+If the exit passes its checks and direct traffic works, but the relay's hop check fails, investigate the relay provider's foreign route or firewall. If the exit's own service or DNS checks fail, restore it first. Direct tests can themselves be blocked on a network that needs a relay; use the server-side hop results to locate the break. Add a second relay on another network, or a second exit reachable from your relays, so one broken foreign link does not remove every working route.
 
 ### Relay service not running
 
