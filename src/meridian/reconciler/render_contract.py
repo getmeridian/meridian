@@ -9,7 +9,7 @@ _RENDERER_MANIFEST = {
     "compiler": COMPILER_VERSION,
     "agent-runtime": "staged-upgrade-v1",
     "agent-spec": "service-blob-v1",
-    "control-subscriptions": "refresh-interval-v7",
+    "control-subscriptions": "primary-availability-v8",
     "pwa": "quiet-account-v23",
     "control-service": "attention-v17",
     "control-api": "people-expiry-v3",

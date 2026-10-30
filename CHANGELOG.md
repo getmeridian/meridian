@@ -26,6 +26,7 @@ that dials out to it.
   IP limits).
 
 ### Control service
+- Xray subscriptions show availability notices when only fingerprint copies remain.
 - **Subscription refresh interval** — delivery.update_interval_hours accepts 1–168
   hours (default 6), round-trips through fleet export/import, and reaches native
   apps in profile-update-interval.

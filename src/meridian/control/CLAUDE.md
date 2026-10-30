@@ -36,6 +36,7 @@
 - A proposal whose intent has a secret-shaped key or value (`secret_paths()`, keys per `core.redaction`) is refused, never stored; so is one whose `access` block is malformed (the console reads `access.users` on every person screen, and a `null` there broke them all).
 
 ## Pitfalls
+- Xray availability checks primary endpoints; fingerprint copies alone must show the same inert availability notices as Mihomo and sing-box.
 - Attention shares NodeStatus runtime freshness and degradation with fleet views; stale reports cannot supply current health or apply failures, and failing checks count even under a healthy summary.
 - The topology owns subscription refresh hours (1–168, default 6); persist them with the other service settings in one transaction, and read old databases as six hours.
 - ClientEndpoint strips one matching pair of IPv6 brackets at the API boundary; structured server addresses stay bare, and only URI authorities add brackets.

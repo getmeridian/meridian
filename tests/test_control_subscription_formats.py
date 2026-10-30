@@ -207,6 +207,7 @@ EMPTY_CASES: list[tuple[DocumentFormat, str]] = [
 ] + [
     ("stash", "xhttp-only"),
     ("singbox", "xhttp-only"),
+    ("xray-json", "copies-only"),
     ("mihomo", "copies-only"),
     ("stash", "copies-only"),
     ("singbox", "copies-only"),
