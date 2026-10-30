@@ -97,11 +97,13 @@ def availability_placeholders(endpoints: list[ClientEndpoint], placeholders: tup
 
 
 def primaries(endpoints: list[ClientEndpoint]) -> list[ClientEndpoint]:
-    return [endpoint for endpoint in ordered(endpoints) if not endpoint.fingerprint_copy]
+    """Primary entries, preserving the caller's presentation order."""
+    return [endpoint for endpoint in endpoints if not endpoint.fingerprint_copy]
 
 
 def copies(endpoints: list[ClientEndpoint]) -> list[ClientEndpoint]:
-    return [endpoint for endpoint in ordered(endpoints) if endpoint.fingerprint_copy]
+    """Fingerprint copies, preserving the caller's presentation order."""
+    return [endpoint for endpoint in endpoints if endpoint.fingerprint_copy]
 
 
 def copy_groups(endpoints: list[ClientEndpoint]) -> list[tuple[str, list[ClientEndpoint]]]:

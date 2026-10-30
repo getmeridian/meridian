@@ -26,6 +26,7 @@ that dials out to it.
   IP limits).
 
 ### Control service
+- Subscription primary and fingerprint groups keep the same endpoint order after duplicate names are disambiguated.
 - Xray subscriptions show availability notices when only fingerprint copies remain.
 - **Subscription refresh interval** — delivery.update_interval_hours accepts 1–168
   hours (default 6), round-trips through fleet export/import, and reaches native

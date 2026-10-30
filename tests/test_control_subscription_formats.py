@@ -192,6 +192,55 @@ def test_duplicate_names_have_a_stable_order_when_positions_tie() -> None:
     assert _render_endpoints(endpoints, "base64").body == _render_endpoints(endpoints[::-1], "base64").body
 
 
+@pytest.mark.parametrize(
+    ("remarks", "expected_names"),
+    [
+        (("X", "X", "XA"), ["X", "X (2)", "XA"]),
+        (("Exit",) * 10, ["Exit", *(f"Exit ({index})" for index in range(2, 11))]),
+        (("Exit", "Exit", "Exit (1)"), ["Exit", "Exit (2)", "Exit (1)"]),
+    ],
+    ids=["prefix", "double-digit-suffix", "existing-suffix"],
+)
+@pytest.mark.parametrize("fingerprint_copy", [False, True], ids=["primaries", "copies"])
+def test_formats_keep_presentation_order_after_disambiguation(
+    remarks: tuple[str, ...], expected_names: list[str], fingerprint_copy: bool
+) -> None:
+    prototype = FLEETS["single"].endpoints[0]
+    endpoints = [
+        prototype.model_copy(
+            update={
+                "remark": remark,
+                "position": 0,
+                "address": f"198.51.100.{index}",
+                "fingerprint_copy": fingerprint_copy,
+                "fingerprint": "firefox" if fingerprint_copy else "chrome",
+            }
+        )
+        for index, remark in enumerate(remarks, start=10)
+    ]
+    expected_addresses = [endpoint.address for endpoint in endpoints]
+    if fingerprint_copy:
+        endpoints.append(prototype.model_copy(update={"remark": "Primary", "position": 1}))
+
+    links = json.loads(_render_endpoints(endpoints, "browser").body)["links"]
+    names = [unquote(urlsplit(link).fragment) for link in links]
+    assert names == [*expected_names, *(["Primary"] if fingerprint_copy else [])]
+    addresses = [urlsplit(link).hostname for link in links]
+    for dialect in ("mihomo", "stash"):
+        parsed = yaml.safe_load(_render_endpoints(endpoints, dialect).body)
+        assert [proxy["server"] for proxy in parsed["proxies"]] == addresses
+        selector = next(group for group in parsed["proxy-groups"] if group["name"] == "Meridian")
+        assert selector["proxies"][1:] == names
+
+    singbox = json.loads(_render_endpoints(endpoints, "singbox").body)
+    primary_addresses = [endpoints[-1].address] if fingerprint_copy else expected_addresses
+    assert [outbound["server"] for outbound in singbox["outbounds"][3:]] == primary_addresses
+    configs = json.loads(_render_endpoints(endpoints, "xray-json").body)
+    remark = "Automatic · Firefox" if fingerprint_copy else "Automatic"
+    selected = next(config for config in configs if config["remarks"] == remark)
+    assert [outbound["settings"]["vnext"][0]["address"] for outbound in proxy_outbounds(selected)] == expected_addresses
+
+
 def test_disambiguated_names_keep_the_endpoint_remark_length_bound() -> None:
     endpoint = FLEETS["single"].endpoints[0]
     endpoints = [endpoint.model_copy(update={"remark": "я" * 100, "position": index}) for index in range(3)]
