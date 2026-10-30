@@ -128,7 +128,6 @@ export const zh: LandingStrings = {
     '<strong>第一次使用？</strong>直接运行 <code>meridian setup</code>，向导会询问它需要的一切。',
   'builder.status.invalid': '请填写 IP 地址、已保存的服务器名称，或 "local"。',
   'builder.status.local': '直接在服务器本机上运行，无需 SSH，以 root 身份或使用免密码 sudo。',
-  'builder.status.domainMissing': '请填写域名，或取消勾选。',
   'builder.status.deploy': '部署 Reality、XHTTP 和 Hysteria2。',
   'builder.status.deployDomain': '部署 Reality、XHTTP 和 Hysteria2，并在你的域名上添加 WSS。',
   'builder.status.relayNeed': '请填写中继服务器及其转发到的出口服务器。',

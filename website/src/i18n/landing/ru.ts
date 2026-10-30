@@ -130,7 +130,6 @@ export const ru: LandingStrings = {
     '<strong>Настраиваете впервые?</strong> Запустите <code>meridian setup</code> — пошаговый мастер сам спросит всё необходимое.',
   'builder.status.invalid': 'Укажите IP-адрес, имя сохранённого сервера или «local».',
   'builder.status.local': 'Выполняется прямо на сервере без SSH (от имени root или с беспарольным sudo).',
-  'builder.status.domainMissing': 'Введите доменное имя или снимите флажок.',
   'builder.status.deploy': 'Разворачивает Reality, XHTTP и Hysteria2.',
   'builder.status.deployDomain': 'Разворачивает Reality, XHTTP и Hysteria2, а также WSS на вашем домене.',
   'builder.status.relayNeed': 'Укажите промежуточный сервер и выходной сервер, на который он будет перенаправлять трафик.',

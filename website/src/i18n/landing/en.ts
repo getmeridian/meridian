@@ -133,7 +133,6 @@ export const en = {
     '<strong>First time?</strong> Just run <code>meridian setup</code> — the wizard asks for everything it needs.',
   'builder.status.invalid': 'Use an IP address, a saved server name, or "local".',
   'builder.status.local': 'Runs on the server itself without SSH, as root or with passwordless sudo.',
-  'builder.status.domainMissing': 'Enter a domain, or uncheck it.',
   'builder.status.deploy': 'Deploys Reality, XHTTP, and Hysteria2.',
   'builder.status.deployDomain': 'Deploys Reality, XHTTP, and Hysteria2, plus WSS on your domain.',
   'builder.status.relayNeed': 'Enter the relay server and the exit it forwards to.',

@@ -128,7 +128,6 @@ export const fa: LandingStrings = {
     '<strong>اولین بار است؟</strong> فقط <code>meridian setup</code> را اجرا کنید — ویزارد هر چیزی را که لازم دارد می‌پرسد.',
   'builder.status.invalid': 'یک آدرس IP، نام سرور ذخیره‌شده یا «local» وارد کنید.',
   'builder.status.local': 'روی خود سرور و بدون SSH اجرا می‌شود، با کاربر root یا با sudo بدون رمز عبور.',
-  'builder.status.domainMissing': 'یک دامنه وارد کنید، یا تیک آن را بردارید.',
   'builder.status.deploy': 'Reality، XHTTP و Hysteria2 را مستقر می‌کند.',
   'builder.status.deployDomain': 'Reality، XHTTP و Hysteria2 را مستقر می‌کند، به‌علاوهٔ WSS روی دامنهٔ شما.',
   'builder.status.relayNeed': 'سرور رله و سرور خروجی‌ای را که به آن هدایت می‌کند وارد کنید.',
