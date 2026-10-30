@@ -43,27 +43,53 @@ then
 fi
 pass "reviewed setup applied and verified"
 
-for container in \
-  ctlsvc-api \
-  ctlsvc-db \
-  ctlsvc-cache \
-  netagent
-do
-  require_command \
-    "$container running on control/exit A" \
-    ssh root@"$EXIT_A_IP" \
-    "docker ps --format '{{.Names}}' | grep -qx '$container'"
-done
-
 require_command \
-  "no proxy names in container names or /opt on control/exit A" \
-  ssh root@"$EXIT_A_IP" \
-  "! docker ps -a --format '{{.Names}}' | grep -Eqi 'remna|xray|vless|vpn|proxy|meridian' && ! ls /opt | grep -Eqi 'remna|xray|vless|vpn|proxy|meridian'"
+  "control service running on control/exit A" \
+  ssh root@"$EXIT_A_IP" systemctl is-active --quiet ctld
 
-for host in "$EXIT_B_IP" "$GATEWAY_IP"; do
-  wait_for_node_api "$host"
+for host in "$EXIT_A_IP" "$EXIT_B_IP" "$GATEWAY_IP"; do
+  wait_for_agent "$host"
 done
-pass "both exits and routing gateway connected"
+pass "agents and cores run on both exits and the routing gateway"
+
+PROXY_NAMES='remna|xray|vless|vpn|proxy|meridian'
+UNIT_AND_OPT_NAMES="! systemctl list-units --all --no-legend --plain | awk '{print \$1}' | grep -Eqi '$PROXY_NAMES' && ! ls /opt | grep -Eqi '$PROXY_NAMES'"
+require_command \
+  "no proxy names in unit or /opt names on control/exit A" \
+  ssh root@"$EXIT_A_IP" "$UNIT_AND_OPT_NAMES"
+# The control service runs as `meridian serve`; only the nodes it manages hide their processes too.
+for host in "$EXIT_B_IP" "$GATEWAY_IP"; do
+  require_command \
+    "no proxy names in unit, process, or /opt names on $host" \
+    ssh root@"$host" "$UNIT_AND_OPT_NAMES && ! ps -eo comm= | grep -Eqi '$PROXY_NAMES'"
+done
+
+FLEET_STATUS_OUT=/tmp/meridian-systemlab-fleet-status.json
+# Exit 3 is expected: a relay route stays unverified until a client goes through it.
+status_rc=0
+meridian --json fleet status >"$FLEET_STATUS_OUT" || status_rc=$?
+python3 - "$FLEET_STATUS_OUT" "$status_rc" <<'PYEOF'
+import json
+import sys
+
+payload = json.load(open(sys.argv[1], encoding="utf-8"))
+data, counts = payload["data"], payload["summary"]["counts"]
+problems = []
+if sys.argv[2] not in {"0", "3"}:
+    problems.append(f"fleet status exited {sys.argv[2]}")
+if not data["panel"]["healthy"]:
+    problems.append("control service not healthy")
+names = sorted(node["name"] for node in data["nodes"] if node["status"] == "connected")
+if names != ["exit-a", "exit-b", "gateway-a"]:
+    problems.append(f"connected nodes {names}")
+for key in ("failed_nodes", "disconnected_nodes", "unknown_nodes", "unhealthy_relays"):
+    if counts[key]:
+        problems.append(f"{key}={counts[key]}")
+if problems:
+    print(json.dumps(payload, indent=2))
+    sys.exit("fleet status: " + "; ".join(problems))
+PYEOF
+pass "fleet status reports every agent live and applied"
 
 for host in "$RELAY_A_IP" "$RELAY_B_IP"; do
   require_command \

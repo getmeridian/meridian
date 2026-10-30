@@ -63,7 +63,10 @@ def compile_delivery_templates(builder: PlanBuilder, delivery: DeliveryIntent, *
     xray_template_id = alt_template_id = ""
     if "xray_json" in delivery.formats:
         xray_template_id = add_template(
-            "xray-json", delivery.template_name, "XRAY_JSON", template_json=xray_json_template()
+            "xray-json",
+            delivery.template_name,
+            "XRAY_JSON",
+            template_json=xray_json_template(client_routing=delivery.client_routing),
         )
         template_ids.append(xray_template_id)
         if copies:
@@ -71,7 +74,7 @@ def compile_delivery_templates(builder: PlanBuilder, delivery: DeliveryIntent, *
                 "xray-json-alt",
                 f"{delivery.template_name}-alt",
                 "XRAY_JSON",
-                template_json=xray_json_template(edge_tag=XRAY_ALT_EDGE_TAG),
+                template_json=xray_json_template(edge_tag=XRAY_ALT_EDGE_TAG, client_routing=delivery.client_routing),
             )
     if "mihomo" in delivery.formats:
         template_ids.append(
@@ -79,12 +82,19 @@ def compile_delivery_templates(builder: PlanBuilder, delivery: DeliveryIntent, *
                 "mihomo",
                 delivery.template_name,
                 "MIHOMO",
-                template_yaml=mihomo_template(exclude_from_failover=copy_remarks),
+                template_yaml=mihomo_template(
+                    exclude_from_failover=copy_remarks, client_routing=delivery.client_routing
+                ),
             )
         )
     if "singbox" in delivery.formats:
         template_ids.append(
-            add_template("singbox", delivery.template_name, "SINGBOX", template_json=singbox_template())
+            add_template(
+                "singbox",
+                delivery.template_name,
+                "SINGBOX",
+                template_json=singbox_template(client_routing=delivery.client_routing),
+            )
         )
     if xray_template_id:
         labels = sorted({fingerprint_label(payload.fingerprint) for payload in copies})

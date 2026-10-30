@@ -18,7 +18,7 @@ It prints a short Markdown guide for agents: what Meridian does, how the fleet f
 To make this permanent, add a line to your project's agent instructions (`AGENTS.md`, `CLAUDE.md`, or your tool's equivalent):
 
 ```markdown
-Our proxy servers are managed with Meridian. Run `meridian help agents` before using it.
+Our VPN servers are managed with Meridian. Run `meridian help agents` before using it.
 ```
 
 ## What the CLI gives agents
@@ -26,7 +26,7 @@ Our proxy servers are managed with Meridian. Run `meridian help agents` before u
 - **No prompts.** Commands that change something accept `--yes`. The `setup` wizard needs a terminal, so agents use `deploy`, `node add`, `relay add`, and `client add`, or `setup --intent FILE --yes`.
 - **JSON envelopes.** Commands with `--json` print one `meridian.output/v1` envelope on stdout, errors included. Progress and warnings go to stderr.
 - **Contracts.** `meridian api commands` lists every command with a machine-readable contract; `meridian api schema NAME` prints its JSON Schema.
-- **Meaningful exit codes.** `0` is success, `2` a user error, `3` missing evidence (SSH, panel, or local state), and `4` a completed check that found problems. See the [CLI reference](/en/cli-reference/) for each command.
+- **Meaningful exit codes.** `0` is success, `2` a user error, `3` missing evidence (SSH, the control service, or local state), and `4` a completed check that found problems. See the [CLI reference](/en/cli-reference/) for each command.
 - **Review before change.** `meridian plan` shows what would change, and `meridian apply --yes` applies exactly that.
 
 ## What the docs give agents
@@ -37,4 +37,4 @@ Our proxy servers are managed with Meridian. Run `meridian help agents` before u
 
 ## Keep secrets out of the chat
 
-Connection pages and subscription URLs give whoever holds them access to your servers. The agent guide tells agents to hand each link only to the person it belongs to and never to reveal the panel password unless you ask. Don't paste links into a chat you share with others. `meridian doctor` produces a redacted report that is safe to share.
+Connection pages and subscription URLs give whoever holds them access to your servers. The agent guide tells agents to hand each link only to the person it belongs to and never to print a web panel setup link unless you ask. Don't paste links into a chat you share with others. `meridian doctor` produces a redacted report that is safe to share.

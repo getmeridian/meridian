@@ -5,6 +5,11 @@ moved into place under ``flock`` only if the old file's SHA-256 still matches
 what this process read. A read or swap that loses its SSH connection runs again
 after a pause; before swapping again, the fence is re-read, because the lost
 attempt may already have landed. Decisions live in ``meridian.reconciler.fence``.
+
+On a control-service fleet the service takes the fence over once it answers
+(``meridian.service_fence``); this file then keeps the last state under a lease
+held by ``SERVICE_HOLDER`` that never ends, so a Meridian that predates the move
+refuses instead of applying around the service.
 """
 
 from __future__ import annotations
@@ -17,10 +22,10 @@ import shlex
 import socket
 import uuid
 from collections.abc import Callable
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import UTC, datetime
 
-from meridian.config import HOME_DISPLAY
+from meridian import config
 from meridian.reconciler.fence import (
     RENEW_AFTER,
     FenceRecord,
@@ -38,6 +43,13 @@ FENCE_DIR = "/var/lib/meridian"
 FENCE_FILE = f"{FENCE_DIR}/fence.json"
 _ABSENT = "absent"
 _CONFLICT_RC = 4
+SERVICE_HOLDER = "meridian-control-service"
+HANDED_OVER_UNTIL = "9999-12-31T00:00:00+00:00"
+
+
+def handed_over(record: FenceRecord | None) -> bool:
+    """True when the control service keeps the fence and this file only marks the move."""
+    return record is not None and record.lease_holder == SERVICE_HOLDER
 
 
 def apply_holder() -> str:
@@ -82,6 +94,20 @@ class SSHApplyFence:
         self._record: FenceRecord | None = None
         self._digest = _ABSENT
         self._renewed_at: datetime | None = None
+
+    @property
+    def holder(self) -> str:
+        return self._holder
+
+    def read(self) -> FenceRecord | None:
+        """The stored record; a later ``hand_over()`` swaps from exactly what this read saw."""
+        record, self._digest = self._read()
+        return record
+
+    def hand_over(self, record: FenceRecord) -> None:
+        """Store *record* as handed over to the control service, if the file still holds what ``read()`` saw."""
+        self._write(replace(record, lease_holder=SERVICE_HOLDER, lease_expires_at=HANDED_OVER_UNTIL), self._digest)
+        self._record = None  # never committed or released from here: the service holds the fence now
 
     def acquire(self, local: LocalFenceView) -> str:
         remote, digest = self._read()
@@ -203,7 +229,7 @@ class SSHApplyFence:
                 if current == written:
                     return
                 if current != expected_digest:
-                    raise _swap_conflict()
+                    raise swap_conflict()
             tried = True
             self._swap(staged, text, expected_digest)
 
@@ -234,7 +260,7 @@ class SSHApplyFence:
             timeout=30,
         )
         if result.returncode == _CONFLICT_RC:
-            raise _swap_conflict()
+            raise swap_conflict()
         if result.returncode != 0:
             raise FleetFenceError(
                 "Could not update the apply fence on the control server.",
@@ -244,10 +270,10 @@ class SSHApplyFence:
             )
 
 
-def _swap_conflict() -> FleetFenceError:
+def swap_conflict() -> FleetFenceError:
     return FleetFenceError(
         "Another machine changed this fleet's apply fence at the same moment.",
-        hint=f"Copy {HOME_DISPLAY} from the machine that applied last, then retry.",
+        hint=f"Copy {config.HOME_DISPLAY} from the machine that applied last, then retry.",
         category="user",
     )
 

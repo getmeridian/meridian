@@ -1,7 +1,7 @@
 """Shared exception hierarchy for all Meridian subsystems.
 
 Every user-facing subsystem error inherits ``MeridianError``.  CLI adapters
-catch it to render human-readable output via ``console.fail()``.  Engine/API
+catch it to render human-readable output via ``console.fail()``.  Machine
 adapters catch it to build typed JSON error responses via ``to_error_model()``.
 """
 
@@ -21,7 +21,7 @@ class MeridianError(Exception):
     """Base for all typed Meridian exceptions.
 
     Subsystem errors inherit this.  CLI adapters catch it to render
-    human-readable output.  Engine/API adapters catch it to build
+    human-readable output.  Other adapters catch it to build
     typed error responses.  The ``to_error_model()`` method serializes
     to the JSON-safe ``ErrorModel`` Pydantic model.
     """
@@ -56,26 +56,8 @@ class MeridianError(Exception):
         )
 
 
-class EngineError(MeridianError):
-    """Typed Engine error for CLI/API adapters to render.
-
-    Lives in core so that both adapters and engine can import it
-    without creating circular dependencies.
-    """
-
-    def __init__(self, message: str, *, hint: str = "", category: ErrorCategory = "user") -> None:
-        super().__init__(message, hint=hint, category=category)
-
-
 class ProvisioningError(MeridianError):
     """SSH provisioner pipeline failure (step failed, container unhealthy, etc.)."""
-
-    def __init__(self, message: str, *, hint: str = "", category: ErrorCategory = "system") -> None:
-        super().__init__(message, hint=hint, category=category)
-
-
-class PanelSetupError(MeridianError):
-    """Remnawave panel API configuration failure (register, token, node, profile)."""
 
     def __init__(self, message: str, *, hint: str = "", category: ErrorCategory = "system") -> None:
         super().__init__(message, hint=hint, category=category)
@@ -93,6 +75,26 @@ class LocalStateError(MeridianError):
 
     def __init__(self, message: str, *, hint: str = "", category: ErrorCategory = "user") -> None:
         super().__init__(message, hint=hint, category=category)
+
+
+def previous_release_command(deployed_with: str, args: str) -> str:
+    """The command that runs *args* with the Meridian release that deployed a Remnawave fleet.
+
+    This Meridian no longer drives a Remnawave fleet, so finishing its last apply (or
+    removing its servers) before or instead of `meridian migrate` takes that release.
+    """
+    # 4.0.0b8 is the last release that drives Remnawave.
+    return f"uvx --from 'meridian-vpn=={deployed_with or '4.0.0b8'}' meridian {args}"
+
+
+class RemnawaveFleetError(LocalStateError):
+    """A fleet that still runs Remnawave: this Meridian only moves it onto its control service."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "This fleet still runs Remnawave, which this Meridian no longer manages",
+            hint="Move it to Meridian's control service in place, keeping every link: meridian migrate",
+        )
 
 
 class LocalStateCorruptedError(LocalStateError):

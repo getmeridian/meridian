@@ -1,33 +1,39 @@
-# core - Meridian API contracts
+# core — Meridian API contracts
 
 ## Design decisions
-- **No CLI globals** - core never imports Typer, Rich, console, config, or command modules (tested); CLI and future UI clients are adapters. Core constants live in `core/defaults.py`.
-- **Envelope first** - JSON clients get one stable `meridian.output/v1` shape; command data lives under `data`.
-- **Events are a public set** - long-running flows report typed JSONL-ready events; add a name to `core.events` before emitting it.
-- **Workflows are renderable data** - wizard-style interactions expose typed fields and sections; CLI and UI decide how to render them.
-- **Command metadata is schema-neutral** - `command_catalog.COMMAND_OUTPUTS` maps every public command path to its JSON output (schemas, outcomes, stability) or `None`; argv, flags, and help come from the Typer tree via `meridian.cli_catalog`, and nothing here imports schema registration.
-- **Pydantic at API boundaries** - request, result, event, error, and service contracts validate, serialize, and export JSON Schema from Pydantic v2 models.
-- **Validate early, plan purely** - adapters validate typed request models at the boundary; deploy mode, ports, and paths are computed before any SSH or panel I/O.
-- **Topology roles compose** - a server may hold several roles (relay and exit); ordered routes decide where traffic exits.
-- **Verification is four-state** - passed, failed, warning, skipped; skipped evidence is inconclusive, never a pass.
-- **Cooperative cancellation** - `core/cancellation.py` owns the token protocol, `OperationCancellation`, and `OperationCancelledError`; workers poll only at safe points.
-- **Narrow panel interfaces** - services depend on protocols such as `FleetPanelClient` and `ClientPanelClient`, not the concrete Remnawave client.
-- **Two names per person** - `AccessIntent.users` are Remnawave usernames (Latin only); `display_names` keeps the typed name when it differs and is omitted when empty. `assign_access_usernames()` is the one place that maps typed names to usernames (known first, Latin names claim themselves, the rest transliterate via anyascii); look people up with `find_user()`.
+- **No CLI globals** — core never imports Typer, Rich, console, config, or command modules (tested); the CLI and the control service are adapters. Constants live in `core/defaults.py`.
+- **Envelope first** — JSON clients get one stable `meridian.output/v1` shape with command data under `data`; `schema_envelopes.py` builds command envelopes from the catalog, and `schema.py` composes contract families from their owning modules.
+- **Command metadata is schema-neutral** — `command_catalog.COMMAND_OUTPUTS` maps every public command path to its JSON output or `None`; argv, flags, and help come from the Typer tree via `meridian.cli_catalog`.
+- **Events are a public set** — long-running flows report typed JSONL-ready events; add a name to `core.events` before emitting it. Durable lifecycle facts for integrations are a separate contract (`fleet_events.py`).
+- **Pydantic at API boundaries** — requests, results, events, errors, and service contracts validate, serialize, and export JSON Schema from Pydantic v2 models; validate at the boundary, before any SSH or panel I/O.
+- **Verification is four-state** — passed, failed, warning, skipped; skipped evidence is inconclusive, never a pass.
+- **Cooperative cancellation** — `core/cancellation.py` owns the token protocol; workers poll only at safe points.
+- **Agent protocol is a contract, kept apart** — `meridian.agent/v1` (`agent_*` modules) is the internal service-to-agent wire format the Rust agent consumes; `schema_agent.AGENT_SCHEMAS` exports it to `contracts/meridian/v1/agent/`, never into `core.schema`. Docstrings are its spec: every field always sent, no floats, no addresses in agent messages; extend it only behind a negotiated capability. `version_skew.py` holds CLI/service/agent compatibility.
+- **Two names per person** — `AccessIntent.users` are Latin usernames; `display_names` keeps a typed name when it differs. `assign_access_usernames()` is the one place mapping typed names to usernames (via anyascii); look people up with `find_user()`.
+- **Fleet document** — `fleet_document.py` owns `meridian.fleet/v1` and `intent_changes()`, the one description of how two intents differ; unequal intents always report a change, a reorder at least.
+- **Operator settings have one contract each** — client limits (`client_limits.py`), creation settings (`UserCreationSettings`), languages, notices, owner contact, person metadata, server allowances, and connection-page settings; each module owns its bounds and canonical form. Explicit null clears, omitted fields preserve.
+- **Derived evidence** — `traffic.py` is the aggregate evidence contract (unknown history stays null) and `attention.py` derives typed reasons from it with no stored alert flags; `calendar.py` and `server_calendar.py` share clamped UTC month arithmetic.
+- **Subscription vocabulary** — `subscription_formats.py` owns document and suffix names; `subscription_preview.py` bounds transient headers and explains selection without credentials.
 
 ## What's done well
+- **Defaults stay off the wire** — new intent and settings fields omit their defaults (routing `ru-split`, the six-hour refresh, empty mappings), so existing plans and payloads keep their hashes.
+- **Command kinds are hello capabilities**, and a reset result discloses its effect without carrying a user identifier.
 - No barrel re-exports in `__init__.py`; consumers import specific submodules.
-- Shared serializers keep JSON output stable and recurse through core models.
-- Fleet, client, node, and relay commands build typed, redacted results before any envelope or rendering.
-- Reporter primitives let provision, apply, and deploy emit typed events without choosing a renderer.
+- Commands build typed, redacted results before any envelope or rendering, and reporter primitives emit typed events without choosing a renderer.
 
 ## Pitfalls
-- Never emit raw SSH commands, panel tokens, private keys, database URLs, or subscription secrets.
-- `redact_string()` is the only secret masker (SSH debug logs included); teach it a new secret form instead of adding a local regex.
-- Generated JSON Schemas are public data; redact values without destroying schema `properties`.
-- SSH passwords and private keys never enter public server contracts; Engine handles them through short-lived secret channels.
-- Keep human wording in adapters; core summaries are short API metadata.
-- Wrap Pydantic `ValidationError` before rendering; raw model errors are too noisy for operators.
-- Use `WithJsonSchema` for custom validators that need public schema constraints without replacing readable runtime errors.
-- Keep topology IDs lowercase and bounded, and validate access usernames against the pinned panel contract before compilation.
-- Command catalogs list only completed JSON outcomes: an interruption exits 130 without an envelope, while a cooperative cancel is a completed `cancelled` outcome with exit 5.
-- Routing domains are suffixes: gateway rules and exit overrides validate with `validate_domain_suffix_value()` (bare zones like `ru`, `рф` → `xn--p1ai`); SNI and certificate names keep `validate_hostname_value()`, which needs two labels.
+- **Never emit raw SSH commands, panel tokens, private keys, database URLs, or subscription secrets.**
+- **`redact_string()` is the only secret masker** (SSH debug logs included) — teach it a new secret form instead of adding a local regex.
+- **Reveal exact paths only** — connection URIs and QR fields are complete credentials; JSON reveal options name exact dotted paths (list indices included) and never expose neighbouring fields. Preview redaction masks whole URIs and replaces opaque Base64 headers.
+- **Generated JSON Schemas are public data** — redact values without destroying schema `properties`.
+- **SSH passwords and private keys never enter public server contracts.**
+- **Keep human wording in adapters**, and wrap Pydantic `ValidationError` before rendering; raw model errors are too noisy for operators.
+- **Use `WithJsonSchema` for custom validators** that need public schema constraints without replacing readable runtime errors.
+- **Timestamps keep their input string** after validating date and time, so fractional precision and generated schemas stay unchanged.
+- **Routing domains are suffixes** — validate with `validate_domain_suffix_value()` (bare zones like `ru`, IDN to punycode); SNI and certificate names use `validate_hostname_value()`, which needs two labels. Topology IDs stay lowercase and bounded.
+- **Provider labels allow Persian ZWNJ/ZWJ joiners** while rejecting line breaks, bidi controls, and other control characters.
+- **Server metadata names only declared physical servers** and never moves automatically with an exit.
+- **Fleet diffs compare creation settings per person** — changing them is an edit, not a reorder.
+- **Command catalogs list only completed JSON outcomes** — an interruption exits 130 without an envelope; a cooperative cancel is a `cancelled` outcome with exit 5.
+- **Fleet results keep reachability, runtime, and convergence apart** — a live poll never makes an old health report current, and a healthy runtime can still await convergence.
+- **Client detail carries lifetime traffic beside the period** — resetting period use never erases the lifetime figure.

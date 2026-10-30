@@ -1,0 +1,50 @@
+{
+  "$defs": {
+    "CutOffNode": {
+      "additionalProperties": false,
+      "properties": {
+        "inbound_tags": {
+          "items": {
+            "description": "Xray inbound tag.",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "title": "Inbound Tags",
+          "type": "array"
+        },
+        "node_id": {
+          "description": "Node identifier: the server's lowercase topology ID, unique within the fleet.",
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Node Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "inbound_tags"
+      ],
+      "title": "CutOffNode",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Every managed inbound that may hold the person's open sessions; contains no person or credential.",
+  "properties": {
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/CutOffNode"
+      },
+      "title": "Nodes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "nodes"
+  ],
+  "title": "CutOffPlan",
+  "type": "object"
+}

@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from meridian.cluster import RealityKeyBinding
-from meridian.compiler import TopologyCompileError, compile_topology
+from meridian.compiler import TopologyCompileError
 from meridian.compiler.models import (
     CertificatePayload,
     ConfigProfilePayload,
@@ -23,7 +23,7 @@ from meridian.core.topology import (
 )
 from meridian.reconciler.server_render import render_nginx_artifact
 from meridian.xray_workload import render_workload_config
-from tests.support.topology import single_exit_intent
+from tests.support.topology import compile_panel_pass, single_exit_intent
 
 OWN = "www.example.org"
 ADDRESSES = {"srv-control": "198.51.100.10", "srv-exit": "198.51.100.11", "srv-relay": "198.51.100.12"}
@@ -76,14 +76,14 @@ def test_self_steal_needs_a_reality_path_with_a_domain(fields: dict[str, str], m
 
 def test_borrowed_camouflage_serializes_exactly_as_before() -> None:
     """Unset self-steal fields stay out of the intent and payloads, so existing plan hashes never move."""
-    plan = compile_topology(single_exit_intent())
+    plan = compile_panel_pass(single_exit_intent())
     assert "self_steal" not in single_exit_intent().exits[0].paths[0].model_dump()
     dumped = [resource.payload.model_dump(mode="json") for resource in plan.resources]
     assert not [item for item in dumped if {"reality_dest_port", "reality_dest_proxy", "fallback_port"} & set(item)]
 
 
 def test_own_hostname_gets_a_certificate_and_a_local_fallback_server() -> None:
-    plan = compile_topology(single_exit_intent(paths=[_own_reality()]))
+    plan = compile_panel_pass(single_exit_intent(paths=[_own_reality()]))
     payloads = _payloads(plan)
 
     [(decoy_id, decoy)] = _http(plan, OWN)
@@ -104,7 +104,7 @@ def test_own_hostname_gets_a_certificate_and_a_local_fallback_server() -> None:
 
 def test_shared_domain_routes_to_reality_which_passes_xhttp_on() -> None:
     """One name, one route: the 443 stream sends it to Reality, whose fallback is the XHTTP server."""
-    plan = compile_topology(single_exit_intent(paths=[_own_reality(), _xhttp(OWN)]))
+    plan = compile_panel_pass(single_exit_intent(paths=[_own_reality(), _xhttp(OWN)]))
 
     [(_, server)] = _http(plan, OWN)
     assert [route.protocol for route in server.routes] == ["xhttp"]
@@ -118,7 +118,7 @@ def test_shared_domain_routes_to_reality_which_passes_xhttp_on() -> None:
 
 
 def test_separate_xhttp_domain_keeps_its_own_route() -> None:
-    plan = compile_topology(single_exit_intent(paths=[_own_reality(), _xhttp("cdn.example.org")]))
+    plan = compile_panel_pass(single_exit_intent(paths=[_own_reality(), _xhttp("cdn.example.org")]))
 
     [stream] = _streams(plan)
     assert sorted(name for route in stream.routes for name in route.server_names) == ["cdn.example.org", OWN]
@@ -130,7 +130,7 @@ def test_separate_xhttp_domain_keeps_its_own_route() -> None:
 
 def test_forwarded_client_ips_reach_the_fallback_through_reality() -> None:
     """The fallback server reads PROXY headers once the fleet forwards IPs, so Reality must send one."""
-    plan = compile_topology(single_exit_intent(paths=[_own_reality()], forward_client_ips=True))
+    plan = compile_panel_pass(single_exit_intent(paths=[_own_reality()], forward_client_ips=True))
     payloads = _payloads(plan)
 
     [(_, decoy)] = _http(plan, OWN)
@@ -148,7 +148,7 @@ def test_forwarded_client_ips_reach_the_fallback_through_reality() -> None:
 
 
 def test_rendered_reality_and_stream_point_at_the_local_server() -> None:
-    plan = compile_topology(single_exit_intent(paths=[_own_reality()]))
+    plan = compile_panel_pass(single_exit_intent(paths=[_own_reality()]))
     payloads = _payloads(plan)
     [(decoy_id, decoy)] = _http(plan, OWN)
     profile = payloads["profile:exit-a"]
@@ -180,7 +180,7 @@ def test_relay_on_the_exit_name_falls_back_locally_too() -> None:
             )
         ],
     )
-    plan = compile_topology(intent)
+    plan = compile_panel_pass(intent)
     [(_, decoy)] = _http(plan, OWN)
     ingress = [stream for stream in _streams(plan) if stream.listener_port != 443]
     assert [(item.fallback_server_name, item.fallback_port) for item in ingress] == [("", decoy.listener_port)]
@@ -199,7 +199,7 @@ def test_relay_with_its_own_name_keeps_borrowing() -> None:
             )
         ],
     )
-    plan = compile_topology(intent)
+    plan = compile_panel_pass(intent)
     ingress = [stream for stream in _streams(plan) if stream.listener_port != 443]
     assert [(item.fallback_server_name, item.fallback_port) for item in ingress] == [("relay.example.com", 0)]
 
@@ -209,7 +209,7 @@ def test_gateway_bridge_falls_back_to_the_exit_server() -> None:
         paths=[_own_reality()],
         routing_gateways=[RoutingGatewayIntent(id="gw-a", server_ref="srv-gateway", bridge_path_ref="reality-a")],
     )
-    plan = compile_topology(intent)
+    plan = compile_panel_pass(intent)
     [(_, decoy)] = _http(plan, OWN)
     bridges = [
         payload
@@ -225,12 +225,12 @@ def test_panel_domain_cannot_double_as_self_steal_on_the_control_server() -> Non
         paths=[_own_reality()],
     )
     with pytest.raises(TopologyCompileError, match="panel domain"):
-        compile_topology(intent)
+        compile_panel_pass(intent)
 
 
 def test_two_self_steal_exits_get_independent_servers() -> None:
     intent = single_exit_intent(paths=[_own_reality()])
     second = ExitIntent(id="exit-b", server_ref="srv-exit-b", paths=[_own_reality("de.example.org")])
-    plan = compile_topology(intent.model_copy(update={"exits": [*intent.exits, second]}))
+    plan = compile_panel_pass(intent.model_copy(update={"exits": [*intent.exits, second]}))
     assert len(_http(plan, OWN)) == len(_http(plan, "de.example.org")) == 1
     assert _streams(plan, "srv-exit-b")[0].fallback_port == _http(plan, "de.example.org")[0][1].listener_port

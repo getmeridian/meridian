@@ -9,47 +9,89 @@ from typing import Annotated
 
 import typer
 
-from meridian.cli_options import Json, NewServer, SelfSteal, SshPort, Target, User, Yes, enable_json_output
+from meridian.cli_client_preview import client_preview_cmd
+from meridian.cli_fleet_contact import fleet_contact_cmd
+from meridian.cli_fleet_language import fleet_language_cmd
+from meridian.cli_fleet_notice import notice_app
+from meridian.cli_fleet_routing import fleet_routing_cmd
+from meridian.cli_fleet_usage import fleet_usage_cmd
+from meridian.cli_node_commands import node_restart_cmd
+from meridian.cli_options import (
+    CutOff,
+    DeviceLimit,
+    Expires,
+    ForgetUnreachable,
+    Json,
+    NewServer,
+    SelfSteal,
+    SshPort,
+    Target,
+    TrafficLimit,
+    TrafficResetPeriod,
+    User,
+    Yes,
+    enable_json_output,
+)
+from meridian.cli_server_metadata import server_set_cmd
 
 client_app = typer.Typer(
-    help="Manage who can connect: add, show, list, reissue, enable, disable, remove", no_args_is_help=True
+    help="Manage who can connect: add, show, list, limit, reissue, enable, disable, remove", no_args_is_help=True
 )
-server_app = typer.Typer(help="Save and name servers you reach over SSH", no_args_is_help=True)
-node_app = typer.Typer(help="Add, list, replace, or remove exit servers, or change their SNI", no_args_is_help=True)
+server_app = typer.Typer(help="Save servers and review bandwidth allowances and payment dates", no_args_is_help=True)
+node_app = typer.Typer(
+    help="Add, list, restart, replace, or remove exit servers, or change their SNI", no_args_is_help=True
+)
 relay_app = typer.Typer(
     help="Add, list, or remove relays that forward traffic to an exit, or change their SNI", no_args_is_help=True
 )
 route_app = typer.Typer(help="Send chosen destinations through WARP, directly, or nowhere", no_args_is_help=True)
-fleet_app = typer.Typer(help="Fleet status, inventory, and image upgrades", no_args_is_help=True)
+fleet_app = typer.Typer(
+    help="Fleet status, inventory, client routing, upgrades, and the fleet as a file", no_args_is_help=True
+)
 api_app = typer.Typer(help="Machine-readable contracts for scripts and UIs", no_args_is_help=True)
 dev_app = typer.Typer(help="Developer tools for testing and debugging", no_args_is_help=True)
+fleet_app.command("usage")(fleet_usage_cmd)
+node_app.command("restart", rich_help_panel="Operations")(node_restart_cmd)
+fleet_app.command("routing", rich_help_panel="Routing")(fleet_routing_cmd)
+fleet_app.command("contact", rich_help_panel="Connection pages")(fleet_contact_cmd)
+fleet_app.add_typer(notice_app, name="notice", rich_help_panel="Connection pages")
+client_app.command("preview", rich_help_panel="Connections")(client_preview_cmd)
+fleet_app.command("language", rich_help_panel="Connection pages")(fleet_language_cmd)
+server_app.command("set", rich_help_panel="Allowances and payments")(server_set_cmd)
 
 
 @client_app.command("add")
 def client_add(
     names: list[str] = typer.Argument(..., metavar="NAME", help="Client name(s) to add"),
+    limit: TrafficLimit = None,
+    reset: TrafficResetPeriod = None,
+    expires: Expires = None,
+    devices: DeviceLimit = None,
     _json: Json = False,
     # Adding never asks; accepted so scripts can pass --yes to every mutating command.
     _yes: bool = typer.Option(False, "--yes", "-y", hidden=True),
 ) -> None:
     """Add one or more clients (people who connect)
 
-    Prints each client's connection page and subscription link.
+    Prints each client's connection page and subscription link. Limits and expiry apply to every name.
 
     [dim]Examples:[/dim]
       [cyan]meridian client add alice[/cyan]
       [cyan]meridian client add alice bob charlie[/cyan]
+      [cyan]meridian client add alice --limit 50GB --reset month --expires 2026-12-31[/cyan]
     """
     from meridian.commands.client import run_add
 
-    run_add(names)
+    run_add(names, limit=limit, reset=reset, expires=expires, devices=devices)
 
 
 @client_app.command("show")
 def client_show_cmd(
     name: str = typer.Argument(..., help="Client name"),
     _json: Json = False,
-    repair_page: bool = typer.Option(False, "--repair-page", help="Republish the client's connection page"),
+    connections: bool = typer.Option(
+        False, "--connections", help="Show individual connection credentials and format URLs"
+    ),
 ) -> None:
     """Show a client's connection page, subscription link, and status
 
@@ -58,17 +100,107 @@ def client_show_cmd(
     """
     from meridian.commands.client import run_show
 
-    run_show(name, repair_page=repair_page)
+    run_show(name, connections=connections)
 
 
 @client_app.command("list")
 def client_list_cmd(
     _json: Json = False,
+    attention: bool = typer.Option(False, "--attention", help="Only people expiring soon, near quota, or never used"),
+    tag: str | None = typer.Option(None, "--tag", metavar="TAG", help="Only people with this tag; none for untagged"),
 ) -> None:
     """List managed access clients with status and traffic"""
     from meridian.commands.client import run_list
 
-    run_list()
+    run_list(attention=attention, tag=tag)
+
+
+@client_app.command("usage")
+def client_usage_cmd(
+    name: str = typer.Argument(..., help="Client name"),
+    days: str = typer.Option("30", "--days", metavar="N", help="UTC days to show, 1–730, within the retention cap"),
+    _json: Json = False,
+) -> None:
+    """Show a person's daily usage when daily history is on"""
+    from meridian.commands.client_usage import run_usage
+
+    run_usage(name, days=days)
+
+
+@client_app.command("set")
+def client_set_cmd(
+    name: str = typer.Argument(..., help="Client name"),
+    limit: TrafficLimit = None,
+    reset: TrafficResetPeriod = None,
+    expires: Expires = None,
+    devices: DeviceLimit = None,
+    note: str | None = typer.Option(
+        None, "--note", metavar="TEXT", help='Private note, up to 500 characters; "" clears'
+    ),
+    tag: str | None = typer.Option(
+        None, "--tag", metavar="TAG", help="1–16 letters, digits, underscores (saved in uppercase); none clears"
+    ),
+    language: str | None = typer.Option(
+        None, "--language", metavar="LANGUAGE", help="Page and app language: en, ru, fa, zh; default follows the fleet"
+    ),
+    _json: Json = False,
+) -> None:
+    """Change a client's traffic limit, reset period, or expiry
+
+    Only the options you pass change. A client cut off by their limit or expiry can connect
+    again as soon as the new values allow it.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian client set alice --expires 2026-12-31[/cyan]
+      [cyan]meridian client set alice --limit 50GB --reset month[/cyan]
+      [cyan]meridian client set alice --limit none --expires never[/cyan]
+    """
+    from meridian.commands.client_limits import run_set
+
+    run_set(name, limit=limit, reset=reset, expires=expires, devices=devices, note=note, tag=tag, language=language)
+
+
+@client_app.command("devices", rich_help_panel="Device limits")
+def client_devices_cmd(
+    name: str = typer.Argument(..., help="Client name"),
+    remove: str | None = typer.Option(None, "--remove", metavar="ID", help="Forget one device ID"),
+    clear: bool = typer.Option(False, "--clear", help="Forget all of this client's devices"),
+    _json: Json = False,
+) -> None:
+    """Show device counts or details, or forget a device so another can register
+
+    Private mode shows a count; full mode lists devices. Nothing is counted while device limits are off.
+    """
+    from meridian.commands.client_devices import run_devices
+
+    run_devices(name, remove=remove, clear=clear)
+
+
+@client_app.command("reset-traffic")
+def client_reset_traffic_cmd(
+    name: str = typer.Argument(..., help="Client name"),
+    _json: Json = False,
+) -> None:
+    """Start a client's used traffic from zero; a client cut off by their limit connects again
+
+    [dim]Examples:[/dim]
+      [cyan]meridian client reset-traffic alice[/cyan]
+    """
+    from meridian.commands.client_limits import run_reset_traffic
+
+    run_reset_traffic(name)
+
+
+@client_app.command("extend", rich_help_panel="Limits and expiry")
+def client_extend_cmd(
+    name: str = typer.Argument(..., help="Client name"),
+    days: str = typer.Option(..., "--days", metavar="N", help="Days to add after now or the current expiry, 1–3650"),
+    _json: Json = False,
+) -> None:
+    """Extend a person's access by whole days, including people added in the web panel"""
+    from meridian.commands.client_limits import run_extend
+
+    run_extend(name, days=days)
 
 
 @client_app.command("remove")
@@ -76,11 +208,12 @@ def client_remove(
     name: str = typer.Argument(..., help="Client name"),
     yes: Yes = False,
     _json: Json = False,
+    cut_off: CutOff = False,
 ) -> None:
     """Remove a client permanently; their links stop working"""
     from meridian.commands.client import run_remove
 
-    run_remove(name, yes=yes)
+    run_remove(name, yes=yes, cut_off=cut_off)
 
 
 @client_app.command("reissue")
@@ -88,17 +221,18 @@ def client_reissue_cmd(
     name: str = typer.Argument(..., help="Client name"),
     yes: Yes = False,
     _json: Json = False,
+    cut_off: CutOff = False,
 ) -> None:
     """Replace a client's links after a leak; the old page and subscription stop working
 
-    Keeps the client and their panel settings (limits, expiry, HWID devices).
+    Keeps the client and their settings (limits and expiry), and clears registered devices.
 
     [dim]Examples:[/dim]
       [cyan]meridian client reissue alice[/cyan]
     """
     from meridian.commands.client import run_reissue
 
-    run_reissue(name, yes=yes)
+    run_reissue(name, yes=yes, cut_off=cut_off)
 
 
 @client_app.command("enable")
@@ -137,8 +271,8 @@ def server_add_cmd(
 
 
 @server_app.command("list")
-def server_list_cmd() -> None:
-    """List saved servers"""
+def server_list_cmd(_json: Json = False) -> None:
+    """List saved servers with reviewed allowances and payment dates"""
     from meridian.commands.server import run_list
 
     run_list()
@@ -198,6 +332,7 @@ def relay_remove_cmd(
     relay_ip: str = typer.Argument(..., help="Relay server IP, saved name, or relay chain ID"),
     exit: str = typer.Option("", "--exit", "-e", help="Only chains toward this exit (IP, name, or exit ID)"),
     yes: Yes = False,
+    forget_unreachable: ForgetUnreachable = False,
 ) -> None:
     """Remove relay chains through a relay server
 
@@ -212,7 +347,7 @@ def relay_remove_cmd(
     """
     from meridian.commands.relay import run_remove
 
-    run_remove(relay_ip, exit, yes)
+    run_remove(relay_ip, exit, yes, forget_unreachable=forget_unreachable)
 
 
 @relay_app.command("sni")
@@ -241,25 +376,29 @@ def relay_sni_cmd(
 @route_app.command("add")
 def route_add_cmd(
     exit: str = typer.Argument(..., help="Exit ID, saved server name, or IP"),
-    values: list[str] = typer.Argument(
-        ..., metavar="VALUE", help="Domains, geosite:NAME, or geoip:NAME (one kind per route)"
+    values: list[str] | None = typer.Argument(
+        None, metavar="VALUE", help="Domains, geosite:NAME, or geoip:NAME (one kind per route)"
     ),
-    via: str = typer.Option(..., "--via", help="warp, direct, or block"),
-    name: str = typer.Option("", "--name", help="Route ID (default: the --via value, numbered)"),
+    via: str = typer.Option("", "--via", help="warp, direct, or block (default for --preset: warp)"),
+    preset: str = typer.Option("", "--preset", help="A named destination set instead of VALUEs: ai"),
+    name: str = typer.Option("", "--name", help="Route ID (default: the preset, or the --via value, numbered)"),
     _json: Json = False,
 ) -> None:
     """Send matching destinations through WARP, directly, or nowhere
 
     Overrides apply on the exit, ahead of its default egress, in the order
     they were added. Using --via warp sets up WARP on the exit if needed.
+    --preset ai sends AI services (ChatGPT, Claude, Gemini, Cursor, ...)
+    through WARP instead of the exit's hosting address, which some refuse.
 
     [dim]Examples:[/dim]
+      [cyan]meridian route add exit-1 --preset ai[/cyan]
       [cyan]meridian route add exit-1 --via warp netflix.com chatgpt.com[/cyan]
       [cyan]meridian route add exit-1 --via block geosite:category-ads-all[/cyan]
     """
     from meridian.commands.route import run_add
 
-    run_add(exit, values, via, name)
+    run_add(exit, values or [], via, name, preset=preset)
 
 
 @route_app.command("list")
@@ -306,12 +445,12 @@ def node_add_cmd(
     """Add an exit server to the fleet
 
     Connects via SSH, adds the server as an exit in your topology, and
-    applies the reviewed plan (hardening, Docker, Xray, panel registration).
+    applies the reviewed plan (hardening, firewall, the node agent and Xray).
 
     [dim]Examples:[/dim]
       [cyan]meridian node add 198.51.100.10[/cyan]
       [cyan]meridian node add 198.51.100.10 --name finland --sni www.google.com[/cyan]
-      [cyan]meridian node add 198.51.100.10 --domain proxy.example.com --yes[/cyan]
+      [cyan]meridian node add 198.51.100.10 --domain vpn.example.com --yes[/cyan]
       [cyan]meridian node add 198.51.100.10 --sni de.example.com --self-steal[/cyan]   Your own domain
       [cyan]meridian node add 198.51.100.10 --country NL[/cyan]   Registry says otherwise
     """
@@ -349,6 +488,7 @@ def node_replace_cmd(
     user: User = "",
     ssh_port: SshPort = 0,
     yes: Yes = False,
+    forget_unreachable: ForgetUnreachable = False,
 ) -> None:
     """Move an exit to another server
 
@@ -363,7 +503,7 @@ def node_replace_cmd(
     """
     from meridian.commands.node_replace import run_replace
 
-    run_replace(old, new, name=name, user=user, ssh_port=ssh_port, yes=yes)
+    run_replace(old, new, name=name, user=user, ssh_port=ssh_port, yes=yes, forget_unreachable=forget_unreachable)
 
 
 @node_app.command("sni")
@@ -402,6 +542,7 @@ def node_remove_cmd(
     node: str = typer.Argument(..., help="Node IP or name"),
     yes: Yes = False,
     force: bool = typer.Option(False, "--force", help="Also remove relay chains that route to this exit"),
+    forget_unreachable: ForgetUnreachable = False,
 ) -> None:
     """Remove an exit or routing gateway from the fleet
 
@@ -416,7 +557,7 @@ def node_remove_cmd(
     """
     from meridian.commands.node import run_remove
 
-    run_remove(node, yes=yes, force=force)
+    run_remove(node, yes=yes, force=force, forget_unreachable=forget_unreachable)
 
 
 @fleet_app.command("status")
@@ -441,24 +582,87 @@ def fleet_inventory_cmd(
     run_inventory()
 
 
+@fleet_app.command("export")
+def fleet_export_cmd(
+    _json: Json = False,
+) -> None:
+    """Print the fleet's topology as a YAML file you can edit
+
+    Lists exits, protocol paths, relays, gateways, pools, rules, clients, and
+    settings, with saved server names instead of IDs. Reality keys,
+    credentials, and transport paths stay in Meridian.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian fleet export > fleet.yml[/cyan]
+    """
+    from meridian.commands.fleet_transfer import run_export
+
+    run_export()
+
+
+@fleet_app.command("import")
+def fleet_import_cmd(
+    file: str = typer.Argument(..., metavar="FILE", help="Fleet file from `meridian fleet export`, or - for stdin"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show the changes and the review, apply nothing"),
+    yes: Yes = False,
+    forget_unreachable: ForgetUnreachable = False,
+    _json: Json = False,
+) -> None:
+    """Apply an edited fleet file
+
+    Shows what the file adds, changes, and removes, plus every resource the
+    change deletes, then applies exactly that review. Clients removed from the
+    file are removed as with `client remove`.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian fleet import fleet.yml[/cyan]
+      [cyan]meridian fleet import fleet.yml --dry-run[/cyan]
+      [cyan]meridian fleet import fleet.yml --yes --json[/cyan]
+    """
+    from meridian.commands.fleet_transfer import run_import
+
+    run_import(file, dry_run=dry_run, yes=yes, forget_unreachable=forget_unreachable)
+
+
+@fleet_app.command("history")
+def fleet_history_cmd(
+    _json: Json = False,
+) -> None:
+    """List the reviewed applies the control service recorded"""
+    from meridian.commands.fleet_history import run_history
+
+    run_history()
+
+
+@fleet_app.command("events", rich_help_panel="Activity")
+def fleet_events_cmd(
+    since: str = typer.Option("0", "--since", metavar="ID", help="Read events after this cursor"),
+    limit: str = typer.Option("100", "--limit", metavar="N", help="Events to return, 1–2000"),
+    _json: Json = False,
+) -> None:
+    """Read local lifecycle and node outage events, oldest first after the cursor"""
+    from meridian.commands.fleet_events import run_events
+
+    run_events(since=since, limit=limit)
+
+
 @fleet_app.command("upgrade")
 def fleet_upgrade_cmd(
     yes: Yes = False,
     tested: bool = typer.Option(
         False,
         "--tested",
-        help="Ask neither Docker Hub nor GitHub: Remnawave returns to the tested versions, an upgraded Realm stays",
+        help="Skip GitHub: Realm stays on the tested version or what you already upgraded to",
     ),
 ) -> None:
-    """Upgrade Remnawave and Realm to their newest releases in the tested major
+    """Bring the control service, node agents, and Realm up to date
 
-    Finds the newest backend, node, and subscription page releases on Docker
-    Hub within the major this Meridian release supports (no Meridian update
-    needed), and with relays the newest Realm on GitHub, pinned by the sha256
-    GitHub publishes. Shows what each server runs, applies the reviewed plan,
-    then runs `meridian check`. Newer or floating tags you chose are kept;
-    PostgreSQL and Valkey stay on Meridian's pins, and a PostgreSQL major is
-    never moved.
+    The control service and every node agent move to the versions this
+    Meridian installs (run `meridian update` first for newer ones); agents
+    upgrade in place and keep their identity. With relays, Realm moves to the
+    newest release in the tested major on GitHub, pinned by the sha256 GitHub
+    publishes. Shows what each server runs, applies the reviewed plan, then
+    runs `meridian check`.
 
     [dim]Examples:[/dim]
       [cyan]meridian fleet upgrade[/cyan]

@@ -1,0 +1,138 @@
+---
+/**
+ * Screenshots of both website demos, each linking to the live, clickable version.
+ * Images come from scripts/showcase_screenshots.py; the People shot follows the site theme.
+ */
+import { landingT, type Locale } from '../i18n';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = landingT(locale);
+const img = (name: string) => `/img/showcase/${name}.webp`;
+const page = `/demo/?lang=${locale}`;
+const console = `/demo/console/?lang=${locale}`;
+const more = [
+  { name: 'console-person', route: '#/people/Luma', caption: t('showcase.person') },
+  { name: 'console-servers', route: '#/servers', caption: t('showcase.servers') },
+  { name: 'console-settings', route: '#/settings', caption: t('showcase.settings') },
+];
+---
+
+<div class="showcase">
+  <figure class="showcase__card card">
+    <a href={page} class="showcase__shot showcase__shot--phone" tabindex="-1" aria-hidden="true">
+      <img src={img('connection-page-phone')} alt={t('showcase.page.alt')} width="780" height="1328" loading="lazy" decoding="async" />
+    </a>
+    <figcaption class="showcase__text">
+      <h3>{t('showcase.page.title')}</h3>
+      <p>{t('showcase.page.text')}</p>
+      <a href={page} class="btn btn--primary">{t('showcase.page.try')}</a>
+    </figcaption>
+  </figure>
+  <figure class="showcase__card card">
+    <a href={console} class="showcase__shot" tabindex="-1" aria-hidden="true">
+      <img class="showcase__light" src={img('console-people')} alt={t('showcase.console.alt')} width="1600" height="1075" loading="lazy" decoding="async" />
+      <img class="showcase__dark" src={img('console-people-dark')} alt={t('showcase.console.alt')} width="1600" height="1075" loading="lazy" decoding="async" />
+    </a>
+    <figcaption class="showcase__text">
+      <h3>{t('showcase.console.title')}</h3>
+      <p>{t('showcase.console.text')}</p>
+      <a href={console} class="btn btn--primary">{t('showcase.console.try')}</a>
+    </figcaption>
+  </figure>
+</div>
+<ul class="showcase__more">
+  {more.map((shot) => (
+    <li>
+      <a href={console + shot.route} class="showcase__link">
+        <span class="showcase__shot"><img src={img(shot.name)} alt="" width="1600" height="1075" loading="lazy" decoding="async" /></span>
+        <p>{shot.caption}</p>
+      </a>
+    </li>
+  ))}
+</ul>
+
+<style>
+  .showcase {
+    display: grid;
+    gap: 24px;
+  }
+  .showcase__card {
+    display: grid;
+    gap: 20px;
+    margin: 0;
+    padding: 20px;
+    align-content: start;
+  }
+  .showcase__shot {
+    display: block;
+    overflow: hidden;
+    border: 1px solid var(--b1);
+    border-radius: var(--r2);
+    box-shadow: var(--shadow-md);
+  }
+  .showcase__shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .showcase__shot--phone {
+    max-width: 300px;
+    justify-self: center;
+    border-radius: 28px;
+  }
+  .showcase__text h3 {
+    margin: 0 0 6px;
+  }
+  .showcase__text p {
+    margin: 0 0 16px;
+    color: var(--t2);
+  }
+  /* The People shot follows the reader's theme: the system's, unless they chose one. */
+  .showcase__dark {
+    display: none !important;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .showcase__light {
+      display: none !important;
+    }
+    :root:not([data-theme='light']) .showcase__dark {
+      display: block !important;
+    }
+  }
+  :root[data-theme='dark'] .showcase__light {
+    display: none !important;
+  }
+  :root[data-theme='dark'] .showcase__dark {
+    display: block !important;
+  }
+  .showcase__more {
+    display: grid;
+    gap: 24px;
+    margin: 32px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .showcase__link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+  }
+  .showcase__more p {
+    margin: 10px 0 0;
+    font-size: 0.94rem;
+    color: var(--t2);
+  }
+  @media (min-width: 860px) {
+    .showcase {
+      grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+      align-items: start;
+    }
+    .showcase__more {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+</style>

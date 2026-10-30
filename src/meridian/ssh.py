@@ -2,7 +2,7 @@
 
 This module is a pure transport layer with no Rich/console dependency.
 All user-facing output goes through an optional ``SSHUI`` callback
-protocol so that CLI callers get Rich output while Engine/headless
+protocol so that CLI callers get Rich output while headless
 callers stay dependency-free.
 """
 
@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-from meridian.config import MERIDIAN_HOME
+from meridian import config
 from meridian.core.errors import MeridianError
 from meridian.core.redaction import redact_string
 from meridian.i18n import t
@@ -100,7 +100,7 @@ _KEEPALIVE_OPTS = ["-o", "ServerAliveInterval=5", "-o", "ServerAliveCountMax=3"]
 def control_path(user: str, host: str, port: int) -> Path | None:
     """The ControlMaster socket for one target, or None if the path cannot fit."""
     digest = hashlib.sha256(f"{user}@{host}:{port}".encode()).hexdigest()[:12]
-    path = MERIDIAN_HOME / "ssh" / digest
+    path = config.INSTALL_HOME / "ssh" / digest
     if len(os.fsencode(path)) > _MAX_CONTROL_PATH:
         return None
     return path

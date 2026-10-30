@@ -1,28 +1,251 @@
 {
   "$defs": {
+    "ClientConnection": {
+      "additionalProperties": false,
+      "description": "One canonical subscription entry; URI and QR are credentials, never passive output.",
+      "properties": {
+        "available": {
+          "title": "Available",
+          "type": "boolean"
+        },
+        "protocol": {
+          "anyOf": [
+            {
+              "enum": [
+                "reality",
+                "xhttp",
+                "wss",
+                "hysteria2"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Null for an inert availability or status notice.",
+          "title": "Protocol"
+        },
+        "qr_svg": {
+          "default": "",
+          "description": "Local SVG data URI in an owner-console share view.",
+          "title": "Qr Svg",
+          "type": "string"
+        },
+        "remark": {
+          "title": "Remark",
+          "type": "string"
+        },
+        "uri": {
+          "title": "Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "remark",
+        "protocol",
+        "available",
+        "uri"
+      ],
+      "title": "ClientConnection",
+      "type": "object"
+    },
+    "ClientConnections": {
+      "additionalProperties": false,
+      "description": "Producing handoff view, shared by the API, console, and explicit CLI inspection.",
+      "properties": {
+        "connections": {
+          "items": {
+            "$ref": "#/$defs/ClientConnection"
+          },
+          "title": "Connections",
+          "type": "array"
+        },
+        "formats": {
+          "items": {
+            "$ref": "#/$defs/SubscriptionFormatUrl"
+          },
+          "title": "Formats",
+          "type": "array"
+        },
+        "profile_title": {
+          "title": "Profile Title",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "disabled",
+            "limited",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "subscription_url": {
+          "title": "Subscription Url",
+          "type": "string"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "status",
+        "profile_title",
+        "subscription_url"
+      ],
+      "title": "ClientConnections",
+      "type": "object"
+    },
     "ClientDetail": {
       "additionalProperties": false,
       "description": "Client metadata for a detail view.",
       "properties": {
+        "attention_reasons": {
+          "description": "Derived reasons when client list --attention was requested; never stored.",
+          "items": {
+            "enum": [
+              "expiring",
+              "quota",
+              "unused"
+            ],
+            "type": "string"
+          },
+          "title": "Attention Reasons",
+          "type": "array"
+        },
         "created_at": {
           "title": "Created At",
           "type": "string"
+        },
+        "declared": {
+          "default": true,
+          "description": "False for a person added in the control service's web console rather than the fleet's reviewed intent; the CLI reads them, and the console manages them.",
+          "title": "Declared",
+          "type": "boolean"
+        },
+        "device_limit": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "None uses the fleet's default cap.",
+          "title": "Device Limit"
+        },
+        "expires_at": {
+          "description": "UTC timestamp; empty means never.",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "first_traffic_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the service first accepted traffic growth; unknown for historical use.",
+          "title": "First Traffic At"
         },
         "id": {
           "title": "Id",
           "type": "string"
         },
+        "language": {
+          "anyOf": [
+            {
+              "enum": [
+                "en",
+                "ru",
+                "fa",
+                "zh"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Subscription status language; null uses the fleet default.",
+          "title": "Language"
+        },
         "last_seen": {
           "title": "Last Seen",
+          "type": "string"
+        },
+        "last_traffic_node": {
+          "anyOf": [
+            {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The node whose latest accepted growth set the user's last traffic time.",
+          "title": "Last Traffic Node"
+        },
+        "lifetime_traffic_bytes": {
+          "default": 0,
+          "description": "Lifetime use, unaffected by traffic resets.",
+          "minimum": 0,
+          "title": "Lifetime Traffic Bytes",
+          "type": "integer"
+        },
+        "note": {
+          "default": "",
+          "description": "Private operator note; people/admin only.",
+          "maxLength": 500,
+          "title": "Note",
           "type": "string"
         },
         "status": {
           "title": "Status",
           "type": "string"
         },
+        "tag": {
+          "default": "",
+          "description": "Private operator tag; people/admin only.",
+          "pattern": "^[A-Z0-9_]{0,16}$",
+          "title": "Tag",
+          "type": "string"
+        },
         "traffic_limit_bytes": {
+          "description": "0 means unlimited.",
           "title": "Traffic Limit Bytes",
           "type": "integer"
+        },
+        "traffic_reset": {
+          "description": "When used traffic starts again from zero: never, day, week, month, or the panel-only month_rolling (monthly from the day the client was created).",
+          "title": "Traffic Reset",
+          "type": "string"
+        },
+        "traffic_reset_at": {
+          "default": "",
+          "description": "UTC start of the current traffic period; empty if unknown.",
+          "title": "Traffic Reset At",
+          "type": "string"
         },
         "traffic_used_bytes": {
           "title": "Traffic Used Bytes",
@@ -39,6 +262,8 @@
         "status",
         "traffic_used_bytes",
         "traffic_limit_bytes",
+        "traffic_reset",
+        "expires_at",
         "created_at",
         "last_seen"
       ],
@@ -74,6 +299,98 @@
       ],
       "title": "ClientHandoff",
       "type": "object"
+    },
+    "SubscriptionFormatUrl": {
+      "additionalProperties": false,
+      "description": "A credential-bearing URL for a format the control service already serves.",
+      "properties": {
+        "format": {
+          "enum": [
+            "xray-json",
+            "mihomo",
+            "singbox"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "format",
+        "url"
+      ],
+      "title": "SubscriptionFormatUrl",
+      "type": "object"
+    },
+    "UserTrafficDay": {
+      "additionalProperties": false,
+      "properties": {
+        "day": {
+          "format": "date",
+          "title": "Day",
+          "type": "string"
+        },
+        "downlink_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Downlink Bytes",
+          "type": "integer"
+        },
+        "uplink_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Uplink Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "day",
+        "uplink_bytes",
+        "downlink_bytes"
+      ],
+      "title": "UserTrafficDay",
+      "type": "object"
+    },
+    "UserUsage": {
+      "additionalProperties": false,
+      "description": "UTC days, oldest first, including zero-use days; never reconstructed from lifetime totals.",
+      "properties": {
+        "daily": {
+          "items": {
+            "$ref": "#/$defs/UserTrafficDay"
+          },
+          "title": "Daily",
+          "type": "array"
+        },
+        "days": {
+          "description": "Days returned, including today; at most the retention cap.",
+          "maximum": 730,
+          "minimum": 1,
+          "title": "Days",
+          "type": "integer"
+        },
+        "history_days": {
+          "maximum": 730,
+          "minimum": 7,
+          "title": "History Days",
+          "type": "integer"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "days",
+        "history_days",
+        "daily"
+      ],
+      "title": "UserUsage",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -82,8 +399,32 @@
     "client": {
       "$ref": "#/$defs/ClientDetail"
     },
+    "connections": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ClientConnections"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Only requested by --connections."
+    },
     "handoff": {
       "$ref": "#/$defs/ClientHandoff"
+    },
+    "usage": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UserUsage"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The last seven UTC days, absent while daily history is off."
     }
   },
   "required": [

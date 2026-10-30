@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import email.utils
-import math
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -29,10 +28,10 @@ from meridian.diagnostics.external import (
 from meridian.health import tcp_connect
 from meridian.remnawave import (
     XRAY_JSON_CLIENT_TYPE,
-    MeridianPanel,
     RemnawaveAuthError,
     RemnawaveError,
     RemnawaveNetworkError,
+    SubscriptionDocument,
     User,
 )
 from meridian.verification import (
@@ -56,7 +55,18 @@ from meridian.xray_client import (
     use_free_local_ports,
 )
 
-PanelFactory = Callable[[str, str, float], MeridianPanel]
+
+class VerificationPanel(Protocol):
+    """What client verification reads from the control backend."""
+
+    def __enter__(self) -> VerificationPanel: ...
+    def __exit__(self, *args: Any) -> None: ...
+    def get_user(self, username: str) -> User | None: ...
+    def list_users(self) -> list[User]: ...
+    def fetch_subscription(self, short_uuid: str, *, client_type: str = "") -> SubscriptionDocument: ...
+
+
+PanelFactory = Callable[[str, str, float], VerificationPanel]
 EndpointProbe = Callable[[str, int, float], bool]
 
 
@@ -78,9 +88,11 @@ class ConnectionTester(Protocol):
     ) -> ConnectionAttempt: ...
 
 
-def create_verification_panel(url: str, token: str, timeout: float) -> MeridianPanel:
-    """Create a single-attempt panel client bounded by the verification timeout."""
-    return MeridianPanel(url, token, timeout=max(1, math.ceil(timeout)), max_retries=1)
+def _service_panel(url: str, token: str, timeout: float) -> VerificationPanel:
+    """The control service's client, the fleet's only control backend."""
+    from meridian.control_access import ServiceAccessPanel
+
+    return ServiceAccessPanel(url, token, timeout)
 
 
 @dataclass(frozen=True)
@@ -161,7 +173,7 @@ def collect_connectivity_checks(
     client: str = "",
     basic: bool = False,
     timeout: float = 5,
-    panel_factory: PanelFactory = create_verification_panel,
+    panel_factory: PanelFactory | None = None,
     xray_provider: XrayProvider = ensure_xray_binary,
     connection_tester: ConnectionTester = test_connection,
 ) -> ConnectivityChecks:
@@ -221,7 +233,7 @@ def collect_connectivity_checks(
         target_ip,
         requested_client=client,
         timeout=timeout,
-        panel_factory=panel_factory,
+        panel_factory=panel_factory or _service_panel,
         xray_provider=xray_provider,
         connection_tester=connection_tester,
     )
@@ -470,7 +482,7 @@ def _run_canonical_subscription(
                         code="SUBSCRIPTION_INVALID",
                         status="failed",
                         message=str(exc),
-                        remediation="Repair the Remnawave subscription template and host bindings.",
+                        remediation="Run meridian apply to republish the fleet's client endpoints.",
                     )
                 ],
             )
@@ -507,7 +519,7 @@ def _run_canonical_subscription(
                         code="UNSUPPORTED_OUTBOUND",
                         status="failed",
                         message="Unsupported canonical outbound(s): " + ", ".join(unsupported),
-                        remediation="Update Meridian/Remnawave or remove unsupported delivered protocols.",
+                        remediation="Update Meridian or remove unsupported delivered protocols.",
                     )
                 ],
             )
@@ -703,7 +715,7 @@ def _classify_attempt(
     )
 
 
-def select_active_client(panel: MeridianPanel, cluster: ClusterConfig, requested_client: str) -> User | None:
+def select_active_client(panel: VerificationPanel, cluster: ClusterConfig, requested_client: str) -> User | None:
     """Choose a deterministic active user with a usable canonical subscription."""
     intent = cluster.topology_intent
     if requested_client:

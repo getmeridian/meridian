@@ -1,0 +1,17 @@
+{
+  "additionalProperties": false,
+  "description": "Add whole days after the later of now and the person's current expiry.",
+  "properties": {
+    "days": {
+      "maximum": 3650,
+      "minimum": 1,
+      "title": "Days",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "days"
+  ],
+  "title": "ClientExtendRequest",
+  "type": "object"
+}

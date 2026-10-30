@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import getpass
 import re
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -181,6 +182,29 @@ def fail(
 def line() -> None:
     dash = "\u2500"
     err_console.print(f"  [dim]{dash * 41}[/dim]")
+
+
+BANNER_INTERVAL_SECONDS = 20 * 3600
+
+
+def banner_due(version: str) -> bool:
+    """The banner shows once a day per version, so a session of commands is not prefixed by it every time."""
+    from meridian import config
+
+    marker = config.CACHE_DIR / "banner_shown"
+    stamp = f"{version} {int(time.time())}"
+    try:
+        shown_version, _, shown_at = marker.read_text().strip().partition(" ")
+        if shown_version == version and time.time() - int(shown_at) < BANNER_INTERVAL_SECONDS:
+            return False
+    except (OSError, ValueError):
+        pass
+    try:
+        config.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        marker.write_text(stamp)
+    except OSError:
+        pass  # an unwritable cache only means the banner shows again next time
+    return True
 
 
 def banner(version: str) -> None:

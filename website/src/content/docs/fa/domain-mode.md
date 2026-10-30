@@ -14,7 +14,7 @@ meridian deploy 198.51.100.10 --domain vpn.example.com
 - **XHTTP** به دامنه شما منتقل می‌شود و **WSS** هم همان‌جا اضافه می‌شود، با یک certificate Let's Encrypt که Meridian صادر و تجدید می‌کند (acme.sh)
 - هنگامی که دامنه از طریق Cloudflare proxied می‌شود، هر دو مسیر از طریق CDN Cloudflare می‌رود — بنابراین حتی اگر IP سرور شما مسدود شود کار می‌کنند
 
-پنل و صفحات اتصال روی certificate IP سرور باقی می‌مانند؛ دامنه تنها مسیرهای proxy را حمل می‌کند.
+سرویس کنترل، پنل وب و صفحات اتصال روی گواهی IP سرور باقی می‌مانند؛ دامنه تنها مسیرهای VPN را حمل می‌کند.
 
 Hysteria2 روی UDP/443 هم به certificate دامنه می‌رود (ببینید [Hysteria2 و Cloudflare](#hysteria2-و-cloudflare))؛ `--no-hysteria2` آن را خاموش می‌کند.
 

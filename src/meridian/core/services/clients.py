@@ -7,7 +7,10 @@ from typing import Protocol, Self
 
 from pydantic import Field
 
+from meridian.control.models import UserUsage
+from meridian.core.attention import AttentionList
 from meridian.core.clients import (
+    ClientConnections,
     ClientListResult,
     ClientShowResult,
     PanelUserLike,
@@ -59,14 +62,21 @@ def collect_client_list(
     panel_client: ClientPanelClient,
     *,
     allowed_usernames: Collection[str] | None = None,
+    declared_usernames: Collection[str] | None = None,
+    read_attention: Callable[[], AttentionList] | None = None,
+    tag: str | None = None,
 ) -> ClientListServiceResult:
-    """Collect redacted client list data from the panel."""
+    """Collect redacted client list data from the panel; `declared_usernames` marks the rest undeclared."""
     with panel_client as panel:
         users = panel.list_users()
+        attention = {person.username: person.reasons for person in read_attention().people} if read_attention else None
     if allowed_usernames is not None:
         allowed = set(allowed_usernames)
         users = [user for user in users if user.username in allowed]
-    return ClientListServiceResult(clients=build_client_list_result(users))
+    if tag is not None:
+        users = [user for user in users if getattr(user, "tag", "") == tag]
+    declared = None if declared_usernames is None else set(declared_usernames)
+    return ClientListServiceResult(clients=build_client_list_result(users, declared=declared, attention=attention))
 
 
 def collect_client_show(
@@ -76,6 +86,9 @@ def collect_client_show(
     build_share_url: ShareUrlBuilder | None = None,
     build_subscription_url: SubscriptionUrlBuilder | None = None,
     allowed_usernames: Collection[str] | None = None,
+    declared_usernames: Collection[str] | None = None,
+    read_usage: Callable[[str], UserUsage | None] | None = None,
+    read_connections: Callable[[str], ClientConnections] | None = None,
 ) -> ClientShowServiceResult:
     """Collect one client plus deterministic handoff links."""
     if allowed_usernames is not None and username not in allowed_usernames:
@@ -86,8 +99,17 @@ def collect_client_show(
             raise ClientNotFoundError(username)
         share_url = build_share_url(user) if build_share_url else ""
         subscription_url = build_subscription_url(user.short_uuid) if build_subscription_url and user.short_uuid else ""
+        usage = read_usage(username) if read_usage else None
+        connections = read_connections(username) if read_connections else None
     return ClientShowServiceResult(
-        client=build_client_show_result(user, share_url=share_url, subscription_url=subscription_url),
+        client=build_client_show_result(
+            user,
+            share_url=share_url,
+            subscription_url=subscription_url,
+            declared=declared_usernames is None or username in declared_usernames,
+            usage=usage,
+            connections=connections,
+        ),
         share_url=share_url,
         subscription_url=subscription_url,
     )

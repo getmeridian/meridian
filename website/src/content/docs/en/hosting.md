@@ -10,9 +10,13 @@ You rent two kinds of servers, and they have different needs:
 - **Exit**: carries all traffic to the open internet. It should be outside the censored country.
 - **Relay**: a small TCP forwarder in front of an exit, see [Relay nodes](/en/relay/). It needs a clean address that users can reach, and little else.
 
+## Why small private fleets survive longer
+
+Large VPN services are blocked by their traffic signatures and by the subnets they use. Small private fleets often last longer: they have few users, attract less attention, and, with a suitable Reality camouflage target, look like ordinary HTTPS sites. A block on the hosting subnet can still take down every address in it.
+
 ## What to look at
 
-**Address and network reputation.** Censors can block or throttle a single IP, a subnet, or everything from one hosting network. Large, well-known hosting networks are the most likely to be blocked wholesale, and deployers in Russia report that blocks sometimes take down neighboring customers who never ran a proxy. A smaller host in a less obvious location often lasts longer, but a host that everyone recommends stops being obscure. You can't know ahead of time, so test (below). Mobile networks are stricter than home connections: the same IP can work on a home line and fail on every mobile operator.
+**Address and network reputation.** Censors can block or throttle a single IP, a subnet, or everything from one hosting network. A September 2026 wave in Russia blocked whole hosting subnets, including neighboring customers who never ran a VPN. A bad neighbor can make your address unusable too. A smaller host in a less obvious location often lasts longer, but a host that everyone recommends stops being obscure. Test the actual address; a provider's name is not enough. Mobile networks are stricter than home connections: the same IP can work on a home line and fail on every mobile operator.
 
 **Location and latency.** Pick a country with good routing to your users, close enough for low latency. Measure from the users' own network, not from your laptop abroad. Use `meridian check` before you deploy to see how the server reaches its camouflage target.
 
@@ -26,21 +30,37 @@ You rent two kinds of servers, and they have different needs:
 
 ## Test the IP before you pay a lot
 
-1. Rent the smallest plan with **hourly billing**, or one with a refund window.
+1. Ask for a test address **before paying**. If that is unavailable, rent the smallest plan with **hourly billing** or a refund window and test as soon as you receive it.
 2. Run `meridian check IP` for the pre-flight checks: camouflage target, port 443, outside reachability, OS, disk, and clock.
 3. Deploy, then run `meridian test` and `meridian test --probe` **from inside the network your users are on**, on both a home connection and a mobile one. `--probe` also reports whether the server IP or the camouflage SNI looks blocked. Results from outside the censored network prove very little.
-4. Leave it running for a few days and test again. Some addresses work at first and get throttled later.
-5. If it fails, delete the server and rent another address, then test again. Hourly billing makes this cheap.
+4. Compare a small HTTPS page with a download larger than **32 KB from the same server**. On a burned subnet, TLS can complete normally and a small page can load, while a larger transfer stalls after roughly **16 KB**. A successful handshake or ping does not rule this out. Use a provider's test page before buying, or test your deployed server immediately afterward.
+5. Leave it running for a few days and test again. Some addresses work at first and get throttled later.
+6. If it fails, try a different subnet or provider and repeat the tests. Another address in the same burned subnet may fail in exactly the same way.
+
+Public multi-city ping services can help check reachability from inside Russia. The service learns the address you test, and ping cannot prove that TLS transfers work. Submit the address directly to the test service; never paste your server IP into public chats.
 
 When a server stops working after it was fine, see [IP blocked recovery](/en/recovery/).
 
+## Hosting reports: October 2026
+
+**Reported in October 2026; this changes fast.** These are field reports, not endorsements or guarantees for every address a provider sells. Test your own IP on your users' networks.
+
+| Use | Reports |
+|-----|---------|
+| Exits reported reachable | **Webdock**, **noez**, **FirstVDS Netherlands**. noez was reported clean, but a bad neighbor can still burn its subnet. |
+| Exits reported burned or risky | **DigitalOcean**: the roughly 16 KB TLS block. **gcore Almaty**: addresses already banned when allocated. **Yandex Cloud**: addresses often already blocked. |
+| Russian relay candidates in use | **cloud.ru**, **Selectel**, **RUVDS**, **JustHost**, **FirstVDS**, **VDSina**, **Timeweb**. Availability under mobile whitelists depends on the particular subnet and operator. |
+| Kazakhstan candidates in use | **hoster.kz**, **Selectel**. Check routes from your users and from any relay separately. |
+
 ## Where not to put an exit
 
-An exit inside Russia is fragile. The host operates under local rules, can see and act on your server, and reports from Russian hosts describe identity verification and takedowns of proxy servers. Keep exits abroad. Use a domestic server only as a relay, which forwards encrypted bytes and runs no proxy software.
+An exit inside Russia is fragile. The host operates under local rules, can see and act on your server, and reports from Russian hosts describe identity verification and takedowns of VPN servers. Keep exits abroad. Meridian's domestic relays are Realm port forwarders: they forward encrypted bytes and run no VPN software.
 
 ## Domestic relays carry risk
 
-A relay on a domestic host helps when foreign IPs are blocked, but the person who rents it carries the risk. It is rented in their name, under local law, and the host can ask for identity checks or end the service. The relay only forwards TCP that is encrypted end to end between the client and the exit, so the host sees connections to your exit's address and their volume, not the content. Abuse complaints about what users do online go to the exit's provider. This isn't legal advice: understand your local rules and your host's terms before you rent a relay for other people.
+A relay on a domestic host helps when foreign IPs are blocked, but the person who rents it carries the risk. It is rented in their name, under local law, and the host can ask for identity checks or end the service. The relay only forwards TCP that is encrypted end to end between the client and the exit, so the host sees client and exit addresses and traffic volume, not the content. Abuse complaints about what users do online go to the exit's provider.
+
+The “Antifraud 3.0” draft published on **1 October 2026** would require Russian hosters to identify clients and ask what their servers are for, and bar VPN hosters from Russian hosting for a year; the earliest proposed entry into force is **March 2028**.
 
 ## Don't depend on one path
 
@@ -54,4 +74,4 @@ Every client's subscription lists all of them, and apps that use the Xray JSON o
 
 ## Camouflage target
 
-The host's network also shapes the best camouflage target. Pick a popular site with TLS 1.3 that sits on a network that looks natural next to your server: `meridian scan` finds candidates in the server's own neighborhood. Don't choose `apple.com` or `icloud.com` (their networks don't match hosting providers), and don't choose `www.microsoft.com`: its certificate chain is too large for Reality, so the deploy converges but no traffic passes. See [Choosing a camouflage target](/en/deploy/#choosing-a-camouflage-target).
+The host's network also shapes the best camouflage target. Pick an ordinary site with TLS 1.3 and HTTP/2 that plausibly belongs next to your server: `meridian scan` finds candidates in the server's own neighborhood. Meridian refuses `apple.com` and `icloud.com` because their networks (ASNs) don't match VPS providers, and `www.microsoft.com` because its certificate chain is too large for Reality to pass traffic. Avoid conspicuous or novelty SNIs such as `max.ru`. See [Choosing a camouflage target](/en/deploy/#choosing-a-camouflage-target).

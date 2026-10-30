@@ -24,6 +24,8 @@ from meridian.compiler.deployment import (
 from meridian.compiler.errors import TopologyCompileError
 from meridian.compiler.firewalls import add_firewall, stable_token
 from meridian.compiler.gateway_compile import compile_routing_gateways
+from meridian.compiler.geodata import validate_geodata_lists
+from meridian.compiler.meridian_backend import to_meridian_backend, validate_meridian_backend
 from meridian.compiler.models import (
     COMPILER_VERSION,
     AccessUserPayload,
@@ -75,6 +77,9 @@ def compile_topology(
     """Compile complete setup intent without network, filesystem, or randomness."""
     reviewed_contract = deployment_contract if deployment_contract is not None else DeploymentContract()
     validate_deployment_contract(intent, reviewed_contract)
+    validate_geodata_lists(intent)
+    if intent.control.backend == "meridian":
+        validate_meridian_backend(intent)
     builder = PlanBuilder()
     ports = PortAllocator()
     baseline_ids = compile_server_baselines(builder, intent)
@@ -397,6 +402,8 @@ def compile_topology(
         "subscription:settings",
         SubscriptionSettingsPayload(
             profile_title=intent.delivery.profile_title,
+            update_interval_hours=intent.delivery.update_interval_hours,
+            client_routing=intent.delivery.client_routing,
         ),
         dependencies=[control_id],
     )
@@ -414,6 +421,8 @@ def compile_topology(
         forward_client_ips(builder, ports)
     assign_host_positions(builder, [exit_.id for exit_ in intent.exits_in_delivery_order()])
     attach_server_baselines(builder, baseline_ids)
+    if intent.control.backend == "meridian":
+        builder = to_meridian_backend(builder, intent)
     ordered = builder.ordered()
     intent_hash = canonical_hash(normalized_intent(intent))
     plan_hash = compute_plan_hash(

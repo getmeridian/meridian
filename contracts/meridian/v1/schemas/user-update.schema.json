@@ -1,0 +1,116 @@
+{
+  "additionalProperties": false,
+  "description": "A partial change: omitted fields keep their value; null clears expiry or selects the default device cap.",
+  "properties": {
+    "device_limit": {
+      "anyOf": [
+        {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Device Limit"
+    },
+    "expire_at": {
+      "anyOf": [
+        {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expire At"
+    },
+    "language": {
+      "anyOf": [
+        {
+          "enum": [
+            "en",
+            "ru",
+            "fa",
+            "zh"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Page/app language; null follows the fleet, omitted preserves the override.",
+      "title": "Language"
+    },
+    "note": {
+      "default": "",
+      "maxLength": 500,
+      "title": "Note",
+      "type": "string"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "enum": [
+            "active",
+            "disabled"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Status"
+    },
+    "tag": {
+      "default": "",
+      "pattern": "^[A-Z0-9_]{0,16}$",
+      "title": "Tag",
+      "type": "string"
+    },
+    "traffic_limit_bytes": {
+      "anyOf": [
+        {
+          "maximum": 9223372036854775807,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Traffic Limit Bytes"
+    },
+    "traffic_limit_strategy": {
+      "anyOf": [
+        {
+          "enum": [
+            "no_reset",
+            "day",
+            "week",
+            "month"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Traffic Limit Strategy"
+    }
+  },
+  "title": "UserUpdate",
+  "type": "object"
+}

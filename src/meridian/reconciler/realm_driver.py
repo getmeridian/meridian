@@ -21,6 +21,7 @@ from meridian.reconciler.resources import (
 )
 from meridian.reconciler.server_evidence import (
     build_observation,
+    content_mismatch,
     file_content_or_absent,
     port_is_listening,
     require_available_evidence,
@@ -109,6 +110,18 @@ class RealmHopDriver(retirement.RealmHopRetirement):
             satisfied.add("exists")
         if port_listening:
             satisfied.add("listening")
+        mismatches = [
+            reason
+            for reason in (
+                content_mismatch("the Realm configuration", config_content, expected_config),
+                content_mismatch("the Realm unit", unit_content, expected_unit),
+                "a pre-rename Realm unit remains" if legacy_unit is not None else "",
+                "" if service_active else f"{service} is not active",
+                "" if port_listening else f"nothing listens on port {payload.listen_port}",
+                "" if version_ok else f"Realm is not the pinned {expected_version}",
+            )
+            if reason
+        ]
         return build_observation(
             action,
             remote_id=service,
@@ -123,6 +136,7 @@ class RealmHopDriver(retirement.RealmHopRetirement):
                 "legacy_unit": legacy_unit is not None,
             },
             satisfied=satisfied,
+            mismatches=mismatches,
         )
 
     def apply(

@@ -16,13 +16,16 @@ Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
 - **Aesthetics are trust** — every surface is UI. CLI output, pages, error messages. In censored regions, polished = safe.
 
 ## Architecture (summary)
-
 - **CLI:** a Python package on PyPI (`meridian-vpn`) over a growing meridian-core contract layer.
-- **Server stack:** nginx (stream SNI routing, HTTP TLS, reverse proxy), acme.sh, Xray (VLESS+Reality, XHTTP, Hysteria2 over UDP), and Remnawave (panel, node, PostgreSQL, Valkey, subscription page), all pinned.
+- **Server stack:** nginx (stream SNI routing, HTTP TLS, reverse proxy), acme.sh, Xray (VLESS+Reality, XHTTP, Hysteria2 over UDP), Meridian's control service, and its node agent, all pinned; no Docker.
 - **Domain mode:** XHTTP moves onto the domain and WSS is added, both able to ride Cloudflare's CDN.
 - **Roles:** relays are L4 TCP forwarders (Realm); one server can hold several roles, such as relay and exit.
+- **Contexts:** one machine keeps several fleets (`meridian context`); the home is the `default` one, others live in `contexts/NAME/`, and the SSH key is shared.
 - **Plan and apply:** every fleet is a reviewed `topology_intent` in `cluster.yml`; `meridian plan` / `apply` compile it and reconcile resource drivers.
-- **Website and Studio:** Astro, with docs on Starlight (every page also served as Markdown for agents). Static Studio consumes generated contracts; executable Studio runs through a localhost-only Engine (`meridian studio`) for server onboarding, deploy dry-runs, and deploys.
+- **Control service (#95):** `meridian serve` (`ctld`) keeps users, traffic, revisions, and operator-owned privacy in SQLite (device limits and daily history default off), serves subscriptions and the owner's web console, and signs documents that each server's Rust agent (`netagent`) pulls over HTTPS; every change pulls an encrypted snapshot to the deployer (`meridian backup`, `restore`). `meridian migrate` moves a Remnawave fleet from an earlier beta onto it in place, keeping every link.
+- **Website:** Astro, with docs on Starlight (every page also served as Markdown for agents).
+- **Connection pages:** `ctld` serves every person's subscription URL as browser HTML or app configs, including console invitees; branding and exit countries travel through its settings, and shared PWA assets come from the installed package.
+- **Page language:** the service owns an automatic browser default or an explicit en/ru/fa/zh default, with nullable person overrides; a person's saved page choice wins, and automatic native status remarks stay English.
 - **Real-VM harness:** optional, local-only, in `tests/realvm/`.
 
 Full detail: [website/src/content/docs/en/architecture.md](website/src/content/docs/en/architecture.md).
@@ -33,7 +36,8 @@ Every folder with distinct architectural concerns has a `CLAUDE.md`. AI assistan
 
 **Format (applies to every file, root excepted):**
 - Section order: **Design decisions → What's done well → Pitfalls → (optional) Links**
-- ≤ 40 lines and roughly 700 words (leaf files). Root is the spine; longer is acceptable but resist bloat.
+- ≤ 40 lines and roughly 700 words (leaf files); the largest modules may reach about 1,000. Root is the spine; longer is acceptable but resist bloat.
+- Cut incident stories, counts, and lists the code already states; never cut a pitfall's cause to fit.
 - Pitfalls are one-line, concrete, actionable.
 - No duplication across files. Root has the big picture; folders have the details. Cross-reference by path.
 - No line numbers or function signatures (they drift with code).
@@ -45,6 +49,8 @@ CLAUDE.md                               — this file (vision, manifest, convent
 contracts/CLAUDE.md                     — generated meridian-core contract artifacts
 scripts/CLAUDE.md                       — repository automation and contract export
 .github/workflows/CLAUDE.md             — two-stage pipeline, VERSION-driven releases
+agent/CLAUDE.md                         — Rust node agent (netagent): contract, musl builds, upgrades, tests
+└── src/CLAUDE.md                       — agent runtime: identity, sessions, apply, Xray users, traffic, commands
 
 src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── core/CLAUDE.md                      — transport-neutral API contracts
@@ -53,9 +59,13 @@ src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── compiler/CLAUDE.md                  — pure finite topology compiler
 ├── reconciler/CLAUDE.md                — checkpointed compiled-resource drivers
 ├── provision/CLAUDE.md                 — step pipeline + idempotency
-├── remnawave/CLAUDE.md                 — typed panel adapter and image version policy
+├── remnawave/CLAUDE.md                 — migrate's read-only panel reader and shared user/node shapes
 ├── diagnostics/CLAUDE.md               — reusable health, blocking, and probe checks
-├── engine/CLAUDE.md                    — local Engine use-case boundary
+├── control/CLAUDE.md                   — `meridian serve`: signed node documents, users, subscriptions
+│   ├── formats/CLAUDE.md               — subscription documents: golden corpus, Xray JSON, Mihomo, Stash, sing-box
+│   └── ui/CLAUDE.md                    — owner's web console: vanilla JS, strict CSP, owner sign-in
+├── migrate/CLAUDE.md                   — hidden `meridian migrate`: Remnawave fleet onto the control service
+├── backup/CLAUDE.md                    — device keys, snapshot pulls after every change, restore
 ├── i18n/CLAUDE.md                      — CLI message catalog, language detection
 └── templates/pwa/CLAUDE.md             — PWA security model, vanilla JS rationale
 
@@ -72,7 +82,6 @@ website/CLAUDE.md                       — Astro + Starlight docs, agent endpoi
 ├── src/layouts/CLAUDE.md               — Base/BlogPost shells, early theme + locale
 ├── src/pages/CLAUDE.md                 — docs entry, Markdown twins, machine-readable endpoints
 ├── src/pages/blog/CLAUDE.md            — blog index, post route
-├── src/studio/CLAUDE.md                — generated Studio contracts and adapters
 └── src/styles/CLAUDE.md                — token system, warm light-first palette
 
 video/CLAUDE.md                         — Remotion setup walkthrough from recorded, sanitized footage
@@ -91,7 +100,8 @@ Updating is part of the change, not a separate task. In the SAME commit:
 When in doubt: shorter is better. A 30-line CLAUDE.md that's current beats a 100-line one that's half-stale.
 
 ## Conventions
-
+- **Owner contact**: public, owned by reviewed delivery intent; page and app links are chosen by the operator and open only on user action
+- **Private notes and tags**: operator-owned service data; scoped reads blank them below people/admin, and delivery, events, and logs never carry their contents
 - **Shell injection**: `shlex.quote()` on ALL `conn.run()` interpolated values
 - **Demo data**: RFC 5737 IPs (`198.51.100.x`), never real server IPs
 - **Privacy**: never reference real people's names, server IPs, or domains in commits, code, or docs unless asked
@@ -105,7 +115,7 @@ Rules enforced by `tests/test_architecture.py` — violations fail CI.
 
 - **800-line budget** — files above 800 lines require an entry in `FILE_SIZE_ALLOWLIST` in `test_architecture.py` with a justification. When a change pushes a file past the budget, split first.
 - **No private cross-module imports** — if `_foo()` is imported outside its own file, it's public. Drop the underscore and move it to the right module, or add it to the allowlist with a justification.
-- **Layer boundaries** — `core/` never imports commands, console, config, Typer, or Rich. `engine/` never imports commands, console, provision, remnawave, or ssh. `compiler/` never does I/O or randomness. `adapters/` never imports engine.
+- **Layer boundaries** — `core/` never imports commands, console, config, Typer, or Rich. `compiler/` never does I/O or randomness.
 - **One concept, one place** — before adding a new type, helper, or constant, search for an existing one. Duplicate port computations, result types, error hierarchies, and field sets were the top source of drift.
 - **Typed contracts at boundaries** — new result types must reference or compose existing core types. Don't reinvent `returncode, stdout, stderr`; use `CommandResult`. Don't hand-build dicts that match a Pydantic model; construct the model.
 

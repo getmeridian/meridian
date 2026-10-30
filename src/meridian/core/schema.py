@@ -2,10 +2,34 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, RootModel, create_model
+from pydantic import BaseModel, Field, RootModel
 
+from meridian.control.command_models import (
+    CutOffPlan,
+    NodeCommandOutcome,
+    NodeCommandRecord,
+    NodeCommandRequest,
+    NodeCommandTargets,
+    UserCutOffMutation,
+    UserCutOffRequest,
+)
+from meridian.control.models import (
+    IssuedToken,
+    PrivacySettings,
+    PrivacyState,
+    PrivacyUpdateResult,
+    RevisionList,
+    TokenCreate,
+    TokenList,
+    TokenRecord,
+    TrafficDailySummary,
+    UserUsage,
+)
+from meridian.control.models import (
+    NodeStatus as ServiceNodeStatus,
+)
 from meridian.core.apply import (
     ApplyCommandData,
     ApplyCounts,
@@ -13,14 +37,21 @@ from meridian.core.apply import (
     CompiledApplyPreview,
     CompiledApplyResult,
 )
+from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.cancellation import OperationCancellation
+from meridian.core.client_devices import ClientDevicesResult
+from meridian.core.client_limits import CalendarExpiryPreview, CalendarRenewalRequest, ClientExtendRequest
 from meridian.core.clients import (
     ClientAddResult,
+    ClientConnection,
+    ClientConnections,
+    ClientLimitsResult,
     ClientListResult,
     ClientReissueResult,
     ClientRemoveResult,
     ClientShowResult,
     ClientStatusResult,
+    SubscriptionFormatUrl,
 )
 from meridian.core.command_catalog import (
     CommandCatalogEntry,
@@ -40,9 +71,12 @@ from meridian.core.command_inputs import (
     ServerAddRequest,
     ServerRemoveRequest,
 )
+from meridian.core.contexts import ContextListResult, ContextSummary
 from meridian.core.deploy import DeployPlan, DeployPorts, DeployRequest, DeployResult
 from meridian.core.events import EVENT_TYPES
 from meridian.core.fleet import FleetInventory, FleetStatus, NodeListResult, RelayListResult
+from meridian.core.fleet_document import FleetExportResult, FleetImportResult, IntentChange
+from meridian.core.fleet_events import FleetEvent, FleetEventPage, FleetEventQuery
 from meridian.core.health import HealthCheckResult
 from meridian.core.models import (
     CoreModel,
@@ -53,18 +87,7 @@ from meridian.core.models import (
     OutputStatus,
     Summary,
 )
-from meridian.core.operations import (
-    DeployOperationResult,
-    OperationCancel,
-    OperationDiagnostics,
-    OperationEnvelope,
-    OperationError,
-    OperationEvents,
-    OperationList,
-    OperationResultEnvelope,
-    OperationSnapshot,
-    OperationStart,
-)
+from meridian.core.node_commands import NodeRestartRequest, NodeRestartResult
 from meridian.core.plan import (
     CompiledPlanDriftResult,
     CompiledPlanResourceResult,
@@ -73,15 +96,12 @@ from meridian.core.plan import (
 )
 from meridian.core.relay_check import RelayCheckResult
 from meridian.core.routes import RouteListResult, RouteMutationResult
+from meridian.core.schema_delivery import delivery_schemas
+from meridian.core.schema_delivery_service import service_delivery_schemas
+from meridian.core.schema_envelopes import make_command_envelope
+from meridian.core.schema_people import PEOPLE_SCHEMAS
+from meridian.core.schema_servers import SERVER_SCHEMAS, server_command_schemas
 from meridian.core.schema_topology import TOPOLOGY_SCHEMAS
-from meridian.core.servers import (
-    ServerBootstrapKeyRequest,
-    ServerBootstrapKeyResult,
-    ServerConnectionDraft,
-    ServerProfile,
-    ServerValidateRequest,
-    ServerValidateResult,
-)
 from meridian.core.verification import (
     FleetTestResult,
     ProbeResult,
@@ -94,7 +114,7 @@ from meridian.core.verification import (
     VerificationResult,
     VerificationTarget,
 )
-from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowCatalogEntry, WorkflowPlan
+from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowPlan
 
 
 class EmptyData(CoreModel):
@@ -166,11 +186,6 @@ class _ContractEnvelope(CoreModel):
     errors: list[ErrorModel]
 
 
-# ---------------------------------------------------------------------------
-# Envelope factory — replaces per-command copy-pasted envelope classes
-# ---------------------------------------------------------------------------
-
-
 def _make_command_envelope(
     prefix: str,
     command: str,
@@ -180,48 +195,16 @@ def _make_command_envelope(
     failure_data_type: Any = EmptyData,
     doc: str = "",
 ) -> tuple[type[_ContractEnvelope], type[_ContractEnvelope], type[RootModel]]:  # type: ignore[type-arg]
-    """Build (SuccessEnvelope, TerminalEnvelope, OutputEnvelope) for a command.
-
-    The generated models produce identical JSON Schemas to the hand-written
-    classes they replace — same ``$defs`` keys, same discriminator mapping.
-
-    Args:
-        prefix: PascalCase prefix for class names (e.g. ``"FleetStatus"``).
-        command: Literal command string (e.g. ``"fleet.status"``).
-        data_type: Pydantic model (or union of models) for the success ``data`` field.
-        success_statuses: Literal type for success status values.
-            Defaults to ``Literal["ok"]``.
-        failure_data_type: Pydantic model for the terminal ``data`` field.
-            Defaults to :class:`EmptyData`.
-        doc: Docstring for the root envelope model.
-    """
-    cmd_literal = Literal[command]  # type: ignore[valid-type]
-    if success_statuses is None:
-        success_statuses = Literal["ok"]
-    failed_status: Any = Literal["failed"]
-
-    success_cls = create_model(
-        f"_{prefix}SuccessEnvelope",
-        __base__=_ContractEnvelope,
-        command=(cmd_literal, ...),
-        status=(success_statuses, ...),
-        data=(data_type, ...),
-        errors=(list[ErrorModel], Field(max_length=0)),
+    """Use the shared factory with the catalog's base and empty failure-data model."""
+    return make_command_envelope(
+        prefix,
+        command,
+        data_type,
+        envelope_base=_ContractEnvelope,
+        success_statuses=success_statuses,
+        failure_data_type=failure_data_type,
+        doc=doc,
     )
-
-    terminal_cls = create_model(
-        f"_{prefix}TerminalEnvelope",
-        __base__=_ContractEnvelope,
-        command=(cmd_literal, ...),
-        status=(failed_status, ...),
-        data=(failure_data_type, ...),
-        errors=(list[ErrorModel], Field(min_length=1)),
-    )
-
-    union_type = Annotated[Union[success_cls, terminal_cls], Field(discriminator="status")]  # type: ignore[valid-type]
-    root_cls = type(f"{prefix}OutputEnvelope", (RootModel[union_type],), {"__doc__": doc})
-
-    return success_cls, terminal_cls, root_cls
 
 
 # --- Plan ---
@@ -356,6 +339,35 @@ _, _, FleetInventoryOutputEnvelope = _make_command_envelope(
     doc="Envelope schema for `meridian fleet inventory --json`.",
 )
 
+_, _, FleetExportOutputEnvelope = _make_command_envelope(
+    "FleetExport",
+    "fleet.export",
+    FleetExportResult,
+    doc="Envelope schema for `meridian fleet export --json`.",
+)
+
+_, _, FleetHistoryOutputEnvelope = _make_command_envelope(
+    "FleetHistory",
+    "fleet.history",
+    RevisionList,
+    doc="Envelope schema for `meridian fleet history --json`.",
+)
+
+_, _, FleetEventsOutputEnvelope = _make_command_envelope(
+    "FleetEvents",
+    "fleet.events",
+    FleetEventPage,
+    doc="Envelope schema for `meridian fleet events --json`.",
+)
+
+_, _, FleetImportOutputEnvelope = _make_command_envelope(
+    "FleetImport",
+    "fleet.import",
+    FleetImportResult,
+    success_statuses=Literal["ok", "changed", "no_changes"],
+    doc="Envelope schema for `meridian fleet import --json`.",
+)
+
 _, _, ClientListOutputEnvelope = _make_command_envelope(
     "ClientList",
     "client.list",
@@ -368,6 +380,35 @@ _, _, ClientShowOutputEnvelope = _make_command_envelope(
     "client.show",
     ClientShowResult,
     doc="Envelope schema for `meridian client show --json`.",
+)
+
+_, _, ClientUsageOutputEnvelope = _make_command_envelope(
+    "ClientUsage",
+    "client.usage",
+    UserUsage,
+    doc="Envelope schema for `meridian client usage --json`.",
+)
+
+_, _, PrivacyShowOutputEnvelope = _make_command_envelope(
+    "PrivacyShow",
+    "privacy.show",
+    PrivacyState,
+    doc="Envelope schema for `meridian privacy show --json`.",
+)
+
+_, _, PrivacySetOutputEnvelope = _make_command_envelope(
+    "PrivacySet",
+    "privacy.set",
+    PrivacyUpdateResult,
+    success_statuses=Literal["changed", "no_changes"],
+    doc="Envelope schema for `meridian privacy set --json`.",
+)
+
+_, _, FleetUsageOutputEnvelope = _make_command_envelope(
+    "FleetUsage",
+    "fleet.usage",
+    TrafficDailySummary,
+    doc="Envelope schema for `meridian fleet usage --json`.",
 )
 
 _, _, ClientAddOutputEnvelope = _make_command_envelope(
@@ -405,11 +446,46 @@ _, _, ClientDisableOutputEnvelope = _make_command_envelope(
     doc="Envelope schema for `meridian client disable --json`.",
 )
 
+_, _, ClientSetOutputEnvelope = _make_command_envelope(
+    "ClientSet",
+    "client.set",
+    ClientLimitsResult,
+    doc="Envelope schema for `meridian client set --json`.",
+)
+
+_, _, ClientResetTrafficOutputEnvelope = _make_command_envelope(
+    "ClientResetTraffic",
+    "client.reset-traffic",
+    ClientLimitsResult,
+    doc="Envelope schema for `meridian client reset-traffic --json`.",
+)
+
+_, _, ClientDevicesOutputEnvelope = _make_command_envelope(
+    "ClientDevices",
+    "client.devices",
+    ClientDevicesResult,
+    doc="Envelope schema for `meridian client devices --json`.",
+)
+
+_, _, ClientExtendOutputEnvelope = _make_command_envelope(
+    "ClientExtend",
+    "client.extend",
+    ClientLimitsResult,
+    doc="Envelope schema for `meridian client extend --json`.",
+)
+
 _, _, NodeListOutputEnvelope = _make_command_envelope(
     "NodeList",
     "node.list",
     NodeListResult,
     doc="Envelope schema for `meridian --json node list`.",
+)
+
+_, _, NodeRestartOutputEnvelope = _make_command_envelope(
+    "NodeRestart",
+    "node.restart",
+    NodeRestartResult,
+    doc="Envelope schema for `meridian node restart --json`.",
 )
 
 _, _, RelayListOutputEnvelope = _make_command_envelope(
@@ -438,6 +514,13 @@ _, _, RouteRemoveOutputEnvelope = _make_command_envelope(
     "route.remove",
     RouteMutationResult,
     doc="Envelope schema for `meridian route remove --json`.",
+)
+
+_, _, ContextListOutputEnvelope = _make_command_envelope(
+    "ContextList",
+    "context.list",
+    ContextListResult,
+    doc="Envelope schema for `meridian context list --json`.",
 )
 
 _, _, ApiSchemasOutputEnvelope = _make_command_envelope(
@@ -470,6 +553,7 @@ _, _, ApiWorkflowOutputEnvelope = _make_command_envelope(
 
 
 _SCHEMAS: dict[str, type[BaseModel]] = {
+    **PEOPLE_SCHEMAS,
     "output-envelope": OutputEnvelope,
     "apply-command-data": ApplyCommandData,
     "apply-counts": ApplyCounts,
@@ -488,16 +572,34 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "api-workflow-envelope": ApiWorkflowOutputEnvelope,
     "client-list-envelope": ClientListOutputEnvelope,
     "client-show-envelope": ClientShowOutputEnvelope,
+    "client-usage-envelope": ClientUsageOutputEnvelope,
+    "privacy-show-envelope": PrivacyShowOutputEnvelope,
+    "privacy-set-envelope": PrivacySetOutputEnvelope,
+    "privacy-settings": PrivacySettings,
+    "privacy-state": PrivacyState,
+    "privacy-update": PrivacyUpdateResult,
+    "traffic-daily": TrafficDailySummary,
+    "token-create": TokenCreate,
+    "token-record": TokenRecord,
+    "token-issued": IssuedToken,
+    "token-list": TokenList,
     "client-add-envelope": ClientAddOutputEnvelope,
     "client-remove-envelope": ClientRemoveOutputEnvelope,
     "client-reissue-envelope": ClientReissueOutputEnvelope,
     "client-enable-envelope": ClientEnableOutputEnvelope,
     "client-disable-envelope": ClientDisableOutputEnvelope,
+    "client-set-envelope": ClientSetOutputEnvelope,
+    "client-reset-traffic-envelope": ClientResetTrafficOutputEnvelope,
+    "client-devices-envelope": ClientDevicesOutputEnvelope,
+    "client-extend-envelope": ClientExtendOutputEnvelope,
+    "client-extend-request": ClientExtendRequest,
     "node-list-envelope": NodeListOutputEnvelope,
+    "node-restart-envelope": NodeRestartOutputEnvelope,
     "relay-list-envelope": RelayListOutputEnvelope,
     "route-add-envelope": RouteAddOutputEnvelope,
     "route-list-envelope": RouteListOutputEnvelope,
     "route-remove-envelope": RouteRemoveOutputEnvelope,
+    "context-list-envelope": ContextListOutputEnvelope,
     "check": HealthCheckResult,
     "check-envelope": CheckOutputEnvelope,
     "check-failure": CheckFailureData,
@@ -520,38 +622,54 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "verification-target": VerificationTarget,
     "fleet-status-envelope": FleetStatusOutputEnvelope,
     "fleet-inventory-envelope": FleetInventoryOutputEnvelope,
+    "fleet-export-envelope": FleetExportOutputEnvelope,
+    "fleet-history-envelope": FleetHistoryOutputEnvelope,
+    "fleet-events-envelope": FleetEventsOutputEnvelope,
+    "fleet-events": FleetEventPage,
+    "fleet-event": FleetEvent,
+    "fleet-event-query": FleetEventQuery,
+    "service-node-status": ServiceNodeStatus,
+    "attention": AttentionList,
+    "attention-thresholds": AttentionThresholds,
+    "fleet-usage-envelope": FleetUsageOutputEnvelope,
+    "fleet-import-envelope": FleetImportOutputEnvelope,
+    **delivery_schemas(envelope_base=_ContractEnvelope, failure_data_type=EmptyData),
+    **service_delivery_schemas(envelope_base=_ContractEnvelope, failure_data_type=EmptyData),
     "event": Event,
     "error": ErrorModel,
-    "operation": OperationEnvelope,
-    "deploy-operation-result": DeployOperationResult,
-    "operation-cancel": OperationCancel,
     "operation-cancellation": OperationCancellation,
-    "operation-diagnostics": OperationDiagnostics,
-    "operation-error": OperationError,
-    "operation-events": OperationEvents,
-    "operation-list": OperationList,
-    "operation-result": OperationResultEnvelope,
-    "operation-snapshot": OperationSnapshot,
-    "operation-start": OperationStart,
     "summary": Summary,
     "client-list": ClientListResult,
     "client-show": ClientShowResult,
+    "client-connection": ClientConnection,
+    "client-connections": ClientConnections,
+    "calendar-renewal-request": CalendarRenewalRequest,
+    "calendar-expiry-preview": CalendarExpiryPreview,
+    "subscription-format-url": SubscriptionFormatUrl,
+    "client-usage": UserUsage,
     "client-add": ClientAddResult,
     "client-remove": ClientRemoveResult,
     "client-reissue": ClientReissueResult,
     "client-status": ClientStatusResult,
+    "client-limits": ClientLimitsResult,
+    "client-devices": ClientDevicesResult,
     "client-name-request": ClientNameRequest,
     "server-add-request": ServerAddRequest,
-    "server-bootstrap-key-request": ServerBootstrapKeyRequest,
-    "server-bootstrap-key-result": ServerBootstrapKeyResult,
-    "server-connection-draft": ServerConnectionDraft,
-    "server-profile": ServerProfile,
     "server-remove-request": ServerRemoveRequest,
-    "server-validate-request": ServerValidateRequest,
-    "server-validate-result": ServerValidateResult,
+    **SERVER_SCHEMAS,
+    **server_command_schemas(_ContractEnvelope, EmptyData),
     **TOPOLOGY_SCHEMAS,
     "node-add-request": NodeAddRequest,
     "node-target-request": NodeTargetRequest,
+    "node-command-request": NodeCommandRequest,
+    "node-command-record": NodeCommandRecord,
+    "node-command-targets": NodeCommandTargets,
+    "node-restart-request": NodeRestartRequest,
+    "node-restart": NodeRestartResult,
+    "node-command-outcome": NodeCommandOutcome,
+    "cut-off-plan": CutOffPlan,
+    "user-cut-off-request": UserCutOffRequest,
+    "user-cut-off-result": UserCutOffMutation,
     "relay-deploy-request": RelayDeployRequest,
     "relay-target-request": RelayTargetRequest,
     "deploy-command-data": DeployCommandData,
@@ -561,7 +679,6 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "deploy-plan": DeployPlan,
     "deploy-ports": DeployPorts,
     "workflow-plan": WorkflowPlan,
-    "workflow-catalog-entry": WorkflowCatalogEntry,
     "input-field": InputField,
     "input-option": InputOption,
     "input-section": InputSection,
@@ -574,10 +691,16 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "compiled-plan-result": CompiledPlanResult,
     "fleet-status": FleetStatus,
     "fleet-inventory": FleetInventory,
+    "fleet-export": FleetExportResult,
+    "fleet-history": RevisionList,
+    "fleet-import": FleetImportResult,
+    "intent-change": IntentChange,
     "node-list": NodeListResult,
     "relay-list": RelayListResult,
     "route-list": RouteListResult,
     "route-mutation": RouteMutationResult,
+    "context-list": ContextListResult,
+    "context-summary": ContextSummary,
     "command-contract": CommandContract,
     "command-catalog-entry": CommandCatalogEntry,
     "command-outcome": CommandOutcome,

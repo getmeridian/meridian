@@ -1,5 +1,34 @@
 {
   "$defs": {
+    "RecoveryHint": {
+      "additionalProperties": false,
+      "description": "Next step when nothing on an exit's server answers from the deployer's network.\n\n``replace_exit`` carries the ``node replace`` command for that exit;\n``control_unreachable`` has none, because the control server cannot move.",
+      "properties": {
+        "code": {
+          "enum": [
+            "replace_exit",
+            "control_unreachable"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "command": {
+          "default": "",
+          "title": "Command",
+          "type": "string"
+        },
+        "exit": {
+          "title": "Exit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "exit"
+      ],
+      "title": "RecoveryHint",
+      "type": "object"
+    },
     "TransportResult": {
       "additionalProperties": false,
       "description": "One delivered transport's traffic outcome, linked to its check by ID.\n\n``no_traffic`` means the endpoint accepts TCP but the proxy session carries\nnothing; ``unreachable`` means the endpoint does not accept TCP at all.",
@@ -275,6 +304,17 @@
       ],
       "title": "Exit Code",
       "type": "integer"
+    },
+    "recovery": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RecoveryHint"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "scope": {
       "default": "full",

@@ -21,21 +21,9 @@ from pathlib import Path
 import pytest
 
 from meridian.compiler.delivery import xray_json_template
-from meridian.config import XRAY_VERSION
 
 _HANDSHAKE = b"\x13BitTorrent protocol" + bytes(8) + bytes(range(20)) + b"-MR0001-123456789012"
 _DHT_PING = b"d1:ad2:id20:abcdefghij0123456789e1:q4:ping1:t2:aa1:y1:qe"
-
-
-@pytest.fixture(scope="module")
-def xray_binary() -> Path:
-    configured = os.environ.get("MERIDIAN_TEST_XRAY")
-    if not configured:
-        pytest.skip("set MERIDIAN_TEST_XRAY to run real Xray routing tests")
-    binary = Path(configured).resolve()
-    version = subprocess.run([str(binary), "version"], capture_output=True, text=True, check=True, timeout=10)
-    assert version.stdout.startswith(f"Xray {XRAY_VERSION} "), version.stdout
-    return binary
 
 
 def _bound_socket(kind: socket.SocketKind) -> socket.socket:
@@ -179,3 +167,19 @@ def test_udp_limitations_and_existing_quic_block(xray_binary, tmp_path, packet, 
                 else:
                     assert ready == [peers[1]], "pinned Xray UDP behavior changed; review the documented limit"
                     assert peers[1].recvfrom(4096)[0] == payload
+
+
+def test_foreign_domains_never_reach_the_plain_dns_servers(xray_binary, tmp_path):
+    """Plain DNS to 1.1.1.1/8.8.8.8 is redirected inside Russia, so the template's `dns` block must stay unused.
+
+    IPIfNonMatch resolves only when no rule matched the domain; the final balancer rule
+    matches everything first. Moving or narrowing it would start plain lookups.
+    """
+    with _running_xray(xray_binary, tmp_path, socket.SOCK_STREAM) as (ports, peers, _):
+        with socket.create_connection(("127.0.0.1", ports["SOCKS"]), timeout=3) as client:
+            _socks_request(client, 1, b"\x03\x10news.example.com", 443)
+            client.sendall(b"ordinary non-BitTorrent TCP payload")
+            ready, _, _ = select.select(peers, [], [], 3)
+            assert ready == [peers[1]], "a foreign domain left outside the tunnel"
+    log = (tmp_path / "xray.log").read_text(encoding="utf-8")
+    assert "querying DNS for" not in log and "app/dns: UDP:" not in log

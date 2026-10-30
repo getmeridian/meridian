@@ -13,17 +13,18 @@ import typer
 from rich.markup import escape
 
 from meridian.adapters.cluster import topology_from_local_cluster
-from meridian.cluster import ClusterConfig
-from meridian.commands._helpers import format_traffic, load_topology_cluster, make_panel
+from meridian.commands._helpers import format_traffic, load_topology_cluster
+from meridian.commands.server_display import print_metadata, print_server_usage
 from meridian.console import err_console, error_context, fail, is_json_mode, warn
+from meridian.control_access import fleet_panel
 from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.fleet import FleetStatus, TopologyRelay
 from meridian.core.models import ErrorModel, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.services.fleet import collect_fleet_inventory, collect_fleet_status
 from meridian.health import tcp_connect
+from meridian.i18n import t
 from meridian.remnawave import RemnawaveAuthError, RemnawaveError
-from meridian.remnawave.versions import check_panel_version
 from meridian.renderers import emit_json
 
 
@@ -60,24 +61,6 @@ def _render_warnings(warnings: list[ErrorModel]) -> None:
         warn(warning.message)
 
 
-def _panel_version_warnings(cluster: ClusterConfig) -> list[ErrorModel]:
-    """Flag a live panel outside Meridian's supported Remnawave range."""
-    try:
-        with make_panel(cluster) as panel:
-            version = panel.get_version()
-    except RemnawaveError:
-        return []  # reachability is already reported by the status collector
-    try:
-        message = check_panel_version(version)
-    except RemnawaveError as exc:
-        return [_version_warning(str(exc), exc.hint)]
-    return [_version_warning(message, "")] if message else []
-
-
-def _version_warning(message: str, hint: str) -> ErrorModel:
-    return ErrorModel(code="MERIDIAN_PANEL_VERSION", category="user", message=message, hint=hint, exit_code=0)
-
-
 def run_inventory() -> None:
     """Show the configured fleet inventory without exposing secrets."""
     operation = OperationContext()
@@ -94,7 +77,7 @@ def _run_inventory(*, operation: OperationContext) -> None:
     try:
         result = collect_fleet_inventory(
             topology,
-            make_panel(cluster),
+            fleet_panel(cluster, topology),
             classify_error=_classify_panel_error,
         )
     except MeridianError as exc:
@@ -183,8 +166,17 @@ def _render_status(status: FleetStatus) -> None:
     err_console.print(f"  [bold]Panel[/bold]   {escape(status.panel.url)} {panel_state}")
 
     if status.nodes:
+        from rich.table import Table
+
         err_console.print()
         err_console.print("  [bold]Nodes[/bold]")
+        table = Table(
+            box=None, padding=(0, 1), caption=t("fleet.active_report") + "\n" + t("server_metadata.approximate")
+        )
+        table.add_column(t("fleet.label.node"))
+        table.add_column(t("client.label.status"))
+        table.add_column(t("client.label.traffic"))
+        table.add_column(t("fleet.label.active"), justify="right")
 
         for node in status.nodes:
             label = escape(node.name or node.ip)
@@ -194,14 +186,53 @@ def _render_status(status: FleetStatus) -> None:
 
             if node.status == "connected":
                 xray = f"  Xray {escape(node.xray_version)}" if node.xray_version else ""
-                traffic = f"  {format_traffic(node.traffic_bytes)}" if node.traffic_bytes else ""
-                err_console.print(f"    {escape(node.ip)}  {label}{role}  [green]connected[/green]{xray}{traffic}")
+                state = f"[green]connected[/green]{xray}"
             elif node.status == "disabled":
-                err_console.print(f"    {escape(node.ip)}  {label}{role}  [dim]disabled[/dim]")
+                state = "[dim]disabled[/dim]"
             elif node.status == "disconnected":
-                err_console.print(f"    {escape(node.ip)}  {label}{role}  [red]DISCONNECTED[/red]")
+                state = "[red]DISCONNECTED[/red]"
+            elif node.status == "failed":
+                state = "[red]FAILED[/red] [dim]meridian check[/dim]"
             else:
-                err_console.print(f"    {escape(node.ip)}  {label}{role}  [dim]unknown[/dim]")
+                state = "[dim]unknown[/dim]"
+            table.add_row(
+                f"{escape(node.ip)}  {label}{role}",
+                state,
+                format_traffic(node.traffic_bytes),
+                str(node.active_users) if node.active_users is not None else "-",
+            )
+        err_console.print(table)
+        for node in status.nodes:
+            if node.active_report_at is not None:
+                err_console.print(
+                    f"  [dim]{escape(t('fleet.active_at', node=node.name or node.ip, at=node.active_report_at))}[/dim]"
+                )
+            if node.runtime_available is not None:
+                err_console.print(f"    {escape(node.name or node.ip)}")
+                reachable = "live" if node.live else "unavailable"
+                runtime = (
+                    (
+                        "degraded"
+                        if node.runtime.degraded and node.runtime.health.status == "healthy"
+                        else node.runtime.health.status
+                    )
+                    if node.runtime_available and node.runtime
+                    else "unavailable"
+                )
+                convergence = (
+                    ("failed" if node.failed else "in sync" if node.in_sync else "pending")
+                    if node.runtime_available
+                    else "unavailable"
+                )
+                err_console.print(f"      Reachability: {reachable} · Runtime: {runtime} · Convergence: {convergence}")
+                if node.runtime_available and node.runtime:
+                    for check in node.runtime.health.checks:
+                        if check.status != "pass":
+                            label = "Traffic counting stalled (stats)" if check.name == "stats" else check.name
+                            err_console.print(f"      {escape(label)}: {escape(check.message)}")
+                if node.runtime_available:
+                    for error in node.errors or node.failed:
+                        err_console.print(f"      {escape(error)}")
 
     if status.relays:
         err_console.print()
@@ -218,6 +249,17 @@ def _render_status(status: FleetStatus) -> None:
                 relay_state = "[dim]unknown[/dim]"
 
             err_console.print(f"    {escape(relay.ip)}  {label} -> {target_label}  listener: {relay_state}")
+
+    print_server_usage(status.server_usage, status.server_attention)
+    if status.sources.server_usage == "unavailable":
+        for server in status.servers:
+            if server.metadata is not None:
+                err_console.print("    [bold]" + escape(server.name or server.id) + "[/bold]")
+                print_metadata(server.metadata)
+                if "exit" in server.roles or "routing_gateway" in server.roles:
+                    warn(t("server_metadata.unavailable"))
+                else:
+                    err_console.print("      " + escape(t("server_metadata.not_measured")))
 
     internal_hops = [(server, hop) for server in status.servers for hop in server.relay_hops if not hop.advertised]
     if internal_hops:
@@ -260,19 +302,22 @@ def _run_status(*, operation: OperationContext) -> int:
     except LocalStateError as exc:
         fail(exc)
     try:
+        panel = fleet_panel(cluster, topology)
         result = collect_fleet_status(
             topology,
-            make_panel(cluster),
+            panel,
             check_relays=_check_relays_health,
             classify_error=_classify_panel_error,
+            read_node_evidence=panel.node_evidence,
+            read_server_usage=panel.server_usage
+            if cluster.topology_intent and cluster.topology_intent.server_metadata
+            else None,
         )
     except MeridianError as exc:
         fail(exc)
 
     status = result.status
     warnings = result.warnings
-    if status.panel.healthy:
-        warnings = [*warnings, *_panel_version_warnings(cluster)]
     _render_warnings(warnings)
     exit_code = {"healthy": 0, "degraded": 4, "unknown": 3}[status.summary.health]
 
@@ -294,8 +339,11 @@ def _run_status(*, operation: OperationContext) -> int:
                         "unknown_relays": status.summary.unknown_relays,
                         "unknown_relay_hops": status.summary.unknown_relay_hops,
                         "disconnected_nodes": status.summary.disconnected_nodes,
+                        "failed_nodes": status.summary.failed_nodes,
+                        "out_of_sync_nodes": status.summary.out_of_sync_nodes,
                         "disabled_nodes": status.summary.disabled_nodes,
                         "unknown_nodes": status.summary.unknown_nodes,
+                        "servers_needing_attention": status.summary.servers_needing_attention,
                     },
                 ),
                 exit_code=exit_code,

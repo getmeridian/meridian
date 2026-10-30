@@ -65,15 +65,28 @@ def command_path(ctx: click.Context, args: list[str]) -> tuple[list[str], click.
     Returns the names consumed (including an unknown last name), the command reached
     (None when the last name is unknown), and the arguments left for it.
     """
+    from meridian.cli_options import GROUP_CONTEXT, GROUP_MACHINE_OUTPUT, enable_json_output
+
+    ctx.meta.pop(GROUP_CONTEXT, None)
+    ctx.meta.pop(GROUP_MACHINE_OUTPUT, None)
     command: click.Command | None = ctx.command
     path: list[str] = []
     rest = list(args)
     while isinstance(command, click.Group):
-        index = next((i for i, arg in enumerate(rest) if not arg.startswith("-")), None)
-        if index is None:
+        parsed = command.make_context(command.name or "", [], parent=ctx, resilient_parsing=True)
+        _options, remaining, _order = command.make_parser(parsed).parse_args(list(rest))
+        for param in command.params:
+            if not isinstance(param, click.Option):
+                continue
+            value = _options.get(param.name or "")
+            if value and getattr(param.callback, "__wrapped__", param.callback) is enable_json_output:
+                ctx.meta[GROUP_MACHINE_OUTPUT] = True
+            if value and "--context" in param.opts:
+                ctx.meta[GROUP_CONTEXT] = str(value)
+        if not remaining:
             break
-        path.append(rest[index])
-        rest = rest[index + 1 :]
+        path.append(remaining[0])
+        rest = remaining[1:]
         command = command.get_command(ctx, path[-1])
     return path, command, rest
 
@@ -85,15 +98,43 @@ def requests_machine_output(ctx: click.Context, name: str, command: click.Comman
     options never pass for flags; machine-output options are those whose callback is
     `cli_options.enable_json_output`.
     """
-    from meridian.cli_options import enable_json_output
+    from meridian.cli_options import GROUP_MACHINE_OUTPUT, enable_json_output
 
     parsed = command.make_context(name, list(args), parent=ctx, resilient_parsing=True)
-    return any(
+    return bool(ctx.meta.get(GROUP_MACHINE_OUTPUT)) or any(
         isinstance(param, click.Option)
         and getattr(param.callback, "__wrapped__", param.callback) is enable_json_output
         and bool(parsed.params.get(param.name or ""))
         for param in command.params
     )
+
+
+def requests_help(ctx: click.Context, args: list[str], command: click.Command | None, rest: list[str]) -> bool:
+    """Whether `args` ask for help: a group's `--help`, or a leaf's as Click parses it.
+
+    A raw scan would take an option's value for a request (`--context --help`), and a run that
+    reads as help skips context validation, so a leaf's own arguments go through its parser.
+    """
+    consumed = args[: len(args) - len(rest)]
+    if any(arg in ctx.help_option_names for arg in consumed):
+        return True
+    if command is None:
+        return any(arg in ctx.help_option_names for arg in rest)
+    parsed = command.make_context(command.name or "", [], parent=ctx, resilient_parsing=True)
+    help_option = command.get_help_option(parsed)
+    if help_option is None:
+        return False
+    options, _arguments, _order = command.make_parser(parsed).parse_args(list(rest))
+    return help_option.name in options
+
+
+def requested_context(ctx: click.Context, name: str, command: click.Command, args: list[str]) -> str:
+    """The `--context` value given after the command, parsed leniently before the root callback runs."""
+    from meridian.cli_options import GROUP_CONTEXT, LEAF_CONTEXT
+
+    ctx.meta.pop(LEAF_CONTEXT, None)
+    command.make_context(name, list(args), parent=ctx, resilient_parsing=True)
+    return str(ctx.meta.pop(LEAF_CONTEXT, "") or ctx.meta.get(GROUP_CONTEXT, "") or "")
 
 
 def command_argv(path: str, command: click.Command) -> list[str]:

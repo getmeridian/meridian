@@ -1,0 +1,255 @@
+{
+  "$defs": {
+    "NodeStateRef": {
+      "additionalProperties": false,
+      "description": "Points at one desired-state document by epoch, revision, and content hash.",
+      "properties": {
+        "fleet_epoch": {
+          "description": "Fleet epoch. A restore of the control service bumps it. An agent remembers the highest epoch it accepted and refuses desired state and commands from an older one (a resurrected old control server).",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Fleet Epoch",
+          "type": "integer"
+        },
+        "revision": {
+          "description": "Desired-state revision for one node. Ordering is (fleet_epoch, revision): within an epoch revisions only grow; a higher epoch wins even with a lower revision.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "sha256": {
+          "description": "The document's `sha256` (hash of its `resources`).",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fleet_epoch",
+        "revision",
+        "sha256"
+      ],
+      "title": "NodeStateRef",
+      "type": "object"
+    },
+    "ReconcileCreate": {
+      "additionalProperties": false,
+      "properties": {
+        "expires_in_seconds": {
+          "default": 300,
+          "maximum": 3600,
+          "minimum": 30,
+          "title": "Expires In Seconds",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "reconcile",
+          "default": "reconcile",
+          "title": "Kind",
+          "type": "string"
+        },
+        "wait_for": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NodeStateRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Deliver only after this node reports this revision applied (or a newer one in the same epoch)."
+        }
+      },
+      "title": "ReconcileCreate",
+      "type": "object"
+    },
+    "RenewCredentialCreate": {
+      "additionalProperties": false,
+      "properties": {
+        "expires_in_seconds": {
+          "default": 300,
+          "maximum": 3600,
+          "minimum": 30,
+          "title": "Expires In Seconds",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "renew_credential",
+          "default": "renew_credential",
+          "title": "Kind",
+          "type": "string"
+        },
+        "wait_for": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NodeStateRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Deliver only after this node reports this revision applied (or a newer one in the same epoch)."
+        }
+      },
+      "title": "RenewCredentialCreate",
+      "type": "object"
+    },
+    "ReportCreate": {
+      "additionalProperties": false,
+      "properties": {
+        "expires_in_seconds": {
+          "default": 300,
+          "maximum": 3600,
+          "minimum": 30,
+          "title": "Expires In Seconds",
+          "type": "integer"
+        },
+        "include_stats": {
+          "title": "Include Stats",
+          "type": "boolean"
+        },
+        "kind": {
+          "const": "report",
+          "default": "report",
+          "title": "Kind",
+          "type": "string"
+        },
+        "wait_for": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NodeStateRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Deliver only after this node reports this revision applied (or a newer one in the same epoch)."
+        }
+      },
+      "required": [
+        "include_stats"
+      ],
+      "title": "ReportCreate",
+      "type": "object"
+    },
+    "ResetInboundCreate": {
+      "additionalProperties": false,
+      "properties": {
+        "expires_in_seconds": {
+          "default": 300,
+          "maximum": 3600,
+          "minimum": 30,
+          "title": "Expires In Seconds",
+          "type": "integer"
+        },
+        "inbound_tag": {
+          "description": "Xray inbound tag.",
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Inbound Tag",
+          "type": "string"
+        },
+        "kind": {
+          "const": "reset_inbound",
+          "default": "reset_inbound",
+          "title": "Kind",
+          "type": "string"
+        },
+        "wait_for": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NodeStateRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Deliver only after this node reports this revision applied (or a newer one in the same epoch)."
+        }
+      },
+      "required": [
+        "inbound_tag"
+      ],
+      "title": "ResetInboundCreate",
+      "type": "object"
+    },
+    "RestartUnitCreate": {
+      "additionalProperties": false,
+      "properties": {
+        "expires_in_seconds": {
+          "default": 300,
+          "maximum": 3600,
+          "minimum": 30,
+          "title": "Expires In Seconds",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "restart_unit",
+          "default": "restart_unit",
+          "title": "Kind",
+          "type": "string"
+        },
+        "resource_id": {
+          "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "wait_for": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NodeStateRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Deliver only after this node reports this revision applied (or a newer one in the same epoch)."
+        }
+      },
+      "required": [
+        "resource_id"
+      ],
+      "title": "RestartUnitCreate",
+      "type": "object"
+    }
+  },
+  "description": "The admin body names a command kind and only that kind's fields.",
+  "discriminator": {
+    "mapping": {
+      "reconcile": "#/$defs/ReconcileCreate",
+      "renew_credential": "#/$defs/RenewCredentialCreate",
+      "report": "#/$defs/ReportCreate",
+      "reset_inbound": "#/$defs/ResetInboundCreate",
+      "restart_unit": "#/$defs/RestartUnitCreate"
+    },
+    "propertyName": "kind"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/ReconcileCreate"
+    },
+    {
+      "$ref": "#/$defs/ReportCreate"
+    },
+    {
+      "$ref": "#/$defs/ResetInboundCreate"
+    },
+    {
+      "$ref": "#/$defs/RestartUnitCreate"
+    },
+    {
+      "$ref": "#/$defs/RenewCredentialCreate"
+    }
+  ],
+  "title": "NodeCommandRequest"
+}

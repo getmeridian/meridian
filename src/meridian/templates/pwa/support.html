@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr" data-language="auto" data-page="">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="language.js"></script>
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <title>Connection Setup</title>
@@ -11,11 +12,30 @@
 </head>
 <body>
 <div class="wrap">
+  <div id="languages" class="lang-bar" role="group" aria-label="Language">
+    <button class="lang-btn" type="button" data-lang="en" lang="en">English</button>
+    <button class="lang-btn" type="button" data-lang="ru" lang="ru">Русский</button>
+    <button class="lang-btn" type="button" data-lang="fa" lang="fa">فارسی</button>
+    <button class="lang-btn" type="button" data-lang="zh" lang="zh">中文</button>
+  </div>
   <div class="load-error">
-    <h1 id="title">Connection Setup</h1>
-    <p id="status">Opening your connection page…</p>
+    <h1 id="title">
+      <span class="initial-text initial-en" lang="en">Connection Setup</span>
+      <span class="initial-text initial-ru" lang="ru">Настройка подключения</span>
+      <span class="initial-text initial-fa" lang="fa">تنظیم اتصال</span>
+      <span class="initial-text initial-zh" lang="zh">连接设置</span>
+    </h1>
+    <p id="status">
+      <span class="initial-text initial-en" lang="en">Opening your connection page…</span>
+      <span class="initial-text initial-ru" lang="ru">Открываем вашу страницу подключения…</span>
+      <span class="initial-text initial-fa" lang="fa">در حال باز کردن صفحهٔ اتصال شما…</span>
+      <span class="initial-text initial-zh" lang="zh">正在打开您的连接页面…</span>
+    </p>
+    <div id="owner-contact"></div>
+    <a id="open-page" class="btn btn-ghost" hidden></a>
   </div>
 </div>
+<script src="contact.js"></script>
 <script src="support.js"></script>
 </body>
 </html>

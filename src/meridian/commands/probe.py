@@ -6,9 +6,9 @@ from dataclasses import replace
 
 import typer
 
+from meridian import config
 from meridian.cluster import ClusterConfig
 from meridian.commands.check_render import emit_verification_json, render_verification
-from meridian.config import SERVER_PROFILES_FILE
 from meridian.console import error_context, fail, is_json_mode
 from meridian.core.errors import MeridianError
 from meridian.core.inputs import validate_hostname_value
@@ -72,7 +72,7 @@ def collect_probe_result(
 ) -> ProbeResult:
     """Run probe checks and return a reusable typed result."""
     timeout = normalize_verification_timeout(timeout)
-    registry = registry or ServerRegistry(SERVER_PROFILES_FILE)
+    registry = registry or ServerRegistry(config.SERVER_PROFILES_FILE)
     if sni:
         try:
             sni = validate_hostname_value(sni)

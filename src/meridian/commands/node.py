@@ -1,7 +1,7 @@
-"""Node management -- add, list, check, remove proxy nodes in the fleet.
+"""Node management -- add, list, check, remove nodes in the fleet.
 
-Nodes are servers running Remnawave node + Xray. All node state is
-tracked in the panel database; cluster.yml stores topology for local
+Nodes are servers running the node agent and its Xray core. Their runtime
+state lives in the control service; cluster.yml stores topology for local
 reference and SSH access.
 """
 
@@ -12,17 +12,17 @@ from typing import TYPE_CHECKING
 import typer
 from rich.markup import escape
 
+from meridian import config
 from meridian.adapters.cluster import topology_from_local_cluster
 from meridian.commands._helpers import (
     apply_reviewed_intent,
     format_traffic,
     load_topology_cluster,
-    make_panel,
     require_intent,
 )
 from meridian.commands._validation import validate_command_input
-from meridian.config import HOME_DISPLAY
 from meridian.console import confirm, err_console, fail, info, ok, warn
+from meridian.control_access import fleet_panel
 from meridian.core.command_inputs import NodeAddRequest, NodeTargetRequest
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import build_node_list_result
@@ -54,17 +54,23 @@ def run_add(
         ensure_server_connection,
         resolve_server,
     )
-    from meridian.config import DEFAULT_SNI, SERVER_PROFILES_FILE
+    from meridian.config import DEFAULT_SNI
     from meridian.servers import ServerEntry, ServerRegistry
     from meridian.setup.editor import add_exit_to_intent
 
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     target = resolve_server(registry, explicit_ip=ip, user=user, port=ssh_port)
+    try:
+        saved = registry.find(target.ip)
+    except LocalStateError as exc:
+        fail(exc)
     request = validate_command_input(
         NodeAddRequest,
         "Invalid node add request",
         ip=target.ip,
-        name=name,
+        # A saved server keeps its title (saving it as its IP renamed it) and names the exit;
+        # a profile saved under its own address has no title (an IP is no exit name).
+        name=name or (saved.name if saved is not None and saved.name != saved.host else ""),
         user=target.user,
         ssh_port=target.port,
         sni=sni,
@@ -107,7 +113,7 @@ def run_add(
     except OSError as exc:
         fail(
             f"Could not save the server profile: {exc}",
-            hint=f"Check {HOME_DISPLAY} permissions and disk space, then retry.",
+            hint=f"Check {config.HOME_DISPLAY} permissions and disk space, then retry.",
             hint_type="system",
         )
     try:
@@ -194,7 +200,7 @@ def _run_list(*, operation: OperationContext) -> None:
     api_nodes = []
     warnings: list[ErrorModel] = []
     try:
-        with make_panel(cluster) as panel:
+        with fleet_panel(cluster, topology) as panel:
             api_nodes = panel.list_nodes()
     except RemnawaveError as exc:
         warnings.append(
@@ -252,6 +258,8 @@ def _run_list(*, operation: OperationContext) -> None:
         if api_node:
             if api_node.is_disabled:
                 status_text = "[dim]disabled[/dim]"
+            elif api_node.is_connected and api_node.apply_failed:
+                status_text = "[red]failed[/red]"
             elif api_node.is_connected:
                 status_text = "[green]connected[/green]"
             else:
@@ -284,17 +292,16 @@ def _run_list(*, operation: OperationContext) -> None:
         raise typer.Exit(3)
 
 
-def run_remove(ip_or_name: str, yes: bool = False, force: bool = False) -> None:
+def run_remove(ip_or_name: str, yes: bool = False, force: bool = False, forget_unreachable: bool = False) -> None:
     """Remove a server's exit or routing-gateway role, then apply the reviewed removal."""
     request = validate_command_input(NodeTargetRequest, "Invalid node remove request", ip_or_name=ip_or_name)
     from meridian.commands.topology_removal import apply_topology_removal
-    from meridian.config import SERVER_PROFILES_FILE
     from meridian.servers import ServerRegistry
 
     cluster = load_topology_cluster()
     intent = require_intent(cluster)
     try:
-        entry = ServerRegistry(SERVER_PROFILES_FILE).find(request.ip_or_name)
+        entry = ServerRegistry(config.SERVER_PROFILES_FILE).find(request.ip_or_name)
     except LocalStateError as exc:
         fail(exc)
     server_ref = entry.id if entry is not None else ""
@@ -330,7 +337,9 @@ def run_remove(ip_or_name: str, yes: bool = False, force: bool = False) -> None:
         fail(
             f"Node '{request.ip_or_name}' not found", hint="Check node list with: meridian node list", hint_type="user"
         )
-    apply_topology_removal(cluster, updated, subject=subject, yes=yes, extra_lines=extra_lines)
+    apply_topology_removal(
+        cluster, updated, subject=subject, yes=yes, extra_lines=extra_lines, forget_unreachable=forget_unreachable
+    )
 
 
 def _exit_removal(

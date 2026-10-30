@@ -1,0 +1,12 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "cut_off": {
+      "default": false,
+      "title": "Cut Off",
+      "type": "boolean"
+    }
+  },
+  "title": "UserCutOffRequest",
+  "type": "object"
+}

@@ -1,0 +1,155 @@
+{
+  "$defs": {
+    "PrivacyChange": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "$ref": "#/$defs/PrivacySettings"
+        },
+        "author": {
+          "title": "Author",
+          "type": "string"
+        },
+        "before": {
+          "$ref": "#/$defs/PrivacySettings"
+        },
+        "changed_at": {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Changed At",
+          "type": "string"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Local audit row referenced by privacy.changed events.",
+          "title": "Id"
+        }
+      },
+      "required": [
+        "changed_at",
+        "author",
+        "before",
+        "after"
+      ],
+      "title": "PrivacyChange",
+      "type": "object"
+    },
+    "PrivacyDeletedRows": {
+      "additionalProperties": false,
+      "description": "Rows removed by a privacy change; lifetime traffic totals are kept.",
+      "properties": {
+        "devices": {
+          "default": 0,
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Devices",
+          "type": "integer"
+        },
+        "node_traffic_daily": {
+          "default": 0,
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Node Traffic Daily",
+          "type": "integer"
+        },
+        "traffic_daily": {
+          "default": 0,
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Traffic Daily",
+          "type": "integer"
+        }
+      },
+      "title": "PrivacyDeletedRows",
+      "type": "object"
+    },
+    "PrivacySettings": {
+      "additionalProperties": false,
+      "description": "Operator-owned privacy choices; reviewed applies never replace them.",
+      "properties": {
+        "default_device_limit": {
+          "default": 3,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Default Device Limit",
+          "type": "integer"
+        },
+        "device_limits": {
+          "default": "off",
+          "enum": [
+            "off",
+            "private",
+            "full"
+          ],
+          "title": "Device Limits",
+          "type": "string"
+        },
+        "history_days": {
+          "default": 90,
+          "maximum": 730,
+          "minimum": 7,
+          "title": "History Days",
+          "type": "integer"
+        },
+        "usage_history": {
+          "default": "off",
+          "enum": [
+            "off",
+            "daily"
+          ],
+          "title": "Usage History",
+          "type": "string"
+        }
+      },
+      "title": "PrivacySettings",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "changed": {
+      "title": "Changed",
+      "type": "boolean"
+    },
+    "changes": {
+      "description": "Newest first, at most 50 changes.",
+      "items": {
+        "$ref": "#/$defs/PrivacyChange"
+      },
+      "maxItems": 50,
+      "title": "Changes",
+      "type": "array"
+    },
+    "deleted": {
+      "$ref": "#/$defs/PrivacyDeletedRows"
+    },
+    "rekeyed_devices": {
+      "default": 0,
+      "description": "Full device rows converted to fingerprints without metadata.",
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Rekeyed Devices",
+      "type": "integer"
+    },
+    "settings": {
+      "$ref": "#/$defs/PrivacySettings"
+    }
+  },
+  "required": [
+    "settings",
+    "changes",
+    "changed"
+  ],
+  "title": "PrivacyUpdateResult",
+  "type": "object"
+}

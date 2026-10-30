@@ -12,13 +12,13 @@ from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import (
     ReviewedApplyPersistenceError,
     apply_reviewed_intent,
-    make_panel,
-    persist_reviewed_apply,
     require_intent,
 )
 from meridian.commands.client_handoff import get_user_or_fail, print_handoff_links
 from meridian.commands.client_state import build_client_persistence_warning
 from meridian.console import err_console, fail, is_json_mode, ok, warn
+from meridian.control_access import access_panel
+from meridian.core.client_limits import ClientLimitChange, UserCreationSettings
 from meridian.core.clients import build_client_add_result, build_client_remove_result
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -34,9 +34,10 @@ def run_add_v4(
     operation: OperationContext,
     *,
     display_names: Mapping[str, str] | None = None,
-    publish_handoff: Callable[[ClusterConfig, list[str]], list[HandoffLinks]],
+    collect_handoff: Callable[[ClusterConfig, list[str]], list[HandoffLinks]],
+    limits: ClientLimitChange | None = None,
 ) -> None:
-    """Add access users through the reviewed compiler and resource drivers."""
+    """Add access users and their first limits through the reviewed compiler and resource drivers."""
     from meridian.config import SERVER_PROFILES_FILE
     from meridian.servers import ServerRegistry
     from meridian.setup.editor import add_access_users_to_intent
@@ -50,7 +51,7 @@ def run_add_v4(
             hint_type="user",
         )
 
-    panel = make_panel(cluster)
+    panel = access_panel(cluster)
     with panel:
         for name in names:
             if get_user_or_fail(panel, name, action="check") is not None:
@@ -60,7 +61,13 @@ def run_add_v4(
                     hint_type="user",
                 )
 
-    updated = add_access_users_to_intent(intent, names, display_names)
+    settings = limits.for_creation() if limits is not None else UserCreationSettings()
+    updated = add_access_users_to_intent(
+        intent,
+        names,
+        display_names,
+        creation_settings={name: settings for name in names} if settings != UserCreationSettings() else None,
+    )
     result = apply_reviewed_intent(
         cluster,
         ServerRegistry(SERVER_PROFILES_FILE),
@@ -71,7 +78,7 @@ def run_add_v4(
     )
 
     succeeded: list[tuple[str, User]] = []
-    with make_panel(cluster) as refreshed_panel:
+    with access_panel(cluster) as refreshed_panel:
         for name in names:
             user = get_user_or_fail(refreshed_panel, name, action="verify")
             if user is None:
@@ -82,7 +89,7 @@ def run_add_v4(
                 )
             succeeded.append((name, user))
 
-    handoffs = publish_handoff(cluster, [name for name, _user in succeeded])
+    handoffs = collect_handoff(cluster, [name for name, _user in succeeded])
     if is_json_mode():
         result_data = build_client_add_result(
             succeeded,
@@ -98,7 +105,6 @@ def run_add_v4(
                     counts={
                         "added": len(succeeded),
                         "failed": 0,
-                        "page_deploy_failed": sum(1 for links in handoffs if not links.page_url),
                     },
                 ),
                 timer=operation.timer,
@@ -139,7 +145,7 @@ def _report_state_failure(
     reason = redact_string(str(exc.__cause__ or exc))
     observed: list[tuple[str, User]] = []
     try:
-        with make_panel(cluster) as panel:
+        with access_panel(cluster) as panel:
             for name in names:
                 user = panel.get_user(name)
                 if user is not None:
@@ -181,11 +187,16 @@ def _report_state_failure(
     fail(exc)
 
 
-def run_remove_v4(name: str, cluster: ClusterConfig, operation: OperationContext, *, yes: bool) -> None:
-    """Remove an access user through the reviewed topology, then delete their page."""
+def run_remove_v4(
+    name: str, cluster: ClusterConfig, operation: OperationContext, *, yes: bool, cut_off: bool = False
+) -> None:
+    """Remove an access user through the reviewed topology, every old link stops working."""
+    from meridian.commands.node_command_results import cut_off_disclosure, print_command_results
     from meridian.config import SERVER_PROFILES_FILE
     from meridian.console import confirm
-    from meridian.handoff import remove_connection_page
+    from meridian.control.command_models import NodeCommandRecord
+    from meridian.i18n import t
+    from meridian.node_commands import command_exit_code, command_warnings, cut_off_scope, wait_commands
     from meridian.servers import ServerRegistry
     from meridian.setup.editor import remove_access_user_from_intent
 
@@ -193,35 +204,44 @@ def run_remove_v4(name: str, cluster: ClusterConfig, operation: OperationContext
         updated = remove_access_user_from_intent(require_intent(cluster), name)
     except ValueError as exc:
         fail(str(exc), hint="Check client names with: meridian client list", hint_type="user")
-    if not yes and not confirm(f"Remove client '{name}'? Their links stop working immediately."):
+    scope = cut_off_scope(cluster, name) if cut_off else None
+    confirmation = t("node_commands.remove_confirm", name=require_intent(cluster).access.display_name(name))
+    if scope is not None:
+        confirmation += "\n\n" + cut_off_disclosure(scope)
+        if yes and not is_json_mode():
+            warn(cut_off_disclosure(scope))
+    if not yes and not confirm(confirmation):
         raise typer.Exit(1)
 
-    with make_panel(cluster) as panel:
-        user = get_user_or_fail(panel, name, action="load")
+    commands: list[NodeCommandRecord] = []
+    if cut_off:
+        for binding in cluster.managed_bindings.values():
+            if binding.resource_kind == "control_user" and binding.remote_id == name:
+                binding.cut_off_on_retire = True
     apply_reviewed_intent(
         cluster,
         ServerRegistry(SERVER_PROFILES_FILE),
         updated,
         failure=f"Client '{name}' was not fully removed",
         hint="The client is out of the topology; rerun `meridian apply` to finish.",
+        user_cut_off={name: commands} if cut_off else None,
     )
 
-    page_error = remove_connection_page(cluster, user.vless_uuid) if user and user.vless_uuid else ""
-    if page_error:
-        warn(f"Client '{name}' was removed, but their connection page could not be deleted: {page_error}")
-    else:
-        persist_reviewed_apply(cluster)
+    cut_off_results = wait_commands(cluster, commands) if scope is not None else None
+    exit_code = command_exit_code(cut_off_results or [])
     if is_json_mode():
         emit_json(
             command_envelope(
                 command="client.remove",
-                data=build_client_remove_result(name).to_data(),
+                data=build_client_remove_result(name, cut_off=cut_off_results).to_data(),
                 summary=Summary(text=f"Removed client {name}", changed=True, counts={"removed": 1}),
-                exit_code=3 if page_error else 0,
+                exit_code=exit_code,
+                warnings=command_warnings(cut_off_results or []),
                 timer=operation.timer,
             )
         )
     else:
         ok(f"Removed client '{name}'. Their links no longer work.")
-    if page_error:
-        raise typer.Exit(3)
+        print_command_results(cut_off_results or [])
+    if exit_code:
+        raise typer.Exit(exit_code)

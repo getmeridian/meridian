@@ -27,8 +27,6 @@ services:
     tmpfs:
       - /run
       - /run/lock
-    volumes:
-      - exit-docker:/var/lib/docker
     healthcheck:
       test: ["CMD", "bash", "-c", "nc -z 127.0.0.1 22"]
       interval: 5s
@@ -48,8 +46,6 @@ services:
     tmpfs:
       - /run
       - /run/lock
-    volumes:
-      - exit-b-docker:/var/lib/docker
     healthcheck:
       test: ["CMD", "bash", "-c", "nc -z 127.0.0.1 22"]
       interval: 5s
@@ -107,8 +103,6 @@ services:
     tmpfs:
       - /run
       - /run/lock
-    volumes:
-      - gateway-docker:/var/lib/docker
     healthcheck:
       test: ["CMD", "bash", "-c", "nc -z 127.0.0.1 22"]
       interval: 5s
@@ -169,8 +163,3 @@ networks:
     ipam:
       config:
         - subnet: 172.30.0.0/24
-
-volumes:
-  exit-docker:
-  exit-b-docker:
-  gateway-docker:

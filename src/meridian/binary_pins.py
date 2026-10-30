@@ -3,8 +3,8 @@
 `config.py` holds this CLI's tested pins. `fleet upgrade` can save a newer
 release in the same major into `ClusterConfig.binary_pins` (version plus the
 sha256 GitHub publishes for each asset), so a fleet takes upstream fixes
-without a Meridian release. Like image pins, a saved pin only ever raises the
-version: an older or malformed entry yields to the CLI's pin.
+without a Meridian release. A saved pin only ever raises the version: an older
+or malformed entry yields to the CLI's pin.
 """
 
 from __future__ import annotations
@@ -20,6 +20,17 @@ REALM_SHA256_PIN_PREFIX = "realm_sha256."
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
+_VERSION_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.-]*)?$")
+
+Version = tuple[int, int, int]
+
+
+def parse_version(value: str) -> Version | None:
+    """Parse ``X.Y.Z`` (optionally ``v``-prefixed or with a suffix); None otherwise."""
+    match = _VERSION_RE.match(value.strip())
+    if match is None:
+        return None
+    return int(match.group(1)), int(match.group(2)), int(match.group(3))
 
 
 @dataclass(frozen=True)
@@ -58,8 +69,6 @@ BINARY_SOURCES: dict[str, BinarySource] = {
 
 def valid_binary_pin(name: str, pin: BinaryPin) -> bool:
     """Whether a saved pin names an X.Y.Z release in the CLI pin's major with a digest for every asset."""
-    from meridian.remnawave.versions import parse_version  # cluster.py imports this module; keep httpx lazy
-
     default = UPGRADABLE_BINARIES.get(name)
     if default is None or not _SEMVER_RE.match(pin.version):
         return False
@@ -75,8 +84,6 @@ def valid_binary_pin(name: str, pin: BinaryPin) -> bool:
 
 def effective_binary_pins(saved: Mapping[str, BinaryPin]) -> dict[str, BinaryPin]:
     """This CLI's binary pins, raised to a newer release `fleet upgrade` saved."""
-    from meridian.remnawave.versions import parse_version
-
     pins = dict(UPGRADABLE_BINARIES)
     for name, pin in saved.items():
         if not valid_binary_pin(name, pin):

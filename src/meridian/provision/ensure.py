@@ -7,7 +7,9 @@ consistent while leaving project-specific policy in the calling step.
 
 from __future__ import annotations
 
+import re
 import shlex
+import time
 from dataclasses import dataclass
 from typing import TypeVar
 
@@ -34,6 +36,70 @@ class EnsureResult:
     result: CommandResult | None = None
 
 
+# A fresh server often runs unattended-upgrades or cloud-init's apt for minutes after boot.
+APT_LOCK_WAIT_SECONDS = 300
+APT_LOCK_RETRY_SECONDS = 5
+_APT_LOCK_MARKERS = ("Could not get lock", "Unable to acquire the dpkg frontend lock", "Unable to lock directory")
+_APT_LOCK_HOLDER = re.compile(r"held by process (\d+) \(([^)]+)\)")
+
+
+def apt_lock_held(result: CommandResult) -> bool:
+    output = f"{result.stdout}\n{result.stderr}"
+    return any(marker in output for marker in _APT_LOCK_MARKERS)
+
+
+def run_apt(
+    conn: ServerConnection,
+    command: str,
+    *,
+    timeout: int,
+    operation_name: str = "",
+    wait: float = APT_LOCK_WAIT_SECONDS,
+) -> CommandResult:
+    """Run an apt command, waiting up to `wait` seconds while another package manager holds the lock.
+
+    Lock refusals are retried; any other failure returns at once. Never hide apt's stderr from
+    this helper (`2>/dev/null`), or a lock looks like an ordinary failure.
+    """
+    deadline = time.monotonic() + wait
+    while True:
+        result = conn.run(
+            command,
+            timeout=timeout,
+            env={"DEBIAN_FRONTEND": "noninteractive"},
+            operation_name=operation_name,
+        )
+        if result.returncode == 0 or not apt_lock_held(result) or time.monotonic() >= deadline:
+            return result
+        time.sleep(APT_LOCK_RETRY_SECONDS)
+
+
+def apt_failure(result: CommandResult) -> str:
+    """apt's error for the user, saying what to do when another package manager kept the lock."""
+    output = (result.stderr or result.stdout).strip()
+    if not apt_lock_held(result):
+        return output[:300]
+    holder = _APT_LOCK_HOLDER.search(output)
+    who = f"{holder[2]} (process {holder[1]})" if holder else "another package manager"
+    minutes = round(APT_LOCK_WAIT_SECONDS / 60)
+    return (
+        f"{who} kept the package lock for {minutes} minutes. A fresh server often installs updates "
+        "for a while after boot; wait until it finishes, then run the same command again."
+    )
+
+
+def apt_update_and_install(conn: ServerConnection, arguments: str, *, timeout: int) -> CommandResult:
+    """`apt-get update`, then `apt-get install ARGUMENTS`, each with its own lock wait and timeout.
+
+    One `update && install` command would download the lists again on every lock retry (dpkg's lock
+    can be held while the lists' is free) and share one timeout between a slow mirror and the install.
+    """
+    update = run_apt(conn, "apt-get update -qq", timeout=180, operation_name="apt update")
+    if update.returncode != 0:
+        return update
+    return run_apt(conn, f"apt-get install {arguments}", timeout=timeout, operation_name="apt install")
+
+
 def ensure_packages(
     conn: ServerConnection,
     packages: list[str],
@@ -48,23 +114,18 @@ def ensure_packages(
         return EnsureResult(changed=False, detail="all packages present")
 
     if update:
-        update_result = conn.run(
-            "apt-get update -qq",
-            timeout=180,
-            env={"DEBIAN_FRONTEND": "noninteractive"},
-            operation_name="apt update",
-        )
+        update_result = run_apt(conn, "apt-get update -qq", timeout=180, operation_name="apt update")
         if update_result.returncode != 0:
-            return EnsureResult(ok=False, detail=update_result.stderr.strip()[:200], result=update_result)
+            return EnsureResult(ok=False, detail=apt_failure(update_result), result=update_result)
 
-    install = conn.run(
+    install = run_apt(
+        conn,
         "apt-get install -y -qq " + " ".join(shlex.quote(p) for p in missing),
         timeout=timeout,
-        env={"DEBIAN_FRONTEND": "noninteractive"},
         operation_name="apt install",
     )
     if install.returncode != 0:
-        return EnsureResult(ok=False, detail=install.stderr.strip()[:200], result=install)
+        return EnsureResult(ok=False, detail=apt_failure(install), result=install)
     return EnsureResult(changed=True, detail=f"installed {len(missing)} packages", result=install)
 
 

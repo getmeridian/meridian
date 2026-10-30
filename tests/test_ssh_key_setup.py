@@ -226,7 +226,7 @@ def test_password_is_never_sent_to_an_unverified_host(key: KeyMaterial) -> None:
 
 
 def test_setup_saves_the_installed_key_in_the_server_profile(key: KeyMaterial, servers_file: Path) -> None:
-    with _patched(FakeSSH(), key, _terminal()), patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file):
+    with _patched(FakeSSH(), key, _terminal()), patch("meridian.config.SERVER_PROFILES_FILE", servers_file):
         run_add(HOST, name="edge", offer_key_setup=True)
 
     entry = ServerRegistry(servers_file).find("edge")

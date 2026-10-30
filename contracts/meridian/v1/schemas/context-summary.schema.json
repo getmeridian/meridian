@@ -1,0 +1,65 @@
+{
+  "additionalProperties": false,
+  "description": "One context as local state describes it; nothing here comes from a server.",
+  "properties": {
+    "control": {
+      "default": "",
+      "description": "The control server's saved address; empty with no fleet yet",
+      "title": "Control",
+      "type": "string"
+    },
+    "current": {
+      "description": "Whether commands without --context work on this fleet",
+      "title": "Current",
+      "type": "boolean"
+    },
+    "exits": {
+      "default": 0,
+      "title": "Exits",
+      "type": "integer"
+    },
+    "gateways": {
+      "default": 0,
+      "title": "Gateways",
+      "type": "integer"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "path": {
+      "description": "The directory holding this fleet's local files, ~ for the home directory",
+      "title": "Path",
+      "type": "string"
+    },
+    "relays": {
+      "default": 0,
+      "title": "Relays",
+      "type": "integer"
+    },
+    "state": {
+      "description": "ok: a deployed fleet; empty: nothing deployed yet; unreadable: local files need repair",
+      "enum": [
+        "ok",
+        "empty",
+        "unreadable"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "superseded_by": {
+      "default": "",
+      "description": "The context a restore moved this fleet to ('?' when unknown); this copy no longer changes it",
+      "title": "Superseded By",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "current",
+    "path",
+    "state"
+  ],
+  "title": "ContextSummary",
+  "type": "object"
+}

@@ -1,0 +1,83 @@
+{
+  "additionalProperties": false,
+  "description": "The signed node certificate and the service identity the agent pins from now on.",
+  "properties": {
+    "ca_certificate_pem": {
+      "description": "The internal CA; must match the bootstrap `ca_sha256`.",
+      "maxLength": 8192,
+      "minLength": 64,
+      "pattern": "^-----BEGIN CERTIFICATE-----\\n[A-Za-z0-9+/=\\n]+-----END CERTIFICATE-----\\n?$",
+      "title": "Ca Certificate Pem",
+      "type": "string"
+    },
+    "certificate_expires_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in Z.",
+      "maxLength": 40,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+      "title": "Certificate Expires At",
+      "type": "string"
+    },
+    "certificate_pem": {
+      "description": "Node certificate with URI SAN `meridian-agent://<fleet_id>/<node_id>`.",
+      "maxLength": 8192,
+      "minLength": 64,
+      "pattern": "^-----BEGIN CERTIFICATE-----\\n[A-Za-z0-9+/=\\n]+-----END CERTIFICATE-----\\n?$",
+      "title": "Certificate Pem",
+      "type": "string"
+    },
+    "fleet_epoch": {
+      "description": "Fleet epoch. A restore of the control service bumps it. An agent remembers the highest epoch it accepted and refuses desired state and commands from an older one (a resurrected old control server).",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "title": "Fleet Epoch",
+      "type": "integer"
+    },
+    "fleet_id": {
+      "description": "Fleet identifier: a lowercase UUID fixed when the fleet is created.",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "title": "Fleet Id",
+      "type": "string"
+    },
+    "node_id": {
+      "description": "Node identifier: the server's lowercase topology ID, unique within the fleet.",
+      "maxLength": 48,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "title": "Node Id",
+      "type": "string"
+    },
+    "protocol": {
+      "const": "meridian.agent/v1",
+      "default": "meridian.agent/v1",
+      "title": "Protocol",
+      "type": "string"
+    },
+    "service_certificate_pem": {
+      "description": "Certificate of the service signing key that signs desired state and commands: issued by the CA, with URI SAN `meridian-service://<fleet_id>`. The agent accepts no other certificate as the service's, so a node certificate can never sign desired state.",
+      "maxLength": 8192,
+      "minLength": 64,
+      "pattern": "^-----BEGIN CERTIFICATE-----\\n[A-Za-z0-9+/=\\n]+-----END CERTIFICATE-----\\n?$",
+      "title": "Service Certificate Pem",
+      "type": "string"
+    },
+    "type": {
+      "const": "enrolled",
+      "default": "enrolled",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "protocol",
+    "fleet_id",
+    "node_id",
+    "fleet_epoch",
+    "certificate_pem",
+    "certificate_expires_at",
+    "ca_certificate_pem",
+    "service_certificate_pem"
+  ],
+  "title": "EnrollResponse",
+  "type": "object"
+}

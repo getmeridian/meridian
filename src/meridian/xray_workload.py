@@ -1,9 +1,10 @@
-"""Render one reviewed workload into a Remnawave Xray profile."""
+"""Render one reviewed workload into the Xray profile its node agent runs."""
 
 from __future__ import annotations
 
 import hashlib
 import hmac
+import uuid
 from dataclasses import dataclass
 from typing import Any
 
@@ -144,7 +145,6 @@ def render_workload_config(
         ]
     config: dict[str, Any] = {
         # No access log: it would record every user's destinations on the server.
-        # Remnawave reads only startup errors from the log; IP stats use the API.
         "log": {"loglevel": "warning", "access": "none"},
         "dns": _dns_config(profile),
         "routing": routing,
@@ -305,8 +305,8 @@ def _render_inbound_body(
                 ],
                 "alpn": ["h3"],
             },
-            # Salamander turns QUIC (and its visible SNI) into random-looking UDP. Remnawave
-            # copies the inbound's finalmask into every client format.
+            # Salamander turns QUIC (and its visible SNI) into random-looking UDP. Every
+            # client format carries the inbound's finalmask.
             "finalmask": {"udp": [{"type": "salamander", "settings": {"password": salamander_password(keys)}}]},
         },
     }
@@ -320,6 +320,17 @@ def salamander_password(keys: RealityKeyBinding) -> str:
     """
     digest = hmac.new(keys.private_key.encode("utf-8"), b"meridian-hysteria2-salamander", hashlib.sha256)
     return digest.hexdigest()[:32]
+
+
+def bridge_client_uuid(keys: RealityKeyBinding, bridge_inbound_ref: str) -> str:
+    """Derive the VLESS ID a routing gateway dials one exit bridge with (control-service fleets).
+
+    Like the salamander password it follows the exit's Reality private key, so both ends render
+    it from saved state with nothing new to store; each bridge Inbound gets its own ID.
+    """
+    message = f"meridian-gateway-bridge:{bridge_inbound_ref}".encode()
+    digest = hmac.new(keys.private_key.encode("utf-8"), message, hashlib.sha256).digest()
+    return str(uuid.UUID(bytes=digest[:16], version=4))
 
 
 def _render_service_outbound(

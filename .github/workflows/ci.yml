@@ -53,6 +53,24 @@ jobs:
               env.write(f"MERIDIAN_TEST_XRAY={binary}\n")
           PY
 
+      - uses: pnpm/action-setup@v4
+        if: matrix.python-version == '3.12'
+        with:
+          version: 10.33.3
+
+      - uses: actions/setup-node@v6
+        if: matrix.python-version == '3.12'
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
+
+      - name: Install jsdom for console DOM tests
+        if: matrix.python-version == '3.12'
+        run: |
+          cd website && pnpm install --frozen-lockfile
+          echo "MERIDIAN_TEST_CONSOLE=1" >> "$GITHUB_ENV"
+
       - name: Run tests
         run: uv run pytest tests/ -v --tb=short
 
@@ -161,8 +179,45 @@ jobs:
       - name: Shellcheck
         run: shellcheck -e SC2086,SC2029,SC2087,SC2155 -S warning install.sh
 
-  # System Lab costs ~15 minutes of nested Docker, so it runs only when a change can
-  # alter what a real deploy does: runtime code, the lab itself, dependencies, or CI.
+  # The node agent's own suite, including the round trip against the real Python
+  # control service (tests/service.rs), which needs uv and the package installed.
+  agent:
+    name: Agent
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Install package with dev dependencies
+        working-directory: .
+        run: uv sync --extra dev
+
+      - name: Rust toolchain
+        run: rustup toolchain install stable --profile minimal --component clippy,rustfmt && rustup default stable
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: Tests
+        run: cargo test --locked
+
+      # The wheel carries both static musl builds; publish-pypi builds them the same way.
+      - name: Build musl binaries and check the wheel carries them
+        working-directory: .
+        run: |
+          make agent
+          uv build --wheel --out-dir "$RUNNER_TEMP/wheel"
+          uv run python scripts/verify_package_assets.py --agent-only "$RUNNER_TEMP"/wheel/*.whl
+
+  # System Lab costs ~15 minutes of Docker, so it runs only when a change can alter what
+  # a real deploy does: runtime code, the node agent, the lab itself, dependencies, or CI.
   # Docs, website, contracts, and other tests skip it; a manual dispatch always runs it.
   changes:
     name: Changes
@@ -186,7 +241,7 @@ jobs:
             while IFS= read -r changed; do
               case "$changed" in
                 src/meridian/*.md | src/meridian/i18n/locales/*) ;;
-                src/meridian/* | tests/systemlab/* | pyproject.toml | uv.lock | .github/workflows/ci.yml)
+                src/meridian/* | agent/* | tests/systemlab/* | tests/test_control_subscription_corpus.py | pyproject.toml | uv.lock | .github/workflows/ci.yml)
                   needed=true
                   echo "System Lab needed: $changed"
                   break ;;
@@ -206,6 +261,10 @@ jobs:
 
       - name: Generate test fixtures
         run: bash tests/systemlab/scripts/setup-fixtures.sh
+
+      # The controller deploys this checkout's agent; build the runner's architecture only.
+      - name: Build the node agent
+        run: make system-lab-agent
 
       - name: Run system lab
         run: docker compose -f tests/systemlab/compose.yml up --build --abort-on-container-exit --exit-code-from controller
@@ -238,7 +297,6 @@ jobs:
         run: |
           cd website
           pnpm install --frozen-lockfile
-          pnpm run contracts:check
           pnpm run build
 
       - name: Type-check Astro components
@@ -247,24 +305,21 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
 
-      - name: Validate packaged Studio assets
+      - name: Validate the website demos
         run: |
-          uv build --wheel
-          python3 scripts/verify_package_assets.py dist/*.whl
-
-      - name: Validate PWA demo generation
-        run: |
-          uv run meridian dev preview --output website/dist/demo
-          # Verify expected files exist
+          uv run python scripts/build_showcase.py website/dist/demo
+          # The connection page demo: shared assets, a disabled worker, and rendered pages
           test -f website/dist/demo/index.html
-          test -f website/dist/demo/pwa/app.js
-          test -f website/dist/demo/pwa/styles.css
-          test -f website/dist/demo/pwa/icon.svg
-          test -f website/dist/demo/pwa/sw.js
-          # Verify SW is no-op (disabled for static hosting)
-          grep -q "SW disabled" website/dist/demo/pwa/sw.js
-          # Verify client index.html is non-empty (jinja2 rendered correctly)
-          find website/dist/demo -mindepth 2 -name 'index.html' -size +0c | grep -q .
+          assets=$(echo website/dist/demo/sub/~pwa/pwa-*)
+          test -f "$assets/app.js"
+          test -f "$assets/styles.css"
+          test -f "$assets/icon.svg"
+          grep -q "SW disabled" website/dist/demo/sub/~pwa/sw.js
+          find website/dist/demo/sub -mindepth 2 -name 'index.html' -size +0c | grep -q .
+          # The owner console demo: the real console, its adapter, and recorded responses
+          test -f website/dist/demo/console/index.html
+          test -f website/dist/demo/console/ui/app.js
+          test -s website/dist/demo/console/demo-data.json
 
       - name: Check the site and demo for external requests
         run: node website/scripts/check-runtime-assets.mjs website/dist

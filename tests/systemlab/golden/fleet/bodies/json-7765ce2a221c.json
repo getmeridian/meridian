@@ -1,0 +1,29 @@
+{
+  "isFound": true,
+  "user": {
+    "shortUuid": "<short-uuid:1>",
+    "daysLeft": "<volatile>",
+    "trafficUsed": "<volatile>",
+    "trafficLimit": "0",
+    "lifetimeTrafficUsed": "<volatile>",
+    "lifetimeTrafficUsedBytes": "<volatile>",
+    "trafficLimitBytes": "0",
+    "trafficUsedBytes": "<volatile>",
+    "username": "acceptance",
+    "expiresAt": "<timestamp:1>",
+    "isActive": true,
+    "userStatus": "ACTIVE",
+    "trafficLimitStrategy": "NO_RESET"
+  },
+  "links": [
+    "vless://<vless-uuid:1>@<host:exit-a>:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality&sni=www.google.com&fp=chrome&pbk=<reality-pbk:1>&sid=<short-id:1>#exit-a%20%C2%B7%20Reality%20%C2%B7%20Chrome",
+    "vless://<vless-uuid:1>@<host:exit-a>:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality&sni=www.google.com&fp=firefox&pbk=<reality-pbk:1>&sid=<short-id:1>#exit-a%20%C2%B7%20Reality%20%C2%B7%20Firefox",
+    "vless://<vless-uuid:1>@<host:relay-a>:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality&sni=www.cloudflare.com&fp=chrome&pbk=<reality-pbk:1>&sid=<short-id:1>#exit-a%20%C2%B7%20Reality%20%C2%B7%20Chrome%20via%20relay-chain",
+    "vless://<vless-uuid:1>@<host:relay-a>:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality&sni=www.cloudflare.com&fp=firefox&pbk=<reality-pbk:1>&sid=<short-id:1>#exit-a%20%C2%B7%20Reality%20%C2%B7%20Firefox%20via%20relay-chain",
+    "vless://<vless-uuid:1>@<host:exit-b>:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality&sni=www.google.com&fp=chrome&pbk=<reality-pbk:2>&sid=<short-id:2>#exit-b%20%C2%B7%20Reality%20%C2%B7%20Chrome",
+    "vless://<vless-uuid:1>@<host:exit-b>:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality&sni=www.google.com&fp=firefox&pbk=<reality-pbk:2>&sid=<short-id:2>#exit-b%20%C2%B7%20Reality%20%C2%B7%20Firefox",
+    "vless://<vless-uuid:1>@<host:gateway-a>:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality&sni=www.google.com&fp=chrome&pbk=<reality-pbk:3>&sid=<short-id:3>#Smart%20routing"
+  ],
+  "ssConfLinks": {},
+  "subscriptionUrl": "https://<host:exit-a>/<sub-path:1>/sub/<short-uuid:1>"
+}

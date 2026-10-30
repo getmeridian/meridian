@@ -10,23 +10,26 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 import typer
 
+from meridian import __version__
 from meridian.cluster import ClusterConfig, SubscriptionPageConfig
 from meridian.commands import health
+from meridian.control.client import ControlServiceError
+from meridian.control.models import NodeRuntime, NodeStatus, ServiceHealth
+from meridian.control.service import utc_now
+from meridian.core.agent_types import NodeStateRef
 from meridian.core.fleet import TopologyNode
 from meridian.core.verification import build_verification_check
 from meridian.diagnostics.checks import CheckResult
 from meridian.diagnostics.evidence import finding
-from meridian.remnawave import RemnawaveError
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.editor import add_relay_to_intent
 from meridian.setup.single_server import single_server_intent
+from meridian.verification import VerificationHttpsRoute
+from tests.support.node_runtime import node_report
 
+FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
+OTHER_FLEET_ID = "1f1e2d3c-4b5a-4968-8776-655443322110"
 PASSED = CheckResult(name="check", status="passed", detail="healthy")
-PLUGINS_READY = build_verification_check(
-    "node_plugins",
-    "Node plugin readiness",
-    [finding("NODE_PLUGIN_KERNEL", "passed", "Kernel 6.8.0 supports node plugins")],
-)
 DNS_REACHABLE = build_verification_check(
     "exit_dns",
     "Encrypted DNS",
@@ -44,7 +47,9 @@ def fleet(servers_file: Path) -> SimpleNamespace:
     relay_ref = registry.find("relay-a").id
     intent = single_server_intent(None, server_ref=exit_ref, sni="www.example.com")
     intent = add_relay_to_intent(intent, server_ref=relay_ref, title="relay-a", exit_ref="main", listen_port=8443)
-    cluster = ClusterConfig(topology_intent=intent, subscription_page=SubscriptionPageConfig(deployed=True))
+    cluster = ClusterConfig(
+        topology_intent=intent, fleet_id=FLEET_ID, subscription_page=SubscriptionPageConfig(deployed=True)
+    )
     cluster.save()
     node = TopologyNode(
         ip="198.51.100.10",
@@ -58,38 +63,50 @@ def fleet(servers_file: Path) -> SimpleNamespace:
         xhttp_path="",
         ws_path="",
     )
-    panel = MagicMock()
-    panel.__enter__.return_value = panel
-    panel.get_node.return_value = SimpleNamespace(is_disabled=False, is_connected=True)
+    client = MagicMock()
+    client.__enter__.return_value = client
+    client.health.return_value = ServiceHealth(version=__version__, fleet_id=FLEET_ID, fleet_epoch=1)
+    client.node.return_value = NodeStatus(
+        node_id="exit-a",
+        fleet_epoch=1,
+        revision=2,
+        sha256="a" * 64,
+        spec_sha256="b" * 64,
+        applied=NodeStateRef(fleet_epoch=1, revision=2, sha256="a" * 64),
+        last_seen_at=utc_now(),
+        agent_version="0.1.0",
+        runtime=NodeRuntime.model_validate(
+            {key: node_report(utc_now())[key] for key in ("health", "versions", "observed_at")}
+        ),
+    )
     conn = MagicMock(local_mode=False, user="root")
     deployment = SimpleNamespace(
         public_tcp_ports=(443,),
         public_udp_ports=(),
         internal_ports={},
         public_tls_ports=(443,),
-        https_routes=(SimpleNamespace(port=443, tls_sni="www.example.com", host_header=""),),
+        https_routes=(VerificationHttpsRoute(kind="camouflage", port=443, tls_sni="www.example.com"),),
     )
-    return SimpleNamespace(cluster=cluster, node=node, panel=panel, conn=conn, deployment=deployment)
+    return SimpleNamespace(cluster=cluster, node=node, client=client, conn=conn, deployment=deployment)
 
 
 def _run(fleet: SimpleNamespace, *args: str, **kwargs: object) -> SimpleNamespace:
     mocks = SimpleNamespace(
-        containers=MagicMock(return_value=PASSED),
+        units=MagicMock(return_value=PASSED),
         ports=MagicMock(return_value=PASSED),
         tls=MagicMock(return_value=PASSED),
         blocking=MagicMock(return_value=[]),
-        plugins=MagicMock(return_value=kwargs.pop("plugins", PLUGINS_READY)),
         exit_dns=MagicMock(return_value=DNS_REACHABLE),
     )
     with (
         patch.object(health, "topology_from_local_cluster", return_value=SimpleNamespace(nodes=[fleet.node])),
-        patch.object(health, "make_panel", return_value=fleet.panel),
+        patch.object(health, "ControlClient", return_value=fleet.client),
+        patch.object(health, "expected_agent_version", return_value=kwargs.pop("agent", "0.1.0")),
         patch.object(health, "connection_for_entry", return_value=fleet.conn),
-        patch.object(health, "check_container_running", mocks.containers),
+        patch.object(health, "check_unit_active", mocks.units),
         patch.object(health, "check_port_listening", mocks.ports),
         patch.object(health, "check_tls_certificate", mocks.tls),
         patch.object(health, "check_disk_space", return_value=PASSED),
-        patch.object(health, "check_node_plugin_host", mocks.plugins),
         patch.object(health, "check_exit_dns", mocks.exit_dns),
         patch.object(health, "deployment_verification_context", return_value=fleet.deployment),
         patch.object(health, "blocking_jobs", mocks.blocking),
@@ -100,28 +117,6 @@ def _run(fleet: SimpleNamespace, *args: str, **kwargs: object) -> SimpleNamespac
     return mocks
 
 
-def test_control_and_exit_server_checks_node_panel_and_subscription_page_containers(fleet: SimpleNamespace) -> None:
-    containers = _run(fleet, "exit-a").containers
-
-    assert containers.call_args_list == [
-        call(fleet.conn, name, legacy)
-        for name, legacy in (
-            ("netagent", "remnawave-node"),
-            ("ctlsvc-api", "remnawave"),
-            ("ctlsvc-db", "remnawave-db"),
-            ("ctlsvc-cache", "remnawave-redis"),
-            ("ctlsvc-web", "remnawave-subscription-page"),
-        )
-    ]
-    fleet.panel.get_node.assert_called_once_with("node-uuid")
-
-
-def test_node_hosts_report_plugin_readiness(fleet: SimpleNamespace) -> None:
-    plugins = _run(fleet, "exit-a").plugins
-
-    plugins.assert_called_once_with(fleet.conn)
-
-
 def test_node_hosts_report_encrypted_dns_reachability(fleet: SimpleNamespace) -> None:
     mocks = _run(fleet, "exit-a")
 
@@ -129,46 +124,10 @@ def test_node_hosts_report_encrypted_dns_reachability(fleet: SimpleNamespace) ->
     mocks.exit_dns.assert_called_once_with(fleet.conn)
 
 
-def test_unready_plugin_host_is_reported_with_its_fix(
-    fleet: SimpleNamespace, capsys: pytest.CaptureFixture[str]
-) -> None:
-    unready = build_verification_check(
-        "node_plugins",
-        "Node plugin readiness",
-        [finding("NODE_PLUGIN_KERNEL", "warning", "Kernel 5.4.0 is older than 5.7", "move to a 5.7+ kernel")],
-    )
-
-    with pytest.raises(typer.Exit) as exc_info:
-        _run(fleet, "exit-a", plugins=unready)
-
-    # A warning is a finding like any other (non-LTS OS, disabled node): exit 4, never 3.
-    assert exc_info.value.exit_code == 4
-    assert "Fix: move to a 5.7+ kernel" in capsys.readouterr().err
-
-
-def test_disconnected_node_is_a_finding(fleet: SimpleNamespace) -> None:
-    fleet.panel.get_node.return_value = SimpleNamespace(is_disabled=False, is_connected=False)
-
-    with pytest.raises(typer.Exit) as exc_info:
-        _run(fleet, "exit-a")
-
-    assert exc_info.value.exit_code == 4
-
-
-def test_unreachable_panel_is_inconclusive_and_server_checks_still_run(fleet: SimpleNamespace) -> None:
-    fleet.panel.get_node.side_effect = RemnawaveError("Connection refused")
-
-    with pytest.raises(typer.Exit) as exc_info:
-        _run(fleet, "exit-a")
-
-    assert exc_info.value.exit_code == 3
-    fleet.conn.check_ssh.assert_called_once()
-
-
 def test_no_target_checks_every_fleet_server_including_relay_hops(fleet: SimpleNamespace) -> None:
     mocks = _run(fleet)
 
-    assert mocks.containers.call_count == 5
+    assert mocks.units.call_count == 3
     mocks.relay_check.assert_called_once_with("198.51.100.20", "")
 
 
@@ -204,7 +163,7 @@ def test_listener_checks_follow_compiled_public_and_internal_ports(fleet: Simple
         public_udp_ports=(9443,),
         internal_ports={"exit-a/reality": 39001},
         public_tls_ports=(7443,),
-        https_routes=(SimpleNamespace(port=7443, tls_sni="edge.example.com", host_header=""),),
+        https_routes=(VerificationHttpsRoute(kind="managed", port=7443, tls_sni="edge.example.com"),),
     )
     mocks = _run(fleet, "exit-a")
 
@@ -214,6 +173,20 @@ def test_listener_checks_follow_compiled_public_and_internal_ports(fleet: Simple
         call(fleet.conn, 39001, transport="any"),
     ]
     mocks.tls.assert_called_once_with(fleet.conn, "edge.example.com", port=7443)
+
+
+def test_tls_check_reads_meridians_certificate_before_the_camouflage_sites(fleet: SimpleNamespace) -> None:
+    fleet.deployment.https_routes = (
+        VerificationHttpsRoute(kind="camouflage", port=443, tls_sni="www.example.com"),
+        VerificationHttpsRoute(kind="managed", port=443, tls_sni="198.51.100.10", host_header="198.51.100.10"),
+    )
+    with patch.object(health, "health_report", wraps=health.health_report) as report:
+        mocks = _run(fleet, "exit-a")
+
+    mocks.tls.assert_called_once_with(fleet.conn, "198.51.100.10", port=443)
+    title, _scope, checks = report.call_args.args
+    assert not title.startswith("TLS")  # the server's heading keeps its name
+    assert "TLS certificate on 443" in [check.name for check in checks]
 
 
 def test_remote_check_measures_data_flow_from_the_deployer_without_the_differential(fleet: SimpleNamespace) -> None:
@@ -233,11 +206,111 @@ def test_findings_print_their_fix(capsys: pytest.CaptureFixture[str]) -> None:
     from meridian.commands.check_render import render_verification
     from meridian.diagnostics.evidence import check_from_result
 
-    failed = CheckResult(name="c", status="failed", detail="node is stopped", remediation="docker start remnawave-node")
-    check = check_from_result("container:remnawave-node", "Container remnawave-node", failed)
+    failed = CheckResult(name="c", status="failed", detail="node is stopped", remediation="systemctl start netagent")
+    check = check_from_result("unit:netagent.service", "Unit netagent.service", failed)
 
     render_verification("Server health", "exit-a", [check], "findings", "1 problem")
 
     err = capsys.readouterr().err
     assert "node is stopped" in err
-    assert "Fix: docker start remnawave-node" in err
+    assert "Fix: systemctl start netagent" in err
+
+
+@pytest.mark.parametrize(
+    ("service", "agent", "message"),
+    [("9.0.0", "0.1.0", "newer than this Meridian"), (__version__, "0.2.0", "this Meridian installs 0.2.0")],
+    ids=["newer-service", "older-agent"],
+)
+def test_version_skew_is_a_check_finding(
+    fleet: SimpleNamespace, capsys: pytest.CaptureFixture[str], service: str, agent: str, message: str
+) -> None:
+    fleet.client.health.return_value = ServiceHealth(version=service, fleet_id=FLEET_ID, fleet_epoch=1)
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run(fleet, "exit-a", agent=agent)
+
+    assert exc_info.value.exit_code == 4
+    assert message in capsys.readouterr().err
+
+
+def test_control_and_exit_server_checks_units_service_and_agent(fleet: SimpleNamespace) -> None:
+    mocks = _run(fleet, "exit-a")
+
+    assert [item.args[1] for item in mocks.units.call_args_list] == [
+        "ctld.service",
+        "netagent.service",
+        "netcore.service",
+    ]
+    fleet.client.health.assert_called_once_with()
+    fleet.client.node.assert_called_once_with("exit-a")
+
+
+def test_an_unreachable_control_service_is_inconclusive_and_server_checks_still_run(
+    fleet: SimpleNamespace,
+) -> None:
+    fleet.client.health.side_effect = ControlServiceError("no answer", retryable=True)
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run(fleet, "exit-a")
+
+    assert exc_info.value.exit_code == 3
+    fleet.client.node.assert_not_called()
+    fleet.conn.check_ssh.assert_called_once()
+
+
+def test_a_service_answering_for_another_fleet_is_a_finding(fleet: SimpleNamespace) -> None:
+    fleet.client.health.return_value = ServiceHealth(version="4.0.0", fleet_id=OTHER_FLEET_ID, fleet_epoch=1)
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run(fleet, "exit-a")
+
+    assert exc_info.value.exit_code == 4
+
+
+@pytest.mark.parametrize(
+    ("health_status", "check", "stamp", "exit_code"),
+    [
+        ("unhealthy", "pass", None, 4),
+        ("healthy", "fail", None, 4),
+        ("unhealthy", "fail", "2026-01-01T00:00:00Z", 3),
+    ],
+)
+def test_check_uses_fresh_runtime_health(
+    fleet: SimpleNamespace,
+    health_status: str,
+    check: str,
+    stamp: str | None,
+    exit_code: int,
+) -> None:
+    report = node_report(stamp or utc_now(), health=health_status, check=check)
+    fleet.client.node.return_value = NodeStatus.model_validate(
+        {
+            **fleet.client.node.return_value.model_dump(),
+            "runtime": {key: report[key] for key in ("health", "versions", "observed_at")},
+        }
+    )
+    with pytest.raises(typer.Exit) as raised:
+        _run(fleet, "exit-a")
+    assert raised.value.exit_code == exit_code
+
+
+def test_check_flags_a_failed_enforcement_task(fleet: SimpleNamespace) -> None:
+    fleet.client.health.return_value = ServiceHealth.model_validate(
+        {
+            "version": __version__,
+            "fleet_id": FLEET_ID,
+            "fleet_epoch": 1,
+            "status": "degraded",
+            "background_tasks": [
+                {
+                    "name": "enforcement",
+                    "last_attempt_at": utc_now(),
+                    "last_success_at": None,
+                    "error_code": "enforcement_failed",
+                }
+            ],
+        }
+    )
+    with pytest.raises(typer.Exit) as raised:
+        _run(fleet, "exit-a")
+    assert raised.value.exit_code == 4

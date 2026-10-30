@@ -4,31 +4,47 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass
-from typing import Annotated, NoReturn
+from typing import Annotated, Any, NoReturn
 
 import typer
 from typer.core import TyperGroup
 
 from meridian import __version__
 from meridian import cli_types as click
-from meridian.cli_catalog import command_path, requests_machine_output, supports_json
-from meridian.cli_groups import api_app, client_app, dev_app, fleet_app, node_app, relay_app, route_app, server_app
+from meridian.cli_backup import backup_app, restore_cmd
+from meridian.cli_catalog import command_path, requested_context, requests_help, requests_machine_output, supports_json
+from meridian.cli_context import context_app
+from meridian.cli_daemon import serve_cmd
+from meridian.cli_groups import (
+    api_app,
+    client_app,
+    dev_app,
+    fleet_app,
+    node_app,
+    relay_app,
+    route_app,
+    server_app,
+)
 from meridian.cli_options import (
+    CONTEXT_HELP,
     JSON_HELP,
     SELF_STEAL_HELP,
     SSH_PORT_HELP,
     USER_HELP,
     YES_HELP,
+    ForgetUnreachable,
     Json,
     SshPort,
     Target,
     Timeout,
     User,
     Yes,
+    add_context_option,
     enable_json_output,
 )
+from meridian.cli_privacy import privacy_app
 from meridian.config import DISABLE_UPDATE_CHECK
-from meridian.console import banner
+from meridian.console import banner, banner_due
 
 # Top-level `--help` sections, in display order, each with its commands in display order.
 # Typer lists plain commands before sub-apps, so the group class below imposes this order.
@@ -40,9 +56,9 @@ ADVANCED = "Advanced"
 _HELP_LAYOUT: tuple[tuple[str, tuple[str, ...]], ...] = (
     (GET_STARTED, ("setup", "deploy", "help")),
     (CLIENTS, ("client",)),
-    (SERVERS, ("node", "relay", "route", "fleet", "server")),
-    (CHECK_AND_FIX, ("check", "test", "probe", "doctor", "logs", "plan", "apply")),
-    (ADVANCED, ("panel", "scan", "studio", "update", "teardown", "api")),
+    (SERVERS, ("node", "relay", "route", "fleet", "server", "context")),
+    (CHECK_AND_FIX, ("check", "test", "probe", "doctor", "logs", "plan", "apply", "backup", "restore")),
+    (ADVANCED, ("panel", "privacy", "scan", "update", "migrate", "teardown", "api")),
 )
 # Option panels inside `deploy --help`.
 SERVER_ACCESS = "Server access"
@@ -61,6 +77,10 @@ RENAMED: dict[str, str] = {
     "relay deploy": "relay add",
 }
 RENAMED_OPTIONS: dict[str, str] = {"--server": "the first argument"}
+# Removed commands with no successor spelling: the refusal says where the work moved.
+RETIRED: dict[str, str] = {
+    "studio": "`meridian studio` was removed. Manage the fleet in the owner's web panel: `meridian panel`.",
+}
 
 
 @dataclass(frozen=True)
@@ -71,6 +91,7 @@ class _Invocation:
     supports_json: bool
     machine_output: bool
     help_requested: bool
+    context: str = ""
 
 
 _INVOCATION = "meridian.invocation"
@@ -81,7 +102,12 @@ class _SectionedGroup(TyperGroup):
 
     Resolving a command also records what it is (`_Invocation`) for the root callback,
     which runs before Click parses the command's own options, and refuses `RENAMED` spellings.
+    Every leaf also accepts the root's `--context` (`cli_options.add_context_option`).
     """
+
+    def __init__(self, **attrs: Any) -> None:
+        super().__init__(**attrs)
+        add_context_option(self)
 
     def list_commands(self, ctx: click.Context) -> list[str]:
         names = super().list_commands(ctx)
@@ -93,12 +119,17 @@ class _SectionedGroup(TyperGroup):
         if not ctx.resilient_parsing:
             path, command, rest = command_path(ctx, args)
             _refuse_renamed(ctx, path, command, rest)
-            leaf = command if command is not None and not isinstance(command, click.Group) else None
+            leaf = (
+                command
+                if command is not None and (not isinstance(command, click.Group) or command.invoke_without_command)
+                else None
+            )
             ctx.meta[_INVOCATION] = _Invocation(
-                name=".".join(path),
+                name="privacy.show" if path == ["privacy"] else ".".join(path),
                 supports_json=leaf is not None and supports_json(leaf),
                 machine_output=leaf is not None and requests_machine_output(ctx, path[-1], leaf, rest),
-                help_requested=any(arg in ctx.help_option_names for arg in args),
+                help_requested=requests_help(ctx, args, command, rest),
+                context=requested_context(ctx, path[-1], leaf, rest) if leaf is not None else "",
             )
         return super().resolve_command(ctx, args)
 
@@ -108,12 +139,16 @@ def _refuse_renamed(ctx: click.Context, path: list[str], command: click.Command 
     old = " ".join(path)
     if old in RENAMED:
         _fail_renamed(ctx, old, f"`meridian {old}` is now `meridian {RENAMED[old]}`", rest)
+    if old in RETIRED:
+        _fail_renamed(ctx, old, RETIRED[old], rest)
     if command is None or isinstance(command, click.Group):
         return
     for arg in rest:
         if arg == "--":
             return
         option = arg.split("=", 1)[0]
+        if old == "client show" and option == "--repair-page":
+            _fail_renamed(ctx, old, "Connection pages are served automatically. Use `meridian client show NAME`.", rest)
         if option in RENAMED_OPTIONS:
             message = f"`{option}` is now {RENAMED_OPTIONS[option]}: `meridian {old} SERVER`"
             _fail_renamed(ctx, old, message, rest)
@@ -132,12 +167,14 @@ app = typer.Typer(
     name="meridian",
     cls=_SectionedGroup,
     help=(
-        "Censorship-resistant proxy server management\n\n"
-        "Rent a server, run one command, and share a link or QR code.\n\n"
+        "Deploy and manage self-hosted VPN servers\n\n"
+        "One command turns a fresh VPS into a hardened VPN server, with a built-in "
+        "web panel and a connection page for each person.\n\n"
         "[dim]Quick start:[/dim]\n"
-        "  [cyan]meridian deploy 198.51.100.10[/cyan]   One server, shareable link at the end\n"
-        "  [cyan]meridian setup[/cyan]                  Guided wizard for several servers, relays, or routing\n"
+        "  [cyan]meridian deploy 198.51.100.10[/cyan]   One server, connection page at the end\n"
+        "  [cyan]meridian panel[/cyan]                  Web panel URL and one-time setup link\n"
         "  [cyan]meridian client add alice[/cyan]       Give another person access\n"
+        "  [cyan]meridian setup[/cyan]                  Guided wizard for several servers, relays, or routing\n"
         "  [cyan]meridian check[/cyan]                  Is everything healthy?"
     ),
     epilog=(
@@ -154,8 +191,13 @@ app.add_typer(node_app, name="node", rich_help_panel=SERVERS)
 app.add_typer(relay_app, name="relay", rich_help_panel=SERVERS)
 app.add_typer(route_app, name="route", rich_help_panel=SERVERS)
 app.add_typer(fleet_app, name="fleet", rich_help_panel=SERVERS)
+app.add_typer(context_app, name="context", rich_help_panel=SERVERS)
 app.add_typer(api_app, name="api", rich_help_panel=ADVANCED)
 app.add_typer(dev_app, name="dev", hidden=True)
+app.add_typer(backup_app, name="backup", rich_help_panel=CHECK_AND_FIX)
+app.add_typer(privacy_app, name="privacy", rich_help_panel=ADVANCED)
+app.command("restore", rich_help_panel=CHECK_AND_FIX)(restore_cmd)
+app.command("serve", hidden=True)(serve_cmd)
 
 
 @app.callback(invoke_without_command=True)
@@ -168,8 +210,9 @@ def main_callback(
     ),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress output"),
     lang: str = typer.Option("", "--lang", help="Language for the setup wizard: en, ru, fa, zh", show_default=False),
+    context: str = typer.Option("", "--context", metavar="NAME", help=CONTEXT_HELP, show_default=False),
 ) -> None:
-    """Meridian — Censorship-resistant proxy server management."""
+    """Meridian — Deploy and manage self-hosted VPN servers."""
     if ctx.resilient_parsing:
         return
 
@@ -224,6 +267,16 @@ def main_callback(
         print(f"meridian {__version__}")
         raise typer.Exit()
 
+    from meridian.commands.context import select_for_invocation
+
+    select_for_invocation(
+        root=context,
+        leaf=invocation.context if invocation is not None else "",
+        command=invocation.name if invocation is not None else "",
+        help_requested=invocation is not None and invocation.help_requested,
+        machine_output=invocation is not None and invocation.machine_output,
+    )
+
     if ctx.invoked_subcommand is None:
         _offer_setup_or_help(ctx, interactive=not (machine_output or quiet))
         raise typer.Exit()
@@ -233,10 +286,17 @@ def main_callback(
 
         # Human output speaks the chosen language, else the terminal's; machine output stays English.
         i18n.set_locale(i18n.explicit_locale() or i18n.system_locale())
-    if not machine_output and not (invocation is not None and invocation.help_requested):
-        banner(__version__)
+    # `serve` is a daemon: its journal gets no banner, and the server never phones out for updates.
+    daemon = ctx.invoked_subcommand == "serve"
+    if not daemon:
+        from meridian.commands.backup import pull_after_mutations
 
-    if not DISABLE_UPDATE_CHECK and not machine_output and ctx.invoked_subcommand not in ("update",):
+        pull_after_mutations(ctx.call_on_close)  # every change to a service fleet ends with a fresh snapshot
+    if not machine_output and not daemon and not (invocation is not None and invocation.help_requested):
+        if banner_due(__version__):
+            banner(__version__)
+
+    if not DISABLE_UPDATE_CHECK and not machine_output and ctx.invoked_subcommand not in ("update", "serve"):
         from meridian.update import check_for_update
 
         check_for_update(__version__)
@@ -261,34 +321,6 @@ def _offer_setup_or_help(ctx: typer.Context, *, interactive: bool) -> None:
             setup_v4.run()
             return
     typer.echo(ctx.get_help())
-
-
-@app.command("studio", rich_help_panel=ADVANCED)
-def studio_cmd(
-    port: int | None = typer.Option(
-        None,
-        "--port",
-        min=0,
-        max=65535,
-        show_default=False,
-        help="Localhost port (default 7391, or the next free one, so browser drafts survive restarts); 0 picks any",
-    ),
-    assets_dir: str = typer.Option("", "--assets-dir", help="Directory containing built Studio assets"),
-    no_open: bool = typer.Option(False, "--no-open", help="Print the URL without opening a browser"),
-) -> None:
-    """Open Meridian Studio, the local web UI (experimental)"""
-    try:
-        from meridian.commands.studio import run
-    except ModuleNotFoundError as exc:
-        from meridian.console import fail
-
-        fail(
-            f"Meridian Studio needs extra packages ({exc.name})",
-            hint="Install them with: uv tool install 'meridian-vpn[studio]'  (or pip install 'meridian-vpn[studio]')",
-            hint_type="user",
-        )
-
-    run(port=port, assets_dir=assets_dir, no_open=no_open)
 
 
 @app.command("help", rich_help_panel=GET_STARTED)
@@ -330,6 +362,7 @@ def plan_cmd(
 @app.command("apply", rich_help_panel=CHECK_AND_FIX)
 def apply_cmd(
     yes: Yes = False,
+    forget_unreachable: ForgetUnreachable = False,
     _json: Json = False,
 ) -> None:
     """Apply the reviewed topology in cluster.yml to your servers
@@ -343,7 +376,7 @@ def apply_cmd(
     """
     from meridian.commands.apply import run
 
-    run(yes=yes)
+    run(yes=yes, forget_unreachable=forget_unreachable)
 
 
 @app.command("setup", rich_help_panel=GET_STARTED)
@@ -447,7 +480,8 @@ def deploy_cmd(
     client_ips: bool = typer.Option(
         False,
         "--client-ips/--no-client-ips",
-        help="Let the panel see each client's real IP (for per-user IP limits); off keeps it private",
+        hidden=True,  # the control service cannot forward client IPs yet
+        help="Forward each client's real IP to the server",
     ),
     display_name: str = typer.Option(
         "",
@@ -486,7 +520,7 @@ def deploy_cmd(
         "",
         "--cancel-file",
         hidden=True,
-        help="Stop at the next safe point once this file exists (used by Studio)",
+        help="Stop at the next safe point once this file exists (used by automation)",
     ),
 ) -> None:
     """Deploy one server and get a shareable connection link
@@ -592,7 +626,7 @@ def test_cmd(
     timeout: Timeout = "5",
     _json: Json = False,
 ) -> None:
-    """Test real proxy traffic from this device (no SSH needed)
+    """Test real VPN traffic from this device (no SSH needed)
 
     Runs one active client's delivered connection end to end. [cyan]--basic[/cyan]
     only checks reachability and cannot be combined with [cyan]--client[/cyan];
@@ -689,12 +723,14 @@ def logs_cmd(
 
 @app.command("panel", rich_help_panel=ADVANCED)
 def panel_cmd(
-    show_password: bool = typer.Option(False, "--show-password", help="Also print the admin password"),
+    setup_link: bool = typer.Option(
+        False, "--setup-link", hidden=True, help="Print a fresh one-time setup link for the web panel"
+    ),
 ) -> None:
-    """Show the Remnawave admin panel URL and login, and what Meridian manages there"""
+    """Show the fleet's web panel URL, with a one-time setup link until it has an owner"""
     from meridian.commands.panel import run
 
-    run(show_password=show_password)
+    run(setup_link=setup_link)
 
 
 @app.command("teardown", rich_help_panel=ADVANCED)
@@ -729,3 +765,11 @@ def update_cmd(
     exit_code = run_self_update(major=major)
     if exit_code:
         raise typer.Exit(exit_code)
+
+
+@app.command("migrate", rich_help_panel=ADVANCED)
+def migrate_cmd(yes: Yes = False) -> None:
+    """Move this Remnawave fleet onto Meridian's own control service, keeping every link"""
+    from meridian.commands.migrate import run
+
+    run(yes)

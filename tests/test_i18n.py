@@ -177,3 +177,10 @@ def test_language_step_lists_every_language_and_defaults_to_the_terminal(
     io = _IO("")
     assert Prompter(io).language() == "fa"
     assert all(name in "\n".join(io.output) for name in i18n.LOCALE_NAMES.values())
+
+
+@pytest.mark.parametrize(("locale", "expected"), [("en", "main"), ("ru", "main"), ("fa", "⁨main⁩")])
+def test_names_are_bidi_isolated_only_inside_persian_text(locale: i18n.Locale, expected: str) -> None:
+    """Plain terminals printed the isolate marks around node names in every language."""
+    i18n.set_locale(locale)
+    assert i18n.isolate("main") == expected

@@ -4,6 +4,20 @@
       "additionalProperties": false,
       "description": "Meridian-owned access squad and human users.\n\n`users` are panel usernames (Latin only, as Remnawave requires); `display_names`\nkeeps the name as typed, in any script, for users whose username differs from it.",
       "properties": {
+        "creation_settings": {
+          "description": "First account settings only; reviewed applies never replace an existing person's settings.",
+          "patternProperties": {
+            "^[A-Za-z0-9_-]+$": {
+              "$ref": "#/$defs/UserCreationSettings"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 36,
+            "minLength": 3
+          },
+          "title": "Creation Settings",
+          "type": "object"
+        },
         "display_names": {
           "patternProperties": {
             "^[A-Za-z0-9_-]+$": {
@@ -49,6 +63,16 @@
       "additionalProperties": false,
       "description": "Canonical Remnawave subscription presentation settings.",
       "properties": {
+        "client_routing": {
+          "default": "ru-split",
+          "description": "Client routing: ru-split bypasses Russian destinations; full tunnels them. Both bypass private/LAN ranges and retain Xray's best-effort BitTorrent bypass.",
+          "enum": [
+            "ru-split",
+            "full"
+          ],
+          "title": "Client Routing",
+          "type": "string"
+        },
         "formats": {
           "items": {
             "enum": [
@@ -62,6 +86,10 @@
           "minItems": 1,
           "title": "Formats",
           "type": "array"
+        },
+        "owner_contact": {
+          "$ref": "#/$defs/OwnerContact",
+          "description": "Optional public owner contact, chosen through reviewed delivery intent."
         },
         "profile_title": {
           "default": "Meridian",
@@ -78,9 +106,101 @@
           "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Template Name",
           "type": "string"
+        },
+        "update_interval_hours": {
+          "default": 6,
+          "maximum": 168,
+          "minimum": 1,
+          "title": "Update Interval Hours",
+          "type": "integer"
         }
       },
       "title": "DeliveryIntent",
+      "type": "object"
+    },
+    "OwnerContact": {
+      "additionalProperties": false,
+      "properties": {
+        "link": {
+          "default": "",
+          "maxLength": 2048,
+          "pattern": "^(?:|https://[^\\s]+|tg://[^\\s]+|mailto:[^\\s]+)$",
+          "title": "Link",
+          "type": "string"
+        },
+        "text": {
+          "default": "",
+          "maxLength": 120,
+          "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]*$",
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "title": "OwnerContact",
+      "type": "object"
+    },
+    "UserCreationSettings": {
+      "additionalProperties": false,
+      "description": "First service-owned settings, applied only when an access account is created.",
+      "properties": {
+        "device_limit": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Device Limit"
+        },
+        "expire_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expire At"
+        },
+        "status": {
+          "default": "active",
+          "enum": [
+            "active",
+            "disabled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "traffic_limit_bytes": {
+          "default": 0,
+          "maximum": 9223372036854775807,
+          "minimum": 0,
+          "title": "Traffic Limit Bytes",
+          "type": "integer"
+        },
+        "traffic_limit_strategy": {
+          "default": "no_reset",
+          "enum": [
+            "no_reset",
+            "day",
+            "week",
+            "month"
+          ],
+          "title": "Traffic Limit Strategy",
+          "type": "string"
+        }
+      },
+      "title": "UserCreationSettings",
       "type": "object"
     }
   },

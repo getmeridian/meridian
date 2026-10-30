@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "client_routing": {
+      "anyOf": [
+        {
+          "enum": [
+            "ru-split",
+            "full"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Client Routing"
+    },
+    "dry_run": {
+      "default": false,
+      "title": "Dry Run",
+      "type": "boolean"
+    },
+    "yes": {
+      "default": false,
+      "title": "Yes",
+      "type": "boolean"
+    }
+  },
+  "title": "FleetRoutingRequest",
+  "type": "object"
+}

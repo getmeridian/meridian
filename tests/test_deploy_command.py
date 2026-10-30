@@ -14,11 +14,13 @@ from typer.testing import CliRunner
 
 import meridian.cli as cli
 from meridian.cli import app
+from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands.deploy import _print_success
 from meridian.console import set_json_mode, set_quiet_mode
 from meridian.core.deploy import DeployRequest
 from meridian.handoff import HandoffLinks
-from meridian.servers import ServerRegistry
+from meridian.servers import ServerEntry, ServerRegistry
+from meridian.setup.single_server import single_server_intent
 from tests.support.text import unstyle
 
 runner = CliRunner()
@@ -34,7 +36,6 @@ def _invoke(args: list[str]):
 
 def test_dry_run_compiles_a_single_server_topology_without_touching_state(tmp_home: Path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
 
     result = _invoke(["deploy", "198.51.100.10", "--domain", "vpn.example.com", "--dry-run", "--json"])
 
@@ -47,18 +48,89 @@ def test_dry_run_compiles_a_single_server_topology_without_touching_state(tmp_ho
     assert not (tmp_home / "servers.json").exists()
 
 
+def _save_deployed_fleet(tmp_home: Path) -> tuple[ClusterConfig, ServerEntry]:
+    registry = ServerRegistry(tmp_home / "servers.json")
+    registry.add(ServerEntry(host="198.51.100.10", user="root", name="main"))
+    entry = registry.find("198.51.100.10")
+    assert entry is not None
+    cluster = ClusterConfig(
+        panel=PanelConfig(
+            url="https://198.51.100.10/panel",
+            api_token="test-token",
+            server_ip=entry.host,
+            secret_path="existing-secret-path",
+            sub_path="existing-info-page",
+        ),
+        topology_intent=single_server_intent(None, server_ref=entry.id, domain="proxy.example.com"),
+    )
+    cluster.save()
+    return cluster, entry
+
+
+def test_dry_run_of_a_redeploy_reuses_saved_panel_and_transport_paths(tmp_home: Path, monkeypatch) -> None:
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    cluster, _ = _save_deployed_fleet(tmp_home)
+    assert cluster.topology_intent is not None
+    saved_paths = {path.protocol: path.path for path in cluster.topology_intent.exits[0].paths}
+
+    result = _invoke(["deploy", "198.51.100.10", "--domain", "proxy.example.com", "--dry-run", "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.stdout)["data"]
+    assert data["mode"] == "redeploy"
+    assert data["info_page_path"] == "existing-info-page"
+    assert data["xhttp_path"] == saved_paths["xhttp"]
+    assert data["ws_path"] == saved_paths["wss"]
+
+
+def test_dry_run_refuses_a_server_that_is_not_an_exit_of_the_saved_fleet(tmp_home: Path, monkeypatch) -> None:
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    _save_deployed_fleet(tmp_home)
+
+    result = _invoke(["deploy", "198.51.100.20", "--dry-run", "--json"])
+
+    assert result.exit_code == 2, result.output
+    assert "meridian node add" in json.loads(result.stdout)["errors"][0]["hint"]
+
+
+def test_dry_run_refuses_a_cluster_without_topology_with_rebuild_guidance(tmp_home: Path, monkeypatch) -> None:
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    ClusterConfig(panel=PanelConfig(url="https://198.51.100.10/panel", api_token="test-token")).save()
+
+    result = _invoke(["deploy", "198.51.100.10", "--dry-run", "--json"])
+
+    assert result.exit_code == 2, result.output
+    error = json.loads(result.stdout)["errors"][0]
+    assert "development build" in error["message"]
+    assert "cluster.yml" in error["hint"]
+
+
+def test_cancel_file_stops_a_machine_deploy_before_it_connects(tmp_home: Path, monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    marker = tmp_path / "cancel"
+    marker.touch()
+
+    with patch("meridian.commands.deploy.resolve_server") as resolve_server:
+        result = _invoke(["deploy", "198.51.100.10", "--yes", "--json", "--cancel-file", str(marker)])
+
+    assert result.exit_code == 5, result.output
+    envelope = json.loads(result.stdout)
+    assert envelope["status"] == "cancelled"
+    assert envelope["data"]["phase"] == "preflight"
+    resolve_server.assert_not_called()
+
+
 def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
     conn = MagicMock(port=22, identity_file="")
     resolved = SimpleNamespace(ip="198.51.100.10", user="root", port=22, machine_id="", conn=conn)
     runtime = MagicMock()
     runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)
-    runtime.publish_handoff.return_value = [
+    runtime.handoff.return_value = [
         HandoffLinks(
             "alice",
             subscription_url="https://198.51.100.10/pages/sub/s1",
-            page_url="https://198.51.100.10/pages/u1/",
+            page_url="https://198.51.100.10/pages/sub/s1",
         )
     ]
 
@@ -78,7 +150,7 @@ def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypa
     assert intent.access.users == ["alice"]
     assert intent.exits[0].geo_block is False and intent.harden is True
     runtime.verify.assert_called_once()
-    runtime.publish_handoff.assert_called_once_with(["alice"])
+    runtime.handoff.assert_called_once_with(["alice"])
     data = json.loads(result.stdout)["data"]
     assert data["mode"] == "first_deploy"
     assert data["sni"] == "www.google.com"
@@ -89,7 +161,7 @@ def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypa
 def _fake_runtime() -> MagicMock:
     runtime = MagicMock()
     runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)
-    runtime.publish_handoff.return_value = [HandoffLinks("default", subscription_url="https://198.51.100.10/p/sub/s")]
+    runtime.handoff.return_value = [HandoffLinks("default", subscription_url="https://198.51.100.10/p/sub/s")]
     return runtime
 
 
@@ -112,7 +184,6 @@ def _deploy_with(runtime: MagicMock, traffic, targets=("www.google.com", "dl.goo
 
 def test_dead_camouflage_target_falls_back_to_the_next_candidate(tmp_home: Path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
     runtime = _fake_runtime()
 
     result = _deploy_with(runtime, [("failed", "connection reset"), ("ok", "exit IP 198.51.100.10")])
@@ -124,7 +195,6 @@ def test_dead_camouflage_target_falls_back_to_the_next_candidate(tmp_home: Path,
 
 def test_explicit_sni_is_never_swapped_and_dead_traffic_fails(tmp_home: Path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
     runtime = _fake_runtime()
 
     result = _deploy_with(runtime, [("failed", "connection reset")], args=("--sni", "www.example.com"))
@@ -132,12 +202,11 @@ def test_explicit_sni_is_never_swapped_and_dead_traffic_fails(tmp_home: Path, mo
     assert result.exit_code == 3
     assert "no traffic passes" in unstyle(result.output)
     assert runtime.apply_intent.call_count == 1
-    runtime.publish_handoff.assert_not_called()
+    runtime.handoff.assert_not_called()
 
 
 def test_egress_mismatch_and_inconclusive_evidence_do_not_fail_a_deploy(tmp_home: Path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
 
     for outcome in (("egress_mismatch", "exit IP 203.0.113.1 does not match"), ("inconclusive", "no observer")):
         result = _deploy_with(_fake_runtime(), [outcome])
@@ -182,7 +251,6 @@ def test_traffic_check_waits_for_node_warm_up_before_declaring_failure(monkeypat
 
 def test_cancel_file_present_before_start_reports_cancelled_without_ssh(tmp_home: Path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
     cancel_file = tmp_home / "cancel"
     cancel_file.touch()
 
@@ -202,7 +270,6 @@ def test_cancel_during_apply_stops_before_verification_and_handoff(tmp_home: Pat
     from meridian.core.cancellation import OperationCancellation, OperationCancelledError
 
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
     runtime = _fake_runtime()
     runtime.apply_intent.side_effect = OperationCancelledError(
         OperationCancellation(
@@ -218,7 +285,7 @@ def test_cancel_during_apply_stops_before_verification_and_handoff(tmp_home: Pat
     assert envelope["summary"]["changed"] is True
     assert envelope["data"]["message"] == "Apply stopped after 4 of 12 resource actions."
     runtime.verify.assert_not_called()
-    runtime.publish_handoff.assert_not_called()
+    runtime.handoff.assert_not_called()
     assert runtime.constructed_with["cancellation"].path == tmp_home / "cancel"
 
 
@@ -239,7 +306,6 @@ def test_deploy_offers_key_setup_only_without_yes_and_saves_the_key(
     tmp_home: Path, monkeypatch, yes: bool, offer: bool
 ) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
     key_path = str(tmp_home / "ssh" / "meridian_ed25519")
     resolved = SimpleNamespace(
         ip="198.51.100.10", user="root", port=22, machine_id="", conn=MagicMock(port=22, identity_file=key_path)

@@ -54,3 +54,6 @@ references/
 video/out/
 video/.remotion/
 video/.cache/
+
+# System Lab raw captures (hold live lab secrets)
+tests/systemlab/output/

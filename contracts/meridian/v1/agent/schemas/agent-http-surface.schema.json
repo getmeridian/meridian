@@ -1,0 +1,269 @@
+{
+  "$defs": {
+    "AgentEndpoint": {
+      "additionalProperties": false,
+      "description": "One HTTP endpoint of the agent transport.",
+      "properties": {
+        "auth": {
+          "description": "`enrollment_token`: the body carries the one-time token. `node_proof`: the body carries a signed `NodeProof`. `session`: `Authorization: Bearer <session_token>` from `welcome`.",
+          "enum": [
+            "enrollment_token",
+            "node_proof",
+            "session"
+          ],
+          "title": "Auth",
+          "type": "string"
+        },
+        "idempotent": {
+          "description": "Repeating the request with the same body has no further effect.",
+          "title": "Idempotent",
+          "type": "boolean"
+        },
+        "long_poll": {
+          "title": "Long Poll",
+          "type": "boolean"
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "name": {
+          "pattern": "^[a-z][a-z_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path below `{service_url}/{base_path}/`; `{name}` segments are parameters.",
+          "pattern": "^[a-z][a-z0-9/_{}-]*$",
+          "title": "Path",
+          "type": "string"
+        },
+        "request_schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Agent schema name (`agent/schemas/<name>.schema.json`) of the body; `null` for none.",
+          "title": "Request Schema"
+        },
+        "response_content_type": {
+          "enum": [
+            "application/json",
+            "application/octet-stream"
+          ],
+          "title": "Response Content Type",
+          "type": "string"
+        },
+        "response_schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Agent schema name of a 200 JSON body; `null` if not JSON.",
+          "title": "Response Schema"
+        },
+        "summary": {
+          "maxLength": 400,
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "method",
+        "path",
+        "auth",
+        "request_schema",
+        "response_schema",
+        "response_content_type",
+        "long_poll",
+        "idempotent",
+        "summary"
+      ],
+      "title": "AgentEndpoint",
+      "type": "object"
+    },
+    "AgentErrorMapping": {
+      "additionalProperties": false,
+      "description": "HTTP status per error code; every non-2xx body is the error schema.",
+      "properties": {
+        "code": {
+          "enum": [
+            "invalid_request",
+            "unsupported_protocol",
+            "enrollment_token_invalid",
+            "unauthenticated",
+            "credential_expired",
+            "credential_revoked",
+            "clock_skew",
+            "epoch_superseded",
+            "counter_regression",
+            "conflict",
+            "not_found",
+            "payload_too_large",
+            "rate_limited",
+            "unavailable",
+            "internal"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "http_status": {
+          "maximum": 599,
+          "minimum": 400,
+          "title": "Http Status",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "code",
+        "http_status"
+      ],
+      "title": "AgentErrorMapping",
+      "type": "object"
+    },
+    "LongPollSemantics": {
+      "additionalProperties": false,
+      "description": "How `poll` holds a request open.",
+      "properties": {
+        "client_timeout_margin_seconds": {
+          "description": "The agent's read timeout is `wait_seconds` plus this margin.",
+          "maximum": 60,
+          "minimum": 1,
+          "title": "Client Timeout Margin Seconds",
+          "type": "integer"
+        },
+        "default_wait_seconds": {
+          "maximum": 120,
+          "minimum": 1,
+          "title": "Default Wait Seconds",
+          "type": "integer"
+        },
+        "empty_result": {
+          "description": "What an answer with nothing new means and what the agent does next.",
+          "title": "Empty Result",
+          "type": "string"
+        },
+        "max_wait_seconds": {
+          "maximum": 120,
+          "minimum": 1,
+          "title": "Max Wait Seconds",
+          "type": "integer"
+        },
+        "returns_early_when": {
+          "description": "Events that end the wait before `wait_seconds`.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Returns Early When",
+          "type": "array"
+        }
+      },
+      "required": [
+        "default_wait_seconds",
+        "max_wait_seconds",
+        "client_timeout_margin_seconds",
+        "returns_early_when",
+        "empty_result"
+      ],
+      "title": "LongPollSemantics",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Every endpoint of the `meridian.agent/v1` HTTPS transport.",
+  "properties": {
+    "base_path": {
+      "const": "agent/v1",
+      "default": "agent/v1",
+      "description": "Joined to the bootstrap `service_url` (scheme, host, secret path).",
+      "title": "Base Path",
+      "type": "string"
+    },
+    "content_type": {
+      "const": "application/json",
+      "default": "application/json",
+      "title": "Content Type",
+      "type": "string"
+    },
+    "endpoints": {
+      "items": {
+        "$ref": "#/$defs/AgentEndpoint"
+      },
+      "title": "Endpoints",
+      "type": "array"
+    },
+    "error_schema": {
+      "title": "Error Schema",
+      "type": "string"
+    },
+    "errors": {
+      "items": {
+        "$ref": "#/$defs/AgentErrorMapping"
+      },
+      "title": "Errors",
+      "type": "array"
+    },
+    "long_poll": {
+      "$ref": "#/$defs/LongPollSemantics"
+    },
+    "max_request_bytes": {
+      "description": "Larger bodies get `payload_too_large`.",
+      "minimum": 1,
+      "title": "Max Request Bytes",
+      "type": "integer"
+    },
+    "max_response_bytes": {
+      "description": "Largest JSON body an agent must accept (desired state).",
+      "minimum": 1,
+      "title": "Max Response Bytes",
+      "type": "integer"
+    },
+    "protocol": {
+      "const": "meridian.agent/v1",
+      "default": "meridian.agent/v1",
+      "title": "Protocol",
+      "type": "string"
+    },
+    "schema": {
+      "const": "meridian.agent-http/v1",
+      "default": "meridian.agent-http/v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "transport_notes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Transport Notes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "protocol",
+    "base_path",
+    "content_type",
+    "max_request_bytes",
+    "max_response_bytes",
+    "transport_notes",
+    "long_poll",
+    "error_schema",
+    "errors",
+    "endpoints"
+  ],
+  "title": "AgentHttpSurface",
+  "type": "object"
+}

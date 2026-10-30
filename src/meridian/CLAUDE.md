@@ -1,41 +1,45 @@
 # src/meridian — Python CLI package
 ## Design decisions
-**Cluster config** — one hidden Schema V3 `cluster.yml` holds topology intent, bindings, allocations, and checkpoints (`cluster.py` model, `cluster_persistence.py` YAML); users live in Remnawave.
-**Panel access** — `remnawave/` speaks HTTPS from the deployer's machine to nginx's secret path on 443 with an API token; no SSH tunnel.
-**SSH abstraction** — `ServerConnection` runs locally or over SSH (non-root adds `sudo -n`); `conn.run()` returns `CommandResult`, `ssh_transfer.py` moves files, and the `SSHUI` callbacks (`ssh_auth.py`) keep Rich out of transport. Keepalives end a silent connection in ~15s, and a timeout or exit 255 drops the ControlMaster (`reset_multiplex()`) so the next command redials.
-**One key bootstrap** — `ssh_keys.py` owns Meridian's key pair, the `authorized_keys` install, and the key-login check for Engine and CLI alike; `resolve.install_meridian_key()` is the CLI's one-time-password path.
-**Server facts** — `facts.py` caches OS, kernel, Docker, UFW, containers, sshd ports, disk, and sysctl; use it before adding one-off probe parsing.
-**Errors over exits** — library modules raise `MeridianError` subclasses (`core/errors.py`) carrying a `category`; only command entry points call `console.fail()`, whose `hint_type` picks the footer and exit code (tested). Every error must be actionable.
-**Shared logic stays out of commands** — `resolve.py`, `panel_bootstrap.py`, `node_deploy.py`, and `reality_keys.py` serve commands and Engine; library code never imports `commands/`.
-**Protocol keys** — `core/topology.py` owns the protocol vocabulary; `handoff.protocol_key()` classifies delivered links.
-**Exit country** — `registry_country.py` reads the RIR country via RDAP (no geo-IP) when an exit is first named and stores it in `ExitIntent.region` (`--country` overrides), keeping the compiler pure.
-**Local home** — `config.default_home()` prefers `$XDG_CONFIG_HOME/meridian` (`~/.config/meridian`), adopting an older 4.x home (`~/.meridian-v4`, `~/.meridian`) only if XDG is absent and it holds `servers.json`; `MERIDIAN_HOME` overrides.
-**Neutral host names** — `host_runtime.py` is the one place for container, Compose project, and `/opt` names (`ctlsvc-*`, `netagent`); `legacy` names are read only to migrate and clean up, and images keep upstream tags.
-**Binary pins** — `binary_pins.py` holds the server binaries `fleet upgrade` may raise (Realm) and their trust rules; `github_releases.py` reads newer same-major releases with GitHub's per-asset sha256, saved in `ClusterConfig.binary_pins` and carried into `runtime_pins` like image pins.
-**Workload secrets** — `reconciler/workloads.py` allocates or reuses complete Reality key triples and persists them before remote mutation; `xray_workload.py` renders only reviewed protocols and egress.
+**Cluster config** — one hidden `cluster.yml` holds topology intent, bindings, allocations, and checkpoints (`cluster.py` model, `cluster_persistence.py` YAML); users and operator-owned data live in the control service.
+**Service access** — `control/client.py` speaks HTTPS from the deployer to nginx's secret path on 443 with the admin token, no SSH tunnel; client paths use `control_access.access_panel()`, fleet views `fleet_panel()`. `remnawave/` keeps only what `meridian migrate` reads.
+**SSH abstraction** — `ServerConnection` runs locally or over SSH (non-root adds `sudo -n`); `conn.run()` returns `CommandResult`, `ssh_transfer.py` moves files, and `SSHUI` callbacks keep Rich out of transport. A timeout or exit 255 drops the ControlMaster so the next command redials.
+**One key bootstrap** — `ssh_keys.py` owns Meridian's key pair, `authorized_keys` install, and the key-login check; `resolve.install_meridian_key()` is the one-time-password path.
+**Server facts** — `facts.py` caches OS, kernel, firewall, sshd ports, disk, and sysctl; use it before adding one-off probe parsing.
+**Errors over exits** — library modules raise `MeridianError` subclasses (`core/errors.py`) with a `category`; only command entry points call `console.fail()`. Every error must be actionable.
+**Shared logic stays out of commands** — `resolve.py` and `setup/` serve all commands; library code never imports `commands/`.
+**Deploy targets** — `resolve.resolve_deploy_target()` turns a request and the server shelf into IP, SSH user, and port without opening SSH; `deploy` and its dry run share it.
+**Exit country** — `registry_country.py` reads the RIR country via RDAP (no geo-IP) when an exit is first named and stores it in intent, keeping the compiler pure.
+**Local home and contexts** — `config.default_home()` prefers `$XDG_CONFIG_HOME/meridian`; the home keeps per-person files and is the `default` context, and other fleets live in `contexts/NAME/` (`contexts.py`). `fleet_contexts.refuse_servers_claimed_elsewhere()` keeps a host in one fleet; a context a restore took over (`superseded.json`) only runs reads. `config.select_context()` binds per-fleet globals once.
+**Neutral host names** — `host_runtime.py` is the one place for unit, `/opt`, and config names (`ctld`, `netagent`, `netcore`).
+**Binary pins** — `binary_pins.py` holds the server binaries `fleet upgrade` may raise and their trust rules; `github_releases.py` reads same-major releases with GitHub's per-asset sha256.
+**Remnawave fleets are only read to move them** — a legacy `cluster.yml` loads as `remnawave`, and every command except the move points at `meridian migrate` (`migrate/`).
+**Revisions on the service** — `service_fence.py` moves the apply fence into the service and records each reviewed apply as a revision; once handed over, fence.json makes older Meridians refuse, and a service newer than the CLI refuses too (`core/version_skew.py`).
+**Workload secrets** — `reconciler/workloads.py` allocates complete Reality key triples and persists them before remote mutation; `xray_workload.py` renders only reviewed protocols and egress.
 ## What's done well
-- **Forward-compatible YAML** — unknown keys land inertly in `_extra` (never store load-bearing state there); `load_topology_cluster()` refuses pre-topology files with rebuild guidance.
-- **One owner per state** — Remnawave owns users, `cluster.yml` owns topology, and the control server's apply fence (`reconciler/fence.py`) stops a stale or foreign copy from applying.
-- **Read-only fleet projection** — `adapters/cluster.py` is the only source of node/relay rows; it never projects routing gateways as exits or source-restricted relay hops as public endpoints.
+- **Forward-compatible YAML** — unknown keys land inertly in `_extra` (never store load-bearing state there); pre-topology files are refused with rebuild guidance.
+- **Applied kinds are explicit** — `core/resources.APPLIED_KINDS` lists what plan/apply drives; a leftover panel binding fails closed outside migrate's cut-over.
+- **One owner per state** — the service owns users, `cluster.yml` owns topology, and the fence stops a stale or foreign copy from applying.
+- **Read-only fleet projection** — `adapters/cluster.py` is the only source of node and relay rows; it never shows gateways as exits or restricted relay hops as public endpoints.
 ## Pitfalls
-- **Local state is fail-closed** — only missing `cluster.yml`/`servers.json` means fresh; malformed files need recovery, and `srv-*` IDs survive connection edits.
-- **Never hard-code the home in messages** — print `config.HOME_DISPLAY`; a literal `~/.meridian` sent 4.x users into 3.x's directory.
-- **Rendered inputs are typed** — validate and canonicalize hostname, SNI, port, and transport path before nginx, Xray, or Remnawave serialization.
-- **Shared links never use the panel path** — build subscription URLs with `PanelConfig.subscription_url()` (connection-page path + `/sub/`); `SUB_PUBLIC_DOMAIN` matches it.
-- **Local mode follows the saved profile** — `ServerEntry.runs_here()` matches the recorded `/etc/machine-id` or a bindable address, never the outbound IP (a laptop on the server's VPN shares it); open saved servers with `resolve.connection_for_entry()`.
-- **A one-time SSH password only reaches a trusted host key** — it rides the askpass environment of one command and is never saved, logged, or put in an error; `check_ssh` raises `SSHPasswordOnlyError` (user, `ssh-copy-id` hint) only when the server lists `password` or `keyboard-interactive`.
-- **Sudo must be passwordless and checked up front** — a failing `sudo -n true` is a user error with a `sudo "$(command -v meridian)"` or NOPASSWD hint, never an SSH key problem; so is an unwritable `known_hosts`.
-- **SSH ControlPath must fit a Unix socket** — macOS allows 103 bytes and ssh adds 17; hash the target into the path and drop multiplexing when `MERIDIAN_HOME` is still too deep.
-- **Camouflage targets** — never apple.com (ASN mismatch with VPS providers) or www.microsoft.com (certificate over REALITY's 8192-byte limit; no traffic passes); `diagnostics.camouflage.camouflage_refusal()` refuses both for every `--sni` and `sni` command, and a relay's own SNI must be reachable from its exit, which dials it. A `--self-steal` name is served by the exit only after apply, so `own_hostname()` checks its DNS from the exit instead: unresolved stops, elsewhere warns.
-- **Reality key material is atomic** — refuse partial private/public/short-ID state instead of rotating keys; `node replace` carries a workload's keys to the new server.
-- **Hysteria2 always carries salamander** — the `finalmask` password derives from the workload's Reality private key (`salamander_password()`); never store or rotate it separately.
-- **Exits resolve only over IP-addressed DoH** — `xray_workload.EXIT_DOH_RESOLVERS` as parallel `https+local` servers plus freedom `ForceIPv4v6` (gateways keep the host resolver: foreign DoH may be blocked in-country); a plain or hostname resolver, `localhost`, or an `AsIs`/`UseIP*` strategy hands names to the host's plain resolver.
-- **Unknown panel admin is a user error** — with no saved credentials and register and login both refused, stop with restore-or-`meridian teardown` guidance.
-- **Local Xray is evidence, not a requirement** — validate delivered configs with `run -test` (malformed fails); a missing runtime or an archive that misses `XRAY_SHA256` is inconclusive, and that archive never runs.
-- **Deployer-side HTTPS uses httpx** — its certifi bundle verifies GitHub and Docker Hub; urllib failed certificate checks on uv-managed Pythons, so `fleet upgrade` could never see a release.
-- **Exit-IP observers are single-stack** — match the server's address family, or a dual-stack exit answers over the other one and fails the egress match.
-- **Failed traffic is classified by a direct TCP connect** — `connectivity.py` separates `no_traffic` from `unreachable`; UDP (Hysteria2) paths are never TCP-probed.
-- **Whatever adds a firewall rule retires it** — node retirement deletes the Docker-internal node API rule (`fw-node-api`, plus its pre-rename comment).
-- **Readiness checks name their transient errors** — pass `poll_until_ready(transient=...)`; anything else propagates instead of timing out silently.
-- **Page evidence must be saved** — `client show` offers a page link only with a saved `connection_page_markers` entry; `publish_connection_pages()` saves after marking (it once only marked, so every new client's link vanished after `client add`).
-- **A missing PWA template raises** — never upload a blank page.
+- **A handed-over fence.json is never a fallback** — an unreachable service is retried and refused, or a stale copy could apply around it.
+- **Server ownership compares canonical addresses and fails closed** — two spellings of one IPv6 address once passed as two machines; an unreadable context refuses, and bindings claim servers until retirement.
+- **A live agent that could not apply is a failed node**, and a refused service token (401/403) stops `fleet status` with exit 2 rather than reading as degraded.
+- **Persist a requested cut-off in the typed binding before applying the removal** — runtime flags alone lose it after an interrupted apply.
+- **Local state is fail-closed** — only missing `cluster.yml`/`servers.json` means fresh; malformed files need recovery.
+- **Print `config.HOME_DISPLAY`, never a literal home path**, and read paths as `config.NAME` at call time — an import-time copy ignores `--context` (architecture-tested).
+- **Rendered inputs are typed** — validate and canonicalize hostname, SNI, port, and path before nginx, Xray, or service serialization.
+- **Build subscription URLs with `PanelConfig.subscription_url()`** — shared links never use the panel path.
+- **Local mode follows the saved profile** — `ServerEntry.runs_here()` matches the recorded machine ID or a bindable address, never the outbound IP (a laptop on the server's VPN shares it).
+- **A one-time SSH password only reaches a trusted host key** — it rides one command's askpass environment and is never saved, logged, or put in an error.
+- **Sudo must be passwordless and checked up front** — a failing `sudo -n true` is a user error with a NOPASSWD hint, never an SSH key problem.
+- **SSH ControlPath must fit a Unix socket** (103 bytes on macOS) — hash the target into the path and drop multiplexing when the home is too deep.
+- **Camouflage targets** — never apple.com (ASN mismatch with VPS providers) or www.microsoft.com (certificate over REALITY's size limit, so no traffic passes); `camouflage_refusal()` refuses both. A relay's SNI must be reachable from its exit, and a `--self-steal` name's DNS is checked from the exit.
+- **Reality key material is atomic** — refuse partial state instead of rotating keys; `node replace` carries keys to the new server. Hysteria2's salamander password derives from the Reality private key and is never stored separately.
+- **Exits resolve only over IP-addressed DoH** (`xray_workload.EXIT_DOH_RESOLVERS`) — a hostname resolver or `AsIs` strategy hands names to the host's plain resolver; gateways keep the host resolver, since foreign DoH may be blocked in-country.
+- **Local Xray is evidence, not a requirement** — a missing runtime is inconclusive, and an archive that misses `XRAY_SHA256` never runs.
+- **Deployer-side HTTPS uses httpx** — urllib failed certificate checks on uv-managed Pythons.
+- **Exit-IP observers match the server's address family**, or a dual-stack exit answers over the other one.
+- **Failed traffic is classified by a direct TCP connect** (`connectivity.py`); UDP paths are never TCP-probed.
+- **Whatever adds a firewall rule retires it.**
+- **Readiness checks name their transient errors** (`poll_until_ready(transient=...)`); anything else propagates.
+- **A missing PWA template raises** — never render a blank page.

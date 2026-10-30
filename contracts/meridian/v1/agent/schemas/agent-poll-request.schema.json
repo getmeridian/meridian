@@ -1,0 +1,72 @@
+{
+  "$defs": {
+    "NodeStateRef": {
+      "additionalProperties": false,
+      "description": "Points at one desired-state document by epoch, revision, and content hash.",
+      "properties": {
+        "fleet_epoch": {
+          "description": "Fleet epoch. A restore of the control service bumps it. An agent remembers the highest epoch it accepted and refuses desired state and commands from an older one (a resurrected old control server).",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Fleet Epoch",
+          "type": "integer"
+        },
+        "revision": {
+          "description": "Desired-state revision for one node. Ordering is (fleet_epoch, revision): within an epoch revisions only grow; a higher epoch wins even with a lower revision.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "sha256": {
+          "description": "The document's `sha256` (hash of its `resources`).",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fleet_epoch",
+        "revision",
+        "sha256"
+      ],
+      "title": "NodeStateRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Long-poll for a newer desired state or pending commands.\n\nCatch-up is by revision: an agent that was offline sends the document it\nholds and receives the current whole-node document if it differs.",
+  "properties": {
+    "have": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/NodeStateRef"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The newest desired state the agent holds, applied or not; `null` if it holds none."
+    },
+    "type": {
+      "const": "poll",
+      "default": "poll",
+      "title": "Type",
+      "type": "string"
+    },
+    "wait_seconds": {
+      "description": "How long the service may hold the request; 0 answers at once.",
+      "maximum": 120,
+      "minimum": 0,
+      "title": "Wait Seconds",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "type",
+    "have",
+    "wait_seconds"
+  ],
+  "title": "PollRequest",
+  "type": "object"
+}

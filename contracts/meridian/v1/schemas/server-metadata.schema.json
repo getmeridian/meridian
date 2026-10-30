@@ -1,0 +1,64 @@
+{
+  "additionalProperties": false,
+  "description": "Deployer-owned metadata keyed to a server declared in the topology.",
+  "properties": {
+    "allowance_bytes": {
+      "anyOf": [
+        {
+          "maximum": 9223372036854775807,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Allowance Bytes"
+    },
+    "pay_every": {
+      "anyOf": [
+        {
+          "enum": [
+            "month",
+            "year"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Pay Every"
+    },
+    "pay_on": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Pay On"
+    },
+    "provider": {
+      "default": "",
+      "maxLength": 80,
+      "title": "Provider",
+      "type": "string"
+    },
+    "reset_day": {
+      "default": 1,
+      "maximum": 31,
+      "minimum": 1,
+      "title": "Reset Day",
+      "type": "integer"
+    }
+  },
+  "title": "ServerMetadata",
+  "type": "object"
+}

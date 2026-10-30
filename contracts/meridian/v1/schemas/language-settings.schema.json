@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "description": "Starting page and app status language; auto follows browsers and keeps app messages English.",
+  "properties": {
+    "language": {
+      "default": "auto",
+      "enum": [
+        "auto",
+        "en",
+        "ru",
+        "fa",
+        "zh"
+      ],
+      "title": "Language",
+      "type": "string"
+    }
+  },
+  "title": "LanguageSettings",
+  "type": "object"
+}

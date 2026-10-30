@@ -22,21 +22,21 @@ from meridian.update import (
 
 class TestShouldCheck:
     def test_first_check_returns_true(self, tmp_home: Path) -> None:
-        with patch("meridian.update.CACHE_DIR", tmp_home / "cache"):
+        with patch("meridian.config.CACHE_DIR", tmp_home / "cache"):
             assert _should_check() is True
 
     def test_second_check_within_interval_returns_false(self, tmp_home: Path) -> None:
-        with patch("meridian.update.CACHE_DIR", tmp_home / "cache"):
+        with patch("meridian.config.CACHE_DIR", tmp_home / "cache"):
             assert _should_check() is True
             assert _should_check() is False
 
     def test_check_after_interval_returns_true(self, tmp_home: Path) -> None:
-        with patch("meridian.update.CACHE_DIR", tmp_home / "cache"), patch("meridian.update.UPDATE_CHECK_INTERVAL", 0):
+        with patch("meridian.config.CACHE_DIR", tmp_home / "cache"), patch("meridian.update.UPDATE_CHECK_INTERVAL", 0):
             assert _should_check() is True
             assert _should_check() is True  # interval is 0, always check
 
     def test_unwritable_cache_disables_optional_check(self) -> None:
-        with patch("meridian.update.CACHE_DIR", Path("/dev/null/cache")):
+        with patch("meridian.config.CACHE_DIR", Path("/dev/null/cache")):
             assert _should_check() is False
 
 

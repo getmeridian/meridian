@@ -14,6 +14,7 @@ import Accordion from './Accordion.astro';
 import Callout from './Callout.astro';
 import CommandBuilder from './CommandBuilder.astro';
 import ArchitectureDiagram from './ArchitectureDiagram.astro';
+import Showcase from './Showcase.astro';
 import { LOCALES, LOCALE_INFO, homeOf, landingT, type LandingKey, type Locale } from '../i18n';
 
 interface Props {
@@ -110,7 +111,14 @@ const organization = {
       </div>
     </section>
 
-    <section id="builder-section" class="section section--band">
+    <section id="demo" class="section section--band">
+      <div class="container">
+        <SectionHead eyebrow={t('showcase.label')} title={t('showcase.title')} desc={t('showcase.desc')} />
+        <Showcase locale={locale} />
+      </div>
+    </section>
+
+    <section id="builder-section" class="section">
       <div class="container">
         <SectionHead eyebrow={t('builder.label')} title={t('builder.title')} desc={t('builder.desc')} />
         <CommandBuilder locale={locale} />

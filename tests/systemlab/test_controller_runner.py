@@ -13,6 +13,7 @@ _STAGES = (
     "05-single-deploy.sh",
     "10-deploy.sh",
     "20-subscriptions.sh",
+    "25-golden.sh",
     "30-resilience.sh",
     "40-removal.sh",
 )
@@ -23,92 +24,44 @@ def _write_stage(path: Path, body: str) -> None:
     path.chmod(0o755)
 
 
-def test_controller_cleans_nested_state_and_preserves_stage_failure(tmp_path: Path) -> None:
-    scripts = tmp_path / "scripts"
-    stages = scripts / "stages"
-    stages.mkdir(parents=True)
-    marker = tmp_path / "calls"
-    _write_stage(stages / _STAGES[0], 'printf "bootstrap\\n" >> "$CALL_MARKER"; exit 7')
-    for stage in _STAGES[1:]:
-        _write_stage(stages / stage, f'printf "{stage}\\n" >> "$CALL_MARKER"')
-    _write_stage(stages / "90-cleanup.sh", 'printf "cleanup\\n" >> "$CALL_MARKER"')
-
-    result = subprocess.run(
+def _run(scripts: Path, marker: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
         ["bash", str(_RUNNER)],
         cwd=_ROOT,
-        env={
-            **os.environ,
-            "SYSTEMLAB_SCRIPT_DIR": str(scripts),
-            "CALL_MARKER": str(marker),
-        },
+        env={**os.environ, "SYSTEMLAB_SCRIPT_DIR": str(scripts), "CALL_MARKER": str(marker), "SYSTEMLAB_KEEP": ""},
         text=True,
         capture_output=True,
         check=False,
     )
+
+
+def test_controller_stops_at_the_first_failing_stage_and_keeps_its_status(tmp_path: Path) -> None:
+    scripts = tmp_path / "scripts"
+    stages = scripts / "stages"
+    stages.mkdir(parents=True)
+    marker = tmp_path / "calls"
+    _write_stage(stages / _STAGES[0], 'printf "bootstrap\\n" >> "$CALL_MARKER"')
+    _write_stage(stages / _STAGES[1], 'printf "single\\n" >> "$CALL_MARKER"; exit 7')
+    for stage in _STAGES[2:]:
+        _write_stage(stages / stage, f'printf "{stage}\\n" >> "$CALL_MARKER"')
+
+    result = _run(scripts, marker)
 
     assert result.returncode == 7
-    assert marker.read_text(encoding="utf-8").splitlines() == ["bootstrap", "cleanup"]
+    assert marker.read_text(encoding="utf-8").splitlines() == ["bootstrap", "single"]
     assert "V4 SYSTEM LAB PASSED" not in result.stdout
 
 
-def test_controller_reports_success_only_after_cleanup(tmp_path: Path) -> None:
+def test_controller_reports_success_only_after_every_stage(tmp_path: Path) -> None:
     scripts = tmp_path / "scripts"
     stages = scripts / "stages"
     stages.mkdir(parents=True)
     marker = tmp_path / "calls"
     for stage in _STAGES:
         _write_stage(stages / stage, f'printf "{stage}\\n" >> "$CALL_MARKER"')
-    _write_stage(stages / "90-cleanup.sh", 'printf "cleanup\\n" >> "$CALL_MARKER"')
 
-    result = subprocess.run(
-        ["bash", str(_RUNNER)],
-        cwd=_ROOT,
-        env={
-            **os.environ,
-            "SYSTEMLAB_SCRIPT_DIR": str(scripts),
-            "CALL_MARKER": str(marker),
-        },
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    result = _run(scripts, marker)
 
     assert result.returncode == 0, result.stderr
-    assert marker.read_text(encoding="utf-8").splitlines() == [
-        _STAGES[0],
-        "cleanup",
-        *_STAGES[1:],
-        "cleanup",
-    ]
+    assert marker.read_text(encoding="utf-8").splitlines() == list(_STAGES)
     assert "V4 SYSTEM LAB PASSED" in result.stdout
-
-
-def test_controller_fails_before_deploy_when_precleanup_fails(tmp_path: Path) -> None:
-    scripts = tmp_path / "scripts"
-    stages = scripts / "stages"
-    stages.mkdir(parents=True)
-    marker = tmp_path / "calls"
-    for stage in _STAGES:
-        _write_stage(stages / stage, f'printf "{stage}\n" >> "$CALL_MARKER"')
-    _write_stage(stages / "90-cleanup.sh", 'printf "cleanup\n" >> "$CALL_MARKER"; exit 9')
-
-    result = subprocess.run(
-        ["bash", str(_RUNNER)],
-        cwd=_ROOT,
-        env={
-            **os.environ,
-            "SYSTEMLAB_SCRIPT_DIR": str(scripts),
-            "CALL_MARKER": str(marker),
-        },
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-
-    assert result.returncode == 9
-    assert marker.read_text(encoding="utf-8").splitlines() == [
-        _STAGES[0],
-        "cleanup",
-        "cleanup",
-    ]
-    assert "V4 SYSTEM LAB PASSED" not in result.stdout

@@ -1,5 +1,5 @@
-.PHONY: help install sync test lint format check typecheck validate dead-code ci system-lab-preflight system-lab system-lab-fast \
-       templates dead-code ai-docs build publish clean hooks
+.PHONY: help install sync test lint format check typecheck validate dead-code ci system-lab-preflight system-lab-agent system-lab system-lab-fast \
+       templates dead-code ai-docs build publish clean hooks agent
 
 ## —— Setup ——————————————————————————————————————————————
 
@@ -41,6 +41,7 @@ validate: ## Check CLI docs, app list sync, and generated contracts
 	uv run python tests/validate_cli_docs.py
 	uv run python tests/validate_apps_sync.py
 	uv run python scripts/export_contracts.py --check
+	uv run python scripts/validate_api_docs.py
 
 dead-code: ## Report dead / test-only code and unused params (warnings, never fails)
 	@echo "  —— Dead-code report (warnings only) ——"
@@ -53,7 +54,14 @@ ci: check typecheck templates validate dead-code ## Run full CI locally
 system-lab-preflight: ## Check Compose, daemon registry access, and container DNS
 	bash tests/systemlab/scripts/preflight.sh
 
-system-lab: system-lab-preflight ## Run multi-node system lab (clean state, ~10min)
+# The lab's servers run the Docker daemon's architecture; build just that agent target.
+system-lab-agent:
+	@arch=$$(docker info --format '{{.Architecture}}'); \
+		case "$$arch" in x86_64|amd64) target=x86_64-unknown-linux-musl ;; aarch64|arm64) target=aarch64-unknown-linux-musl ;; \
+		*) echo "System lab has no agent target for $$arch" >&2; exit 2 ;; esac; \
+		$(MAKE) agent AGENT_TARGETS=$$target
+
+system-lab: system-lab-preflight system-lab-agent ## Run multi-node system lab (clean state, ~10min)
 	bash tests/systemlab/scripts/setup-fixtures.sh
 	@set -eu; \
 		cleanup() { docker compose -f tests/systemlab/compose.yml down -v; }; \
@@ -67,7 +75,7 @@ system-lab: system-lab-preflight ## Run multi-node system lab (clean state, ~10m
 		cleanup; \
 		docker compose -f tests/systemlab/compose.yml up --build --abort-on-container-exit --exit-code-from controller
 
-system-lab-fast: system-lab-preflight ## Re-run system lab preserving cached images (~3-4min after first run)
+system-lab-fast: system-lab-preflight system-lab-agent ## Re-run system lab preserving cached images (~3-4min after first run)
 	bash tests/systemlab/scripts/setup-fixtures.sh
 	@set -eu; \
 		cleanup() { docker compose -f tests/systemlab/compose.yml down; }; \
@@ -123,12 +131,19 @@ ai-docs: ## Bundle the docs `doctor --ai` pastes into its prompt (needs Node)
 		echo "  - Node.js not found; skipping the AI reference (doctor --ai works without it)"; \
 	fi
 
-studio-assets: ## Build website assets bundled into `meridian studio`
-	cd website && pnpm run contracts:check && pnpm run build
-	cp VERSION website/dist/version
-	find website/dist -name .DS_Store -delete
+# Pinned toolchain image (multi-arch index digest), run on the host's own architecture;
+# agent/scripts/build-musl.sh cross-compiles the other target without emulation.
+AGENT_IMAGE := rust:1.99.1-alpine3.22@sha256:731f64e16c12af70970d9a3655eecb1eecab4898352f09688a8e5ca2ab8b77c5
+AGENT_TARGETS ?= x86_64-unknown-linux-musl aarch64-unknown-linux-musl
 
-build: ai-docs studio-assets ## Build wheel and sdist
+agent: ## Build static netagent binaries (musl, in Docker) into agent/dist/
+	@mkdir -p agent/dist
+	docker run --rm -v "$(CURDIR)/agent:/src:ro" -v "$(CURDIR)/agent/dist:/out" \
+		-v meridian-agent-registry:/usr/local/cargo/registry -v meridian-agent-target:/target \
+		-e CARGO_TARGET_DIR=/target -w /src $(AGENT_IMAGE) sh /src/scripts/build-musl.sh $(AGENT_TARGETS)
+	@ls -l $(foreach t,$(AGENT_TARGETS),agent/dist/netagent-$(t))
+
+build: ai-docs ## Build wheel and sdist
 	uv build
 	uv run python scripts/verify_package_assets.py dist/*.whl
 

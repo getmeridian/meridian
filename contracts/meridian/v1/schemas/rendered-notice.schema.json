@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "description": "The current person's literal notice, never a template or a credential.",
+  "properties": {
+    "text": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "title": "Text",
+      "type": "string"
+    },
+    "until": {
+      "anyOf": [
+        {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Until"
+    }
+  },
+  "required": [
+    "text"
+  ],
+  "title": "RenderedNotice",
+  "type": "object"
+}

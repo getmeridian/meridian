@@ -79,7 +79,7 @@ def _cli(
         with ExitStack() as stack:
             stack.enter_context(patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster))
             panel_cls = stack.enter_context(
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel or _make_panel_mock())
+                patch("meridian.control_access.ServiceAccessPanel", return_value=panel or _make_panel_mock())
             )
             if runtime is not None:
                 stack.enter_context(patch("meridian.setup.runtime.SetupRuntime", return_value=runtime))
@@ -104,7 +104,7 @@ class TestRunAdd:
         with (
             _cli(cluster, panel, runtime=runtime),
             patch(
-                "meridian.commands.client.publish_connection_pages",
+                "meridian.commands.client.client_handoffs",
                 return_value=[HandoffLinks("alice", subscription_url="https://198.51.100.1/pages/sub/abc123")],
             ) as publish_handoff,
         ):
@@ -165,7 +165,7 @@ class TestRunAdd:
 
         with (
             _cli(_make_cluster(tmp_home, users=["default"]), panel, runtime=runtime),
-            patch("meridian.commands.client.publish_connection_pages", return_value=[]) as publish_handoff,
+            patch("meridian.commands.client.client_handoffs", return_value=[]) as publish_handoff,
         ):
             run_add(names=["Биба"])
 
@@ -202,15 +202,6 @@ class TestRunShow:
         assert "panel-admin" not in output
         assert "panel-password" not in output
 
-    def test_v4_show_does_not_expose_internal_service_user(self, tmp_home: Path) -> None:
-        panel = _make_panel_mock()
-
-        with _cli(_make_cluster(tmp_home, users=["alice"]), panel), pytest.raises(typer.Exit) as exc_info:
-            run_show(name="meridian-route-123")
-
-        assert exc_info.value.exit_code == 2
-        panel.get_user.assert_not_called()
-
     def test_show_nonexistent_client_fails(self, tmp_home: Path) -> None:
         panel = _make_panel_mock()
         panel.get_user.return_value = None
@@ -234,81 +225,14 @@ class TestRunShow:
 
 
 class TestShowConnectionPage:
-    _PAGE_URL = "https://198.51.100.1/pages/550e8400-e29b-41d4-a716-446655440099/"
-
-    def test_show_advertises_only_a_published_page(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        from meridian.pwa import mark_connection_page_deployed
-
-        cluster = _make_cluster(tmp_home)
-        user = _make_user("alice")
-        panel = _make_panel_mock()
-        panel.get_user.return_value = user
-
-        for published in (False, True):
-            if published:
-                mark_connection_page_deployed(cluster, user.vless_uuid)
-            with _cli(cluster, panel, json_mode=True):
-                run_show(name="alice")
-
-            assert _json(capsys)["data"]["handoff"]["share_available"] is published
-
-    def test_show_repair_page_republishes_from_the_subscription(self, tmp_home: Path) -> None:
-        cluster = _make_cluster(tmp_home)
-
-        with (
-            _cli(cluster),
-            patch(
-                "meridian.handoff.publish_connection_pages",
-                return_value=[HandoffLinks("alice", page_url=self._PAGE_URL)],
-            ) as publish,
-            patch("meridian.commands.client.print_handoff_links") as print_links,
-        ):
-            run_show(name="alice", repair_page=True)
-
-        publish.assert_called_once_with(cluster, ["alice"])
-        assert print_links.call_args.kwargs["page_url"] == self._PAGE_URL
-
-    def test_show_failed_explicit_page_repair_returns_partial_json(
+    def test_show_offers_the_subscription_as_the_page_without_publication(
         self, tmp_home: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        with (
-            _cli(_make_cluster(tmp_home), json_mode=True),
-            patch(
-                "meridian.handoff.publish_connection_pages",
-                return_value=[HandoffLinks("alice", error="upload failed")],
-            ),
-            pytest.raises(typer.Exit) as exc_info,
-        ):
-            run_show(name="alice", repair_page=True)
-
-        assert exc_info.value.exit_code == 3
-        payload = _json(capsys)
-        assert payload["status"] == "ok"
-        assert payload["data"]["handoff"]["share_available"] is False
-        assert payload["warnings"][0]["code"] == "MERIDIAN_CLIENT_PAGE_REPAIR_FAILED"
-
-    def test_show_repair_save_failure_reports_remote_page_change(
-        self, tmp_home: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        cluster = _make_cluster(tmp_home)
-
-        with (
-            _cli(cluster, json_mode=True),
-            patch(
-                "meridian.handoff.publish_connection_pages",
-                return_value=[HandoffLinks("alice", page_url=self._PAGE_URL)],
-            ),
-            patch.object(cluster, "save", side_effect=OSError("read-only filesystem")),
-            pytest.raises(typer.Exit) as exc_info,
-        ):
-            run_show(name="alice", repair_page=True)
-
-        payload = _json(capsys)
-        assert exc_info.value.exit_code == 3
-        assert payload["summary"]["changed"] is True
-        assert payload["data"]["handoff"]["share_available"] is True
-        assert payload["warnings"][0]["code"] == "MERIDIAN_CLIENT_LOCAL_STATE_SAVE_FAILED"
-        assert payload["warnings"][0]["details"]["remote_state_changed"] is True
+        with _cli(_make_cluster(tmp_home), json_mode=True):
+            run_show(name="alice")
+        handoff = _json(capsys)["data"]["handoff"]
+        assert handoff["share_available"] is True
+        assert handoff["share_url"] == handoff["subscription_url"]
 
 
 class TestRunList:
@@ -338,17 +262,6 @@ class TestRunList:
 
         panel.list_users.assert_called_once()
 
-    def test_v4_list_hides_internal_service_users(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        panel = _make_panel_mock()
-        panel.list_users.return_value = [_make_user("alice"), _make_user("meridian-route-123")]
-
-        with _cli(_make_cluster(tmp_home, users=["alice"]), panel, json_mode=True):
-            run_list()
-
-        payload = _json(capsys)
-        assert payload["data"]["summary"]["clients"] == 1
-        assert [client["username"] for client in payload["data"]["clients"]] == ["alice"]
-
     def test_list_json_outputs_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
         with _cli(_make_cluster(tmp_home), json_mode=True):
             run_list()
@@ -368,7 +281,7 @@ class TestRunRemove:
         assert exc_info.value.exit_code == 2
         panel_cls.assert_not_called()
 
-    def test_remove_retires_the_user_through_the_topology_and_deletes_the_page(self, tmp_home: Path) -> None:
+    def test_remove_retires_the_user_through_the_topology_without_page_ssh(self, tmp_home: Path) -> None:
         cluster = _make_cluster(tmp_home)
         panel = _make_panel_mock()
         panel.get_user.return_value = _make_user("bob")
@@ -377,12 +290,12 @@ class TestRunRemove:
 
         with (
             _cli(cluster, panel, runtime=runtime),
-            patch("meridian.handoff.remove_connection_page", return_value="") as remove_page,
+            patch("meridian.ssh.ServerConnection") as remove_page,
         ):
             run_remove(name="bob", yes=True)
 
         assert runtime.apply_intent.call_args.args[0].access.users == ["alice"]
-        remove_page.assert_called_once_with(cluster, _make_user("bob").vless_uuid)
+        remove_page.assert_not_called()
         panel.delete_user.assert_not_called()  # retirement owns the delete
 
     def test_remove_finds_a_client_by_the_name_they_were_added_with(self, tmp_home: Path) -> None:
@@ -395,7 +308,7 @@ class TestRunRemove:
         runtime = MagicMock()
         runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failure_summary="")
 
-        with _cli(cluster, panel, runtime=runtime), patch("meridian.handoff.remove_connection_page", return_value=""):
+        with _cli(cluster, panel, runtime=runtime), patch("meridian.ssh.ServerConnection"):
             run_remove(name="биба", yes=True)
 
         access = runtime.apply_intent.call_args.args[0].access
@@ -453,41 +366,25 @@ def _reissued(name: str = "alice") -> User:
 
 
 @contextmanager
-def _reissue_cli(
-    cluster: ClusterConfig,
-    panel: MagicMock,
-    *,
-    json_mode: bool = False,
-    page_error: str = "",
-    published: HandoffLinks | None = None,
-) -> Iterator[tuple[MagicMock, MagicMock]]:
-    """Serve a reissue; yields the (remove_connection_page, publish_connection_pages) mocks."""
-    links = published or HandoffLinks(
-        "alice",
-        "https://198.51.100.1/pages/sub/new-short-uuid-1234",
-        page_url=f"https://198.51.100.1/pages/{_NEW_VLESS}/",
-    )
-    with (
-        _cli(cluster, panel, json_mode=json_mode),
-        patch("meridian.commands.client.remove_connection_page", return_value=page_error) as remove_page,
-        patch("meridian.commands.client.publish_connection_pages", return_value=[links]) as publish,
-        patch("meridian.commands.client.print_handoff_links"),
-    ):
-        yield remove_page, publish
+def _reissue_cli(cluster: ClusterConfig, panel: MagicMock, *, json_mode: bool = False) -> Iterator[MagicMock]:
+    with _cli(cluster, panel, json_mode=json_mode), patch("meridian.commands.client.print_handoff_links") as links:
+        yield links
 
 
 class TestRunReissue:
-    def test_revokes_by_numeric_id_and_swaps_the_page(self, tmp_home: Path) -> None:
+    def test_revokes_by_numeric_id_and_hands_off_the_new_subscription_page(self, tmp_home: Path) -> None:
         cluster = _make_cluster(tmp_home)
         panel = _make_panel_mock()
         panel.revoke_user_subscription.return_value = _reissued()
 
-        with _reissue_cli(cluster, panel) as (remove_page, publish):
+        with _reissue_cli(cluster, panel) as links:
             run_reissue(name="alice", yes=True)
 
         panel.revoke_user_subscription.assert_called_once_with("101")
-        remove_page.assert_called_once_with(cluster, _make_user().vless_uuid)
-        publish.assert_called_once_with(cluster, ["alice"])
+        links.assert_called_once_with(
+            "https://198.51.100.1/pages/sub/new-short-uuid-1234",
+            page_url="https://198.51.100.1/pages/sub/new-short-uuid-1234",
+        )
         # Settings stay the operator's: nothing beside the revoke touches the user.
         panel.delete_user.assert_not_called()
         panel.disable_user.assert_not_called()
@@ -507,7 +404,7 @@ class TestRunReissue:
             "username": "alice",
             "id": "101",
             "status": "active",
-            "page_url": f"https://198.51.100.1/pages/{_NEW_VLESS}/",
+            "page_url": "https://198.51.100.1/pages/sub/new-short-uuid-1234",
             "subscription_url": "https://198.51.100.1/pages/sub/new-short-uuid-1234",
         }
 
@@ -520,11 +417,11 @@ class TestRunReissue:
         panel.get_user.return_value = _make_user("biba")
         panel.revoke_user_subscription.return_value = _reissued("biba")
 
-        with _reissue_cli(cluster, panel) as (_remove_page, publish):
+        with _reissue_cli(cluster, panel) as links:
             run_reissue(name="биба", yes=True)
 
         panel.get_user.assert_called_once_with("biba")
-        publish.assert_called_once_with(cluster, ["biba"])
+        assert links.call_args.kwargs["page_url"] == links.call_args.args[0]
 
     @pytest.mark.parametrize(
         ("name", "users"),
@@ -559,7 +456,7 @@ class TestRunReissue:
         panel = _make_panel_mock()
 
         with (
-            _reissue_cli(_make_cluster(tmp_home), panel) as (remove_page, _publish),
+            _reissue_cli(_make_cluster(tmp_home), panel) as links,
             patch("meridian.commands.client.confirm", return_value=False) as ask,
             pytest.raises(typer.Exit) as exc_info,
         ):
@@ -567,40 +464,25 @@ class TestRunReissue:
 
         assert exc_info.value.exit_code == 1
         assert "alice" in ask.call_args.args[0]
-        remove_page.assert_not_called()
+        links.assert_not_called()
         panel.revoke_user_subscription.assert_not_called()
 
-    def test_an_undeletable_old_page_stops_before_the_revoke(self, tmp_home: Path) -> None:
+    def test_reissue_needs_only_the_control_service(self, tmp_home: Path) -> None:
         panel = _make_panel_mock()
-
-        with (
-            _reissue_cli(_make_cluster(tmp_home), panel, page_error="permission denied"),
-            pytest.raises(typer.Exit) as exc_info,
-        ):
+        panel.revoke_user_subscription.return_value = _reissued()
+        with _reissue_cli(_make_cluster(tmp_home), panel), patch("meridian.ssh.ServerConnection") as ssh:
             run_reissue(name="alice", yes=True)
+        ssh.assert_not_called()
 
-        assert exc_info.value.exit_code == 3
-        panel.revoke_user_subscription.assert_not_called()
-
-    def test_unpublished_new_page_is_partial_with_a_repair_hint(
+    def test_service_reissue_failure_returns_a_plain_error(
         self, tmp_home: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         panel = _make_panel_mock()
-        panel.revoke_user_subscription.return_value = _reissued()
-        failed = HandoffLinks("alice", "https://198.51.100.1/pages/sub/new-short-uuid-1234", error="ssh down")
-
-        with (
-            _reissue_cli(_make_cluster(tmp_home), panel, json_mode=True, published=failed),
-            pytest.raises(typer.Exit) as exc_info,
-        ):
+        panel.revoke_user_subscription.side_effect = RemnawaveError("Service unavailable")
+        with _reissue_cli(_make_cluster(tmp_home), panel, json_mode=True) as links, pytest.raises(typer.Exit):
             run_reissue(name="alice", yes=True)
-
-        payload = _json(capsys)
-        assert exc_info.value.exit_code == 3
-        assert payload["data"]["client"]["page_url"] == ""
-        assert payload["data"]["client"]["subscription_url"].endswith("/sub/new-short-uuid-1234")
-        assert payload["warnings"][0]["code"] == "MERIDIAN_CLIENT_PAGE_PUBLISH_FAILED"
-        assert "--repair-page" in payload["warnings"][0]["hint"]
+        assert _json(capsys)["errors"][0]["message"].startswith("Could not reissue client")
+        links.assert_not_called()
 
 
 @pytest.mark.parametrize("command", ["add", "enable", "disable"])
@@ -695,12 +577,14 @@ class TestRunDisable:
         # Apply leaves a client's status to the operator, so the old "until the next apply" warning is gone.
         warning.assert_not_called()
 
-    def test_v4_disable_rejects_unmanaged_panel_user(self, tmp_home: Path) -> None:
+    def test_v4_disable_refuses_a_person_missing_from_the_service(self, tmp_home: Path) -> None:
+        panel = _make_panel_mock()
+        panel.get_user.return_value = None
         with (
-            _cli(_make_cluster(tmp_home, users=["default"])) as panel_cls,
+            _cli(_make_cluster(tmp_home, users=["default"]), panel),
             pytest.raises(typer.Exit) as exc_info,
         ):
             run_disable(name="alice")
 
         assert exc_info.value.exit_code == 2
-        panel_cls.assert_not_called()
+        panel.disable_user.assert_not_called()

@@ -6,7 +6,6 @@ source /workspace/tests/systemlab/scripts/stages/common.sh
 mkdir -p "$MERIDIAN_HOME" /root/.ssh
 
 PEBBLE_ENDPOINT_CA=/usr/local/share/ca-certificates/pebble-ca.crt
-PEBBLE_ISSUER_CA=/usr/local/share/ca-certificates/pebble-issuer.crt
 PEBBLE_ISSUER_TMP=/tmp/pebble-issuer.crt
 PEBBLE_ISSUER_URL=${SYSTEMLAB_PEBBLE_ISSUER_URL:-https://pebble:15000/roots/0}
 issuer_ready=0
@@ -82,6 +81,15 @@ for host in $(all_server_ips); do
   fi
 done
 pass "all topology servers booted"
+
+# Agents dial the control service over HTTPS, and Pebble issued its certificate. Each node
+# trusts Pebble's issuance root in its CA bundle (GitHub downloads keep working), and a
+# drop-in points netagent at that bundle before any deploy writes the unit.
+for host in $(all_server_ips); do
+  scp -q "$PEBBLE_ISSUER_CA" root@"$host":"$PEBBLE_ISSUER_CA"
+  ssh root@"$host" "update-ca-certificates >/dev/null 2>&1 && mkdir -p ${AGENT_CA_DROPIN%/*} && printf '%s\n' '[Service]' 'Environment=NETAGENT_TLS_CA_FILE=/etc/ssl/certs/ca-certificates.crt' > $AGENT_CA_DROPIN && systemctl daemon-reload"
+done
+pass "every node trusts the Pebble issuance root, agents included"
 
 meridian server add "$EXIT_A_IP" --name exit-a
 meridian server add "$EXIT_B_IP" --name exit-b

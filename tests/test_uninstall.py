@@ -10,10 +10,9 @@ import typer
 
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands.uninstall import _remove_saved_server_or_fail, _topology_references, run
-from meridian.remnawave import RemnawaveError
 from meridian.servers import ServerEntry
 from meridian.setup.single_server import single_server_intent
-from tests.support.topology import panel_mock, single_exit_intent
+from tests.support.topology import single_exit_intent
 
 
 def test_teardown_bad_server_selector_fails_without_prompt_fallback() -> None:
@@ -121,6 +120,29 @@ def test_v4_teardown_fails_before_ssh_or_remote_mutation() -> None:
     registry.remove.assert_not_called()
 
 
+def test_teardown_of_a_remnawave_fleet_server_points_at_migrate_or_its_own_release() -> None:
+    """`setup` refuses a Remnawave fleet, so the usual hint would loop; its own release still edits it."""
+    intent = single_exit_intent(users=["alice"])
+    intent = intent.model_copy(update={"control": intent.control.model_copy(update={"backend": "remnawave"})})
+    cluster = ClusterConfig(panel=PanelConfig(deployed_with="4.0.0b8"), topology_intent=intent)
+    registry = MagicMock()
+    registry.find.return_value = ServerEntry(id="srv-exit", host="198.51.100.2", name="exit-server")
+    resolved = SimpleNamespace(ip="198.51.100.2", user="root", conn=MagicMock())
+
+    with (
+        patch("meridian.commands.uninstall.ServerRegistry", return_value=registry),
+        patch("meridian.commands.uninstall.resolve_server", return_value=resolved),
+        patch("meridian.cluster.ClusterConfig.load", return_value=cluster),
+        patch("meridian.commands.uninstall.fail", side_effect=typer.Exit(2)) as failure,
+        pytest.raises(typer.Exit),
+    ):
+        run(ip=resolved.ip, yes=True)
+
+    hint = failure.call_args.kwargs["hint"]
+    assert "meridian migrate" in hint
+    assert "uvx --from 'meridian-vpn==4.0.0b8' meridian setup" in hint
+
+
 def test_v4_teardown_of_a_single_server_fleet_removes_everything(tmp_home) -> None:
     from meridian.setup.single_server import single_server_intent
 
@@ -166,7 +188,9 @@ def _roleless_server_cluster() -> ClusterConfig:
     )
 
 
-def _run_roleless_teardown(cluster: ClusterConfig, panel: MagicMock, registry: MagicMock) -> None:
+def test_roleless_server_teardown_removes_its_saved_profile() -> None:
+    cluster = _roleless_server_cluster()
+    registry = MagicMock()
     registry.find.return_value = ServerEntry(id="srv-spare", host="198.51.100.2")
     resolved = SimpleNamespace(ip="198.51.100.2", user="root", conn=MagicMock())
     with (
@@ -174,36 +198,12 @@ def _run_roleless_teardown(cluster: ClusterConfig, panel: MagicMock, registry: M
         patch("meridian.commands.uninstall.resolve_server", return_value=resolved),
         patch("meridian.commands.uninstall.ensure_server_connection", return_value=resolved),
         patch("meridian.cluster.ClusterConfig.load", return_value=cluster),
-        patch("meridian.commands.uninstall.make_panel", return_value=panel),
         patch("meridian.provision.steps.Provisioner") as provisioner,
     ):
         provisioner.return_value.run.return_value = [SimpleNamespace(status="changed", detail="")]
         run(ip=resolved.ip, yes=True)
 
-
-def test_roleless_server_teardown_deregisters_its_stale_panel_node() -> None:
-    cluster = _roleless_server_cluster()
-    registry = MagicMock()
-    panel = panel_mock(find_node_by_address=SimpleNamespace(uuid="node-spare"))
-
-    _run_roleless_teardown(cluster, panel, registry)
-
-    panel.find_node_by_address.assert_called_once_with("198.51.100.2")
-    panel.delete_node.assert_called_once_with("node-spare")
     registry.remove.assert_called_once_with("198.51.100.2")
-
-
-def test_panel_cleanup_failure_after_uninstall_retains_saved_server() -> None:
-    cluster = _roleless_server_cluster()
-    registry = MagicMock()
-    panel = panel_mock(find_node_by_address=SimpleNamespace(uuid="node-spare"))
-    panel.delete_node.side_effect = RemnawaveError("panel unavailable")
-
-    with pytest.raises(typer.Exit) as exc_info:
-        _run_roleless_teardown(cluster, panel, registry)
-
-    assert exc_info.value.exit_code == 3
-    registry.remove.assert_not_called()
 
 
 def test_cluster_without_topology_is_refused_before_ssh() -> None:

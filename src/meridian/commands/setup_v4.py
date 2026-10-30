@@ -9,13 +9,9 @@ from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 
-from meridian import i18n
+from meridian import config, i18n
 from meridian.commands.apply_progress import apply_progress
 from meridian.commands.setup_wizard import CamouflageSites, SetupWizard
-from meridian.config import (
-    SERVER_PROFILES_FILE,
-    SETUP_DRAFT_FILE,
-)
 from meridian.console import error_context, fail, has_tty
 from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.setup import SetupDraft
@@ -48,8 +44,8 @@ def run(
 
 def _run(*, intent_path: str, restart: bool, yes: bool) -> None:
     with error_context("setup"):
-        registry = ServerRegistry(SERVER_PROFILES_FILE)
-        store = SetupDraftStore(SETUP_DRAFT_FILE)
+        registry = ServerRegistry(config.SERVER_PROFILES_FILE)
+        store = SetupDraftStore(config.SETUP_DRAFT_FILE)
         shelf = ServerShelf(registry)
         service = SetupDraftService(store, shelf)
 

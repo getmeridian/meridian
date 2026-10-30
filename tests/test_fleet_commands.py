@@ -160,7 +160,7 @@ def _run(
     probe = {"side_effect": relay} if isinstance(relay, Exception) else {"return_value": relay}
     with (
         _fleet_source(topology or _fleet_topology()),
-        patch("meridian.commands.fleet.make_panel", return_value=panel),
+        patch("meridian.commands.fleet.fleet_panel", return_value=panel),
         patch("meridian.commands.fleet.tcp_connect", **probe) as tcp,
         patch("meridian.commands.fleet.is_json_mode", return_value=json),
         patch("meridian.commands.fleet.emit_json") as emit,
@@ -406,7 +406,7 @@ class TestFleetInventory:
 
         with (
             _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=_panel(ping_ok=False)),
+            patch("meridian.commands.fleet.fleet_panel", return_value=_panel(ping_ok=False)),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
             patch("meridian.commands.fleet.emit_json") as emit,
             pytest.raises(typer.Exit) as exc_info,
@@ -425,34 +425,3 @@ class TestFleetInventory:
             _run(run_inventory, panel)
 
         assert exc_info.value.exit_code == 3
-
-
-class TestPanelVersionWarnings:
-    @pytest.mark.parametrize(
-        ("version", "expected"),
-        [
-            ("3.4.5", []),
-            ("4.0.1", ["newer than the tested 3.x"]),
-            ("2.8.0", ["older than the minimum supported 3.4.0"]),
-        ],
-    )
-    def test_status_flags_panels_outside_the_supported_range(self, version: str, expected: list[str]) -> None:
-        from meridian.commands.fleet import _panel_version_warnings
-
-        panel = _make_panel_mock()
-        panel.get_version.return_value = version
-        with patch("meridian.commands.fleet.make_panel", return_value=panel):
-            warnings = _panel_version_warnings(MagicMock())
-
-        assert len(warnings) == len(expected)
-        for warning, fragment in zip(warnings, expected, strict=True):
-            assert fragment in warning.message
-            assert warning.code == "MERIDIAN_PANEL_VERSION"
-
-    def test_unreachable_metadata_adds_no_duplicate_warning(self) -> None:
-        from meridian.commands.fleet import _panel_version_warnings
-
-        panel = _make_panel_mock()
-        panel.get_version.side_effect = RemnawaveError("down")
-        with patch("meridian.commands.fleet.make_panel", return_value=panel):
-            assert _panel_version_warnings(MagicMock()) == []

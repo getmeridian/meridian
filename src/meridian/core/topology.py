@@ -5,10 +5,12 @@ from __future__ import annotations
 import ipaddress
 import re
 from collections.abc import Iterable, Sequence
-from typing import Final, Literal, Self
+from typing import Annotated, Final, Literal, Self
 
 from pydantic import Field, HttpUrl, ValidationInfo, field_validator, model_validator
 
+from meridian.core.client_limits import UserCreationSettings
+from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import (
     AccessUsernameValue,
     DisplayNameValue,
@@ -27,6 +29,8 @@ from meridian.core.inputs import (
     validate_domain_suffix_value,
 )
 from meridian.core.models import CoreModel
+from meridian.core.owner_contact import OwnerContactSettings
+from meridian.core.server_allowances import ServerMetadata
 
 ServerCapability = Literal["panel", "exit", "relay", "routing_gateway"]
 # route: through an exit or pool; direct: out of the gateway's own address; block: dropped.
@@ -57,6 +61,8 @@ EgressOverrideAction = Literal["warp", "direct", "block"]
 # v2fly geosite/geoip list names: "netflix", "category-ru", "geolocation-!cn", "google@cn".
 _GEO_LIST_NAME = re.compile(r"[a-z0-9][a-z0-9!@._-]{0,63}")
 DeliveryFormat = Literal["base64", "xray_json", "mihomo", "singbox"]
+ClientRoutingPolicy = Literal["ru-split", "full"]
+SubscriptionUpdateIntervalHours = Annotated[int, Field(ge=1, le=168)]
 
 
 def _geo_list_name(kind: str, value: str) -> str:
@@ -71,12 +77,17 @@ def _default_delivery_formats() -> list[DeliveryFormat]:
     return ["base64", "xray_json", "mihomo", "singbox"]
 
 
+ControlBackend = Literal["remnawave", "meridian"]
+
+
 class ControlPlaneIntent(CoreModel):
-    """One server that owns the Remnawave control-plane workload."""
+    """One server that owns the control-plane workload."""
 
     server_ref: ServerReferenceValue
     public_hostname: OptionalHostnameValue = ""
     title: ServerTitleValue = "Meridian"
+    # Meridian's own control service and node agent (#95); "remnawave" survives only until `meridian migrate`.
+    backend: ControlBackend = Field(default="meridian", exclude_if=lambda backend: backend == "meridian")
 
 
 class ProtocolPathIntent(CoreModel):
@@ -288,6 +299,11 @@ class AccessIntent(CoreModel):
     display_names: dict[AccessUsernameValue, DisplayNameValue] = Field(
         default_factory=dict, exclude_if=lambda names: not names
     )
+    creation_settings: dict[AccessUsernameValue, UserCreationSettings] = Field(
+        default_factory=dict,
+        exclude_if=lambda settings: not settings,
+        description="First account settings only; reviewed applies never replace an existing person's settings.",
+    )
 
     @field_validator("users")
     @classmethod
@@ -304,6 +320,9 @@ class AccessIntent(CoreModel):
         shown = [self.display_name(user).casefold() for user in self.users]
         if len(shown) != len(set(shown)):
             raise ValueError("Each person needs a different name.")
+        unknown_settings = sorted(set(self.creation_settings) - set(self.users))
+        if unknown_settings:
+            raise ValueError("Creation settings refer to unknown users: " + ", ".join(unknown_settings))
         return self
 
     def display_name(self, username: str) -> str:
@@ -351,12 +370,22 @@ def _accepted_username(name: str) -> bool:
     return True
 
 
-class DeliveryIntent(CoreModel):
+class DeliveryIntent(OwnerContactSettings):
     """Canonical Remnawave subscription presentation settings."""
 
     profile_title: ServerTitleValue = "Meridian"
     template_name: TopologyIdValue = "meridian"
     formats: list[DeliveryFormat] = Field(default_factory=_default_delivery_formats, min_length=1)
+    update_interval_hours: SubscriptionUpdateIntervalHours = Field(
+        default=SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
+        exclude_if=lambda value: value == SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
+    )
+    client_routing: ClientRoutingPolicy = Field(
+        default=DEFAULT_CLIENT_ROUTING,
+        exclude_if=lambda value: value == DEFAULT_CLIENT_ROUTING,
+        description="Client routing: ru-split bypasses Russian destinations; full tunnels them. "
+        "Both bypass private/LAN ranges and retain Xray's best-effort BitTorrent bypass.",
+    )
 
     @field_validator("formats")
     @classmethod
@@ -382,6 +411,22 @@ class SetupIntent(CoreModel):
     # Pass each client's real address to Xray and the panel (PROXY protocol, X-Forwarded-For).
     # Off by default: Remnawave then never stores where users connect from.
     forward_client_ips: bool = False
+    server_metadata: dict[ServerReferenceValue, ServerMetadata] = Field(
+        default_factory=dict, exclude_if=lambda metadata: not metadata
+    )
+
+    def declared_server_refs(self) -> list[str]:
+        """Servers holding reviewed roles, in document order, once each."""
+        return list(
+            dict.fromkeys(
+                [
+                    self.control.server_ref,
+                    *(exit_.server_ref for exit_ in self.exits),
+                    *(server_ref for relay in self.transparent_relays for server_ref in relay.hop_server_refs),
+                    *(gateway.server_ref for gateway in self.routing_gateways),
+                ]
+            )
+        )
 
     def gateway_routes(self, gateway_ref: str) -> list[OrderedRouteIntent]:
         """The enabled rules one routing gateway applies, in first-match order."""
@@ -396,6 +441,9 @@ class SetupIntent(CoreModel):
 
     @model_validator(mode="after")
     def validate_references(self) -> Self:
+        unknown_servers = sorted(self.server_metadata.keys() - set(self.declared_server_refs()))
+        if unknown_servers:
+            raise ValueError("Server metadata refers to undeclared servers: " + ", ".join(unknown_servers) + ".")
         resources = [
             *[exit_.id for exit_ in self.exits],
             *[relay.id for relay in self.transparent_relays],

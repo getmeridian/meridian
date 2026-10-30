@@ -31,9 +31,8 @@ def _load_warning(message: str, *, details: list[str] | None = None) -> None:
         logger.warning("%s", message)
 
 
-CURRENT_CLUSTER_VERSION = 3
-# The shared support page (templates/pwa/support.html), under the connection-page path.
-SUPPORT_PAGE = "pwa/support.html"
+# 4: the control backend defaults to Meridian's service, so a Remnawave intent names its backend (#95).
+CURRENT_CLUSTER_VERSION = 4
 
 
 class ClusterConfigExternallyModifiedError(RuntimeError):
@@ -61,6 +60,13 @@ class PanelConfig:
     deployed_with: str = ""  # Meridian CLI version
     _extra: dict[str, Any] = field(default_factory=dict, repr=False)
 
+    def public_base_url(self) -> str:
+        """Scheme, host, and connection-page path that public links start with; empty when unknown."""
+        if not self.url or not self.sub_path:
+            return ""
+        parsed = urlsplit(self.url)
+        return f"{parsed.scheme}://{parsed.netloc}/{self.sub_path}"
+
     def subscription_url(self, short_uuid: str) -> str:
         """Public subscription URL for a user; empty when it cannot be built.
 
@@ -71,18 +77,6 @@ class PanelConfig:
             return ""
         parsed = urlsplit(self.url)
         return f"{parsed.scheme}://{parsed.netloc}/{self.sub_path}/sub/{quote(short_uuid, safe='')}"
-
-    def support_url(self) -> str:
-        """Panel-wide ``support-url`` header value; empty when it cannot be built.
-
-        Pages live under each VLESS UUID, which no header template can name, so the
-        shared support page reads the person's subscription and redirects. Remnawave
-        fills ``{{SHORT_UUID}}`` per user; the fragment keeps it out of server logs.
-        """
-        if not self.url or not self.sub_path:
-            return ""
-        parsed = urlsplit(self.url)
-        return f"{parsed.scheme}://{parsed.netloc}/{self.sub_path}/{SUPPORT_PAGE}#{{{{SHORT_UUID}}}}"
 
     @property
     def display_url(self) -> str:
@@ -173,6 +167,7 @@ class ManagedResourceBinding:
     active: bool = False
     adopted: bool = False
     server_ref: str = ""  # host owning server-side artifacts, needed to retire them
+    cut_off_on_retire: bool = False
     _extra: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -187,6 +182,68 @@ class ResourceAllocation:
     path: str = ""
     tag: str = ""
     _extra: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+# `meridian migrate` checkpoints, in order: each names the last step that finished.
+MigrationStep = Literal["started", "backed_up", "imported", "cut_over", "applied", "done"]
+MIGRATION_STEPS: tuple[MigrationStep, ...] = ("started", "backed_up", "imported", "cut_over", "applied", "done")
+
+
+@dataclass
+class ControlMigration:
+    """Progress of moving a Remnawave fleet onto Meridian's own control service (`meridian migrate`).
+
+    A re-run continues after `step`; `done` makes it a no-op. The service token lives
+    here only until the cut-over moves it into `panel.api_token`.
+    """
+
+    step: MigrationStep = "started"
+    started_at: str = ""
+    finished_at: str = ""
+    backup_dir: str = ""  # on the deployer, under the Meridian home
+    server_backup_dir: str = ""  # on the control server; teardown never deletes it
+    service_token: str = field(default="", repr=False)
+    imported_users: list[str] = field(default_factory=list)
+    _extra: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    def reached(self, step: MigrationStep) -> bool:
+        """Whether `step` has finished."""
+        return step_reached(MIGRATION_STEPS, self.step, step)
+
+
+# `meridian restore` checkpoints, in order: each names the last step that finished.
+RestoreStep = Literal["started", "staged", "loaded", "installed", "applied", "done"]
+RESTORE_STEPS: tuple[RestoreStep, ...] = ("started", "staged", "loaded", "installed", "applied", "done")
+
+
+@dataclass
+class ControlRestore:
+    """Progress of rebuilding the control service on another server from a snapshot (`meridian restore`).
+
+    A re-run continues after `step`; once `done`, the next restore starts a new record.
+    `staged_database` (plaintext, 0600 on the deployer) exists only between `staged` and `loaded`.
+    """
+
+    step: RestoreStep = "started"
+    started_at: str = ""
+    finished_at: str = ""
+    snapshot: str = ""  # the snapshot file restored from
+    from_server_ref: str = ""
+    from_address: str = ""
+    to_server_ref: str = ""
+    fleet_epoch: int = 0  # the epoch the restored service starts at
+    staged_database: str = ""
+    staged_sha256: str = ""
+    links_change: bool = False  # bare-IP control: every subscription URL names the new address
+    _extra: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    def reached(self, step: RestoreStep) -> bool:
+        return step_reached(RESTORE_STEPS, self.step, step)
+
+
+def step_reached(steps: tuple[str, ...], current: str, step: str) -> bool:
+    """Whether checkpoint `step` has finished when `current` is the last one that did."""
+    return steps.index(current) >= steps.index(step)
 
 
 ActionCheckpointStatus = Literal["pending", "running", "unknown", "succeeded", "failed", "skipped", "cancelled"]
@@ -224,15 +281,17 @@ class ClusterConfig:
     subscription_page: SubscriptionPageConfig | None = None
     # Telegram notifications (None = not configured, disable in panel)
     telegram: TelegramConfig | None = None
+    # `meridian migrate` checkpoints (None = never started).
+    control_migration: ControlMigration | None = None
+    # `meridian restore` checkpoints (None = never restored).
+    control_restore: ControlRestore | None = None
     # Workload-scoped topology and durable compiled-resource state.
     topology_intent: SetupIntent | None = None
     workloads: list[WorkloadBinding] = field(default_factory=list)
     managed_bindings: dict[str, ManagedResourceBinding] = field(default_factory=dict)
     allocations: dict[str, ResourceAllocation] = field(default_factory=dict)
     action_checkpoints: dict[str, ActionCheckpoint] = field(default_factory=dict)
-    connection_page_markers: list[str] = field(default_factory=list)
-    # Newer Remnawave releases `fleet upgrade` moved past this CLI's pins
-    # (runtime pin name -> tag@sha256 image); see remnawave.versions.effective_pins.
+    # A Remnawave fleet's saved image pins, kept only until `meridian migrate` clears them.
     image_pins: dict[str, str] = field(default_factory=dict)
     # Newer server binaries (Realm) `fleet upgrade` recorded; see binary_pins.effective_binary_pins.
     binary_pins: dict[str, BinaryPin] = field(default_factory=dict)
@@ -344,6 +403,10 @@ class ClusterConfig:
                 errors.append(f"{label}.desired_hash is not a SHA-256 hash")
 
         for key, binding in self.managed_bindings.items():
+            if not isinstance(binding.cut_off_on_retire, bool):
+                errors.append(f"managed_bindings[{key}].cut_off_on_retire must be a boolean")
+            elif binding.cut_off_on_retire and binding.resource_kind != "control_user":
+                errors.append(f"managed_bindings[{key}].cut_off_on_retire applies only to control users")
             if key != f"{binding.logical_id}@{binding.generation}":
                 errors.append(f"managed_bindings[{key}] key does not match its logical ID and generation")
             if binding.desired_hash and re.fullmatch(r"[0-9a-f]{64}", binding.desired_hash) is None:
@@ -368,12 +431,6 @@ class ClusterConfig:
             if checkpoint.attempts < 0:
                 errors.append(f"action_checkpoints[{key}].attempts cannot be negative")
 
-        markers = self.connection_page_markers
-        if len(markers) != len(set(markers)):
-            errors.append("connection_page_markers contains duplicate markers")
-        if any(re.fullmatch(r"[0-9a-f]{64}", marker) is None for marker in markers):
-            errors.append("connection_page_markers contains an invalid SHA-256 marker")
-
         for field_name, value in (
             ("active_plan_hash", self.active_plan_hash),
             ("pending_plan_hash", self.pending_plan_hash),
@@ -382,6 +439,10 @@ class ClusterConfig:
                 errors.append(f"{field_name} is not a SHA-256 hash")
         if self.active_generation < 0 or self.pending_generation < 0:
             errors.append("cluster generations cannot be negative")
+        if self.control_migration is not None and self.control_migration.step not in MIGRATION_STEPS:
+            errors.append(f"control_migration.step is unknown: {self.control_migration.step}")
+        if self.control_restore is not None and self.control_restore.step not in RESTORE_STEPS:
+            errors.append(f"control_restore.step is unknown: {self.control_restore.step}")
 
         return errors
 
@@ -390,6 +451,11 @@ class ClusterConfig:
         from meridian.cluster_persistence import backup_cluster
 
         backup_cluster(path)
+
+    @property
+    def runs_control_service(self) -> bool:
+        """True when Meridian's own control service, not Remnawave, holds this fleet's users (#95)."""
+        return self.topology_intent is not None and self.topology_intent.control.backend == "meridian"
 
     @property
     def is_configured(self) -> bool:
@@ -409,6 +475,7 @@ class ClusterConfig:
             self.panel.sub_path,
             self.subscription_page.path if self.subscription_page else "",
             self.telegram.bot_token if self.telegram else "",
+            self.control_migration.service_token if self.control_migration else "",
             *(keys.private_key for workload in self.workloads for keys in workload.reality_keys.values()),
             *(allocation.path for allocation in self.allocations.values()),
         ]

@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "description": "A credential-bearing URL for a format the control service already serves.",
+  "properties": {
+    "format": {
+      "enum": [
+        "xray-json",
+        "mihomo",
+        "singbox"
+      ],
+      "title": "Format",
+      "type": "string"
+    },
+    "url": {
+      "title": "Url",
+      "type": "string"
+    }
+  },
+  "required": [
+    "format",
+    "url"
+  ],
+  "title": "SubscriptionFormatUrl",
+  "type": "object"
+}

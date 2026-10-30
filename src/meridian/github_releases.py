@@ -10,9 +10,8 @@ import os
 
 import httpx
 
-from meridian.binary_pins import BINARY_SOURCES, BinaryPin, BinarySource
+from meridian.binary_pins import BINARY_SOURCES, BinaryPin, BinarySource, parse_version
 from meridian.core.errors import MeridianError
-from meridian.remnawave.versions import parse_version
 
 _TIMEOUT = 30
 

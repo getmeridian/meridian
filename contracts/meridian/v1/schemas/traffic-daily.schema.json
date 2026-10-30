@@ -1,0 +1,86 @@
+{
+  "$defs": {
+    "NodeDailyUsage": {
+      "additionalProperties": false,
+      "properties": {
+        "daily": {
+          "items": {
+            "$ref": "#/$defs/NodeTrafficDay"
+          },
+          "title": "Daily",
+          "type": "array"
+        },
+        "node_id": {
+          "title": "Node Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "daily"
+      ],
+      "title": "NodeDailyUsage",
+      "type": "object"
+    },
+    "NodeTrafficDay": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "day": {
+          "format": "date",
+          "title": "Day",
+          "type": "string"
+        }
+      },
+      "required": [
+        "day",
+        "bytes"
+      ],
+      "title": "NodeTrafficDay",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Daily bytes across the fleet and by node, oldest first; includes retained use of removed nodes.",
+  "properties": {
+    "daily": {
+      "items": {
+        "$ref": "#/$defs/NodeTrafficDay"
+      },
+      "title": "Daily",
+      "type": "array"
+    },
+    "days": {
+      "maximum": 730,
+      "minimum": 1,
+      "title": "Days",
+      "type": "integer"
+    },
+    "history_days": {
+      "maximum": 730,
+      "minimum": 7,
+      "title": "History Days",
+      "type": "integer"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/NodeDailyUsage"
+      },
+      "title": "Nodes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "days",
+    "history_days",
+    "daily",
+    "nodes"
+  ],
+  "title": "TrafficDailySummary",
+  "type": "object"
+}

@@ -62,11 +62,10 @@ def main() -> int:
         errors.append("  order differs: apps.json and _PWA_APPS must list apps in the same order")
 
     # Check matching apps for field differences
-    compare_fields = ("platform", "platforms", "recommended", "url", "deeplink", "urls", "protocols")
     for name in sorted(set(json_by_name) & set(py_by_name)):
         j = json_by_name[name]
         p = py_by_name[name]
-        for field in compare_fields:
+        for field in sorted(set(j) | set(p)):
             jval = j.get(field)
             pval = p.get(field)
             if jval != pval:

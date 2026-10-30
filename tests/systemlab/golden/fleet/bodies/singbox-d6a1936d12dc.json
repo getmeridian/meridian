@@ -1,0 +1,150 @@
+{
+  "dns": {
+    "rules": [
+      {
+        "server": "remote",
+        "query_type": [
+          "A",
+          "AAAA"
+        ]
+      }
+    ],
+    "servers": [
+      {
+        "tag": "cf-dns",
+        "type": "tls",
+        "server": "1.1.1.1"
+      },
+      {
+        "tag": "local",
+        "type": "udp",
+        "server": "1.1.1.1"
+      },
+      {
+        "tag": "remote",
+        "type": "fakeip",
+        "inet4_range": "198.18.0.0/15",
+        "inet6_range": "fc00::/18"
+      }
+    ]
+  },
+  "log": {
+    "level": "warn",
+    "timestamp": true
+  },
+  "route": {
+    "final": "Meridian",
+    "rules": [
+      {
+        "action": "sniff"
+      },
+      {
+        "action": "hijack-dns",
+        "protocol": "dns"
+      },
+      {
+        "outbound": "direct",
+        "ip_is_private": true
+      },
+      {
+        "outbound": "direct",
+        "domain_suffix": [
+          ".ru",
+          ".su",
+          ".xn--p1ai"
+        ]
+      },
+      {
+        "port": [
+          443
+        ],
+        "action": "reject",
+        "network": [
+          "udp"
+        ]
+      }
+    ],
+    "auto_detect_interface": true,
+    "default_domain_resolver": "local"
+  },
+  "inbounds": [
+    {
+      "mtu": 9000,
+      "tag": "tun-in",
+      "type": "tun",
+      "stack": "mixed",
+      "address": [
+        "172.19.0.1/30",
+        "fdfe:dcba:9876::1/126"
+      ],
+      "platform": {
+        "http_proxy": {
+          "server": "127.0.0.1",
+          "enabled": true,
+          "server_port": 2412
+        }
+      },
+      "auto_route": true,
+      "strict_route": true
+    },
+    {
+      "tag": "mixed-in",
+      "type": "mixed",
+      "listen": "127.0.0.1",
+      "listen_port": 2412
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "Meridian",
+      "type": "selector",
+      "default": "Automatic",
+      "outbounds": [
+        "Automatic",
+        "🚫 Subscription disabled",
+        "Contact support"
+      ],
+      "interrupt_exist_connections": true
+    },
+    {
+      "tag": "Automatic",
+      "url": "https://www.apple.com/library/test/success.html",
+      "type": "urltest",
+      "interval": "3m",
+      "outbounds": [
+        "🚫 Subscription disabled",
+        "Contact support"
+      ],
+      "tolerance": 50,
+      "interrupt_exist_connections": true
+    },
+    {
+      "tag": "direct",
+      "type": "direct"
+    },
+    {
+      "type": "vless",
+      "tag": "🚫 Subscription disabled",
+      "server": "0.0.0.0",
+      "server_port": 1,
+      "uuid": "<uuid:1>"
+    },
+    {
+      "type": "vless",
+      "tag": "Contact support",
+      "server": "0.0.0.0",
+      "server_port": 1,
+      "uuid": "<uuid:1>"
+    }
+  ],
+  "experimental": {
+    "clash_api": {
+      "default_mode": "rule",
+      "external_controller": "127.0.0.1:9090"
+    },
+    "cache_file": {
+      "enabled": true,
+      "store_fakeip": true
+    }
+  }
+}

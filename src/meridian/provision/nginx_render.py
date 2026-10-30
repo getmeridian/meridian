@@ -16,7 +16,7 @@ from meridian.core.defaults import CONTROL_PROXY_TLS_PORT
 # ---------------------------------------------------------------------------
 
 
-# V4 location files (IP-mode XHTTP) that join the panel TLS server, the no-SNI route.
+# V4 location files (IP-mode XHTTP) that join the control TLS server, the no-SNI route.
 NGINX_LOCATION_DIR = "/etc/nginx/meridian-v4-locations"
 
 
@@ -171,13 +171,11 @@ def render_nginx_http_config(
     nginx_internal_port: int,
     ws_path: str,
     wss_internal_port: int,
-    panel_web_base_path: str,
-    panel_internal_port: int,
+    service_base_path: str,
+    service_port: int,
     info_page_path: str,
     xhttp_path: str = "",
     xhttp_internal_port: int = 0,
-    subscription_page_path: str = "",
-    subscription_page_port: int = 0,
 ) -> str:
     """Render the nginx http configuration for domain mode.
 
@@ -185,17 +183,21 @@ def render_nginx_http_config(
     nginx stream does SNI routing without TLS termination.
     nginx http handles TLS with certificates issued by acme.sh.
     """
-    wss_block = textwrap.dedent(f"""\
+    # The control service's bootstrap has no WSS listener; an empty path would render a
+    # second `location /` (and port 0), which fails `nginx -t`. Compiled artifacts own WSS.
+    wss_block = ""
+    if ws_path and wss_internal_port > 0:
+        wss_block = textwrap.dedent(f"""\
 
-        # --- VLESS+WSS Fallback (Cloudflare CDN path) ---
-        location /{ws_path} {{
-            proxy_pass http://127.0.0.1:{wss_internal_port};
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection $connection_upgrade;
-            proxy_read_timeout 360s;
-        }}
-    """).rstrip()
+            # --- VLESS+WSS Fallback (Cloudflare CDN path) ---
+            location /{ws_path} {{
+                proxy_pass http://127.0.0.1:{wss_internal_port};
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+                proxy_read_timeout 360s;
+            }}
+        """).rstrip()
 
     xhttp_block = ""
     xhttp_upstream = ""
@@ -212,8 +214,8 @@ def render_nginx_http_config(
     return render_nginx_server_block(
         host=domain,
         nginx_internal_port=nginx_internal_port,
-        panel_web_base_path=panel_web_base_path,
-        panel_internal_port=panel_internal_port,
+        service_base_path=service_base_path,
+        service_port=service_port,
         info_page_path=info_page_path,
         extra_locations=wss_block + xhttp_block,
         upstream_blocks=xhttp_upstream,
@@ -222,21 +224,17 @@ def render_nginx_http_config(
         mode_comment="Domain Mode",
         tls_comment=(f"TLS: certificates issued by acme.sh for {domain}"),
         redirect_http=True,
-        subscription_page_path=subscription_page_path,
-        subscription_page_port=subscription_page_port,
     )
 
 
 def render_nginx_ip_config(
     server_ip: str,
     nginx_internal_port: int,
-    panel_web_base_path: str,
-    panel_internal_port: int,
+    service_base_path: str,
+    service_port: int,
     info_page_path: str,
     xhttp_path: str = "",
     xhttp_internal_port: int = 0,
-    subscription_page_path: str = "",
-    subscription_page_port: int = 0,
 ) -> str:
     """Render nginx http configuration for IP certificate mode (no domain).
 
@@ -256,8 +254,8 @@ def render_nginx_ip_config(
     return render_nginx_server_block(
         host=server_ip,
         nginx_internal_port=nginx_internal_port,
-        panel_web_base_path=panel_web_base_path,
-        panel_internal_port=panel_internal_port,
+        service_base_path=service_base_path,
+        service_port=service_port,
         info_page_path=info_page_path,
         extra_locations=xhttp_block,
         upstream_blocks=xhttp_upstream,
@@ -266,16 +264,14 @@ def render_nginx_ip_config(
         mode_comment="IP Certificate Mode",
         tls_comment=("TLS: Let's Encrypt IP certificate (acme.sh, shortlived profile)"),
         redirect_http=False,
-        subscription_page_path=subscription_page_path,
-        subscription_page_port=subscription_page_port,
     )
 
 
 def render_nginx_server_block(
     host: str,
     nginx_internal_port: int,
-    panel_web_base_path: str,
-    panel_internal_port: int,
+    service_base_path: str,
+    service_port: int,
     info_page_path: str,
     extra_locations: str,
     root_action: str,
@@ -284,8 +280,6 @@ def render_nginx_server_block(
     tls_comment: str,
     redirect_http: bool = True,
     upstream_blocks: str = "",
-    subscription_page_path: str = "",
-    subscription_page_port: int = 0,
 ) -> str:
     """Render the shared nginx server block structure.
 
@@ -294,8 +288,6 @@ def render_nginx_server_block(
                    False = ACME-only, no redirect (IP mode — redirect to
                    HTTPS that returns 403 is a contradiction signal).
     """
-    csp = "default-src 'self'; img-src 'self' data:; connect-src 'self'"
-
     # Port 80 behavior: domain mode redirects (has real content),
     # IP mode serves ACME challenges only (no redirect — redirect to
     # HTTPS that returns 403 is a contradiction signal for censors).
@@ -304,23 +296,22 @@ def render_nginx_server_block(
     else:
         http_default = "return 403;"
 
-    # Subscription page proxy (Remnawave subscription frontend)
-    subscription_block = ""
-    if subscription_page_path and subscription_page_port > 0:
-        subscription_block = textwrap.dedent(f"""\
-
-            # --- Subscription Page (Remnawave subscription frontend) ---
-            location /{subscription_page_path}/ {{
-                proxy_pass http://127.0.0.1:{subscription_page_port}/;
+    # The control service has no UI to rewrite: the admin API, the agent
+    # long-poll (held up to 55 s), and the web console live under the path.
+    panel_block = textwrap.indent(
+        textwrap.dedent(f"""\
+            # --- Control service (admin and agent APIs on secret path) ---
+            location /{service_base_path}/ {{
+                proxy_pass http://127.0.0.1:{service_port}/;
                 proxy_http_version 1.1;
                 proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $remote_addr;
-                proxy_set_header X-Forwarded-Proto $scheme;
-                proxy_set_header X-Forwarded-Host $host;
-                proxy_set_header X-Forwarded-Port $server_port;
+                proxy_buffering off;
+                proxy_read_timeout 90s;
+                client_max_body_size 4m;
             }}
-        """).rstrip()
+        """).rstrip(),
+        " " * 12,
+    )
 
     return textwrap.dedent(f"""\
         # Meridian Proxy Configuration ({mode_comment})
@@ -328,20 +319,6 @@ def render_nginx_server_block(
         #
         # Architecture: nginx stream (port 443) -> nginx http (port {nginx_internal_port})
         # {tls_comment}
-
-        # --- Cache control for connection pages (map avoids add_header inheritance) ---
-        map $uri $meridian_cache {{
-            ~*/pwa/            "public, max-age=86400";
-            ~*/config\\.json$   "no-cache, must-revalidate";
-            ~*/sub\\.txt$       "no-cache, must-revalidate";
-            ~*/stats/          "no-cache, must-revalidate";
-            default            "no-store";
-        }}
-
-        map $uri $meridian_sw {{
-            ~*/sw\\.js$   "/";
-            default      "";
-        }}
 
         # WebSocket upgrade: only set Connection: upgrade when client sends Upgrade header
         map $http_upgrade $connection_upgrade {{
@@ -371,7 +348,7 @@ def render_nginx_server_block(
             ssl_session_cache shared:MozSSL:10m;
             ssl_session_tickets off;
 
-            # Gzip — reduces bandwidth for panel UI, API responses, subscription page
+            # Gzip — reduces bandwidth for the web console, API responses, and pages
             gzip on;
             gzip_vary on;
             gzip_proxied any;
@@ -383,81 +360,24 @@ def render_nginx_server_block(
     {extra_locations}
             include {NGINX_LOCATION_DIR}/*.conf;
 
-            # --- Remnawave Panel (management interface on secret path) ---
-            location /{panel_web_base_path}/ {{
-                proxy_pass http://127.0.0.1:{panel_internal_port}/;
-                proxy_http_version 1.1;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $remote_addr;
-                proxy_set_header X-Forwarded-Proto $scheme;
-                proxy_set_header Upgrade $http_upgrade;
-                proxy_set_header Connection $connection_upgrade;
+{panel_block}
 
-                # Rewrite paths for subpath deployment.  Remnawave is not
-                # designed for sub-paths (docs: "must be hosted on root path"),
-                # so we patch responses with sub_filter.
-                #
-                # HTML: href/src for assets, favicons, splash_screens
-                #       CSS url() for fonts
-                # JS:   axios baseURL (every /api call, the backend-tools
-                #       queue link, and the node SSH websocket derive from
-                #       it), plus backtick literals the 3.4 bundle uses for
-                #       React Router routes, i18next loadPath, Lottie,
-                #       favicon fallback, workers, wasm, and editor schemas.
-                #       Never rewrite `/api: it is joined onto the
-                #       rewritten baseURL and would double the prefix.
-                # Backend-tools auth redirects and cookie paths are root-
-                # absolute, so Location and Set-Cookie are mapped too.
-                #
-                # This eliminates all root-level paths — every probe
-                # returns stock nginx 403/404.
-                proxy_redirect default;
-                proxy_redirect /api/ /{panel_web_base_path}/api/;
-                proxy_cookie_path /api/ /{panel_web_base_path}/api/;
-                proxy_set_header Accept-Encoding "";
-                sub_filter_once off;
-                sub_filter_types application/javascript text/javascript;
-                sub_filter 'href="/a' 'href="/{panel_web_base_path}/a';
-                sub_filter 'href="/f' 'href="/{panel_web_base_path}/f';
-                sub_filter 'href="/s' 'href="/{panel_web_base_path}/s';
-                sub_filter 'src="/a' 'src="/{panel_web_base_path}/a';
-                sub_filter 'url(/a' 'url(/{panel_web_base_path}/a';
-                sub_filter '=window.location.origin;' '=window.location.origin+"/{panel_web_base_path}";';
-                sub_filter '`/dashboard' '`/{panel_web_base_path}/dashboard';
-                sub_filter '`/auth' '`/{panel_web_base_path}/auth';
-                sub_filter '`/oauth2/' '`/{panel_web_base_path}/oauth2/';
-                sub_filter '`/locales/' '`/{panel_web_base_path}/locales/';
-                sub_filter '`/lotties/' '`/{panel_web_base_path}/lotties/';
-                sub_filter '`/favicons/' '`/{panel_web_base_path}/favicons/';
-                sub_filter '`/assets/' '`/{panel_web_base_path}/assets/';
-            }}
-
-    {subscription_block}
-
-            # --- Client subscriptions (raw configs for VPN apps) ---
+            # --- Subscriptions, connection pages, and packaged PWA assets ---
             # Public under the connection-page path, never the admin path:
-            # only the panel's /api/sub/ route is reachable from here.
+            # only the service's /sub/ route is reachable from here.
             location /{info_page_path}/sub/ {{
-                proxy_pass http://127.0.0.1:{panel_internal_port}/api/sub/;
+                proxy_pass http://127.0.0.1:{service_port}/sub/;
                 proxy_http_version 1.1;
                 proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $remote_addr;
-                proxy_set_header X-Forwarded-Proto $scheme;
                 add_header Referrer-Policy "no-referrer" always;
             }}
 
-            # --- Connection Info Pages (PWA with per-client config) ---
-            # alias strips the location prefix (like Caddy's handle_path).
+            # --- Legacy UUID pages and service-worker update URLs ---
+            # The service resolves UUIDs to current subscription tokens.
             location /{info_page_path}/ {{
-                alias /var/www/private/;
-
-                add_header Cache-Control $meridian_cache always;
-                add_header Service-Worker-Allowed $meridian_sw always;
-                add_header Content-Security-Policy "{csp}" always;
-                add_header X-Content-Type-Options "nosniff" always;
-                add_header X-Frame-Options "DENY" always;
+                proxy_pass http://127.0.0.1:{service_port}/sub/~legacy/;
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
                 add_header Referrer-Policy "no-referrer" always;
             }}
 
@@ -467,13 +387,13 @@ def render_nginx_server_block(
             }}
 
             # Default: stock nginx 404 — indistinguishable from any nginx server.
-            # No root-level proxies — all panel traffic goes through the secret
-            # path location above (sub_filter rewrites JS to use it).
+            # No root-level proxies — all service traffic goes through the secret
+            # path location above.
             location / {{
                 {default_action}
             }}
 
-            # Request paths carry the panel secret and subscription UUIDs; a
+            # Request paths carry the service secret and subscription tokens; a
             # seized server must not hold a record of who fetched what.
             access_log off;
         }}

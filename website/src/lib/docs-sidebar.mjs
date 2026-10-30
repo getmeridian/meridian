@@ -15,6 +15,7 @@ export const DOCS_SIDEBAR = [
       'deploy',
       'domain-mode',
       'client-management',
+      'privacy',
       'connecting',
       'relay',
       'split-routing',

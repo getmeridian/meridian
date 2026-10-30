@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "Unsaved server connection details collected by an onboarding UI.",
+  "description": "Unsaved server connection details before they become a saved profile.",
   "properties": {
     "host": {
       "anyOf": [

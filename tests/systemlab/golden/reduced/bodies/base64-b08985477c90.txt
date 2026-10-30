@@ -1,0 +1,3 @@
+vless://<vless-uuid:1>@<host:exit-a>:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality&sni=www.google.com&fp=chrome&pbk=<reality-pbk:1>&sid=<short-id:1>#Reality%20%C2%B7%20Chrome
+vless://<vless-uuid:1>@<host:exit-a>:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality&sni=www.google.com&fp=firefox&pbk=<reality-pbk:1>&sid=<short-id:1>#Reality%20%C2%B7%20Firefox
+vless://<vless-uuid:1>@<host:gateway-a>:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality&sni=www.google.com&fp=chrome&pbk=<reality-pbk:2>&sid=<short-id:2>#Smart%20routing

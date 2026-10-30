@@ -11,29 +11,18 @@ from meridian.compiler.models import (
     CertificatePayload,
     FirewallRulePayload,
     NginxArtifactPayload,
-    NodeRuntimePayload,
     ResourcePlan,
     ServerBaselinePayload,
 )
-from meridian.config import REMNAWAVE_NODE_IMAGE
 from meridian.core.cancellation import CancellationToken
 from meridian.core.inputs import is_ip
 from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
-from meridian.host_runtime import LEGACY_NODE_DIR, NODE, NODE_DIR
-from meridian.node_deploy import deploy_node_container, render_node_compose, wait_for_node_connected
 from meridian.provision.baseline import build_server_baseline_checks, build_server_baseline_steps
 from meridian.provision.ensure import ensure_file_content, ensure_ufw_rule, ufw_rule_present
 from meridian.provision.nginx import InstallNginx
-from meridian.provision.runtime_migration import (
-    LEGACY_NODE_PROBE,
-    remove_legacy_node_command,
-    restart_legacy_node,
-    stop_legacy_node,
-)
 from meridian.provision.steps import ProvisionContext
 from meridian.provision.tls import IssueTLSCert
-from meridian.provision.warp import InstallWarp
 from meridian.reconciler import server_retirement as retirement
 from meridian.reconciler.resources import (
     ResourceAction,
@@ -48,9 +37,9 @@ from meridian.reconciler.server_evidence import (
     baseline_attestation,
     baseline_check_command,
     build_observation,
-    docker_container_running,
+    content_mismatch,
     file_content_or_absent,
-    managed_command_output,
+    listener_wait_command,
     negated_path_is_absent,
     port_is_listening,
     require_successful_evidence,
@@ -71,15 +60,11 @@ from meridian.reconciler.server_support import (
     raise_if_step_timeout,
     raise_if_timeout,
     restore_file,
-    runtime_pin,
 )
-from meridian.remnawave import MeridianPanel
-from meridian.remnawave.versions import effective_image
 from meridian.ssh import ServerConnection
 
 ConnectionFactory = Callable[[str], ServerConnection]
 _payload = payload_of
-_runtime_pin = runtime_pin
 _raise_if_timeout = raise_if_timeout
 _raise_if_step_timeout = raise_if_step_timeout
 
@@ -88,10 +73,8 @@ _raise_if_step_timeout = raise_if_step_timeout
 class ServerDriverContext:
     plan: ResourcePlan
     cluster: ClusterConfig
-    panel: MeridianPanel
     connection_for: ConnectionFactory
     server_addresses: Mapping[str, str]
-    node_secrets: dict[str, str] = field(default_factory=dict, repr=False)
     cancellation: CancellationToken | None = None
     reporter: Reporter = field(default_factory=NoopReporter)
     operation: OperationContext | None = None
@@ -124,7 +107,6 @@ def build_server_drivers(context: ServerDriverContext) -> ResourceDrivers:
         "certificate": CertificateDriver(context),
         "nginx_artifact": NginxArtifactDriver(context),
         "realm_hop": RealmHopDriver(context),
-        "node_runtime": NodeRuntimeDriver(context),
     }
 
 
@@ -160,6 +142,9 @@ class ServerBaselineDriver:
         attestation = baseline_attestation(action, self.context.plan, payload.server_ref)
         marker_ok = marker_content == f"{attestation}\n"
         matches = marker_ok and all(outcomes.values())
+        mismatches = [f"baseline check '{name}' fails" for name, ok in outcomes.items() if not ok]
+        if not marker_ok:
+            mismatches.append("the attestation is missing" if marker_content is None else "the attestation is stale")
         return build_observation(
             action,
             remote_id=payload.server_ref,
@@ -170,6 +155,7 @@ class ServerBaselineDriver:
                 "checks": outcomes,
             },
             satisfied={"exists"} if matches else set(),
+            mismatches=mismatches,
         )
 
     def apply(
@@ -324,7 +310,12 @@ class CertificateDriver(retirement.CertificateRetirement):
         )
         valid = assertion_matches(action.resource.logical_id, result, "certificate validation")
         san = f"IP Address:{payload.hostname}" if is_ip(payload.hostname) else f"DNS:{payload.hostname}"
-        matches = valid and san in result.stdout
+        # Whole entries only: as a substring, 198.51.100.1 matched a certificate for 198.51.100.10.
+        named = san in {entry.strip() for entry in result.stdout.replace("\n", ",").split(",")}
+        matches = valid and named
+        mismatches = [] if valid else ["the certificate expires within a day"]
+        if not named:
+            mismatches.append(f"the certificate does not name {payload.hostname}")
         return build_observation(
             action,
             remote_id=certificate_path,
@@ -332,6 +323,7 @@ class CertificateDriver(retirement.CertificateRetirement):
             matches=matches,
             projection={"certificate": result.stdout},
             satisfied={"exists"},
+            mismatches=mismatches,
         )
 
     def apply(
@@ -444,6 +436,16 @@ class NginxArtifactDriver(retirement.NginxArtifactRetirement):
         file_matches = current_content == expected
         port_listening = port_is_listening(listening.stdout, payload.listener_port)
         matches = file_matches and service_active and port_listening and legacy_absent
+        mismatches = [
+            reason
+            for reason, failed in (
+                (content_mismatch(path, current_content, expected), not file_matches),
+                ("nginx is not active", not service_active),
+                (f"nothing listens on TCP port {payload.listener_port}", not port_listening),
+                (f"{self._LEGACY_STREAM_PATH} is still present", not legacy_absent),
+            )
+            if failed
+        ]
         satisfied: set[str] = set()
         if current_content is not None:
             satisfied.add("exists")
@@ -461,6 +463,7 @@ class NginxArtifactDriver(retirement.NginxArtifactRetirement):
                 "legacy_absent": legacy_absent,
             },
             satisfied=satisfied,
+            mismatches=mismatches,
         )
 
     def apply(
@@ -539,6 +542,9 @@ class NginxArtifactDriver(retirement.NginxArtifactRetirement):
                 self._restore_file(conn, self._LEGACY_STREAM_PATH, legacy_content)
             conn.run(NGINX_ENABLE_AND_RELOAD, timeout=30)
             raise ResourceReconcileError(f"nginx reload failed for {path}.")
+        # Reload hands new listeners over asynchronously; observing at once can miss the port
+        # on a busy 1 vCPU server. A port that never comes up is the observation's to report.
+        conn.run(listener_wait_command(payload.listener_port), timeout=20)
         return ResourceApplyReceipt(remote_id=path)
 
     @staticmethod
@@ -571,126 +577,6 @@ class NginxArtifactDriver(retirement.NginxArtifactRetirement):
         NginxArtifactDriver._restore_file(conn, path, previous_content)
         if enabled_path and previous_content is None:
             conn.run(f"rm -f {shlex.quote(enabled_path)}", timeout=15)
-
-
-class NodeRuntimeDriver(retirement.NodeRuntimeRetirement):
-    """The panel-managed node container under its neutral name.
-
-    Nodes deployed before neutral naming run as ``remnawave-node`` from
-    ``/opt/remnanode``. Observation reports them as drift; apply stops the legacy
-    container (same host ports), deploys the renamed one with the legacy image
-    choice, and deletes the legacy container and directory only once the panel
-    sees the new node, starting the legacy container again if it never does.
-    """
-
-    def __init__(self, context: ServerDriverContext) -> None:
-        self.context = context
-
-    def _image(self, compose: str | None) -> str:
-        """Accept an operator-upgraded node image; never treat it as drift to downgrade."""
-        return effective_image(_runtime_pin(self.context.plan, "remnawave_node_image", REMNAWAVE_NODE_IMAGE), compose)
-
-    def observe(
-        self,
-        action: ResourceAction,
-        binding: ManagedResourceBinding | None,
-    ) -> ResourceObservation:
-        payload = _payload(action, NodeRuntimePayload)
-        logical_id = action.resource.logical_id
-        conn = self.context.connection(payload.server_ref)
-        compose_path = f"{NODE_DIR}/docker-compose.yml"
-        compose = conn.get_text(compose_path, timeout=15)
-        compose_content = file_content_or_absent(logical_id, compose, "node compose file")
-        expected_compose = render_node_compose(self._image(compose_content))
-        running = conn.run(
-            f"docker inspect {shlex.quote(NODE.name)} --format '{{{{.State.Running}}}}' 2>&1",
-            timeout=15,
-        )
-        container_running = docker_container_running(logical_id, running, NODE.name)
-        legacy_probe = conn.run(LEGACY_NODE_PROBE, timeout=15)
-        require_successful_evidence(logical_id, legacy_probe, "pre-rename node inspection")
-        legacy = bool({"container", "dir"} & set(legacy_probe.stdout.split()))
-        node_uuid = self.context.remote_id(payload.binding_ref, action.generation)
-        node = self.context.panel.get_node(node_uuid) if node_uuid else None
-        warp_ok = True
-        if payload.warp:
-            warp = conn.run("warp-cli --accept-tos status 2>/dev/null", timeout=15)
-            warp_output = managed_command_output(logical_id, warp, "WARP status")
-            warp_ok = warp_output is not None and "Connected" in warp_output
-        exists = compose_content is not None
-        connected = node is not None and node.is_connected
-        matches = (
-            exists
-            and not legacy
-            and compose_content == expected_compose
-            and container_running
-            and connected
-            and warp_ok
-        )
-        satisfied: set[str] = set()
-        if exists:
-            satisfied.add("exists")
-        if connected:
-            satisfied.add("connected")
-        return build_observation(
-            action,
-            remote_id=NODE_DIR,
-            exists=exists,
-            matches=matches,
-            projection={
-                "compose": compose_content or "",
-                "running": container_running,
-                "connected": connected,
-                "warp": warp_ok,
-                "legacy": legacy,
-            },
-            satisfied=satisfied,
-        )
-
-    def apply(
-        self,
-        action: ResourceAction,
-        binding: ManagedResourceBinding | None,
-    ) -> ResourceApplyReceipt:
-        payload = _payload(action, NodeRuntimePayload)
-        conn = self.context.connection(payload.server_ref)
-        if payload.warp:
-            result = InstallWarp().run(
-                conn,
-                ProvisionContext(ip=self.context.address(payload.server_ref)),
-            )
-            if result.status == "failed":
-                raise ResourceReconcileError(f"Could not configure WARP: {result.detail}")
-        secret = self.context.node_secrets.get(payload.workload_ref, "")
-        if not secret:
-            secret = self.context.panel.get_node_secret_key()
-        if not secret:
-            raise ResourceReconcileError(f"Remnawave returned no node secret for workload {payload.workload_ref!r}.")
-        current = conn.get_text(f"{NODE_DIR}/docker-compose.yml", timeout=15)
-        legacy_compose = conn.get_text(f"{LEGACY_NODE_DIR}/docker-compose.yml", timeout=15)
-        legacy = conn.run(LEGACY_NODE_PROBE, timeout=15)
-        if legacy.returncode != 0:
-            raise ResourceReconcileError("Could not check the server for a pre-rename node container.")
-        survivors = set(legacy.stdout.split())
-        has_legacy_container = "container" in survivors
-        # A first rename carries the operator's image choice over from the legacy compose file.
-        compose_source = current if current.returncode == 0 else legacy_compose
-        image = self._image(compose_source.stdout if compose_source.returncode == 0 else None)
-        # Same host ports: the legacy container must release them before the renamed one binds.
-        if has_legacy_container and not stop_legacy_node(conn):
-            raise ResourceReconcileError(f"Could not stop the pre-rename node container {NODE.legacy}.")
-        deployed = deploy_node_container(conn, secret, node_api_port=payload.api_port, image=image)
-        node_uuid = self.context.remote_id(payload.binding_ref, action.generation)
-        connected = deployed and bool(node_uuid) and wait_for_node_connected(self.context.panel, node_uuid)
-        if not connected:
-            if has_legacy_container:
-                restart_legacy_node(conn, NODE_DIR)
-            if not deployed:
-                raise ResourceReconcileError(f"Remnawave node runtime {payload.workload_ref!r} did not become healthy.")
-            raise ResourceReconcileError(f"Node runtime {payload.workload_ref!r} did not connect to the panel.")
-        if survivors and conn.run(remove_legacy_node_command(), timeout=60).returncode != 0:
-            raise ResourceReconcileError(f"The renamed node runs, but {NODE.legacy} or {LEGACY_NODE_DIR} remains.")
-        return ResourceApplyReceipt(remote_id=NODE_DIR)
 
 
 def _baseline_context(

@@ -5,12 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "meridian-vpn"
 dynamic = ["version"]
-description = "Deploy a censorship-resistant proxy server — hardened by default, shared via QR code"
+description = "Deploy a self-hosted VPN server with a built-in web panel and shareable connection pages"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [{ name = "uburuntu" }]
-keywords = ["vpn", "proxy", "vless", "reality", "xray"]
+keywords = ["vpn", "vpn-panel", "self-hosted", "proxy", "vless", "reality", "xhttp", "hysteria2", "xray"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
@@ -33,6 +33,8 @@ dependencies = [
     "pydantic>=2.12",
     "prompt-toolkit>=3.0.43",
     "anyascii>=0.3.2",
+    "cryptography>=43",
+    "pyrage>=1.3",
 ]
 
 [project.scripts]
@@ -50,12 +52,8 @@ dev = [
     "mypy>=1.0",
     "types-PyYAML>=6.0",
     "hatchling>=1.31.0",
-    "fastapi>=0.128",
-    "uvicorn>=0.30",
     "pexpect>=4.9; sys_platform != 'win32'",
 ]
-# Experimental local web UI (`meridian studio`): pip install 'meridian-vpn[studio]'
-studio = ["fastapi>=0.128", "uvicorn>=0.30"]
 
 [dependency-groups]
 # Cloud SDKs for the local-only real-VM harness (tests/realvm/); never published.

@@ -8,7 +8,6 @@ from urllib.parse import urlsplit
 import pytest
 
 from meridian.cluster import RealityKeyBinding
-from meridian.compiler import compile_topology
 from meridian.compiler.models import (
     ConfigProfilePayload,
     EgressBalancerSpec,
@@ -24,7 +23,7 @@ from meridian.xray_workload import (
     WorkloadConfigError,
     render_workload_config,
 )
-from tests.support.topology import single_exit_intent
+from tests.support.topology import compile_panel_pass, single_exit_intent
 
 _EDGE_A_TAG = "meridian-edge-0dbff829e6d1bdd5"
 _EDGE_B_TAG = "meridian-edge-c123917cc6e24846"
@@ -333,7 +332,7 @@ def test_gateway_direct_rule_leaves_through_the_gateways_freedom_outbound() -> N
     )
     profile = next(
         resource.payload
-        for resource in compile_topology(intent).resources
+        for resource in compile_panel_pass(intent).resources
         if resource.logical_id == "profile:gateway-a"
     )
     assert isinstance(profile, ConfigProfilePayload)

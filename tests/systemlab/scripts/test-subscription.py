@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Execute the canonical Xray document returned by Remnawave."""
+"""Execute the canonical Xray document the control service serves."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import argparse
 import sys
 
 from meridian.cluster import ClusterConfig
-from meridian.remnawave import MeridianPanel
+from meridian.control.client import ControlClient
 from meridian.xray_client import XrayStartupError, ensure_xray_binary, test_connection
 from tests.systemlab.subscription_client import (
     endpoint_addresses,
@@ -66,16 +66,10 @@ def main() -> int:
 
     cluster = ClusterConfig.load()
     if not cluster.panel.url or not cluster.panel.api_token:
-        print("FAIL: panel credentials are missing")
+        print("FAIL: control service credentials are missing")
         return 1
-    with MeridianPanel(
-        cluster.panel.url,
-        cluster.panel.api_token,
-    ) as panel:
-        document = fetch_canonical_xray(
-            panel,
-            args.username,
-        )
+    with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
+        document = fetch_canonical_xray(client, args.username)
     config = parse_xray_subscription(document.content)
     print(f"  canonical URL: {document.url}")
     print("  delivered endpoints: " + ", ".join(sorted(endpoint_addresses(config))))

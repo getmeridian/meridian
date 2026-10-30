@@ -6,12 +6,254 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [4.0.0] - Unreleased
 
-Meridian 4 is a new foundation: the Remnawave panel replaces 3x-ui, and one
-reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet.
+Meridian 4 is a new foundation. Its own control service and web management
+panel replace 3x-ui; one reviewed topology in `~/.config/meridian/cluster.yml`
+describes your whole fleet; a small agent on every server applies it; and no
+server needs Docker. The first section lists what changed since the previous
+beta, 4.0.0b8; the second is what 4.0 changes compared with 3.x.
 
-### Read first: this is not an in-place upgrade
+### Since 4.0.0b8
+
+#### Read first: moving a Remnawave fleet
+- **`meridian migrate`** moves a fleet deployed by an earlier 4.0 beta onto the
+  control service in place, keeping every link. It backs up the panel's
+  database to your machine and to the control server, carries each client over
+  with their keys, subscription ID, status, limits, expiry, and traffic,
+  replaces each node's container with the agent, checks that every
+  subscription link is unchanged, and only then removes Remnawave. It is
+  resumable and has no rollback; the backup is the way back. `meridian deploy`
+  offers it when it finds a Remnawave fleet.
+- Panel-only data is not carried over, and the review lists it: the panel's
+  admin account and API tokens, per-day usage history, HWID device lists,
+  panel plugins, response rules Meridian didn't set, the Remnawave
+  subscription page, and client IP forwarding (it served the panel's per-user
+  IP limits).
+
+#### Web panel
+- Meridian runs its own control service in place of Remnawave: no Docker, no
+  third-party panel, and every server runs a small agent (`netagent`, static
+  builds for x86-64 and ARM64) that dials out to it. Nodes open no ports for
+  management.
+- `meridian panel` prints the web panel's address and, while it has no owner, a
+  one-time setup link (`--setup-link` resets the owner: new password, sign-in
+  code off, every device signed out). There is no panel password.
+- In the panel you manage people, API tokens, privacy levels, the fleet
+  notice, and the default page language; servers, revisions, and the
+  subscription title are read-only there.
+- Person and password forms ask Leave/Stay while edits exist, including
+  browser back. Person status and usage refresh while visible without
+  replacing drafts, and actions update the screen they came from and name the
+  person in their feedback.
+- Expiry forms edit a native date and time, show the browser zone and the
+  exact UTC instant, and offer +1 month, +3 months, and No expiry.
+- QR images export as PNG or SVG with the person's name and fleet title, and
+  supported browsers copy the PNG.
+- A closed **Individual connections** section lists each named connection with
+  copy and QR actions and the Xray JSON, Mihomo, and sing-box URLs; `client
+  show --connections` prints the same list.
+- Phone dialogs scroll with sticky actions and 44 px touch targets, and the
+  panel keeps English and shows a retry notice when a language file fails to
+  load.
+- Token creation blocks dismissal while it writes and keeps the one-time secret
+  in its own step. People and Servers refresh while visible, mark stale data,
+  and offer retry; background polling no longer keeps an idle owner signed in.
+
+#### Connection pages and apps
+- Connection pages are served by the control service at every person's
+  subscription URL, including people added in the panel; apps keep receiving
+  their configs from the same URL. Old UUID links redirect, and a reviewed
+  apply removes SSH-published page files and retires their service workers.
+- Owners choose the default language for connection and support pages through
+  `fleet language`, the API, or Settings, and can override it per person
+  (`client set --language`). The default follows each person's browser; saved
+  page choices win, and app status messages stay English.
+- Native subscription status remarks come in English, Russian, Persian, and
+  Chinese; status codes stay English.
+- Owners can preview, publish, expire, and clear one fleet notice
+  (`fleet notice` or Settings): apps get it in an `announce` header and pages
+  show a banner.
+- Reviewed owner contact (`fleet contact`) appears on connection and support
+  pages in all four languages as a link that opens only when clicked, and
+  supplies apps' support button.
+- An app too old for Meridian's connections (v2rayNG before 1.9.17) or no
+  longer maintained (desktop NekoRay) gets one extra inert entry at the end of
+  its subscription asking to update or switch to Throne. It is read from that
+  request's User-Agent only and nothing is stored.
+- The **Not connecting?** section explains in all four languages that a red or
+  "n/a" ping in an app does not mean the connection is broken, how to refresh
+  the subscription now, and to turn on update-on-launch.
+- Setup follows your chosen platform and app: labelled store and direct-install
+  alternatives (including desktop architectures and Linux packages), manual or
+  one-tap import, and localized Connect steps, with TUN guidance on Clash
+  desktop apps. Stash joins the additional iOS apps.
+- Pages show account status, current and lifetime traffic, expiry, and
+  freshness in all four languages, with a marked offline answer; long
+  connection lists start with three entries and a "Show all" toggle.
+- Pages validate configuration and app catalogs before rendering, open setup
+  even when the optional app catalog stalls, keep quotes in links from breaking
+  the HTML, offer selectable text when a copy fails, and tell search engines
+  not to index them.
+- Xray JSON subscriptions keep Automatic first and add a named profile for each
+  primary connection, with the same routing and fingerprint alternatives.
+- Subscriptions accept `/v2ray-json`, `/stash`, and `/clash` beside the
+  existing formats; `/sub/<token>/info` returns account status and links;
+  `profile-update-interval` follows `delivery.update_interval_hours` (1-168,
+  default 6); `subscription-refill-date` carries the next quota reset.
+- Empty or unsupported-only subscriptions show inert "No connections available
+  yet" entries instead of empty documents, duplicate connection names get
+  stable suffixes, and Xray subscriptions explain when only fingerprint copies
+  remain.
+- `meridian fleet routing` reads or reviews the client policy: `ru-split`
+  (default) or `full`. Private ranges stay direct either way, and Xray JSON
+  keeps its best-effort BitTorrent direct rule.
+- `client preview` and Settings explain which format an app's request gets,
+  which protocols it includes, and which entries are omitted, without showing
+  credentials.
+
+#### Control service and agents
+- One service (`ctld`, running `meridian serve`) keeps users, traffic, and
+  applied revisions in one SQLite file, serves every subscription format, logs
+  no requests, and sits behind nginx on a secret path.
+- Agents enroll over SSH with a single-use token, verify every document the
+  service signs, and run Xray. `meridian apply` upgrades an agent in place when
+  Meridian ships a new build, keeping the node's identity.
+- `meridian fleet history` lists every reviewed apply the service recorded, with
+  author, status, and plan hash; the apply lease lives in the service.
+- API tokens carry read, propose, or approve scopes, or a separate `people`
+  scope for managing people without access to servers, backups, or settings.
+  Tokens can expire after 1-3650 days (new panel tokens default to 90).
+  Scoped integrations fetch OpenAPI 3.1 at `/api/openapi.json`.
+- Signed node commands are queued durably, delivered only to agents that accept
+  their kind, executed once even if redelivered, and reported per node.
+- `meridian node restart NAME` and the panel's Restart Xray button restart a
+  node's core and wait for readiness; `--all` restarts every managed unit.
+- `client remove` and `client reissue` offer `--cut-off` to end existing
+  sessions once the old credentials are revoked. The confirmation discloses
+  other people's reconnects, and results distinguish success, fallback
+  restart, failure, and timeout.
+- `client extend NAME --days N` adds time after the later of now and the current
+  expiry; `client add` creates limits, reset period, and device caps together
+  with the account.
+- `client set` and the panel keep a private note and one tag per person
+  (`--tag family` is saved as `FAMILY`); `client list --tag` filters.
+- CLI edits for enable, disable, limits, expiry, resets, and devices accept
+  people created in the panel, using the same exact-name rules as `client show`.
+- `client list --attention` and `/api/attention` find people expiring within
+  seven days, above 80% of their quota, or unused for three days, plus offline
+  nodes and unhealthy reports; nothing about attention is stored.
+- `fleet events` and `/api/events` give a local timeline of lifecycle changes,
+  enforcement, node outages, and token activity, without credentials or client
+  addresses: up to 2,000 events for up to 180 days.
+- `meridian server set` records monthly bandwidth allowances, reset days,
+  provider labels, and repeating payment dates, shown by `fleet status`, server
+  lists and exports, the panel, and the attention API. Usage is approximate
+  accepted upload plus download.
+- Node health reports Xray uptime apart from host uptime, traffic-collection
+  failures, API failures, memory, disk, and load; `fleet status` and `check` flag
+  unhealthy nodes and treat stale reports as unavailable evidence.
+- Node totals survive late counter epochs; people show first reported use and
+  their last reporting node; `fleet status` shows who was active in the last
+  report.
+- An apply after a Meridian upgrade no longer re-runs every server's package and
+  hardening baseline; only a change to the baseline or the server's connection
+  does.
+- `meridian fleet upgrade` covers the control service, node agents, and Realm.
+  After `meridian update` it moves the service and agents to the new build;
+  `--tested` skips GitHub, so Realm stays on the tested version.
+
+#### Privacy and backups
+- Device limits and daily usage history are off by default. `meridian privacy
+  show|set` and Settings disclose what each level stores and what a seized
+  control server reveals; lowering a level deletes its records in the same
+  transaction, and applies leave privacy settings alone.
+- Optional daily usage gives per-person and per-server totals per UTC day,
+  kept 90 days by default (7-730), with `client usage`, `fleet usage`, and
+  charts in the panel.
+- Optional device limits use private fingerprints or full details, a fleet
+  default cap, and per-person overrides (`client add|set --devices`, `client
+  devices --remove|--clear`). Apps without a supported HWID header are not
+  counted, and no client addresses are stored.
+- Every machine that manages the fleet pulls an encrypted snapshot after each
+  change, sealed to its own key and to a recovery key shown once at the first
+  deploy. `meridian backup pull`, `recovery-key`, `devices`, and `revoke`
+  manage them. Snapshots carry people, notes, tags, the notice, language
+  choices, and privacy settings; private device records clear after a restore.
+- `meridian restore --to SERVER` rebuilds a lost or seized control server from a
+  snapshot with a new certificate authority and signing keys, so the old server
+  signs nothing your nodes accept. Domain links survive once DNS moves;
+  bare-IP links change and are printed. On a machine with only the snapshot and
+  the recovery key, restore brings the fleet files back too.
+
+#### CLI
+- The version and beta banner prints once a day and after an upgrade, not before
+  every command.
+- Console and CLI quotas use binary GiB and TiB with an explicit Unlimited, and
+  expiries from 2099 on are refused.
+- Fleet import reviews name each person's changed creation settings instead of
+  reporting a reorder.
+- Restart and cut-off commands report service failures in their JSON error
+  envelopes, and a failed result read marks the node failed instead of a
+  retryable timeout.
+
+#### Docs
+- The Russian text of the CLI, web panel, connection and support pages, website,
+  and docs was rewritten with one glossary.
+- Hosting, relay, and security guides in all four languages cover October 2026
+  hosting reports, TLS transfer blocking, mobile whitelist limits, broken
+  relay-to-exit routes, and an audited account of outbound requests and
+  download verification.
+- The website and README show screenshots of the connection page and the web
+  panel, and `/demo/console/` is a clickable panel demo beside the connection
+  page demo, both running on one invented fleet.
+- The README, website, docs, CLI, web panel, and connection pages say VPN
+  where they mean the product and call the owner's console the web panel in
+  all four languages; "proxy" stays only where it is technically exact.
+
+#### Fixed
+- `meridian apply` no longer retries the removal of a deleted server on every
+  run after an interrupted apply, and an exit whose first apply failed is
+  cleaned up when you remove it (`--forget-unreachable` when the server is
+  gone).
+- `fleet status` reports pending convergence separately from runtime health
+  instead of calling a fresh but unapplied configuration healthy.
+- A second `netagent run` exits clearly instead of racing the running agent, and
+  core starts wait for the Xray API and restore the previous configuration if it
+  never comes up.
+- Mihomo, Clash, and Stash subscriptions quote a Reality short ID that looks like
+  a number (such as `12e34567`), which those apps read as a float and then
+  refused the whole document.
+- API-created IPv6 endpoints produce share links with exactly one pair of
+  brackets.
+- Removing a person erases their traffic totals and replay baselines as well as
+  daily history.
+- `client show` includes lifetime traffic and the current period's start, also
+  when daily history is off.
+- `check` reports background enforcement and blob mirror failures with safe error
+  codes, and a lost token reply keeps its recovery notice.
+- A server that already ran nginx from nginx.org gets Meridian's sites included,
+  so certificates and connection pages work there.
+- Hardening from a security review: the agent re-checks every name that reaches
+  a file path, an Xray argument, or its API address; the service answers probes
+  the way nginx does, takes small bodies before sign-in, drops traffic reports
+  for unknown users, re-checks a node's session before handing it a document, and
+  keeps its files private.
+
+#### Removed
+- Remnawave, its database, Valkey, the subscription page container, and Docker
+  on new fleets.
+- Meridian Studio, `meridian studio`, the local Engine behind them, and the
+  `studio` install extra; the web panel is where fleet management lives.
+  `meridian deploy --json`, `--events=jsonl`, `--request`, and `--dry-run` are
+  unchanged for scripts and agents.
+- `meridian panel --show-password` (there is no panel password),
+  `deploy --client-ips` (the control service does not forward client IPs yet),
+  and `client show --repair-page` (pages are live at the subscription URL).
+
+### Compared with 3.x
+
+#### Read first: this is not an in-place upgrade
 - Meridian 4 cannot manage servers deployed by 3.x, and existing client links
-  cannot carry over to Remnawave. Your 3.x servers keep working.
+  cannot carry over. Your 3.x servers keep working.
 - To keep managing them, stay on 3.x: `uv tool install 'meridian-vpn<4'`.
 - To move: deploy a fresh server with 4.0, give your users the new links, then
   `meridian teardown` the old server (it also removes 3x-ui).
@@ -23,31 +265,30 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   `~/.meridian` alone. A fleet set up with a 4.0 beta in `~/.meridian-v4` or
   `~/.meridian` is found there, so the release manages it without moving files.
 
-### Working in the Remnawave panel
-- **`meridian panel`** — prints the admin panel URL and login (`--show-password`
-  for the password) and lists what Meridian manages versus what is yours.
-- **Your panel edits stick** — Meridian now owns only each client's existence,
-  name, and squads. Disabling a client (with `client disable` or in the panel),
-  traffic limits, expiry, and descriptions set in the panel survive every
-  `apply`; before, the next apply re-enabled disabled or limited clients, and a
-  description edit made every apply fail. Disabled, limited, or expired clients
-  no longer mark `fleet status` as degraded.
-- **`meridian check` says whether node plugins can work** — Remnawave's node
-  plugins (Torrent Blocker, ingress and egress filters) need a 5.7+ kernel
-  and otherwise silently do nothing; every exit and
-  gateway now reports "Node plugin readiness" with the fix. The docs explain
-  turning plugins on in the panel. Server inbounds now sniff traffic
-  (route-only, destinations untouched), so Torrent Blocker can recognize
-  BitTorrent once you enable it.
+#### Managing people
+- **Your edits stick** — Meridian owns only each person's existence, name, and
+  squads. Disabling someone (`client disable` or the web panel), traffic limits,
+  expiry, notes, and tags survive every `apply`. Disabled, limited, or expired
+  people don't mark `fleet status` as degraded.
 - **Connect a bot safely** — the client guide shows how to give a community bot
-  its own scoped, expiring panel token and which endpoints a read-only bot
-  needs, instead of sharing Meridian's full-access token.
+  its own read-scoped, expiring API token instead of sharing Meridian's
+  full-access one.
 
-### Deploy
-- **One command, verified end to end** — `meridian deploy IP` sets up the panel
-  and proxy, picks a camouflage target the server can actually use, pushes real
-  traffic through the delivered subscription, and only then prints "Done" with a
-  shareable connection page and QR code. Re-running it resumes or redeploys.
+#### Deploy
+- **Several fleets on one computer** — `meridian context list|use|rename|remove`
+  keeps separate fleets apart, say family and work, kubectl-style:
+  `meridian deploy IP --context work` starts one, `--context NAME` (before or
+  after any command) or `MERIDIAN_CONTEXT` picks one for a run, and
+  `context use` changes the current one. An existing fleet becomes the
+  `default` context without moving a file; others live in `contexts/NAME/`
+  with their own saved servers, sharing Meridian's SSH key. A server belongs
+  to one fleet at a time, `context remove` deletes only local files (asking
+  first while the fleet has servers), and `MERIDIAN_HOME` still pins one fleet.
+- **One command, verified end to end** — `meridian deploy IP` sets up the control
+  service and an exit, picks a camouflage target the server can actually use,
+  pushes real traffic through the delivered subscription, and only then prints
+  "Done" with a shareable connection page and QR code. Re-running it resumes or
+  redeploys.
 - **A setup wizard anyone can follow** — `meridian setup` is a guided,
   resumable wizard for one server or many (exits, Realm relays, routing
   gateways with failover). It speaks English, Russian, Persian, and Chinese
@@ -59,16 +300,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   Choices are arrow-key lists and checklists (Space toggles, `?` explains,
   Esc goes back), typed answers are checked as you enter them, and the
   camouflage list leads with sites found in the exit's own network.
-  `MERIDIAN_PLAIN_PROMPTS=1` keeps the numbered prompts. The final screen also
-  shows the admin panel address and login (the password stays behind
-  `meridian panel --show-password`).
+  `MERIDIAN_PLAIN_PROMPTS=1` keeps the numbered prompts.
 - **Names in any script** — `setup` and `client add` take people's names as
   typed (Биба, مریم, 王小明); connection pages and output show them, and the
-  panel gets a Latin username (`biba`). Other client commands accept either.
-- **Camouflage scans work on cloud servers** — VPSes that get a `/32` address
-  (Hetzner Cloud and others) now scan their surrounding `/24`; the scan used to
-  cover only the server itself, so `deploy` and `node add` always fell back to
-  a well-known site.
+  service gets a Latin username (`biba`). Other client commands accept either.
 - **Review before change** — `meridian plan` shows what `meridian apply` would do
   (exit 0 converged, 1 config error, 2 changes pending, 3 evidence unavailable).
 - **Paths** — Reality, XHTTP, and Hysteria2 on UDP/443 by default; `--domain`
@@ -77,8 +312,9 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
 - **Camouflage next door** — without `--sni`, a first deploy (and `node add`)
   scans the server's own subnet and prefers a site whose DNS really points
   there and that passes Reality's TLS 1.3 + HTTP/2 check, so the SNI and the
-  server's IP look like they belong together. Well-known targets remain the
-  fallback, and real traffic still decides.
+  server's IP look like they belong together. VPSes that get a `/32` address
+  (Hetzner Cloud and others) scan their surrounding `/24`. Well-known targets
+  remain the fallback, and real traffic still decides.
 - **Your own domain as camouflage (self-steal)** — `--self-steal` on `deploy`,
   `node add`, and `node sni` makes Reality imitate a domain you own, pointed
   at the server with a DNS-only record, instead of someone else's site. The
@@ -90,26 +326,30 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   it stops when it doesn't resolve and warns when it points elsewhere (a
   Cloudflare-proxied record). The wizard offers it as "My own domain", and
   `test --probe` no longer treats a self-steal name as an independent site to
-  compare against. `meridian scan` stopped promising that `--domain` alone did
-  this.
-- **Client IPs stay private unless you ask** — by default the panel records
-  the server's own address for every TCP connection, so it never stores where
-  users connect from. `--client-ips` (or `forward_client_ips` in the topology)
-  passes real addresses to Xray and the panel, through the PROXY protocol and
-  X-Forwarded-For, for Remnawave's per-user IP limits; the camouflage site
-  never sees the header.
+  compare against.
+- **Client IPs are never stored** — the control service records no client
+  addresses or connection logs; every TCP connection reaches Xray through nginx
+  on the server.
 - **TLS fingerprint is a setting** — every Reality, XHTTP, and WSS link presents
   the `chrome` fingerprint by default (XHTTP and WSS used to send none, which
   exposed the client library); `--fingerprint` or the topology's path
   `fingerprint` switches it when a region starts flagging one.
 - **Shrink a running fleet** — `meridian node remove` and `meridian relay remove`
   edit the topology, show every resource they will delete, and clean up the
-  panel node, node container, Realm units, firewall rules, and published Hosts.
+  node's agent and Xray, Realm units, firewall rules, and published endpoints.
   `meridian plan` lists removals too, and the review covers them.
 - **Move an exit to another server** — `meridian node replace EXIT SERVER`
   keeps the exit's ID, Reality keys, protocol paths, SNI, WARP and geo-block
   settings, and relays, so clients keep working, then cleans up the old server
-  through the reviewed apply. The control server can't be moved yet.
+  through the reviewed apply. The control server can't be moved this way; use
+  `meridian restore`.
+- **Forget a server that no longer answers** — when a server a change removes
+  doesn't answer over SSH (blocked from your network, or deleted at the
+  provider), its cleanup failed on every apply. `node replace`, `node remove`,
+  `relay remove`, and `apply` now offer to forget what was deployed there, or do
+  it with `--forget-unreachable`; `--yes` alone never does. The control service
+  still deletes what it held, and the server keeps serving the users it had until
+  you delete or wipe it.
 - **Change a camouflage SNI in one command** — `meridian node sni EXIT NEW_SNI`
   and `meridian relay sni RELAY NEW_SNI` switch an exit or relay to another
   site when `meridian test --probe` says the SNI is blocked. They check that
@@ -117,51 +357,44 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   apply it. The old name is replaced, not kept alongside; apps switch at their
   next subscription refresh (every 6 hours) or a manual refresh. They, `node
   add --sni`, and `relay add --sni` refuse Apple names and `www.microsoft.com`.
-- **`meridian fleet upgrade`** — compares the Remnawave images each server runs
-  with this CLI's pins, applies the reviewed plan, then runs `meridian check`.
-  Newer or floating tags you chose are kept, and PostgreSQL never moves to a new
-  major version in place. `meridian update` points to it when a fleet exists.
-  With relays it also moves Realm to GitHub's newest release in the tested
-  major, pinned by the sha256 GitHub publishes, so relay fixes need no Meridian
-  release either. Relays get Realm's static build, which runs on any glibc, and
-  a new binary replaces the running one only after it starts on that server.
+- **Edit the fleet as a file** — `meridian fleet export > fleet.yml` prints the
+  topology as YAML with saved server names and no keys, credentials, links, or
+  transport paths. `meridian fleet import fleet.yml` shows each change
+  (`+ client carol`, `~ exit-2 sni www.example.com -> www.example.org`), then
+  applies the same review `apply` would; an unedited file is a no-op. Removed
+  clients go as with `client remove`. `--dry-run` only shows the changes, and
+  import refuses unsaved servers and edits that need their own command (moving
+  an exit or the control server).
 - **Pins stay current between releases** — a weekly job opens a pull request
-  raising the Realm, RealiTLScanner, acme.sh, and Remnawave defaults; the local
-  Xray test client is now pinned by checksum too, and a Realm tarball without a
-  pinned checksum is refused instead of installed unverified.
+  raising the Realm, RealiTLScanner, and acme.sh defaults; the local Xray test
+  client is pinned by checksum too, and a Realm tarball without a pinned
+  checksum is refused instead of installed unverified. Relays get Realm's static
+  build, which runs on any glibc, and a new binary replaces the running one only
+  after it starts on that server.
 - **One health command: `meridian check`** — checks whatever the server is in
-  your fleet: pre-flight readiness for a new server; panel connection,
-  containers (including Docker health, so a crash-looping service is flagged),
-  every compiled port, TLS, and disk for control, exit, and gateway servers;
-  and each Realm hop for relays. With no server it checks the whole fleet, and
-  `--json` returns one typed report. `meridian test --probe` (short form:
-  `meridian probe`) shows a server the way a censor's scanner would.
+  your fleet: pre-flight readiness for a new server; the control service, each
+  agent, every compiled port, TLS, and disk for control, exit, and gateway
+  servers; and each Realm hop for relays. With no server it checks the whole
+  fleet, and `--json` returns one typed report. `meridian test --probe` (short
+  form: `meridian probe`) shows a server the way a censor's scanner would.
   `preflight`, `rage`, `node check`, and `relay check` are gone: each now stops
   with a one-line pointer to the new command (exit 2, or a JSON error envelope
   with `--json`).
 - **`meridian logs SERVER`** — shows a server's recent logs without logging in:
-  the node, panel, and nginx on control, exit, and gateway servers, and the
-  Realm units on relays. `--grep TEXT` keeps matching lines, `--lines N` sets
-  how many, and `--component` picks node, panel, nginx, or relay. Every line is
-  redacted like `meridian doctor` (tokens, keys, UUIDs, and the panel's secret
-  path), so the output is safe to share; `doctor` now masks that path too.
+  the agent and Xray, the control service, and nginx on control, exit, and
+  gateway servers, and the Realm units on relays. `--grep TEXT` keeps matching
+  lines, `--lines N` sets how many, and `--component` picks node, panel, nginx,
+  or relay. Every line is redacted like `meridian doctor` (tokens, keys, UUIDs,
+  and secret paths), so the output is safe to share.
 - **`cluster.yml` stops growing with every apply** — each apply kept a full copy
   of every resource binding, so a small fleet's file passed 300 KB after a few
   dozen changes. Older copies of the same remote resource are now dropped when a
   change commits; the next apply shrinks existing files.
-- **`client show` keeps the connection-page link** — `client add` and `deploy`
-  printed each client's page link but never recorded that the page was
-  published, so `client show` and `--json` later offered only the
-  subscription URL.
 - **`meridian plan` no longer calls pending changes unavailable** — after any
-  topology edit (even one new client) it listed clients, hosts, and squads as
+  topology edit (even one new client) it listed clients and endpoints as
   "observation failed" and exited 3, because their dependencies only get
   their new identities during apply. It now shows them as `recheck … after`
   those dependencies and exits 2, as for any pending change.
-- **`meridian doctor` reads the node again** — its node log section said
-  "container not running" and its Xray process check failed on every exit
-  (the node's logs aren't plain text and its image has no `pgrep`), so every
-  report came out partial with exit 3.
 - **"What is blocked?"** — `meridian test --probe` now tells a blocked server
   IP from a blocked camouflage SNI by comparing the server with and without the
   SNI against the real camouflage site, and inconclusive stays inconclusive.
@@ -172,6 +405,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
 - **`meridian test` says how each path fails** — every delivered path reports
   its time to first byte, and a failed one is reported as "connects, but no
   traffic passes" or "unreachable". `--json` adds `data.transports`.
+- **`meridian test` says what to do about a blocked exit** — when nothing on
+  an exit answers from your network, it prints the `meridian node replace`
+  command for that exit (`--json`: `data.recovery`). A blocked control server
+  points to the recovery guide instead, since it can't be moved yet.
 - **Name the server first, like ssh** — every server command takes one target:
   an IP, a saved name, `user@host:port`, or `local`. `--user` and `--ssh-port`
   default to the saved values (else `root` and `22`) everywhere, including
@@ -190,12 +427,17 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   password once (hidden, never saved), and the deploy continues; the key is
   saved with the server for later commands. Without a terminal, with `--yes`,
   or with `--json`, they stop with the `ssh-copy-id` command instead.
-
 - **Per-domain routes on an exit** — `meridian route add EXIT --via
   warp|direct|block VALUES...` sends chosen domains, `geosite:` lists, or
   `geoip:` ranges through Cloudflare WARP, directly, or nowhere, ahead of the
   exit's default egress (for example, AI services that block datacenter IPs).
   `route list` and `route remove` complete it; the wizard keeps existing routes.
+- **One route for AI services** — `meridian route add EXIT --preset ai` sends
+  ChatGPT, Claude, Gemini, Cursor, and the rest of the AI site list through
+  WARP as one route named `ai`, so they never see the exit's hosting address
+  (`--via direct` keeps them on it). The deploy guide adds what a server route
+  cannot fix: changing exit countries, device-side leaks, and Google's
+  country-association request.
 - **Gateway rules can send traffic directly** — a routing-gateway rule can
   send matching traffic out of the gateway itself instead of to an exit or
   pool, so Russian sites can leave from a gateway in Russia. The wizard offers
@@ -210,17 +452,15 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   too.
 - **Relays look like nothing in particular** — nothing a hosting provider can
   list on a relay (service, binary, config path, firewall comment) names
-  Meridian, Realm, a relay, or a VPN. Existing relays switch on the next apply.
+  Meridian, Realm, a relay, or a VPN.
 - **`meridian check` measures each relay leg** — every hop downloads the exit's
   camouflage page through the next hop with the clients' SNI and reports
   connect time, first byte, and bytes received; a freeze in the 8–32 KB
   throttling window suggests moving the relay to another provider.
 - **`meridian test` tests the whole fleet** — with no target and several saved
   servers it tests every exit and relay entry in turn instead of asking which
-  one, and exits with the worst result.
-- `meridian test` names each path like its subscription entry ("Reality ·
-  Chrome", "XHTTP · Firefox", "Hysteria2 · UDP") instead of calling every
-  VLESS path "VLESS".
+  one, and exits with the worst result. Each path is named like its
+  subscription entry ("Reality · Chrome", "XHTTP · Firefox", "Hysteria2 · UDP").
 - With several exits, subscriptions list the first server's entries ahead of
   later ones within each method instead of sorting them by exit name.
 - **A brief network stall no longer fails the apply** — every command shared one
@@ -231,24 +471,26 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   "connection stalled, retrying…". A change whose outcome is unknown is checked
   on the server first and is never repeated blindly.
 
-### Sharing
-- **`meridian client reissue NAME` replaces a leaked link** — Remnawave issues
-  the client a new subscription ID and new keys, so the old subscription URL,
-  connection page, and links stop working; Meridian deletes the old page,
-  publishes a new one, and prints the new links. The client and their panel
-  settings stay, including the HWID device limit, which the panel enforces.
+#### Sharing
+- **Traffic limits and expiry from the CLI** — `meridian client set alice
+  --limit 50GB --reset month --expires 2026-12-31` gives a client an
+  allowance, a reset period, and an end date (`--limit none` and
+  `--expires never` lift them); `client add` takes the same options, and
+  `client reset-traffic` refills the allowance at once. `client show` prints
+  "12.4 GB / 50 GB (resets monthly)" and the expiry, `client list` gains an
+  Expires column, and applies leave all of it alone. Sizes are binary
+  (1 GB = 1024³ bytes), and a bare date lasts to the end of that day, UTC.
+- **`meridian client reissue NAME` replaces a leaked link** — the client gets a
+  new subscription ID and new keys, so the old subscription URL, connection
+  page, and links stop working, and Meridian prints the new links. Status,
+  limits, and expiry stay, and device registrations are cleared.
 - **Happ, v2rayNG, and other JSON-capable apps get the Xray JSON** — with it
   comes the automatic failover between entries; they used to get plain base64
-  links. Meridian turns on Remnawave's JSON-at-base setting, which follows
-  upstream's list of apps that read it (v2RayTun and Shadowrocket keep links).
-- **The app's support button opens the person's connection page** — every
-  subscription used to send Remnawave's placeholder `https://dummy.docs.rw`. A
-  `support-url` you set yourself in the panel is kept.
+  links. v2RayTun and Shadowrocket keep links.
 - **Connection names show where traffic exits** — entries lead with the exit's
-  flag and country ("🇩🇪 DE · Reality · Chrome"), and the panel shows the same
-  flag on the node. Deploy, `node add`, and the setup wizard look the country up
-  once from the address's Regional Internet Registry; set `--country` when it is
-  wrong (anycast or leased ranges).
+  flag and country ("🇩🇪 DE · Reality · Chrome"). Deploy, `node add`, and the
+  setup wizard look the country up once from the address's Regional Internet
+  Registry; set `--country` when it is wrong (anycast or leased ranges).
 - **A redesigned connection page** — two clear steps (install an app, add the
   connection with one tap), the subscription QR beside them on a computer for
   setting up a phone, and everything else folded into quiet panels: every
@@ -262,20 +504,19 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   address, and to turn on the app's VPN (TUN) mode. Shown in English, Russian,
   Persian, and Chinese, with no external links.
 - Connection pages are built from each user's real subscription, so relays and
-  every enabled protocol appear.
-- Subscription links live under the connection-page path and never reveal the
-  admin panel's address.
+  every enabled protocol appear. Subscription links live under the
+  connection-page path and never reveal the web panel's address.
 - **Apps refresh subscriptions every 6 hours** — every subscription sends
   `profile-update-interval`, so Happ, Clash Verge, and other apps that read it
-  pick up new exits and relays within hours. Meridian keeps the header set in
-  the panel; other response headers you add stay yours.
-- `meridian client add|show|list|remove|enable|disable`. `client remove` deletes
-  the user and their page; links stop working immediately.
+  pick up new exits and relays within hours.
+- `meridian client add|show|list|set|reset-traffic|remove|enable|disable`.
+  `client remove` deletes the user and their page; links stop working
+  immediately.
 - **Connection pages recommend apps per platform** — Happ first, then
   FlClashX and Clash Mi (plus Throne on desktop), with a link to the router
   guide and a note on subscription refresh and app updates. v2rayNG and
   Streisand import links are fixed, Throne import is added, and the broken
-  v2rayN button is gone. App icons now ship once in a shared cached file, so
+  v2rayN button is gone. App icons ship once in a shared cached file, so
   each page loads about 70 KB less.
 - **"Check my connection"** — the page tests the device clock, whether data
   keeps flowing (the throttling freeze), and the subscription from the
@@ -307,7 +548,7 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   safety net. Plain Base64 imports still need the app's own routing settings.
 - **Torrents skip the VPN in Xray apps** — Xray JSON subscriptions send
   recognized BitTorrent peer connections directly from the device, so a torrent
-  client left running doesn't trip Torrent Blocker and cut off the person's VPN.
+  client left running doesn't draw abuse complaints against the exit.
   Encrypted peers and UDP DHT/uTP may still use the tunnel; Mihomo, sing-box, and
   Base64 subscriptions are unchanged.
 - **sing-box apps get a Meridian profile** — sing-box-based apps (SFA, SFI,
@@ -316,7 +557,7 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   is downloaded at startup, so the app starts even when GitHub is blocked.
   sing-box has no XHTTP, so those entries are left out.
 
-### Docs and agents
+#### Docs and agents
 - **Reviewed translations** — the Russian, Persian, and Chinese CLI, docs, and
   connection pages were reviewed against the English source: mistranslations,
   machine-translation leftovers, and stray tokens fixed, one term per concept
@@ -344,13 +585,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   load in messengers, and the blog has an RSS feed at `/blog/rss.xml`. The
   command builder only offers commands and flags the CLI actually has.
 
-### Security and correctness
+#### Security and correctness
 - **`meridian test` trusts valid certificates on macOS** — uv's bundled Python
   looked for root certificates at a Linux path, so every Let's Encrypt
   certificate was reported untrusted; certificate checks now use certifi.
-- **A smaller download** — the package carries only Studio's own page, scripts,
-  and fonts instead of the whole website: about 1 MB instead of 7.5 MB, which
-  matters on slow or filtered connections.
 - **Starts with current Typer** — Typer 0.26 stopped installing Click, and a
   fresh install of an earlier beta failed at launch with `No module named
   'click'`. Meridian now needs Typer 0.26 or later and uses the Click it ships.
@@ -358,14 +596,11 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   its `SHA256SUMS`, the installation guide shows how to check them, and the
   script pins uv's installer by version and SHA-256 instead of piping the
   latest one into a shell. `MERIDIAN_VERSION=4.0.0` installs one exact release.
-- **Exits and the control server look like ordinary hosts** — containers and
-  directories no longer name the proxy software: `docker ps` shows `ctlsvc-api`,
-  `ctlsvc-db`, `ctlsvc-cache`, `ctlsvc-web`, and `netagent`, in `/opt/ctlsvc`
-  and `/opt/netagent`, like relays' `netfwd`. Servers deployed with a 4.0 beta
-  move over on the next `meridian apply`: the panel directory, with its database
-  and secrets, is renamed in place, so users, client links, and API tokens stay.
-  `meridian check` and `meridian doctor` name the role behind each container,
-  and `meridian teardown` removes both the old and the new names.
+- **Servers look like ordinary hosts** — units and directories don't name the
+  proxy software: the control service is `ctld` in `/opt/ctld`, the agent is
+  `netagent`, and its Xray is `netcore`, like relays' `netfwd`. `meridian check`
+  and `meridian doctor` name the role behind each unit, and `meridian teardown`
+  removes them.
 - **Exits look up destinations over encrypted DNS only** — the exit's direct
   egress used the host's resolver, so the hosting provider saw every site its
   users opened in plain-text DNS, and a failed encrypted lookup fell back to
@@ -374,8 +609,7 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   IPv6), and never fall back to plain DNS: if none answers, sites by
   name fail through that server, and `meridian check` reports a resolver the
   server cannot reach. The system lab sniffs an exit during proxied traffic and
-  requires no plain DNS question on the wire. Servers pick this up on the next
-  `meridian apply`.
+  requires no plain DNS question on the wire.
 - **Large uploads over XHTTP never hit nginx's body limit** — nginx's 1 MB
   default cut long uploads off on 3.x when a client chose a streaming XHTTP
   mode. 4.0 serves packet-up only and now also lifts the limit.
@@ -387,16 +621,27 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   site's certificate (a `www.google.com` certificate for `yandex.ru`), which
   gives the relay away. Each relay name now gets its own Reality listener on
   the exit, and anything else sent through the relay reaches that site.
-- **Debian 12 deploys finish** — fail2ban there found no SSH log file and
-  stopped right after starting, which failed server preparation; it now reads
-  the system journal on every supported release, and a package Debian only
-  remembers is no longer mistaken for an installed one.
-- **1 GB control servers deploy** — without swap, the panel's first start used
-  up the memory and the server stopped answering SSH; the deploy then failed on
-  "Install system packages" though that step was never the cause. A control
-  server with less than about 2 GB of memory now gets a 2 GB `/swapfile` before
-  anything else runs. Servers also no longer install `python3-pip`, which
-  pulled in a compiler toolchain nothing used.
+- **Debian 12 and 13 deploy** — on Debian 12, fail2ban found no SSH log file and
+  stopped right after starting; it now reads the system journal on every
+  supported release, and a package Debian only remembers is no longer mistaken
+  for an installed one. Stock Debian 13 deploys and joins as an exit too: the
+  baseline no longer waits for a `dnsutils` package Debian stopped shipping.
+- **`node replace` moves a bare-IP exit's certificate address** — the moved
+  exit kept the old server's IP as its XHTTP and Hysteria2 certificate name,
+  so the new server could never get a certificate and the move failed. If a
+  move already failed that way, rerun the same `meridian node replace`.
+- **`node add NAME` keeps the saved name** — adding a saved server without
+  `--name` resaved it under its IP, so the name stopped working; it now keeps
+  the name and uses it for the exit too.
+- **`meridian test NAME` and `meridian probe NAME` take saved names** — a name
+  without a dot was refused as "not a full domain name".
+- **Certificate failures say why** — the error kept acme.sh's first lines
+  (timestamps and progress) and cut off its reason; it now shows the last ones.
+- **Unknown geo lists are refused at review** — a gateway rule or exit override
+  naming a `geosite:`/`geoip:` list or country the servers' Xray data lacks made
+  Xray refuse its whole config, so the server stopped converging. Review now
+  stops with the name and a close match (`categry-ru` → `category-ru`), and a
+  saved fleet with such a name still loads so the rule can be removed.
 - **Re-running a command resumes it** — `relay add` for a relay that is already
   declared finishes it instead of failing on a duplicate listener, and a bare
   `meridian test` after removing servers tests what is left instead of asking
@@ -404,28 +649,25 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
 - **Page branding is checked before anything changes** — an unknown `--color`
   or an `--icon` that is neither an emoji nor a reachable image stops deploy
   with the valid choices; a redeploy that names only some branding flags keeps
-  the rest. `client disable --json` no longer claims the next apply re-enables
-  the client.
-- No request logging on Meridian's web server; panel secrets are never rotated
-  on restart; the live SSH port is never firewalled; teardown removes everything
-  Meridian created and nothing it didn't: fail2ban stays on, and nginx keeps
-  running when it serves your own sites, as do your own HAProxy/Caddy.
-- Deploy checks the loopback ports its nginx serves the panel on (8443 and
-  8444) before changing anything, and names the process holding one, instead
-  of failing halfway through on `nginx -t`.
-- An out-of-date copy of `cluster.yml` can't undo newer changes. The
-  control server records the last change applied, and `apply` refuses to run
-  from an older copy or while another machine is applying.
+  the rest.
+- No request logging on Meridian's web server; the live SSH port is never
+  firewalled; teardown removes everything Meridian created and nothing it
+  didn't: fail2ban stays on, and nginx keeps running when it serves your own
+  sites, as do your own HAProxy/Caddy.
+- Deploy checks the loopback ports its nginx serves the control service on
+  (8443 and 8444) before changing anything, and names the process holding one,
+  instead of failing halfway through on `nginx -t`.
+- An out-of-date copy of `cluster.yml` can't undo newer changes. The control
+  server records the last change applied, and `apply` refuses to run from an
+  older copy or while another machine is applying.
 - Mihomo-based apps (FlClash, Clash Verge, ClashMi) and sing-box routers
-  connect again. By default the Remnawave node's Xray rejects clients that
-  announce a version below 26.3.27, and those apps announce 1.8.x, so their
-  Reality connections failed with "authentication failed". Exits now accept any
-  client that speaks Reality.
+  connect again. Recent Xray releases reject clients that announce a version
+  below the server's minimum, and those apps announce 1.8.x, so their Reality
+  connections failed with "authentication failed". Exits now accept any client
+  that speaks Reality.
 - Setup no longer opens an untagged `443/udp` firewall rule, and the next apply
-  removes the one earlier v4 builds left. Removing or moving a node also deletes
-  the `remnawave/node` image and its node API firewall rule; Docker itself stays
-  installed.
-- Panel and connection-page links typed or copied without the trailing slash
+  removes the one earlier v4 builds left.
+- Web panel and connection-page links typed or copied without the trailing slash
   now open; they used to redirect to an internal port and fail.
 - Subscriptions list Reality first, then XHTTP, WSS, and Hysteria2 last. Apps
   use the first entry by default, and Hysteria2 (UDP, often blocked) used to
@@ -433,17 +675,13 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   server.
 - XHTTP links work. Apps sending the default `chrome` fingerprint speak
   HTTP/2, and the server answered in HTTP/1.1, so no traffic passed.
-- A fresh deploy with Hysteria2 converges. The node started before its
-  certificate existed, so Xray refused to run and the deploy stopped.
-- Stock Debian 13 servers deploy and join as exits. The baseline treated a
-  missing `ufw` as an unreadable check, waited for a `dnsutils` package Debian
-  no longer ships, and WARP needed `lsb_release`.
+- A fresh deploy with Hysteria2 converges. Xray started before its certificate
+  existed, so it refused to run and the deploy stopped.
 - Servers without apt (CentOS, Fedora, Alpine) are refused by name before
   anything changes, instead of failing halfway at "apt-get: command not found";
   `meridian check` reports them as a failure rather than a warning.
-- Reality keys come from the panel instead of a Docker container or an
-  unverified Xray download on the exit, so a fresh exit without `unzip` or
-  Docker no longer fails at its Proxy profile.
+- Reality keys are generated on your machine, so a fresh exit needs neither
+  `unzip` nor an unverified Xray download to create them.
 - Adding or removing an exit renames existing subscription entries instead of
   leaving the old ones behind. Before, every entry appeared twice, and a stale
   Firefox copy slipped into the automatic failover group.
@@ -451,40 +689,32 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   reported as a pass.
 - Mihomo and sing-box subscriptions are tested with the real engines, not only
   parsed: every change runs `mihomo -t` (Mihomo 1.19.32) and `sing-box check`
-  (sing-box 1.14.3) on what a real panel delivers. The client-management docs
-  list the tested apps and engine versions.
-- Downloaded binaries (Xray, Realm, RealiTLScanner) are checksum-verified, and
-  every container image is pinned to its tested multi-arch digest (amd64 and
-  arm64), so a re-pushed tag cannot change what a fresh server runs.
+  (sing-box 1.14.3) on what the control service delivers. The client-management
+  docs list the tested apps and engine versions.
+- Downloaded binaries (Xray, Realm, RealiTLScanner) are checksum-verified, so a
+  re-pushed release cannot change what a fresh server runs.
 - `meridian update` stays on the current major version; `--major` moves to the
   next one after you have read its release notes.
 
-### Remnawave versions
-Fresh deploys install the versions below. Meridian requires at least backend
-3.4.0 and never downgrades a Remnawave you upgraded yourself; it warns when the
-running version is newer than the tested one. `meridian fleet upgrade` moves
-the backend, node, and subscription page to their newest digest-pinned
-release in the same major without a Meridian update (`--tested` keeps the
-versions below), and the choice is saved for later applies.
+#### Tested versions
+Fresh deploys install the versions below. `meridian fleet upgrade` moves Realm
+to its newest release in the same major without a Meridian update (`--tested`
+keeps the version below), and the choice is saved for later applies.
 
 | Component | Version |
 |---|---|
-| `remnawave/backend` | `3.4.5` (minimum `3.4.0`) |
-| `remnawave/node` | `3.4.2` |
-| `remnawave/subscription-page` | `8.0.0` |
-| `postgres` (panel database) | `17.11-alpine` |
-| `valkey/valkey` (panel cache) | `9.1.2-alpine` |
-| Xray-core (test client) | `26.7.28` |
-| Realm (relay forwarder) | `2.9.3` |
+| Xray-core (exits, gateways, test client) | `26.7.28` |
+| Realm (relay forwarder) | `2.9.6` |
 | RealiTLScanner (`meridian scan`) | `0.2.3` |
+| acme.sh (certificates) | `3.1.6` |
 
-### Not yet available
-- `meridian studio` (local web UI) is experimental and needs `pip install 'meridian-vpn[studio]'`.
-  It opens an address ending in `#k=…`, and only a tab opened from that address can use the
-  local Engine. A running deploy can be cancelled; it stops after its current step and resumes
-  on the next run. The default port, 7391, keeps your browser's draft across restarts.
+#### Not yet available
+- Client IP forwarding and per-user IP limits: the control service stores no
+  client addresses. A fleet moved by `meridian migrate` loses it.
+- Moving the control server with `meridian node replace`; rebuild it from a
+  snapshot with `meridian restore`.
 
-### Removed
+#### Removed
 - 3x-ui, HAProxy and Caddy support; per-server `proxy.yml` credentials.
 - The website's ping page: a browser cannot tell a blocked server from one that
   refuses the connection. Run `meridian test --probe` from the censored network,

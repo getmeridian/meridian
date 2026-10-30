@@ -1,0 +1,50 @@
+{
+  "additionalProperties": false,
+  "description": "One canonical subscription entry; URI and QR are credentials, never passive output.",
+  "properties": {
+    "available": {
+      "title": "Available",
+      "type": "boolean"
+    },
+    "protocol": {
+      "anyOf": [
+        {
+          "enum": [
+            "reality",
+            "xhttp",
+            "wss",
+            "hysteria2"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Null for an inert availability or status notice.",
+      "title": "Protocol"
+    },
+    "qr_svg": {
+      "default": "",
+      "description": "Local SVG data URI in an owner-console share view.",
+      "title": "Qr Svg",
+      "type": "string"
+    },
+    "remark": {
+      "title": "Remark",
+      "type": "string"
+    },
+    "uri": {
+      "title": "Uri",
+      "type": "string"
+    }
+  },
+  "required": [
+    "remark",
+    "protocol",
+    "available",
+    "uri"
+  ],
+  "title": "ClientConnection",
+  "type": "object"
+}

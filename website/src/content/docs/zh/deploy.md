@@ -11,7 +11,7 @@ description: 完整的部署演练，包括所有配置选项。
 meridian deploy 198.51.100.10
 ```
 
-一台服务器既是控制服务器（运行 Remnawave 面板）又是承载流量的出口。Meridian 构建与 [`meridian setup`](/zh/cli-reference/#meridian-setup) 相同的已审核拓扑，并用检查点应用它。在打印“Done”之前，它会通过交付的订阅发送真实流量。
+一台服务器既是控制服务器（运行 Meridian 的控制服务）又是承载流量的出口。Meridian 构建与 [`meridian setup`](/zh/cli-reference/#meridian-setup) 相同的已审核拓扑，并用检查点应用它。在打印“Done”之前，它会通过交付的订阅发送真实流量。
 
 不指定 IP 直接运行 `meridian deploy`，它会提示。添加 `--yes` 跳过确认：
 
@@ -54,7 +54,6 @@ ssh-copy-id root@198.51.100.10
 | `--harden / --no-harden` | 启 | 仅 SSH 密钥登录、fail2ban 和 UFW 防火墙。`--no-harden` 用于与其他服务共享的服务器 |
 | `--warp / --no-warp` | 关 | 通过 Cloudflare WARP 发送出站流量 |
 | `--geo-block / --no-geo-block` | 启 | 在服务器上屏蔽俄罗斯域名和 IP |
-| `--client-ips / --no-client-ips` | 关 | 让面板看到每个客户端的真实 IP（见[客户端 IP](#客户端-ip)） |
 | `--country CC` | 自动查询 | 显示在连接名称中的国家，例如 `DE`。Meridian 根据地址注册机构信息查询；如果不对，请手动指定 |
 | `--yes` | | 跳过确认提示 |
 
@@ -137,7 +136,27 @@ meridian deploy 198.51.100.10 --display-name "Alice 的 VPN" --icon 🚀 --color
 
 每次部署结束时，Meridian 都会打印包含当前设置的完整重新部署命令。修改标志后再次运行即可按新设置更新服务器：添加或去掉 `--domain` 或 `--no-hysteria2` 会相应地新增或移除这些连接路径。
 
-`meridian deploy` 只会重新部署已经在你的集群中作为出口的服务器。要添加更多服务器，请使用 `meridian node add NEW_IP`。
+`meridian deploy` 只会重新部署已经在你的集群中作为出口的服务器。要添加更多服务器，请使用 `meridian node add NEW_IP`。如果集群仍在运行 Remnawave 面板，部署会先提议把它迁移到控制服务（见[从 Remnawave 迁移](#从-remnawave-迁移)）。
+
+## 用文件编辑集群
+
+要一次修改多处，或把集群布局纳入版本控制，可以导出、编辑后再导入：
+
+```bash
+meridian fleet export > fleet.yml
+$EDITOR fleet.yml
+meridian fleet import fleet.yml
+```
+
+导入会在执行任何操作之前显示每处变更：
+
+```
+  + client carol
+  ~ exit-2 sni www.example.com -> www.example.org
+  → 应用？ [y/N]
+```
+
+文件以保存的名称指代服务器，不包含密钥、凭据、链接或传输路径，因此可以放进代码仓库。文件中出现的服务器必须先保存（`meridian server add`）。导入会拒绝哪些内容，见 [`fleet import`](/zh/cli-reference/#meridian-fleet)。
 
 ## 部署前检查
 
@@ -194,9 +213,19 @@ meridian route remove exit-1 warp
 
 匹配值可以是域名（包含子域名）、内置 v2fly 数据文件中的 `geosite:NAME` 列表或 `geoip:NAME` 列表；同一条路由只能包含同一种类型。在启用了全局 WARP 的出口上，`--via direct` 作用相反：让匹配的目标绕过 WARP 直接出站。路由按添加顺序生效，优先级高于出口默认出站和地理封锁。这些路由运行在服务器端，与用户设备上将俄罗斯网站直连的客户端分流规则相互独立，也与路由网关规则无关；后者可以让流量直接从境内网关发出（[分流路由](/zh/split-routing/#通过路由网关)）。
 
+### AI 服务
+
+AI 服务（ChatGPT、Claude、Gemini、Cursor 等）会拒绝部分托管商地址；如果会话的地址在不同国家之间跳动，或短暂暴露出家庭网络连接，可能导致账号被登出或封禁。一条路由即可让它们全部走 WARP：
+
+```
+meridian route add exit-1 --preset ai
+```
+
+该预设是一条名为 `ai` 的路由，涵盖 `geosite:category-ai-!cn`、`anthropic`、`openai`、`cursor` 和 `google-gemini`；加上 `--via direct` 则让它们使用出口自身的地址。WARP 在出口所在地区出站，因此请让使用 AI 服务的用户固定在同一国家的出口上。服务器端路由无法拦截设备绕过 VPN 发出的流量：在 macOS 上，Happ 可能在打开笔记本盖子后的片刻直接发送流量。如果 Google 服务仍认为你身处其他国家，可在 Google 账号帮助中提交“更改与账号关联的国家/地区”申请，通常几小时内即可解决。
+
 ## 地理封锁
 
-默认情况下，服务器会拒绝通过代理访问俄罗斯域名（`geosite:category-ru`）和俄罗斯 IP 段（`geoip:ru`）。这样可以避免你的 VPS IP 出现在俄罗斯服务的日志中，降低被发现和封锁的风险。
+默认情况下，服务器会拒绝通过 VPN 访问俄罗斯域名（`geosite:category-ru`）和俄罗斯 IP 段（`geoip:ru`）。这样可以避免你的 VPS IP 出现在俄罗斯服务的日志中，降低被发现和封锁的风险。
 
 如果你的用户需要通过 Meridian 访问这些网站，可以将其关闭：
 
@@ -206,17 +235,9 @@ meridian deploy 198.51.100.10 --no-geo-block
 
 如果想在保留服务器端封锁的同时让用户的设备直连打开俄罗斯网站，详见[分流路由](/zh/split-routing/)。
 
-## 客户端 IP
+## 客户端地址
 
-默认情况下，面板不会知道你的用户从哪里连接：每个 TCP 连接都经由服务器上的 nginx 到达 Xray，所以 Remnawave 记录的是服务器自己的地址。这样更保护隐私，不会保存任何关于用户位置的信息。
-
-Remnawave 的按用户 IP 限制和连接日志需要真实地址。用下面的命令开启：
-
-```
-meridian deploy 198.51.100.10 --client-ips
-```
-
-nginx 随后会把每个客户端的地址传给 Xray 和面板。Hysteria2 是直接的 UDP 连接，始终显示真实地址。经由中继的连接显示中继的地址，经由 Cloudflare CDN 的 WebSocket 或 XHTTP 显示 Cloudflare 的地址。该设置对整个集群生效；要关闭，不带该标志重新部署即可。
+控制服务从不保存客户端 IP 地址或连接日志。每个 TCP 连接经服务器上的 nginx 到达 Xray。默认保留累计流量总量和最后活跃时间；[隐私](/zh/privacy/)允许主动启用每日历史或设备限制，并清楚说明这些信息会暴露什么。
 
 ## 添加中继
 
@@ -226,10 +247,45 @@ nginx 随后会把每个客户端的地址传给 Xray 和面板。Hysteria2 是�
 meridian relay add 203.0.113.10 --exit 198.51.100.10
 ```
 
-## 管理面板
+## 网页面板
 
-Meridian 安装 [Remnawave](https://remna.st/) 作为管理面板。面板由 nginx 在随机生成的秘密路径上反向代理，与连接页面路径相互独立，因此你分享给用户的链接绝不会暴露面板地址。`meridian panel` 会打印面板 URL 和管理员用户名（加 `--show-password` 可显示密码）。
+控制服务自带一个内置网页面板（管理控制台），供唯一的所有者——你——使用。它位于随机生成的秘密路径上，与连接页面路径相互独立，因此你分享的链接绝不会暴露它。`meridian panel` 会打印它的地址；在面板还没有所有者时，还会打印一个一次性设置链接：
 
-请像保护密码一样保护面板路径。CLI 调用同一个面板 API，因此 CLI 所做的更改会同步显示在面板中。Meridian 负责管理它创建的节点、配置和模板：如果你在面板中手动修改了这些内容，`meridian plan` 会报告差异，下次 `apply` 时会恢复为 Meridian 的版本。客户端状态、流量限额、到期时间以及你在面板中自己创建的用户则完全归你控制；详见 [Web 面板](/zh/client-management/#web-面板)。
+```
+  Meridian web panel
+  URL         https://198.51.100.10/<secret-path>/
+  Setup link  https://198.51.100.10/<secret-path>/#setup=…
+              Works once, for 15 minutes. Open it to choose the owner's password.
+```
 
-Meridian 固定了它已测试的 Remnawave 版本。`meridian fleet upgrade` 会把你的服务器升级到同一主版本内最新的 Remnawave，无需等待 Meridian 更新。如果你自己升级 Remnawave，Meridian 不会降级它。
+设置密码后，可以开启来自身份验证器应用的登录验证码。在网页面板中，你可以添加用户、分享他们的链接和二维码、设置到期时间、流量限额与设备上限、记录私有备注与标签、发布全员通知、选择隐私级别，以及签发限定权限的 API 令牌；服务器健康状况、流量、每月流量额度、修订和拓扑设置以只读方式显示，并附上修改它们的 `meridian` 命令。详见[网页面板](/zh/client-management/#网页面板)。
+
+请像保护密码一样保护面板地址。如果你丢失了密码或身份验证器，`meridian panel --setup-link` 会打印一个重置链接：它会设置新密码、关闭登录验证码，并让所有设备退出登录。
+
+## 备份
+
+首次部署结束时，Meridian 会显示一次恢复密钥：
+
+```
+  Recovery key (shown once; Meridian keeps no copy)
+
+    AGE-SECRET-KEY-1…
+
+  Write it down or print it, and keep it offline, away from this computer.
+```
+
+请把它离线保存，远离管理集群的机器。每次变更后，Meridian 都会在你的机器上保存一份控制服务的加密快照，可以用你机器自己的密钥或恢复密钥读取。如果控制服务器丢失，[`meridian restore`](/zh/recovery/#控制服务器丢失) 可以用最新的快照在新服务器上重建它。
+
+## 升级
+
+控制服务和节点 agent 随 Meridian 一起发布。运行 `meridian update` 之后，再运行 `meridian fleet upgrade`：它会先显示将要改变的内容，然后把控制服务升级到新版本，并就地升级每个 agent，保留每个节点的身份。它还会把中继升级到最新的 Realm 版本，无需等待 Meridian 更新。任何一次 `meridian apply` 也会让控制服务和 agent 跟上已安装的 Meridian 版本。
+
+## 从 Remnawave 迁移
+
+由更早的 Meridian 4 版本部署的集群运行的是 Remnawave 面板。`meridian migrate` 会在原服务器上就地把它迁移到控制服务：
+
+```
+meridian migrate
+```
+
+它会备份面板的数据库（备份到你的机器和控制服务器上），带着每个客户端的密钥、状态、限额、到期时间和流量迁移过去，用 agent 替换每个节点的容器，并在删除 Remnawave 之前检查每条订阅链接都没有变化。客户端保留各自的链接，不会察觉任何变化。只存在于面板中的数据（例如 HWID 设备列表、按天的用量历史和插件设置）不会迁移，客户端 IP 转发（它服务于面板按用户的 IP 限制）也会关闭；审核时会列出这些内容。迁移可以继续：如果中途停止，再次运行 `meridian migrate` 即可。详见 [`meridian migrate`](/zh/cli-reference/#meridian-migrate)。

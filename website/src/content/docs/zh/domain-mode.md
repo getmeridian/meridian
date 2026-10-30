@@ -14,7 +14,7 @@ meridian deploy 198.51.100.10 --domain vpn.example.com
 - **XHTTP** 迁移到你的域名上，并新增 **WSS**，使用由 Meridian 自动申请和续期的 Let's Encrypt 证书（通过 acme.sh）
 - 当域名开启 Cloudflare 代理后，这两条路径都会经由 Cloudflare CDN 传输——即使你的服务器 IP 被封锁，它们也能继续工作
 
-管理面板和连接页面仍使用服务器的 IP 证书；域名仅承载代理流量路径。
+控制服务、网页面板和连接页面仍使用服务器的 IP 证书；域名仅承载 VPN 路径。
 
 UDP/443 上的 Hysteria2 也会改用域名的证书（见 [Hysteria2 和 Cloudflare](#hysteria2-和-cloudflare)）；`--no-hysteria2` 可将其关闭。
 

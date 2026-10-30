@@ -32,6 +32,27 @@ def test_removes_v4_server_artifacts() -> None:
     assert "ufw delete allow 443/udp" in script
 
 
+def test_removes_the_control_service_and_node_agent_stopping_the_agent_first() -> None:
+    commands = _commands()
+    stops = [call for call in commands if call.startswith("systemctl stop ")]
+    script = "\n".join(commands)
+
+    assert [call.split()[2] for call in stops if call.split()[2].endswith(("netagent.service", "netcore.service"))] == [
+        "netagent.service",
+        "netcore.service",
+    ]
+    for path in (
+        "/opt/ctld",
+        "/etc/ctld",
+        "/var/lib/ctld",
+        "/etc/netagent",
+        "/var/lib/netagent",
+        "/usr/local/lib/netagent",
+    ):
+        assert path in script
+    assert "userdel ctld" in script
+
+
 def test_removes_meridian_3x_panel() -> None:
     assert "rm -rf /opt/3x-ui" in _commands()
 

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import typer
 
+from meridian import config
 from meridian.commands._helpers import load_cluster
 from meridian.commands.resolve import ensure_server_connection, resolve_server
-from meridian.config import SERVER_PROFILES_FILE
 from meridian.console import err_console, fail, info, line, ok, prompt, warn
 from meridian.diagnostics.camouflage import ScanUnavailableError, scan_neighbors
 from meridian.servers import ServerRegistry
@@ -39,7 +39,7 @@ def run(
     ssh_port: int = 0,
 ) -> None:
     """Download RealiTLScanner, scan the server's subnet, and let user pick an SNI target."""
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     resolved = resolve_server(registry, explicit_ip=ip, user=user, port=ssh_port)
 
     resolved = ensure_server_connection(resolved)

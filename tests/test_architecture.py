@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import subprocess
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "meridian"
@@ -52,29 +53,11 @@ CORE_FORBIDDEN = (
     "click",
 )
 
-# engine/ must not import commands, provisioning runtime, or console.
-# meridian.config is allowed (path constants needed for server state).
-ENGINE_FORBIDDEN = (
-    "meridian.commands",
-    "meridian.console",
-    "meridian.provision",
-    "meridian.remnawave",
-    "meridian.renderers",
-    "meridian.ssh",
-    "rich",
-    "typer",
-    "click",
-)
-
-# adapters/ bridge core↔concrete — never depend on engine.
-ADAPTER_FORBIDDEN = ("meridian.engine",)
-
 # compiler/ is a pure transformation from typed intent to typed resources.
 COMPILER_FORBIDDEN = (
     "meridian.commands",
     "meridian.config",
     "meridian.console",
-    "meridian.engine",
     "meridian.provision",
     "meridian.remnawave",
     "meridian.ssh",
@@ -87,13 +70,24 @@ COMPILER_FORBIDDEN = (
     "secrets",
 )
 
+# control/ is the service on the control server: it never reaches back into the
+# deployer (CLI, SSH, panel, provisioning, reconciler) or its presentation.
+CONTROL_FORBIDDEN = (
+    "meridian.commands",
+    "meridian.config",
+    "meridian.console",
+    "meridian.provision",
+    "meridian.reconciler",
+    "meridian.remnawave",
+    "meridian.ssh",
+    "rich",
+    "typer",
+    "click",
+)
+
 # Shared library modules must not import private (_-prefixed) symbols
 # from commands/.
-LIBRARY_MODULES = [
-    SRC / "panel_bootstrap.py",
-    SRC / "node_deploy.py",
-    SRC / "reality_keys.py",
-]
+LIBRARY_MODULES = [SRC / "resolve.py", *sorted((SRC / "setup").rglob("*.py"))]
 
 
 class TestLayerBoundaries:
@@ -108,17 +102,13 @@ class TestLayerBoundaries:
 
         assert "meridian.core.schema" not in imports
 
-    def test_engine_never_imports_commands_or_runtime(self) -> None:
-        violations = _scan_violations(SRC / "engine", ENGINE_FORBIDDEN)
-        assert violations == [], "engine/ has forbidden imports:\n" + "\n".join(violations)
-
-    def test_adapters_never_import_engine(self) -> None:
-        violations = _scan_violations(SRC / "adapters", ADAPTER_FORBIDDEN)
-        assert violations == [], "adapters/ has forbidden imports:\n" + "\n".join(violations)
-
     def test_compiler_has_no_runtime_or_randomness_dependencies(self) -> None:
         violations = _scan_violations(SRC / "compiler", COMPILER_FORBIDDEN)
         assert violations == [], "compiler/ has forbidden imports:\n" + "\n".join(violations)
+
+    def test_control_service_never_imports_the_deployer(self) -> None:
+        violations = _scan_violations(SRC / "control", CONTROL_FORBIDDEN)
+        assert violations == [], "control/ has forbidden imports:\n" + "\n".join(violations)
 
     def test_click_is_reached_only_through_cli_types(self) -> None:
         """Typer ≥ 0.26 vendors Click; the ``click`` package isn't installed in production."""
@@ -126,7 +116,7 @@ class TestLayerBoundaries:
         assert violations == [], "import Click's classes from meridian.cli_types:\n" + "\n".join(violations)
 
     def test_library_modules_never_import_private_from_commands(self) -> None:
-        """panel_bootstrap.py and friends must not import _foo from commands/.
+        """resolve.py and setup/ must not import _foo from commands/.
 
         These modules are shared business logic consumed by both CLI commands
         and the reconciler. Importing private command functions creates an
@@ -192,46 +182,12 @@ class TestContractDrift:
             # Just verify each class has typed public fields (the derivation test)
             assert len(expected) > 0, f"{cls.__name__} has no public fields"
 
-    def test_operation_state_is_single_source(self) -> None:
-        """OperationState must be defined once in core, not redefined in engine."""
-        # engine should import from core, not redefine
-        import meridian.engine.operations as eng_mod
-        from meridian.core.operations import OperationKind, OperationState
-
-        source = ast.parse(Path(eng_mod.__file__).read_text())
-        for node in ast.walk(source):
-            if isinstance(node, ast.Assign):
-                for target in node.targets:
-                    if isinstance(target, ast.Name) and target.id in ("OperationState", "OperationKind"):
-                        raise AssertionError(f"engine/operations.py redefines {target.id} — import from core instead")
-
-        # Verify the engine module actually uses the core types
-        assert OperationState is not None
-        assert OperationKind is not None
-
-    def test_engine_snapshot_returns_core_model(self) -> None:
-        """EngineOperation.snapshot() must return a core OperationSnapshot."""
-        import inspect
-
-        from meridian.core.operations import OperationSnapshot
-        from meridian.engine.operations import EngineOperation
-
-        sig = inspect.signature(EngineOperation.snapshot)
-        ret = sig.return_annotation
-        # Accept both the class itself and string annotations
-        if isinstance(ret, str):
-            assert "OperationSnapshot" in ret
-        elif ret is not inspect.Parameter.empty:
-            assert ret is OperationSnapshot or (hasattr(ret, "__name__") and ret.__name__ == "OperationSnapshot")
-
 
 # File size budget — catches god-modules at 850 lines, not 2500.
 # Files above this limit must be in the allowlist with a reason.
 FILE_SIZE_BUDGET = 800
 
-FILE_SIZE_ALLOWLIST: dict[str, str] = {
-    "remnawave.py": "single API client wrapping 10+ REST domains — facade pattern is intentional",
-}
+FILE_SIZE_ALLOWLIST: dict[str, str] = {}
 
 
 class TestStructuralHealth:
@@ -305,18 +261,13 @@ class TestStructuralHealth:
         """Library modules must raise exceptions, not call console.fail().
 
         fail() exits the process — it belongs in CLI command entry points only.
-        Library modules (resolve, panel_bootstrap, node_deploy, reality_keys,
-        provision/) should raise typed exceptions that command callers convert
-        to fail() calls.
+        Library modules (resolve, setup/, provision/, migrate/) should raise
+        typed exceptions that command callers convert to fail() calls.
         """
         # Modules that must not import fail from meridian.console
-        library_files = [
-            SRC / "resolve.py",
-            SRC / "panel_bootstrap.py",
-            SRC / "node_deploy.py",
-            SRC / "reality_keys.py",
-        ]
+        library_files = [SRC / "resolve.py", *sorted((SRC / "setup").rglob("*.py"))]
         library_files.extend(sorted((SRC / "provision").rglob("*.py")))
+        library_files.extend(sorted((SRC / "migrate").rglob("*.py")))
 
         violations = []
         for path in library_files:
@@ -334,3 +285,91 @@ class TestStructuralHealth:
             + "\n".join(violations)
             + "\nSee core/errors.py for MeridianError hierarchy."
         )
+
+
+def test_no_tracked_text_file_carries_merge_conflict_markers() -> None:
+    """A merge once committed `<<<<<<<` markers into a CLAUDE.md that no linter reads."""
+    root = SRC.parents[1]
+    tracked = (
+        subprocess.run(
+            ["git", "ls-files", "-z", "*.md", "*.py", "*.rs", "*.yml", "*.yaml", "*.toml", "*.json"],
+            cwd=root,
+            capture_output=True,
+            check=True,
+        )
+        .stdout.decode()
+        .split("\0")
+    )
+    marked = [
+        name
+        for name in tracked
+        if name
+        and (root / name).is_file()
+        and any(
+            line.startswith(("<<<<<<< ", ">>>>>>> ")) for line in (root / name).read_text(errors="replace").splitlines()
+        )
+    ]
+    assert marked == []
+
+
+# Paths `config.select_context()` rebinds (or tests repoint): a copy taken at import keeps the wrong fleet.
+CONTEXT_BOUND_PATHS = frozenset(
+    {
+        "PINNED_HOME",
+        "INSTALL_HOME",
+        "CACHE_DIR",
+        "PREFERENCES_FILE",
+        "MERIDIAN_SSH_KEY_FILE",
+        "CONTEXT",
+        "FLEET_HOME",
+        "HOME_DISPLAY",
+        "CLUSTER_CONFIG",
+        "CLUSTER_BACKUP",
+        "SERVER_PROFILES_FILE",
+        "SETUP_DRAFT_FILE",
+    }
+)
+
+
+def _import_time_nodes(tree: ast.Module) -> list[ast.AST]:
+    """Every node Python evaluates when the module is imported: not function or lambda bodies."""
+    found: list[ast.AST] = []
+
+    def visit(node: ast.AST) -> None:
+        found.append(node)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            args = node.args
+            for default in (*args.defaults, *(d for d in args.kw_defaults if d is not None)):
+                visit(default)
+            for decorator in getattr(node, "decorator_list", ()):
+                visit(decorator)
+            return
+        for child in ast.iter_child_nodes(node):
+            visit(child)
+
+    visit(tree)
+    return found
+
+
+def test_no_module_copies_a_context_bound_path_at_import() -> None:
+    """`from meridian.config import CLUSTER_CONFIG` at module level would ignore `--context`."""
+    violations = []
+    for path in sorted(SRC.rglob("*.py")):
+        if path == SRC / "config.py":
+            continue
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in _import_time_nodes(tree):
+            if isinstance(node, ast.ImportFrom) and node.module == "meridian.config":
+                names = sorted(alias.name for alias in node.names if alias.name in CONTEXT_BOUND_PATHS)
+                if names:
+                    violations.append(f"{path.relative_to(SRC)}:{node.lineno} imports {', '.join(names)}")
+            elif (
+                isinstance(node, ast.Attribute)
+                and node.attr in CONTEXT_BOUND_PATHS
+                and isinstance(node.value, ast.Name)
+                and node.value.id in {"config", "cfg"}
+            ):
+                violations.append(f"{path.relative_to(SRC)}:{node.lineno} reads config.{node.attr} at import")
+    assert violations == [], (
+        "Read context-bound paths as `config.NAME` inside functions (see meridian.contexts):\n" + "\n".join(violations)
+    )

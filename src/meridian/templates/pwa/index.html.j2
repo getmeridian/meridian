@@ -1,9 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ lang }}" dir="{{ 'rtl' if lang == 'fa' else 'ltr' }}" data-language="{{ language }}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="{{ asset_path }}/language.js"></script>
 <meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow, noarchive">
 <meta name="theme-color" content="#0E1014" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#F3F4F6" media="(prefers-color-scheme: light)">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -13,12 +15,13 @@
 <meta property="og:description" content="Secure connection setup page">
 <meta property="og:type" content="website">
 <link rel="stylesheet" href="{{ asset_path }}/styles.css">
-<link rel="manifest" href="manifest.webmanifest">
+<link rel="manifest" href="{{ manifest_path }}">
 <link rel="icon" type="image/svg+xml" href="{{ asset_path }}/icon.svg">
 <link rel="apple-touch-icon" href="{{ asset_path }}/icon.svg">
 </head>
 <body>
 <div class="wrap" id="app">
+  {% if notice %}<section class="notice owner-notice" dir="auto" role="status"><p>{{ notice.text }}</p></section>{% endif %}
   <div class="skeleton">
     <div class="skel skel-title"></div>
     <div class="skel skel-sub"></div>
@@ -37,6 +40,8 @@
     </div>
   </div>
 </noscript>
-<script src="{{ asset_path }}/app.js"></script>
+<script src="{{ asset_path }}/contact.js"></script>
+<script src="{{ asset_path }}/notice.js"></script>
+<script src="{{ asset_path }}/app.js" data-config="{{ config_path }}" data-worker="{{ worker_path }}" data-scope="{{ worker_scope }}"></script>
 </body>
 </html>

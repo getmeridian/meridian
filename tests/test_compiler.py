@@ -8,7 +8,7 @@ from collections import Counter
 import pytest
 from pydantic import ValidationError
 
-from meridian.compiler import TopologyCompileError, compile_topology
+from meridian.compiler import TopologyCompileError
 from meridian.compiler.models import (
     COMPILER_VERSION,
     NON_XRAY_JSON_TYPES,
@@ -61,7 +61,7 @@ from meridian.core.topology import (
     SetupIntent,
     TransparentRelayIntent,
 )
-from tests.support.topology import single_exit_intent
+from tests.support.topology import compile_panel_pass, single_exit_intent
 
 
 def _reality(path_id: str, sni: str) -> ProtocolPathIntent:
@@ -178,8 +178,8 @@ def _deployment_contract() -> DeploymentContract:
 
 class TestPureCompiler:
     def test_same_intent_produces_identical_reviewed_plan(self) -> None:
-        first = compile_topology(_intent())
-        second = compile_topology(_intent())
+        first = compile_panel_pass(_intent())
+        second = compile_panel_pass(_intent())
 
         assert first == second
         assert first.model_dump_json(by_alias=True) == second.model_dump_json(by_alias=True)
@@ -187,7 +187,7 @@ class TestPureCompiler:
         assert len(first.plan_hash) == 64
 
     def test_control_bootstrap_waits_for_its_web_ports_so_acme_can_answer(self) -> None:
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         order = [resource.logical_id for resource in plan.resources]
         control = next(resource for resource in plan.resources if resource.logical_id == "control:runtime")
         web_rules = [
@@ -203,8 +203,8 @@ class TestPureCompiler:
         assert all(order.index(rule) < order.index("control:runtime") for rule in web_rules)
 
     def test_default_deployment_contract_is_explicit_empty_and_deterministic(self) -> None:
-        implicit = compile_topology(_intent())
-        explicit = compile_topology(_intent(), deployment_contract=DeploymentContract())
+        implicit = compile_panel_pass(_intent())
+        explicit = compile_panel_pass(_intent(), deployment_contract=DeploymentContract())
 
         assert implicit == explicit
         assert implicit.compiler_version == COMPILER_VERSION
@@ -218,8 +218,8 @@ class TestPureCompiler:
             renderer_contract=contract.renderer_contract,
         )
 
-        plan = compile_topology(_intent(), deployment_contract=contract)
-        reordered_plan = compile_topology(_intent(), deployment_contract=reordered)
+        plan = compile_panel_pass(_intent(), deployment_contract=contract)
+        reordered_plan = compile_panel_pass(_intent(), deployment_contract=reordered)
 
         assert plan.deployment_contract == contract
         assert plan.plan_hash == reordered_plan.plan_hash
@@ -227,7 +227,7 @@ class TestPureCompiler:
 
     def test_every_deployment_contract_component_changes_plan_hash(self) -> None:
         contract = _deployment_contract()
-        original = compile_topology(_intent(), deployment_contract=contract)
+        original = compile_panel_pass(_intent(), deployment_contract=contract)
 
         def targets_with(**changes: object) -> dict[str, DeploymentTarget]:
             targets = dict(contract.server_targets)
@@ -257,19 +257,19 @@ class TestPureCompiler:
         }
 
         for component, changed_contract in variants.items():
-            changed = compile_topology(_intent(), deployment_contract=changed_contract)
+            changed = compile_panel_pass(_intent(), deployment_contract=changed_contract)
             assert changed.plan_hash != original.plan_hash, component
 
     def test_semantically_unordered_exit_input_is_normalized(self) -> None:
-        first = compile_topology(_intent())
-        reordered = compile_topology(_intent(reverse_exits=True))
+        first = compile_panel_pass(_intent())
+        reordered = compile_panel_pass(_intent(reverse_exits=True))
 
         assert reordered.intent_hash == first.intent_hash
         assert reordered.plan_hash == first.plan_hash
         assert reordered.resources == first.resources
 
     def test_generated_remnawave_names_respect_pinned_wire_contracts(self) -> None:
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         short_names = [
             resource.payload.name
             for resource in plan.resources
@@ -319,7 +319,7 @@ class TestPureCompiler:
         assert "/" not in subscription_template_name(first_id, "XRAY_JSON")
 
     def test_plan_uses_only_finite_v4_resource_kinds(self) -> None:
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         kinds = {resource.payload.kind for resource in plan.resources}
 
         assert {
@@ -347,7 +347,7 @@ class TestPureCompiler:
         } <= kinds
 
     def test_every_server_mutation_depends_on_one_server_baseline(self) -> None:
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         baselines = {
             resource.payload.server_ref: resource
             for resource in plan.resources
@@ -377,7 +377,7 @@ class TestPureCompiler:
                 assert baselines[resource.payload.server_ref].logical_id in resource.dependencies
 
     def test_every_exit_certificate_waits_for_its_reviewed_http_challenge_rule(self) -> None:
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         http_rules = {
             resource.payload.server_ref: resource.logical_id
             for resource in plan.resources
@@ -396,7 +396,7 @@ class TestPureCompiler:
             control="srv-shared", exit_ref="srv-shared", paths=[_reality("exit-a-reality", "www.microsoft.com")]
         )
 
-        plan = compile_topology(intent)
+        plan = compile_panel_pass(intent)
         streams = [
             resource.payload
             for resource in plan.resources
@@ -417,7 +417,7 @@ class TestPureCompiler:
     def test_delivered_clients_keep_russian_and_local_traffic_off_the_tunnel(self) -> None:
         import yaml
 
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         templates = {
             resource.payload.template_type: resource.payload
             for resource in plan.resources
@@ -453,7 +453,7 @@ class TestPureCompiler:
     def test_delivery_compiles_owned_templates_and_client_capability_truth(self) -> None:
         import yaml
 
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         templates = [
             resource.payload for resource in plan.resources if isinstance(resource.payload, SubscriptionTemplatePayload)
         ]
@@ -520,7 +520,7 @@ class TestPureCompiler:
 
     def test_base64_delivery_publishes_alternatives_without_fake_failover_template(self) -> None:
         intent = _intent().model_copy(update={"delivery": DeliveryIntent(formats=["base64"])})
-        plan = compile_topology(intent)
+        plan = compile_panel_pass(intent)
 
         assert not any(
             isinstance(resource.payload, (SubscriptionTemplatePayload, ExternalSquadPayload))
@@ -531,7 +531,7 @@ class TestPureCompiler:
         assert all(user.external_squad_ref == "" for user in users)
 
     def test_resources_are_dependency_ordered_with_unique_tags_and_ports(self) -> None:
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         positions = {resource.logical_id: index for index, resource in enumerate(plan.resources)}
 
         for resource in plan.resources:
@@ -545,7 +545,7 @@ class TestPureCompiler:
         assert len(listeners) == len(set(listeners))
 
     def test_two_exits_keep_profiles_paths_and_egress_isolated(self) -> None:
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         profiles = {
             resource.payload.workload_id: resource.payload
             for resource in plan.resources
@@ -599,7 +599,7 @@ class TestPureCompiler:
         assert "private" not in gateway_wire
 
     def test_two_exits_publish_exact_owned_hosts_and_shared_access_squad(self) -> None:
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         resources = {resource.logical_id: resource for resource in plan.resources}
         direct_hosts = {
             resource.logical_id: resource.payload
@@ -645,7 +645,7 @@ class TestPureCompiler:
         )
 
     def test_gateway_compiles_private_edges_ordered_rules_and_fail_closed_pool(self) -> None:
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         resources = {resource.logical_id: resource for resource in plan.resources}
         profile = resources["profile:gateway-a"].payload
         assert isinstance(profile, ConfigProfilePayload)
@@ -693,16 +693,16 @@ class TestPureCompiler:
         monkeypatch.setattr("meridian.compiler.routing.edge_outbound_tag", colliding_tag)
 
         with pytest.raises(TopologyCompileError, match="colliding service Outbound tags"):
-            compile_topology(_intent())
+            compile_panel_pass(_intent())
 
     def test_control_plane_resources_do_not_claim_runtime_postconditions(self) -> None:
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         for resource in plan.resources:
             if isinstance(resource.payload, InboundPayload | NodeBindingPayload | HostPayload):
                 assert [condition.kind for condition in resource.postconditions] == ["exists"]
 
     def test_hosts_are_published_after_live_listener_dependencies(self) -> None:
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         resources = {resource.logical_id: resource for resource in plan.resources}
         host_resources = [resource for resource in plan.resources if isinstance(resource.payload, HostPayload)]
 
@@ -716,7 +716,7 @@ class TestPureCompiler:
             assert resources[host.payload.inbound_ref].payload.kind == "inbound"
 
     def test_realm_hops_execute_downstream_first_and_only_first_is_advertised(self) -> None:
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         hops = {
             resource.payload.hop_index: resource
             for resource in plan.resources
@@ -741,7 +741,7 @@ class TestPureCompiler:
 
     def test_custom_relay_sni_gets_its_own_camouflage_inbound(self) -> None:
         """One Reality inbound imitates one site; a relay name on the exit's inbound showed the exit's certificate."""
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         resources = {resource.logical_id: resource for resource in plan.resources}
         inbound = resources["inbound:exit-a:reality-a"]
         assert isinstance(inbound.payload, InboundPayload)
@@ -789,7 +789,7 @@ class TestPureCompiler:
         )
         changed = original.model_copy(update={"exits": [changed_exit, original.exits[1]]})
 
-        assert compile_topology(changed).plan_hash != compile_topology(original).plan_hash
+        assert compile_panel_pass(changed).plan_hash != compile_panel_pass(original).plan_hash
 
     def test_plan_never_contains_secret_shaped_payload_fields(self) -> None:
         plan_schema = ResourcePlan.model_json_schema()
@@ -822,7 +822,7 @@ class TestCompilerFailures:
         )
 
         with pytest.raises(TopologyCompileError, match=r"missing srv-relay-core"):
-            compile_topology(_intent(), deployment_contract=incomplete)
+            compile_panel_pass(_intent(), deployment_contract=incomplete)
 
         extra = contract.model_copy(
             update={
@@ -833,7 +833,7 @@ class TestCompilerFailures:
             }
         )
         with pytest.raises(TopologyCompileError, match=r"unexpected srv-unused"):
-            compile_topology(_intent(), deployment_contract=extra)
+            compile_panel_pass(_intent(), deployment_contract=extra)
 
     def test_two_exit_workloads_cannot_share_one_node_runtime(self) -> None:
         original = _intent()
@@ -841,12 +841,12 @@ class TestCompilerFailures:
         intent = original.model_copy(update={"exits": [original.exits[0], shared]})
 
         with pytest.raises(TopologyCompileError, match="own server"):
-            compile_topology(intent)
+            compile_panel_pass(intent)
 
     def test_relay_lands_on_a_dedicated_ingress_that_cannot_reveal_the_exit(self) -> None:
         from meridian.compiler.models import FirewallRulePayload, NginxArtifactPayload, RealmHopPayload
 
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         last_hop = next(
             r.payload
             for r in plan.resources
@@ -877,7 +877,7 @@ class TestCompilerFailures:
 
         hosts = {
             r.payload.protocol: r.payload
-            for r in compile_topology(_intent()).resources
+            for r in compile_panel_pass(_intent()).resources
             if isinstance(r.payload, HostPayload)
             and r.payload.owner_ref == "exit-b"
             and r.logical_id.endswith("direct")
@@ -892,7 +892,7 @@ class TestCompilerFailures:
         intent = original.model_copy(update={"transparent_relays": [relay]})
 
         with pytest.raises(TopologyCompileError, match=r"srv-exit-b:443; nginx already owns"):
-            compile_topology(intent)
+            compile_panel_pass(intent)
 
     def test_hysteria_cannot_advertise_an_unforwarded_udp_port(self) -> None:
         original = _intent()
@@ -904,7 +904,7 @@ class TestCompilerFailures:
         intent = original.model_copy(update={"exits": [original.exits[0], exit_b.model_copy(update={"paths": paths})]})
 
         with pytest.raises(TopologyCompileError, match="public UDP port"):
-            compile_topology(intent)
+            compile_panel_pass(intent)
 
     def test_same_sni_cannot_route_to_two_backends_on_one_listener(self) -> None:
         intent = single_exit_intent(
@@ -916,10 +916,10 @@ class TestCompilerFailures:
         )
 
         with pytest.raises(TopologyCompileError, match="cannot route SNI"):
-            compile_topology(intent)
+            compile_panel_pass(intent)
 
     def test_reviewed_hash_tampering_is_rejected(self) -> None:
-        plan = compile_topology(_intent())
+        plan = compile_panel_pass(_intent())
         payload = plan.model_dump(mode="json", by_alias=True)
         payload["resources"][0]["desired_hash"] = "0" * 64
 
@@ -927,7 +927,7 @@ class TestCompilerFailures:
             ResourcePlan.model_validate(payload)
 
     def test_deployment_contract_tampering_is_rejected(self) -> None:
-        plan = compile_topology(_intent(), deployment_contract=_deployment_contract())
+        plan = compile_panel_pass(_intent(), deployment_contract=_deployment_contract())
         payload = plan.model_dump(mode="json", by_alias=True)
         payload["deployment_contract"]["server_targets"]["srv-control"]["port"] = 2200
 
@@ -990,7 +990,7 @@ def test_bare_ip_paths_join_the_panel_on_the_control_and_own_the_no_sni_route_el
     intent = add_exit_to_intent(
         intent, server_ref="srv-b", title="second", reality_sni="www.example.org", address="198.51.100.20"
     )
-    resources = {resource.logical_id: resource.payload for resource in compile_topology(intent).resources}
+    resources = {resource.logical_id: resource.payload for resource in compile_panel_pass(intent).resources}
     nginx = [payload for payload in resources.values() if isinstance(payload, NginxArtifactPayload)]
     certificates = [payload for payload in resources.values() if isinstance(payload, CertificatePayload)]
 
@@ -1020,7 +1020,7 @@ def test_hosts_follow_exit_order_within_each_protocol() -> None:
     intent = add_exit_to_intent(intent, server_ref="srv-b", title="exit-2", reality_sni="www.example.com")
     assert [exit_.id for exit_ in intent.exits] == ["main", "exit-2"]
 
-    plan = compile_topology(intent)
+    plan = compile_panel_pass(intent)
 
     hosts = sorted(
         (resource.payload for resource in plan.resources if isinstance(resource.payload, HostPayload)),
@@ -1033,7 +1033,7 @@ def test_hosts_follow_exit_order_within_each_protocol() -> None:
 
 
 def test_mixed_case_usernames_compile_to_lowercase_logical_ids() -> None:
-    plan = compile_topology(single_exit_intent(users=("Biba", "boba")))
+    plan = compile_panel_pass(single_exit_intent(users=("Biba", "boba")))
 
     users = {
         resource.logical_id: resource.payload.username
@@ -1064,10 +1064,10 @@ _GATEWAY_HASHES = {
 
 def test_existing_gateway_plan_compiles_byte_identically() -> None:
     """A rule vocabulary change must not re-apply fleets that never use the new target."""
-    plan = compile_topology(_intent())
+    plan = compile_panel_pass(_intent())
     hashes = {resource.logical_id: resource.desired_hash for resource in plan.resources}
 
-    assert plan.intent_hash == "8044d5946f5ba0870d77847364d6fdc54ea1ff170cc086144e018ef2c287bc7c"
+    assert plan.intent_hash == "b61fcb298c072ec0a2716425076617135e82d80c471bb55b48cf4d55accd2192"
     assert {logical_id: hashes[logical_id] for logical_id in _GATEWAY_HASHES} == _GATEWAY_HASHES
 
 
@@ -1090,7 +1090,7 @@ def test_direct_gateway_rules_use_the_gateways_own_freedom_outbound_in_order() -
             "source_gateway_ref": "gateway-a",
         },
     )
-    resources = {resource.logical_id: resource.payload for resource in compile_topology(intent).resources}
+    resources = {resource.logical_id: resource.payload for resource in compile_panel_pass(intent).resources}
     profile = resources["profile:gateway-a"]
     assert isinstance(profile, ConfigProfilePayload)
 
@@ -1115,7 +1115,7 @@ def test_direct_catch_all_replaces_the_default_route() -> None:
     )
     profile = next(
         resource.payload
-        for resource in compile_topology(intent).resources
+        for resource in compile_panel_pass(intent).resources
         if resource.logical_id == "profile:gateway-a"
     )
     assert isinstance(profile, ConfigProfilePayload)
@@ -1145,3 +1145,69 @@ def test_direct_gateway_rules_are_validated(route: dict[str, object], message: s
 def test_direct_rules_need_a_routing_gateway() -> None:
     with pytest.raises(ValidationError, match="require at least one routing gateway"):
         single_exit_intent(routes=[OrderedRouteIntent(id="domestic", priority=1, action="direct")])
+
+
+@pytest.mark.parametrize(
+    ("match", "value", "refusal"),
+    [
+        ("geosite", "category-ru", None),
+        ("geosite", "google@cn", None),
+        ("country", "RU", None),
+        ("geosite", "categry-ru", "Did you mean 'category-ru'"),
+        ("country", "ZZ", "country 'zz'"),
+    ],
+    ids=["geosite", "geosite-attribute", "country", "geosite-typo", "unknown-country"],
+)
+def test_gateway_rules_name_only_lists_the_servers_xray_has(match: str, value: str, refusal: str | None) -> None:
+    """Xray refuses the whole config over one unknown list, so the gateway would never converge."""
+    intent = _with_routes(
+        {
+            "id": "regional",
+            "priority": 10,
+            "match": match,
+            "match_values": [value],
+            "target_ref": "primary",
+            "source_gateway_ref": "gateway-a",
+        }
+    )
+
+    if refusal is None:
+        compile_panel_pass(intent)
+    else:
+        with pytest.raises(TopologyCompileError, match=refusal):
+            compile_panel_pass(intent)
+
+
+def test_exit_overrides_with_an_unknown_geoip_list_are_refused_but_still_load() -> None:
+    """A saved fleet with a bad name must still load, or `route remove` could never fix it."""
+    payload = _intent().model_dump()
+    payload["exits"][0]["egress_overrides"] = [
+        {"id": "block-1", "match": "geoip", "values": ["nowhere"], "action": "block"}
+    ]
+    intent = SetupIntent.model_validate(payload)
+
+    with pytest.raises(TopologyCompileError, match="geoip list 'nowhere'"):
+        compile_panel_pass(intent)
+
+
+def test_geodata_lists_follow_the_pinned_xray() -> None:
+    from meridian.config import XRAY_VERSION
+    from meridian.core.geodata_lists import SOURCE
+
+    assert SOURCE.startswith(f"Xray-core v{XRAY_VERSION} "), "Xray moved: run scripts/export_geodata_lists.py"
+
+
+def test_built_in_server_rules_name_lists_the_pinned_geodata_has() -> None:
+    """geo_block, the private-range block, and exit DoH scoping are rendered on every exit."""
+    from meridian.core.geodata_lists import GEOIP_LISTS, GEOSITE_LISTS
+
+    assert {"category-ru", "geolocation-!cn"} <= GEOSITE_LISTS
+    assert {"ru", "private"} <= GEOIP_LISTS
+
+
+def test_route_presets_name_lists_the_pinned_geodata_has() -> None:
+    from meridian.core.geodata_lists import GEOSITE_LISTS
+    from meridian.core.routes import ROUTE_PRESETS
+
+    for values in ROUTE_PRESETS.values():
+        assert {value.removeprefix("geosite:") for value in values} <= GEOSITE_LISTS

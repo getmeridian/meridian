@@ -120,7 +120,10 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         data_schema="client-add",
         outcomes=[
             _ok("all requested clients were added"),
-            _ok("clients were added with failed requests or incomplete page/local-state follow-up", exit_code=3),
+            _ok(
+                "clients were added with incomplete page or local-state follow-up",
+                exit_code=3,
+            ),
             _user("invalid input or client conflict"),
             *_PANEL_FAILURES,
         ],
@@ -136,14 +139,60 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         ],
         stability="stable",
     ),
+    "client.usage": CommandOutput(
+        data_schema="client-usage",
+        outcomes=[
+            _ok("daily client usage was read"),
+            _user("history is off, client not found, or invalid days"),
+            *_PANEL_FAILURES,
+        ],
+        stability="preview",
+    ),
+    "client.preview": CommandOutput(
+        data_schema="subscription-preview", outcomes=[_ok("format preview read"), *_FAILURES], stability="preview"
+    ),
     "client.list": CommandOutput(
         data_schema="client-list", outcomes=[_ok("client list was collected"), *_FAILURES], stability="stable"
+    ),
+    "client.set": CommandOutput(
+        data_schema="client-limits",
+        outcomes=[
+            _ok("client limits were changed"),
+            _user("client not found, nothing to change, or an invalid size, period, or date"),
+            *_PANEL_FAILURES,
+        ],
+        stability="stable",
+    ),
+    "client.reset-traffic": CommandOutput(
+        data_schema="client-limits",
+        outcomes=[_ok("client traffic was reset"), _user("client not found or input error"), *_PANEL_FAILURES],
+        stability="stable",
+    ),
+    "client.extend": CommandOutput(
+        data_schema="client-limits",
+        outcomes=[
+            _ok("client access was extended; effective status and expiry were returned"),
+            _user("client not found or invalid days"),
+            *_PANEL_FAILURES,
+        ],
+        stability="stable",
+    ),
+    "client.devices": CommandOutput(
+        data_schema="client-devices",
+        outcomes=[
+            _ok("device counts or details were returned, with any requested removals"),
+            _user("client not found, invalid device ID, or conflicting removal options"),
+            *_PANEL_FAILURES,
+        ],
+        stability="stable",
     ),
     "client.remove": CommandOutput(
         data_schema="client-remove",
         outcomes=[
             _ok("client was removed"),
             _ok("client was removed but their connection page could not be deleted", exit_code=3),
+            _ok("client was removed but an open-session cut-off timed out", exit_code=3),
+            _ok("client was removed but an open-session cut-off failed", exit_code=4),
             _user("client not found or input error"),
             *_PANEL_FAILURES,
         ],
@@ -154,6 +203,8 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         outcomes=[
             _ok("client links were reissued and the new page published"),
             _ok("links were reissued but the old page, new page, or local evidence save was incomplete", exit_code=3),
+            _ok("links were reissued but an open-session cut-off timed out", exit_code=3),
+            _ok("links were reissued but an open-session cut-off failed", exit_code=4),
             _user("client not found, not one of the fleet's clients, or confirmation missing"),
             *_PANEL_FAILURES,
         ],
@@ -181,6 +232,17 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         stability="stable",
     ),
     "node.replace": None,
+    "node.restart": CommandOutput(
+        data_schema="node-restart",
+        outcomes=[
+            _ok("the requested node units restarted and became ready"),
+            _ok("one or more restart results timed out", exit_code=3),
+            _ok("one or more node units failed to restart", exit_code=4),
+            _user("unknown node, conflicting scope flags, or confirmation missing"),
+            *_PANEL_FAILURES,
+        ],
+        stability="stable",
+    ),
     "node.sni": None,
     "node.remove": None,
     "relay.add": None,
@@ -233,9 +295,124 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         stability="stable",
     ),
     "fleet.upgrade": None,
+    "fleet.history": CommandOutput(
+        data_schema="fleet-history",
+        outcomes=[_ok("the recorded revisions were listed"), *_FAILURES],
+        stability="preview",
+    ),
+    "fleet.events": CommandOutput(
+        data_schema="fleet-events",
+        outcomes=[_ok("local lifecycle events were read"), *_FAILURES],
+        stability="stable",
+    ),
+    "fleet.usage": CommandOutput(
+        data_schema="traffic-daily",
+        outcomes=[
+            _ok("daily fleet and node usage was read"),
+            _user("history is off or invalid days"),
+            *_PANEL_FAILURES,
+        ],
+        stability="preview",
+    ),
+    "fleet.export": CommandOutput(
+        data_schema="fleet-export",
+        outcomes=[_ok("the fleet document was exported"), *_FAILURES],
+        stability="preview",
+    ),
+    "fleet.contact": CommandOutput(
+        data_schema="fleet-contact",
+        outcomes=[
+            _ok("the current owner contact was read"),
+            _ok("the contact is unchanged", status="no_changes"),
+            _ok("dry run: the contact change was reviewed"),
+            _ok("the reviewed contact was applied", status="changed"),
+            _user("invalid contact or confirmation missing"),
+            _system("review, apply, or local-state failure"),
+            _BUG,
+        ],
+        stability="preview",
+    ),
+    "fleet.notice.show": CommandOutput(
+        data_schema="notice-state", outcomes=[_ok("notice read"), *_FAILURES], stability="preview"
+    ),
+    "fleet.notice.set": CommandOutput(
+        data_schema="notice-state",
+        outcomes=[_ok("notice saved", status="changed"), _ok("notice unchanged", status="no_changes"), *_FAILURES],
+        stability="preview",
+    ),
+    "fleet.language": CommandOutput(
+        data_schema="language-state",
+        outcomes=[
+            _ok("language read"),
+            _ok("language saved", status="changed"),
+            _ok("language unchanged", status="no_changes"),
+            *_FAILURES,
+        ],
+        stability="preview",
+    ),
+    "fleet.notice.clear": CommandOutput(
+        data_schema="notice-state",
+        outcomes=[
+            _ok("notice cleared", status="changed"),
+            _ok("notice already absent", status="no_changes"),
+            *_FAILURES,
+        ],
+        stability="preview",
+    ),
+    "fleet.routing": CommandOutput(
+        data_schema="fleet-routing",
+        outcomes=[
+            _ok("the current policy and choices were read"),
+            _ok("the policy is already selected", status="no_changes"),
+            _ok("dry run: the policy change was reviewed"),
+            _ok("the reviewed policy was applied", status="changed"),
+            _user("invalid policy or confirmation missing"),
+            _system("review, apply, or local-state failure"),
+            _BUG,
+        ],
+        stability="preview",
+    ),
+    "fleet.import": CommandOutput(
+        data_schema="fleet-import",
+        outcomes=[
+            _ok("the file matches the fleet", status="no_changes"),
+            _ok("dry run: the changes and their review were shown"),
+            _ok("the changes were applied", status="changed"),
+            _ok(
+                "the changes were applied but a client's connection page was not updated", exit_code=3, status="changed"
+            ),
+            _user("invalid or unsupported file, unknown server, refused edit, or confirmation missing"),
+            _system("apply, panel, or local-state failure"),
+            _BUG,
+        ],
+        stability="preview",
+    ),
     "server.add": None,
-    "server.list": None,
+    "server.list": CommandOutput(
+        data_schema="server-list",
+        outcomes=[_ok("saved servers and reviewed metadata were read"), *_FAILURES],
+        stability="preview",
+    ),
+    "server.set": CommandOutput(
+        data_schema="server-set",
+        outcomes=[
+            _ok("current metadata was read"),
+            _ok("metadata is unchanged", status="no_changes"),
+            _ok("dry run: server metadata was reviewed"),
+            _ok("reviewed server metadata was applied", status="changed"),
+            *_FAILURES,
+        ],
+        stability="preview",
+    ),
     "server.remove": None,
+    "context.list": CommandOutput(
+        data_schema="context-list",
+        outcomes=[_ok("contexts were listed from local state"), _user("context or local-state error"), _BUG],
+        stability="preview",
+    ),
+    "context.use": None,
+    "context.rename": None,
+    "context.remove": None,
     "check": CommandOutput(
         data_schema="check", failure_data_schema="check-failure", outcomes=_verification("check"), stability="stable"
     ),
@@ -276,8 +453,27 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         stability="preview",
     ),
     "panel": None,
+    "privacy.show": CommandOutput(
+        data_schema="privacy-state",
+        outcomes=[_ok("privacy settings and changes were read"), *_FAILURES],
+        stability="preview",
+    ),
+    "privacy.set": CommandOutput(
+        data_schema="privacy-update",
+        outcomes=[
+            _ok("privacy settings were changed", status="changed"),
+            _ok("privacy settings already match", status="no_changes"),
+            *_FAILURES,
+        ],
+        stability="preview",
+    ),
     "scan": None,
-    "studio": None,
+    "migrate": None,
+    "backup.pull": None,
+    "backup.recovery-key": None,
+    "backup.devices": None,
+    "backup.revoke": None,
+    "restore": None,
     "update": None,
     "teardown": None,
     "api.schemas": CommandOutput(

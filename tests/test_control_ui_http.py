@@ -1,0 +1,730 @@
+"""The web UI over HTTP: setup links, the session cookie, CSRF, scope mapping, step-up, and static files."""
+
+from __future__ import annotations
+
+import json
+import threading
+import time
+import urllib.error
+import urllib.request
+from collections.abc import Iterator
+from dataclasses import dataclass, field
+from email.message import Message
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from meridian.control import passwords
+from meridian.control.enrollment import token_sha256
+from meridian.control.models import PrivacySettings, RevisionProposal, RevisionResult, ServiceSettings
+from meridian.control.owner import CONFIRM_SECONDS, IDLE_SECONDS
+from meridian.control.server import ControlServer
+from meridian.control.service import ControlService
+from meridian.control.tokens import ROOT
+from meridian.control.ui_routes import CONTENT_SECURITY_POLICY, SESSION_COOKIE, UI_DIR, passkey_state
+from tests.support.control_service import write_privacy
+from tests.support.node_commands import command_node_spec
+
+FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
+ADMIN_TOKEN = "admin-token-for-tests-only-0123456789"
+PUBLIC_PATH = "/9f8e7d6c5b4a39281706f5e4"
+PASSWORD = "correct horse battery"
+UI = {"X-Meridian-Request": "1"}
+
+
+@pytest.mark.parametrize("path", ["/api/users", "/ui/api/fleet", "/auth/state"])
+def test_a_polling_only_tab_still_reaches_the_owner_idle_timeout(fleet: Fleet, path: str) -> None:
+    fleet.set_up()
+    for _ in range(IDLE_SECONDS // 60 - 1):
+        fleet.clock.now += 60
+        reply = fleet.ui("GET", path, headers={"X-Meridian-Passive": "1"})
+        assert reply.status == 200
+    fleet.clock.now += 60
+    reply = fleet.ui("GET", path, headers={"X-Meridian-Passive": "1"})
+    if path == "/auth/state":
+        assert reply.status == 200 and reply.body["signed_in"] is False
+    else:
+        assert reply.status == 401
+
+
+@pytest.mark.parametrize("write", [False, True], ids=["active-read", "write-with-passive-header"])
+def test_owner_activity_still_extends_idle_time(fleet: Fleet, write: bool) -> None:
+    fleet.set_up()
+    fleet.clock.now += 60
+    if write:
+        fleet.service.put_user("sample")
+        assert (
+            fleet.ui("PATCH", "/api/users/sample", {"status": "disabled"}, headers={"X-Meridian-Passive": "1"}).status
+            == 200
+        )
+    else:
+        assert fleet.ui("GET", "/api/users").status == 200
+    fleet.clock.now += IDLE_SECONDS - 30
+    assert fleet.ui("GET", "/api/users", headers={"X-Meridian-Passive": "1"}).status == 200
+
+
+class Clock:
+    def __init__(self) -> None:
+        self.now = float(int(time.time()))
+
+    def __call__(self) -> float:
+        return self.now
+
+
+@dataclass
+class Reply:
+    status: int
+    headers: Message
+    body: Any = None
+    raw: bytes = b""
+
+
+@dataclass
+class Fleet:
+    url: str
+    service: ControlService
+    clock: Clock
+    cookie: str = ""
+    sent: list[str] = field(default_factory=list)
+
+    def call(
+        self,
+        method: str,
+        path: str,
+        body: Any = None,
+        *,
+        headers: dict[str, str] | None = None,
+        bearer: str | None = None,
+        session: bool = False,
+    ) -> Reply:
+        data = json.dumps(body).encode() if body is not None else (b"" if method in ("POST", "PUT") else None)
+        request = urllib.request.Request(self.url + path, data=data, method=method)
+        if body is not None:
+            request.add_header("Content-Type", "application/json")
+        for name, value in (headers or {}).items():
+            request.add_header(name, value)
+        if bearer:
+            request.add_header("Authorization", f"Bearer {bearer}")
+        if session and self.cookie:
+            request.add_header("Cookie", f"{SESSION_COOKIE}={self.cookie}")
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                return _reply(response.status, response.headers, response.read())
+        except urllib.error.HTTPError as exc:
+            return _reply(exc.code, exc.headers, exc.read())
+
+    def ui(self, method: str, path: str, body: Any = None, **kwargs: Any) -> Reply:
+        """A request as the signed-in page sends it: cookie plus the UI's request header."""
+        return self.call(method, path, body, headers={**UI, **kwargs.pop("headers", {})}, session=True, **kwargs)
+
+    def set_up(self, password: str = PASSWORD) -> Reply:
+        link = self.call("POST", "/api/owner/setup-link", {}, bearer=ADMIN_TOKEN).body["token"]
+        reply = self.call("POST", "/auth/setup", {"token": link, "password": password}, headers=UI)
+        self.cookie = _cookie_value(reply)
+        return reply
+
+
+def _reply(status: int, headers: Message, raw: bytes) -> Reply:
+    try:
+        body = json.loads(raw) if raw and headers.get("Content-Type", "").startswith("application/json") else None
+    except ValueError:
+        body = None
+    return Reply(status, headers, body, raw)
+
+
+def _cookie_value(reply: Reply) -> str:
+    header = reply.headers.get("Set-Cookie", "")
+    name, _, rest = header.partition("=")
+    assert name == SESSION_COOKIE, header
+    return rest.split(";", 1)[0]
+
+
+def _serve(tmp_path: Path, public_path: str) -> Iterator[Fleet]:
+    clock = Clock()
+    service = ControlService(tmp_path / "control.db", fleet_id=FLEET_ID, version="4.0.0", clock=clock)
+    server = ControlServer(("127.0.0.1", 0), service, token_sha256(ADMIN_TOKEN), public_path=public_path)
+    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
+    thread.start()
+    try:
+        yield Fleet(f"http://127.0.0.1:{server.server_address[1]}", service, clock)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+@pytest.fixture(autouse=True)
+def cheap_scrypt(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(passwords, "SCRYPT_PARAMS", (10, 8, 1))
+
+
+def test_owner_reads_events_and_mutations_record_the_owner(fleet: Fleet) -> None:
+    assert fleet.set_up().status == 200
+    assert fleet.ui("POST", "/api/users", {"username": "alice"}).status == 200
+    reply = fleet.ui("GET", "/api/events?limit=10")
+    assert reply.status == 200
+    assert reply.body["events"][0]["actor"] == "owner"
+    assert reply.body["events"][0]["kind"] == "user.created"
+
+
+def test_owner_can_read_attention_without_a_password_recheck(fleet: Fleet) -> None:
+    assert fleet.set_up().status == 200
+    fleet.clock.now += CONFIRM_SECONDS + 1
+    reply = fleet.ui("GET", "/api/attention")
+    assert reply.status == 200
+    assert reply.body["people"] == [] and reply.body["nodes"] == []
+
+
+@pytest.fixture
+def fleet(tmp_path: Path) -> Iterator[Fleet]:
+    yield from _serve(tmp_path, PUBLIC_PATH)
+
+
+@pytest.mark.parametrize("level", ["private", "full"])
+def test_the_owner_can_manage_device_slots_with_csrf_but_no_new_credential(
+    fleet: Fleet,
+    tmp_path: Path,
+    level: str,
+) -> None:
+    user = fleet.service.put_user("alice")
+    write_privacy(tmp_path / "control.db", PrivacySettings(device_limits=level))  # type: ignore[arg-type]
+    fleet.set_up()
+    assert fleet.call("GET", f"/sub/{user.sub_token}", headers={"X-Hwid": "device-00000001"}).status == 200
+    view = fleet.ui("GET", "/api/users/alice/devices")
+    assert view.status == 200 and view.body["count"] == 1
+    key = view.body["devices"][0]["device_key"]
+    target = f"/api/users/alice/devices/{key}"
+    assert fleet.call("DELETE", target, session=True).status == 403
+    assert fleet.ui("PATCH", "/api/users/alice", {"device_limit": 2}).body["device_limit"] == 2
+    assert fleet.ui("DELETE", target).body == {"deleted": 1}
+    assert fleet.ui("DELETE", target).body == {"deleted": 0}
+    assert fleet.ui("DELETE", "/api/users/alice/devices").body == {"deleted": 0}
+
+
+# -- setup links ------------------------------------------------------------------------------
+
+
+def test_the_console_can_mint_a_people_token_after_step_up(fleet: Fleet) -> None:
+    fleet.set_up()
+    fleet.clock.now += CONFIRM_SECONDS + 1
+    body = {"name": "People desk", "scope": "people", "expires_in_days": 90}
+    assert fleet.ui("POST", "/api/tokens", body).status == 403
+    assert fleet.ui("POST", "/auth/confirm", {"password": PASSWORD}).status == 200
+    issued = fleet.ui("POST", "/api/tokens", body)
+    assert issued.status == 200, issued.body
+    assert issued.body["scope"] == "people" and issued.body["expires_at"] is not None
+
+
+def test_owner_can_extend_declared_and_console_people(fleet: Fleet, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("meridian.control.service.utc_now", lambda: "2026-10-29T12:00:00Z")
+    fleet.set_up()
+    for name in ("alice", "bob"):
+        fleet.service.put_user(name)
+    _declare(fleet.service, "alice")
+    for name in ("alice", "bob"):
+        reply = fleet.ui("POST", f"/api/users/{name}/extend", {"days": 7})
+        assert reply.status == 200, reply.body
+        assert (reply.body["expire_at"], reply.body["status"]) == ("2026-11-05T12:00:00Z", "active")
+
+
+def test_only_the_root_token_issues_setup_links(fleet: Fleet) -> None:
+    admin = fleet.call("POST", "/api/tokens", {"name": "laptop", "scope": "admin"}, bearer=ADMIN_TOKEN).body["token"]
+    assert fleet.call("POST", "/api/owner/setup-link", {}, bearer=admin).status == 403
+    assert fleet.call("POST", "/api/owner/setup-link", {}).status == 401
+    grant = fleet.call("POST", "/api/owner/setup-link", {}, bearer=ADMIN_TOKEN)
+    assert grant.status == 200 and grant.body["purpose"] == "setup"
+    fleet.set_up()
+    assert fleet.ui("POST", "/api/owner/setup-link", {"reset": True}).status == 403  # a session never mints recovery
+
+
+def test_owner_status_and_reset_links_follow_setup(fleet: Fleet) -> None:
+    assert fleet.call("GET", "/api/owner", bearer=ADMIN_TOKEN).body == {"exists": False, "totp_enabled": False}
+    fleet.set_up()
+    assert fleet.call("GET", "/api/owner", bearer=ADMIN_TOKEN).body["exists"]
+    refused = fleet.call("POST", "/api/owner/setup-link", {}, bearer=ADMIN_TOKEN)
+    assert refused.status == 409 and refused.body["error"]["code"] == "owner_exists"
+    reset = fleet.call("POST", "/api/owner/setup-link", {"reset": True}, bearer=ADMIN_TOKEN)
+    assert reset.body["purpose"] == "reset"
+
+
+def test_setup_sets_a_strict_session_cookie_on_the_secret_path(fleet: Fleet) -> None:
+    reply = fleet.set_up()
+    assert reply.status == 200
+    attributes = [part.strip() for part in reply.headers["Set-Cookie"].split(";")]
+    assert f"Path={PUBLIC_PATH}/" in attributes
+    assert {"Secure", "HttpOnly", "SameSite=Strict"} <= set(attributes)
+    assert reply.headers["Cache-Control"] == "no-store"
+    assert fleet.cookie not in json.dumps(reply.body)
+
+
+def test_a_spent_setup_link_is_gone(fleet: Fleet) -> None:
+    link = fleet.call("POST", "/api/owner/setup-link", {}, bearer=ADMIN_TOKEN).body["token"]
+    assert fleet.call("POST", "/auth/setup/check", {"token": link}, headers=UI).body == {"purpose": "setup"}
+    assert fleet.call("POST", "/auth/setup", {"token": link, "password": PASSWORD}, headers=UI).status == 200
+    again = fleet.call("POST", "/auth/setup", {"token": link, "password": PASSWORD}, headers=UI)
+    assert again.status == 410 and again.body["error"]["code"] == "link_invalid"
+
+
+def test_sign_in_stays_closed_without_the_secret_path(tmp_path: Path) -> None:
+    for fleet in _serve(tmp_path, ""):
+        link = fleet.call("POST", "/api/owner/setup-link", {}, bearer=ADMIN_TOKEN).body["token"]
+        assert fleet.call("GET", "/auth/state").body["configured"] is False
+        # Checked before the password form, too: the owner once typed a password only to be refused.
+        checked = fleet.call("POST", "/auth/setup/check", {"token": link}, headers=UI)
+        assert checked.status == 503 and checked.body["error"]["code"] == "ui_unconfigured"
+        refused = fleet.call("POST", "/auth/setup", {"token": link, "password": PASSWORD}, headers=UI)
+        assert refused.status == 503 and refused.body["error"]["code"] == "ui_unconfigured"
+
+
+# -- CSRF ---------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {},
+        {"X-Meridian-Request": "0"},
+        {**UI, "Sec-Fetch-Site": "cross-site"},
+        {**UI, "Sec-Fetch-Site": "same-site"},
+        {**UI, "Origin": "https://attacker.example"},
+    ],
+    ids=["no-header", "wrong-header", "cross-site", "same-site", "foreign-origin"],
+)
+def test_sign_in_and_session_writes_refuse_cross_site_requests(fleet: Fleet, headers: dict[str, str]) -> None:
+    fleet.set_up()
+    login = fleet.call("POST", "/auth/login", {"password": PASSWORD}, headers=headers)
+    assert login.status == 403 and login.body["error"]["code"] == "csrf"
+    write = fleet.call("POST", "/api/users", {"username": "alice"}, headers=headers, session=True)
+    assert write.status == 403 and write.body["error"]["code"] == "csrf"
+    assert fleet.service.get_user("alice") is None
+
+
+def test_a_same_origin_page_passes_the_csrf_checks(fleet: Fleet) -> None:
+    fleet.set_up()
+    host = fleet.url.removeprefix("http://")
+    headers = {"Sec-Fetch-Site": "same-origin", "Origin": f"http://{host}"}
+    assert fleet.ui("POST", "/api/users", {"username": "alice"}, headers=headers).status == 200
+
+
+def test_session_reads_need_no_csrf_header(fleet: Fleet) -> None:
+    fleet.set_up()
+    assert fleet.call("GET", "/api/users", session=True).status == 200
+
+
+# -- the session as a caller -----------------------------------------------------------------------
+
+
+def test_a_session_holds_the_admin_scope_and_sees_credentials(fleet: Fleet) -> None:
+    fleet.set_up()
+    assert fleet.ui("POST", "/api/users", {"username": "alice"}).status == 200
+    user = fleet.ui("GET", "/api/users/alice").body
+    assert user["uuid"] and user["sub_token"]
+    assert fleet.ui("GET", "/api/tokens").status == 200
+
+
+def test_adding_a_person_sets_their_limits_and_expiry_in_one_step(fleet: Fleet) -> None:
+    """Create then PATCH left an active, unlimited person when the second request never landed."""
+    fleet.set_up()
+    body = {
+        "username": "alice",
+        "expire_at": "2031-01-01T00:00:00Z",
+        "traffic_limit_bytes": 4194304,
+        "traffic_limit_strategy": "month",
+    }
+    created = fleet.ui("POST", "/api/users", body)
+    assert created.status == 200
+    alice = fleet.service.get_user("alice")
+    assert alice is not None
+    assert (alice.status, alice.expire_at, alice.traffic_limit_bytes, alice.traffic_limit_strategy) == (
+        "active",
+        "2031-01-01T00:00:00Z",
+        4194304,
+        "month",
+    )
+    again = fleet.ui("POST", "/api/users", {"username": "alice"})
+    assert again.status == 409 and again.body["error"]["code"] == "user_exists"
+    assert fleet.service.get_user("alice") == alice
+
+
+def test_a_person_added_already_expired_starts_expired(fleet: Fleet) -> None:
+    fleet.set_up()
+    assert fleet.ui("POST", "/api/users", {"username": "bob", "expire_at": "2020-01-01T00:00:00Z"}).status == 200
+    assert fleet.service.get_user("bob").status == "expired"  # type: ignore[union-attr]
+
+
+def test_bearer_wins_over_a_session_cookie(fleet: Fleet) -> None:
+    fleet.set_up()
+    read = fleet.call("POST", "/api/tokens", {"name": "viewer", "scope": "read"}, bearer=ADMIN_TOKEN).body["token"]
+    reply = fleet.call("POST", "/api/users", {"username": "alice"}, headers=UI, bearer=read, session=True)
+    assert reply.status == 403 and reply.body["error"]["code"] == "insufficient_scope"
+
+
+def test_without_a_session_the_api_answers_401(fleet: Fleet) -> None:
+    fleet.set_up()
+    fleet.cookie = "not-a-session"
+    assert fleet.ui("GET", "/api/users").status == 401
+    assert fleet.call("GET", "/auth/state", session=True).body["signed_in"] is False
+
+
+def test_a_session_reads_the_settings_but_never_writes_them(fleet: Fleet) -> None:
+    """The title and address are the fleet file's: an apply would put a console edit back."""
+    fleet.set_up()
+    current = fleet.ui("GET", "/api/settings").body
+    titled = fleet.ui("PUT", "/api/settings", {"profile_title": "Ours", "public_url": current["public_url"]})
+    assert titled.status == 403 and titled.body["error"]["code"] == "insufficient_scope"
+
+
+def test_the_console_never_mints_an_admin_token(fleet: Fleet) -> None:
+    """An admin token would reach every route `OWNER_ROUTES` keeps from a session."""
+    fleet.set_up()  # signed in this second: step-up would pass
+    refused = fleet.ui("POST", "/api/tokens", {"name": "ci", "scope": "admin"})
+    assert refused.status == 403 and refused.body["error"]["code"] == "insufficient_scope"
+    assert fleet.ui("POST", "/api/tokens", {"name": "ci", "scope": "approve"}).status == 200
+
+
+def test_a_session_signed_out_while_minting_mints_nothing(fleet: Fleet, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The step-up is held inside the insert's transaction, not only judged before the body is read."""
+    fleet.set_up()
+    owner = fleet.service.owner
+    judged = owner.require_recent
+
+    def then_signed_out(session: Any) -> None:
+        judged(session)
+        owner.logout(session)  # another tab signs out after the early check passed
+
+    monkeypatch.setattr(owner, "require_recent", then_signed_out)
+    assert fleet.ui("POST", "/api/tokens", {"name": "ci", "scope": "read"}).status == 401
+    assert fleet.call("GET", "/api/tokens", bearer=ADMIN_TOKEN).body["tokens"] == []
+
+
+def test_minting_a_token_needs_a_recent_confirmation(fleet: Fleet) -> None:
+    fleet.set_up()
+    fleet.clock.now += CONFIRM_SECONDS + 1
+    refused = fleet.ui("POST", "/api/tokens", {"name": "ci", "scope": "read"})
+    assert refused.status == 403 and refused.body["error"]["code"] == "reauth_required"
+    assert fleet.ui("POST", "/auth/confirm", {"password": "wrong password!"}).status == 401
+    assert fleet.ui("POST", "/auth/confirm", {"password": PASSWORD}).status == 200
+    issued = fleet.ui("POST", "/api/tokens", {"name": "ci", "scope": "read"})
+    assert issued.status == 200 and issued.body["token"].startswith("mrd_")
+
+
+def test_privacy_needs_owner_step_up_records_owner_and_allows_both_usage_views(fleet: Fleet) -> None:
+    fleet.set_up()
+    fleet.clock.now += CONFIRM_SECONDS + 1
+    settings = PrivacySettings(usage_history="daily").model_dump()
+    assert fleet.ui("GET", "/api/privacy").body == {"settings": PrivacySettings().model_dump(), "changes": []}
+    refused = fleet.ui("PUT", "/api/privacy", settings)
+    assert refused.status == 403 and refused.body["error"]["code"] == "reauth_required"
+    assert fleet.ui("POST", "/auth/confirm", {"password": PASSWORD}).status == 200
+    changed = fleet.ui("PUT", "/api/privacy", settings)
+    assert changed.status == 200 and changed.body["changes"][0]["author"] == "owner"
+    assert changed.body["changes"][0]["before"] == PrivacySettings().model_dump()
+    fleet.service.put_user("alice")
+    assert fleet.ui("GET", "/api/users/alice/usage?days=7").status == 200
+    assert fleet.ui("GET", "/api/traffic/daily?days=7").status == 200
+    assert fleet.ui("PUT", "/api/privacy", settings).body["changed"] is False
+
+
+@pytest.mark.parametrize("race", ["revoked", "confirmation-expired"])
+def test_privacy_holds_session_and_step_up_in_the_same_transaction_as_settings_and_audit(
+    fleet: Fleet,
+    monkeypatch: pytest.MonkeyPatch,
+    race: str,
+) -> None:
+    fleet.set_up()
+    service = fleet.service
+    set_privacy = service.set_privacy
+
+    def changed_meanwhile(settings: PrivacySettings, *, author: str) -> Any:
+        if race == "revoked":
+            service.owner.logout(service.owner.authenticate(fleet.cookie))
+        else:
+            fleet.clock.now += CONFIRM_SECONDS + 1
+        return set_privacy(settings, author=author)
+
+    monkeypatch.setattr(service, "set_privacy", changed_meanwhile)
+    refused = fleet.ui("PUT", "/api/privacy", PrivacySettings(usage_history="daily").model_dump())
+    assert refused.status == (401 if race == "revoked" else 403)
+    assert service.privacy_state().changes == [] and service.privacy() == PrivacySettings()
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "body"),
+    [
+        ("POST", "/api/nodes/main/enrollment", {}),
+        ("POST", "/api/import/users", {"users": []}),
+        ("GET", "/api/backup/devices", None),
+        ("POST", "/api/backup/devices", {"name": "thief", "public_key": "age1x"}),
+        ("DELETE", "/api/backup/devices/0123456789ab", None),
+        ("GET", "/api/backup/recovery-key", None),
+        ("PUT", "/api/backup/recovery-key", {"public_key": "age1x"}),
+        ("PUT", "/api/backup/deployer-state", {}),
+        ("GET", "/api/backup/snapshot", None),
+        ("PUT", "/api/users/main", {}),
+        ("PUT", "/api/nodes/main", {}),
+        ("DELETE", "/api/nodes/main", None),
+        ("PUT", "/api/endpoints/main", {}),
+        ("DELETE", "/api/endpoints/main", None),
+        ("PUT", "/api/fence", {}),
+        ("POST", "/api/revisions", {"intent": {}, "plan_hash": "1" * 64, "review_hash": "2" * 64}),
+        ("POST", "/api/revisions/1/approve", {}),
+        ("POST", "/api/revisions/1/result", {}),
+        ("GET", "/api/traffic", None),
+        ("POST", "/api/owner/setup-link", {}),
+    ],
+    ids=lambda value: value if isinstance(value, str) and value.startswith("/") else None,
+)
+def test_a_session_reaches_only_what_the_console_calls_even_just_confirmed(
+    fleet: Fleet, method: str, path: str, body: Any
+) -> None:
+    """A borrowed browser could seal a snapshot to its own key, enroll a rogue node, or reshape the fleet."""
+    fleet.set_up()  # signed in this second: step-up would pass
+    refused = fleet.ui(method, path, body)
+    assert refused.status == 403 and refused.body["error"]["code"] == "insufficient_scope"
+    assert fleet.call(method, path, body, bearer=ADMIN_TOKEN).status != 403
+
+
+def test_logout_clears_the_cookie_and_ends_the_session(fleet: Fleet) -> None:
+    fleet.set_up()
+    reply = fleet.ui("POST", "/auth/logout", {})
+    assert "Max-Age=0" in reply.headers["Set-Cookie"]
+    assert fleet.ui("GET", "/api/users").status == 401
+
+
+def test_sign_out_others_over_http(fleet: Fleet) -> None:
+    fleet.set_up()
+    mine = fleet.cookie
+    login = fleet.call("POST", "/auth/login", {"password": PASSWORD}, headers=UI)
+    other = _cookie_value(login)
+    assert len(fleet.ui("GET", "/auth/sessions").body["sessions"]) == 2
+    assert fleet.ui("POST", "/auth/sessions/revoke-others", {}).body == {"revoked": 1}
+    fleet.cookie = other
+    assert fleet.ui("GET", "/api/users").status == 401
+    fleet.cookie = mine
+    assert fleet.ui("GET", "/api/users").status == 200
+
+
+def test_repeated_wrong_passwords_answer_429_with_retry_after(fleet: Fleet) -> None:
+    fleet.set_up()
+    for _ in range(5):
+        assert fleet.call("POST", "/auth/login", {"password": "wrong password!"}, headers=UI).status == 401
+    locked = fleet.call("POST", "/auth/login", {"password": PASSWORD}, headers=UI)
+    assert locked.status == 429 and int(locked.headers["Retry-After"]) >= 1
+
+
+# -- views ---------------------------------------------------------------------------------------
+
+
+def _declare(service: ControlService, *names: str) -> int:
+    """Record an applied revision whose intent declares `names`, as the deployer's apply does."""
+    proposal = RevisionProposal(intent={"access": {"users": list(names)}}, plan_hash="1" * 64, review_hash="2" * 64)
+    number = service.revisions.propose(proposal, caller=ROOT).number
+    service.revisions.approve(number, caller=ROOT)
+    service.revisions.record_result(number, RevisionResult(status="applied"))
+    return number
+
+
+def test_share_links_need_admin_and_every_person_has_a_page(fleet: Fleet) -> None:
+    fleet.set_up()
+    service = fleet.service
+    service.put_settings(ServiceSettings(profile_title="Meridian", public_url="https://198.51.100.7/c0nn"))
+    for name in ("alice", "bob"):
+        assert fleet.ui("POST", "/api/users", {"username": name}).status == 200
+    number = _declare(service, "alice")
+    read = fleet.call("POST", "/api/tokens", {"name": "viewer", "scope": "read"}, bearer=ADMIN_TOKEN).body["token"]
+    assert fleet.call("GET", "/ui/api/people/alice/share", bearer=read).status == 403
+    alice = fleet.call("GET", "/ui/api/people/alice/share", bearer=ADMIN_TOKEN).body
+    user = service.get_user("alice")
+    assert user is not None
+    assert alice["subscription_url"] == f"https://198.51.100.7/c0nn/sub/{user.sub_token}"
+    assert alice["page_url"] == alice["subscription_url"]
+    assert alice["qr_svg"].startswith("data:image/svg+xml")
+    assert alice["declared"] is True
+    bob = fleet.call("GET", "/ui/api/people/bob/share", bearer=ADMIN_TOKEN).body
+    assert bob["page_url"] == bob["subscription_url"] != "" and bob["declared"] is False
+    bob_user = service.get_user("bob")
+    assert bob_user is not None
+    page = fleet.call("GET", f"/sub/{bob_user.sub_token}", headers={"Accept": "text/html"})
+    assert page.status == 200 and b"<!DOCTYPE html>" in page.raw
+    view = fleet.call("GET", "/ui/api/fleet", bearer=read).body
+    assert view["declared_users"] == ["alice"] and view["intent_revision"] == number
+
+
+@pytest.mark.parametrize(
+    ("host", "reason"),
+    [
+        ("198.51.100.7", "no_domain"),
+        ("[2001:db8::1]", "no_domain"),
+        ("localhost:8443", "no_domain"),
+        ("console.example.com", "not_built"),
+    ],
+    ids=str,
+)
+def test_passkeys_are_never_offered_on_an_ip_address(host: str, reason: str) -> None:
+    headers = Message()
+    headers["Host"] = host
+    state = passkey_state(headers)
+    assert not state.available and state.reason == reason
+
+
+# -- static files ----------------------------------------------------------------------------------
+
+
+def test_page_carries_strict_security_headers_and_is_never_cached(fleet: Fleet) -> None:
+    reply = fleet.call("GET", "/")
+    assert reply.status == 200 and reply.headers["Content-Type"].startswith("text/html")
+    assert reply.headers["Content-Security-Policy"] == CONTENT_SECURITY_POLICY
+    assert "frame-ancestors 'none'" in CONTENT_SECURITY_POLICY and "'unsafe-inline'" not in CONTENT_SECURITY_POLICY
+    assert reply.headers["Referrer-Policy"] == "no-referrer"
+    assert reply.headers["X-Frame-Options"] == "DENY"
+    assert reply.headers["Cache-Control"] == "no-store"
+
+
+def test_assets_revalidate_by_etag_and_honour_weak_tags(fleet: Fleet) -> None:
+    first = fleet.call("GET", "/ui/core.js")
+    etag = first.headers["ETag"]
+    assert first.status == 200 and first.headers["Cache-Control"] == "no-cache"
+    assert first.headers["Content-Type"] == "text/javascript"
+    assert fleet.call("GET", "/ui/core.js", headers={"If-None-Match": etag}).status == 304
+    assert fleet.call("GET", "/ui/core.js", headers={"If-None-Match": f"W/{etag}"}).status == 304
+    assert fleet.call("GET", "/ui/locales/fa.json").status == 200
+
+
+@pytest.mark.parametrize(
+    "path", ["/ui/CLAUDE.md", "/ui/index.html", "/ui/../server.py", "/ui/%2e%2e/server.py", "/ui/missing.js"], ids=str
+)
+def test_only_shipped_ui_files_are_served(fleet: Fleet, path: str) -> None:
+    assert fleet.call("GET", path).status == 404
+
+
+def test_every_shipped_asset_is_reachable(fleet: Fleet) -> None:
+    for path in sorted(UI_DIR.rglob("*")):
+        relative = path.relative_to(UI_DIR).as_posix()
+        if path.is_file() and path.suffix in (".js", ".css", ".svg", ".json"):
+            assert fleet.call("GET", f"/ui/{relative}").status == 200, relative
+
+
+def test_declared_people_are_the_clis_to_remove_or_relink(fleet: Fleet) -> None:
+    """The reviewed topology owns declared credentials, even though every person now has a live page."""
+    fleet.set_up()
+    service = fleet.service
+    for name in ("alice", "bob"):
+        service.put_user(name)
+    _declare(service, "alice")
+    before = service.get_user("alice")
+    assert before is not None
+    for method, path in (("POST", "/api/users/alice/reissue"), ("DELETE", "/api/users/alice")):
+        refused = fleet.ui(method, path, {} if method == "POST" else None)
+        assert refused.status == 409 and refused.body["error"]["code"] == "declared_user", path
+        refused = fleet.ui(method, path, {"cut_off": True})
+        assert refused.status == 409 and refused.body["error"]["code"] == "declared_user", path
+    after = service.get_user("alice")
+    assert after is not None and after.uuid == before.uuid
+    assert fleet.ui("GET", "/ui/api/people/alice/share").body["declared"] is True
+    assert fleet.ui("POST", "/api/users/bob/reissue", {}).status == 200  # the console's own people stay its own
+    assert fleet.ui("DELETE", "/api/users/bob").status == 200
+    assert fleet.call("POST", "/api/users/alice/reissue", {}, bearer=ADMIN_TOKEN).status == 200  # the CLI may
+    assert fleet.call("DELETE", "/api/users/alice", bearer=ADMIN_TOKEN).status == 200
+
+
+def test_the_owner_can_remove_its_person_with_a_cut_off_and_read_the_result(fleet: Fleet) -> None:
+    fleet.set_up()
+    fleet.service.put_user("person-a")
+    fleet.service.put_node_spec("main", command_node_spec())
+    scope = fleet.ui("GET", "/api/users/person-a/cut-off")
+    assert scope.status == 200 and scope.body["nodes"][0]["node_id"] == "main"
+    removed = fleet.ui("DELETE", "/api/users/person-a", {"cut_off": True})
+    assert removed.status == 200 and fleet.service.get_user("person-a") is None
+    record = removed.body["commands"][0]
+    read = fleet.ui("GET", f"/api/nodes/main/commands/{record['command']['command_id']}")
+    assert read.status == 200 and read.body["status"] == "waiting"
+
+
+def test_the_owner_can_restart_a_managed_unit_but_cannot_issue_other_command_kinds(fleet: Fleet) -> None:
+    fleet.set_up()
+    fleet.service.put_node_spec("main", command_node_spec())
+    assert fleet.ui("GET", "/api/nodes/main/command-targets").status == 200
+    restart = fleet.ui("POST", "/api/nodes/main/commands", {"kind": "restart_unit", "resource_id": "unit:netcore"})
+    assert restart.status == 200
+    for command in [
+        {"kind": "reconcile"},
+        {"kind": "renew_credential"},
+        {"kind": "reset_inbound", "inbound_tag": "vless-reality"},
+    ]:
+        assert fleet.ui("POST", "/api/nodes/main/commands", command).status == 403
+
+
+@pytest.mark.parametrize(("username", "status"), [(".", 404), ("..", 404), (".hidden", 200), ("...", 200)])
+def test_only_dot_segments_are_refused_as_usernames(fleet: Fleet, username: str, status: int) -> None:
+    """A browser resolves "." and ".." away in the console's relative URLs; other dotted names keep working."""
+    fleet.set_up()
+    assert fleet.call("PUT", f"/api/users/{username}", {}, bearer=ADMIN_TOKEN).status == status
+    if status == 200:
+        assert fleet.call("GET", f"/api/users/{username}", bearer=ADMIN_TOKEN).status == 200
+        assert fleet.call("GET", f"/ui/api/people/{username}/share", bearer=ADMIN_TOKEN).status == 200
+
+
+# -- checks that must still hold when the write lands ----------------------------------------------
+
+
+@pytest.mark.parametrize("outcome", ["approved", "failed"])
+def test_a_person_an_apply_is_declaring_stays_the_clis(fleet: Fleet, outcome: str) -> None:
+    """The apply creates its people while its revision is still approved, before it records applied; one
+    that failed elsewhere still declares them, and the CLI's retry reuses their credentials."""
+    fleet.set_up()
+    _declare(fleet.service, "erin")
+    proposal = RevisionProposal(intent={"access": {"users": ["dave"]}}, plan_hash="1" * 64, review_hash="2" * 64)
+    number = fleet.service.revisions.propose(proposal, caller=ROOT).number
+    fleet.service.revisions.approve(number, caller=ROOT)
+    fleet.service.put_user("dave")
+    if outcome == "failed":
+        fleet.service.revisions.record_result(number, RevisionResult(status="failed", detail="an exit failed"))
+    for method, path in (("POST", "/api/users/dave/reissue"), ("DELETE", "/api/users/dave")):
+        refused = fleet.ui(method, path, {} if method == "POST" else None)
+        assert refused.status == 409 and refused.body["error"]["code"] == "declared_user"
+
+
+def test_a_merely_proposed_revision_declares_no_one(fleet: Fleet) -> None:
+    """A `propose` token could otherwise lock the owner out of removing or relinking their own people."""
+    fleet.set_up()
+    fleet.service.put_user("dave")
+    proposal = RevisionProposal(intent={"access": {"users": ["dave"]}}, plan_hash="1" * 64, review_hash="2" * 64)
+    fleet.service.revisions.propose(proposal, caller=ROOT)
+
+    assert fleet.ui("POST", "/api/users/dave/reissue", {}).status == 200
+
+
+def test_a_person_declared_between_the_check_and_the_write_keeps_their_link(
+    fleet: Fleet, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fleet.set_up()
+    service = fleet.service
+    before = service.put_user("erin")
+    reissue = service.reissue_user
+
+    def declared_meanwhile(username: str) -> Any:
+        _declare(service, username)  # the apply finishes after the request was authorized
+        return reissue(username)
+
+    monkeypatch.setattr(service, "reissue_user", declared_meanwhile)
+    refused = fleet.ui("POST", "/api/users/erin/reissue", {})
+    assert refused.status == 409 and refused.body["error"]["code"] == "declared_user"
+    after = service.get_user("erin")
+    assert after is not None and (after.uuid, after.sub_token) == (before.uuid, before.sub_token)
+
+
+def test_a_session_revoked_after_authorizing_changes_nothing(fleet: Fleet, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every owner write rechecks the session in its own transaction, not only before reading the body."""
+    fleet.set_up()
+    service = fleet.service
+    service.put_user("frank")
+    update_user = service.update_user
+
+    def revoked_meanwhile(*args: Any, **kwargs: Any) -> Any:
+        service.owner.logout(service.owner.authenticate(fleet.cookie))  # another tab signs out
+        return update_user(*args, **kwargs)
+
+    monkeypatch.setattr(service, "update_user", revoked_meanwhile)
+    assert fleet.ui("PATCH", "/api/users/frank", {"status": "disabled"}).status == 401
+    user = service.get_user("frank")
+    assert user is not None and user.status == "active"

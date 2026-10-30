@@ -16,41 +16,23 @@ from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import DeploymentTarget, ResourcePlan, canonical_hash
 
 # Dependents first, so nothing is deleted while something that uses it remains:
-# users before the squads they join, Hosts before the Inbounds they publish,
-# panel Nodes before their Profile, and server runtimes before the listeners,
-# firewall openings, and baseline beneath them.
+# users and endpoints before the node workloads that serve them, and server
+# runtimes before the listeners, firewall openings, and baseline beneath them.
+# A Remnawave fleet's panel-side kinds are not here: `meridian migrate` forgets them.
 RETIREMENT_ORDER: tuple[str, ...] = (
-    "access_user",
-    "service_user",
-    "host",
-    "external_squad",
-    "internal_squad",
-    "inbound",
-    "node_binding",
-    "config_profile",
-    "routing_gateway",
-    "egress_pool",
-    "route_rule",
-    "node_runtime",
+    "control_user",
+    "client_endpoint",
+    "node_workload",
+    "agent_runtime",
     "realm_hop",
     "nginx_artifact",
     "firewall_rule",
     "certificate",
-    "probe",
     "server_baseline",
 )
 
 # Kinds whose binding is dropped without a remote call, and why.
 FORGET_ONLY: Mapping[str, str] = {
-    # Inbounds and routing projections are materialized inside their config
-    # Profile: either the surviving Profile was already rewritten without them
-    # during convergence, or the whole Profile is deleted by its own retirement.
-    "inbound": "lives inside its config Profile",
-    "routing_gateway": "lives inside its config Profile",
-    "egress_pool": "lives inside its config Profile",
-    "route_rule": "lives inside its config Profile",
-    # Probes are read-only checks with nothing to delete.
-    "probe": "read-only check",
     # The baseline installs packages and hardens SSH/UFW. Undoing that could lock
     # the operator out or break unrelated services, so it is never reverted.
     "server_baseline": "packages and SSH/firewall hardening are never reverted",
@@ -59,11 +41,39 @@ FORGET_ONLY: Mapping[str, str] = {
 
 # Kinds whose remote state lives on one server. When the plan keeps such a
 # resource but places it on another server (`node replace`), the old placement
-# is retired on the server its binding recorded. Panel-side kinds keep their
-# UUID across the move and are updated in place instead.
+# is retired on the server its binding recorded. Service-side kinds keep their
+# identity across the move and are updated in place instead.
 SERVER_PLACED: frozenset[str] = frozenset(
-    {"node_runtime", "realm_hop", "nginx_artifact", "firewall_rule", "certificate"}
+    {"agent_runtime", "realm_hop", "nginx_artifact", "firewall_rule", "certificate"}
 )
+
+
+def forget_server(cluster: ClusterConfig, bindings: Iterable[ManagedResourceBinding], server_ref: str) -> list[str]:
+    """Drop the retiring server-side bindings on one unreachable server without contacting it.
+
+    Service-side bindings stay, so the service still deletes what it holds; whatever
+    ran on the server keeps running until the operator deletes or wipes it. A committed
+    binding is deactivated; one only an uncommitted apply recorded is dropped, since
+    `retired_bindings()` picks those up inactive.
+    """
+    server_side = SERVER_PLACED | {"server_baseline"}
+    retiring = {
+        binding.logical_id
+        for binding in bindings
+        if binding.server_ref == server_ref and binding.resource_kind in server_side
+    }
+    forgotten: list[str] = []
+    for key, saved in list(cluster.managed_bindings.items()):
+        if saved.logical_id not in retiring or saved.server_ref != server_ref:
+            continue
+        if saved.active:
+            saved.active = False
+        elif saved.generation > cluster.active_generation:
+            del cluster.managed_bindings[key]
+        else:
+            continue
+        forgotten.append(saved.logical_id)
+    return sorted(set(forgotten))
 
 
 @runtime_checkable
@@ -72,15 +82,26 @@ class RetiringDriver(Protocol):
 
 
 def retired_bindings(plan: ResourcePlan, cluster: ClusterConfig) -> list[ManagedResourceBinding]:
-    """Active bindings that left the plan or moved to another server, in retirement order."""
+    """Bindings that left the plan or moved to another server, in retirement order.
+
+    Besides the committed (active) ones, this counts what an uncommitted apply installed
+    (inactive, newer than the active generation): an exit whose first apply failed still
+    runs an enrolled agent and holds open firewall rules until something retires them.
+    """
     desired = {
         resource.logical_id: str(getattr(resource.payload, "server_ref", "") or "") for resource in plan.resources
     }
-    vanished = [
-        binding
-        for binding in cluster.managed_bindings.values()
-        if binding.active and (binding.logical_id not in desired or _moved(binding, desired[binding.logical_id]))
-    ]
+    newest: dict[tuple[str, str, str], ManagedResourceBinding] = {}
+    for binding in cluster.managed_bindings.values():
+        if not (binding.active or binding.generation > cluster.active_generation):
+            continue
+        if binding.logical_id in desired and not _moved(binding, desired[binding.logical_id]):
+            continue
+        # One remote resource retires once, however many generations bound it.
+        key = (binding.logical_id, binding.remote_id, binding.server_ref)
+        if key not in newest or binding.generation > newest[key].generation:
+            newest[key] = binding
+    vanished = list(newest.values())
     rank = {kind: index for index, kind in enumerate(RETIREMENT_ORDER)}
     return sorted(vanished, key=lambda item: (rank.get(item.resource_kind, len(rank)), item.logical_id))
 

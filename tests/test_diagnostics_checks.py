@@ -11,13 +11,11 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from meridian.diagnostics.checks import (
-    check_container_running,
     check_disk_space,
     check_port_listening,
     check_tls_certificate,
 )
 from meridian.diagnostics.exit_dns import check_exit_dns
-from meridian.diagnostics.node_plugins import check_node_plugin_host
 from meridian.xray_workload import EXIT_DOH_RESOLVERS
 from tests.support.mock_connection import MockConnection
 
@@ -46,39 +44,6 @@ def test_disk_space(stdout: str, rc: int, status: str, detail: str) -> None:
     assert detail in result.detail
     if status == "failed":
         assert result.remediation != ""
-
-
-@pytest.mark.parametrize(
-    ("stdout", "rc", "status", "detail"),
-    [
-        ("true\n", 0, "passed", ""),
-        ("false\n", 0, "failed", "not running"),
-        ("", 1, "failed", "not found"),
-        *[("", rc, "skipped", "") for rc in _UNAVAILABLE],
-    ],
-)
-def test_container_running(stdout: str, rc: int, status: str, detail: str) -> None:
-    result = check_container_running(_conn("docker inspect", stdout=stdout, rc=rc), "netagent")
-    assert result.name == "container:netagent"
-    assert result.status == status
-    assert detail in result.detail
-
-
-def test_running_but_unhealthy_container_is_a_warning_not_a_pass() -> None:
-    result = check_container_running(_conn("docker inspect", stdout="true unhealthy\n"), "ctlsvc-web")
-
-    assert result.status == "warning"
-    assert "docker logs" in result.remediation
-
-
-@pytest.mark.parametrize(("legacy_rc", "remediation"), [(0, "meridian apply"), (1, "Deploy or restart")])
-def test_missing_container_with_a_pre_rename_twin_points_at_apply(legacy_rc: int, remediation: str) -> None:
-    conn = MockConnection().when("--type container remnawave-node", rc=legacy_rc).when("docker inspect", rc=1)
-
-    result = check_container_running(conn, "netagent", "remnawave-node")
-
-    assert result.status == "failed"
-    assert remediation in result.remediation
 
 
 @pytest.mark.parametrize(
@@ -135,29 +100,40 @@ def test_tls_check_quotes_the_host_and_uses_the_requested_local_port() -> None:
     assert any("'evil; rm -rf /'" in c and "127.0.0.1:7443" in c for c in conn.calls)
 
 
-def _plugin_host(*, kernel: str = "6.8.0-45-generic\n", kernel_rc: int = 0) -> MockConnection:
-    return MockConnection().when("uname -r", stdout=kernel, rc=kernel_rc)
+@pytest.mark.parametrize(
+    ("host", "sni"),
+    [("198.51.100.1", "-noservername"), ("vpn.example.com", "-servername vpn.example.com")],
+    ids=["ip-sends-no-sni", "hostname-sends-its-sni"],
+)
+def test_tls_check_asks_for_the_certificate_as_a_client_would(host: str, sni: str) -> None:
+    conn = _conn("openssl", stdout="notAfter=Dec 30 00:00:00 2099 GMT")
+
+    check_tls_certificate(conn, host)
+
+    (command,) = [c for c in conn.calls if "s_client" in c]
+    assert sni in command
+
+
+def _dates(issued: datetime, lifetime: timedelta) -> str:
+    stamp = "%b %d %H:%M:%S %Y GMT"
+    return f"notBefore={issued.strftime(stamp)}\nnotAfter={(issued + lifetime).strftime(stamp)}\n"
+
+
+_NOW = datetime.now(timezone.utc)
 
 
 @pytest.mark.parametrize(
-    ("conn", "status", "codes"),
+    ("stdout", "status"),
     [
-        (_plugin_host(), "passed", []),
-        (_plugin_host(kernel="5.7.0\n"), "passed", []),
-        (_plugin_host(kernel="5.4.0-216-generic\n"), "warning", ["NODE_PLUGIN_KERNEL"]),
-        *[(_plugin_host(kernel="", kernel_rc=rc), "skipped", []) for rc in _UNAVAILABLE],
-        (_plugin_host(kernel="unknown\n"), "skipped", []),
+        (_dates(_NOW - timedelta(days=3), timedelta(days=6, hours=16)), "passed"),
+        (_dates(_NOW - timedelta(days=6, hours=10), timedelta(days=6, hours=16)), "warning"),
+        (_dates(_NOW - timedelta(days=85), timedelta(days=90)), "warning"),
+        (_dates(_NOW - timedelta(days=30), timedelta(days=90)), "passed"),
     ],
-    ids=["supported", "minimum", "old-kernel", *map(str, _UNAVAILABLE), "unparseable"],
+    ids=["short-lived-mid-life", "short-lived-hours-left", "long-lived-last-week", "long-lived-mid-life"],
 )
-def test_node_plugin_host_readiness(conn: MockConnection, status: str, codes: list[str]) -> None:
-    check = check_node_plugin_host(conn)
-
-    assert check.status == status
-    warned = [found for found in check.findings if found.status == "warning"]
-    assert [found.code for found in warned] == codes
-    # Plugins are optional: an unready host warns with a fix and never fails the check.
-    assert all(found.remediation.startswith("Only if you use node plugins") for found in warned)
+def test_certificate_expiry_warning_scales_with_its_lifetime(stdout: str, status: str) -> None:
+    assert check_tls_certificate(_conn("openssl", stdout=stdout), "198.51.100.1").status == status
 
 
 _IPV4_RESOLVERS = {resolver.address for resolver in EXIT_DOH_RESOLVERS if ":" not in resolver.address}

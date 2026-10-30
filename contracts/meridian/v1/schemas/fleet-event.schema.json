@@ -1,0 +1,318 @@
+{
+  "$defs": {
+    "CommandIssuedDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "command_id": {
+          "description": "Idempotency key of a command: a lowercase UUID chosen by the service, never reused.",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Command Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "reconcile",
+            "report",
+            "reset_inbound",
+            "restart_unit",
+            "renew_credential"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "kind"
+      ],
+      "title": "CommandIssuedDetail",
+      "type": "object"
+    },
+    "CommandResultDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "command_id": {
+          "description": "Idempotency key of a command: a lowercase UUID chosen by the service, never reused.",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Command Id",
+          "type": "string"
+        },
+        "effect": {
+          "anyOf": [
+            {
+              "enum": [
+                "inbound_reset",
+                "core_restart"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effect"
+        },
+        "kind": {
+          "enum": [
+            "reconcile",
+            "report",
+            "reset_inbound",
+            "restart_unit",
+            "renew_credential"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "rejected",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "kind",
+        "status"
+      ],
+      "title": "CommandResultDetail",
+      "type": "object"
+    },
+    "EmptyEventDetail": {
+      "additionalProperties": false,
+      "description": "A fact needs no additional stored data.",
+      "properties": {},
+      "title": "EmptyEventDetail",
+      "type": "object"
+    },
+    "NodeEventDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "failed_resources": {
+          "default": 0,
+          "description": "Only a count; raw errors and resource values never ride.",
+          "minimum": 0,
+          "title": "Failed Resources",
+          "type": "integer"
+        },
+        "reason": {
+          "enum": [
+            "live_window_elapsed",
+            "agent_seen",
+            "apply_failed",
+            "apply_recovered"
+          ],
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "title": "NodeEventDetail",
+      "type": "object"
+    },
+    "PrivacyEventDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "audit_id": {
+          "description": "The row in privacy_changes, also exposed in the audit.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Audit Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "audit_id"
+      ],
+      "title": "PrivacyEventDetail",
+      "type": "object"
+    },
+    "TokenEventDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+          "title": "Name",
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "read",
+            "propose",
+            "approve",
+            "people",
+            "admin"
+          ],
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "scope"
+      ],
+      "title": "TokenEventDetail",
+      "type": "object"
+    },
+    "UserFieldsDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "description": "Changed field names, never values.",
+          "items": {
+            "enum": [
+              "status",
+              "device_limit",
+              "expire_at",
+              "traffic_limit_bytes",
+              "traffic_limit_strategy",
+              "credentials",
+              "created_at",
+              "traffic_reset_at",
+              "lifetime_traffic_bytes",
+              "language"
+            ],
+            "type": "string"
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "title": "Fields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "fields"
+      ],
+      "title": "UserFieldsDetail",
+      "type": "object"
+    },
+    "UserStateDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "previous_status": {
+          "enum": [
+            "active",
+            "disabled",
+            "limited",
+            "expired"
+          ],
+          "title": "Previous Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "previous_status"
+      ],
+      "title": "UserStateDetail",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One secret-free lifecycle fact in this fleet's bounded local ledger.",
+  "properties": {
+    "actor": {
+      "description": "Token name, owner, root, or system.",
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+      "title": "Actor",
+      "type": "string"
+    },
+    "detail": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EmptyEventDetail"
+        },
+        {
+          "$ref": "#/$defs/UserFieldsDetail"
+        },
+        {
+          "$ref": "#/$defs/UserStateDetail"
+        },
+        {
+          "$ref": "#/$defs/NodeEventDetail"
+        },
+        {
+          "$ref": "#/$defs/PrivacyEventDetail"
+        },
+        {
+          "$ref": "#/$defs/TokenEventDetail"
+        },
+        {
+          "$ref": "#/$defs/CommandIssuedDetail"
+        },
+        {
+          "$ref": "#/$defs/CommandResultDetail"
+        }
+      ],
+      "title": "Detail"
+    },
+    "id": {
+      "description": "Monotonic cursor, never reused after retention pruning.",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "title": "Id",
+      "type": "integer"
+    },
+    "kind": {
+      "enum": [
+        "user.created",
+        "user.updated",
+        "user.enabled",
+        "user.disabled",
+        "user.reissued",
+        "user.removed",
+        "user.traffic_reset",
+        "user.expired",
+        "user.limited",
+        "user.restored",
+        "node.offline",
+        "node.online",
+        "node.apply_failed",
+        "node.apply_recovered",
+        "command.issued",
+        "command.result",
+        "privacy.changed",
+        "notice.changed",
+        "language.changed",
+        "token.created",
+        "token.revoked"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "subject": {
+      "description": "Username, node ID, privacy, or token name.",
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+      "title": "Subject",
+      "type": "string"
+    },
+    "time": {
+      "description": "RFC 3339 timestamp in UTC, ending in Z.",
+      "maxLength": 40,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+      "title": "Time",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "time",
+    "kind",
+    "actor",
+    "subject"
+  ],
+  "title": "FleetEvent",
+  "type": "object"
+}

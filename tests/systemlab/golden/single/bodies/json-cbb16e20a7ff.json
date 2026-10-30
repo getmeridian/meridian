@@ -1,0 +1,27 @@
+{
+  "isFound": true,
+  "user": {
+    "shortUuid": "<short-uuid:1>",
+    "daysLeft": "<volatile>",
+    "trafficUsed": "<volatile>",
+    "trafficLimit": "0",
+    "lifetimeTrafficUsed": "<volatile>",
+    "lifetimeTrafficUsedBytes": "<volatile>",
+    "trafficLimitBytes": "0",
+    "trafficUsedBytes": "<volatile>",
+    "username": "solo",
+    "expiresAt": "<timestamp:1>",
+    "isActive": true,
+    "userStatus": "ACTIVE",
+    "trafficLimitStrategy": "NO_RESET"
+  },
+  "links": [
+    "vless://<vless-uuid:1>@<host:exit-b>:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality&sni=www.google.com&fp=chrome&pbk=<reality-pbk:1>&sid=<short-id:1>#Reality%20%C2%B7%20Chrome",
+    "vless://<vless-uuid:1>@<host:exit-b>:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality&sni=www.google.com&fp=firefox&pbk=<reality-pbk:1>&sid=<short-id:1>#Reality%20%C2%B7%20Firefox",
+    "vless://<vless-uuid:1>@<host:exit-b>:443?encryption=none&type=xhttp&path=%2F<path:1>&host=<host:exit-b>&mode=packet-up&security=tls&sni=<host:exit-b>&fp=chrome#XHTTP%20%C2%B7%20Chrome",
+    "vless://<vless-uuid:1>@<host:exit-b>:443?encryption=none&type=xhttp&path=%2F<path:1>&host=<host:exit-b>&mode=packet-up&security=tls&sni=<host:exit-b>&fp=firefox#XHTTP%20%C2%B7%20Firefox",
+    "hysteria2://<vless-uuid:1>@<host:exit-b>:443/?obfs=salamander&obfs-password=<salamander:1>&sni=<host:exit-b>&fm=%7B%22udp%22%3A%5B%7B%22type%22%3A%22salamander%22%2C%22settings%22%3A%7B%22password%22%3A%22<salamander:1>%22%7D%7D%5D%7D#Hysteria2%20%C2%B7%20UDP"
+  ],
+  "ssConfLinks": {},
+  "subscriptionUrl": "https://<host:exit-b>/<sub-path:1>/sub/<short-uuid:1>"
+}

@@ -227,6 +227,49 @@ class TestNodeAdd:
         lookup.assert_called_once_with("198.51.100.5")
         assert applied.call_args.args[0].exits[-1].region == "FI"
 
+    def test_adding_a_saved_server_by_name_keeps_its_title_and_names_the_exit(self) -> None:
+        """Without --name the profile was resaved under its IP, so the saved name stopped resolving."""
+        cluster = ClusterConfig(topology_intent=_minimal_v4_intent())
+        registry = MagicMock()
+        registry.find.return_value = SimpleNamespace(id="srv-new", host="198.51.100.5", name="finland")
+        resolved = SimpleNamespace(ip="198.51.100.5", user="root", port=22, machine_id="")
+        applied = MagicMock(return_value=SimpleNamespace(all_succeeded=True, changed=True))
+
+        with (
+            patch("meridian.commands.node.load_topology_cluster", return_value=cluster),
+            patch("meridian.servers.ServerRegistry", return_value=registry),
+            patch("meridian.commands.resolve.resolve_server", return_value=resolved),
+            patch("meridian.commands.resolve.ensure_server_connection", return_value=resolved),
+            patch("meridian.commands.node._neighbor_sni", return_value=""),
+            patch("meridian.commands.node.registry_country", return_value="FI"),
+            patch("meridian.setup.runtime.SetupRuntime.apply_intent", applied),
+        ):
+            run_add(ip="finland", yes=True)
+
+        assert registry.add.call_args.args[0].name == "finland"
+        assert applied.call_args.args[0].exits[-1].id == "exit-finland"
+
+    def test_re_adding_a_server_saved_under_its_address_derives_the_exit_name(self) -> None:
+        """A removed exit's profile keeps its IP as its name; reusing it failed name validation."""
+        cluster = ClusterConfig(topology_intent=_minimal_v4_intent())
+        registry = MagicMock()
+        registry.find.return_value = SimpleNamespace(id="srv-new", host="198.51.100.5", name="198.51.100.5")
+        resolved = SimpleNamespace(ip="198.51.100.5", user="root", port=22, machine_id="")
+        applied = MagicMock(return_value=SimpleNamespace(all_succeeded=True, changed=True))
+
+        with (
+            patch("meridian.commands.node.load_topology_cluster", return_value=cluster),
+            patch("meridian.servers.ServerRegistry", return_value=registry),
+            patch("meridian.commands.resolve.resolve_server", return_value=resolved),
+            patch("meridian.commands.resolve.ensure_server_connection", return_value=resolved),
+            patch("meridian.commands.node._neighbor_sni", return_value=""),
+            patch("meridian.commands.node.registry_country", return_value="FI"),
+            patch("meridian.setup.runtime.SetupRuntime.apply_intent", applied),
+        ):
+            run_add(ip="198.51.100.5", yes=True)
+
+        assert applied.call_args.args[0].exits[-1].id.startswith("exit-")
+
     def test_rerunning_add_with_a_different_sni_refuses_instead_of_ignoring_it(self) -> None:
         cluster = ClusterConfig(topology_intent=_minimal_v4_intent())
         pending = cluster.topology_intent.exits[0]
@@ -285,7 +328,7 @@ class TestNodeList:
 
         with (
             patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+            patch("meridian.control_access.ServiceFleetPanel", return_value=panel),
         ):
             mock_load.return_value = cluster
             run_list()
@@ -300,7 +343,7 @@ class TestNodeList:
 
         with (
             patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+            patch("meridian.control_access.ServiceFleetPanel", return_value=panel),
             pytest.raises(typer.Exit) as exc_info,
         ):
             mock_load.return_value = cluster
@@ -323,7 +366,7 @@ class TestNodeList:
         try:
             with (
                 patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+                patch("meridian.control_access.ServiceFleetPanel", return_value=panel),
                 pytest.raises(typer.Exit) as exc_info,
             ):
                 run_list()
@@ -345,7 +388,7 @@ class TestNodeList:
         try:
             with (
                 patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+                patch("meridian.control_access.ServiceFleetPanel", return_value=panel),
             ):
                 mock_load.return_value = cluster
                 run_list()
@@ -399,7 +442,7 @@ class TestNodeList:
         try:
             with (
                 patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+                patch("meridian.control_access.ServiceFleetPanel", return_value=panel),
                 patch("meridian.commands.node.topology_from_local_cluster", return_value=topology),
             ):
                 run_list()
@@ -431,7 +474,7 @@ class TestNodeList:
 
         with (
             patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+            patch("meridian.control_access.ServiceFleetPanel", return_value=panel),
             patch("meridian.commands.node.topology_from_local_cluster", return_value=topology),
         ):
             run_list()

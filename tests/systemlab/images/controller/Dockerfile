@@ -58,15 +58,28 @@ RUN set -eu; \
     sing-box version | grep -qF "sing-box version ${SING_BOX_VERSION}"; \
     mihomo -v | grep -qF "v${MIHOMO_VERSION} "
 
+# uv builds this checkout's wheel for the control server (meridian.control_artifacts).
+ARG UV_VERSION=0.12.19
+RUN pip install --no-cache-dir "uv==${UV_VERSION}"
+
 WORKDIR /workspace
 
-# Install Python deps first (cached unless pyproject.toml changes)
-COPY pyproject.toml VERSION README.md ./
+# An editable install: the deployer then uploads this checkout's wheel and agent build to
+# the servers instead of the released meridian-vpn. Dependencies are cached unless
+# pyproject.toml changes.
+COPY pyproject.toml VERSION README.md CHANGELOG.md ./
 COPY scripts/hatch_build.py scripts/hatch_build.py
 COPY src/ src/
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir -e . pytest
 
-# Copy test scripts and fixtures (small, changes often)
+# The node agent for this architecture (`make agent`; the Makefile and CI build it first).
+COPY agent/dist/ agent/dist/
+RUN test -n "$(ls agent/dist/netagent-*-unknown-linux-musl 2>/dev/null)" \
+    || { echo "agent/dist has no netagent build: run make agent" >&2; exit 1; }
+
+# Test scripts, fixtures, and the corpus comparison the live golden diff reuses.
+COPY tests/__init__.py tests/__init__.py
+COPY tests/test_control_subscription_corpus.py tests/test_control_subscription_corpus.py
 COPY tests/systemlab/ tests/systemlab/
 
 CMD ["bash"]

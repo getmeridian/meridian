@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "after": {
+      "default": 0,
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "After",
+      "type": "integer"
+    },
+    "limit": {
+      "default": 100,
+      "maximum": 2000,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+    }
+  },
+  "title": "FleetEventQuery",
+  "type": "object"
+}

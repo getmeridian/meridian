@@ -8,14 +8,26 @@ from __future__ import annotations
 import shlex
 
 from meridian.host_runtime import (
-    CONTAINERS,
+    AGENT_BINARY,
+    AGENT_CONFIG_DIR,
+    AGENT_LIB_DIR,
+    AGENT_STATE_DIR,
+    AGENT_UNIT,
+    CONTROL_SERVICE_CONFIG,
+    CONTROL_SERVICE_DIR,
+    CONTROL_SERVICE_NAME,
+    CONTROL_SERVICE_STATE_DIR,
+    CONTROL_SERVICE_UNIT,
+    CORE_UNIT,
     LEGACY_NODE_DIR,
     LEGACY_PANEL_DIR,
     LEGACY_PANEL_NETWORK,
     LEGACY_PANEL_SOCKET_VOLUME,
+    NODE,
     NODE_DIR,
     PANEL_DIR,
     PANEL_PROJECT,
+    PANEL_STOP_ORDER,
 )
 from meridian.provision.nginx import LEGACY_PROXY_CLEANUP
 from meridian.provision.steps import ProvisionContext, StepResult
@@ -46,6 +58,24 @@ def _remove_containers(*names: str) -> str:
     return f"docker rm -f {' '.join(shlex.quote(name) for name in names)} >/dev/null 2>&1; true"
 
 
+def panel_stack_removal() -> list[str]:
+    """Remove the Remnawave panel stack under its neutral and pre-rename names: Compose projects,
+    containers, images, the data directories (PostgreSQL's ``data/``), and leftover volumes and networks.
+
+    Teardown runs it, and so does ``meridian migrate`` once the control service has taken over.
+    """
+    return [
+        *_compose_removal(PANEL_DIR, LEGACY_PANEL_DIR),
+        _remove_containers(*(name for container in PANEL_STOP_ORDER for name in (container.name, container.legacy))),
+        # Docker objects that may remain after compose down (pre-rename projects took the directory name)
+        (
+            f"docker volume rm {PANEL_PROJECT}_valkey-socket {LEGACY_PANEL_SOCKET_VOLUME}"
+            " valkey-socket remnawave-db-data 2>/dev/null; true"
+        ),
+        f"docker network rm {PANEL_PROJECT}_internal {LEGACY_PANEL_NETWORK} 2>/dev/null; true",
+    ]
+
+
 class Uninstall:
     """Remove all Meridian proxy components from the server.
 
@@ -67,8 +97,9 @@ class Uninstall:
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
         commands = [
             # Remnawave panel stack and node, under their neutral and pre-rename names
-            *_compose_removal(PANEL_DIR, LEGACY_PANEL_DIR, NODE_DIR, LEGACY_NODE_DIR),
-            _remove_containers(*(name for container in CONTAINERS for name in (container.name, container.legacy))),
+            *panel_stack_removal(),
+            *_compose_removal(NODE_DIR, LEGACY_NODE_DIR),
+            _remove_containers(NODE.name, NODE.legacy),
             # Meridian 3.x panel (3x-ui), so teardown also clears pre-4.0 deployments
             "cd /opt/3x-ui && docker compose down --rmi all 2>/dev/null; true",
             "rm -rf /opt/3x-ui",
@@ -82,12 +113,18 @@ class Uninstall:
                 " done; true"
             ),
             "rm -rf /usr/local/bin/netfwd /etc/netfwd",
-            # Docker objects that may remain after compose down (pre-rename projects took the directory name)
-            (
-                f"docker volume rm {PANEL_PROJECT}_valkey-socket {LEGACY_PANEL_SOCKET_VOLUME}"
-                " valkey-socket remnawave-db-data 2>/dev/null; true"
+            # Meridian's own node agent first (it would restart the core), then the core and the control service
+            *(
+                f"systemctl stop {unit} 2>/dev/null; systemctl disable {unit} 2>/dev/null; true"
+                for unit in (AGENT_UNIT, CORE_UNIT, CONTROL_SERVICE_UNIT)
             ),
-            f"docker network rm {PANEL_PROJECT}_internal {LEGACY_PANEL_NETWORK} 2>/dev/null; true",
+            (
+                f"rm -rf /etc/systemd/system/{AGENT_UNIT} /etc/systemd/system/{CORE_UNIT}"
+                f" /etc/systemd/system/{CONTROL_SERVICE_UNIT} {AGENT_BINARY} {AGENT_CONFIG_DIR} {AGENT_STATE_DIR}"
+                f" {AGENT_LIB_DIR} {CONTROL_SERVICE_DIR} {CONTROL_SERVICE_CONFIG.rsplit('/', 1)[0]}"
+                f" {CONTROL_SERVICE_STATE_DIR} {CONTROL_SERVICE_STATE_DIR}.attestation"
+            ),
+            f"userdel {CONTROL_SERVICE_NAME} 2>/dev/null; true",
             # nginx: Meridian's files and systemd restart override, then the service (see NGINX_STOP_UNLESS_SHARED)
             "rm -f /etc/nginx/conf.d/meridian-http.conf /etc/nginx/stream.d/meridian.conf",
             "rm -rf /etc/nginx/stream.d/relay-maps",

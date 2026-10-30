@@ -7,8 +7,10 @@ from datetime import UTC, datetime
 
 import pytest
 
-from meridian.cluster import ActionCheckpoint, ClusterConfig, ManagedResourceBinding
+from meridian.cluster import ActionCheckpoint, ClusterConfig, ManagedResourceBinding, WorkloadBinding
 from meridian.compiler.models import (
+    ConfigProfilePayload,
+    NodeWorkloadPayload,
     ProbePayload,
     ResourcePlan,
     make_resource,
@@ -243,6 +245,22 @@ class TestCheckpointedExecution:
         assert saves == []
         assert cluster.pending_plan_hash == ""
 
+    def test_a_meridian_plan_keeps_its_workloads_active_at_commit(self) -> None:
+        profile = ConfigProfilePayload(workload_id="exit-a", name="exit-a", inbound_refs=[], inbounds=[])
+        workload = make_resource(
+            "workload:exit-a",
+            NodeWorkloadPayload(workload_ref="exit-a", server_ref="srv-a", agent_ref="agent:exit-a", profile=profile),
+        )
+        cluster = ClusterConfig(workloads=[WorkloadBinding(id="exit-a", generation=1, server_refs=["srv-a"])])
+        driver = ScriptedDriver([_missing(), _converged(build_resource_actions(resource_plan(workload), 1)[0])])
+
+        result = execute_resource_plan(
+            resource_plan(workload), cluster, {"node_workload": driver}, persist=lambda _state: None, clock=_clock
+        )
+
+        assert result.all_succeeded
+        assert cluster.workloads[0].active
+
     def test_progress_events_report_each_action_and_skip_its_dependents(self) -> None:
         plan = _plan(with_probe=True)
         reporter = CaptureReporter()
@@ -288,7 +306,7 @@ class TestCheckpointedExecution:
         assert completed.type == "plan.action.completed"
         assert completed.data["changed"] is True
 
-    def test_vanished_host_and_user_are_retired_after_convergence(self) -> None:
+    def test_vanished_endpoint_and_user_are_retired_after_convergence(self) -> None:
         plan = _plan()
         action = build_resource_actions(plan, generation=2)[0]
         events: list[str] = []
@@ -305,7 +323,7 @@ class TestCheckpointedExecution:
                 remote_id=f"{kind}-remote",
                 active=True,
             )
-            for kind in ("host", "access_user")
+            for kind in ("client_endpoint", "control_user")
         }
         cluster = ClusterConfig(managed_bindings=bindings, active_generation=1, active_plan_hash=_HASH_B)
         firewall = Retiring([_missing(), _converged(action)], [ResourceApplyReceipt(remote_id="fw")], events=events)
@@ -314,15 +332,15 @@ class TestCheckpointedExecution:
         result = execute_resource_plan(
             plan,
             cluster,
-            {"firewall_rule": firewall, "host": retiring, "access_user": retiring},
+            {"firewall_rule": firewall, "client_endpoint": retiring, "control_user": retiring},
             persist=lambda _state: None,
             clock=_clock,
         )
 
         assert result.all_succeeded
-        assert result.retired == ["access_user:gone", "host:gone"]
+        assert result.retired == ["control_user:gone", "client_endpoint:gone"]
         assert events.index("apply:firewall:srv-exit:tcp:443") < events.index(
-            "retire:access_user:gone:access_user-remote"
+            "retire:control_user:gone:control_user-remote"
         )
         assert not any(binding.active for key, binding in cluster.managed_bindings.items() if key.endswith(":gone@1"))
         assert cluster.active_generation == 2
@@ -333,12 +351,16 @@ class TestCheckpointedExecution:
 
         class Broken(ScriptedDriver):
             def retire(self, binding: ManagedResourceBinding) -> None:
-                raise OSError("panel unavailable")
+                raise OSError("service unavailable")
 
         cluster = ClusterConfig(
             managed_bindings={
-                "host:gone@1": ManagedResourceBinding(
-                    logical_id="host:gone", resource_kind="host", generation=1, remote_id="h", active=True
+                "client_endpoint:gone@1": ManagedResourceBinding(
+                    logical_id="client_endpoint:gone",
+                    resource_kind="client_endpoint",
+                    generation=1,
+                    remote_id="e",
+                    active=True,
                 )
             },
             active_generation=1,
@@ -347,13 +369,17 @@ class TestCheckpointedExecution:
         firewall = ScriptedDriver([_missing(), _converged(action)], [ResourceApplyReceipt(remote_id="fw")])
 
         result = execute_resource_plan(
-            plan, cluster, {"firewall_rule": firewall, "host": Broken([])}, persist=lambda _state: None, clock=_clock
+            plan,
+            cluster,
+            {"firewall_rule": firewall, "client_endpoint": Broken([])},
+            persist=lambda _state: None,
+            clock=_clock,
         )
 
         assert not result.all_succeeded
-        assert "retire host:gone: panel unavailable" in result.failure_summary
+        assert "retire client_endpoint:gone: service unavailable" in result.failure_summary
         assert cluster.active_generation == 1
-        assert cluster.managed_bindings["host:gone@1"].active
+        assert cluster.managed_bindings["client_endpoint:gone@1"].active
 
     def test_applies_in_dependency_order_and_commits_generation(self) -> None:
         plan = _plan(with_probe=True)
@@ -500,6 +526,44 @@ class TestCheckpointedExecution:
             f"{resource.logical_id}@4",
             "host:gone@2",
         ]
+
+    def test_commit_of_the_active_plan_forgets_an_abandoned_newer_generation(self) -> None:
+        """Re-applying the active plan reuses its generation; the abandoned one's agent was retired on every apply."""
+        plan = _plan()
+        action = build_resource_actions(plan, generation=1)[0]
+        abandoned = ManagedResourceBinding(
+            logical_id="agent_runtime:exit-2",
+            resource_kind="agent_runtime",
+            generation=2,
+            remote_id="agent-2",
+            server_ref="srv-gone",
+        )
+        cluster = ClusterConfig(
+            managed_bindings={"agent_runtime:exit-2@2": abandoned},
+            active_generation=1,
+            active_plan_hash=plan.plan_hash,
+            pending_generation=2,
+            pending_plan_hash=_HASH_B,
+        )
+        retired: list[str] = []
+
+        class Retiring(ScriptedDriver):
+            def retire(self, binding: ManagedResourceBinding) -> None:
+                retired.append(binding.logical_id)
+
+        drivers = {
+            "firewall_rule": ScriptedDriver([_converged(action)] * 2),
+            "agent_runtime": Retiring([]),
+        }
+
+        first = execute_resource_plan(plan, cluster, drivers, persist=lambda _s: None, clock=_clock)
+        drivers["firewall_rule"] = ScriptedDriver([_converged(action)] * 2)
+        second = execute_resource_plan(plan, cluster, drivers, persist=lambda _s: None, clock=_clock)
+
+        assert first.all_succeeded and second.all_succeeded
+        assert retired == ["agent_runtime:exit-2"]
+        assert "agent_runtime:exit-2@2" not in cluster.managed_bindings
+        assert cluster.active_generation == 1
 
     def test_old_generation_remains_active_until_resumed_cutover_succeeds(self) -> None:
         old_plan = _plan(public_port=8443)
@@ -668,6 +732,23 @@ class TestUnknownOutcomeRecovery:
 
         assert result.results[0].status == "unknown"
         assert next(iter(cluster.action_checkpoints.values())).status == "unknown"
+
+    def test_a_post_apply_shortfall_names_what_differs(self) -> None:
+        """The failure carries the driver's own reasons, not only "did not satisfy the reviewed hash"."""
+        plan = _plan()
+        drifted = ResourceObservation(
+            exists=True, observed_hash="0" * 64, mismatches=["the rule allows the wrong port"]
+        )
+        driver = ScriptedDriver([_missing(), drifted], [ResourceApplyReceipt(remote_id="firewall-1")])
+        cluster = ClusterConfig()
+
+        result = execute_resource_plan(
+            plan, cluster, {"firewall_rule": driver}, persist=lambda _state: None, clock=_clock
+        )
+
+        assert result.results[0].status == "failed"
+        assert "the rule allows the wrong port" in (result.results[0].error or "")
+        assert "the rule allows the wrong port" in (next(iter(cluster.action_checkpoints.values())).last_error or "")
 
 
 class TestPendingPlanSafety:

@@ -7,13 +7,17 @@ from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import Field
 
+from meridian.control.models import NodeRuntime
+from meridian.core.attention import AttentionThresholds, ServerAttention, derive_server_attention
 from meridian.core.models import CoreModel
+from meridian.core.server_allowances import ServerMetadata, ServerUsage, ServerUsageList
 from meridian.core.topology import ProtocolKind
+from meridian.core.traffic import NodeTrafficEvidence
 
 NodeRole = Literal["exit", "routing_gateway"]
 ServerRole = Literal["panel", "exit", "relay", "routing_gateway"]
 InventoryRole = Literal["panel+node", "node", "relay", "panel+routing_gateway", "routing_gateway"]
-NodeStatus = Literal["connected", "disconnected", "disabled", "unknown"]
+NodeStatus = Literal["connected", "failed", "disconnected", "disabled", "unknown"]
 RelayHealth = Literal["healthy", "unhealthy", "unknown"]
 SourceAvailability = Literal["available", "unavailable", "not_requested", "unknown"]
 FleetHealth = Literal["healthy", "degraded", "unknown"]
@@ -104,6 +108,7 @@ class TopologyServerMember(CoreModel):
     ssh_user: str
     ssh_port: int
     relay_hops: list[RelayHopMembership] = Field(default_factory=list)
+    metadata: ServerMetadata | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class FleetTopology(CoreModel):
@@ -123,6 +128,7 @@ class FleetTopology(CoreModel):
 
 
 class FleetSources(CoreModel):
+    server_usage: SourceAvailability = Field(default="not_requested", exclude_if=lambda value: value == "not_requested")
     panel: SourceAvailability = "unknown"
     nodes: SourceAvailability = "unknown"
     users: SourceAvailability = "unknown"
@@ -142,6 +148,7 @@ class ServerInventory(CoreModel):
     ssh_user: str
     ssh_port: int
     relay_hops: list[RelayHopMembership] = Field(default_factory=list)
+    metadata: ServerMetadata | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class PanelInventory(CoreModel):
@@ -205,7 +212,7 @@ class PanelStatus(CoreModel):
     healthy: bool
 
 
-class FleetStatusNode(CoreModel):
+class FleetStatusNode(NodeTrafficEvidence):
     ip: str
     name: str
     uuid: str
@@ -214,6 +221,12 @@ class FleetStatusNode(CoreModel):
     status: NodeStatus
     xray_version: str
     traffic_bytes: int
+    live: bool | None = None
+    runtime: NodeRuntime | None = None
+    runtime_available: bool | None = None
+    in_sync: bool | None = None
+    failed: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
 
 
 class NodeListResult(CoreModel):
@@ -253,6 +266,7 @@ class FleetStatusRelay(CoreModel):
 class FleetStatusSummary(CoreModel):
     health: FleetHealth
     needs_attention: bool
+    servers_needing_attention: int = 0
     nodes: int
     relays: int
     users: int
@@ -263,6 +277,8 @@ class FleetStatusSummary(CoreModel):
     nonactive_access_users: int
     connected_nodes: int
     disconnected_nodes: int
+    failed_nodes: int = 0
+    out_of_sync_nodes: int = 0
     disabled_nodes: int
     unknown_nodes: int
     unhealthy_relays: int
@@ -274,6 +290,7 @@ class FleetStatusSummary(CoreModel):
         return (
             f"{self.nodes} node(s), {self.relays} relay(s), "
             f"{self.active_users} active user(s), {self.missing_access_users} missing access user(s), "
+            f"{self.out_of_sync_nodes} node(s) awaiting convergence, "
             f"{self.unhealthy_relays} unreachable relay listener(s), "
             f"{self.unknown_relays + self.unknown_relay_hops} unverified relay route(s)"
         )
@@ -286,6 +303,8 @@ class FleetStatus(CoreModel):
     servers: list[ServerInventory] = Field(default_factory=list)
     nodes: list[FleetStatusNode] = Field(default_factory=list)
     relays: list[FleetStatusRelay] = Field(default_factory=list)
+    server_usage: list[ServerUsage] = Field(default_factory=list)
+    server_attention: list[ServerAttention] = Field(default_factory=list)
 
 
 def public_url(url: str) -> str:
@@ -305,11 +324,41 @@ def node_api_status(api_node: ApiNodeLike | None) -> NodeStatus:
     disabled = getattr(api_node, "is_disabled", None)
     if disabled is True:
         return "disabled"
+    if getattr(api_node, "runtime_available", None) is False:
+        return "unknown"
     if connected is True:
-        return "connected"
+        # A control-service agent that polls but could not apply its document is no healthy node.
+        runtime = getattr(api_node, "runtime", None)
+        return (
+            "failed"
+            if getattr(api_node, "apply_failed", False) is True or (runtime and runtime.degraded)
+            else "connected"
+        )
     if connected is False or disabled is False:
         return "disconnected"
     return "unknown"
+
+
+def _status_node(
+    node: TopologyNode, api_node: ApiNodeLike | None, evidence: NodeTrafficEvidence | None = None
+) -> FleetStatusNode:
+    return FleetStatusNode(
+        ip=node.ip,
+        name=node.name,
+        uuid=node.uuid,
+        is_panel_host=node.is_panel_host,
+        role=node.role,
+        status=node_api_status(api_node),
+        xray_version=api_node.xray_version if api_node else "",
+        traffic_bytes=api_node.traffic_used if api_node else 0,
+        live=api_node.is_connected if api_node else None,
+        runtime=getattr(api_node, "runtime", None),
+        runtime_available=getattr(api_node, "runtime_available", None),
+        in_sync=getattr(api_node, "in_sync", None),
+        failed=getattr(api_node, "failed", []),
+        errors=getattr(api_node, "errors", []),
+        **(evidence or NodeTrafficEvidence()).model_dump(),
+    )
 
 
 def build_node_list_result(
@@ -318,21 +367,7 @@ def build_node_list_result(
 ) -> NodeListResult:
     """Build a node list from configured topology and live panel observations."""
     api_by_uuid = {node.uuid: node for node in api_nodes}
-    return NodeListResult(
-        nodes=[
-            FleetStatusNode(
-                ip=node.ip,
-                name=node.name,
-                uuid=node.uuid,
-                is_panel_host=node.is_panel_host,
-                role=node.role,
-                status=node_api_status(api_by_uuid.get(node.uuid)),
-                xray_version=(api_by_uuid[node.uuid].xray_version if node.uuid in api_by_uuid else ""),
-                traffic_bytes=(api_by_uuid[node.uuid].traffic_used if node.uuid in api_by_uuid else 0),
-            )
-            for node in nodes
-        ]
-    )
+    return NodeListResult(nodes=[_status_node(node, api_by_uuid.get(node.uuid)) for node in nodes])
 
 
 def build_relay_list_result(
@@ -378,6 +413,7 @@ def build_server_inventory(topology: FleetTopology) -> list[ServerInventory]:
                 ssh_user=server.ssh_user,
                 ssh_port=server.ssh_port,
                 relay_hops=server.relay_hops,
+                metadata=server.metadata,
             )
             for server in topology.servers
         ]
@@ -420,6 +456,8 @@ def build_fleet_status(
     api_users: Sequence[ApiUserLike] | None = None,
     relay_health: Mapping[tuple[str, int], bool] | None = None,
     sources: FleetSources | None = None,
+    node_evidence: Mapping[str, NodeTrafficEvidence] | None = None,
+    server_usage: ServerUsageList | None = None,
 ) -> FleetStatus:
     """Build fleet health status from local state plus live observations."""
     api_by_uuid = {node.uuid: node for node in api_nodes or []}
@@ -429,19 +467,7 @@ def build_fleet_status(
     nodes = []
     for node in topology.nodes:
         api_node = api_by_uuid.get(node.uuid)
-        status = node_api_status(api_node)
-        nodes.append(
-            FleetStatusNode(
-                ip=node.ip,
-                name=node.name,
-                uuid=node.uuid,
-                is_panel_host=node.is_panel_host,
-                role=node.role,
-                status=status,
-                xray_version=getattr(api_node, "xray_version", "") if api_node else "",
-                traffic_bytes=getattr(api_node, "traffic_used", 0) if api_node else 0,
-            )
-        )
+        nodes.append(_status_node(node, api_node, (node_evidence or {}).get(node.uuid)))
 
     relays = []
     for relay in topology.relays:
@@ -476,6 +502,8 @@ def build_fleet_status(
     disabled_users = sum(1 for status in user_statuses if status.upper() == "DISABLED")
     other_users = len(user_statuses) - active_users - disabled_users
     disconnected_nodes = sum(1 for node in nodes if node.status == "disconnected")
+    failed_nodes = sum(1 for node in nodes if node.status == "failed")
+    out_of_sync_nodes = sum(1 for node in nodes if node.runtime_available is True and node.in_sync is False)
     disabled_nodes = sum(1 for node in nodes if node.status == "disabled")
     unknown_nodes = sum(1 for node in nodes if node.status == "unknown")
     unhealthy_relays = sum(1 for relay in relays if relay.health == "unhealthy")
@@ -484,11 +512,21 @@ def build_fleet_status(
         1 for server in topology.servers for hop in server.relay_hops if not hop.advertised and hop.health == "unknown"
     )
     missing_required_sources = (
-        sources.panel == "unavailable" or sources.nodes == "unavailable" or sources.users == "unavailable"
+        sources.panel == "unavailable"
+        or sources.nodes == "unavailable"
+        or sources.users == "unavailable"
+        or sources.server_usage == "unavailable"
     )
     # Disabled, limited, or expired clients are operator or panel decisions, not faults.
     health: FleetHealth
-    if disconnected_nodes > 0 or disabled_nodes > 0 or unhealthy_relays > 0 or missing_access_users > 0:
+    if (
+        disconnected_nodes
+        or failed_nodes
+        or out_of_sync_nodes
+        or disabled_nodes
+        or unhealthy_relays
+        or missing_access_users
+    ):
         health = "degraded"
     elif (
         not panel_healthy
@@ -500,10 +538,17 @@ def build_fleet_status(
         health = "unknown"
     else:
         health = "healthy"
-    needs_attention = health != "healthy"
+    allowance_usage = server_usage.servers if server_usage is not None else []
+    server_attention = (
+        derive_server_attention(allowance_usage, AttentionThresholds(), server_usage.observed_at)
+        if server_usage
+        else []
+    )
+    needs_attention = health != "healthy" or bool(server_attention)
     summary = FleetStatusSummary(
         health=health,
         needs_attention=needs_attention,
+        servers_needing_attention=len(server_attention),
         nodes=len(nodes),
         relays=len(relays),
         users=len(user_statuses),
@@ -514,6 +559,8 @@ def build_fleet_status(
         nonactive_access_users=nonactive_access_users,
         connected_nodes=sum(1 for node in nodes if node.status == "connected"),
         disconnected_nodes=disconnected_nodes,
+        failed_nodes=failed_nodes,
+        out_of_sync_nodes=out_of_sync_nodes,
         disabled_nodes=disabled_nodes,
         unknown_nodes=unknown_nodes,
         unhealthy_relays=unhealthy_relays,
@@ -521,6 +568,8 @@ def build_fleet_status(
         unknown_relay_hops=unknown_relay_hops,
     )
     return FleetStatus(
+        server_usage=allowance_usage,
+        server_attention=server_attention,
         panel=PanelStatus(url=topology.panel_url, healthy=panel_healthy),
         summary=summary,
         sources=sources,

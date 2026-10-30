@@ -1,0 +1,436 @@
+{
+  "$defs": {
+    "ClientLimitsResult": {
+      "additionalProperties": false,
+      "description": "Result for changing a client's limits or resetting their traffic: the client as the panel now has it.",
+      "properties": {
+        "client": {
+          "$ref": "#/$defs/ClientRecord"
+        }
+      },
+      "required": [
+        "client"
+      ],
+      "title": "ClientLimitsResult",
+      "type": "object"
+    },
+    "ClientRecord": {
+      "additionalProperties": false,
+      "description": "Redacted client metadata suitable for list views.",
+      "properties": {
+        "attention_reasons": {
+          "description": "Derived reasons when client list --attention was requested; never stored.",
+          "items": {
+            "enum": [
+              "expiring",
+              "quota",
+              "unused"
+            ],
+            "type": "string"
+          },
+          "title": "Attention Reasons",
+          "type": "array"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "declared": {
+          "default": true,
+          "description": "False for a person added in the control service's web console rather than the fleet's reviewed intent; the CLI reads them, and the console manages them.",
+          "title": "Declared",
+          "type": "boolean"
+        },
+        "device_limit": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "None uses the fleet's default cap.",
+          "title": "Device Limit"
+        },
+        "expires_at": {
+          "description": "UTC timestamp; empty means never.",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "first_traffic_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the service first accepted traffic growth; unknown for historical use.",
+          "title": "First Traffic At"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "enum": [
+                "en",
+                "ru",
+                "fa",
+                "zh"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Subscription status language; null uses the fleet default.",
+          "title": "Language"
+        },
+        "last_seen": {
+          "title": "Last Seen",
+          "type": "string"
+        },
+        "last_traffic_node": {
+          "anyOf": [
+            {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The node whose latest accepted growth set the user's last traffic time.",
+          "title": "Last Traffic Node"
+        },
+        "note": {
+          "default": "",
+          "description": "Private operator note; people/admin only.",
+          "maxLength": 500,
+          "title": "Note",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "tag": {
+          "default": "",
+          "description": "Private operator tag; people/admin only.",
+          "pattern": "^[A-Z0-9_]{0,16}$",
+          "title": "Tag",
+          "type": "string"
+        },
+        "traffic_limit_bytes": {
+          "description": "0 means unlimited.",
+          "title": "Traffic Limit Bytes",
+          "type": "integer"
+        },
+        "traffic_reset": {
+          "description": "When used traffic starts again from zero: never, day, week, month, or the panel-only month_rolling (monthly from the day the client was created).",
+          "title": "Traffic Reset",
+          "type": "string"
+        },
+        "traffic_used_bytes": {
+          "title": "Traffic Used Bytes",
+          "type": "integer"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "id",
+        "status",
+        "traffic_used_bytes",
+        "traffic_limit_bytes",
+        "traffic_reset",
+        "expires_at",
+        "created_at",
+        "last_seen"
+      ],
+      "title": "ClientRecord",
+      "type": "object"
+    },
+    "EmptyData": {
+      "additionalProperties": false,
+      "description": "Empty data object used by envelopes without command-specific failure data.",
+      "properties": {},
+      "title": "EmptyData",
+      "type": "object"
+    },
+    "ErrorModel": {
+      "additionalProperties": false,
+      "description": "Structured error safe for JSON/API clients.",
+      "properties": {
+        "category": {
+          "enum": [
+            "user",
+            "system",
+            "bug",
+            "cancelled"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "cause": {
+          "additionalProperties": true,
+          "title": "Cause",
+          "type": "object"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "exit_code": {
+          "default": 1,
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "hint": {
+          "default": "",
+          "title": "Hint",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "message"
+      ],
+      "title": "MeridianError",
+      "type": "object"
+    },
+    "Summary": {
+      "additionalProperties": false,
+      "description": "Structured summary shown in JSON envelopes and UI dashboards.",
+      "properties": {
+        "changed": {
+          "default": false,
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "Summary",
+      "type": "object"
+    },
+    "_ClientResetTrafficSuccessEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "client.reset-traffic",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/ClientLimitsResult"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "maxItems": 0,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "ok",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_ClientResetTrafficSuccessEnvelope",
+      "type": "object"
+    },
+    "_ClientResetTrafficTerminalEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "client.reset-traffic",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/EmptyData"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "minItems": 1,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "failed",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_ClientResetTrafficTerminalEnvelope",
+      "type": "object"
+    }
+  },
+  "description": "Envelope schema for `meridian client reset-traffic --json`.",
+  "discriminator": {
+    "mapping": {
+      "failed": "#/$defs/_ClientResetTrafficTerminalEnvelope",
+      "ok": "#/$defs/_ClientResetTrafficSuccessEnvelope"
+    },
+    "propertyName": "status"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/_ClientResetTrafficSuccessEnvelope"
+    },
+    {
+      "$ref": "#/$defs/_ClientResetTrafficTerminalEnvelope"
+    }
+  ],
+  "title": "ClientResetTrafficOutputEnvelope"
+}

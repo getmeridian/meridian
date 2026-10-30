@@ -19,20 +19,23 @@ import typer
 from pydantic import ValidationError
 from rich.markup import escape
 
+from meridian import config
 from meridian.adapters.cancellation import FileCancellationToken
 from meridian.adapters.reporters import JsonlReporter
 from meridian.branding import normalize_icon
 from meridian.cluster import BrandingConfig, ClusterConfig
+from meridian.cluster_persistence import saved_backend
 from meridian.commands._helpers import ReviewedApplyPersistenceError, persist_reviewed_apply
 from meridian.commands.apply_progress import apply_progress
+from meridian.commands.backup import offer_recovery_key
 from meridian.commands.client_handoff import print_handoff_links
 from meridian.commands.port_check import check_ports
 from meridian.commands.resolve import ensure_server_connection, resolve_server
-from meridian.config import HOME_DISPLAY, SERVER_PROFILES_FILE
 from meridian.console import (
     err_console,
     error_context,
     fail,
+    has_tty,
     info,
     is_quiet_mode,
     line,
@@ -45,7 +48,7 @@ from meridian.core.cancellation import CancellationToken, OperationCancelledErro
 from meridian.core.defaults import DEFAULT_SNI, REALITY_SNI_CANDIDATES
 from meridian.core.deploy import DeployPlan, DeployRequest, DeployResult, build_deploy_workflow
 from meridian.core.deploy_validation import DeployValidationError, normalize_deploy_request
-from meridian.core.errors import EngineError, MeridianError
+from meridian.core.errors import MeridianError, RemnawaveFleetError
 from meridian.core.events import COMMAND_CANCELLED, COMMAND_COMPLETED, COMMAND_STARTED
 from meridian.core.inputs import is_ip
 from meridian.core.models import OutputStatus, Summary
@@ -55,11 +58,10 @@ from meridian.core.reporters import NoopReporter, Reporter, emit_event
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
 from meridian.core.validation import wrap_validation_error
-from meridian.engine.deploy import resolve_deploy_target
 from meridian.handoff import HandoffLinks
 from meridian.registry_country import registry_country
 from meridian.renderers import emit_json
-from meridian.resolve import connection_for_entry, merge_target, parse_target
+from meridian.resolve import connection_for_entry, merge_target, parse_target, resolve_deploy_target
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.single_server import (
     DEFAULT_CLIENT,
@@ -108,6 +110,9 @@ def run(
     with error_context("deploy", timer=operation.timer), _quiet_machine_output(final_json):
         if events and events != "jsonl":
             fail(f"Unsupported --events value: {events}", hint="Use: --events=jsonl", hint_type="user")
+        if saved_backend() == "remnawave":
+            _offer_migrate(machine=final_json or bool(request_path) or dry_run, yes=yes)
+            return
         requested_server = ""
         if ip and not request_path:
             ip, requested_server, user, ssh_port = _split_target(ip, user, ssh_port)
@@ -187,7 +192,7 @@ def run(
         if machine_mode and not request.yes:
             fail(
                 "Machine deploy requires confirmation in the request",
-                hint="Set `yes: true` after the UI user confirms the deployment.",
+                hint="Set `yes: true` after the person running it confirms the deployment.",
                 hint_type="user",
             )
         cancellation = FileCancellationToken(Path(cancel_file)) if cancel_file else None
@@ -210,10 +215,10 @@ def _execute(
     operation: OperationContext | None = None,
 ) -> DeployResult:
     raise_if_cancelled(cancellation, phase="preflight", message="Deploy was cancelled before connecting to the server.")
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     try:
         target = resolve_deploy_target(request, registry)
-    except EngineError as exc:
+    except MeridianError as exc:
         fail(exc)
     resolved = ensure_server_connection(
         resolve_server(registry, explicit_ip=target.server_ip, user=target.ssh_user, port=target.ssh_port),
@@ -239,7 +244,7 @@ def _execute(
     if entry is None or not entry.id:
         fail(
             "Could not save the server profile",
-            hint=f"Check {HOME_DISPLAY}/servers.json permissions.",
+            hint=f"Check {config.HOME_DISPLAY}/servers.json permissions.",
             hint_type="system",
         )
     # Without --sni, a fresh deploy tries sites next to the server first, then known-good
@@ -277,6 +282,7 @@ def _execute(
     info("Applying the reviewed topology; this takes a few minutes on a fresh server...")
     client = request.client_name or DEFAULT_CLIENT
     try:
+        _save_branding(request)
         for attempt, sni in enumerate(sni_candidates):
             if attempt:
                 raise_if_cancelled(
@@ -309,10 +315,8 @@ def _execute(
             draft = SetupDraft.from_intent(intent).model_copy(
                 update={"review_hash": applied.plan_hash, "applied_plan_hash": applied.plan_hash}
             )
-            verification = runtime.verify(draft)
-            for message in verification.warnings:
-                warn(message)
-            ok("Verified the control plane, node, and subscription")
+            runtime.verify(draft)
+            ok("Verified the control service, node, and subscription")
             traffic, detail = _verify_traffic(resolved.ip, client, cancellation=cancellation)
             if traffic == "failed" and attempt + 1 < len(sni_candidates):
                 warn(f"No traffic through camouflage target {sni or DEFAULT_SNI}; trying {sni_candidates[attempt + 1]}")
@@ -322,11 +326,10 @@ def _execute(
         raise_if_cancelled(
             cancellation,
             phase="handoff",
-            message="Deploy was cancelled after verification, before publishing connection pages.",
+            message="Deploy was cancelled after verification, before reading the connection links.",
             remote_changed=True,
         )
-        _save_branding(request)
-        (links,) = runtime.publish_handoff([client])
+        (links,) = runtime.handoff([client])
     except ReviewedApplyPersistenceError as exc:
         fail("Deploy changed the server, but local state could not be saved", hint=str(exc), hint_type="system")
     except OperationCancelledError:
@@ -338,6 +341,7 @@ def _execute(
 
     cluster = ClusterConfig.load()
     _print_success(resolved.ip, cluster, request, links)
+    offer_recovery_key(cluster)
     exit_ = next(item for item in intent.exits if item.server_ref == entry.id)
     reality = next(path for path in exit_.paths if path.protocol == "reality")
     return DeployResult(
@@ -464,10 +468,10 @@ def _report_traffic(outcome: TrafficOutcome, detail: str, server_ip: str) -> Non
 
 def _dry_run(request: DeployRequest) -> DeployPlan:
     """Compile the intent a deploy would apply, without SSH or local writes."""
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     try:
         target = resolve_deploy_target(request, registry)
-    except EngineError as exc:
+    except MeridianError as exc:
         fail(exc)
     cluster = ClusterConfig.load()
     _refuse_pre_topology_cluster(cluster)
@@ -501,7 +505,7 @@ def _refuse_pre_topology_cluster(cluster: ClusterConfig) -> None:
     if cluster.is_configured and cluster.topology_intent is None:
         fail(
             "This cluster.yml was written by a Meridian 4.0 development build",
-            hint=f"Move {HOME_DISPLAY}/cluster.yml aside, then deploy again to rebuild it from scratch.",
+            hint=f"Move {config.HOME_DISPLAY}/cluster.yml aside, then deploy again to rebuild it from scratch.",
             hint_type="user",
         )
 
@@ -571,8 +575,6 @@ def _print_success(server_ip: str, cluster: ClusterConfig, request: DeployReques
     err_console.print()
     line()
     err_console.print(f"\n  [dim]Redeploy with the same settings:  {_redeploy_command(server_ip, request)}[/dim]")
-    if cluster.panel.url:
-        err_console.print(f"  [dim]Remnawave panel (advanced):        {cluster.panel.display_url}[/dim]")
     err_console.print()
 
 
@@ -638,6 +640,17 @@ def _load_request(source: str) -> DeployRequest:
         fail(str(error), hint=error.hint, hint_type="user")
 
 
+def _offer_migrate(*, machine: bool, yes: bool) -> None:
+    """A fleet still on Remnawave moves before anything deploys: offer `meridian migrate` in a terminal."""
+    if machine or yes or not has_tty():
+        fail(RemnawaveFleetError())
+    from meridian.commands import migrate
+
+    warn("This fleet still runs Remnawave; move it to Meridian's control service first (every link stays)")
+    migrate.run()
+    info("Run `meridian deploy` again to redeploy on the control service")
+
+
 def _split_target(ip: str, user: str, ssh_port: int) -> tuple[str, str, str, int]:
     """Map the positional ``[user@]host[:port]`` / saved name / ``local`` onto request ip, server, user, port."""
     try:
@@ -646,7 +659,7 @@ def _split_target(ip: str, user: str, ssh_port: int) -> tuple[str, str, str, int
         fail(str(exc), hint="Use IP, saved name, user@host[:port], or 'local'.", hint_type="user")
     if target.local:
         return ip, "", target.user, target.port
-    if not is_ip(target.host) and ServerRegistry(SERVER_PROFILES_FILE).find(target.host) is not None:
+    if not is_ip(target.host) and ServerRegistry(config.SERVER_PROFILES_FILE).find(target.host) is not None:
         return "", target.host, target.user, target.port
     return target.host, "", target.user, target.port
 

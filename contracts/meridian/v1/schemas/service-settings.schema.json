@@ -1,0 +1,209 @@
+{
+  "$defs": {
+    "OwnerContact": {
+      "additionalProperties": false,
+      "properties": {
+        "link": {
+          "default": "",
+          "maxLength": 2048,
+          "pattern": "^(?:|https://[^\\s]+|tg://[^\\s]+|mailto:[^\\s]+)$",
+          "title": "Link",
+          "type": "string"
+        },
+        "text": {
+          "default": "",
+          "maxLength": 120,
+          "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]*$",
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "title": "OwnerContact",
+      "type": "object"
+    },
+    "ServerAllowanceSpec": {
+      "additionalProperties": false,
+      "description": "Settings for a declared server; agent identity is separate from signed node documents.",
+      "properties": {
+        "metadata": {
+          "$ref": "#/$defs/ServerMetadata"
+        },
+        "node_id": {
+          "anyOf": [
+            {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Node Id"
+        }
+      },
+      "required": [
+        "metadata"
+      ],
+      "title": "ServerAllowanceSpec",
+      "type": "object"
+    },
+    "ServerMetadata": {
+      "additionalProperties": false,
+      "description": "Deployer-owned metadata keyed to a server declared in the topology.",
+      "properties": {
+        "allowance_bytes": {
+          "anyOf": [
+            {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Allowance Bytes"
+        },
+        "pay_every": {
+          "anyOf": [
+            {
+              "enum": [
+                "month",
+                "year"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pay Every"
+        },
+        "pay_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pay On"
+        },
+        "provider": {
+          "default": "",
+          "maxLength": 80,
+          "title": "Provider",
+          "type": "string"
+        },
+        "reset_day": {
+          "default": 1,
+          "maximum": 31,
+          "minimum": 1,
+          "title": "Reset Day",
+          "type": "integer"
+        }
+      },
+      "title": "ServerMetadata",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "client_routing": {
+      "default": "ru-split",
+      "enum": [
+        "ru-split",
+        "full"
+      ],
+      "title": "Client Routing",
+      "type": "string"
+    },
+    "color": {
+      "default": "",
+      "enum": [
+        "",
+        "ocean",
+        "sunset",
+        "forest",
+        "lavender",
+        "rose",
+        "slate"
+      ],
+      "title": "Color",
+      "type": "string"
+    },
+    "exit_countries": {
+      "items": {
+        "maxLength": 2,
+        "pattern": "^$|^[A-Za-z]{2}$",
+        "type": "string"
+      },
+      "maxItems": 250,
+      "title": "Exit Countries",
+      "type": "array"
+    },
+    "owner_contact": {
+      "$ref": "#/$defs/OwnerContact",
+      "description": "Optional public owner contact, chosen through reviewed delivery intent."
+    },
+    "profile_title": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Profile Title",
+      "type": "string"
+    },
+    "public_url": {
+      "default": "",
+      "description": "Public base of subscriptions and connection pages (scheme, host, connection-page path), without a trailing slash; empty leaves out the links built from it.",
+      "maxLength": 512,
+      "pattern": "^(?:https://[^\\s/]+(?:/[A-Za-z0-9._~-]+)*)?$",
+      "title": "Public Url",
+      "type": "string"
+    },
+    "server_icon": {
+      "default": "",
+      "maxLength": 409600,
+      "title": "Server Icon",
+      "type": "string"
+    },
+    "server_name": {
+      "default": "",
+      "maxLength": 100,
+      "title": "Server Name",
+      "type": "string"
+    },
+    "servers": {
+      "patternProperties": {
+        "^[^\\r\\n\\t]+$": {
+          "$ref": "#/$defs/ServerAllowanceSpec"
+        }
+      },
+      "propertyNames": {
+        "maxLength": 120,
+        "minLength": 1
+      },
+      "title": "Servers",
+      "type": "object"
+    },
+    "update_interval_hours": {
+      "default": 6,
+      "maximum": 168,
+      "minimum": 1,
+      "title": "Update Interval Hours",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "profile_title"
+  ],
+  "title": "ServiceSettings",
+  "type": "object"
+}

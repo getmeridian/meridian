@@ -10,7 +10,7 @@ import { remarkDiagrams } from './src/lib/diagrams.mjs';
 import { DOCS_SIDEBAR, DOCS_SLUGS } from './src/lib/docs-sidebar.mjs';
 
 const LOCALES = ['en', 'ru', 'fa', 'zh'];
-const SITEMAP_EXCLUDED = ['/docs/', '/studio/', '/demo/'];
+const SITEMAP_EXCLUDED = ['/docs/', '/demo/'];
 
 // A page missing from the sidebar list would build but stay unreachable from the navigation.
 for (const locale of LOCALES) {
@@ -63,7 +63,7 @@ export default defineConfig({
     dropContributorNotes,
     starlight({
       title: 'Meridian',
-      description: 'Deploy censorship-resistant proxy servers with one command, hardened by default.',
+      description: 'Deploy a self-hosted VPN server with a built-in web panel and one-tap connection pages.',
       logo: { src: './src/assets/logo.png', alt: '' },
       favicon: '/favicon.svg',
       defaultLocale: 'en',
@@ -98,7 +98,7 @@ export default defineConfig({
       disable404Route: true,
       credits: false,
       // Blog, demo, and other custom pages live outside Starlight, so the validator cannot see them.
-      plugins: [starlightLinksValidator({ exclude: ['/blog/**', '/demo/', '/studio/'] })],
+      plugins: [starlightLinksValidator({ exclude: ['/blog/**', '/demo/'] })],
     }),
     sitemap({
       // Redirects and tools are not pages to index; Astro's own redirect stubs are already left out.

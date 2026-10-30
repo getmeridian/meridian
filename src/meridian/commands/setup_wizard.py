@@ -495,15 +495,13 @@ class SetupWizard:
     def _verify(self, draft: SetupDraft) -> None:
         self.prompt.explain(t("verify.explain"))
         self._verification = self.runtime.verify(draft)
-        for message in self._verification.warnings:
-            self.io.write(f"[warn]{escape(message)}[/warn]")
         self.prompt.say(t("verify.done", count=self._verification.node_count), style="ok")
         self.service.mark_verified(datetime.now(UTC).isoformat().replace("+00:00", "Z"))
 
     def _handoff(self, draft: SetupDraft) -> WizardOutcome:
         verification = self._verification or self.runtime.verify(draft)
         self.prompt.say(t("handoff.ready"), style="bold green")
-        for links in self.runtime.publish_handoff(sorted(verification.subscription_urls)):
+        for links in self.runtime.handoff(sorted(verification.subscription_urls)):
             self.io.write(f"  [bold]{escape(links.name)}[/bold]")
             if links.page_url:
                 self.io.write(f"    {escape(t('handoff.page'))} [bold]{escape(links.page_url)}[/bold]")
@@ -511,21 +509,9 @@ class SetupWizard:
                 self.io.write(f"    [warn]{escape(t('handoff.page_unavailable', error=links.error))}[/warn]")
             self.io.write(f"    {escape(t('handoff.subscription'))} {escape(links.subscription_url)}")
         self.prompt.explain(t("handoff.explain"))
-        if verification.panel_url:
-            self._admin_panel(verification)
         self.prompt.explain(t("handoff.next"))
         self.service.complete_handoff()
         return "completed"
-
-    def _admin_panel(self, verification: SetupVerification) -> None:
-        """Where the Remnawave panel lives, for the curious; the password stays behind `meridian panel`."""
-        self.io.write("")
-        self.io.write(f"  [bold]{escape(t('handoff.admin_title'))}[/bold]")
-        self.io.write(f"    {escape(t('handoff.admin_url'))} [bold]{escape(verification.panel_url)}[/bold]")
-        if verification.admin_user:
-            self.io.write(f"    {escape(t('handoff.admin_login'))} {escape(verification.admin_user)}")
-        self.io.write(f"    {escape(t('handoff.admin_password'))} meridian panel --show-password")
-        self.io.write(f"    [dim]{escape(t('handoff.admin_warning'))}[/dim]")
 
     def _write_summary(self, draft: SetupDraft, review: SetupReview) -> None:
         intent = review.intent
@@ -663,4 +649,7 @@ def _access_intent(names: Sequence[str], previous: AccessIntent | None) -> Acces
     return AccessIntent(
         users=users,
         display_names={user: name for user, name in zip(users, names, strict=True) if user != name},
+        creation_settings={user: settings for user, settings in previous.creation_settings.items() if user in users}
+        if previous is not None
+        else {},
     )

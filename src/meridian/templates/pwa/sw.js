@@ -1,101 +1,50 @@
-/* PWA — Service Worker */
+/* PWA — cache only shared, content-versioned assets. Person pages always use the network. */
 var CACHE_VERSION = 'pwa-v1';
-var SHELL_ASSETS = [
-  '../pwa/styles.css',
-  '../pwa/app.js',
-  '../pwa/selfcheck.js',
-  '../pwa/icon.svg',
-];
+var LEGACY = self.location.pathname.indexOf('/sub/~pwa/') === -1;
+var ASSET_BASE = new URL('./' + CACHE_VERSION + '/', self.location.href);
+var SHELL_ASSETS = ['styles.css', 'app.js', 'account.js', 'selfcheck.js', 'contact.js', 'notice.js', 'icon.svg', 'apps.json']
+  .map(function(name) { return ASSET_BASE.href + name; });
 
 self.addEventListener('install', function(event) {
-  event.waitUntil(
+  event.waitUntil(LEGACY ? self.skipWaiting() :
     caches.open(CACHE_VERSION)
       .then(function(cache) { return cache.addAll(SHELL_ASSETS); })
-      .then(function() { return self.skipWaiting(); })
-  );
+      .then(function() { return self.skipWaiting(); }));
 });
 
 self.addEventListener('activate', function(event) {
-  event.waitUntil(
-    caches.keys().then(function(keys) {
-      return Promise.all(
-        keys.filter(function(k) { return k !== CACHE_VERSION; })
-            .map(function(k) { return caches.delete(k); })
-      );
-    }).then(function() { return self.clients.claim(); })
-  );
+  event.waitUntil(caches.keys().then(function(keys) {
+    return Promise.all(keys.filter(function(key) {
+      return /^pwa-(?:v1|[0-9a-f]{8}|[0-9a-f]{16})$/.test(key) && (LEGACY || key !== CACHE_VERSION);
+    }).map(function(key) { return caches.delete(key); }));
+  }).then(function() {
+    if (!LEGACY) return self.clients.claim();
+    /* This same file answers the old /pwa/sw.js update URL after SSH files retire.
+       Unregister and reload controlled pages so their UUID requests reach the 302. */
+    return self.registration.unregister().then(function() {
+      return self.clients.matchAll({ type: 'window' });
+    }).then(function(clients) {
+      return Promise.all(clients.map(function(client) {
+        if (client.navigate) return client.navigate(client.url);
+      }));
+    });
+  }));
 });
 
 self.addEventListener('fetch', function(event) {
-  var url = new URL(event.request.url);
-  var path = url.pathname;
-
-  /* Straight to the network: the self-check must measure the live path, the
-     subscription must never be cached, and the Cache API stores GETs only */
-  if (event.request.method !== 'GET' ||
-      path.indexOf('/sub/') !== -1 ||
-      path.endsWith('/probe.bin')) {
-    return;
-  }
-
-  /* Network-first for dynamic per-client data */
-  if (path.endsWith('/config.json')) {
-    event.respondWith(networkFirst(event.request));
-    return;
-  }
-
-  /* Stale-while-revalidate for shell assets and HTML */
-  event.respondWith(staleWhileRevalidate(event));
-});
-
-function networkFirst(request) {
-  return fetch(request).then(function(response) {
-    if (response.ok) {
-      var clone = response.clone();
-      caches.open(CACHE_VERSION).then(function(cache) {
-        cache.put(request, clone);
-      });
-    }
-    return response;
-  }).catch(function() {
-    return caches.match(request).then(function(cached) {
-      if (cached) return cached;
-      return new Response('Offline', {
-        status: 503,
-        statusText: 'Service Unavailable',
-        headers: { 'Content-Type': 'text/plain' },
-      });
-    });
-  });
-}
-
-function staleWhileRevalidate(event) {
   var request = event.request;
-  return caches.match(request).then(function(cached) {
-    /* Background fetch to refresh the cache */
-    var fetchPromise = fetch(request).then(function(response) {
-      if (response.ok) {
-        var clone = response.clone();
-        caches.open(CACHE_VERSION).then(function(cache) {
-          cache.put(request, clone);
-        });
+  var url = new URL(request.url);
+  if (LEGACY || request.method !== 'GET' || request.cache === 'no-store' ||
+      url.origin !== ASSET_BASE.origin || url.pathname.indexOf(ASSET_BASE.pathname) !== 0 ||
+      url.pathname.endsWith('/probe.bin') || url.pathname.endsWith('/support.html')) return;
+  event.respondWith(caches.match(request).then(function(cached) {
+    if (cached) return cached;
+    return fetch(request).then(function(response) {
+      if (response.ok && (response.headers.get('Cache-Control') || '').indexOf('no-store') === -1) {
+        var copy = response.clone();
+        event.waitUntil(caches.open(CACHE_VERSION).then(function(cache) { return cache.put(request, copy); }));
       }
       return response;
     });
-
-    if (cached) {
-      /* Serve stale from cache; keep SW alive until revalidation completes */
-      event.waitUntil(fetchPromise.catch(function() {}));
-      return cached;
-    }
-
-    /* No cache entry yet — wait for network */
-    return fetchPromise.catch(function() {
-      return new Response('Offline', {
-        status: 503,
-        statusText: 'Service Unavailable',
-        headers: { 'Content-Type': 'text/plain' },
-      });
-    });
-  });
-}
+  }));
+});

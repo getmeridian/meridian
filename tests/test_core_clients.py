@@ -25,8 +25,11 @@ class PanelUser:
     status: str = "ACTIVE"
     used_traffic_bytes: int = 1024
     traffic_limit_bytes: int = 2048
+    traffic_limit_strategy: str = "MONTH"
+    expire_at: str = "2026-12-31T23:59:59.000Z"
     created_at: str = "2026-04-01T12:00:00Z"
     online_at: str = "2026-04-02T12:00:00Z"
+    hwid_device_limit: int | None = None
 
 
 class PanelClient:
@@ -81,6 +84,7 @@ def test_client_show_result_carries_handoff_links_outside_the_client_record() ->
     data = result.to_data()
 
     assert data["client"]["username"] == "alice"
+    assert (data["client"]["traffic_reset"], data["client"]["expires_at"]) == ("month", "2026-12-31T23:59:59Z")
     assert "share_url" not in data["client"]
     assert "subscription_url" not in data["client"]
     assert data["handoff"] == {
@@ -100,7 +104,7 @@ def test_client_mutation_results_preserve_public_wire_shapes() -> None:
     assert added.to_data() == {
         "clients": [{"username": "alice", "id": "17", "status": "active", "page_url": "", "subscription_url": ""}]
     }
-    assert removed.to_data() == {"client": {"username": "alice"}}
+    assert removed.to_data() == {"client": {"username": "alice"}, "cut_off": None}
     assert enabled.to_data() == {"client": {"username": "alice", "status": "active"}}
     assert disabled.to_data() == {"client": {"username": "alice", "status": "disabled"}}
 

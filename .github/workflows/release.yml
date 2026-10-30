@@ -57,14 +57,13 @@ jobs:
         run: |
           cd website
           pnpm install --frozen-lockfile
-          pnpm run contracts:check
           pnpm run build
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
 
-      - name: Generate PWA demo page
-        run: uv run meridian dev preview --output website/dist/demo
+      - name: Generate the website demos
+        run: uv run python scripts/build_showcase.py website/dist/demo
 
       # The demo joins dist after the build's own check.
       - name: Check the site and demo for external requests
@@ -287,27 +286,20 @@ jobs:
         with:
           python-version: "3.12"
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.3
-
+      # Node runs the AI reference script, which imports nothing from node_modules.
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: pnpm
-          cache-dependency-path: website/pnpm-lock.yaml
+
+      # Both static musl netagent builds go into agent/dist, which the build hook packages;
+      # `verify_package_assets.py --release` refuses a wheel without them.
+      - name: Build node agent
+        run: make agent
 
       - name: Build package
         run: |
           pip install hatchling build
-          cd website
-          pnpm install --frozen-lockfile
-          pnpm run contracts:check
-          pnpm run build
-          cd ..
-          cp VERSION website/dist/version
-          find website/dist -name .DS_Store -delete
           # The AI reference for doctor --ai (not committed, built fresh)
           node website/scripts/ai-docs.mjs reference src/meridian/data/ai-reference.md
           python -m build

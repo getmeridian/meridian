@@ -1,35 +1,36 @@
 # PWA Connection Page
 
-Server-hosted Progressive Web App and the only connection-page implementation.
+Server-hosted PWA; Meridian's only connection-page implementation.
 
 ## Design decisions
-
-**Vanilla ES5, no build step** — one IIFE with zero dependencies; the self-hosting rule (root `CLAUDE.md`) applies to every asset.
-**Runtime config** — `config.json` is fetched at load, not baked into HTML, so credentials rotate without redeploying pages; it points at Remnawave's canonical subscription URL, which Meridian never rebuilds.
-**Shared/per-client split** — static assets (`app.js`, `selfcheck.js`, `styles.css`, `sw.js`, `icon.svg`, `support.html`/`support.js`, generated `apps.json` and `probe.bin`) deploy once to `/pwa/`; per-client shell and config live in `/{uuid}/`.
-**Support page** — `support.html#<short id>` is the panel's `support-url`: `support.js` reads the person's own subscription for their UUID (VLESS or Hysteria2 link, or Xray JSON) and redirects to their page, or says the page is unavailable. The id stays in the fragment, out of server and CDN logs.
-**Security model** — all user/config data goes through `escapeHtml()`; QR base64 is validated before `<img src>` injection; iOS deep links live in `data-` attributes, never inline JS strings.
-**App catalog** — `_PWA_APPS` entries carry `platforms` (where it runs) and `recommended` (where the page features it), in recommendation order. The page reads the shared, icon-bearing `pwa/apps.json` and falls back to `config.apps`, so catalog edits reach old pages with the next asset upload.
-**Self-check** — `selfcheck.js` (injected by `app.js`, so older shells get it) runs from the visitor's network: clock vs the server `Date` header, a stream of the 96 KB `probe.bin` (freeze window and timeouts mirror `diagnostics/blocking.py`), and the subscription's HTTP status. "Copy report" yields English text without links, hostnames, or UUIDs.
-**i18n** — the website's asymmetric model (`website/src/i18n/CLAUDE.md`): English HTML, `data-t` swaps, and a full `renderPage()` to return to English.
-**Two-step setup card** — step 1 lists the platform's recommended apps, step 2 their "Add to" deep links; the subscription QR sits beside them on desktop and folds away on phones. Everything else is quiet panels: all connections, "Not connecting?", router guide.
+**Vanilla ES5** — no dependencies or build step; `app.js` owns setup and injects `account.js` and `selfcheck.js`, so older shells receive new features.
+**Served at the subscription URL** — ctld renders the shell at `/sub/<token>` with no-store config and manifest beneath it; shared assets live at content-versioned `/sub/~pwa/<version>/` (the token alphabet excludes `~`).
+**Support page** — `support.html#<token>` opens the person's page; with owner contact configured it stays visible with an explicit action instead. It is no-store, outside the worker, and its server-rendered attributes carry no token.
+**Owner text** — `notice.js` and `contact.js` render the notice and contact with text nodes, make no requests, and open no link before a click.
+**Security** — guard versions, shapes, bounds, import schemes, and image sources; escape text and attribute quotes; validate QR base64; deep links never enter inline JS.
+**No indexing** — the shell and nginx both say `noindex, nofollow, noarchive`.
+**Catalog** — embedded apps render immediately; a valid shared `apps.json` may replace setup within seconds, preserving platform, app, focus, selection, and disclosures.
+**Account** — same-origin `/info` on open, return, and refresh; save only status, traffic, expiry, and check time, and treat a saved answer as unverified until checked again.
+**Three-step setup** — platform and app pickers drive install, import, and Connect; manual import shows a selectable URL and the app's menu path. Choices stay in memory.
+**i18n** — English markup with `data-t` swaps; `language.js` runs in the head before CSS and picks saved page choice > person/fleet default > browser for `auto` > English, setting lang and dir (Persian is RTL); dates and numbers use Intl.
+**Self-check** — client clock vs server Date, a probe stream, and subscription status; copied reports contain no links, hostnames, UUIDs, or device data.
+**App help** — the collapsed **Not connecting?** panel holds generic app tips (a red ping is not a failure, refresh, update on launch, clock) and fetches nothing.
 
 ## What's done well
-
-- **SW scope trick + graceful offline** — registered with `{scope: '../'}` to control sibling client dirs (needs nginx `Service-Worker-Allowed: "/"`); shell is stale-while-revalidate, config network-first with a 503 fallback.
-- **Clock warnings share one threshold** — `CLOCK_WARN_MS` in `app.js` and `selfcheck.js` mirrors `core.defaults.CLOCK_DRIFT_WARN_SECONDS` (tested); the page check is skipped when the config is over an hour old, and the copy says connections *can* fail (Reality `maxTimeDiff` is unset).
-- **Connection names are the subscription remarks** — rows show the Remnawave remark verbatim; only the protocol hint below it is translated.
-- **Graceful extras** — wake lock for QR scanning fails quietly, the install banner auto-dismisses, and the skeleton admits a slow load after 10 s.
+- **SW scope and privacy** — the worker caches only content-versioned shared assets; person pages, config, account checks, and probes always use the network. Old `/pwa/sw.js` URLs serve a retirement worker that clears Meridian caches and unregisters.
+- **One clock threshold** — `CLOCK_WARN_MS` mirrors `core.defaults.CLOCK_DRIFT_WARN_SECONDS`, and the page says connections *can* fail.
+- **Connection remarks stay verbatim** — translate protocol hints only, and show entries in subscription order.
 
 ## Pitfalls
-
-- **Nested `<details>` CSS** — always use the `> summary` child combinator; bare `summary` leaks parent styles into nested toggles.
-- **`<details>` markers need three rules** — `list-style:none`, `::-webkit-details-marker{display:none}`, `::marker{content:none}`.
-- **The SW caches stale files** — develop with `meridian dev preview --watch` (disables the SW, injects a reload script).
-- **`_PWA_APPS` must match `website/src/data/apps.json`** field for field and in order; CI validates.
-- **Deep links follow each app's own handler** — v2rayNG names a subscription from the `#fragment`, Throne's `addsub` takes standard Base64 only, and v2rayN has no import scheme (no button).
-- **The CSP has no `style-src 'unsafe-inline'`** — `style=` attributes are silently dropped; use classes (CSSOM `el.style` still works).
-- **Self-check requests skip every cache** — `probe.bin` and `/sub/` bypass the SW with `cache: "no-store"`; a warm connection may be reused, so a freeze is conclusive but a pass is weaker evidence.
-- **Exit countries are data** — validate `config.exit_countries` ISO codes before building flags; names come from `Intl.DisplayNames` and refresh in `applyI18n`.
-- **Never put `data-t` on data** — a translated key replaces the element's whole text, remark included.
-- **Catalog `platform` is an English label** — the shared "All platforms" value renders through `data-t="apps.all"`; any other fixed label needs its own key, never raw text on a translated page.
+- **Routing comes from the subscription** — setup never promises a fixed split policy; raw links carry no routing rules.
+- **Nested details CSS** — use `> summary`, and suppress markers with `list-style:none`, `::-webkit-details-marker`, and `::marker`.
+- **SW staleness** — develop with `meridian dev preview --watch`, which disables the worker; every `no-store` request bypasses it.
+- **Catalog parity** — `_PWA_APPS` must match `website/src/data/apps.json` field for field and in order; CI validates.
+- **Optional data never gates setup** — reject a bad catalog whole and ignore late replies.
+- **Handler-specific encodings** — v2rayNG uses the fragment, Throne standard Base64, Stash percent encoding; an invalid action keeps the manual route.
+- **No inline styles** — CSP drops `style=`; use classes.
+- **Self-check requests skip caches** — a reused warm connection makes a pass weaker evidence than a freeze.
+- **Country names and remarks are data** — validate ISO codes, use Intl.DisplayNames, and never put `data-t` on user data.
+- **Locale state is in memory** — re-detecting after a failed localStorage write reverts the choice.
+- **Clipboard recovery** — handle missing APIs, throws, and rejections, and keep selectable text.
+- **Suspended imports stay disabled** — apply account state after every catalog, platform, or list update, before an iOS handler can navigate.

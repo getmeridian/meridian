@@ -37,7 +37,6 @@ from meridian.reconciler.server_render import (
     render_realm_config,
     render_realm_unit,
 )
-from meridian.remnawave import MeridianPanel
 from meridian.ssh import ServerConnection
 from tests.support.topology import resource_plan
 
@@ -204,7 +203,6 @@ def test_realm_restart_failure_restores_previous_files(monkeypatch: pytest.Monke
     context = ServerDriverContext(
         plan=plan,
         cluster=ClusterConfig(),
-        panel=cast(MeridianPanel, object()),
         connection_for=lambda _server_ref: cast(ServerConnection, conn),
         server_addresses=ADDRESSES,
     )
@@ -244,7 +242,6 @@ def test_realm_observation_reads_version_before_feature_suffixes() -> None:
     context = ServerDriverContext(
         plan=plan,
         cluster=ClusterConfig(),
-        panel=cast(MeridianPanel, object()),
         connection_for=lambda _server_ref: cast(ServerConnection, conn),
         server_addresses=ADDRESSES,
     )
@@ -283,7 +280,6 @@ def _realm_observation_case() -> tuple[RealmHopDriver, ResourceAction, MagicMock
     context = ServerDriverContext(
         plan=plan,
         cluster=ClusterConfig(),
-        panel=cast(MeridianPanel, object()),
         connection_for=lambda _server_ref: conn,
         server_addresses=ADDRESSES,
     )
@@ -324,6 +320,28 @@ def test_realm_inactive_service_is_drift() -> None:
     ]
 
     assert not observation_converges(action, driver.observe(action, None))
+
+
+@pytest.mark.parametrize(
+    ("service", "listener", "version", "reason"),
+    [
+        ("inactive\n", "LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n", f"Realm {REALM_VERSION}\n", "is not active"),
+        ("active\n", "", f"Realm {REALM_VERSION}\n", "nothing listens on port 443"),
+        ("active\n", "LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n", "Realm 2.0.0\n", f"not the pinned {REALM_VERSION}"),
+    ],
+    ids=["inactive", "not-listening", "old-version"],
+)
+def test_realm_drift_names_what_differs(service: str, listener: str, version: str, reason: str) -> None:
+    driver, action, conn = _realm_observation_case()
+    conn.run.side_effect = [
+        _result(returncode=0 if service == "active\n" else 3, stdout=service),
+        _result(stdout=listener),
+        _result(stdout=version),
+    ]
+
+    observation = driver.observe(action, None)
+
+    assert [mismatch for mismatch in observation.mismatches if reason in mismatch]
 
 
 def test_realm_rejects_systemd_daemon_failure() -> None:
@@ -399,7 +417,6 @@ def test_realm_restart_timeout_is_reobserved_without_guessing_rollback(
     context = ServerDriverContext(
         plan=plan,
         cluster=ClusterConfig(),
-        panel=cast(MeridianPanel, object()),
         connection_for=lambda _server_ref: cast(ServerConnection, conn),
         server_addresses=ADDRESSES,
     )
@@ -431,7 +448,6 @@ def _migration_case(
     context = ServerDriverContext(
         plan=plan,
         cluster=ClusterConfig(),
-        panel=cast(MeridianPanel, object()),
         connection_for=lambda _server_ref: cast(ServerConnection, conn),
         server_addresses=ADDRESSES,
     )

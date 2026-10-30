@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from meridian.cluster import ActionCheckpoint, ClusterConfig, ManagedResourceBinding
-from meridian.compiler.models import ConfigProfilePayload, ResourcePlan
+from meridian.compiler.models import ConfigProfilePayload, NodeWorkloadPayload, ResourcePlan
 from meridian.core.cancellation import (
     CancellationToken,
     OperationCancellation,
@@ -44,6 +44,7 @@ from meridian.reconciler.resources import (
     UnsupportedResourceRetirementError,
     build_resource_actions,
     observation_converges,
+    observation_shortfall,
 )
 from meridian.reconciler.retirement import retire, retired_bindings, unretirable
 from meridian.reconciler.stall_retry import StallNotice, StallRetry, stall_event_notice
@@ -277,6 +278,23 @@ def _retrying_observe(driver: ResourceDriver, stall: StallRetry, notice: StallNo
     return observe
 
 
+def refuse_unresolved_pending_plan(plan: ResourcePlan, cluster: ClusterConfig) -> None:
+    """Refuse to replace a pending plan while one of its actions has an unresolved remote outcome."""
+    if not cluster.pending_plan_hash or cluster.pending_plan_hash == plan.plan_hash:
+        return
+    ambiguous = [
+        checkpoint.resource_id
+        for checkpoint in cluster.action_checkpoints.values()
+        if checkpoint.generation == cluster.pending_generation and checkpoint.status in {"running", "unknown"}
+    ]
+    if ambiguous:
+        resources = ", ".join(sorted(ambiguous))
+        raise PendingPlanConflictError(
+            f"Cannot replace pending plan {cluster.pending_plan_hash[:12]}; "
+            f"remote outcome is unresolved for: {resources}."
+        )
+
+
 def validate_resource_plan_transition(
     plan: ResourcePlan,
     cluster: ClusterConfig,
@@ -286,19 +304,7 @@ def validate_resource_plan_transition(
     Callers persist the new intent right after this check, so every refusal
     must happen here rather than once execution starts.
     """
-    if cluster.pending_plan_hash and cluster.pending_plan_hash != plan.plan_hash:
-        ambiguous = [
-            checkpoint.resource_id
-            for checkpoint in cluster.action_checkpoints.values()
-            if checkpoint.generation == cluster.pending_generation and checkpoint.status in {"running", "unknown"}
-        ]
-        if ambiguous:
-            resources = ", ".join(sorted(ambiguous))
-            raise PendingPlanConflictError(
-                f"Cannot replace pending plan {cluster.pending_plan_hash[:12]}; "
-                f"remote outcome is unresolved for: {resources}."
-            )
-
+    refuse_unresolved_pending_plan(plan, cluster)
     blocked = unretirable(retired_bindings(plan, cluster))
     if blocked:
         raise UnsupportedResourceRetirementError(blocked)
@@ -468,7 +474,8 @@ def _execute_action(
                 cluster,
                 persist,
                 clock,
-                "post-apply observation did not satisfy the reviewed hash and postconditions",
+                "post-apply observation did not satisfy the reviewed hash and postconditions: "
+                + observation_shortfall(action, observation),
             )
         _record_success(action, observation, binding, cluster, persist, clock, receipt=receipt)
         return ResourceActionResult(action=action, status="applied", changed=True)
@@ -646,10 +653,11 @@ def _commit_generation(
     for binding in cluster.managed_bindings.values():
         binding.active = binding.generation == generation and binding.logical_id in current_ids
     _drop_superseded_bindings(cluster, generation)
+    # A panel plan carries each workload's Profile; a Meridian plan embeds it in the agent's workload.
     current_workloads = {
-        resource.payload.workload_id
-        for resource in plan.resources
-        if isinstance(resource.payload, ConfigProfilePayload)
+        payload.workload_id if isinstance(payload, ConfigProfilePayload) else payload.profile.workload_id
+        for payload in (resource.payload for resource in plan.resources)
+        if isinstance(payload, ConfigProfilePayload | NodeWorkloadPayload)
     }
     for workload in cluster.workloads:
         workload.active = workload.generation == generation and workload.id in current_workloads
@@ -665,17 +673,20 @@ def _drop_superseded_bindings(cluster: ClusterConfig, generation: int) -> None:
 
     Every generation re-binds each resource, so without this cluster.yml grew with
     every apply. A (logical ID, remote ID) pair is what ownership checks match
-    (``was_managed``), so keeping its newest binding keeps that evidence.
+    (``was_managed``), so keeping its newest binding keeps that evidence. What an
+    abandoned newer generation bound is forgotten too: retirement has removed what
+    it installed outside this plan, and this plan re-bound the rest.
     """
+    kept = {key: binding for key, binding in cluster.managed_bindings.items() if binding.generation <= generation}
     newest: dict[tuple[str, str], int] = {}
-    for binding in cluster.managed_bindings.values():
+    for binding in kept.values():
         pair = (binding.logical_id, binding.remote_id)
         newest[pair] = max(newest.get(pair, 0), binding.generation)
     cluster.managed_bindings = {
         key: binding
-        for key, binding in cluster.managed_bindings.items()
+        for key, binding in kept.items()
         if binding.active
-        or binding.generation >= generation
+        or binding.generation == generation
         or newest[(binding.logical_id, binding.remote_id)] == binding.generation
     }
 

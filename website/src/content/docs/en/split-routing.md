@@ -1,6 +1,6 @@
 ---
-title: Split Routing (Russia)
-description: Route Russian traffic directly while proxying everything else — keep VPS IP protected and Russian sites working.
+title: Client Routing
+description: Choose ru-split or full for client traffic, keep private networks direct, and review every change.
 ---
 
 ## The problem
@@ -15,43 +15,65 @@ Split routing sends Russian traffic **directly** from the device and everything 
 
 ```
 Russian sites   → Device → Direct → Internet (local ISP)
-Everything else → Device → Proxy → VPS → Internet
+Everything else → Device → VPN → VPS → Internet
 ```
 
 You get both:
 - **VPS protection** — the server-side block stays on as a safety net
-- **Working Russian sites** — the device sends them directly, never through the proxy
+- **Working Russian sites** — the device sends them directly, never through the VPN
 
 ## How it works in Meridian
 
-Meridian ships split routing in its **Xray JSON** and **Mihomo** subscriptions, so most apps need no setup. Every subscription sends these destinations directly:
+The default client policy is **`ru-split`**. Xray JSON, Mihomo, and Stash subscriptions send these destinations directly:
 
 - local network addresses (`geosite:private`, `geoip:private`)
 - `.ru`, `.su`, and `.рф` domains, plus `geosite:category-ru`
 - Russian IP ranges (`geoip:ru`)
 
-It also refuses QUIC (UDP 443) to everything else, so apps fall back to TCP, where the proxy routes them by name.
+sing-box uses the same policy with inline rules for private IPs and the three Russian domain suffixes. It does not download geosite or geoip lists, so other Russian domains and IP ranges may still use the tunnel.
 
-Apps that import the plain link list (Base64) don't receive routing rules. In those apps, add **direct** rules for `geosite:category-ru` and `geoip:ru` in the routing settings, or switch to an app that imports Xray JSON or Mihomo subscriptions. Hiddify users can instead set the region to **Russia**.
+Both policies block QUIC (UDP 443) after the direct destination rules, so apps fall back to TCP. Both also retain the **BitTorrent direct rule in Xray JSON** to reduce abuse complaints against exits. It matches recognized peer handshakes only: encrypted peers and UDP DHT/uTP may still use the VPN. Mihomo, Stash, and sing-box do not receive a BitTorrent matcher.
 
-### Why not edit the template in the panel?
+### Choose a policy
 
-Meridian manages its own Xray JSON and Mihomo subscription templates in Remnawave. They carry the automatic fallback between your exits and relays, and the routing above. Meridian restores them on every apply (including redeploys and `client add`, `node add`, `relay add`), so rules added there in the panel won't last.
+| Policy | Routing on the device |
+|--------|-----------------------|
+| `ru-split` (default) | Private/LAN ranges and matched Russian destinations go directly; other traffic uses the tunnel |
+| `full` | Internet traffic, including Russian destinations, uses the tunnel; private/LAN ranges stay direct |
+
+```bash
+meridian fleet routing
+meridian fleet routing full --dry-run
+meridian fleet routing full --yes
+meridian fleet routing ru-split --yes
+```
+
+The bare command shows the current choice and explains both policies. A change edits the topology, shows the review, and applies exactly that review after confirmation. Without a terminal or with `--json`, pass `--yes`; `--dry-run --json` returns the review without applying it. Apps receive the policy at their next subscription refresh (six hours by default, set by `delivery.update_interval_hours`) or after a manual refresh. The setup wizard keeps `ru-split` without an extra question.
+
+`fleet export` and `fleet import` preserve `delivery.client_routing: full`. The `ru-split` default is omitted; removing the field from an exported file restores it. The web panel shows the policy read-only in Settings with the CLI command that changes it.
+
+Apps that import a plain Base64 link list receive no routing rules. Configure split or full routing in those apps yourself, or use a structured subscription. Hiddify receives the sing-box document and follows its inline rules.
+
+### Where the rules come from
+
+The control service builds every structured subscription from one client routing list and the topology's chosen policy. Client routing changes through [`meridian fleet routing`](/en/cli-reference/#meridian-fleet). [`meridian route`](/en/cli-reference/#meridian-route) controls egress on exits; a [routing gateway](#through-a-routing-gateway) has its own server rules.
 
 ## How the layers work together
 
 | Layer | What it does | Protects against |
 |-------|-------------|-----------------|
 | **Server-side geo-block** | Drops Russia-bound traffic at the exit | VPS IP showing up in Russian service logs |
-| **Split routing on the device** | Sends Russian traffic directly | Broken Russian sites, needless proxy load |
+| **Split routing on the device** | Sends Russian traffic directly | Broken Russian sites, needless VPN load |
 
-Russian traffic never reaches the server. If a device doesn't have the rules (a Base64 import, an older app), the server still blocks Russian destinations, so the VPS IP stays protected.
+With `ru-split`, destinations matched by the client's Russian bypass rules do not reach the exit. If a device has no routing rules (a Base64 import or an older app), the exit still blocks Russian destinations while its geo-block is on.
 
-If your users need Russian sites through the VPN instead, deploy with `--no-geo-block`.
+`full` changes client routing only. To reach Russian sites through an exit, that exit must also allow them: deploy it with `--no-geo-block`. Changing the client policy does not change server-side geo-blocking.
 
 ## Through a routing gateway
 
 A routing gateway (set up with `meridian setup`) is Xray on a server in front of your exits that picks, rule by rule, where traffic leaves. A rule sends matching traffic to an exit, to a pool of exits, **directly from the gateway**, or nowhere. On a gateway inside Russia, a direct rule opens Russian sites from the gateway's own Russian address, even in apps that get no routing rules:
+
+Choose `full` if this traffic should reach the gateway's rules. With `ru-split`, matched Russian destinations already leave directly from the device.
 
 ```
 Russian sites   → Device → Gateway (in Russia) → Internet
@@ -64,4 +86,4 @@ That traffic never reaches the exit, so the exit's geo-block stays as it is. Unl
 
 ## DNS considerations
 
-In Xray JSON subscriptions, names that match no rule are resolved through the proxy, so foreign lookups don't leak to the local ISP. Mihomo subscriptions match Russian IP ranges only for connections made by IP and never resolve other names locally. If your app has a separate DNS setting, enable its DNS leak protection for proxied traffic.
+In Xray JSON subscriptions, names that match no rule are resolved through the VPN tunnel, so foreign lookups don't leak to the local ISP. With `ru-split`, Mihomo matches Russian IP ranges only for connections made by IP and never resolves other names locally. If your app has a separate DNS setting, enable its DNS leak protection for tunneled traffic.

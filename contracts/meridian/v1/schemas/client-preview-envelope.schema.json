@@ -1,0 +1,569 @@
+{
+  "$defs": {
+    "EmptyData": {
+      "additionalProperties": false,
+      "description": "Empty data object used by envelopes without command-specific failure data.",
+      "properties": {},
+      "title": "EmptyData",
+      "type": "object"
+    },
+    "ErrorModel": {
+      "additionalProperties": false,
+      "description": "Structured error safe for JSON/API clients.",
+      "properties": {
+        "category": {
+          "enum": [
+            "user",
+            "system",
+            "bug",
+            "cancelled"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "cause": {
+          "additionalProperties": true,
+          "title": "Cause",
+          "type": "object"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "exit_code": {
+          "default": 1,
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "hint": {
+          "default": "",
+          "title": "Hint",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "message"
+      ],
+      "title": "MeridianError",
+      "type": "object"
+    },
+    "FormatRule": {
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "anyOf": [
+            {
+              "enum": [
+                "mihomo",
+                "stash",
+                "singbox",
+                "clash",
+                "xray-json"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Family"
+        },
+        "match": {
+          "default": "",
+          "enum": [
+            "",
+            "text/html"
+          ],
+          "title": "Match",
+          "type": "string"
+        },
+        "rule": {
+          "enum": [
+            "suffix",
+            "user_agent",
+            "accept",
+            "default"
+          ],
+          "title": "Rule",
+          "type": "string"
+        },
+        "suffix": {
+          "default": "",
+          "enum": [
+            "",
+            "info",
+            "json",
+            "v2ray-json",
+            "mihomo",
+            "clash",
+            "stash",
+            "singbox"
+          ],
+          "title": "Suffix",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule"
+      ],
+      "title": "FormatRule",
+      "type": "object"
+    },
+    "OmittedEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint_copy": {
+          "title": "Fingerprint Copy",
+          "type": "boolean"
+        },
+        "id": {
+          "description": "Redacted service endpoint ID.",
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "protocol": {
+          "enum": [
+            "reality",
+            "xhttp",
+            "wss",
+            "hysteria2"
+          ],
+          "title": "Protocol",
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "unsupported_format",
+            "disabled_endpoint",
+            "status_placeholder",
+            "availability_placeholder"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "remark": {
+          "description": "Redacted presentation name, never a URI.",
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Remark",
+          "type": "string"
+        },
+        "restriction": {
+          "anyOf": [
+            {
+              "enum": [
+                "protocol",
+                "fingerprint_copy"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Restriction"
+        }
+      },
+      "required": [
+        "id",
+        "remark",
+        "protocol",
+        "fingerprint_copy",
+        "reason"
+      ],
+      "title": "OmittedEntry",
+      "type": "object"
+    },
+    "PreviewEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint_copy": {
+          "title": "Fingerprint Copy",
+          "type": "boolean"
+        },
+        "id": {
+          "description": "Redacted service endpoint ID.",
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "protocol": {
+          "enum": [
+            "reality",
+            "xhttp",
+            "wss",
+            "hysteria2"
+          ],
+          "title": "Protocol",
+          "type": "string"
+        },
+        "remark": {
+          "description": "Redacted presentation name, never a URI.",
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Remark",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "remark",
+        "protocol",
+        "fingerprint_copy"
+      ],
+      "title": "PreviewEntry",
+      "type": "object"
+    },
+    "SubscriptionPreview": {
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "enum": [
+            "browser",
+            "mihomo",
+            "stash",
+            "singbox",
+            "xray-json",
+            "base64"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "included": {
+          "items": {
+            "$ref": "#/$defs/PreviewEntry"
+          },
+          "maxItems": 10000,
+          "title": "Included",
+          "type": "array"
+        },
+        "omitted": {
+          "items": {
+            "$ref": "#/$defs/OmittedEntry"
+          },
+          "maxItems": 10000,
+          "title": "Omitted",
+          "type": "array"
+        },
+        "placeholder": {
+          "anyOf": [
+            {
+              "enum": [
+                "disabled",
+                "limited",
+                "expired",
+                "no_connections"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Placeholder"
+        },
+        "protocols": {
+          "items": {
+            "enum": [
+              "reality",
+              "xhttp",
+              "wss",
+              "hysteria2"
+            ],
+            "type": "string"
+          },
+          "maxItems": 4,
+          "title": "Protocols",
+          "type": "array"
+        },
+        "response_headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Service response headers; URIs and encoded text are redacted.",
+          "title": "Response Headers",
+          "type": "object"
+        },
+        "response_kind": {
+          "enum": [
+            "subscription",
+            "page",
+            "account_info"
+          ],
+          "title": "Response Kind",
+          "type": "string"
+        },
+        "selection": {
+          "$ref": "#/$defs/FormatRule"
+        },
+        "stale_client": {
+          "anyOf": [
+            {
+              "enum": [
+                "outdated",
+                "abandoned"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why one inert update or switch entry follows the connections; the User-Agent is never stored.",
+          "title": "Stale Client"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "disabled",
+            "limited",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "username": {
+          "description": "Redacted account name.",
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "format",
+        "selection",
+        "username",
+        "status",
+        "response_kind",
+        "protocols",
+        "included",
+        "omitted",
+        "placeholder",
+        "response_headers"
+      ],
+      "title": "SubscriptionPreview",
+      "type": "object"
+    },
+    "Summary": {
+      "additionalProperties": false,
+      "description": "Structured summary shown in JSON envelopes and UI dashboards.",
+      "properties": {
+        "changed": {
+          "default": false,
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "Summary",
+      "type": "object"
+    },
+    "_ClientPreviewSuccessEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "client.preview",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/SubscriptionPreview"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "maxItems": 0,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "ok",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_ClientPreviewSuccessEnvelope",
+      "type": "object"
+    },
+    "_ClientPreviewTerminalEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "client.preview",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/EmptyData"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "minItems": 1,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "failed",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_ClientPreviewTerminalEnvelope",
+      "type": "object"
+    }
+  },
+  "description": "Envelope schema for `meridian client preview --json`.",
+  "discriminator": {
+    "mapping": {
+      "failed": "#/$defs/_ClientPreviewTerminalEnvelope",
+      "ok": "#/$defs/_ClientPreviewSuccessEnvelope"
+    },
+    "propertyName": "status"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/_ClientPreviewSuccessEnvelope"
+    },
+    {
+      "$ref": "#/$defs/_ClientPreviewTerminalEnvelope"
+    }
+  ],
+  "title": "ClientPreviewOutputEnvelope"
+}

@@ -1,0 +1,2 @@
+vless://<uuid:1>@0.0.0.0:1?encryption=none&type=tcp&security=none#%F0%9F%9A%AB%20Subscription%20disabled
+vless://<uuid:1>@0.0.0.0:1?encryption=none&type=tcp&security=none#Contact%20support

@@ -1,27 +1,33 @@
 """`meridian check`: role-aware server health on the shared verification contract.
 
 A server that is not in the fleet yet gets pre-flight checks; a control, exit,
-or gateway server gets container, listener, TLS, and disk checks (plus node-plugin
-readiness where a Remnawave node runs); a relay
-server gets its Realm hops checked. With no target, every fleet server is checked.
+or gateway server gets unit, agent, listener, TLS, and disk checks; a relay
+server gets its Realm hops checked. With no target, every fleet server is
+checked.
 """
 
 from __future__ import annotations
 
 import ipaddress
 import time
+from collections.abc import Callable
 from contextlib import ExitStack
+from typing import TypeVar
 
 import typer
 
+from meridian import __version__
 from meridian.adapters.cluster import topology_from_local_cluster
 from meridian.cluster import ClusterConfig
-from meridian.commands._helpers import load_cluster, make_panel
+from meridian.commands._helpers import load_cluster
 from meridian.commands.check_render import emit_verification_json, render_verification
 from meridian.commands.resolve import ensure_server_connection, resolve_server
 from meridian.config import DEFAULT_SNI
 from meridian.console import err_console, error_context, fail, info, is_json_mode
+from meridian.control.client import ControlClient, ControlServiceError
+from meridian.control_artifacts import expected_agent_version
 from meridian.core.errors import LocalStateError
+from meridian.core.execution import ServerConnection
 from meridian.core.fleet import TopologyNode
 from meridian.core.health import HealthCheckResult, HealthReport, combine_health_reports, health_report
 from meridian.core.inputs import validate_hostname_value
@@ -30,23 +36,33 @@ from meridian.core.topology import SetupIntent
 from meridian.core.verification import VerificationCheck, VerificationCounts, VerificationVerdict
 from meridian.diagnostics.blocking import blocking_jobs
 from meridian.diagnostics.checks import (
-    check_container_running,
     check_disk_space,
     check_port_listening,
     check_tls_certificate,
 )
+from meridian.diagnostics.control_service import (
+    agent_findings,
+    agent_version_finding,
+    background_findings,
+    check_unit_active,
+    service_version_finding,
+)
 from meridian.diagnostics.evidence import check_from_result, finding, finish_check
 from meridian.diagnostics.exit_dns import check_exit_dns
 from meridian.diagnostics.network import resolve_hostname
-from meridian.diagnostics.node_plugins import check_node_plugin_host
 from meridian.diagnostics.preflight import collect_preflight
-from meridian.host_runtime import NODE, PANEL_CORE, SUBSCRIPTION_PAGE, RuntimeContainer
-from meridian.remnawave import MeridianPanel, RemnawaveError
+from meridian.host_runtime import (
+    AGENT_UNIT,
+    CONTROL_SERVICE_UNIT,
+    CORE_UNIT,
+)
 from meridian.resolve import connection_for_entry, local_entry, merge_target
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.ssh import SSHError
 from meridian.ssh_ui import RichSSHUI
 from meridian.verification import deployment_verification_context
+
+T = TypeVar("T")
 
 _TITLES = {"preflight": "Pre-flight check", "server": "Server health", "relay": "Relay hops"}
 
@@ -130,7 +146,7 @@ def _collect(
     nodes = {node.ip: node for node in topology_from_local_cluster(cluster).nodes}
     reports: list[HealthReport] = []
     with ExitStack() as stack:
-        panel = _PanelSession(cluster, stack)
+        panel = _ServiceSession(cluster, stack)
         for entry, roles in servers:
             if set(roles) - {"relay"}:
                 _announce(entry)
@@ -208,39 +224,59 @@ def _preflight_report(
     return health_report(resolved.ip, "preflight", checks, server_ref=entry.id if entry else "")
 
 
-class _PanelSession:
-    """One lazily opened panel client shared by every server; unreachable means skipped evidence."""
+class _ServiceSession:
+    """One lazily opened control-service client; unreachable means skipped evidence."""
 
     def __init__(self, cluster: ClusterConfig, stack: ExitStack) -> None:
         self._cluster = cluster
         self._stack = stack
-        self._panel: MeridianPanel | None = None
+        self._client: ControlClient | None = None
         self.error = ""
+
+    def service_check(self) -> VerificationCheck:
+        started = time.monotonic()
+        health = self._read(lambda client: client.health())
+        if health is None:
+            found = finding("control_service", "skipped", f"Control service unreachable: {self.error}")
+        elif self._cluster.fleet_id and health.fleet_id != self._cluster.fleet_id:
+            found = finding(
+                "control_service",
+                "failed",
+                "The control service belongs to another fleet",
+                "Restore this fleet's local state, or redeploy the control server",
+            )
+        else:
+            found = finding("control_service", "passed", f"Control service {health.version} answers")
+            version = service_version_finding(__version__, health.version)
+            return finish_check(
+                "control_service", "Control service", [found, version, *background_findings(health)], started
+            )
+        return finish_check("control_service", "Control service", [found], started)
 
     def node_check(self, node: TopologyNode) -> VerificationCheck:
         started = time.monotonic()
-        try:
-            if self._panel is None and not self.error:
-                self._panel = self._stack.enter_context(make_panel(self._cluster))
-            api_node = self._panel.get_node(node.uuid) if self._panel is not None and node.uuid else None
-        except RemnawaveError as exc:
-            self.error = str(exc) or "panel unreachable"
+        status = self._read(lambda client: client.node(node.name))
         if self.error:
-            found = finding("panel_node", "skipped", f"Panel unreachable: {self.error}")
-        elif api_node is None:
-            found = finding("panel_node", "failed", "Node is not registered in the panel", "Re-run: meridian apply")
-        elif api_node.is_disabled:
-            found = finding("panel_node", "warning", "Node is disabled in the panel", "Enable it in the panel")
-        elif api_node.is_connected:
-            found = finding("panel_node", "passed", "Node is connected to the panel")
+            findings = [finding("agent", "skipped", f"Control service unreachable: {self.error}")]
         else:
-            found = finding(
-                "panel_node",
-                "failed",
-                "Node is registered but disconnected",
-                f"Check the node container: meridian doctor {node.ip}",
-            )
-        return finish_check("panel_node", "Panel connection", [found], started)
+            findings = agent_findings(status, logs_hint=f"meridian logs {node.ip} --component node")
+            expected = expected_agent_version(status.agent_version if status is not None else None)
+            version = agent_version_finding(expected, status) if status and status.runtime_available() else None
+            if version is not None:
+                findings.append(version)
+        return finish_check("agent", "Node agent", findings, started)
+
+    def _read(self, call: Callable[[ControlClient], T]) -> T | None:
+        if self.error:
+            return None
+        try:
+            if self._client is None:
+                panel = self._cluster.panel
+                self._client = self._stack.enter_context(ControlClient(panel.url, panel.api_token, timeout=20))
+            return call(self._client)
+        except ControlServiceError as exc:
+            self.error = str(exc) or "no answer"
+            return None
 
 
 def _server_report(
@@ -249,13 +285,15 @@ def _server_report(
     entry: ServerEntry,
     roles: list[str],
     node: TopologyNode | None,
-    panel: _PanelSession,
+    panel: _ServiceSession,
     *,
     user: str,
     port: int,
 ) -> HealthReport:
     label = entry.name or entry.host
     checks: list[VerificationCheck] = []
+    if "control" in roles:
+        checks.append(panel.service_check())
     if node is not None:
         checks.append(panel.node_check(node))
 
@@ -270,18 +308,7 @@ def _server_report(
     message = "Running on this server" if conn.local_mode else f"Connected as {conn.user}"
     checks.append(finish_check("ssh", "SSH", [finding("ssh", "passed", message)], started))
 
-    containers: list[RuntimeContainer] = []
-    if {"exit", "gateway"} & set(roles):
-        containers.append(NODE)
-    if "control" in roles:
-        containers.extend(PANEL_CORE)
-        if cluster.subscription_page is not None and cluster.subscription_page.deployed:
-            containers.append(SUBSCRIPTION_PAGE)
-    for container in containers:
-        result = check_container_running(conn, container.name, container.legacy)
-        checks.append(check_from_result(f"container:{container.name}", container.label, result))
-    if NODE in containers:
-        checks.append(check_node_plugin_host(conn))
+    checks.extend(_service_unit_checks(conn, roles, entry.host))
     if "exit" in roles:
         checks.append(check_exit_dns(conn))
 
@@ -302,16 +329,42 @@ def _server_report(
             checks.append(check_from_result(f"internal:{port_number}", f"Internal {port_number} ({purpose})", result))
         default_host = (node.domain or node.sni) if node is not None else ""
         for port_number in deployment.public_tls_ports:
-            route = next((item for item in deployment.https_routes if item.port == port_number), None)
+            # Meridian's own certificate first: a Reality port otherwise answers with the camouflage site's.
+            routes = sorted(
+                (item for item in deployment.https_routes if item.port == port_number),
+                key=lambda item: item.kind == "camouflage",
+            )
+            route = routes[0] if routes else None
             host = (route.tls_sni or route.host_header) if route is not None else default_host
             result = check_tls_certificate(conn, host or entry.host, port=port_number)
-            checks.append(check_from_result(f"tls:{port_number}", f"TLS certificate on {port_number}", result))
+            tls_label = "Camouflage site TLS" if route is not None and route.kind == "camouflage" else "TLS certificate"
+            checks.append(check_from_result(f"tls:{port_number}", f"{tls_label} on {port_number}", result))
         if not conn.local_mode:
             # Deployer-vantage throughput: only meaningful (and only run) from another machine.
             checks.extend(job() for job in blocking_jobs(entry.host, deployment, differential=False))
 
     checks.append(check_from_result("disk", "Disk", check_disk_space(conn, min_free_mb=1024)))
     return health_report(label, "server", checks, server_ref=entry.id, roles=roles)
+
+
+def _service_unit_checks(conn: ServerConnection, roles: list[str], host: str) -> list[VerificationCheck]:
+    """The control service, agent, and core units each role runs."""
+    logs = f"meridian logs {host} --component"
+    units: list[tuple[str, str, str]] = []
+    if "control" in roles:
+        units.append(
+            (CONTROL_SERVICE_UNIT, "Control service unit", f"Read its log ({logs} panel), then: meridian apply")
+        )
+    if {"exit", "gateway"} & set(roles):
+        units.append((AGENT_UNIT, "Node agent unit", f"See {logs} node; then: meridian apply"))
+        # The agent owns the core and repairs it on its next reconcile pass.
+        units.append(
+            (CORE_UNIT, "Proxy core unit", f"The node agent restarts it within 5 minutes; if not: {logs} node")
+        )
+    return [
+        check_from_result(f"unit:{unit}", label, check_unit_active(conn, unit, remediation=fix))
+        for unit, label, fix in units
+    ]
 
 
 def _relay_report(entry: ServerEntry, roles: list[str], *, user: str) -> HealthReport:

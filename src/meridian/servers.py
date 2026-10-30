@@ -222,7 +222,7 @@ class ServerRegistry:
 
 
 class ServerProfileStore:
-    """JSON server profile registry for CLI and Engine flows."""
+    """JSON server profile registry for CLI flows."""
 
     def __init__(self, path: Path) -> None:
         self.path = path

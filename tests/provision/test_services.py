@@ -8,7 +8,6 @@ import pytest
 
 from meridian.provision.nginx import (
     ConfigureNginx,
-    DeployPWAAssets,
     InstallNginx,
 )
 from meridian.provision.nginx_render import (
@@ -29,8 +28,8 @@ _STREAM = {
 _IP = {
     "server_ip": "198.51.100.1",
     "nginx_internal_port": 8443,
-    "panel_web_base_path": "secretpanel",
-    "panel_internal_port": 2053,
+    "service_base_path": "secretpanel",
+    "service_port": 2053,
     "info_page_path": "connect",
 }
 _DOMAIN = {
@@ -38,8 +37,8 @@ _DOMAIN = {
     "nginx_internal_port": 8443,
     "ws_path": "wspath",
     "wss_internal_port": 28000,
-    "panel_web_base_path": "secretpanel",
-    "panel_internal_port": 2053,
+    "service_base_path": "secretpanel",
+    "service_port": 2053,
     "info_page_path": "connect",
 }
 
@@ -51,15 +50,43 @@ CONFIGS = {
     "ip_xhttp": render_nginx_ip_config(**_IP, xhttp_path="xh-abc123", xhttp_internal_port=29000),
     "domain": render_nginx_http_config(**_DOMAIN),
     "domain_xhttp": render_nginx_http_config(**_DOMAIN, xhttp_path="xh-def456", xhttp_internal_port=29500),
+    # The control bootstrap has no WSS listener (compiled artifacts own WSS).
+    "domain_no_wss": render_nginx_http_config(**{**_DOMAIN, "ws_path": "", "wss_internal_port": 0}),
 }
 
-_SECURITY_HEADERS = ("X-Frame-Options", "X-Content-Type-Options", "Referrer-Policy")
-_PWA_CACHE = ("$meridian_cache", "max-age=86400", "$meridian_sw", "Service-Worker-Allowed", "stats/")
-# Connection pages need alias: it strips the location prefix.
-_CONNECTION_PAGES = ("location /connect/", "alias /var/www/private/")
+_SECURITY_HEADERS = ("Referrer-Policy",)
+_CONNECTION_PAGES = ("location /connect/", "proxy_pass http://127.0.0.1:2053/sub/~legacy/")
 # Missing h2 ALPN is a fingerprinting vector.
 _HTTP2 = ("ssl;", "http2 on;", "server_tokens off")
 _NGINX_ERRORS = ("location = /", "return 403", "return 404")
+
+
+def test_public_pages_proxy_to_the_service_and_keep_old_uuid_links() -> None:
+    for name in ("ip", "domain"):
+        rendered = CONFIGS[name]
+        assert "alias /var/www/private/" not in rendered
+        assert "proxy_pass http://127.0.0.1:2053/sub/~legacy/;" in rendered
+        assert "proxy_pass http://127.0.0.1:2053/sub/;" in rendered
+
+
+def test_nginx_cutover_removes_legacy_page_artifacts_after_reload() -> None:
+    conn = MockConnection()
+    result = ConfigureNginx(domain="", ip_mode=True, **_IP).run(conn, ProvisionContext(ip="198.51.100.1"))
+    assert result.status == "changed"
+    cleanup = [call for call in conn.calls if "find /var/www/private" in call]
+    assert cleanup
+    assert "pwa" in cleanup[0]
+    assert "[0-9a-fA-F]" in cleanup[0]
+    reload_index = next(index for index, call in enumerate(conn.calls) if "reload-or-restart nginx" in call)
+    assert conn.calls.index(cleanup[0]) > reload_index
+
+
+def test_failed_nginx_reload_keeps_legacy_page_artifacts() -> None:
+    conn = MockConnection().when("reload-or-restart nginx", rc=1, stderr="reload failed")
+    result = ConfigureNginx(domain="", ip_mode=True, **_IP).run(conn, ProvisionContext(ip="198.51.100.1"))
+    assert result.status == "failed"
+    assert not any("find /var/www/private" in call for call in conn.calls)
+
 
 PRESENT = {
     "stream": (
@@ -81,15 +108,17 @@ PRESENT = {
         "proxy_socket_keepalive on",
     ),
     "stream_domain": ("example.com  nginx_https", "198.51.100.1  nginx_https"),
+    "domain_no_wss": ("server_name example.com;", "proxy_pass http://127.0.0.1:2053/sub/", "return 301"),
     "ip": (
+        # The service's agent long-poll is held up to 55 s and must not be buffered.
+        "proxy_buffering off",
+        "proxy_read_timeout 90s",
+        "proxy_pass http://127.0.0.1:2053/sub/",
         "ssl_certificate",
         "/etc/ssl/meridian/fullchain.pem",
         "/.well-known/acme-challenge/",
-        "no-cache, must-revalidate",
         "TLSv1.2 TLSv1.3",
-        "default-src 'self'",
         *_SECURITY_HEADERS,
-        *_PWA_CACHE,
         *_CONNECTION_PAGES,
         *_HTTP2,
         *_NGINX_ERRORS,
@@ -102,7 +131,6 @@ PRESENT = {
         "return 301",
         "$host$request_uri",
         *_SECURITY_HEADERS,
-        *_PWA_CACHE,
         *_CONNECTION_PAGES,
         *_HTTP2,
         "return 403",
@@ -132,9 +160,21 @@ PRESENT = {
 }
 
 ABSENT = {
+    # An empty WSS path rendered a second `location /` to port 0, which fails `nginx -t`.
+    "domain_no_wss": ("VLESS+WSS", "127.0.0.1:0", "location / {\n            proxy_pass"),
     "stream": ("example.com", "blackhole"),
     # IP mode never redirects port 80 to HTTPS: a redirect to a 403 is a contradiction.
-    "ip": ("XHTTP", "meridian_xhttp", "VLESS+WSS", "TLSv1.0", "TLSv1.1", "SSLv", "return 301"),
+    "ip": (
+        "XHTTP",
+        "meridian_xhttp",
+        "VLESS+WSS",
+        "TLSv1.0",
+        "TLSv1.1",
+        "SSLv",
+        "return 301",
+        "sub_filter",
+        "/api/sub/",
+    ),
 }
 
 
@@ -178,28 +218,6 @@ def test_https_block_serves_only_nginx_generated_errors(config: str) -> None:
     assert "default_type text/html" not in https_block
 
 
-@pytest.mark.parametrize("config", ["ip", "domain"])
-def test_panel_proxy_passes_websocket_upgrade_for_the_remnawave_ui(config: str) -> None:
-    cfg = CONFIGS[config]
-    panel_block = cfg[cfg.index("secretpanel") :]
-    assert "proxy_set_header Upgrade" in panel_block
-    assert "proxy_set_header Connection $connection_upgrade" in panel_block
-    assert "proxy_set_header Host $host" in panel_block
-    assert "proxy_http_version 1.1" in panel_block
-
-
-def test_panel_subpath_rewrites_match_the_3_4_frontend_bundle() -> None:
-    cfg = CONFIGS["ip"]
-    # The 3.4 bundle emits route/asset literals in backticks; quoted forms never match.
-    for literal in ("dashboard", "auth", "oauth2/", "locales/", "lotties/", "favicons/", "assets/"):
-        assert f"sub_filter '`/{literal}' '`/secretpanel/{literal}';" in cfg
-    assert "sub_filter '\"/" not in cfg
-    # /api calls ride the rewritten axios baseURL; rewriting them would double the prefix.
-    assert "'`/api" not in cfg
-    assert "proxy_redirect /api/ /secretpanel/api/;" in cfg
-    assert "proxy_cookie_path /api/ /secretpanel/api/;" in cfg
-
-
 def test_ip_mode_port_80_only_serves_acme_challenges() -> None:
     cfg = CONFIGS["ip"]
     assert "return 403" in cfg.split("listen 80")[1]
@@ -237,6 +255,30 @@ class TestInstallNginx:
         result = InstallNginx().run(conn, ProvisionContext(ip="198.51.100.1"))
         assert result.status == "ok"
         conn.assert_called_with_pattern("acme.sh --install-cronjob")
+
+    def test_a_preinstalled_nginx_org_build_still_gets_the_sites_enabled_include(self):
+        """Only Meridian's own nginx.org install added it, so a server that already ran nginx.org served nothing."""
+        conn = _installed_nginx()
+        InstallNginx().run(conn, ProvisionContext(ip="198.51.100.1"))
+        conn.assert_called_with_pattern("include /etc/nginx/sites-enabled/")
+
+    def test_a_working_stream_module_never_reaches_apt(self):
+        """This step runs on every certificate and nginx apply; nginx.org builds have stream built in."""
+        conn = _installed_nginx()
+        InstallNginx().run(conn, ProvisionContext(ip="198.51.100.1"))
+        assert not [call for call in conn.calls if "libnginx-mod-stream" in call]
+
+    def test_a_stream_module_apt_cannot_install_fails_with_apts_error(self):
+        conn = MockConnection()
+        conn.when("ngx_stream_module.so", rc=1)
+        conn.when("libnginx-mod-stream", rc=100, stderr="E: Unable to locate package libnginx-mod-stream")
+        conn.when("dpkg -l nginx", stdout="ii  nginx")
+        conn.when("nginx -v", stdout="nginx version: nginx/1.27.3")
+
+        result = InstallNginx().run(conn, ProvisionContext(ip="198.51.100.1"))
+
+        assert result.status == "failed"
+        assert "Unable to locate package libnginx-mod-stream" in result.detail
 
     def test_distro_nginx_older_than_1_25_is_replaced_from_nginx_org(self):
         # Ubuntu 24.04 ships nginx 1.24, which rejects the rendered `http2 on;`.
@@ -375,6 +417,44 @@ class TestIssueTLSCert:
         assert "not sent over self-signed TLS" in result.detail
         conn.assert_not_called_with_pattern("systemctl reload")
 
+    def test_acme_failure_names_its_reason_not_its_banner(self):
+        """The first 200 characters were timestamps; the 404 that explained the failure was cut off."""
+        banner = "\n".join(f"[Wed Oct 28 05:56:18 PM UTC 2026] progress line {n}" for n in range(8))
+        conn = MockConnection()
+        conn.when("acme.sh --info", rc=1)
+        conn.when(
+            "acme.sh --issue",
+            stdout=f"{banner}\n[Wed Oct 28 05:56:20 PM UTC 2026] Verification error details: Invalid response: 404",
+            rc=1,
+        )
+        result = IssueTLSCert(domain="", ip_mode=True, server_ip="198.51.100.1").run(
+            conn, ProvisionContext(ip="198.51.100.1")
+        )
+        assert "Verification error details: Invalid response: 404" in result.detail
+        assert "PM UTC" not in result.detail
+
+    def test_acme_rate_limit_names_the_retry_time_instead_of_port_and_dns_advice(self):
+        conn = MockConnection()
+        conn.when("acme.sh --info", rc=1)
+        conn.when(
+            "acme.sh --issue",
+            stdout=(
+                "[Thu Oct 29 03:55:00 PM UTC 2026] Error creating new order. {\n"
+                '  "type": "urn:ietf:params:acme:error:rateLimited",\n'
+                '  "detail": "too many certificates (5) already issued for this exact set of identifiers in the'
+                ' last 168h0m0s, retry after 2026-10-30 08:14:36 UTC: see https://example.org/docs/rate-limits/",\n'
+                '  "status": 429\n}\n'
+                "[Thu Oct 29 03:55:00 PM UTC 2026] Please add '--debug' or '--log' to see more information."
+            ),
+            rc=1,
+        )
+        result = IssueTLSCert(domain="", ip_mode=True, server_ip="198.51.100.1").run(
+            conn, ProvisionContext(ip="198.51.100.1")
+        )
+        assert result.status == "failed"
+        assert "after 2026-10-30 08:14:36 UTC" in result.detail
+        assert "Check port 80" not in result.detail and "not sent over self-signed TLS" in result.detail
+
     def test_install_cert_failure_returns_failed(self):
         conn = _acme()
         conn.when("acme.sh --install-cert", stderr="copy failed", rc=1)
@@ -419,15 +499,3 @@ class TestIssueTLSCert:
         _, issue_calls = _issue(conn)
         assert "shortlived" in issue_calls[0]
         assert ("--force" in issue_calls[0]) is forced
-
-
-class TestDeployPWAAssets:
-    def test_uploads_static_files(self):
-        result = DeployPWAAssets().run(MockConnection(), ProvisionContext(ip="198.51.100.1"))
-        assert result.status == "changed"
-        assert "PWA" in result.detail
-
-    def test_failure_returns_failed(self):
-        conn = MockConnection()
-        conn.when("cat >", rc=1)
-        assert DeployPWAAssets().run(conn, ProvisionContext(ip="198.51.100.1")).status == "failed"

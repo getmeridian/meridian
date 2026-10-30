@@ -93,6 +93,9 @@ class TestRenderConfigJson:
 
 
 class TestRenderPWAShell:
+    def test_robots_meta_keeps_personal_pages_out_of_indexes(self) -> None:
+        assert '<meta name="robots" content="noindex, nofollow, noarchive">' in render_pwa_shell()
+
     def test_has_manifest_link(self) -> None:
         html = render_pwa_shell(client_name="test")
         assert 'rel="manifest"' in html
@@ -299,11 +302,11 @@ class TestPWATemplateSource:
 
     def test_app_js_prefers_the_shared_catalog(self) -> None:
         app_js = Path("src/meridian/templates/pwa/app.js").read_text()
-        assert "fetch('../pwa/apps.json')" in app_js
+        assert "fetch(ASSET_PATH + '/apps.json'," in app_js
 
     def test_every_data_t_key_is_translated(self) -> None:
         app_js = Path("src/meridian/templates/pwa/app.js").read_text()
-        used = set(re.findall(r'data-t="([^"]+)"', app_js))
+        used = set(re.findall(r'data-t="([\w.]+)"', app_js))
         for lang in ("ru", "fa", "zh"):
             block = app_js.split(f"\n  {lang}: {{\n", 1)[1].split("\n  },\n", 1)[0]
             keys = set(re.findall(r"'?([\w.]+)'?: '", block))
@@ -353,14 +356,7 @@ class TestSelfCheck:
         app_js = (PWA_DIR / "app.js").read_text()
         assert 'data-action="selfcheck-run"' in app_js
         assert 'id="selfcheck-results"' in app_js
-        assert "s.src = '../pwa/selfcheck.js';" in app_js
-
-    def test_probe_and_subscription_bypass_the_service_worker(self) -> None:
-        sw = (PWA_DIR / "sw.js").read_text()
-        assert "path.indexOf('/sub/') !== -1" in sw
-        assert "path.endsWith('/probe.bin')" in sw
-        assert "event.request.method !== 'GET'" in sw
-        assert "'../pwa/selfcheck.js'" in sw
+        assert "s.src = ASSET_PATH + '/selfcheck.js';" in app_js
 
     def test_requests_skip_the_http_cache(self) -> None:
         source = (PWA_DIR / "selfcheck.js").read_text()
@@ -381,3 +377,16 @@ class TestSelfCheck:
         keys = {lang: set(re.findall(r"'?([\w.]+)'?: '", block)) for lang, block in blocks.items()}
         for lang in ("ru", "fa", "zh"):
             assert keys[lang] == keys["en"], f"{lang}: {sorted(keys['en'] ^ keys[lang])}"
+
+
+def test_stash_is_additional_on_ios_with_a_self_hosted_icon() -> None:
+    catalog = json.loads(render_apps_catalog())
+    stash = next((app for app in catalog["apps"] if app["name"] == "Stash"), None)
+    assert stash is not None, "Stash is missing from the app catalog"
+    assert stash["platforms"] == ["iOS"]
+    assert not stash.get("recommended")
+    assert stash["deeplink"] == "stash://install-config?url={url}"
+    assert stash["icon"].startswith("data:image/svg+xml;base64,")
+    for lang in ("en", "ru", "fa", "zh"):
+        assert stash["manual"][lang]
+        assert len(stash["connect"][lang]) >= 3

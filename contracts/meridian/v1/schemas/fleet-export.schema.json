@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "`meridian fleet export`: the secret-free fleet document, as written to the file.",
+  "properties": {
+    "document": {
+      "additionalProperties": true,
+      "title": "Document",
+      "type": "object"
+    }
+  },
+  "required": [
+    "document"
+  ],
+  "title": "FleetExportResult",
+  "type": "object"
+}

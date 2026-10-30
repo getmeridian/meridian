@@ -9,9 +9,9 @@ from __future__ import annotations
 import re
 import shlex
 
-from meridian.config import ACME_SH_SHA256, ACME_SH_VERSION, REMNAWAVE_PANEL_PORT, REMNAWAVE_SUBSCRIPTION_PAGE_PORT
+from meridian.config import ACME_SH_SHA256, ACME_SH_VERSION
 from meridian.provision.apt_keys import verify_apt_key
-from meridian.provision.ensure import resolve_ctx
+from meridian.provision.ensure import apt_failure, apt_lock_held, apt_update_and_install, resolve_ctx, run_apt
 from meridian.provision.nginx_render import (
     render_nginx_http_config,
     render_nginx_ip_config,
@@ -89,10 +89,9 @@ class InstallNginx:
                 needs_official_repo = True
         else:
             # Not installed — try distro repo first, upgrade if too old
-            result = conn.run(
-                f"DEBIAN_FRONTEND=noninteractive apt-get install -y {_APT_KEEP_CONFIG} nginx",
-                timeout=180,
-            )
+            result = run_apt(conn, f"apt-get install -y {_APT_KEEP_CONFIG} nginx", timeout=180)
+            if result.returncode != 0 and apt_lock_held(result):
+                return StepResult(name=self.name, status="failed", detail=apt_failure(result))
             if result.returncode != 0:
                 # Distro install failed — fall through to official repo
                 needs_official_repo = True
@@ -113,11 +112,12 @@ class InstallNginx:
             distro_codename = codename.stdout.strip() if codename.returncode == 0 else "jammy"
 
             # Remove conflicting distro packages before official repo install
-            conn.run(
-                "DEBIAN_FRONTEND=noninteractive apt-get remove -y"
-                " nginx-common nginx-core nginx-full 'libnginx-mod-*' 2>/dev/null; true",
-                timeout=120,
+            # Absent packages fail the removal; only a held lock matters here.
+            removed = run_apt(
+                conn, "apt-get remove -y nginx-common nginx-core nginx-full 'libnginx-mod-*'", timeout=120
             )
+            if apt_lock_held(removed):
+                return StepResult(name=self.name, status="failed", detail=apt_failure(removed))
 
             # Ensure keyrings directory exists (missing on Ubuntu < 22.04)
             conn.run("mkdir -p /etc/apt/keyrings && chmod 755 /etc/apt/keyrings", timeout=15)
@@ -160,16 +160,12 @@ class InstallNginx:
                 timeout=15,
             )
 
-            result = conn.run(
-                "DEBIAN_FRONTEND=noninteractive apt-get update -qq"
-                f" && DEBIAN_FRONTEND=noninteractive apt-get install -y {_APT_KEEP_CONFIG} nginx",
-                timeout=180,
-            )
+            result = apt_update_and_install(conn, f"-y {_APT_KEEP_CONFIG} nginx", timeout=180)
             if result.returncode != 0:
                 return StepResult(
                     name=self.name,
                     status="failed",
-                    detail=f"Failed to install nginx from official repo: {result.stderr.strip()[:200]}",
+                    detail=f"Failed to install nginx from official repo: {apt_failure(result)}",
                 )
 
             changed = True
@@ -181,23 +177,26 @@ class InstallNginx:
                 "sed -i '/load_module.*ngx_stream_module/d' /etc/nginx/nginx.conf 2>/dev/null; true",
                 timeout=15,
             )
-            conn.run(_ENSURE_SITES_INCLUDE, timeout=15)
+
+        # Every run, not only after our own nginx.org install: an nginx.org build already on the
+        # server (a resumed install, an image that ships it) never included sites-enabled either.
+        conn.run(_ENSURE_SITES_INCLUDE, timeout=15)
 
         # -- Ensure stream module is available --
-        conn.run(
-            "DEBIAN_FRONTEND=noninteractive apt-get install -y -qq libnginx-mod-stream 2>/dev/null; true",
-            timeout=120,
-        )
-        check = conn.run(
-            "test -f /usr/lib/nginx/modules/ngx_stream_module.so || nginx -V 2>&1 | grep -q 'with-stream '",
-            timeout=15,
-        )
-        if check.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail="nginx stream module not available — install libnginx-mod-stream",
-            )
+        # Check first: this step runs on every certificate and nginx apply, and nginx.org builds have
+        # stream built in while the distro still offers a conflicting libnginx-mod-stream, so an
+        # unconditional install failed every time and could wait out another package manager's lock.
+        stream_check = "test -f /usr/lib/nginx/modules/ngx_stream_module.so || nginx -V 2>&1 | grep -q 'with-stream '"
+        if conn.run(stream_check, timeout=15).returncode != 0:
+            stream = run_apt(conn, "apt-get install -y -qq libnginx-mod-stream", timeout=120)
+            if conn.run(stream_check, timeout=15).returncode != 0:
+                detail = apt_failure(stream) if stream.returncode != 0 else "the module is still missing"
+                return StepResult(
+                    name=self.name,
+                    status="failed",
+                    detail=f"nginx stream module not available: {detail} — install libnginx-mod-stream",
+                )
+            changed = True
 
         # -- Create directories --
         conn.run(
@@ -272,16 +271,14 @@ class ConfigureNginx:
         nginx_internal_port: int = 8443,
         ws_path: str | None = None,
         wss_internal_port: int | None = None,
-        panel_web_base_path: str | None = None,
-        panel_internal_port: int | None = None,
+        service_base_path: str | None = None,
+        service_port: int | None = None,
         info_page_path: str | None = None,
         server_ip: str | None = None,
         skip_dns_check: bool = False,
         ip_mode: bool = False,
         xhttp_path: str | None = None,
         xhttp_internal_port: int | None = None,
-        subscription_page_path: str | None = None,
-        subscription_page_port: int | None = None,
     ) -> None:
         self.domain = domain
         self.reality_sni = reality_sni
@@ -289,22 +286,22 @@ class ConfigureNginx:
         self.nginx_internal_port = nginx_internal_port
         self.ws_path = ws_path
         self.wss_internal_port = wss_internal_port
-        self.panel_web_base_path = panel_web_base_path
-        self.panel_internal_port = panel_internal_port
+        self.service_base_path = service_base_path
+        self.service_port = service_port
         self.info_page_path = info_page_path
         self.server_ip = server_ip
         self.skip_dns_check = skip_dns_check
         self.ip_mode = ip_mode
         self.xhttp_path = xhttp_path
         self.xhttp_internal_port = xhttp_internal_port
-        self.subscription_page_path = subscription_page_path
-        self.subscription_page_port = subscription_page_port
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
-        # Resolve runtime values from context (populated by ConfigurePanel).
-        panel_web_base_path = resolve_ctx(self.panel_web_base_path, ctx.web_base_path)
+        # Resolve runtime values from context (populated by the control bootstrap).
+        service_base_path = resolve_ctx(self.service_base_path, ctx.web_base_path)
         info_page_path = resolve_ctx(self.info_page_path, ctx.info_page_path)
-        panel_internal_port = resolve_ctx(self.panel_internal_port, REMNAWAVE_PANEL_PORT)
+        service_port = resolve_ctx(
+            self.service_port, ctx.control_service.config.listen_port if ctx.control_service else 0
+        )
         server_ip = resolve_ctx(self.server_ip, ctx.ip)
         xhttp_path = resolve_ctx(self.xhttp_path, ctx.xhttp_path)
         xhttp_internal_port = resolve_ctx(
@@ -315,8 +312,6 @@ class ConfigureNginx:
         wss_internal_port = resolve_ctx(self.wss_internal_port, ctx.wss_port)
         reality_sni = resolve_ctx(self.reality_sni, ctx.sni)
         reality_backend_port = resolve_ctx(self.reality_backend_port, ctx.reality_port)
-        sub_page_path = resolve_ctx(self.subscription_page_path, ctx.subscription_page_path)
-        sub_page_port = resolve_ctx(self.subscription_page_port, REMNAWAVE_SUBSCRIPTION_PAGE_PORT)
 
         # -- DNS pre-check (domain mode only) --
         if not self.ip_mode and not self.skip_dns_check:
@@ -380,13 +375,11 @@ class ConfigureNginx:
             http_config = render_nginx_ip_config(
                 server_ip=server_ip,
                 nginx_internal_port=self.nginx_internal_port,
-                panel_web_base_path=panel_web_base_path,
-                panel_internal_port=panel_internal_port,
+                service_base_path=service_base_path,
+                service_port=service_port,
                 info_page_path=info_page_path,
                 xhttp_path=xhttp_path,
                 xhttp_internal_port=xhttp_internal_port,
-                subscription_page_path=sub_page_path,
-                subscription_page_port=sub_page_port,
             )
         else:
             http_config = render_nginx_http_config(
@@ -394,13 +387,11 @@ class ConfigureNginx:
                 nginx_internal_port=self.nginx_internal_port,
                 ws_path=ws_path,
                 wss_internal_port=wss_internal_port,
-                panel_web_base_path=panel_web_base_path,
-                panel_internal_port=panel_internal_port,
+                service_base_path=service_base_path,
+                service_port=service_port,
                 info_page_path=info_page_path,
                 xhttp_path=xhttp_path,
                 xhttp_internal_port=xhttp_internal_port,
-                subscription_page_path=sub_page_path,
-                subscription_page_port=sub_page_port,
             )
         result = conn.put_text(
             "/etc/nginx/conf.d/meridian-http.conf",
@@ -464,6 +455,16 @@ class ConfigureNginx:
                 detail=f"Failed to start nginx: {result.stderr.strip()}",
             )
 
+        from meridian.provision.page_retirement import retire_page_artifacts
+
+        retired = retire_page_artifacts(conn)
+        if retired.returncode != 0:
+            return StepResult(
+                name=self.name,
+                status="failed",
+                detail="Could not remove the old connection-page files. Reapply to retry.",
+            )
+
         host = server_ip if self.ip_mode else self.domain
         return StepResult(
             name=self.name,
@@ -501,43 +502,3 @@ def _check_domain_dns(conn: ServerConnection, domain: str, server_ip: str) -> st
         )
 
     return None
-
-
-# ---------------------------------------------------------------------------
-# DeployPWAAssets
-# ---------------------------------------------------------------------------
-
-
-class DeployPWAAssets:
-    """Deploy shared PWA static assets to /var/www/private/pwa/.
-
-    These assets (JS, CSS, service worker, icon) are identical for all
-    clients and deployed once. Per-client connection pages (index.html,
-    config.json, manifest, sub.txt) are generated by ``meridian client
-    add`` / ``meridian client show`` via the panel API + ``render.py``.
-    """
-
-    name = "Deploy PWA assets"
-
-    def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
-        from meridian.pwa import upload_pwa_assets
-
-        try:
-            error = upload_pwa_assets(conn)
-        except (OSError, RuntimeError, ValueError) as exc:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"Failed to load PWA assets: {exc}",
-            )
-        if error:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=error,
-            )
-        return StepResult(
-            name=self.name,
-            status="changed",
-            detail="Shared PWA assets deployed to /var/www/private/pwa/",
-        )

@@ -67,7 +67,7 @@ dns_hosts=(
   azure.archive.ubuntu.com
   deb.debian.org
   nginx.org
-  download.docker.com
+  github.com
   pypi.org
   ghcr.io
 )

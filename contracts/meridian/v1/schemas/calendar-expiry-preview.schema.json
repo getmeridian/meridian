@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "description": "Whole-second UTC base and expiry for a calendar renewal.",
+  "properties": {
+    "base_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in Z.",
+      "maxLength": 40,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+      "title": "Base At",
+      "type": "string"
+    },
+    "expire_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in Z.",
+      "maxLength": 40,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+      "title": "Expire At",
+      "type": "string"
+    },
+    "months": {
+      "title": "Months",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "base_at",
+    "expire_at",
+    "months"
+  ],
+  "title": "CalendarExpiryPreview",
+  "type": "object"
+}

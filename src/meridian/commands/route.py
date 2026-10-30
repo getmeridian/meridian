@@ -10,19 +10,29 @@ from meridian.commands._helpers import apply_reviewed_intent, load_topology_clus
 from meridian.console import confirm, err_console, error_context, fail, is_json_mode, ok
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
-from meridian.core.routes import RouteMutationResult, build_route_list_result
+from meridian.core.routes import ROUTE_PRESETS, RouteMutationResult, build_route_list_result
 from meridian.core.topology import EgressOverrideAction, EgressOverrideIntent, SetupIntent
 from meridian.renderers import emit_json
 
 _VIA: dict[str, EgressOverrideAction] = {"warp": "warp", "direct": "direct", "block": "block"}
 
 
-def run_add(exit_arg: str, values: list[str], via: str, name: str = "") -> None:
+def run_add(exit_arg: str, values: list[str], via: str, name: str = "", *, preset: str = "") -> None:
     """Add one override to an exit and apply the reviewed topology."""
     from meridian.setup.editor import add_egress_override_to_intent
 
     operation = OperationContext()
     with error_context("route.add", timer=operation.timer):
+        if preset:
+            values, via, name = _preset(preset, values, via, name)
+        elif not values:
+            fail(
+                "No destinations given",
+                hint="Name domains, geosite:NAME, or geoip:NAME, or use --preset ai.",
+                hint_type="user",
+            )
+        if not via:
+            fail("Missing --via", hint="Use --via warp, --via direct, or --via block.", hint_type="user")
         action = _VIA.get(via.strip().lower())
         if action is None:
             fail(f"Unknown --via {via!r}", hint="Use --via warp, --via direct, or --via block.", hint_type="user")
@@ -100,6 +110,20 @@ def run_remove(exit_arg: str, override_id: str, yes: bool = False) -> None:
             _emit("route.remove", RouteMutationResult(exit=exit_.id, override=removed), f"Removed route {removed.id}")
             return
         ok(f"Removed route {removed.id}; {_describe(removed)} follows the exit's default egress ({default}) again")
+
+
+def _preset(preset: str, values: list[str], via: str, name: str) -> tuple[list[str], str, str]:
+    """A preset's values, with --via defaulting to warp and --name to the preset."""
+    key = preset.strip().lower()
+    if key not in ROUTE_PRESETS:
+        fail(f"Unknown --preset {preset!r}", hint=f"Use --preset {', '.join(sorted(ROUTE_PRESETS))}.", hint_type="user")
+    if values:
+        fail(
+            "--preset replaces VALUEs",
+            hint="Add the preset and your own destinations as two routes.",
+            hint_type="user",
+        )
+    return list(ROUTE_PRESETS[key]), via or "warp", name or key
 
 
 def _load() -> tuple[ClusterConfig, SetupIntent]:

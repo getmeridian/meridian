@@ -1,9 +1,9 @@
 ---
 title: 快速开始
-description: 在几分钟内安装 Meridian 并部署第一台代理服务器。
+description: 在几分钟内安装 Meridian 并部署第一台自托管 VPN 服务器。
 ---
 
-一条命令即可把全新的 VPS 变成加固过的代理服务器，并生成一个可分享的链接。本指南带你在几分钟内从零完成可用连接。
+一条命令即可把全新的 VPS 变成加固过的 VPN 服务器，为你配备内置网页面板，并为每个人生成专属连接页面。本指南带你在几分钟内从零完成可用连接。
 
 有人给你发了链接？这些你都不需要：请看[连接指南](/zh/connecting/)。
 
@@ -36,11 +36,12 @@ meridian deploy 198.51.100.10
 ## 部署过程会做什么
 
 1. **加固服务器** — 仅允许 SSH 密钥登录、启用 fail2ban、配置只开放必要端口的 UFW 防火墙，并启用 BBR 拥塞控制
-2. **安装控制平面** — 在 Docker 中部署 [Remnawave](https://remna.st/) 面板以及运行 Xray 的节点
+2. **安装控制服务与网页面板** — Meridian 的控制服务（保存你的用户、提供他们的订阅并承载网页面板）以及运行 Xray 的节点 agent。无需 Docker 或第三方面板
 3. **选择伪装目标** — 先在服务器自身所在网络中寻找合适的 TLS 1.3 网站，找不到时回退到 `www.google.com`、`dl.google.com` 和 `www.cloudflare.com`（也可用 `--sni` 手动指定）
 4. **配置连接方式** — 在 nginx 后的 TCP 443 端口上配置 VLESS+Reality 和 XHTTP（使用为服务器 IP 签发的 Let's Encrypt 证书），并在 UDP 443 上配置 Hysteria2
 5. **验证真实流量** — 在输出“Done”之前，Meridian 会通过交付的订阅发送真实流量；若流量不通则自动尝试下一个伪装目标
-6. **发布连接页面** — 为第一个客户端生成专属连接页面
+6. **发布连接页面** — 为第一个人生成专属连接页面，并准备好你的网页面板
+7. **显示一次恢复密钥** — 请离线保存；有了它，丢失的控制服务器可以重建（见[备份](/zh/deploy/#备份)）
 
 部署带有检查点。如果中途中断，重新运行同一条命令即可从中断处继续。
 
@@ -68,7 +69,17 @@ meridian deploy 198.51.100.10
 meridian test 198.51.100.10
 ```
 
-## 添加更多用户
+## 管理用户：网页面板或 CLI
+
+在浏览器中打开内置网页面板（管理控制台）：
+
+```
+meridian panel
+```
+
+首次运行时，命令会打印面板地址和一次性设置链接，打开后即可设置密码。在网页面板中，你可以添加用户、分享他们的连接页面和二维码、设置到期时间、流量限额与设备上限、记录私有备注与标签、发布全员通知，以及查看服务器健康状况和每月流量额度。
+
+也可以在终端中管理用户：
 
 ```
 meridian client add alice
@@ -80,11 +91,13 @@ meridian client add alice
 
 | 内容 | 位置 |
 |------|------|
-| 拓扑、面板访问凭据和密钥 | 你电脑上的 `~/.config/meridian/cluster.yml` |
+| 拓扑、控制服务访问凭据和密钥 | 你电脑上的 `~/.config/meridian/cluster.yml` |
 | 已保存的 SSH 服务器 | 你电脑上的 `~/.config/meridian/servers.json` |
-| 代理服务 | VPS 上的 Docker、Xray 和 nginx |
+| 控制服务的加密快照 | 你电脑上的 `~/.config/meridian/snapshots/` |
+| 用户、限额、流量和网页面板 | VPS 上的控制服务 |
+| VPN 服务 | VPS 上的 Xray、nginx 和节点 agent |
 
-客户端管理命令直接调用 `cluster.yml` 中记录的 Remnawave 面板 API，不需要 SSH。请备份 `~/.config/meridian/`——Meridian 依靠它管理你的服务器。
+客户端管理命令直接调用 `cluster.yml` 中记录的控制服务 API，不需要 SSH。`meridian panel` 可以在网页面板中打开同样的用户和设置。请备份 `~/.config/meridian/`——Meridian 依靠它管理你的服务器。
 
 ## 多台服务器
 
@@ -95,6 +108,19 @@ meridian setup
 ```
 
 你也可以用 `meridian node add` 和 `meridian relay add` 逐步扩展集群。每次变更都会经过同一套已审核拓扑：`meridian plan` 显示将要发生的变更，`meridian apply` 执行变更。
+
+## 分开管理多组服务器
+
+如果要把服务器分开管理（例如一组给家人、一组用于工作），就为每组建立一个上下文。第一次向新上下文部署时会自动创建它；`context use` 把它设为当前上下文，`--context` 让单条命令作用于另一组：
+
+```
+meridian deploy 203.0.113.5 --context work
+meridian context list
+meridian context use work
+meridian --context default client list
+```
+
+你的第一组服务器就是 `default` 上下文，仍保存在 `~/.config/meridian/`；其他每个上下文都在 `~/.config/meridian/contexts/NAME/` 中保存自己的 `cluster.yml` 和已保存服务器。Meridian 的 SSH 密钥是共用的，同一台服务器同一时间只属于一组。`MERIDIAN_CONTEXT=NAME` 为当前 shell 选择上下文；`MERIDIAN_HOME` 固定使用单独一组并关闭上下文功能。详见 [meridian context](/zh/cli-reference/#meridian-context)。
 
 ## 后续步骤
 

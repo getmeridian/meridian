@@ -7,24 +7,24 @@
  */
 export const en = {
   // Page metadata
-  'page.title': 'Meridian — Censorship-Resistant Proxy, Deployed Right',
+  'page.title': 'Meridian — Self-Hosted VPN, Deployed Right',
   'page.description':
-    'One command deploys a hardened VLESS+Reality proxy server and a link to share. Open source.',
+    'One command deploys a hardened VLESS+Reality VPN server with a built-in web panel and a link to share. Open source.',
   'page.ogAlt': 'Meridian: share secure internet with the people you care about',
 
   // Hero
-  'hero.kicker': 'Open-source internet freedom tool',
+  'hero.kicker': 'Open-source self-hosted VPN',
   'hero.title': 'Share <em>secure internet</em> with the people you&nbsp;care&nbsp;about',
   'hero.sub':
-    'One command sets up a proxy server that is hard to tell apart from ordinary HTTPS, with the firewall, TLS, and routing configured for you. Share access with a link or QR code.',
+    'One command turns a fresh VPS into a hardened VPN server that blends in with ordinary HTTPS, with a built-in web panel for you and a one-tap connection page for each person.',
   'hero.cta': 'Get started',
   'hero.docs': 'Read the docs',
-  'hero.previewAlt': 'Connection page — what your friends receive',
-  'hero.caption': 'What your friends receive — <a href="/demo/">see the demo</a>',
+  'hero.previewAlt': 'Connection page — what each person receives',
+  'hero.caption': 'What each person receives — <a href="/demo/">try the connection page</a> · <a href="/demo/console/">try the web panel</a>',
 
   // How it works
   'setup.label': 'How it works',
-  'setup.title': 'Two commands to a working proxy',
+  'setup.title': 'Two commands to a working VPN',
   'setup.desc':
     'You need a Debian or Ubuntu VPS (a $5/month one is enough) and a terminal on your computer. Meridian sets up the rest.',
   'setup.step1.label': 'Step 1 — Install',
@@ -41,8 +41,8 @@ export const en = {
     'Safe to re-run. A second run keeps credentials and keys, and resumes or updates the deployment in place.',
 
   // Behind-the-scenes timeline (title, then the text that follows it)
-  'step.1.title': 'Installs Docker',
-  'step.1.text': ' and deploys <strong>Xray</strong> managed by the <strong>Remnawave</strong> panel',
+  'step.1.title': 'Installs the control service and web panel',
+  'step.1.text': ' with a node agent that runs <strong>Xray</strong> — no Docker, no third-party panel',
   'step.2.title': 'Generates x25519 keypair',
   'step.2.text': ' — unique encryption keys for Reality authentication',
   'step.3.title': 'Hardens the server',
@@ -69,7 +69,7 @@ export const en = {
   'builder.tab.doctor': 'Doctor',
   'builder.tab.teardown': 'Teardown',
   'builder.desc.deploy':
-    'Deploy Reality, XHTTP, and Hysteria2 on one server. Sets up Docker, the Remnawave panel, nginx, the firewall, and TLS.',
+    'Deploy Reality, XHTTP, and Hysteria2 on one server. Sets up the control service, web panel, nginx, the firewall, and TLS.',
   'builder.desc.relay':
     'Add a TCP relay on a domestic server that forwards to an exit abroad. The exit must be deployed first.',
   'builder.desc.check':
@@ -133,7 +133,6 @@ export const en = {
     '<strong>First time?</strong> Just run <code>meridian setup</code> — the wizard asks for everything it needs.',
   'builder.status.invalid': 'Use an IP address, a saved server name, or "local".',
   'builder.status.local': 'Runs on the server itself without SSH, as root or with passwordless sudo.',
-  'builder.status.domainMissing': 'Enter a domain, or uncheck it.',
   'builder.status.deploy': 'Deploys Reality, XHTTP, and Hysteria2.',
   'builder.status.deployDomain': 'Deploys Reality, XHTTP, and Hysteria2, plus WSS on your domain.',
   'builder.status.relayNeed': 'Enter the relay server and the exit it forwards to.',
@@ -155,19 +154,35 @@ export const en = {
     'OpenVPN and WireGuard have recognizable traffic signatures. A VLESS+Reality connection is hard to tell apart from ordinary HTTPS to a real website.',
   'tech.dpi': 'Deep Packet Inspection (DPI)',
   'tech.dpi.body':
-    '<p>DPI analyzes traffic patterns to identify proxy protocols. OpenVPN and WireGuard have handshakes that are easy to recognize and block.</p><p><strong>VLESS+Reality</strong> runs inside a standard TLS 1.3 connection on port 443, so DPI sees what looks like ordinary HTTPS to the camouflage site. Every server also offers XHTTP and Hysteria2, so a block on one method leaves the others working.</p>',
+    '<p>DPI inspects traffic patterns to identify VPN and proxy protocols. OpenVPN and WireGuard have handshakes that are easy to recognize and block.</p><p><strong>VLESS+Reality</strong> runs inside a standard TLS 1.3 connection on port 443, so DPI sees what looks like ordinary HTTPS to the camouflage site. Every server also offers XHTTP and Hysteria2, so a block on one method leaves the others working.</p>',
   'tech.probe': 'Active probing',
   'tech.probe.body':
-    '<p>Censors connect to suspicious servers and try to fingerprint them. If a server responds differently than the website it claims to be, it gets blocked.</p><p><strong>Reality</strong> borrows the TLS identity of a real website: by default a site hosted near your server, or <code>www.google.com</code>. A probe without your key is passed through to that site and sees its genuine certificate. Only clients with your key get the proxy tunnel.</p>',
+    '<p>Censors connect to suspicious servers and try to fingerprint them. If a server responds differently than the website it claims to be, it gets blocked.</p><p><strong>Reality</strong> borrows the TLS identity of a real website: by default a site hosted near your server, or <code>www.google.com</code>. A probe without your key is passed through to that site and sees its genuine certificate. Only clients with your key enter the VPN tunnel.</p>',
   'tech.fp': 'TLS fingerprinting',
   'tech.fp.body':
     '<p>Every TLS client sends a unique "Client Hello" fingerprint. Censors flag connections where the fingerprint doesn\'t match the claimed application.</p><p>Client apps use <strong>uTLS</strong> to send the same Client Hello as Chrome. Meridian also publishes a Firefox copy of each Reality and XHTTP entry, so if censors flag one fingerprint, the other keeps working.</p>',
+
+  // Showcase
+  'showcase.label': 'See it',
+  'showcase.title': 'What you and your people get',
+  'showcase.desc': 'Every deployment includes a connection page for each person and a web panel for you. Both demos run in your browser on invented data: click around, nothing is real and nothing is sent anywhere.',
+  'showcase.page.title': 'Connection page',
+  'showcase.page.text': 'Each person opens their subscription link in a browser: they pick their platform and app, import with one tap or a QR code, check their traffic and expiry, and read notices and plain help in four languages.',
+  'showcase.page.try': 'Try the connection page',
+  'showcase.page.alt': 'A person\'s connection page on a phone: choose an app, add the connection with one tap, then connect',
+  'showcase.console.title': 'Web panel',
+  'showcase.console.text': 'Run meridian panel to open your management panel (owner console). Add people, share links and QR codes, set expiry dates, traffic limits, and device caps, keep private notes and tags, post a notice for everyone, and issue scoped API tokens.',
+  'showcase.console.try': 'Try the web panel',
+  'showcase.console.alt': 'The web panel\'s People list: each person\'s expiry, last time online, status, and traffic against their limit',
+  'showcase.person': 'One person: links and QR codes, traffic limit, expiry, device cap, private notes and tags, reissue, or session cut-off.',
+  'showcase.servers': 'Servers: live health, Xray version, traffic, monthly allowances, and payment reminders.',
+  'showcase.settings': 'Privacy: client IPs are never logged, and device limits and daily history start off with clear disclosures.',
 
   // Connect
   'connect.label': 'Connect',
   'connect.title': 'Scan and go',
   'connect.desc':
-    'After deploying, you get a connection page with QR codes. Send it to whoever needs it — they tap once and connect.',
+    'After deploying, each person gets a connection page with QR codes and one-tap import. Send them the link — they tap once and connect.',
   'connect.apps.more':
     'Connection pages list these apps first and link others for each platform. <a href="/demo/">See the demo</a>.',
   'connect.clock':
@@ -180,10 +195,10 @@ export const en = {
     'Meridian architecture: nginx routes TCP 443 by SNI to Xray Reality, XHTTP, and the connection pages; Hysteria2 listens on UDP 443',
   'arch.standalone': 'Standalone mode (no domain)',
   'arch.standalone.body':
-    "<p><strong>nginx</strong> owns TCP port 443 and routes connections by TLS SNI with its stream module. Reality connections go to <strong>Xray</strong>. Everything else reaches nginx's http module, which serves the connection pages, subscriptions, and XHTTP over HTTPS with a short-lived Let's Encrypt certificate for the server's IP (issued by acme.sh). <strong>Hysteria2</strong> listens on UDP 443 with salamander obfuscation.</p><p>The Remnawave admin panel is reverse-proxied by nginx on a secret path — accessible via HTTPS, no SSH tunnel needed.</p>",
+    "<p><strong>nginx</strong> owns TCP port 443 and routes connections by TLS SNI with its stream module. Reality connections go to <strong>Xray</strong>. Everything else reaches nginx's http module, which serves the connection pages, subscriptions, and XHTTP over HTTPS with a short-lived Let's Encrypt certificate for the server's IP (issued by acme.sh). <strong>Hysteria2</strong> listens on UDP 443 with salamander obfuscation.</p><p>Meridian's <strong>control service</strong> sits behind nginx on a secret path: it keeps your users, serves their subscriptions, and hosts the web panel over HTTPS, with no SSH tunnel needed. A small agent on each server dials out to it, so nodes open no extra ports.</p>",
   'arch.domain': 'Domain mode (CDN fallback)',
   'arch.domain.body':
-    "<p>With <code>--domain</code>, nginx gets a Let's Encrypt certificate for your domain and routes that SNI to the domain's paths. XHTTP moves to the domain and <strong>VLESS+WSS</strong> is added. With Cloudflare proxying the domain, both travel through the CDN and keep working if your server's IP is blocked. The panel and connection pages stay on the IP certificate.</p>",
+    "<p>With <code>--domain</code>, nginx gets a Let's Encrypt certificate for your domain and routes that SNI to the domain's paths. XHTTP moves to the domain and <strong>VLESS+WSS</strong> is added. With Cloudflare proxying the domain, both travel through the CDN and keep working if your server's IP is blocked. The control service and connection pages stay on the IP certificate.</p>",
   'arch.relay': 'Relay mode (domestic entry point)',
   'arch.relay.body':
     '<p>A <strong>Realm</strong> TCP forwarder on a server inside your country passes connections to your exit abroad. Relays carry Reality only; XHTTP, WSS, and Hysteria2 still connect to the exit directly. Encryption runs end to end between the app and the exit, so the relay never sees plaintext.</p><p>Add one with <code>meridian relay add RELAY_IP --exit EXIT</code>. Subscriptions and connection pages pick up the relay entries automatically.</p>',
@@ -191,7 +206,7 @@ export const en = {
   // Closing call to action
   'cta.title': 'Ready to get started?',
   'cta.desc':
-    'Install Meridian, deploy to your server, and share access with the people who need it. A deploy usually takes 3 to 10 minutes.',
+    'Install Meridian, deploy your VPN server, and share access with the people who need it. A deploy usually takes 3 to 10 minutes.',
   'cta.install': 'Install Meridian',
 } as const;
 

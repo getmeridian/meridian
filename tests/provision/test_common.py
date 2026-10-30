@@ -17,7 +17,6 @@ from meridian.provision.common import (
     ConfigureFail2ban,
     ConfigureFirewall,
     EnableAutoUpgrades,
-    EnsureSwap,
     HardenSSH,
     InstallPackages,
     SetTimezone,
@@ -31,75 +30,6 @@ def _dpkg(installed: list[str], remembered: tuple[str, ...] = ()) -> str:
     rows = [f"{name}\tinstall ok installed" for name in installed]
     rows += [f"{name}\tunknown ok not-installed" for name in remembered]
     return "\n".join(rows) + "\n"
-
-
-def _meminfo(ram_mb: int, swap_mb: int = 0) -> str:
-    return f"MemTotal:       {ram_mb * 1024} kB\nMemFree:          1024 kB\nSwapTotal:      {swap_mb * 1024} kB\n"
-
-
-class TestEnsureSwap:
-    @pytest.mark.parametrize(
-        ("ram_mb", "swap_mb"),
-        [(3900, 0), (967, 2047)],
-        ids=["enough-ram", "swap-already-on"],
-    )
-    def test_enough_memory_leaves_the_host_alone(
-        self, ram_mb: int, swap_mb: int, mock_conn: MockConnection, base_ctx
-    ) -> None:
-        mock_conn.when("/proc/meminfo", stdout=_meminfo(ram_mb, swap_mb))
-
-        result = EnsureSwap().run(mock_conn, base_ctx)
-
-        assert result.status == "ok"
-        mock_conn.assert_not_called_with_pattern("swapon")
-        assert mock_conn.writes == []
-
-    def test_small_server_gets_a_persistent_swap_file(self, mock_conn: MockConnection, base_ctx) -> None:
-        """A 1 GB server without swap starved sshd when the panel first started."""
-        mock_conn.when("/proc/meminfo", stdout=_meminfo(967))
-        mock_conn.when("test -e /swapfile", rc=1)
-        mock_conn.when("df -BM", stdout="20000M\n")
-        mock_conn.when("cat /etc/fstab", stdout="UUID=abc / ext4 defaults 0 1")
-
-        result = EnsureSwap().run(mock_conn, base_ctx)
-
-        assert result.status == "changed"
-        mock_conn.assert_called_with_pattern("mkswap /swapfile.new")
-        mock_conn.assert_called_with_pattern("mv /swapfile.new /swapfile")
-        mock_conn.assert_called_with_pattern("swapon /swapfile")
-        assert mock_conn.write_map["/etc/fstab"] == b"UUID=abc / ext4 defaults 0 1\n/swapfile none swap sw 0 0\n"
-
-    def test_existing_swap_file_is_enabled_not_rewritten(self, mock_conn: MockConnection, base_ctx) -> None:
-        mock_conn.when("/proc/meminfo", stdout=_meminfo(967))
-        mock_conn.when("cat /etc/fstab", stdout="/swapfile none swap sw 0 0\n")
-
-        result = EnsureSwap().run(mock_conn, base_ctx)
-
-        assert result.status == "changed"
-        mock_conn.assert_not_called_with_pattern("mkswap")
-        mock_conn.assert_called_with_pattern("swapon /swapfile")
-        assert mock_conn.writes == []
-
-    @pytest.mark.parametrize(
-        ("rules", "message"),
-        [
-            ([("test -e /swapfile", 1, ""), ("df -BM", 0, "3000M\n")], "only 3000MB disk is free"),
-            ([("test -e /swapfile", 1, ""), ("mkswap", 1, "")], "could not create /swapfile"),
-            ([("swapon", 1, "swapon: /swapfile: Operation not permitted")], "could not be enabled"),
-        ],
-        ids=["no-disk", "create-fails", "swapon-refused"],
-    )
-    def test_swap_that_cannot_be_added_fails_with_guidance(
-        self, rules: list[tuple[str, int, str]], message: str, mock_conn: MockConnection, base_ctx
-    ) -> None:
-        mock_conn.when("/proc/meminfo", stdout=_meminfo(967))
-        for pattern, rc, out in rules:
-            mock_conn.when(pattern, rc=rc, stdout=out, stderr=out)
-
-        result = EnsureSwap().run(mock_conn, base_ctx)
-
-        assert result.status == "failed"
-        assert message in result.detail
 
 
 class TestInstallPackages:
@@ -355,6 +285,17 @@ def _ufw(conn: MockConnection, status: str = "Status: active") -> None:
 
 
 class TestConfigureFirewall:
+    def test_a_failed_ufw_install_says_why(self, mock_conn: MockConnection, base_ctx):
+        mock_conn.when("which ufw", rc=1)
+        mock_conn.when("dpkg-query", rc=1)
+        mock_conn.when("apt-get update", stdout="")
+        mock_conn.when("apt-get install", rc=100, stderr="E: Unable to locate package ufw")
+
+        result = ConfigureFirewall().run(mock_conn, base_ctx)
+
+        assert result.status == "failed"
+        assert "Unable to locate package ufw" in result.detail
+
     def test_ufw_not_found_returns_failed(self, mock_conn: MockConnection, base_ctx):
         mock_conn.when("which ufw", rc=1)
         mock_conn.when("apt-get update", stdout="")

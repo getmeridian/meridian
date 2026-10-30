@@ -99,6 +99,17 @@
           "title": "Relays",
           "type": "string"
         },
+        "server_usage": {
+          "default": "not_requested",
+          "enum": [
+            "available",
+            "unavailable",
+            "not_requested",
+            "unknown"
+          ],
+          "title": "Server Usage",
+          "type": "string"
+        },
         "users": {
           "default": "unknown",
           "enum": [
@@ -134,6 +145,20 @@
           "title": "Relays",
           "type": "array"
         },
+        "server_attention": {
+          "items": {
+            "$ref": "#/$defs/ServerAttention"
+          },
+          "title": "Server Attention",
+          "type": "array"
+        },
+        "server_usage": {
+          "items": {
+            "$ref": "#/$defs/ServerUsage"
+          },
+          "title": "Server Usage",
+          "type": "array"
+        },
         "servers": {
           "items": {
             "$ref": "#/$defs/ServerInventory"
@@ -158,6 +183,78 @@
     "FleetStatusNode": {
       "additionalProperties": false,
       "properties": {
+        "active_report_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The last report's collection window time.",
+          "title": "Active Report At"
+        },
+        "active_report_received_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the service accepted that report; duplicates leave it unchanged.",
+          "title": "Active Report Received At"
+        },
+        "active_users": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "People with accepted growth in the last report; null before any report.",
+          "title": "Active Users"
+        },
+        "errors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Errors",
+          "type": "array"
+        },
+        "failed": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Failed",
+          "type": "array"
+        },
+        "in_sync": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "In Sync"
+        },
         "ip": {
           "title": "Ip",
           "type": "string"
@@ -165,6 +262,18 @@
         "is_panel_host": {
           "title": "Is Panel Host",
           "type": "boolean"
+        },
+        "live": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Live"
         },
         "name": {
           "title": "Name",
@@ -179,9 +288,33 @@
           "title": "Role",
           "type": "string"
         },
+        "runtime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NodeRuntime"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "runtime_available": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Runtime Available"
+        },
         "status": {
           "enum": [
             "connected",
+            "failed",
             "disconnected",
             "disabled",
             "unknown"
@@ -192,6 +325,22 @@
         "traffic_bytes": {
           "title": "Traffic Bytes",
           "type": "integer"
+        },
+        "traffic_counting_since": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Complete durable node accounting starts here. Retained counters from before a migration may also be included; earlier pruned traffic cannot be reconstructed.",
+          "title": "Traffic Counting Since"
         },
         "uuid": {
           "title": "Uuid",
@@ -299,6 +448,11 @@
           "title": "Disconnected Nodes",
           "type": "integer"
         },
+        "failed_nodes": {
+          "default": 0,
+          "title": "Failed Nodes",
+          "type": "integer"
+        },
         "health": {
           "enum": [
             "healthy",
@@ -328,8 +482,18 @@
           "title": "Other Users",
           "type": "integer"
         },
+        "out_of_sync_nodes": {
+          "default": 0,
+          "title": "Out Of Sync Nodes",
+          "type": "integer"
+        },
         "relays": {
           "title": "Relays",
+          "type": "integer"
+        },
+        "servers_needing_attention": {
+          "default": 0,
+          "title": "Servers Needing Attention",
           "type": "integer"
         },
         "unhealthy_relays": {
@@ -373,6 +537,216 @@
         "unknown_relays"
       ],
       "title": "FleetStatusSummary",
+      "type": "object"
+    },
+    "HealthCheck": {
+      "additionalProperties": false,
+      "description": "One local health probe (for example `xray`, `nginx`, `disk`).",
+      "properties": {
+        "message": {
+          "description": "Operator-facing text. Never carries secrets, client addresses, or raw command lines.",
+          "maxLength": 1000,
+          "title": "Message",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_.-]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "warn",
+            "fail"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "status",
+        "message"
+      ],
+      "title": "HealthCheck",
+      "type": "object"
+    },
+    "NodeHealth": {
+      "additionalProperties": false,
+      "description": "Aggregate node health. Resource figures are integers to keep the protocol float-free.",
+      "properties": {
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/HealthCheck"
+          },
+          "maxItems": 32,
+          "title": "Checks",
+          "type": "array"
+        },
+        "disk_free_bytes": {
+          "description": "Free bytes on the filesystem holding the agent's state.",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Disk Free Bytes",
+          "type": "integer"
+        },
+        "load1_milli": {
+          "description": "One-minute load average times 1000.",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Load1 Milli",
+          "type": "integer"
+        },
+        "memory_available_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Memory Available Bytes",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "healthy",
+            "degraded",
+            "unhealthy"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "uptime_seconds": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Uptime Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "status",
+        "checks",
+        "uptime_seconds",
+        "load1_milli",
+        "memory_available_bytes",
+        "disk_free_bytes"
+      ],
+      "title": "NodeHealth",
+      "type": "object"
+    },
+    "NodeRuntime": {
+      "additionalProperties": false,
+      "description": "Runtime evidence from one agent report; polls refresh reachability, never this evidence.",
+      "properties": {
+        "health": {
+          "$ref": "#/$defs/NodeHealth"
+        },
+        "observed_at": {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "versions": {
+          "$ref": "#/$defs/NodeVersions"
+        }
+      },
+      "required": [
+        "health",
+        "versions",
+        "observed_at"
+      ],
+      "title": "NodeRuntime",
+      "type": "object"
+    },
+    "NodeVersions": {
+      "additionalProperties": false,
+      "description": "Versions of what runs on the node; `null` for software that is not installed.",
+      "properties": {
+        "agent": {
+          "description": "Version string as its upstream publishes it, for example 26.7.11 or v2.9.6.",
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$",
+          "title": "Agent",
+          "type": "string"
+        },
+        "kernel": {
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9._+~-]+$",
+          "title": "Kernel",
+          "type": "string"
+        },
+        "nginx": {
+          "anyOf": [
+            {
+              "description": "Version string as its upstream publishes it, for example 26.7.11 or v2.9.6.",
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Nginx"
+        },
+        "os_id": {
+          "description": "`ID` from /etc/os-release.",
+          "maxLength": 32,
+          "pattern": "^[a-z0-9._-]+$",
+          "title": "Os Id",
+          "type": "string"
+        },
+        "os_version": {
+          "description": "`VERSION_ID`.",
+          "maxLength": 32,
+          "pattern": "^[A-Za-z0-9._-]*$",
+          "title": "Os Version",
+          "type": "string"
+        },
+        "realm": {
+          "anyOf": [
+            {
+              "description": "Version string as its upstream publishes it, for example 26.7.11 or v2.9.6.",
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Realm"
+        },
+        "xray": {
+          "anyOf": [
+            {
+              "description": "Version string as its upstream publishes it, for example 26.7.11 or v2.9.6.",
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Xray"
+        }
+      },
+      "required": [
+        "agent",
+        "xray",
+        "realm",
+        "nginx",
+        "os_id",
+        "os_version",
+        "kernel"
+      ],
+      "title": "NodeVersions",
       "type": "object"
     },
     "PanelStatus": {
@@ -429,6 +803,40 @@
       "title": "RelayHopMembership",
       "type": "object"
     },
+    "ServerAttention": {
+      "additionalProperties": false,
+      "properties": {
+        "reasons": {
+          "items": {
+            "enum": [
+              "allowance_near",
+              "allowance_exceeded",
+              "payment_due",
+              "payment_overdue"
+            ],
+            "type": "string"
+          },
+          "maxItems": 2,
+          "minItems": 1,
+          "title": "Reasons",
+          "type": "array"
+        },
+        "server_ref": {
+          "title": "Server Ref",
+          "type": "string"
+        },
+        "usage": {
+          "$ref": "#/$defs/ServerUsage"
+        }
+      },
+      "required": [
+        "server_ref",
+        "reasons",
+        "usage"
+      ],
+      "title": "ServerAttention",
+      "type": "object"
+    },
     "ServerInventory": {
       "additionalProperties": false,
       "properties": {
@@ -439,6 +847,17 @@
         "ip": {
           "title": "Ip",
           "type": "string"
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ServerMetadata"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "name": {
           "title": "Name",
@@ -482,6 +901,210 @@
         "ssh_port"
       ],
       "title": "ServerInventory",
+      "type": "object"
+    },
+    "ServerMetadata": {
+      "additionalProperties": false,
+      "description": "Deployer-owned metadata keyed to a server declared in the topology.",
+      "properties": {
+        "allowance_bytes": {
+          "anyOf": [
+            {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Allowance Bytes"
+        },
+        "pay_every": {
+          "anyOf": [
+            {
+              "enum": [
+                "month",
+                "year"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pay Every"
+        },
+        "pay_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pay On"
+        },
+        "provider": {
+          "default": "",
+          "maxLength": 80,
+          "title": "Provider",
+          "type": "string"
+        },
+        "reset_day": {
+          "default": 1,
+          "maximum": 31,
+          "minimum": 1,
+          "title": "Reset Day",
+          "type": "integer"
+        }
+      },
+      "title": "ServerMetadata",
+      "type": "object"
+    },
+    "ServerUsage": {
+      "additionalProperties": false,
+      "description": "Current UTC allowance period, using accepted traffic by receipt time, or not measured.",
+      "properties": {
+        "counting_since": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Tracking starts at apply; earlier period use is unknown.",
+          "title": "Counting Since"
+        },
+        "coverage": {
+          "enum": [
+            "Approximate accepted user traffic (upload + download); excludes protocol overhead, the server's own downloads, and relay forwarding.",
+            "Not measured: this server runs no traffic agent."
+          ],
+          "title": "Coverage",
+          "type": "string"
+        },
+        "lifetime_bytes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lifetime Bytes"
+        },
+        "measurement": {
+          "enum": [
+            "accepted_user_traffic",
+            "not_measured"
+          ],
+          "title": "Measurement",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/ServerMetadata"
+        },
+        "next_payment_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Payment On"
+        },
+        "node_id": {
+          "anyOf": [
+            {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Node Id"
+        },
+        "period_end": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Period End"
+        },
+        "period_start": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Period Start"
+        },
+        "server_ref": {
+          "maxLength": 120,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n\\t]+$",
+          "title": "Server Ref",
+          "type": "string"
+        },
+        "used_bytes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Used Bytes"
+        }
+      },
+      "required": [
+        "server_ref",
+        "node_id",
+        "metadata",
+        "measurement",
+        "coverage",
+        "used_bytes",
+        "lifetime_bytes",
+        "period_start",
+        "period_end",
+        "counting_since",
+        "next_payment_on"
+      ],
+      "title": "ServerUsage",
       "type": "object"
     },
     "Summary": {

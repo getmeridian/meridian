@@ -11,7 +11,7 @@ This guide covers every option of `meridian deploy`. If this is your first deplo
 meridian deploy 198.51.100.10
 ```
 
-One server becomes both the control server (running the Remnawave panel) and the exit that carries traffic. Meridian builds the same reviewed topology that [`meridian setup`](/en/cli-reference/#meridian-setup) produces and applies it with checkpoints. Before it prints "Done", it pushes real traffic through the delivered subscription.
+One server becomes both the control server (running Meridian's control service) and the exit that carries traffic. Meridian builds the same reviewed topology that [`meridian setup`](/en/cli-reference/#meridian-setup) produces and applies it with checkpoints. Before it prints "Done", it pushes real traffic through the delivered subscription.
 
 Run `meridian deploy` without an IP and it asks for one. Add `--yes` to skip confirmations:
 
@@ -54,7 +54,6 @@ Hardening turns password login off after deploy, so keep the key: later commands
 | `--harden / --no-harden` | on | SSH key-only login, fail2ban, and UFW firewall. Use `--no-harden` on a server shared with other services |
 | `--warp / --no-warp` | off | Send outgoing traffic through Cloudflare WARP |
 | `--geo-block / --no-geo-block` | on | Block Russian domains and IPs on the server |
-| `--client-ips / --no-client-ips` | off | Let the panel see each client's real IP (see [Client IPs](#client-ips)) |
 | `--country CC` | looked up | Country shown in connection names, such as `DE`. Meridian looks it up from the address registry; set it if that is wrong |
 | `--yes` | | Skip confirmation prompts |
 
@@ -137,7 +136,27 @@ To redeploy, run the same command again. Meridian keeps the saved paths, keys, a
 
 At the end of every deploy, Meridian prints the exact redeploy command with your current settings. Running it again with different flags changes the server to match: adding or dropping `--domain` or `--no-hysteria2` adds or removes those paths.
 
-`meridian deploy` only redeploys a server that is already an exit in your fleet. To add another server, use `meridian node add NEW_IP`.
+`meridian deploy` only redeploys a server that is already an exit in your fleet. To add another server, use `meridian node add NEW_IP`. On a fleet that still runs the Remnawave panel, deploy offers to move it to the control service first (see [Moving from Remnawave](#moving-from-remnawave)).
+
+## Edit the fleet as a file
+
+To change several things at once, or to keep your fleet's layout in version control, export it, edit it, and import it back:
+
+```bash
+meridian fleet export > fleet.yml
+$EDITOR fleet.yml
+meridian fleet import fleet.yml
+```
+
+Import shows each change before anything happens:
+
+```
+  + client carol
+  ~ exit-2 sni www.example.com -> www.example.org
+  → Apply? [y/N]
+```
+
+The file names servers by their saved names and holds no keys, credentials, links, or transport paths, so it is safe to keep in a repository. Servers it names must be saved first (`meridian server add`). See [`fleet import`](/en/cli-reference/#meridian-fleet) for what it refuses.
 
 ## Pre-flight check
 
@@ -194,9 +213,19 @@ meridian route remove exit-1 warp
 
 Values are domains (subdomains included), `geosite:NAME` lists, or `geoip:NAME` lists from the stock v2fly data files; one route holds one kind. `--via direct` does the opposite on a WARP exit: those destinations skip WARP. Routes apply in the order you added them, before the exit's default egress and before geo-blocking. These routes live on the server; they are separate from the client-side rules that send Russian sites direct on the user's device, and from routing-gateway rules, which can send traffic directly from a domestic gateway ([Split routing](/en/split-routing/#through-a-routing-gateway)).
 
+### AI services
+
+AI services (ChatGPT, Claude, Gemini, Cursor, and others) refuse some hosting addresses, and a session whose address jumps between countries, or briefly shows a home connection in Russia, can end in a logout or a suspended account. One route sends them all through WARP:
+
+```
+meridian route add exit-1 --preset ai
+```
+
+The preset is a single route named `ai` covering `geosite:category-ai-!cn`, `anthropic`, `openai`, `cursor`, and `google-gemini`; add `--via direct` to keep it on the exit's own address. WARP leaves in the exit's region, so keep AI users on exits in one country. A server route cannot catch traffic the device sends outside the VPN: on macOS, Happ may send traffic directly for a moment after the lid opens. If Google services still treat you as being in Russia, the "change the country associated with your account" request in Google Account help usually fixes it within hours.
+
 ## Geo-blocking
 
-By default, the server blocks Russian domains (`geosite:category-ru`) and Russian IP ranges (`geoip:ru`) through the proxy. This keeps your VPS IP out of Russian services' logs, which lowers the chance of it being found and blocked.
+By default, the server blocks Russian domains (`geosite:category-ru`) and Russian IP ranges (`geoip:ru`) through the VPN. This keeps your VPS IP out of Russian services' logs, which lowers the chance of it being found and blocked.
 
 Turn it off if your users need those sites through Meridian:
 
@@ -206,17 +235,9 @@ meridian deploy 198.51.100.10 --no-geo-block
 
 For a way to open Russian sites directly while keeping the block, see [Split routing](/en/split-routing/).
 
-## Client IPs
+## Client addresses
 
-By default the panel never learns where your users connect from: every TCP connection reaches Xray through nginx on the server, so Remnawave records the server's own address. That is the private choice, and nothing about users' locations is stored.
-
-Remnawave's per-user IP limits and connection logs need the real addresses. Turn them on with:
-
-```
-meridian deploy 198.51.100.10 --client-ips
-```
-
-nginx then passes each client's address to Xray and the panel. Hysteria2 is direct UDP and always shows the real address. Connections through a relay show the relay's address, and WebSocket or XHTTP through the Cloudflare CDN show Cloudflare's. The setting applies to the whole fleet; redeploy without the flag to turn it off.
+The control service never stores client IP addresses or connection logs. Every TCP connection reaches Xray through nginx on the server. By default the service keeps lifetime traffic totals and last seen; [Privacy](/en/privacy/) lets you opt in to daily history or device limits with a plain disclosure of what they reveal.
 
 ## Adding a relay
 
@@ -226,10 +247,45 @@ After the exit is running, add a relay on a domestic server so users keep a way 
 meridian relay add 203.0.113.10 --exit 198.51.100.10
 ```
 
-## Management panel
+## Web panel
 
-Meridian installs [Remnawave](https://remna.st/) as its panel. The panel is reverse-proxied by nginx on a random secret path, separate from the connection-page path, so links you share never reveal it. `meridian panel` prints the URL and admin login (`--show-password` for the password).
+The control service comes with a built-in web panel (owner console) for one owner: you. It sits on a random secret path, separate from the connection-page path, so links you share never reveal it. `meridian panel` prints its address, and until the panel has an owner, a one-time setup link:
 
-Treat the panel path like a password. The CLI uses the same panel API, so CLI changes show up in the panel. Meridian owns the hosts, profiles, and templates it creates: if you edit those in the panel, `meridian plan` reports the difference and the next apply restores Meridian's version. Client status, limits, expiry, and users you add yourself are yours; see [Web panel](/en/client-management/#web-panel).
+```
+  Meridian web panel
+  URL         https://198.51.100.10/<secret-path>/
+  Setup link  https://198.51.100.10/<secret-path>/#setup=…
+              Works once, for 15 minutes. Open it to choose the owner's password.
+```
 
-Meridian pins the Remnawave versions it has tested. `meridian fleet upgrade` moves your servers to the newest Remnawave release in the same major, without waiting for a Meridian update. If you upgrade Remnawave yourself, Meridian does not downgrade it.
+After choosing a password you can turn on a sign-in code from an authenticator app. In the web panel you add people, share their links and QR codes, set expiry dates, traffic limits, and device caps, keep private notes and tags, post a notice for everyone, choose privacy levels, and issue scoped API tokens; server health, traffic, monthly allowances, revisions, and topology settings are shown read-only, with the `meridian` command that changes them. See [Web panel](/en/client-management/#web-panel).
+
+Treat the panel address like a password. If you lose the password or the authenticator, `meridian panel --setup-link` prints a reset link: it sets a new password, turns the sign-in code off, and signs out every device.
+
+## Backups
+
+At the end of your first deploy, Meridian prints a recovery key, once:
+
+```
+  Recovery key (shown once; Meridian keeps no copy)
+
+    AGE-SECRET-KEY-1…
+
+  Write it down or print it, and keep it offline, away from this computer.
+```
+
+Store it somewhere offline, away from the machines that manage the fleet. After every change, Meridian saves an encrypted snapshot of the control service on your machine, readable with your machine's own key or the recovery key. If the control server is ever lost, [`meridian restore`](/en/recovery/#control-server-lost) rebuilds it on a new server from the newest snapshot.
+
+## Upgrades
+
+The control service and the node agent ship with Meridian. After `meridian update`, run `meridian fleet upgrade`: it shows what will change, then moves the control service to the new version and upgrades each agent in place, keeping every node's identity. It also moves relays to the newest Realm release without waiting for a Meridian update. Any `meridian apply` brings the control service and agents up to the installed Meridian too.
+
+## Moving from Remnawave
+
+A fleet deployed by an earlier Meridian 4 release runs the Remnawave panel. `meridian migrate` moves it to the control service in place, on the same servers:
+
+```
+meridian migrate
+```
+
+It backs up the panel's database (to your machine and to the control server), carries every client over with their keys, status, limits, expiry, and traffic, replaces each node's container with the agent, and checks that every subscription link is unchanged before it removes Remnawave. Clients keep their links and notice nothing. Panel-only data such as HWID device lists, per-day usage history, and plugin settings is not carried over, and client IP forwarding (which served the panel's per-user IP limits) is turned off; the review lists it. The move is resumable: if it stops, run `meridian migrate` again. See [`meridian migrate`](/en/cli-reference/#meridian-migrate).

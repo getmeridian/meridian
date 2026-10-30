@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "CommandUnitTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "core": {
+          "title": "Core",
+          "type": "boolean"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "resource_id": {
+          "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+          "title": "Resource Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "resource_id",
+        "name",
+        "core"
+      ],
+      "title": "CommandUnitTarget",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "capabilities": {
+      "items": {
+        "enum": [
+          "long_poll",
+          "files",
+          "systemd_units",
+          "nginx_artifacts",
+          "xray_config",
+          "xray_users",
+          "hysteria2_users",
+          "realm_forwarders",
+          "firewall_rules",
+          "binary_pins",
+          "agent_upgrade",
+          "traffic_stats",
+          "blob_fetch",
+          "reconcile",
+          "report",
+          "reset_inbound",
+          "restart_unit",
+          "renew_credential"
+        ],
+        "type": "string"
+      },
+      "title": "Capabilities",
+      "type": "array"
+    },
+    "inbounds": {
+      "items": {
+        "description": "Xray inbound tag.",
+        "maxLength": 64,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+        "type": "string"
+      },
+      "title": "Inbounds",
+      "type": "array"
+    },
+    "node_id": {
+      "description": "Node identifier: the server's lowercase topology ID, unique within the fleet.",
+      "maxLength": 48,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "title": "Node Id",
+      "type": "string"
+    },
+    "units": {
+      "items": {
+        "$ref": "#/$defs/CommandUnitTarget"
+      },
+      "title": "Units",
+      "type": "array"
+    }
+  },
+  "required": [
+    "node_id",
+    "units",
+    "inbounds",
+    "capabilities"
+  ],
+  "title": "NodeCommandTargets",
+  "type": "object"
+}

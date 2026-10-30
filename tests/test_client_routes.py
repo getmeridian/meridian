@@ -4,21 +4,21 @@ from dataclasses import replace
 
 import pytest
 
-from meridian.compiler import compile_topology, delivery
+from meridian.compiler import delivery
 from meridian.compiler.models import SubscriptionTemplatePayload
-from tests.support.topology import single_exit_intent
+from tests.support.topology import compile_panel_pass, single_exit_intent
 
 
 def test_bittorrent_bypass_changes_only_xray_templates(monkeypatch: pytest.MonkeyPatch) -> None:
     intent = single_exit_intent()
-    current = compile_topology(intent)
+    current = compile_panel_pass(intent)
     without_protocols = tuple(replace(route, protocols=()) for route in delivery.DEFAULT_CLIENT_ROUTES)
     # Simulate the previous routing policy through every renderer, including
     # formats that must ignore the new protocol-only entry entirely.
     for name in ("xray_client_rules", "mihomo_client_rules", "singbox_client_rules"):
         renderer = getattr(delivery, name)
-        monkeypatch.setattr(delivery, name, lambda renderer=renderer: renderer(without_protocols))
-    previous = {resource.logical_id: resource for resource in compile_topology(intent).resources}
+        monkeypatch.setattr(delivery, name, lambda routes, renderer=renderer: renderer(without_protocols))
+    previous = {resource.logical_id: resource for resource in compile_panel_pass(intent).resources}
 
     xray_templates = 0
     bittorrent = {"type": "field", "protocol": ["bittorrent"], "outboundTag": "DIRECT"}

@@ -1,40 +1,33 @@
 # provision — Pure-Python step pipeline
 ## Design decisions
 **Steps over scripts** — each step is a class with `run(conn, ctx) → StepResult` (ok/changed/skipped/failed); the pipeline stops on the first failure.
-**Recipes are ordered lists** — `build_server_baseline_steps()` (OS, SSH-safe UFW, optional Docker; paired with read-only `build_server_baseline_checks()`) and `build_setup_steps()` (swap, control plane, nginx, TLS) return steps in execution order, gated by plain `if`; keep each step after what it depends on. WARP installs through the reconciler's node-runtime driver.
+**Recipes are ordered lists** — `build_server_baseline_steps()` (with read-only `build_server_baseline_checks()`) and `build_setup_steps()` return steps in execution order, gated by plain `if`; keep each step after what it depends on.
 **Typed context** — `ProvisionContext` has explicit fields for configuration and inter-step data; no dictionary escape hatches.
-**Remnawave containers** — the panel stack runs in a bridge network on `127.0.0.1:3000` behind nginx; the node (`node_deploy.py`) runs host-network with `cap_add: NET_ADMIN`, without which the panel's node plugins and IP Control silently do nothing.
-**SSH for infrastructure, REST for configuration** — steps deploy containers; panel, user, and profile setup happens over the API once they run.
+**SSH for infrastructure, REST for configuration** — steps install the service and nginx; users, endpoints, and settings go over its admin API.
 **nginx and TLS split** — `nginx_render.py` renders config strings, `nginx.py` holds the steps, `tls.py` issues acme.sh certificates.
-**Semantic ensure helpers** — `ensure.py` wraps package, file, service, and UFW operations; use it plus `ServerFacts` instead of new check/act shell snippets.
-**Renderer-free steps** — `Provisioner.run()` emits typed core events; Rich lives only in `progress.py` (`RichStepRenderer` for the CLI, `NoopStepRenderer` for Engine and tests).
-**Cooperative cancellation** — `Provisioner.run(cancellation=...)` polls only before each step; a running step and its SSH commands always finish.
-**Relay steps are panel-agnostic** — `RelayContext` and `InstallRealm` back the reconciler's Realm driver; the binary installs as `RELAY_BINARY_PATH` and the sshd drop-in is `00-hardening.conf`.
+**Semantic ensure helpers** — `ensure.py` wraps package, file, service, and UFW operations; use it with `ServerFacts` instead of new check/act shell snippets.
+**Renderer-free steps** — `Provisioner.run()` emits typed core events; Rich lives only in `progress.py`. Cancellation is polled only between steps.
+**Control service install** — `InstallControlService` installs the exact `meridian-vpn` on a sha256-pinned uv under `/opt/ctld`, and never over a newer recorded package (`core/version_skew.py`).
 ## What's done well
-- **Idempotent containers** — panel steps check `docker inspect` before deploying and poll the backend's health endpoint after.
-- **Secrets generated once** — the PostgreSQL password and `APP_SECRET` come from `secrets.token_hex` on first install; restarts reuse `.env` (API tokens depend on `APP_SECRET`).
+- **Check before acting** — steps read package, file, and unit state first, so a rerun reports `ok`, not `changed`.
 ## Pitfalls
-- **Panel sub-path rewrites follow the bundle** — Remnawave has no base path, so `sub_filter` must match the shipped frontend's literals (3.4 uses backticks); re-grep on every backend bump and never rewrite `` `/api ``.
-- **nginx `add_header` inheritance** — a child `location` with `add_header` drops parent headers; use `map`.
-- **acme.sh short-lived IP certs** — 6-day certs need `--days 5` and an explicit renew window.
-- **nginx stream is a dynamic module** — install `libnginx-mod-stream`.
-- **nginx ≥ 1.25 comes from nginx.org** — `http2 on;` needs it; keep old conffiles (`--force-confdef --force-confold`) and add the `sites-enabled` include. The system-lab image pre-installs 1.27 and hides all three.
-- **Internal TLS servers need `absolute_redirect off` and `http2 on`** — behind the 443 stream router on 127.0.0.1:8443, slash redirects point browsers at `:8443`, and Xray's fingerprinted XHTTP client speaks HTTP/2 whatever ALPN says.
-- **XHTTP locations need `client_max_body_size 0`** — nginx counts streamed bodies against its 1m default; serve packet-up only.
-- **Never `return 444` in HTTPS blocks** — use 403/404 (less fingerprintable).
-- **Legacy stream config yields to V4** — `ConfigureNginx` skips `stream.d/meridian.conf` once a `meridian-v4-*` stream file listens on 443, or `nginx -t` fails on a duplicate listener.
-- **Panel data is the directory, never a named volume** — PostgreSQL uses the `./data` bind mount and the Compose `name:` is pinned; `runtime_migration.py` moves `/opt/remnawave` by one rename after stopping the old stack, refusing mounts or two directories first.
-- **`docker compose restart` keeps the old environment** — after an `env_file` change, `up -d --no-deps --force-recreate`.
-- **Teardown never removes the `meridian` CLI** — an operator-installed copy is how they redeploy.
-- **Teardown keeps what may predate Meridian** — fail2ban stays on (host hardening, like SSH settings), and nginx is stopped only when no operator config remains.
+- **nginx `add_header` inheritance** — a child `location` with `add_header` drops the parent's headers; use maps for cache and robots policies and keep page headers together.
+- **acme.sh short-lived IP certificates** need `--days 5` and an explicit renew window; report acme.sh's last lines (its first are timestamps), and name a rate limit's retry time instead of port advice.
+- **nginx stream is a dynamic module** (`libnginx-mod-stream`), and `http2 on;` needs nginx ≥ 1.25 from nginx.org; keep old conffiles and add the `sites-enabled` include on every run, since a preinstalled nginx.org build never had it.
+- **Internal TLS servers need `absolute_redirect off` and `http2 on`** — behind the 443 stream router, redirects otherwise point at the internal port, and Xray's XHTTP client speaks HTTP/2 whatever ALPN says.
+- **XHTTP locations need `client_max_body_size 0`** — nginx counts streamed bodies against its default limit.
+- **Never `return 444` in HTTPS blocks** — use 403/404, which are less fingerprintable.
+- **Legacy stream config yields to V4** — skip `stream.d/meridian.conf` once a `meridian-v4-*` file listens on 443, or `nginx -t` fails on a duplicate listener.
+- **Every apt-get goes through `ensure.run_apt()`** — it waits for unattended-upgrades or cloud-init to release the lock and names the holder; never silence apt's stderr, or a lock reads as an ordinary failure. Install only after a check says something is missing.
+- **Teardown keeps what the operator may own** — the `meridian` CLI, fail2ban, and nginx while operator config remains; `panel_stack_removal()` is the one list teardown and `migrate` share.
 - **One unit per `systemctl` call when a unit may be absent** — multi-unit `disable --now` aborts on a missing unit and stops nothing.
-- **Realm installs only a pinned tarball** — `RelayContext.realm_sha256` comes from the reviewed plan; a target without a digest fails (it once skipped verification silently).
-- **Realm is the static musl build, run before it replaces anything** — upstream's 2.9.6 gnu build needs glibc 2.38, so `fleet upgrade` on Ubuntu 22.04 overwrote a working binary with one that could not start. A binary that runs and fails observes as drift (reinstall), not unavailable evidence.
-- **A 1 GB control server needs swap** — without it the panel's first start starved sshd, and the retry hung on "Install system packages" (the step users saw); `EnsureSwap` runs first and adds `/swapfile` below `CONTROL_MIN_MEMORY_MB`. Teardown leaves it.
-- **Firewall follows the effective sshd port** — never assume `22/tcp`.
-- **Recipes never own public ports** — compiled, tagged rules open them; `ConfigureFirewall` deletes only the bare, comment-less `443/udp` an old bootstrap added.
-- **Baseline checks exit 1 for absence** — a bare `docker` or `ufw` exits 127 (stock Debian has no ufw), which observation treats as unavailable evidence.
-- **fail2ban reads sshd from the journal** — Debian 12 has no `auth.log`; `ConfigureFail2ban` writes `jail.d/sshd-journal.local` (needs `python3-systemd`) and re-checks the service after a pause.
-- **"Installed" means `install ok installed`** — `ServerFacts.installed_packages()` reads `${Status}`; `dpkg-query -W` also lists removed packages.
-- **Ubuntu and Debian both** — use `bind9-dnsutils` (Debian 13's `dnsutils` is virtual) and read the codename from `ServerFacts.os_release()`, not `lsb_release`.
-- **Generated file content stays off shell commands** — use `conn.put_text()`/`put_bytes()` with mode/owner/sensitive flags, not heredocs or `printf`.
+- **Realm installs only a pinned static musl tarball, run before it replaces anything** — a glibc build that couldn't start once overwrote a working binary; a target without a digest fails.
+- **Firewall follows the effective sshd port**, never an assumed `22/tcp`; recipes never open public ports, compiled tagged rules do.
+- **Baseline checks exit 1 for absence** — a missing `ufw` or `docker` exits 127, which observation treats as unavailable evidence.
+- **fail2ban reads sshd from the journal** — Debian 12 has no `auth.log`.
+- **"Installed" means `install ok installed`** — `dpkg-query -W` also lists removed packages.
+- **Ubuntu and Debian both** — use `bind9-dnsutils` and read the codename from `ServerFacts.os_release()`, not `lsb_release`.
+- **An unread install record stops the control-service install** — only an absent marker means fresh; a lost reply once let a forced install downgrade a newer service.
+- **Restart `ctld` when it started before its marker, config, or unit last changed** — a run whose reply was lost after writing them never restarted.
+- **Connection pages are service responses** — remove legacy page files only after nginx validates and reloads; a failed reload keeps them.
+- **Generated file content stays off shell commands** — use `conn.put_text()`/`put_bytes()` with mode, owner, and sensitive flags, not heredocs.

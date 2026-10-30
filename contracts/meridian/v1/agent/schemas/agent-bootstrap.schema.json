@@ -1,0 +1,96 @@
+{
+  "additionalProperties": false,
+  "description": "The file SSH bootstrap writes on a node before the agent first starts (mode 0600).\n\nThe enrollment token is single-use and short-lived; once enrolled, the agent\nrewrites this file with `enrollment_token` and `token_expires_at` set to null.\nA file that carries a token asks for a fresh enrollment (a new node key), so\nSSH bootstrap re-enrolls a node by writing a new token. `ca_sha256` pins the\nfleet's internal CA: the agent accepts only certificates chaining to that CA.",
+  "properties": {
+    "ca_sha256": {
+      "description": "SHA-256 of the internal CA certificate (DER).",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Ca Sha256",
+      "type": "string"
+    },
+    "enrollment_token": {
+      "anyOf": [
+        {
+          "description": "Opaque base64url token.",
+          "maxLength": 256,
+          "minLength": 32,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "One-time enrollment token; `null` once enrolled.",
+      "title": "Enrollment Token"
+    },
+    "fleet_id": {
+      "description": "Fleet identifier: a lowercase UUID fixed when the fleet is created.",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "title": "Fleet Id",
+      "type": "string"
+    },
+    "node_id": {
+      "description": "Node identifier: the server's lowercase topology ID, unique within the fleet.",
+      "maxLength": 48,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "title": "Node Id",
+      "type": "string"
+    },
+    "protocol": {
+      "const": "meridian.agent/v1",
+      "default": "meridian.agent/v1",
+      "title": "Protocol",
+      "type": "string"
+    },
+    "service_url": {
+      "description": "Base URL of the control service: scheme, host, and secret path, without a trailing slash.",
+      "maxLength": 512,
+      "pattern": "^https://[^\\s/]+/[A-Za-z0-9._~-]+(?:/[A-Za-z0-9._~-]+)*$",
+      "title": "Service Url",
+      "type": "string"
+    },
+    "tls_pin_sha256": {
+      "anyOf": [
+        {
+          "description": "Lowercase hex SHA-256 digest.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "SHA-256 of the service's TLS public key (SPKI) when 443 serves a self-signed certificate.",
+      "title": "Tls Pin Sha256"
+    },
+    "token_expires_at": {
+      "anyOf": [
+        {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "When the token expires; `null` once enrolled.",
+      "title": "Token Expires At"
+    }
+  },
+  "required": [
+    "protocol",
+    "service_url",
+    "fleet_id",
+    "node_id",
+    "enrollment_token",
+    "token_expires_at",
+    "ca_sha256",
+    "tls_pin_sha256"
+  ],
+  "title": "AgentBootstrap",
+  "type": "object"
+}

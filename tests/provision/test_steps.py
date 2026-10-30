@@ -59,7 +59,7 @@ class TestProvisionContextInterStepState:
 
     def test_object_fields_default_to_none(self):
         ctx = ProvisionContext(ip="198.51.100.1")
-        assert ctx.panel_api is None
+        assert ctx.control_service is None
         assert ctx.cluster is None
 
 

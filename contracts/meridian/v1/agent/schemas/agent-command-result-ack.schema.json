@@ -1,0 +1,24 @@
+{
+  "additionalProperties": false,
+  "description": "The service recorded the result and stops redelivering the command.",
+  "properties": {
+    "command_id": {
+      "description": "Idempotency key of a command: a lowercase UUID chosen by the service, never reused.",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "title": "Command Id",
+      "type": "string"
+    },
+    "type": {
+      "const": "command_result_ack",
+      "default": "command_result_ack",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "command_id"
+  ],
+  "title": "CommandResultAck",
+  "type": "object"
+}

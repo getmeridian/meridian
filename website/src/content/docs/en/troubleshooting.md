@@ -11,22 +11,22 @@ BEFORE INSTALL           → meridian check IP
   Tests: SNI reachability, port 443, DNS, OS, disk space.
 
 AFTER INSTALL, IS IT HEALTHY? → meridian check
-  "Are the panel, nodes, relays, ports, and certificates OK?"
+  "Are the control service, agents, relays, ports, and certificates OK?"
   Tests every server in the fleet by role, over SSH.
 
 AFTER INSTALL, CAN'T CONNECT → meridian test IP
-  "Is the proxy reachable from where I am right now?"
-  Tests: configured listeners, TLS/SNI, the delivered subscription, and real proxy traffic.
+  "Is the VPN reachable from where I am right now?"
+  Tests: configured listeners, TLS/SNI, the delivered subscription, and real VPN traffic.
   No SSH needed — runs from the client device.
 
 AFTER INSTALL, CHECK EXPOSURE → meridian test IP --probe
-  "Does this deployment reveal a proxy or management surface?"
+  "Does this deployment reveal a VPN or management surface?"
   Tests: public ports, TLS/HTTP behavior, paths, SNI, DNS and topology policy.
   No SSH needed — runs from the client device.
 
 AFTER INSTALL, SOMETHING BROKE → meridian doctor IP
   "Collect everything for debugging."
-  Collects: server OS, Docker, Remnawave node and nginx logs, ports, firewall, SNI, DNS.
+  Collects: server OS, Meridian's services, agent and nginx logs, ports, firewall, SNI, DNS.
 ```
 
 Add `--ai` to check or doctor for an AI-ready diagnostic prompt.
@@ -38,19 +38,19 @@ Add `--ai` to check or doctor for an AI-ready diagnostic prompt.
 **Causes:**
 1. Cloud provider firewall / security group blocks port 443 inbound
 2. ISP or network blocks the server IP entirely
-3. Server is down or proxy is not running
+3. Server is down or VPN services are not running
 4. UFW on the server doesn't allow port 443
 
 **Fixes:**
 1. Check cloud provider console — ensure port 443/TCP is allowed inbound
 2. Try from a different network (mobile data, another Wi-Fi)
-3. SSH in and check: `docker ps` (are `ctlsvc-api` and `netagent` running?), `systemctl status nginx`, `ss -tlnp sport = :443`
+3. SSH in and check: `systemctl status ctld netagent netcore nginx` (are they active?), `ss -tlnp sport = :443`
 4. Check UFW: `ufw status` — should show 443/tcp ALLOW
 
 ### TLS handshake fails
 
 **Causes:**
-1. Xray is not running inside the Docker container
+1. Xray (`netcore`) is not running
 2. Port 443 is occupied by another service
 3. Reality SNI target is unreachable from the server
 
@@ -99,27 +99,23 @@ Deploys and applies are checkpointed. Fix the reported cause and run the same co
 
 Another service (Apache, nginx) is using port 443. Stop it or use a clean server. `meridian check IP` tells you what's using the port.
 
-### Docker installation fails
+### Migration from Remnawave stops
 
-Conflicting Docker packages from distro repos. Meridian auto-removes them, but if Docker is already running with containers, it skips to avoid disruption.
-
-### Panel rename stops during an upgrade
-
-`meridian apply` moves a panel deployed by a 4.0 beta from `/opt/remnawave` to `/opt/ctlsvc`. Before stopping anything it refuses when both directories exist or `/opt/remnawave` is a mount point. Keep the directory that holds the panel's `data/` and `.env` as `/opt/ctlsvc` (or mount the volume there), move the other aside, then run `meridian apply` again. A rename interrupted midway resumes on the next apply.
+`meridian migrate` saves its progress after every step. Fix the reported cause and run it again; it continues where it stopped, and a finished migration does nothing. The panel's database is backed up before anything changes, in `~/.config/meridian/backups/` and in `/var/backups/meridian-migration/` on the control server. If the links check fails after the apply, Remnawave is left in place (stopped) and the command says so: that is a bug, so [open an issue](https://github.com/getmeridian/meridian/issues) with the output of `meridian doctor`.
 
 ### SSH connection errors
 
 Test SSH manually: `ssh root@SERVER_IP`. Ensure you have key-based access. Use `--user` flag if not root. If the server accepts only a password, run `meridian deploy` in a terminal without `--yes` and let it install a key (see [Password-only servers](/en/deploy/#password-only-servers)), or run `ssh-copy-id root@SERVER_IP` once.
 
-### Xray fails to start in the node container
+### A node agent is offline or doesn't apply
 
-Check the container: `meridian logs IP -c node -n 50`. Common causes are a port collision on the host (node runs in `network_mode: host`, so ports from `cluster.yml` must be free), an unreachable panel (node registration needs the panel's `node_secret_key` at boot), or a missing `NET_ADMIN` capability.
+Check its logs: `meridian logs IP -c node -n 50` shows the agent (`netagent`) and Xray (`netcore`). Common causes are a port collision on the host (Xray binds the ports from your topology directly, so they must be free), or an exit that can't reach the control server on TCP 443 (the agent dials out to it; check the provider's outbound firewall).
 
-**Fix:** run `meridian check IP` and follow its remediation before redeploying. To verify Remnawave panel state, log into the admin UI at `https://<IP>/<secret_path>/` and check **Nodes** → the node should be `connected`; `meridian fleet status` surfaces the same information from the CLI.
+**Fix:** run `meridian check IP` and follow its remediation, then `meridian apply`: it re-enrolls an agent that lost its identity and upgrades one that runs an old build. `meridian fleet status` shows whether each agent is online and has applied the current configuration; the web panel's **Servers** screen shows the same.
 
 ### Disk space insufficient
 
-Less than 2GB free. Free up space: `docker system prune -af`, `journalctl --vacuum-time=1d`, check `/var/log/`.
+Less than 2GB free. Free up space: `journalctl --vacuum-time=1d`, `apt-get clean`, check `/var/log/`.
 
 ### DNS resolution fails (domain mode)
 
@@ -127,13 +123,14 @@ The certificate for your domain can only be issued once the domain's A record po
 
 ## Was working, now stopped
 
-**Most common cause:** Server IP got blocked. Run `meridian test IP`; its findings distinguish network reachability from TLS, subscription, and proxy execution failures. A TCP failure can also mean a cloud firewall or an offline server.
+**Most common cause:** Server IP got blocked. Run `meridian test IP`; its findings distinguish network reachability from TLS, subscription, and tunnel failures. A TCP failure can also mean a cloud firewall or an offline server.
 
 See the [IP Blocked Recovery guide](/en/recovery/) for recovery options (replacement exit, relay, CDN fallback).
 
 Other causes:
-- Server rebooted and services didn't start → `meridian plan` shows what is off and `meridian apply` repairs it. By hand: `docker compose up -d` in `/opt/ctlsvc` and `/opt/netagent`, then `systemctl restart nginx`
-- Disk full → `df -h /`, `docker system prune -af`
+- Server rebooted and services didn't start → `meridian plan` shows what is off and `meridian apply` repairs it. By hand: `systemctl restart ctld netagent nginx`
+- Disk full → `df -h /`, `journalctl --vacuum-time=1d`
+- Control server gone for good → rebuild it from a snapshot with `meridian restore` ([Control server lost](/en/recovery/#control-server-lost))
 - Connected, but sites by name do not open (IP addresses still do) → the exit reaches none of its encrypted DNS resolvers. `meridian check` names them under **Encrypted DNS**; allow outbound TCP 443 to those addresses in the provider's firewall
 
 ## Slow speeds
@@ -182,9 +179,9 @@ See the [Relay guide — Troubleshooting](/en/relay/#troubleshooting) section fo
 |---------|-----------------|
 | Local Machine | OS compatibility |
 | Server | OS version, uptime (recent reboot?), disk/memory usage |
-| Docker | Are the `ctlsvc-api` (panel) and `netagent` (node) containers running? Status should be "Up" |
-| Exit node Logs | Node startup errors, "failed to start" entries, certificate issues |
-| Listening Ports | Port 443 should show nginx. If missing, proxy isn't running |
+| Services | Are `ctld` (control service), `netagent` (agent), and `netcore` (Xray) active? |
+| Exit node Logs | Agent and Xray startup errors, "failed to start" entries, certificate issues |
+| Listening Ports | Port 443 should show nginx. If missing, nginx isn't running |
 | Firewall (UFW) | Port 443/tcp should be ALLOW. If not listed, it's blocked |
 | Camouflage Target | Should show CONNECTED with a certificate chain |
 | Domain DNS | Should resolve to server IP |
@@ -196,11 +193,11 @@ See the [Relay guide — Troubleshooting](/en/relay/#troubleshooting) section fo
 | TCP reachability | Every configured public TCP listener is reachable | Firewall, ISP block, server down, or wrong topology |
 | TLS/SNI camouflage | The target presents the expected camouflage identity | TLS routing, certificate, DNS, or SNI mismatch |
 | Domain root | Hardened `403`/`404` response is reachable | DNS/nginx failure or unintended public content |
-| Subscription | Remnawave delivered valid Xray JSON for an active client | Missing/inactive client, panel failure, or broken template |
+| Subscription | The control service delivered valid Xray JSON for an active client | Missing or inactive client, or the control service unreachable |
 | Automatic fallback | The delivered policy carried real traffic | Balancer, routing, credential, or endpoint failure |
 | Protocol checks | Each target outbound carried real traffic | Protocol-specific listener, firewall, or delivered config failure |
 
-The full test rotates independent public IP observers and checks the same observers directly. If neither the proxy nor control path can obtain an IP, the result is inconclusive rather than a false protocol failure. Set `MERIDIAN_CONNECT_TEST_URL` only when you operate a known observer endpoint.
+The full test rotates independent public IP observers and checks the same observers directly. If neither the VPN tunnel nor the direct path can obtain an IP, the result is inconclusive rather than a false protocol failure. Set `MERIDIAN_CONNECT_TEST_URL` only when you operate a known observer endpoint.
 
 The first full test may spend up to 120 seconds downloading and verifying the pinned Xray release from GitHub. After bootstrap, `--timeout` (default `5`, range `1`-`30`) applies to individual network operations. Exit `0` passed, `4` completed with negative findings, and `3` was inconclusive because required evidence was skipped. Basic mode cannot verify UDP-only Hysteria2 traffic.
 

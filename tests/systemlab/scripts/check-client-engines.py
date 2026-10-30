@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 from meridian.cluster import ClusterConfig
-from meridian.remnawave import MeridianPanel
+from meridian.control.client import ControlClient
 from tests.systemlab.subscription_client import (
     ENGINE_NAMES,
     MIHOMO_CLIENT_TYPE,
@@ -52,11 +52,11 @@ def main() -> int:
         return 1
     cluster = ClusterConfig.load()
     if not cluster.panel.url or not cluster.panel.api_token:
-        print("FAIL: panel credentials are missing")
+        print("FAIL: control service credentials are missing")
         return 1
-    with MeridianPanel(cluster.panel.url, cluster.panel.api_token) as panel:
+    with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
         documents = {
-            client_type: fetch_canonical_document(panel, args.username, client_type) for client_type in _PARSERS
+            client_type: fetch_canonical_document(client, args.username, client_type) for client_type in _PARSERS
         }
 
     failures = 0

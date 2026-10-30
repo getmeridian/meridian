@@ -9,7 +9,8 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from meridian.core.inputs import TOPOLOGY_ID_MAX_LENGTH
+from meridian.core.client_limits import UserCreationSettings
+from meridian.core.inputs import TOPOLOGY_ID_MAX_LENGTH, is_ip
 from meridian.core.topology import (
     AccessIntent,
     EgressOverrideAction,
@@ -23,7 +24,11 @@ from meridian.setup.default_paths import default_exit_paths
 
 
 def add_access_users_to_intent(
-    intent: SetupIntent, usernames: list[str], display_names: Mapping[str, str] | None = None
+    intent: SetupIntent,
+    usernames: list[str],
+    display_names: Mapping[str, str] | None = None,
+    *,
+    creation_settings: Mapping[str, UserCreationSettings] | None = None,
 ) -> SetupIntent:
     """Return validated intent with new access users in stable request order."""
     existing = set(intent.access.users)
@@ -35,6 +40,7 @@ def add_access_users_to_intent(
         squad_name=intent.access.squad_name,
         users=[*intent.access.users, *usernames],
         display_names={**intent.access.display_names, **(display_names or {})},
+        creation_settings={**intent.access.creation_settings, **(creation_settings or {})},
     ).model_dump(mode="json")
     return SetupIntent.model_validate(payload)
 
@@ -51,6 +57,9 @@ def remove_access_user_from_intent(intent: SetupIntent, username: str) -> SetupI
         squad_name=intent.access.squad_name,
         users=remaining,
         display_names={user: name for user, name in intent.access.display_names.items() if user != username},
+        creation_settings={
+            user: settings for user, settings in intent.access.creation_settings.items() if user != username
+        },
     ).model_dump(mode="json")
     return SetupIntent.model_validate(payload)
 
@@ -150,14 +159,49 @@ def remove_exit_from_intent(intent: SetupIntent, exit_id: str) -> SetupIntent:
     return _validated(payload)
 
 
-def move_exit_in_intent(intent: SetupIntent, exit_id: str, server_ref: str) -> SetupIntent:
-    """Return validated intent with one exit on another server; its ID, paths, and settings stay."""
+def move_exit_in_intent(
+    intent: SetupIntent, exit_id: str, server_ref: str, *, old_address: str = "", new_address: str = ""
+) -> SetupIntent:
+    """Return validated intent with one exit on another server; its ID, paths, and settings stay.
+
+    A bare-IP path names the old server's address as its certificate SNI and Host;
+    those follow the exit to ``new_address`` (domains stay: their DNS is the operator's).
+    """
     if not any(exit_.id == exit_id for exit_ in intent.exits):
         raise ValueError(f"Exit {exit_id!r} is not in the topology.")
+    follows = is_ip(old_address) and is_ip(new_address)
     payload = intent.model_dump(mode="json")
     for exit_ in payload["exits"]:
-        if exit_["id"] == exit_id:
-            exit_["server_ref"] = server_ref
+        if exit_["id"] != exit_id:
+            continue
+        exit_["server_ref"] = server_ref
+        for path in exit_["paths"] if follows else []:
+            for field in ("tls_sni", "host"):
+                if path.get(field) == old_address:
+                    path[field] = new_address
+    return _validated(payload)
+
+
+def move_control_server_in_intent(
+    intent: SetupIntent, server_ref: str, *, old_address: str = "", new_address: str = ""
+) -> SetupIntent:
+    """Return validated intent with the control plane, and every exit beside it, on another server.
+
+    A relay hop or routing gateway on the old control server cannot move with it yet.
+    """
+    old = intent.control.server_ref
+    if old == server_ref:
+        return intent
+    stuck = [gateway.id for gateway in intent.routing_gateways if gateway.server_ref == old]
+    stuck += [relay.id for relay in intent.transparent_relays if old in relay.hop_server_refs]
+    if stuck:
+        raise ValueError(f"the control server also runs {', '.join(sorted(stuck))}, which cannot move with it")
+    moved = intent
+    for exit_ in intent.exits:
+        if exit_.server_ref == old:
+            moved = move_exit_in_intent(moved, exit_.id, server_ref, old_address=old_address, new_address=new_address)
+    payload = moved.model_dump(mode="json")
+    payload["control"]["server_ref"] = server_ref
     return _validated(payload)
 
 
@@ -286,6 +330,12 @@ def _override_kind(value: str) -> EgressOverrideMatch:
 def _validated(payload: dict[str, Any]) -> SetupIntent:
     """Validate an edited intent, surfacing the first rule it breaks as a plain message."""
     try:
+        metadata = payload.pop("server_metadata", {})
+        updated = SetupIntent.model_validate(payload)
+        if not metadata:
+            return updated
+        refs = set(updated.declared_server_refs())
+        payload["server_metadata"] = {ref: settings for ref, settings in metadata.items() if ref in refs}
         return SetupIntent.model_validate(payload)
     except ValidationError as exc:
         message = str(exc.errors()[0].get("msg", exc)).removeprefix("Value error, ")

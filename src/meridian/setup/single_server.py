@@ -8,9 +8,9 @@ the same SNI to both the control plane and an exit.
 from __future__ import annotations
 
 from meridian.compiler import compile_topology
-from meridian.compiler.models import ConfigProfilePayload
+from meridian.compiler.models import NodeWorkloadPayload
 from meridian.core.deploy import DeployPlan, DeployPorts, DeployRequest
-from meridian.core.errors import LocalStateError
+from meridian.core.errors import LocalStateError, RemnawaveFleetError
 from meridian.core.topology import (
     AccessIntent,
     ControlPlaneIntent,
@@ -71,6 +71,8 @@ def single_server_intent(
             access=AccessIntent(users=[client_name or DEFAULT_CLIENT]),
         )
 
+    if existing.control.backend == "remnawave":
+        raise RemnawaveFleetError()
     current = next((item for item in existing.exits if item.server_ref == server_ref), None)
     if current is None:
         raise LocalStateError(
@@ -148,8 +150,8 @@ def preview_single_server_deploy(
     ports = {
         inbound.protocol: inbound.listen_port
         for resource in plan.resources
-        if isinstance(resource.payload, ConfigProfilePayload) and resource.payload.workload_id
-        for inbound in resource.payload.inbounds
+        if isinstance(resource.payload, NodeWorkloadPayload)
+        for inbound in resource.payload.profile.inbounds
     }
     paths = {path.protocol: path.path for item in intent.exits if item.server_ref == server_ref for path in item.paths}
     return DeployPlan(

@@ -1,0 +1,293 @@
+{
+  "$defs": {
+    "ApplyCounts": {
+      "additionalProperties": false,
+      "description": "Aggregate counts for apply execution.",
+      "properties": {
+        "actions": {
+          "title": "Actions",
+          "type": "integer"
+        },
+        "failed": {
+          "title": "Failed",
+          "type": "integer"
+        },
+        "skipped": {
+          "title": "Skipped",
+          "type": "integer"
+        },
+        "succeeded": {
+          "title": "Succeeded",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "actions",
+        "succeeded",
+        "failed",
+        "skipped"
+      ],
+      "title": "ApplyCounts",
+      "type": "object"
+    },
+    "CompiledApplyActionResult": {
+      "additionalProperties": false,
+      "description": "Execution result for one V4 compiler resource.",
+      "properties": {
+        "changed": {
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "error": {
+          "default": "",
+          "title": "Error",
+          "type": "string"
+        },
+        "resource_id": {
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "converged",
+            "applied",
+            "failed",
+            "unknown",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "success": {
+          "title": "Success",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "resource_id",
+        "status",
+        "success",
+        "changed"
+      ],
+      "title": "CompiledApplyActionResult",
+      "type": "object"
+    },
+    "CompiledApplyPreview": {
+      "additionalProperties": false,
+      "description": "Reviewed V4 compiler-plan metadata returned before confirmation.",
+      "properties": {
+        "plan_hash": {
+          "title": "Plan Hash",
+          "type": "string"
+        },
+        "resource_count": {
+          "minimum": 0,
+          "title": "Resource Count",
+          "type": "integer"
+        },
+        "retiring_resources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Retiring Resources",
+          "type": "array"
+        },
+        "review_hash": {
+          "default": "",
+          "description": "Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed.",
+          "title": "Review Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_hash",
+        "resource_count"
+      ],
+      "title": "CompiledApplyPreview",
+      "type": "object"
+    },
+    "CompiledApplyResult": {
+      "additionalProperties": false,
+      "description": "Apply result for one generation-scoped V4 compiler plan.",
+      "properties": {
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/CompiledApplyActionResult"
+          },
+          "title": "Actions",
+          "type": "array"
+        },
+        "all_succeeded": {
+          "title": "All Succeeded",
+          "type": "boolean"
+        },
+        "changed": {
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "counts": {
+          "$ref": "#/$defs/ApplyCounts"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "generation": {
+          "minimum": 0,
+          "title": "Generation",
+          "type": "integer"
+        },
+        "plan_hash": {
+          "title": "Plan Hash",
+          "type": "string"
+        },
+        "retired_resources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Retired Resources",
+          "type": "array"
+        },
+        "retirement_errors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Retirement Errors",
+          "type": "array"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_hash",
+        "generation",
+        "all_succeeded",
+        "changed",
+        "summary",
+        "exit_code",
+        "counts"
+      ],
+      "title": "CompiledApplyResult",
+      "type": "object"
+    },
+    "ServerMetadata": {
+      "additionalProperties": false,
+      "description": "Deployer-owned metadata keyed to a server declared in the topology.",
+      "properties": {
+        "allowance_bytes": {
+          "anyOf": [
+            {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Allowance Bytes"
+        },
+        "pay_every": {
+          "anyOf": [
+            {
+              "enum": [
+                "month",
+                "year"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pay Every"
+        },
+        "pay_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pay On"
+        },
+        "provider": {
+          "default": "",
+          "maxLength": 80,
+          "title": "Provider",
+          "type": "string"
+        },
+        "reset_day": {
+          "default": 1,
+          "maximum": 31,
+          "minimum": 1,
+          "title": "Reset Day",
+          "type": "integer"
+        }
+      },
+      "title": "ServerMetadata",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "applied": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CompiledApplyResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "dry_run": {
+      "default": false,
+      "title": "Dry Run",
+      "type": "boolean"
+    },
+    "metadata": {
+      "$ref": "#/$defs/ServerMetadata"
+    },
+    "notes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Notes",
+      "type": "array"
+    },
+    "review": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CompiledApplyPreview"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "server_ref": {
+      "maxLength": 120,
+      "minLength": 1,
+      "pattern": "^[^\\r\\n\\t]+$",
+      "title": "Server Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "server_ref",
+    "metadata"
+  ],
+  "title": "ServerSetResult",
+  "type": "object"
+}

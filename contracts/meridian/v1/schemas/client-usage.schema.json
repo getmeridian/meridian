@@ -1,0 +1,69 @@
+{
+  "$defs": {
+    "UserTrafficDay": {
+      "additionalProperties": false,
+      "properties": {
+        "day": {
+          "format": "date",
+          "title": "Day",
+          "type": "string"
+        },
+        "downlink_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Downlink Bytes",
+          "type": "integer"
+        },
+        "uplink_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Uplink Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "day",
+        "uplink_bytes",
+        "downlink_bytes"
+      ],
+      "title": "UserTrafficDay",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "UTC days, oldest first, including zero-use days; never reconstructed from lifetime totals.",
+  "properties": {
+    "daily": {
+      "items": {
+        "$ref": "#/$defs/UserTrafficDay"
+      },
+      "title": "Daily",
+      "type": "array"
+    },
+    "days": {
+      "description": "Days returned, including today; at most the retention cap.",
+      "maximum": 730,
+      "minimum": 1,
+      "title": "Days",
+      "type": "integer"
+    },
+    "history_days": {
+      "maximum": 730,
+      "minimum": 7,
+      "title": "History Days",
+      "type": "integer"
+    },
+    "username": {
+      "title": "Username",
+      "type": "string"
+    }
+  },
+  "required": [
+    "username",
+    "days",
+    "history_days",
+    "daily"
+  ],
+  "title": "UserUsage",
+  "type": "object"
+}

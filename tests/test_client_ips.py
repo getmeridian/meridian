@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import TypeVar
 
-from meridian.compiler import compile_topology
 from meridian.compiler.models import InboundPayload, NginxArtifactPayload, NginxRouteSpec, ResourcePlan
 from meridian.core.deploy import DeployRequest
 from meridian.provision.nginx_render import render_nginx_server_block
 from meridian.reconciler.server_render import render_nginx_artifact
 from meridian.setup.single_server import request_intent
 from meridian.xray_workload import render_workload_config
+from tests.support.topology import compile_panel_pass
 from tests.test_xray_workload import _keys, _profile
 
 ADDRESSES = {"srv-a": "198.51.100.10"}
@@ -21,7 +21,7 @@ def _plan(*, client_ips: bool) -> ResourcePlan:
     request = DeployRequest(ip="198.51.100.10", domain="vpn.example.com", client_ips=client_ips)
     intent = request_intent(None, request, server_ref="srv-a", address="198.51.100.10")
     assert intent.forward_client_ips is client_ips
-    return compile_topology(intent)
+    return compile_panel_pass(intent)
 
 
 def _payloads(plan: ResourcePlan, kind: type[T]) -> list[T]:
@@ -119,8 +119,8 @@ def test_panel_server_always_offers_a_proxy_protocol_listener() -> None:
     rendered = render_nginx_server_block(
         host="198.51.100.10",
         nginx_internal_port=8443,
-        panel_web_base_path="panel",
-        panel_internal_port=3000,
+        service_base_path="panel",
+        service_port=3000,
         info_page_path="info",
         extra_locations="",
         root_action="return 404;",

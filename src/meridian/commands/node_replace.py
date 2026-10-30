@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING
 import typer
 from rich.markup import escape
 
-from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, require_intent, reviewed_runtime
+from meridian.commands._helpers import (
+    apply_reviewed_intent,
+    forget_unreachable_servers,
+    load_topology_cluster,
+    require_intent,
+    reviewed_runtime,
+)
 from meridian.commands._validation import validate_command_input
 from meridian.console import confirm, err_console, fail, ok
 from meridian.core.command_inputs import NodeTargetRequest
@@ -15,10 +21,19 @@ from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.topology import ExitIntent, SetupIntent
 
 if TYPE_CHECKING:
-    from meridian.servers import ServerRegistry
+    from meridian.servers import ServerEntry, ServerRegistry
 
 
-def run_replace(old: str, new: str, *, name: str = "", user: str = "", ssh_port: int = 0, yes: bool = False) -> None:
+def run_replace(
+    old: str,
+    new: str,
+    *,
+    name: str = "",
+    user: str = "",
+    ssh_port: int = 0,
+    yes: bool = False,
+    forget_unreachable: bool = False,
+) -> None:
     """Move exit OLD onto server NEW, keeping its ID, keys, paths, settings, and relays."""
     request = validate_command_input(NodeTargetRequest, "Invalid node replace request", ip_or_name=old)
     from meridian.commands.resolve import resolve_server
@@ -37,29 +52,34 @@ def run_replace(old: str, new: str, *, name: str = "", user: str = "", ssh_port:
     target = resolve_server(registry, explicit_ip=new, user=user, port=ssh_port)
     try:
         roles = registry.roles(target.ip, cluster)
+        current = registry.find(target.ip)
     except LocalStateError as exc:
         fail(exc)
-    if roles:
+    if roles and not (current is not None and current.id == exit_.server_ref):
         fail(
             f"{target.ip} already serves {', '.join(roles)}",
             hint="Replace an exit with a server that has no role yet; free this one with `meridian node remove` first.",
             hint_type="user",
         )
     entry = register_server(registry, target, name=name)
-    if entry.id == exit_.server_ref:
+    old_address = _old_address(registry, exit_, entry)
+    if entry.id == exit_.server_ref and not old_address:
         fail(f"Exit {exit_.id} already runs on {old_label}", hint_type="user")
     new_label = entry.name or entry.host
     try:
-        updated = move_exit_in_intent(intent, exit_.id, entry.id)
+        updated = move_exit_in_intent(intent, exit_.id, entry.id, old_address=old_address, new_address=entry.host)
     except ValueError as exc:
         fail(f"Cannot move exit {exit_.id}: {exc}", hint="Adjust the topology in `meridian setup`.", hint_type="user")
 
+    forget_unreachable_servers(cluster, registry, updated, forget=forget_unreachable, yes=yes)
     try:
         review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(updated), cluster=cluster)
     except MeridianError as exc:
         fail(exc)
 
     subject = f"exit {exit_.id} from {old_label} to {new_label}"
+    if entry.id == exit_.server_ref:
+        subject = f"exit {exit_.id}'s certificate address from {old_address} to {entry.host} on {new_label}"
     relays = sorted(relay.id for relay in intent.transparent_relays if relay.exit_ref == exit_.id)
     err_console.print()
     err_console.print(f"  [bold]Move {escape(subject)}[/bold]")
@@ -82,7 +102,10 @@ def run_replace(old: str, new: str, *, name: str = "", user: str = "", ssh_port:
         registry,
         updated,
         failure=f"Exit {exit_.id} was not fully moved",
-        hint=f"The topology already places it on {new_label}; rerun `meridian apply` to finish the move.",
+        hint=(
+            f"The topology already places it on {new_label}; rerun `meridian apply` to finish the move "
+            "(add --forget-unreachable if the old server no longer answers)."
+        ),
         expected_plan_hash=review.review_hash,
     )
     ok(f"Moved {subject} ({len(result.retired)} old resources cleaned up). {old_label} stays in your saved servers.")
@@ -108,6 +131,21 @@ def _exit_to_move(intent: SetupIntent, registry: ServerRegistry, query: str) -> 
     if exit_ is None:
         fail(f"Exit '{query}' not found", hint="Check node list with: meridian node list", hint_type="user")
     return exit_
+
+
+def _old_address(registry: ServerRegistry, exit_: ExitIntent, entry: ServerEntry) -> str:
+    """The address the exit's bare-IP paths must leave behind.
+
+    A move names the old server's. Rerun on the server the exit already runs on, it
+    is a path address that belongs to another saved server: a move before 4.0.0b9
+    left it there, so the new server could never get a certificate.
+    """
+    if entry.id != exit_.server_ref:
+        old = registry.find(exit_.server_ref)
+        return old.host if old is not None else ""
+    others = {saved.host for saved in registry.list() if saved.id != entry.id}
+    named = {value for path in exit_.paths for value in (path.tls_sni, path.host) if value}
+    return next(iter(sorted(named & others)), "")
 
 
 def _label(registry: ServerRegistry, server_ref: str) -> str:

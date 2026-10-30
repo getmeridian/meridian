@@ -16,6 +16,8 @@ from meridian.compiler.names import (
     RemnawaveTemplateName,
     RemnawaveUsername,
 )
+from meridian.core.client_limits import UserCreationSettings
+from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import (
     IPAddressValue,
     OptionalCountryCodeValue,
@@ -25,13 +27,17 @@ from meridian.core.inputs import (
     is_ip,
 )
 from meridian.core.models import CoreModel
+from meridian.core.owner_contact import OwnerContactSettings
 from meridian.core.resources import ResourceKind as ResourceKind
+from meridian.core.server_allowances import ServerAllowanceSpec
 from meridian.core.topology import (
     DEFAULT_TLS_FINGERPRINT,
+    ClientRoutingPolicy,
     EgressOverrideMatch,
     EgressStrategy,
     ProtocolKind,
     RouteMatchKind,
+    SubscriptionUpdateIntervalHours,
     TlsFingerprint,
     TrafficRouteAction,
 )
@@ -309,13 +315,15 @@ class SubscriptionTemplatePayload(CoreModel):
 
 # Hours between automatic subscription refreshes, sent as ``profile-update-interval``
 # (Happ and the Clash family read whole hours). New exits and relays reach apps this fast.
-SUBSCRIPTION_UPDATE_INTERVAL_HOURS = 6
 
 
 class SubscriptionSettingsPayload(CoreModel):
     kind: Literal["subscription_settings"] = "subscription_settings"
     profile_title: str
-    update_interval_hours: int = Field(default=SUBSCRIPTION_UPDATE_INTERVAL_HOURS, ge=1)
+    update_interval_hours: SubscriptionUpdateIntervalHours = SUBSCRIPTION_UPDATE_INTERVAL_HOURS
+    client_routing: ClientRoutingPolicy = Field(
+        default=DEFAULT_CLIENT_ROUTING, exclude_if=lambda value: value == DEFAULT_CLIENT_ROUTING
+    )
     randomize_hosts: bool = False
     # Apps Remnawave knows read Xray JSON (Happ, v2rayNG, Streisand, ...) get it instead of
     # base64 links, and with it the automatic failover between entries.
@@ -439,6 +447,84 @@ class ProbePayload(CoreModel):
     expected: str = ""
 
 
+# Meridian's own control service (#95): these kinds replace the Remnawave ones above when
+# `ControlPlaneIntent.backend` is "meridian".
+
+
+class ControlServicePayload(CoreModel):
+    """`meridian serve` behind the control server's nginx, with its TLS and secret paths."""
+
+    kind: Literal["control_service"] = "control_service"
+    server_ref: str
+    public_hostname: str = ""
+    internal_https_port: int = Field(default=8443, ge=1, le=65535)
+    service_port: int = Field(default=3000, ge=1, le=65535)
+
+
+class AgentRuntimePayload(CoreModel):
+    """The node agent on one server, enrolled with the control service over SSH."""
+
+    kind: Literal["agent_runtime"] = "agent_runtime"
+    workload_ref: str
+    server_ref: str
+    # Cloudflare WARP in SOCKS proxy mode beside the agent, installed over SSH like a panel node's.
+    warp: bool = Field(default=False, exclude_if=lambda enabled: not enabled)
+
+
+class NodeWorkloadPayload(CoreModel):
+    """Everything one exit's agent runs: the reviewed Xray profile it renders into a node spec."""
+
+    kind: Literal["node_workload"] = "node_workload"
+    workload_ref: str
+    server_ref: str
+    agent_ref: str
+    profile: ConfigProfilePayload
+
+
+class ClientEndpointPayload(CoreModel):
+    """One way into an exit that subscriptions publish."""
+
+    kind: Literal["client_endpoint"] = "client_endpoint"
+    owner_ref: str
+    workload_ref: str
+    remark: str
+    protocol: ProtocolKind
+    address_server_ref: str
+    address: str = ""
+    public_port: int
+    sni: str = ""
+    host: str = ""
+    path: str = ""
+    fingerprint: str = ""
+    position: int = 0
+    # Another fingerprint of an earlier entry: listed, but never in the same failover group.
+    fingerprint_copy: bool = False
+
+
+class ControlUserPayload(CoreModel):
+    kind: Literal["control_user"] = "control_user"
+    username: RemnawaveUsername
+    creation_settings: UserCreationSettings | None = Field(default=None, exclude_if=lambda settings: settings is None)
+
+
+class ServiceSettingsPayload(OwnerContactSettings):
+    kind: Literal["service_settings"] = "service_settings"
+    profile_title: str
+    servers: dict[ServerReferenceValue, ServerAllowanceSpec] = Field(
+        default_factory=dict, exclude_if=lambda servers: not servers
+    )
+    exit_countries: list[OptionalCountryCodeValue] = Field(
+        default_factory=list, max_length=250, exclude_if=lambda value: not value
+    )
+    update_interval_hours: SubscriptionUpdateIntervalHours = Field(
+        default=SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
+        exclude_if=lambda value: value == SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
+    )
+    client_routing: ClientRoutingPolicy = Field(
+        default=DEFAULT_CLIENT_ROUTING, exclude_if=lambda value: value == DEFAULT_CLIENT_ROUTING
+    )
+
+
 ResourcePayload: TypeAlias = Annotated[
     ServerBaselinePayload
     | ControlPlaneRuntimePayload
@@ -460,7 +546,13 @@ ResourcePayload: TypeAlias = Annotated[
     | RoutingGatewayPayload
     | EgressPoolPayload
     | RouteRulePayload
-    | ProbePayload,
+    | ProbePayload
+    | ControlServicePayload
+    | AgentRuntimePayload
+    | NodeWorkloadPayload
+    | ClientEndpointPayload
+    | ControlUserPayload
+    | ServiceSettingsPayload,
     Field(discriminator="kind"),
 ]
 

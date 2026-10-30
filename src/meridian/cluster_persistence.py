@@ -22,6 +22,8 @@ from meridian.cluster import (
     BrandingConfig,
     ClusterConfig,
     ClusterConfigExternallyModifiedError,
+    ControlMigration,
+    ControlRestore,
     PanelConfig,
     SubscriptionPageConfig,
     TelegramConfig,
@@ -44,7 +46,7 @@ def _public_fields(cls: type) -> set[str]:
 _PANEL_FIELDS = _public_fields(PanelConfig)
 _BRANDING_FIELDS = _public_fields(BrandingConfig)
 _SUBSCRIPTION_PAGE_FIELDS = _public_fields(SubscriptionPageConfig)
-_KNOWN_TOP = _public_fields(ClusterConfig)
+_KNOWN_TOP = _public_fields(ClusterConfig) | {"connection_page_markers"}  # Retired; consume and drop.
 
 
 def _load_binary_pins(raw: object) -> dict[str, BinaryPin]:
@@ -138,8 +140,11 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
         if tg_dict:
             out["telegram"] = tg_dict
 
-    if cfg.connection_page_markers:
-        out["connection_page_markers"] = list(cfg.connection_page_markers)
+    if cfg.control_migration is not None:
+        out["control_migration"] = _serialize_dataclass(cfg.control_migration)
+    if cfg.control_restore is not None:
+        out["control_restore"] = _serialize_dataclass(cfg.control_restore)
+
     if cfg.fleet_id:
         out["fleet_id"] = cfg.fleet_id
     if cfg.image_pins:
@@ -204,16 +209,9 @@ def _load_dataclass(
     return cls(**values, _extra=extra)
 
 
-def _load_string_list(data: dict[str, Any], key: str) -> list[str]:
-    """Load one required string-list shape from typed cluster state."""
-    raw = data.get(key, [])
-    if not isinstance(raw, list) or any(not isinstance(item, str) for item in raw):
-        raise ValueError(f"{key} must be a list of strings")
-    return list(raw)
-
-
 def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
     """Load a cluster config from parsed YAML."""
+    _name_legacy_backend(data)
     # Panel
     panel = _load_dataclass(
         data.get("panel", {}),
@@ -250,7 +248,20 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
             _public_fields(TelegramConfig),
         )
 
-    connection_page_markers = _load_string_list(data, "connection_page_markers")
+    control_migration: ControlMigration | None = None
+    if data.get("control_migration") is not None:
+        raw_migration = data["control_migration"]
+        control_migration = _load_dataclass(
+            raw_migration,
+            ControlMigration,
+            _public_fields(ControlMigration),
+            transforms={"imported_users": lambda value: [str(item) for item in value or []]},
+        )
+
+    control_restore: ControlRestore | None = None
+    if data.get("control_restore") is not None:
+        control_restore = _load_dataclass(data["control_restore"], ControlRestore, _public_fields(ControlRestore))
+
     raw_fleet_id = data.get("fleet_id")
     fleet_id = raw_fleet_id if isinstance(raw_fleet_id, str) else ""
     raw_pins = data.get("image_pins")
@@ -271,12 +282,13 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         branding=branding,
         subscription_page=subscription_page,
         telegram=telegram,
+        control_migration=control_migration,
+        control_restore=control_restore,
         topology_intent=v3.topology_intent,
         workloads=v3.workloads,
         managed_bindings=v3.managed_bindings,
         allocations=v3.allocations,
         action_checkpoints=v3.action_checkpoints,
-        connection_page_markers=connection_page_markers,
         fleet_id=fleet_id,
         image_pins=image_pins,
         binary_pins=binary_pins,
@@ -299,6 +311,42 @@ def _state_error(path: Path, reason: str) -> LocalStateCorruptedError:
     )
 
 
+def _name_legacy_backend(data: dict[str, Any]) -> None:
+    """Before version 4 a Remnawave intent was the default and left its backend out: name it.
+
+    Meridian intents always wrote `backend: meridian` then, so a missing key is Remnawave's.
+    """
+    version = data.get("version")
+    if isinstance(version, int) and version >= 4:
+        return
+    control = (
+        (data.get("topology_intent") or {}).get("control") if isinstance(data.get("topology_intent"), dict) else None
+    )
+    if isinstance(control, dict):
+        control.setdefault("backend", "remnawave")
+
+
+def saved_backend(path: Path | None = None) -> str:
+    """The saved fleet's control backend ("" without a readable topology), read without validating the rest.
+
+    A cheap look before a command runs; loading the whole file stays the command's job, errors included.
+    """
+    if path is None:
+        from meridian.config import CLUSTER_CONFIG
+
+        path = CLUSTER_CONFIG
+    try:
+        data = yaml.safe_load(path.read_text())
+    except (OSError, yaml.YAMLError):
+        return ""
+    if not isinstance(data, dict) or not isinstance(data.get("topology_intent"), dict):
+        return ""
+    _name_legacy_backend(data)
+    control = data["topology_intent"].get("control")
+    backend = control.get("backend", "meridian") if isinstance(control, dict) else ""
+    return backend if isinstance(backend, str) else ""
+
+
 def _require_mapping(data: dict[str, Any], key: str, *, nullable: bool = False) -> None:
     value = data.get(key)
     if value is None and nullable:
@@ -316,7 +364,7 @@ def _validate_cluster_structure(data: dict[str, Any]) -> None:
 
     for key in ("panel", "branding"):
         _require_mapping(data, key)
-    for key in ("subscription_page", "telegram"):
+    for key in ("subscription_page", "telegram", "control_migration"):
         _require_mapping(data, key, nullable=True)
 
     validate_cluster_v3_structure(data)
@@ -376,6 +424,11 @@ def load_cluster(path: Path | None = None) -> ClusterConfig:
         raise _state_error(path, f"validation failed ({preview})")
 
     return cfg
+
+
+def dump_cluster(cfg: ClusterConfig) -> str:
+    """cluster.yml's text for `cfg`, exactly as `save_cluster()` writes it."""
+    return yaml.dump(_serialize_cluster(cfg), default_flow_style=False, sort_keys=False)
 
 
 def save_cluster(cfg: ClusterConfig, path: Path | None = None) -> None:

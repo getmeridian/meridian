@@ -231,6 +231,7 @@ svg{flex-shrink:0}
 
 /* Individual connections */
 .conn-list{display:flex;flex-direction:column;gap:6px}
+.conn-extra{display:flex;flex-direction:column;gap:6px}
 .conn{padding:10px 12px;border-radius:var(--r2);background:var(--sf2);border:1px solid var(--br)}
 .conn-main{display:flex;align-items:center;gap:10px}
 .conn-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
@@ -346,3 +347,66 @@ svg{flex-shrink:0}
   .card,.panels{box-shadow:none !important;border-color:#ccc}
   .topbar,.install-banner,.foot,.btn{display:none !important}
 }
+
+/* Account information */
+.account{padding:18px;margin-bottom:16px;display:flex;flex-direction:column;gap:8px}
+.account-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.account-heading h2{font-size:1.06rem;font-weight:650}
+.account-status{font-size:.88rem;color:var(--green)}
+.account-status.is-disabled,.account-status.is-expired,.account-status.is-limited{color:var(--amber)}
+.account-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:8px}
+.account-metric{min-width:0}
+.account-metric dt{font-size:.76rem;color:var(--tx3);margin-bottom:4px}
+.account-metric dd{font-size:.9rem;font-weight:600;overflow-wrap:anywhere}
+.account-metric .account-note{font-size:.76rem;font-weight:400;color:var(--tx2);margin-top:3px}
+.account-freshness{font-size:.75rem;color:var(--tx3);line-height:1.45}
+.account-unverified,.import-status{color:var(--amber)}
+[data-import][aria-disabled="true"]{opacity:.45;cursor:not-allowed}
+@media (max-width:479px){.account-metrics{grid-template-columns:1fr;gap:12px}}
+
+/* Visible copy fallback, usable with a keyboard or a long press on a phone. */
+.copy-fallback{
+  position:fixed;inset-inline:12px;bottom:16px;z-index:20;max-width:640px;margin-inline:auto;
+  display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:16px;
+  background:var(--sf);border:1px solid var(--br2);border-radius:var(--r2);box-shadow:var(--shadow);
+  max-height:80vh;overflow:auto;
+}
+.copy-fallback p{font-size:.86rem;line-height:1.5;color:var(--tx2)}
+.copy-fallback textarea{
+  width:100%;padding:10px;resize:vertical;border:1px solid var(--br);border-radius:var(--r);
+  font: .8rem/1.5 ui-monospace,'SF Mono',monospace;color:var(--tx);background:var(--sf2);
+}
+
+/* Chosen platform and app, with a nearby manual import route. */
+.setup-pickers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.setup-pickers label{display:flex;flex-direction:column;gap:5px;font-size:.78rem;color:var(--tx2);min-width:0}
+.setup-pickers select{
+  width:100%;min-height:44px;padding:8px 10px;border:1px solid var(--br2);border-radius:var(--r);
+  background:var(--sf2);color:var(--tx);font:inherit;font-size:.9rem;
+}
+.import-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:12px}
+.manual-import{min-width:0}
+.manual-import > summary{min-height:44px}
+.manual-import[open],.manual-direct{grid-column:1/-1}
+.manual-direct{display:flex;flex-direction:column;gap:10px}
+.manual-path{font-size:.84rem;line-height:1.5;overflow-wrap:anywhere;color:var(--tx2)}
+.manual-url{
+  width:100%;padding:10px 12px;resize:vertical;min-height:64px;border-radius:var(--r);border:1px solid var(--br);
+  font:.76rem/1.5 ui-monospace,'SF Mono',monospace;background:var(--sf2);color:var(--tx2);direction:ltr;
+}
+.connect-steps{padding-inline-start:20px;display:flex;flex-direction:column;gap:7px;font-size:.86rem;line-height:1.5;color:var(--tx2)}
+.install-routes{list-style:none;display:flex;flex-direction:column;gap:8px;font-size:.84rem;line-height:1.5}
+.install-routes a{display:block;min-height:36px;padding-block:6px;color:var(--accent);overflow-wrap:anywhere}
+@media (max-width:479px){.import-actions{grid-template-columns:1fr}.setup-pickers{gap:8px}}
+
+.owner-contact { margin: 20px 0; text-align: start; }
+.owner-contact h3 { margin: 0 0 8px; font-size: 1rem; }
+.owner-contact p { margin: 0 0 12px; overflow-wrap: anywhere; }
+.owner-contact .btn { width: auto; }
+.owner-notice { overflow-wrap: anywhere; }
+.owner-notice p { margin: 0; white-space: normal; }
+
+/* The head script selects these support labels before its main script loads. */
+.initial-text{display:none}
+html[lang="en"] .initial-en,html[lang="ru"] .initial-ru,
+html[lang="fa"] .initial-fa,html[lang="zh"] .initial-zh{display:inline}

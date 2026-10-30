@@ -11,8 +11,16 @@ import os
 import re
 import subprocess
 from dataclasses import dataclass
+from typing import Protocol
 
-from meridian.core.inputs import is_ip
+from meridian.core.deploy import DeployRequest
+from meridian.core.deploy_validation import (
+    DeployValidationError,
+    normalize_deploy_request,
+    validate_deploy_target,
+)
+from meridian.core.errors import MeridianError
+from meridian.core.inputs import is_ip, is_local_deploy_target
 from meridian.servers import ServerEntry, ServerRegistry, this_machine_id
 from meridian.ssh import SSHUI, ServerConnection, SSHError, ssh_copy_id_command
 from meridian.ssh_keys import ensure_meridian_keypair, host_key_known, install_public_key, key_login_works
@@ -246,3 +254,55 @@ def install_meridian_key(resolved: ResolvedServer, password: str) -> ResolvedSer
             category="system",
         )
     return ResolvedServer(ip=resolved.ip, user=resolved.user, local_mode=False, conn=keyed)
+
+
+@dataclass(frozen=True)
+class ResolvedDeployTarget:
+    """Deploy target after no-I/O request and registry resolution."""
+
+    server_ip: str
+    ssh_user: str
+    ssh_port: int = 22
+
+
+class ServerLookup(Protocol):
+    """Minimal registry surface needed to resolve a deploy target."""
+
+    def find(self, query: str) -> ServerEntry | None:
+        """Return a registered server by host/name, if known."""
+
+
+def resolve_deploy_target(request: DeployRequest, registry: ServerLookup) -> ResolvedDeployTarget:
+    """Resolve a deploy request to a concrete IP/local target without opening SSH."""
+    try:
+        request = normalize_deploy_request(request)
+        server_ip = request.ip
+        entry = None
+        if request.requested_server:
+            if is_local_deploy_target(request.requested_server):
+                server_ip = request.requested_server
+            else:
+                entry = registry.find(request.requested_server)
+                if not entry:
+                    if is_ip(request.requested_server):
+                        server_ip = request.requested_server
+                    else:
+                        raise DeployValidationError(
+                            f"Server '{request.requested_server}' not found",
+                            hint="See registered servers: meridian server list",
+                        )
+                else:
+                    server_ip = entry.host
+        elif server_ip and not is_local_deploy_target(server_ip):
+            entry = registry.find(server_ip)
+
+        validate_deploy_target(server_ip)
+    except DeployValidationError as exc:
+        raise MeridianError(str(exc), hint=exc.hint, category="user") from exc
+
+    # An empty user or zero port means "the saved value, else the SSH default".
+    return ResolvedDeployTarget(
+        server_ip=server_ip,
+        ssh_user=request.user or (entry.ssh_user if entry else "") or "root",
+        ssh_port=request.ssh_port or (entry.ssh_port if entry else 0) or 22,
+    )

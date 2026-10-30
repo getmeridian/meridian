@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from meridian import config
 from meridian.cluster import ClusterConfig, WorkloadBinding
-from meridian.config import HOME_DISPLAY
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import (
     FleetTopology,
@@ -23,9 +23,8 @@ from meridian.servers import ServerEntry, ServerRegistry
 
 def topology_from_local_cluster(cluster: ClusterConfig) -> FleetTopology:
     """Project the topology, resolving its server references from local state."""
-    from meridian.config import SERVER_PROFILES_FILE
 
-    servers = ServerRegistry(SERVER_PROFILES_FILE).list() if cluster.topology_intent is not None else []
+    servers = ServerRegistry(config.SERVER_PROFILES_FILE).list() if cluster.topology_intent is not None else []
     return topology_from_cluster(cluster, servers=servers)
 
 
@@ -52,7 +51,7 @@ def topology_from_cluster(
         if servers is None:
             raise LocalStateError(
                 "Saved server profiles are required to read the topology.",
-                hint=f"Restore {HOME_DISPLAY}/servers.json, then retry.",
+                hint=f"Restore {config.HOME_DISPLAY}/servers.json, then retry.",
             )
         server_map = _v4_server_map(cluster, servers)
         nodes = _v4_nodes(cluster, server_map)
@@ -142,6 +141,20 @@ def _active_workload(cluster: ClusterConfig, workload_id: str) -> WorkloadBindin
     )
 
 
+def _node_ref(cluster: ClusterConfig, workload: WorkloadBinding | None, node_id: str, server_ref: str) -> str:
+    """The node's ID at its control backend: a panel UUID, or the control service's node ID (the exit ID)."""
+    if cluster.runs_control_service:
+        return node_id
+    return workload.node_uuids.get(server_ref, "") if workload else ""
+
+
+def _host_ref(cluster: ClusterConfig, workload: WorkloadBinding | None, host_ref: str) -> str:
+    """A published entry's ID at its control backend: a panel Host UUID, or the service's endpoint ID."""
+    if cluster.runs_control_service:
+        return host_ref.removeprefix("host:")
+    return workload.host_uuids.get(host_ref, "") if workload else ""
+
+
 def _v4_nodes(
     cluster: ClusterConfig,
     servers: dict[str, ServerEntry],
@@ -164,7 +177,7 @@ def _v4_nodes(
         nodes.append(
             TopologyNode(
                 ip=server.host,
-                uuid=workload.node_uuids.get(exit_.server_ref, "") if workload else "",
+                uuid=_node_ref(cluster, workload, exit_.id, exit_.server_ref),
                 name=exit_.id,
                 ssh_user=server.user,
                 ssh_port=server.port,
@@ -191,7 +204,7 @@ def _v4_nodes(
         nodes.append(
             TopologyNode(
                 ip=server.host,
-                uuid=workload.node_uuids.get(gateway.server_ref, "") if workload else "",
+                uuid=_node_ref(cluster, workload, gateway.id, gateway.server_ref),
                 name=gateway.id,
                 ssh_user=server.user,
                 ssh_port=server.port,
@@ -223,7 +236,7 @@ def _v4_relays(
         exit_server = servers[exit_.server_ref]
         workload = _active_workload(cluster, exit_.id)
         host_ref = f"host:{relay.id}:{path.id}"
-        host_uuid = workload.host_uuids.get(host_ref, "") if workload else ""
+        host_uuid = _host_ref(cluster, workload, host_ref)
         relays.append(
             TopologyRelay(
                 ip=first_hop.host,
@@ -282,6 +295,7 @@ def _v4_members(
             ssh_user=servers[server_ref].user,
             ssh_port=servers[server_ref].port,
             relay_hops=relay_hops.get(server_ref, []),
+            metadata=intent.server_metadata.get(server_ref),
         )
         for server_ref, role_values in roles.items()
     ]

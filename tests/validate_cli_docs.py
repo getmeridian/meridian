@@ -26,7 +26,6 @@ CLI_REFERENCES = {
 # explicit makes section moves deliberate; discovery below makes new or removed
 # commands fail validation instead of silently falling outside the audit.
 COMMAND_SECTIONS: dict[str, str] = {
-    "studio": "### meridian studio",
     "plan": "### meridian plan",
     "apply": "### meridian apply",
     "setup": "### meridian setup",
@@ -34,13 +33,20 @@ COMMAND_SECTIONS: dict[str, str] = {
     "help": "### meridian help",
     "client add": "### meridian client",
     "client show": "### meridian client",
+    "client preview": "### meridian client",
+    "client usage": "### meridian client",
     "client list": "### meridian client",
+    "client set": "### meridian client",
+    "client reset-traffic": "### meridian client",
+    "client extend": "### meridian client",
+    "client devices": "### meridian client",
     "client reissue": "### meridian client",
     "client remove": "### meridian client",
     "client enable": "### meridian client",
     "client disable": "### meridian client",
     "server add": "### meridian server",
     "server list": "### meridian server",
+    "server set": "### meridian server",
     "server remove": "### meridian server",
     "check": "### meridian check",
     "scan": "### meridian scan",
@@ -49,7 +55,15 @@ COMMAND_SECTIONS: dict[str, str] = {
     "doctor": "### meridian doctor",
     "logs": "### meridian logs",
     "panel": "### meridian panel",
+    "privacy show": "### meridian privacy",
+    "privacy set": "### meridian privacy",
     "teardown": "### meridian teardown",
+    "backup pull": "### meridian backup",
+    "backup recovery-key": "### meridian backup",
+    "backup devices": "### meridian backup",
+    "backup revoke": "### meridian backup",
+    "restore": "### meridian restore",
+    "migrate": "### meridian migrate",
     "update": "### meridian update",
     "relay add": "### meridian relay",
     "relay list": "### meridian relay",
@@ -60,17 +74,36 @@ COMMAND_SECTIONS: dict[str, str] = {
     "route remove": "### meridian route",
     "node add": "### meridian node",
     "node list": "### meridian node",
+    "node restart": "### meridian node",
     "node remove": "### meridian node",
     "node replace": "### meridian node",
     "node sni": "### meridian node",
     "fleet status": "### meridian fleet",
     "fleet inventory": "### meridian fleet",
+    "fleet notice show": "### meridian fleet",
+    "fleet notice set": "### meridian fleet",
+    "fleet notice clear": "### meridian fleet",
+    "fleet language": "### meridian fleet",
     "fleet upgrade": "### meridian fleet",
+    "fleet export": "### meridian fleet",
+    "fleet import": "### meridian fleet",
+    "fleet history": "### meridian fleet",
+    "fleet events": "### meridian fleet",
+    "fleet usage": "### meridian fleet",
+    "fleet routing": "### meridian fleet",
+    "fleet contact": "### meridian fleet",
+    "context list": "### meridian context",
+    "context use": "### meridian context",
+    "context rename": "### meridian context",
+    "context remove": "### meridian context",
     "api schemas": "### meridian api",
     "api commands": "### meridian api",
     "api schema": "### meridian api",
     "api workflow": "### meridian api",
 }
+
+# Root options every leaf also accepts (`cli_options.add_context_option`): documented once, globally.
+LEAF_GLOBALS = {"--context"}
 
 GLOBAL_SECTIONS = {
     "en": "## Global options",
@@ -143,7 +176,7 @@ def main() -> int:
             if section_text is None:
                 errors.append(f"  {locale}: section '{heading}' not found")
                 continue
-            for flag in sorted(long_flags(discovered[command]) - flags_in_section(section_text)):
+            for flag in sorted(long_flags(discovered[command]) - LEAF_GLOBALS - flags_in_section(section_text)):
                 errors.append(f"  {locale}: meridian {command}: {flag} not documented in '{heading}'")
 
     if errors:

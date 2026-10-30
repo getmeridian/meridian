@@ -1,8 +1,8 @@
 """Relay management -- deploy, list, remove, check relay nodes.
 
 Relays are lightweight Realm TCP forwarders that provide domestic entry
-points. All relay-to-panel mapping uses Remnawave Host entries; topology
-is persisted in cluster.yml.
+points. Each relay hop is published as a client endpoint of the control
+service; topology is persisted in cluster.yml.
 """
 
 from __future__ import annotations
@@ -12,11 +12,12 @@ from typing import TYPE_CHECKING
 import typer
 from rich.markup import escape
 
+from meridian import config
 from meridian.adapters.cluster import topology_from_local_cluster
-from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, make_panel, require_intent
+from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, require_intent
 from meridian.commands._validation import validate_command_input
-from meridian.config import HOME_DISPLAY
 from meridian.console import confirm, err_console, fail, info, ok, warn
+from meridian.control_access import fleet_panel
 from meridian.core.command_inputs import RelayDeployRequest, RelayTargetRequest
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import build_relay_list_result
@@ -43,11 +44,10 @@ def run_deploy(
 ) -> None:
     """Deploy a relay node that forwards traffic to an exit server."""
     from meridian.commands.resolve import resolve_server
-    from meridian.config import SERVER_PROFILES_FILE
     from meridian.servers import ServerEntry, ServerRegistry
     from meridian.setup.editor import add_relay_to_intent
 
-    target = resolve_server(ServerRegistry(SERVER_PROFILES_FILE), explicit_ip=relay_ip, user=user, port=ssh_port)
+    target = resolve_server(ServerRegistry(config.SERVER_PROFILES_FILE), explicit_ip=relay_ip, user=user, port=ssh_port)
     request = validate_command_input(
         RelayDeployRequest,
         "Invalid relay add request",
@@ -67,7 +67,7 @@ def run_deploy(
 
     cluster = load_topology_cluster()
     intent = require_intent(cluster)
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     exit_ref = ""
     try:
         for exit_ in intent.exits:
@@ -112,7 +112,7 @@ def run_deploy(
     except OSError as exc:
         fail(
             f"Could not save the relay server profile: {exc}",
-            hint=f"Check {HOME_DISPLAY} permissions and disk space, then retry.",
+            hint=f"Check {config.HOME_DISPLAY} permissions and disk space, then retry.",
             hint_type="system",
         )
     try:
@@ -209,7 +209,7 @@ def _run_list(
     warnings: list[ErrorModel] = []
     if relays:
         try:
-            with make_panel(cluster) as panel:
+            with fleet_panel(cluster, topology) as panel:
                 host_map = {h.uuid: h for h in panel.list_hosts()}
                 for relay in relays:
                     endpoint = (relay.ip, relay.port)
@@ -333,6 +333,7 @@ def run_remove(
     relay_ip: str,
     exit_arg: str = "",
     yes: bool = False,
+    forget_unreachable: bool = False,
 ) -> None:
     """Drop every relay chain through a relay server (or one chain by ID), then apply the reviewed removal."""
     request = validate_command_input(
@@ -343,7 +344,6 @@ def run_remove(
         yes=yes,
     )
     from meridian.commands.topology_removal import apply_topology_removal
-    from meridian.config import SERVER_PROFILES_FILE
     from meridian.servers import ServerRegistry
     from meridian.setup.editor import remove_relays_from_intent
 
@@ -351,7 +351,7 @@ def run_remove(
     intent = require_intent(cluster)
     chains, _server_ref, label = select_relay_chains(
         intent,
-        ServerRegistry(SERVER_PROFILES_FILE),
+        ServerRegistry(config.SERVER_PROFILES_FILE),
         request.relay_ip,
         request.exit_arg,
     )
@@ -364,4 +364,6 @@ def run_remove(
     subject = f"{noun} {', '.join(chain_ids)}" + (f" through {label}" if label not in chain_ids else "")
     hop_counts = [len(relay.hop_server_refs) for relay in chains]
     extra = (f"Every hop of the chain stops forwarding ({sum(hop_counts)} hops in total).",)
-    apply_topology_removal(cluster, updated, subject=subject, yes=request.yes, extra_lines=extra)
+    apply_topology_removal(
+        cluster, updated, subject=subject, yes=request.yes, extra_lines=extra, forget_unreachable=forget_unreachable
+    )

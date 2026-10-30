@@ -680,7 +680,7 @@ def check_secret_paths(
                 "SECRET_PANEL_BROKEN",
                 "failed",
                 f"Configured panel path returned {secret_status}",
-                "Repair the nginx panel route or Remnawave backend.",
+                "Repair the nginx route or the control service: meridian apply",
             )
         )
     if not findings:

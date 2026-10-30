@@ -82,17 +82,12 @@ def test_systemlab_runtime_uses_canonical_documents_and_waited_pool_failover() -
     assert "systemctl is-active meridian-relay" not in deploy
 
 
-def test_systemlab_fast_rerun_retains_only_nested_images() -> None:
+def test_systemlab_make_targets_build_the_agent_and_always_tear_down() -> None:
     makefile = (_ROOT / "Makefile").read_text(encoding="utf-8")
-    controller = (_ROOT / "tests/systemlab/scripts/controller-run.sh").read_text(encoding="utf-8")
-    cleanup = (_ROOT / "tests/systemlab/scripts/stages/90-cleanup.sh").read_text(encoding="utf-8")
 
-    assert controller.count("90-cleanup.sh") >= 3
-    assert "docker rm -f" in cleanup
-    assert "docker volume prune -af" in cleanup
-    assert "docker network prune -f" in cleanup
-    assert "cleanup_failed" in cleanup
-    assert "docker image" not in cleanup
+    for target in ("system-lab:", "system-lab-fast:"):
+        prerequisites = next(line for line in makefile.splitlines() if line.startswith(target))
+        assert "system-lab-agent" in prerequisites
     assert makefile.count("@set -eu") >= 2
     assert makefile.count("cleanup_status") >= 2
 
@@ -117,12 +112,14 @@ def test_systemlab_pebble_endpoint_uses_trusted_certificate_hostname() -> None:
     assert "RUN update-ca-certificates" in base_image
 
 
-def test_systemlab_nested_docker_retains_bridge_nat() -> None:
+def test_systemlab_nodes_run_the_agent_without_nested_docker() -> None:
     base_image = (_ROOT / "tests/systemlab/images/base/Dockerfile").read_text(encoding="utf-8")
+    compose = yaml.safe_load((_ROOT / "tests/systemlab/compose.yml").read_text(encoding="utf-8"))
 
-    assert "default bridge NAT" in base_image
-    assert '{"storage-driver":"vfs"}' in base_image
-    assert '"iptables":false' not in base_image
+    assert "docker-ce" not in base_image
+    assert "/var/lib/docker" not in base_image
+    for service in compose["services"].values():
+        assert not any("/var/lib/docker" in str(volume) for volume in service.get("volumes", []))
 
 
 def test_systemlab_fails_fast_on_missing_compose_daemon_or_build_dns() -> None:
