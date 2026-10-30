@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+- Restart and client cut-off commands render service failures through their JSON error envelopes; terminal result-read errors report failed nodes instead of retryable timeouts.
 - Console command results preserve completed nodes when siblings time out or fail to poll; terminal read errors stop polling with an unavailable result instead of a false timeout.
 - CLI client removal queues its cut-off atomically with deletion and preserves the request across apply retries; an uncertain later restart keeps an earlier node failure.
 - Commands that start before their deadline keep their real late outcomes and events; agents retain results and executed IDs beyond expiry so failed delivery or clock rounding cannot repeat an action.

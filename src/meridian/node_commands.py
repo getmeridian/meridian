@@ -74,7 +74,7 @@ def wait_for_commands(
         errors.extend(
             unreadable[record.command.command_id] for record in records if record.command.command_id in unreadable
         )
-        if any(record.status in {"failed", "rejected"} for record in records):
+        if any(record.status in {"failed", "rejected"} or record.command.command_id in abandoned for record in records):
             status = "failed"
         elif any(record.status != "succeeded" for record in records):
             status = "timed_out"

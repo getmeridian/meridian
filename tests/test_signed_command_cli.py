@@ -14,7 +14,7 @@ from meridian.cli import app
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands.client import run_reissue, run_remove
 from meridian.console import set_json_mode
-from meridian.control.client import ControlServiceUncertain
+from meridian.control.client import ControlServiceError, ControlServiceUncertain
 from meridian.control.command_models import (
     CommandUnitTarget,
     CutOffNode,
@@ -256,5 +256,54 @@ def test_review_3_3_an_uncertain_second_restart_never_downgrades_an_earlier_fail
         assert body["data"]["nodes"][0]["status"] == "failed"
         assert body["data"]["nodes"][0]["commands"][0]["status"] == "failed"
         assert body["warnings"][0]["retryable"] is False
+    finally:
+        set_json_mode(False)
+
+
+@pytest.mark.parametrize("command", ["node.restart", "client.remove", "client.reissue"])
+@pytest.mark.parametrize(
+    ("message", "category", "exit_code"),
+    [
+        ("The service cannot be reached.", "system", 3),
+        ("HTTP 401", "user", 2),
+        ("HTTP 403", "user", 2),
+        ("HTTP 404", "user", 2),
+    ],
+)
+def test_review_5_1_service_preflight_errors_use_fail_with_the_command_json_envelope(
+    command, message, category, exit_code, tmp_home, capsys
+) -> None:
+    from meridian.commands.node_restart import run_restart
+
+    error = ControlServiceError(message, category=category)
+    client = MagicMock()
+    client.__enter__.return_value = client
+    client.command_targets.side_effect = error
+    topology = SimpleNamespace(nodes=[SimpleNamespace(name="main", uuid="main", ip="198.51.100.10")])
+    set_json_mode(True)
+    try:
+        with (
+            patch("meridian.commands.client.load_topology_cluster", return_value=cluster()),
+            patch("meridian.commands.node_restart.load_topology_cluster", return_value=cluster()),
+            patch("meridian.commands.node_restart.topology_from_local_cluster", return_value=topology),
+            patch("meridian.commands.node_restart.ControlClient", return_value=client),
+            patch("meridian.node_commands.cut_off_scope", side_effect=error),
+            patch("meridian.commands.client_v4.apply_reviewed_intent") as apply,
+            patch("meridian.commands.client.remove_connection_page") as page,
+            pytest.raises(typer.Exit) as raised,
+        ):
+            if command == "node.restart":
+                run_restart("main", yes=True)
+            elif command == "client.remove":
+                run_remove("person-a", yes=True, cut_off=True)
+            else:
+                run_reissue("person-a", yes=True, cut_off=True)
+        body = json.loads(capsys.readouterr().out)
+        assert raised.value.exit_code == body["exit_code"] == exit_code
+        assert body["schema"] == "meridian.output/v1" and body["command"] == command
+        assert body["status"] == "failed" and body["errors"][0]["message"] == message
+        assert body["errors"][0]["category"] == category
+        apply.assert_not_called()
+        page.assert_not_called()
     finally:
         set_json_mode(False)

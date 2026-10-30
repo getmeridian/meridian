@@ -32,6 +32,7 @@ from meridian.commands.client_state import (
 from meridian.commands.client_usage import print_usage
 from meridian.commands.client_v4 import run_add_v4, run_remove_v4
 from meridian.console import confirm, err_console, error_context, fail, is_json_mode, ok, warn
+from meridian.control.client import ControlServiceError
 from meridian.control_access import access_panel
 from meridian.core.clients import (
     ClientMutationStatus,
@@ -310,7 +311,10 @@ def run_remove(name: str, yes: bool = False, cut_off: bool = False) -> None:
         cluster = load_topology_cluster()
         name = resolve_client_name(cluster, name)
         validate_client_name(name)
-        run_remove_v4(name, cluster, operation, yes=yes, cut_off=cut_off)
+        try:
+            run_remove_v4(name, cluster, operation, yes=yes, cut_off=cut_off)
+        except ControlServiceError as exc:
+            fail(exc)
 
 
 def run_reissue(name: str, yes: bool = False, cut_off: bool = False) -> None:
@@ -339,7 +343,10 @@ def run_reissue(name: str, yes: bool = False, cut_off: bool = False) -> None:
         from meridian.commands.node_command_results import cut_off_disclosure
         from meridian.node_commands import cut_off_scope
 
-        scope = cut_off_scope(cluster, name) if cut_off else None
+        try:
+            scope = cut_off_scope(cluster, name) if cut_off else None
+        except ControlServiceError as exc:
+            fail(exc)
         confirmation = t("client.reissue_confirm", name=shown)
         if scope is not None:
             confirmation += "\n\n" + cut_off_disclosure(scope)
@@ -347,7 +354,10 @@ def run_reissue(name: str, yes: bool = False, cut_off: bool = False) -> None:
                 warn(cut_off_disclosure(scope))
         if not yes and not confirm(confirmation):
             raise typer.Exit(1)
-        _reissue(cluster, name, shown, operation, cut_off=cut_off)
+        try:
+            _reissue(cluster, name, shown, operation, cut_off=cut_off)
+        except ControlServiceError as exc:
+            fail(exc)
 
 
 def _reissue(

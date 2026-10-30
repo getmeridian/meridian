@@ -45,32 +45,35 @@ def run_restart(name: str, *, core: bool = False, all_units: bool = False, yes: 
         node_id = matches[0].uuid
         commands: list[NodeCommandRecord] = []
         issue_error: ControlServiceError | None = None
-        with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
-            targets = client.command_targets(node_id)
-            units = targets.units if request.scope == "all" else [unit for unit in targets.units if unit.core]
-            if not units:
-                fail(
-                    t("node_commands.restart_no_units"),
-                    hint="Use --all for other managed units, or run meridian apply.",
-                    hint_type="user",
+        try:
+            with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
+                targets = client.command_targets(node_id)
+                units = targets.units if request.scope == "all" else [unit for unit in targets.units if unit.core]
+                if not units:
+                    fail(
+                        t("node_commands.restart_no_units"),
+                        hint="Use --all for other managed units, or run meridian apply.",
+                        hint_type="user",
+                    )
+                disclosure = (
+                    t("node_commands.restart_all_confirm", node=node_id, units=", ".join(unit.name for unit in units))
+                    if all_units
+                    else t("node_commands.restart_core_confirm", node=node_id)
                 )
-            disclosure = (
-                t("node_commands.restart_all_confirm", node=node_id, units=", ".join(unit.name for unit in units))
-                if all_units
-                else t("node_commands.restart_core_confirm", node=node_id)
-            )
-            if not yes and not confirm(disclosure):
-                raise typer.Exit(1)
-            if yes and not is_json_mode():
-                warn(disclosure)
-            for unit in units:
-                try:
-                    commands.append(client.issue_command(node_id, RestartUnitCreate(resource_id=unit.resource_id)))
-                except ControlServiceError as exc:
-                    # An uncertain POST may already have queued a restart; do not replace it with another ID.
-                    issue_error = exc
-                    break
-            outcomes = wait_for_commands(client, commands)
+                if not yes and not confirm(disclosure):
+                    raise typer.Exit(1)
+                if yes and not is_json_mode():
+                    warn(disclosure)
+                for unit in units:
+                    try:
+                        commands.append(client.issue_command(node_id, RestartUnitCreate(resource_id=unit.resource_id)))
+                    except ControlServiceError as exc:
+                        # An uncertain POST may already have queued a restart; do not replace it with another ID.
+                        issue_error = exc
+                        break
+                outcomes = wait_for_commands(client, commands)
+        except ControlServiceError as exc:
+            fail(exc)
         if issue_error is not None:
             previous = outcomes[0] if outcomes else None
             outcomes = [with_command_issue_error(node_id, previous, issue_error, secrets=cluster.secret_values())]
