@@ -6,7 +6,7 @@
  */
 
 export type Changed = boolean;
-export type Language = "en" | "ru" | "fa" | "zh";
+export type Language = "auto" | "en" | "ru" | "fa" | "zh";
 
 export interface LanguageState {
   changed?: Changed;

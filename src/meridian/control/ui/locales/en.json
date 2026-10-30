@@ -475,10 +475,10 @@
   "notice.paragraph": "Use a single paragraph without line breaks or control characters.",
   "notice.allowed": "Allowed substitutions: {fields}",
   "notice.until_invalid": "Choose a future expiry time, or leave it blank.",
-  "language.title": "Subscription status language",
-  "language.default": "Default language",
-  "language.hint": "Apps use this language for disabled, expired, or limited accounts. A person can have their own preference; connection pages keep their language picker.",
-  "language.saved": "Subscription language saved",
+  "language.title": "Default language",
+  "language.default": "Pages and app messages",
+  "language.hint": "Each person can still switch on their page; with browser language, app status messages stay in English.",
+  "language.saved": "Default language saved",
   "preview.format": "Format",
   "preview.rule": "Selection rule",
   "preview.family": "App family",
@@ -523,5 +523,9 @@
   "preview.hint": "See which format an app receives and why entries are omitted. Headers are used for this preview only; no connection keys or links are returned.",
   "preview.invalid_person": "Enter an account name.",
   "preview.kind_page": "Connection page (HTML)",
-  "preview.kind_account_info": "Account information (JSON)"
+  "preview.kind_account_info": "Account information (JSON)",
+  "language.auto": "Follow each person's browser",
+  "language.person": "Page and app language",
+  "language.person_default": "Follow fleet default",
+  "language.person_hint": "The person can still switch languages on their page."
 }

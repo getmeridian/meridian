@@ -16,6 +16,7 @@ Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
 - **Aesthetics are trust** — every surface is UI. CLI output, pages, error messages. In censored regions, polished = safe.
 
 ## Architecture (summary)
+- **Page language** — the service owns an automatic browser default or an explicit en/ru/fa/zh default, with nullable person overrides; a person's saved page choice wins, and automatic native status remarks stay English.
 
 - **CLI:** a Python package on PyPI (`meridian-vpn`) over a growing meridian-core contract layer.
 - **Server stack:** nginx (stream SNI routing, HTTP TLS, reverse proxy), acme.sh, Xray (VLESS+Reality, XHTTP, Hysteria2 over UDP), Meridian's control service, and its node agent, all pinned; no Docker.

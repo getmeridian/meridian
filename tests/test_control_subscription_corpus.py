@@ -187,7 +187,8 @@ PANEL_SECURITY_HEADERS = frozenset(
 DROPPED_HEADERS = NGINX_HEADERS | PANEL_SECURITY_HEADERS | {"etag", "content-length"}
 ADDED_HEADERS = (("cache-control", "no-store"),)
 # Support links now enter the packaged, token-free PWA route inside /sub/.
-SUPPORT_PATH_CHANGE = ("/pwa/support.html", "/sub/~pwa/support.html")
+# Personal support HTML lets the service render each person's starting language.
+SUPPORT_PATH_CHANGE = ("/pwa/support.html#", "/sub/")
 
 
 def _stash_dialect(text: str) -> str:
@@ -324,7 +325,7 @@ def _expected(capture: Capture) -> Response:
             )
     headers = (
         tuple(
-            (name, value.replace(*SUPPORT_PATH_CHANGE) if name == "support-url" else value)
+            (name, value.replace(*SUPPORT_PATH_CHANGE) + "/support.html" if name == "support-url" else value)
             for name, value in golden.headers
             if name not in DROPPED_HEADERS
         )

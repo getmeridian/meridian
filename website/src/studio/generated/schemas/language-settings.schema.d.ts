@@ -5,10 +5,10 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
-export type Language = "en" | "ru" | "fa" | "zh";
+export type Language = "auto" | "en" | "ru" | "fa" | "zh";
 
 /**
- * Operator-owned default for native subscription presentation; never guessed from requests.
+ * Starting page and app status language; auto follows browsers and keeps app messages English.
  */
 export interface LanguageSettings {
   language?: Language;

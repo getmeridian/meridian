@@ -7,7 +7,6 @@ import re
 from urllib.parse import urlsplit
 
 from meridian.control.connection_pages import packaged_assets
-from meridian.control.page_contact import support_contact_html
 from meridian.control.subscriptions import unknown_subscription
 from meridian.control.ui_routes import UiRequest
 from meridian.pwa import ASSET_SEGMENT, SECURITY_HEADERS
@@ -44,7 +43,7 @@ def _asset(request: UiRequest, version: str, name: str) -> None:
         )
         return
     if name == "support.html":
-        data = support_contact_html(data, request.ui.service.settings().owner_contact)
+        data = request.ui.service.pages.shared_support()
     headers = dict(SECURITY_HEADERS) | {
         "Cache-Control": "no-store"
         if name == "support.html"

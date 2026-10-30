@@ -345,7 +345,7 @@ meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--j
 meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
 meridian fleet notice clear [--yes] [--json]
-meridian fleet language [en|ru|fa|zh] [--json]
+meridian fleet language [auto|en|ru|fa|zh] [--yes] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -391,7 +391,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 通知由管理者维护，保存在控制服务中。`fleet notice set` 先显示预览，再请求确认；`--until WHEN` 设置到期时间，`--for NAME` 使用真实账户信息，JSON 修改需要 `--yes`。`fleet notice show` 读取通知；`fleet notice clear` 确认清除。参见[客户端管理](/zh/client-management/)。
 
-订阅状态提示使用服务明确设置的默认语言：`en`、`ru`、`fa` 或 `zh`。`fleet language` 读取设置，`fleet language CODE` 保存设置。`client set NAME --language CODE` 设置用户偏好，`--language default` 清除偏好。状态代码保持英文。这些服务设置在经过审核的应用操作和加密备份中保留。
+默认 `auto` 使连接页和帮助页跟随每个人的浏览器语言，应用状态提示保持英语。明确选择 `en`、`ru`、`fa` 或 `zh` 可设置页面的初始语言和应用提示语言。`fleet language` 读取设置，`fleet language CODE --yes --json` 保存设置。`client set NAME --language CODE` 设置用户语言，`--language default` 恢复全局默认值。用户在页面上保存的选择优先，且随时可以切换语言。状态代码保持英文。这些服务设置在经过审核的应用操作和加密备份中保留。
 
 ### meridian context
 

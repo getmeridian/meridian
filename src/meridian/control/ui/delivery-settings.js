@@ -7,8 +7,9 @@
 
   M.languageSection = function () {
     var select = h("select", { disabled: true, "data-language": "default" },
-      [["en", "English"], ["ru", "Русский"], ["fa", "فارسی"], ["zh", "中文"]].map(function (item) {
-        return h("option", { value: item[0], lang: item[0], text: item[1] });
+      h("option", { value: "auto", text: M.t("language.auto") }),
+      M.i18n.langs.map(function (language) {
+        return h("option", { value: language, lang: language, text: M.i18n.names[language] });
       }));
     var error = h("p", { class: "form-error", role: "alert" });
     var save = h("button", { type: "submit", class: "btn btn-primary btn-sm", disabled: true }, M.t("action.save"));

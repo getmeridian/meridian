@@ -20,6 +20,8 @@ MOCK_VARS = {
     "worker_scope": "/connect/sub/",
     "start_url": "/connect/sub/demo",
     "notice": None,
+    "language": "auto",
+    "lang": "en",
 }
 
 

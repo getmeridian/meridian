@@ -3,6 +3,7 @@
 Server-hosted PWA; Meridian's only connection-page implementation.
 
 ## Design decisions
+- `language.js` blocks in the head before CSS/config: saved page choice > rendered person/fleet default > browser for `auto` > English; support's initial labels follow lang through CSS before its main script loads, and Persian sets RTL.
 - `notice.js` renders owner text with text nodes and four local labels, hides it at expiry, and makes no requests; the existing no-store account check refreshes it in memory without adding notice text to saved account snapshots.
 - `contact.js` renders bounded plain instructions and HTTPS/TG/mailto anchors with text nodes and four locale labels; it performs no fetch and opens no link before a click.
 - Configured owner contact keeps the support page visible with an explicit Open connection page action; without contact the existing direct redirect remains. Its escaped server-rendered attributes carry no person token, and its HTML is no-store and excluded from the worker.

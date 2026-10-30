@@ -25,7 +25,7 @@ from meridian.control.formats.singbox import singbox_document
 from meridian.control.formats.xray_json import xray_json_document
 from meridian.control.models import ClientEndpoint
 from meridian.control.periods import next_period_start
-from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS, SUPPORT_PAGE
+from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.notices import RenderedNotice
 from meridian.core.owner_contact import OwnerContact
 from meridian.core.topology import ClientRoutingPolicy
@@ -143,7 +143,7 @@ def subscription_headers(
     if support_link:
         headers["support-url"] = support_link
     elif public_url:
-        headers["support-url"] = f"{public_url}/{SUPPORT_PAGE}#{quote(user.short_id, safe='')}"
+        headers["support-url"] = subscription_url(public_url, user.short_id) + "/support.html"
     headers["profile-title"] = "base64:" + base64.b64encode(profile_title.encode("utf-8")).decode("ascii")
     if public_url:
         headers["profile-web-page-url"] = subscription_url(public_url, user.short_id)

@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ lang }}" dir="{{ 'rtl' if lang == 'fa' else 'ltr' }}" data-language="{{ language }}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="{{ asset_path }}/language.js"></script>
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <meta name="theme-color" content="#0E1014" media="(prefers-color-scheme: dark)">

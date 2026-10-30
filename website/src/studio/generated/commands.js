@@ -1697,7 +1697,7 @@ export const commandCatalog = {
       ],
       "command": "fleet.language",
       "data_schema": "language-state",
-      "description": "Read or set the fleet's subscription status language",
+      "description": "Read or set the default language for pages and app messages",
       "envelope_schema": "fleet-language-envelope",
       "error_schema": "error",
       "exit_codes": {
@@ -1710,6 +1710,7 @@ export const commandCatalog = {
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
+        "--yes",
         "--json",
         "--context"
       ],

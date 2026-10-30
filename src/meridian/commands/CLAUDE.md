@@ -34,6 +34,7 @@
 - **`fleet upgrade` never mutates beside the plan** — it reads images (`diagnostics/images.py`) and each relay's running Realm (never the saved pin, which a failed upgrade leaves ahead), applies the unchanged intent (new pins ride the render contract), then runs the fleet `check`.
 
 ## Pitfalls
+- A JSON fleet-language change requires `--yes` before PUT; bare reads and unchanged values need no confirmation, and `auto` is a fleet choice while person `default` PATCHes null.
 - `server set` accepts the role names `fleet status` prints (exit, gateway, single-hop relay IDs) besides saved names and refs; a lab whose saved names were IPs refused `server set main`.
 - Keep attention labels readable beside the tag column in an 80-column terminal: compact table padding and preserve reason cells.
 - Omitted server options preserve values; clearing `--pay-on none` also clears its repeat, and a declined or dry-run metadata review must never save intent.

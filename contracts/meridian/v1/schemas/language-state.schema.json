@@ -7,8 +7,9 @@
       "type": "boolean"
     },
     "language": {
-      "default": "en",
+      "default": "auto",
       "enum": [
+        "auto",
         "en",
         "ru",
         "fa",

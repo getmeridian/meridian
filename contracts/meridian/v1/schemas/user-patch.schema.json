@@ -47,6 +47,7 @@
         }
       ],
       "default": null,
+      "description": "Page/app language; null follows the fleet, omitted preserves the override.",
       "title": "Language"
     },
     "note": {

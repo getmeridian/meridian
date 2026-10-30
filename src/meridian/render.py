@@ -7,6 +7,7 @@ import json
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
+from meridian.core.languages import DEFAULT_FLEET_LANGUAGE, FleetLanguage, language_or_english
 from meridian.core.notices import RenderedNotice
 from meridian.core.owner_contact import OwnerContact
 from meridian.models import ProtocolURL
@@ -629,12 +630,13 @@ def render_pwa_shell(
     worker_path: str = "../pwa/sw.js",
     worker_scope: str = "../",
     notice: RenderedNotice | None = None,
+    language: FleetLanguage = DEFAULT_FLEET_LANGUAGE,
 ) -> str:
     """Render the PWA HTML shell from the index.html.j2 template.
 
     The shell is lightweight — it loads config.json and shared assets
-    at runtime.  Only the client_name, asset_path, and server_name
-    are baked in.
+    at runtime. The service's resolved language and asset/config paths are ready
+    before the first paint and config request.
     """
     return _render_pwa_template(
         "index.html.j2",
@@ -646,6 +648,8 @@ def render_pwa_shell(
         worker_path=worker_path,
         worker_scope=worker_scope,
         notice=notice,
+        language=language,
+        lang=language_or_english(language),
     )
 
 

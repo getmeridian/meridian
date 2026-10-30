@@ -1,6 +1,7 @@
 # control/ui — The owner's web console (M5, #95)
 
 ## Design decisions
+- Settings offers browser language or four explicit defaults; the person's access form tracks its language select in the same draft and saves only an edited override, with null following the fleet.
 - Person/password drafts live only in memory; changed forms guard routes, history traversal, sign-out, and their own dialog dismissal with Leave/Stay, while visible person reads refresh status and usage passively every 30 seconds.
 - Person and add forms use native local date/time with the browser zone and exact UTC instant; core-computed +1/+3 calendar-month previews only fill a draft, and No expiry PATCHes null when saved.
 - The closed Individual connections disclosure uses canonical subscription order and local QR codes; explicit format URLs and entries share the subscription link's credential permissions.

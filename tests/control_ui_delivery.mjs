@@ -22,6 +22,28 @@ export function deliveryReply(url, options, data, writes) {
 }
 
 export async function runDeliveryScenario({ w, M, ui, mode, locale, data, view, report, events, writes, settle }) {
+  if (mode === 'delivery-support-paint') {
+    const pwa = path.join(ui, '../../templates/pwa');
+    const html = fs.readFileSync(path.join(pwa, 'support.html'), 'utf8');
+    view.innerHTML = html.split('<body>')[1].split('</body>')[0];
+    const style = w.document.createElement('style');
+    style.textContent = fs.readFileSync(path.join(pwa, 'styles.css'), 'utf8');
+    w.document.head.appendChild(style);
+    w.document.documentElement.setAttribute('data-language', data.language || 'ru');
+    w.localStorage.setItem('meridian-lang', locale);
+    w.eval(fs.readFileSync(path.join(pwa, 'language.js'), 'utf8'));
+    function visibleText(element) {
+      if (!element.children.length) return element.textContent.trim();
+      return [...element.children].filter(child => w.getComputedStyle(child).display !== 'none')
+        .map(child => child.textContent).join('').trim();
+    }
+    report.title = visibleText(view.querySelector('#title'));
+    report.status = visibleText(view.querySelector('#status'));
+    report.lang = w.document.documentElement.lang;
+    report.dir = w.document.documentElement.dir;
+    report.requests = events.length;
+    return;
+  }
   if (mode === 'delivery-format-preview') {
     w.eval(fs.readFileSync(path.join(ui, 'format-preview.js'), 'utf8'));
     M.mount(view, M.formatPreviewSection());
@@ -55,6 +77,7 @@ export async function runDeliveryScenario({ w, M, ui, mode, locale, data, view, 
     M.mount(view, M.languageSection());
     await settle();
     report.initial = view.querySelector('select').value;
+    report.options = [...view.querySelectorAll('option')].map(option => ({ value: option.value, text: option.textContent }));
     view.querySelector('select').value = data.next || 'ru';
     view.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
     for (let i = 0; i < 6; i++) await settle();

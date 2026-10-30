@@ -7,6 +7,9 @@
 
 export type DeviceLimit = number | null;
 export type ExpireAt = string | null;
+/**
+ * Page/app language; null follows the fleet, omitted preserves the override.
+ */
 export type Language = ("en" | "ru" | "fa" | "zh") | null;
 export type Note = string;
 export type Status = ("active" | "disabled") | null;

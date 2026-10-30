@@ -118,7 +118,7 @@ def test_schema_16_database_migrates_to_nullable_person_language(tmp_path: Path)
         db.execute("UPDATE meta SET value = '16' WHERE key = 'schema_version'")
     service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
     try:
-        assert service.get_user("person").language is None and service.languages.read().language == "en"
+        assert service.get_user("person").language is None and service.languages.read().language == "auto"
         with sqlite3.connect(path) as db:
             assert db.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone() == (
                 str(SCHEMA_VERSION),

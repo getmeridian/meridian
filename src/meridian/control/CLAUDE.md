@@ -1,6 +1,7 @@
 # control — Meridian's own control service (`meridian serve`)
 
 ## Design decisions
+- An unset fleet language reads `auto`, preserving every stored explicit value; personal connection/support HTML resolves overrides under the state lock, and old fragment support links navigate to personal HTML without a background bearer fetch.
 - **Admin HTTP contract** — `route_catalog.py` declares every `/api` method, named path, scopes, body/query and response models, errors, credential marker, and publication decision; `route_types.py` compiles the same parameter schemas for dispatch, and `openapi.py` uses Pydantic validation/serialization schemas for OpenAPI 3.1.
 - **HTTP route bindings** — `route_table.py` owns ordered route matching and scope bindings; the HTTP front binds its handler without importing the server back into routing.
 - `person_expiry.py` serves an owner/people/admin read-only month preview; choosing a preset stores nothing, and the person form saves the resulting UTC instant through its changed-field PATCH.

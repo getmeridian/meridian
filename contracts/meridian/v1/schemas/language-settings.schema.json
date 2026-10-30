@@ -1,10 +1,11 @@
 {
   "additionalProperties": false,
-  "description": "Operator-owned default for native subscription presentation; never guessed from requests.",
+  "description": "Starting page and app status language; auto follows browsers and keeps app messages English.",
   "properties": {
     "language": {
-      "default": "en",
+      "default": "auto",
       "enum": [
+        "auto",
         "en",
         "ru",
         "fa",

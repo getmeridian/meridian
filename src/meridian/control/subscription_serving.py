@@ -17,7 +17,7 @@ from meridian.control.subscriptions import (
     unknown_subscription,
 )
 from meridian.control.users import USER_SELECT, user_record
-from meridian.core.languages import Language, LanguageState
+from meridian.core.languages import FleetLanguage, LanguageState, language_or_english, resolve_language
 from meridian.core.notices import RenderedNotice
 
 
@@ -51,7 +51,7 @@ def serve_subscription(
         settings = read_settings()
         privacy = read_privacy()
         notice = read_notice(record)
-        language = record.language or read_language().language
+        language = resolve_language(read_language().language, record.language)
         # The connection page's account check (`/info`) is never an app fetching its configs.
         if privacy.device_limits != "off" and document != "browser" and not browser_request(user_agent, accept):
             with store.transaction():
@@ -74,7 +74,7 @@ def serve_subscription(
     )
 
 
-def subscription_user(record: UserRecord, language: Language) -> SubscriptionUser:
+def subscription_user(record: UserRecord, language: FleetLanguage) -> SubscriptionUser:
     """One account projection for live delivery and preview; no private metadata travels."""
     return SubscriptionUser(
         username=record.username,
@@ -86,5 +86,5 @@ def subscription_user(record: UserRecord, language: Language) -> SubscriptionUse
         limit_bytes=record.traffic_limit_bytes,
         lifetime_used_bytes=record.lifetime_traffic_bytes,
         limit_strategy=record.traffic_limit_strategy,
-        language=language,
+        language=language_or_english(language),
     )

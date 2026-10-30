@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from meridian.control.events import EventLedger
 from meridian.control.store import Store
-from meridian.core.languages import DEFAULT_LANGUAGE, LanguageSettings, LanguageState
+from meridian.core.languages import DEFAULT_FLEET_LANGUAGE, LanguageSettings, LanguageState
 
 
 class LanguageLedger:
@@ -13,7 +13,9 @@ class LanguageLedger:
         self._events = events
 
     def read(self) -> LanguageState:
-        return LanguageState.model_validate({"language": self._store.meta("subscription_language") or DEFAULT_LANGUAGE})
+        return LanguageState.model_validate(
+            {"language": self._store.meta("subscription_language") or DEFAULT_FLEET_LANGUAGE}
+        )
 
     def set(self, settings: LanguageSettings) -> LanguageState:
         with self._store.transaction():

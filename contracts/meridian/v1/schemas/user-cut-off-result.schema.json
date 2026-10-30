@@ -620,7 +620,7 @@
             }
           ],
           "default": null,
-          "description": "Subscription status language; null uses the fleet default.",
+          "description": "Starting connection/support page and app status language; null follows the fleet.",
           "title": "Language"
         },
         "last_traffic_node": {

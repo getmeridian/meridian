@@ -11,7 +11,7 @@
 export type FleetLanguageOutputEnvelope = _FleetLanguageSuccessEnvelope | _FleetLanguageTerminalEnvelope;
 export type Command = "fleet.language";
 export type Changed = boolean;
-export type Language = "en" | "ru" | "fa" | "zh";
+export type Language = "auto" | "en" | "ru" | "fa" | "zh";
 export type DurationMs = number;
 /**
  * @maxItems 0

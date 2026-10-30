@@ -1,6 +1,7 @@
 # core - Meridian API contracts
 
 ## Design decisions
+- `FleetLanguage` adds `auto` without widening the four-language CLI/person type; shared resolution prefers the person, and only pages detect browsers while automatic status remarks use English.
 - `calendar.py` shares clamped month shifts with billing; client-limit renewal previews add one or three months after max(now, expiry) in UTC and pass through the existing finite timestamp parser.
 - subscription_formats.py owns the document/suffix vocabulary; subscription_preview.py bounds transient headers and exposes typed selection, included protocols, omission reasons, and redacted service headers without credentials.
 - `languages.py` is the shared en/ru/fa/zh type; fleet defaults and nullable person overrides are operator settings, separate from CLI locale detection and reviewed topology.

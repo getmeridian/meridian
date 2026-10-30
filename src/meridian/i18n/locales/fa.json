@@ -534,13 +534,13 @@
   "notice.error_paragraph": "از یک بند بدون شکست خط یا نویسه‌های کنترلی استفاده کنید.",
   "notice.error_substitutions": "جای‌گذاری‌های مجاز: {fields}",
   "notice.error_expansion": "تعداد جای‌گذاری‌ها را کم کنید تا پیام در ۱۰۲۴ نویسه جا شود.",
-  "language.invalid": "یکی از en، ru، fa یا zh را انتخاب کنید.",
-  "language.invalid_person": "یکی از en، ru، fa، zh یا default برای زبان پیش‌فرض سرویس را انتخاب کنید.",
+  "language.invalid": "یکی از auto، en، ru، fa یا zh را انتخاب کنید.",
+  "language.invalid_person": "یکی از en، ru، fa، zh یا default برای پیروی از پیش‌فرض سرویس را انتخاب کنید.",
   "language.default": "پیش‌فرض سرویس",
-  "language.saved": "زبان اشتراک ذخیره شد: {language}",
-  "language.current": "زبان اشتراک: {language}",
+  "language.saved": "زبان پیش‌فرض ذخیره شد: {language}",
+  "language.current": "زبان پیش‌فرض: {language}",
   "client.label.language": "زبان اشتراک",
-  "events.kind.language.changed": "زبان اشتراک تغییر کرد",
+  "events.kind.language.changed": "زبان پیش‌فرض تغییر کرد",
   "preview.format": "قالب",
   "preview.rule": "قاعدهٔ انتخاب",
   "preview.family": "گروه برنامه",
@@ -576,5 +576,7 @@
   "preview.invalid_user_agent": "User-Agent را با حداکثر ۵۱۲ نویسه، بدون شکست خط یا نویسهٔ کنترلی وارد کنید.",
   "preview.invalid_accept": "سرآیند Accept را با حداکثر ۲۵۶ نویسه، بدون شکست خط یا نویسهٔ کنترلی وارد کنید.",
   "preview.invalid_suffix": "برای پسوند یکی از info، json، v2ray-json، mihomo، clash، stash یا singbox را انتخاب کنید.",
-  "preview.title": "{name}: قالب اشتراک"
+  "preview.title": "{name}: قالب اشتراک",
+  "language.auto": "زبان مرورگر هر فرد",
+  "language.confirm_json": "برای تغییر زبان پیش‌فرض در حالت JSON، گزینهٔ --yes را وارد کنید."
 }

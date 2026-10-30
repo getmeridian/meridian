@@ -124,7 +124,8 @@ for (const script of ['core.js', 'drafts.js', 'qr-export.js', 'people.js', 'expi
   w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 }
 const M = w.M;
-M.i18n = { locale: () => locale === 'zh' ? 'zh-CN' : locale };
+M.i18n = { locale: () => locale === 'zh' ? 'zh-CN' : locale,
+  langs: ['en', 'ru', 'fa', 'zh'], names: { en: 'English', ru: 'Русский', fa: 'فارسی', zh: '中文' } };
 M.t = (key, params = {}) => (catalog[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? ''));
 M.toast = (text) => events.push({ toast: text });
 M.fleetHistory = () => null;
@@ -287,10 +288,12 @@ if (mode === 'owner-page') {
 if (mode === 'owner-support') {
   const pageDir = path.resolve(ui, '../../templates/pwa');
   const support = new JSDOM(fs.readFileSync(path.join(pageDir, 'support.html'), 'utf8'), {
-    url: 'https://198.51.100.1/connect/sub/~pwa/pwa-test/support.html#sampleShortUuid00', runScripts: 'outside-only',
+    url: 'https://198.51.100.1/connect/sub/sampleShortUuid00/support.html', runScripts: 'outside-only',
   });
   const sw = support.window;
   sw.localStorage.setItem('meridian-lang', locale);
+  sw.document.documentElement.setAttribute('data-page', '/connect/sub/sampleShortUuid00');
+  sw.eval(fs.readFileSync(path.join(pageDir, 'language.js'), 'utf8'));
   const holder = sw.document.getElementById('owner-contact');
   if (holder) {
     holder.setAttribute('data-owner-text', data.contact.text);

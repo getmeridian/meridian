@@ -22,7 +22,6 @@ from meridian.control.formats.status_remarks import STATUS_REMARKS
 from meridian.control.models import ENDPOINT_REMARK_MAX_LENGTH, ServiceSettings
 from meridian.control.service import ControlService
 from meridian.control.subscriptions import render_subscription
-from meridian.core.defaults import SUPPORT_PAGE
 from meridian.core.fleet_document import intent_changes
 from meridian.core.topology import DeliveryIntent
 from meridian.pwa import load_pwa_assets
@@ -168,7 +167,7 @@ def test_contact_is_live_on_pages_and_overrides_only_the_support_header(tmp_path
         assert person.sub_token not in support.text
         client.put_settings(ServiceSettings(profile_title="Meridian", public_url=settings.public_url))
         cleared = httpx.get(f"{url}/sub/{person.sub_token}")
-        assert cleared.headers["support-url"] == f"{settings.public_url}/{SUPPORT_PAGE}#{person.sub_token}"
+        assert cleared.headers["support-url"] == f"{settings.public_url}/sub/{person.sub_token}/support.html"
         assert "owner_contact" not in httpx.get(f"{url}/sub/{person.sub_token}/config.json").json()
         assert "sample_support" not in httpx.get(f"{url}/sub/~pwa/{version}/support.html").text
 

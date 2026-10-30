@@ -1880,11 +1880,12 @@
       },
       "LanguageSettings": {
         "additionalProperties": false,
-        "description": "Operator-owned default for native subscription presentation; never guessed from requests.",
+        "description": "Starting page and app status language; auto follows browsers and keeps app messages English.",
         "properties": {
           "language": {
-            "default": "en",
+            "default": "auto",
             "enum": [
+              "auto",
               "en",
               "ru",
               "fa",
@@ -1906,8 +1907,9 @@
             "type": "boolean"
           },
           "language": {
-            "default": "en",
+            "default": "auto",
             "enum": [
+              "auto",
               "en",
               "ru",
               "fa",
@@ -5877,6 +5879,7 @@
               }
             ],
             "default": null,
+            "description": "Page/app language; null follows the fleet, omitted preserves the override.",
             "title": "Language"
           },
           "note": {
@@ -6024,7 +6027,7 @@
               }
             ],
             "default": null,
-            "description": "Subscription status language; null uses the fleet default.",
+            "description": "Starting connection/support page and app status language; null follows the fleet.",
             "title": "Language"
           },
           "last_traffic_node": {
@@ -6315,6 +6318,7 @@
               }
             ],
             "default": null,
+            "description": "Page/app language; null follows the fleet, omitted preserves the override.",
             "title": "Language"
           },
           "note": {
@@ -8270,7 +8274,7 @@
             "meridianToken": []
           }
         ],
-        "summary": "Read the fleet's language for subscription status remarks.",
+        "summary": "Read the default language for connection/support pages and app status remarks.",
         "tags": [
           "language"
         ],
@@ -8376,7 +8380,7 @@
             "meridianToken": []
           }
         ],
-        "summary": "Set the fleet's language for subscription status remarks.",
+        "summary": "Set the page/app default; auto follows browsers and keeps app status remarks English.",
         "tags": [
           "language"
         ],

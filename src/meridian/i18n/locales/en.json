@@ -534,13 +534,13 @@
   "notice.error_paragraph": "Use a single paragraph without line breaks or control characters.",
   "notice.error_substitutions": "Allowed substitutions: {fields}",
   "notice.error_expansion": "Use fewer substitutions so the notice fits within 1,024 characters.",
-  "language.invalid": "Choose en, ru, fa, or zh.",
-  "language.invalid_person": "Choose en, ru, fa, zh, or default for the fleet language.",
+  "language.invalid": "Choose auto, en, ru, fa, or zh.",
+  "language.invalid_person": "Choose en, ru, fa, zh, or default to follow the fleet.",
   "language.default": "Fleet default",
-  "language.saved": "Subscription language saved: {language}",
-  "language.current": "Subscription language: {language}",
+  "language.saved": "Default language saved: {language}",
+  "language.current": "Default language: {language}",
   "client.label.language": "Subscription language",
-  "events.kind.language.changed": "Subscription language changed",
+  "events.kind.language.changed": "Default language changed",
   "preview.format": "Format",
   "preview.rule": "Selection rule",
   "preview.family": "App family",
@@ -576,5 +576,7 @@
   "preview.invalid_user_agent": "Use a User-Agent of up to 512 characters, without line breaks or control characters.",
   "preview.invalid_accept": "Use an Accept header of up to 256 characters, without line breaks or control characters.",
   "preview.invalid_suffix": "Choose info, json, v2ray-json, mihomo, clash, stash, or singbox for the suffix.",
-  "preview.title": "{name}: subscription format"
+  "preview.title": "{name}: subscription format",
+  "language.auto": "Follow each person's browser",
+  "language.confirm_json": "Pass --yes to change the default language in JSON mode."
 }

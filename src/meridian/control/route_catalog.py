@@ -741,7 +741,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         delivery_routes.get_language,
         None,
         LanguageState,
-        "Read the fleet's language for subscription status remarks.",
+        "Read the default language for connection/support pages and app status remarks.",
         credentials=False,
     ),
     route(
@@ -751,7 +751,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         delivery_routes.put_language,
         LanguageSettings,
         LanguageState,
-        "Set the fleet's language for subscription status remarks.",
+        "Set the page/app default; auto follows browsers and keeps app status remarks English.",
         credentials=False,
     ),
     route(

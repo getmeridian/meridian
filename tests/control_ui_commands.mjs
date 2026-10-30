@@ -55,7 +55,8 @@ for (const script of ['core.js', 'drafts.js', 'qr-export.js', 'commands.js', 'pe
   w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 }
 const M = w.M;
-M.i18n = { locale: () => locale === 'zh' ? 'zh-CN' : locale };
+M.i18n = { locale: () => locale === 'zh' ? 'zh-CN' : locale,
+  langs: ['en', 'ru', 'fa', 'zh'], names: { en: 'English', ru: 'Русский', fa: 'فارسی', zh: '中文' } };
 M.t = (key, params = {}) => (catalog[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? ''));
 M.toast = () => {};
 M.go = () => {};

@@ -63,7 +63,7 @@ INTERNAL_ROUTES: tuple[InternalRoute, ...] = (
     ),
     InternalRoute(
         "GET",
-        re.compile(rf"/sub/{_SUB_TOKEN}/(index\.html|config\.json|manifest\.webmanifest)"),
+        re.compile(rf"/sub/{_SUB_TOKEN}/(index\.html|support\.html|config\.json|manifest\.webmanifest)"),
         page_routes.page,
         "Public personal connection-page content.",
     ),

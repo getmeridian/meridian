@@ -17,6 +17,12 @@ To set up a phone from a computer, open the link on the computer and scan the QR
 
 Keep the link to yourself. It is your personal access, and anyone who has it can connect as you.
 
+## Language
+
+Your saved page choice comes first, then your account's language, then the owner's default. With automatic language, connection and support pages follow your browser and fall back to English when needed.
+
+Use the language buttons at any time; your choice is saved in this browser and applies to the support page too. Persian uses a right-to-left layout.
+
 ## Apps
 
 These apps work with Meridian. Your connection page shows the ones for your device first.
@@ -53,7 +59,7 @@ Your connection page may show a notice from the person who runs the service, suc
 
 ## Status messages in your app
 
-If access is disabled, has expired, or has reached its traffic allowance, the entries in your app explain the reason and ask you to contact the owner. The owner chooses the language for these messages and can set one for your account. Your connection page keeps its own language picker. These explanatory entries cannot connect; ask the owner to restore access.
+If access is disabled, has expired, or has reached its traffic allowance, the entries in your app explain the reason and ask you to contact the owner. The messages follow your account language or the owner's default; automatic language keeps them in English. Your page's language buttons save a preference in this browser. These explanatory entries cannot connect; ask the owner to restore access.
 
 ## When an app shows a different list
 

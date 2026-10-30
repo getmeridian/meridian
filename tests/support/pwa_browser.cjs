@@ -118,6 +118,7 @@ function createBrowser(config, catalog, options = {}) {
   document.getElementById = id => document.querySelector('#' + id);
   document.documentElement = document.appendChild(document.createElement('html'));
   document.documentElement.lang = 'en'; document.documentElement.dir = 'ltr';
+  if (options.pageLanguage) document.documentElement.setAttribute('data-language', options.pageLanguage);
   document.body = document.documentElement.appendChild(document.createElement('body'));
   document.body.innerHTML = '<div id="app"><div class="skeleton"></div></div><div id="toast"><span data-t="copied">Copied</span></div>';
   document.readyState = 'loading'; document.visibilityState = 'visible';
@@ -136,7 +137,11 @@ function createBrowser(config, catalog, options = {}) {
   const context = {
     document, location, URL, Intl, console, Promise,
     navigator: { userAgent: options.userAgent || 'Android', language: options.language || 'en', maxTouchPoints: 0 },
-    localStorage: { getItem: key => storage[key] ?? null, setItem: (key, value) => { storage[key] = String(value); }, removeItem: key => { delete storage[key]; } },
+    localStorage: {
+      getItem: key => { if (options.storageUnavailable) throw new Error('storage unavailable'); return storage[key] ?? null; },
+      setItem: (key, value) => { if (options.storageUnavailable) throw new Error('storage unavailable'); storage[key] = String(value); },
+      removeItem: key => { delete storage[key]; },
+    },
     btoa: text => { if (/[^\x00-\xff]/.test(text)) throw new Error('InvalidCharacterError'); return Buffer.from(text, 'latin1').toString('base64'); },
     atob: text => Buffer.from(text, 'base64').toString('latin1'), AbortController,
     Event: function(type) { this.type = type; },
@@ -161,6 +166,7 @@ function createBrowser(config, catalog, options = {}) {
     vm.runInContext(source, context, { filename: name });
   }
   document.onScript = script => { const name = script.src.split('/').at(-1); if (fs.existsSync(path.join(directory, name))) load(name); };
+  load('language.js');
   load('app.js', ['renderPage', 'init', 'switchLang', 'buildDeepLink', 'renderSubUrl', 'renderSetup', 'renderAppRow', 'renderConnection', 'renderConnections', 'T']);
   function fire(type, target, extra = {}) {
     const event = { type, target: target || document, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, ...extra };

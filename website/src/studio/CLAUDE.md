@@ -15,6 +15,7 @@
 **Guided cockpit UX** — one task per screen; the journey rail, contextual help, and native `<dialog>` command sheet replace always-visible JSON/CLI panels.
 
 ## What's done well
+- Generated fleet-language types include the automatic default while person-language enums remain en/ru/fa/zh with null following the fleet.
 - Generated preview types compose the shared selector and endpoint contracts, preserving header bounds and credential-free response fields.
 - Generated client and user types retain nullable language overrides and the shared four-code enum from Python.
 - Generated notice types preserve Unicode text bounds and the explicit preview/save confirmation field from Python.

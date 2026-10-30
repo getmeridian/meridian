@@ -345,7 +345,7 @@ meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--j
 meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
 meridian fleet notice clear [--yes] [--json]
-meridian fleet language [en|ru|fa|zh] [--json]
+meridian fleet language [auto|en|ru|fa|zh] [--yes] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -391,7 +391,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 Сообщение хранится в управляющем сервисе. `fleet notice set` показывает предпросмотр перед подтверждением; `--until WHEN` задаёт срок, `--for NAME` подставляет данные аккаунта, а изменение в JSON требует `--yes`. `fleet notice show` читает сообщение; `fleet notice clear` подтверждает удаление. Подробнее: [Управление клиентами](/ru/client-management/).
 
-Короткие статусы подписок используют заданный язык сервиса: `en`, `ru`, `fa` или `zh`. `fleet language` читает настройку; `fleet language CODE` сохраняет её. `client set NAME --language CODE` задаёт язык человека, `--language default` возвращает общий. Коды статусов остаются английскими. Настройки сохраняются при проверенных применениях и в зашифрованных резервных копиях.
+По умолчанию `auto` выбирает язык браузера для страниц подключения и помощи, а статусы в приложениях оставляет на английском. Выберите `en`, `ru`, `fa` или `zh`, чтобы задать общий язык страниц и статусов. `fleet language` показывает настройку; `fleet language CODE --yes --json` сохраняет её. `client set NAME --language CODE` задаёт язык отдельного пользователя; `--language default` возвращает общую настройку. Сохранённый выбор на странице имеет приоритет, и язык всегда можно переключить. Коды статусов остаются английскими. Настройки не меняются при `apply` и входят в зашифрованные резервные копии.
 
 ### meridian context
 

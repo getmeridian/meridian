@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## Unreleased
 
 - `client set --tag`, `client list --tag`, and the console save tags in uppercase instead of refusing lowercase (`family` becomes `FAMILY`); a refused tag no longer drops the note sent with it.
+- Owners can choose the default language for connection and support pages through the CLI, API, or console, with a person override in the console. The default follows each person's browser and keeps app status messages English; saved page choices still win, and language/direction are ready before the first paint.
+
 - An apply after a Meridian upgrade, or after another renderer changed, no longer re-runs every server's package and hardening baseline; only a change to the baseline itself or to the server's connection does.
 - Scoped integrations can fetch OpenAPI 3.1 at `/api/openapi.json`. The same route catalog drives dispatch and authorization, marks responses that can carry credentials, and supplies checked API operation tables in all four locales.
 - Person and password forms ask Leave/Stay while edits exist, including browser back and dialog dismissal. Person status and usage refresh while visible without replacing drafts or focus; device actions update their originating card. Drafts stay in memory, and successful saves clear only the saved form.

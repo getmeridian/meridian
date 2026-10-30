@@ -15,7 +15,7 @@ from meridian.control.models import ClientEndpoint, PrivacySettings, ServiceSett
 from meridian.control.store import Store
 from meridian.control.subscription_serving import subscription_user
 from meridian.control.subscriptions import JSON_TYPE, TEXT_TYPE, YAML_TYPE, render_subscription, subscription_headers
-from meridian.core.languages import LanguageState
+from meridian.core.languages import LanguageState, resolve_language
 from meridian.core.notices import RenderedNotice
 from meridian.core.redaction import REDACTED, redact_preview_text
 from meridian.core.subscription_preview import (
@@ -53,7 +53,7 @@ def preview_subscription(
         identifiers = {id(endpoint): str(row["endpoint_id"]) for endpoint, row in zip(endpoints, rows, strict=True)}
         settings = read_settings()
         notice = read_notice(record)
-        user = subscription_user(record, record.language or read_language().language)
+        user = subscription_user(record, resolve_language(read_language().language, record.language))
         now = datetime.fromtimestamp(clock(), UTC)
         hwid_active = (
             read_privacy().device_limits != "off"

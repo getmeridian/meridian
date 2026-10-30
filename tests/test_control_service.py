@@ -327,7 +327,7 @@ def test_settings_carry_the_public_url_into_subscription_headers(service: Contro
     service.put_settings(ServiceSettings(profile_title="Meridian", public_url="https://198.51.100.7/connect"))
     headers = service.subscription(user.sub_token).headers
     assert headers["profile-web-page-url"] == f"https://198.51.100.7/connect/sub/{user.sub_token}"
-    assert headers["support-url"] == f"https://198.51.100.7/connect/sub/~pwa/support.html#{user.sub_token}"
+    assert headers["support-url"] == f"https://198.51.100.7/connect/sub/{user.sub_token}/support.html"
 
 
 def _fetch(url: str, headers: dict[str, str], method: str = "GET") -> tuple[int, str, dict[str, str]]:

@@ -534,13 +534,13 @@
   "notice.error_paragraph": "请输入单段文本，不含换行或控制字符。",
   "notice.error_substitutions": "允许的替换字段：{fields}",
   "notice.error_expansion": "请减少替换字段，使通知不超过 1,024 个字符。",
-  "language.invalid": "请选择 en、ru、fa 或 zh。",
-  "language.invalid_person": "请选择 en、ru、fa、zh，或用 default 采用服务默认语言。",
+  "language.invalid": "请选择 auto、en、ru、fa 或 zh。",
+  "language.invalid_person": "请选择 en、ru、fa、zh，或使用 default 跟随全局默认值。",
   "language.default": "服务默认语言",
-  "language.saved": "订阅语言已保存：{language}",
-  "language.current": "订阅语言：{language}",
+  "language.saved": "默认语言已保存：{language}",
+  "language.current": "默认语言：{language}",
   "client.label.language": "订阅语言",
-  "events.kind.language.changed": "订阅语言已更改",
+  "events.kind.language.changed": "默认语言已更改",
   "preview.format": "格式",
   "preview.rule": "选择规则",
   "preview.family": "应用类型",
@@ -576,5 +576,7 @@
   "preview.invalid_user_agent": "User-Agent 最多 512 个字符，不可包含换行或控制字符。",
   "preview.invalid_accept": "Accept 响应类型最多 256 个字符，不可包含换行或控制字符。",
   "preview.invalid_suffix": "后缀请选择 info、json、v2ray-json、mihomo、clash、stash 或 singbox。",
-  "preview.title": "{name}：订阅格式"
+  "preview.title": "{name}：订阅格式",
+  "language.auto": "跟随每个人的浏览器语言",
+  "language.confirm_json": "在 JSON 模式下更改默认语言，请添加 --yes。"
 }

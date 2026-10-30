@@ -267,7 +267,7 @@ if (mode === 'person-guard-save') {
   report.prompt = !!guard();
 }
 
-if (mode.startsWith('person-live')) {
+if (mode.startsWith('person-live') && mode !== 'person-live-language') {
   const note = view().querySelector('textarea'), time = view().querySelector('input[type="time"]');
   if (mode === 'person-live-race') {
     const old = { ...user };
@@ -473,6 +473,42 @@ if (mode === 'person-mutation') {
   report.readsAfterResult = events.filter(event => event.method === 'GET' && event.url.startsWith('api/users/')).length - readsBefore;
   report.hash = w.location.hash;
   report.asks = events.filter(event => event.asked).length;
+}
+
+
+if (mode === 'person-language' || mode === 'person-live-language') {
+  const select = view().querySelector('select[name="language"]');
+  report.found = !!select;
+  if (select) {
+    report.text = select.closest('label')?.textContent || select.parentNode.textContent;
+    report.initial = select.value;
+    report.options = [...select.options].map(option => option.value);
+    select.value = data.next === null ? 'default' : data.next || 'ru';
+    select.dispatchEvent(new w.Event('change', { bubbles: true }));
+    select.focus();
+    const unloading = () => {
+      const event = new w.Event('beforeunload', { cancelable: true });
+      w.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    report.dirty = unloading();
+    if (mode === 'person-live-language') {
+      user = { ...user, language: data.remote || 'zh' };
+      await advance(30000);
+      report.sameSelect = view().querySelector('select[name="language"]') === select;
+      report.focusKept = w.document.activeElement === select;
+      report.afterRefresh = select.value;
+    }
+    select.form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+    await settle();
+    if (!data.failed) user = { ...user, ...writes[0]?.body };
+    for (const resolve of pending.splice(0)) resolve(data.failed ? reply({ error: { code: 'network' } }, 503) : reply(user));
+    await settle();
+    report.writes = writes.map(write => write.body);
+    report.afterSave = view().querySelector('select[name="language"]')?.value;
+    report.afterSaveDirty = unloading();
+    report.stored = [...Object.keys(w.localStorage), ...Object.keys(w.sessionStorage)];
+  }
 }
 
 dom.window.close();

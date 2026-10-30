@@ -181,7 +181,7 @@ export type ExpireAt = string | null;
  */
 export type FirstTrafficAt = string | null;
 /**
- * Subscription status language; null uses the fleet default.
+ * Starting connection/support page and app status language; null follows the fleet.
  */
 export type Language = ("en" | "ru" | "fa" | "zh") | null;
 /**

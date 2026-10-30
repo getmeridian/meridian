@@ -10,6 +10,7 @@
 **No markup in catalogs** — callers escape catalog text and add Rich styles themselves, so a translator can never break rendering.
 
 ## What's done well
+- Fleet browser/default labels, person overrides, and JSON confirmation guidance match across all four locales; the console locale remains separate from the language given to people's pages.
 - Individual connection and format headings and unavailable labels match across all four CLI locales.
 - Preview rules, formats, restrictions, placeholders, and bounded-input errors have matching four-language CLI and console labels; protocol and API codes stay English.
 - Notice preview, expiry, confirmation, clearing, and content-free timeline labels exist in all four CLI locales; operator text remains verbatim.

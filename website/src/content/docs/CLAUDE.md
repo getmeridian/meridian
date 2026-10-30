@@ -1,6 +1,7 @@
 # content/docs — Markdown documentation source
 
 ## Design decisions
+- Connecting, client, and CLI guides explain automatic browser defaults, explicit page/app languages, person overrides, saved page choices, console edits, and JSON `--yes` in all four locales.
 - API-token guides explain scoped issuance, authenticated OpenAPI discovery, credential/scope markers, and cut-off permissions in every locale; operation tables are checked against the committed admin contract by `scripts/validate_api_docs.py`.
 - Person guides explain Leave/Stay, memory-only drafts, preserved focus, visible 30-second refresh, and owner idle expiry in every locale.
 - Person guides explain browser-local expiry, exact UTC, calendar-month clamping, explicit null, and changed-field saves in four locales.

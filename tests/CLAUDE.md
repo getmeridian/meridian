@@ -30,6 +30,8 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - **RFC 5737 IPs** — always `198.51.100.x` for test data, never real IPs.
 
 ## Pitfalls
+- CLI language scenarios use tmp_home and reset JSON mode after each invocation; a leaked JSON mode once made a later human notice confirmation require --yes.
+- Page-language scenarios verify HTML attributes, blocking head selection, saved/browser precedence, early load errors, support text before its main script, and person-select draft preservation; CLI JSON assertions read stdout apart from backup notices.
 - Device-card scenarios use the shared console DOM and form helpers, preserve real field validity, and verify the card's own count refresh after a mutation.
 - Every new admin handler needs a runnable ROUTE_SAMPLES entry so the token-scope matrix can collect and exercise its permissions.
 - Preview tests compare rule precedence and native filtering, verify read scope and zero writes across all device levels, mask encoded headers and URI remarks, and confirm reviewed apply restores an API-disabled endpoint.

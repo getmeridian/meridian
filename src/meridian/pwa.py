@@ -6,6 +6,7 @@ import hashlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from meridian.core.languages import DEFAULT_FLEET_LANGUAGE, FleetLanguage
 from meridian.core.notices import RenderedNotice
 from meridian.core.owner_contact import OwnerContact
 from meridian.render import (
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
 
 # Static PWA assets shipped with the package (relative to templates/pwa/).
 _STATIC_FILES = (
+    "language.js",
     "app.js",
     "account.js",
     "contact.js",
@@ -76,6 +78,7 @@ def generate_client_files(
     exit_countries: list[str] | None = None,
     owner_contact: OwnerContact | None = None,
     notice: RenderedNotice | None = None,
+    language: FleetLanguage = DEFAULT_FLEET_LANGUAGE,
     asset_path: str = "../pwa",
     page_path: str = "",
     worker_path: str = "../pwa/sw.js",
@@ -96,6 +99,7 @@ def generate_client_files(
             worker_path=worker_path,
             worker_scope=worker_scope,
             notice=notice,
+            language=language,
         ),
         "config.json": render_config_json(
             protocol_urls,

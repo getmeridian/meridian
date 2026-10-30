@@ -305,17 +305,22 @@ meridian fleet notice clear --yes
 
 这些设置由管理者维护，经过审核的应用操作会保留它们。`GET /api/notice?for=NAME` 需要 read 权限；`PUT /api/notice` 需要 admin 权限或管理者会话。发送 `{"notice":{"text":"你好，{name}","until":null},"for_user":"person","confirm":false}` 可预览；将 `confirm` 设为 `true` 可保存，将 `notice` 设为 `null` 可清除。预览不会写入存储或注册设备。加密快照包含通知；`notice.changed` 事件记录修改者，不记录正文。不会发送推送或即时消息通知。
 
-## 订阅状态消息的语言
+## 默认语言
 
 ```bash
-meridian fleet language ru --json
+meridian fleet language ru --yes --json
+meridian fleet language auto --yes --json
 meridian client set person --language fa --json
 meridian client set person --language default --json
 ```
 
-应用可用英语（`en`）、俄语（`ru`）、波斯语（`fa`）或中文（`zh`）解释停用、到期及流量用完的订阅。服务默认明确设为 `en`，不会根据 User-Agent、Accept、CLI 或浏览器语言猜测。`meridian fleet language` 读取默认值；传入语言代码则立即保存。控制台设置提供同样的选项。`client set NAME --language CODE` 为指定用户设置语言，`--language default` 恢复服务默认值。不提供该选项则保留现有设置；client list/show 的 JSON 输出包含可为 null 的 `language` 字段。
+默认值为 `auto`：连接页和帮助页跟随每个人的浏览器语言，应用中的订阅状态提示保持英语。选择 `en`、`ru`、`fa` 或 `zh`，可设置页面的初始语言和应用提示语言。`meridian fleet language` 读取设置；传入语言代码会立即保存，JSON 模式下更改设置需要 `--yes`。控制台设置提供相同选项。
 
-这些设置保存在服务中，包含在加密快照内，并由经过审核的应用操作保留。`GET /api/language` 需要 read 权限；`PUT /api/language` 携带 `{"language":"ru"}` 需要 admin 权限或管理者会话。people/admin 权限可通过 `PATCH /api/users/NAME` 发送 `{"language":"fa"}` 或 `{"language":null}`。状态值仍为 `active`、`disabled`、`limited` 和 `expired`；只翻译应用列表中的固定提示，这些提示条目无法连接。连接页面保留自己的语言选择器。
+使用 `client set NAME --language CODE`，或在控制台的用户设置中选择语言，为一个人单独设置。`--language default` 恢复全局默认值；不提供该选项则保留现有设置。client list/show 的 JSON 输出包含可为 `null` 的 `language` 字段。
+
+页面先使用用户保存的语言选择，然后使用账户设置，再使用全局默认值。只有 `auto` 才跟随浏览器；不支持的浏览器语言会回退到英语。每个人都可随时通过页面上的语言按钮切换语言。
+
+这些服务设置在经过审核的应用操作和加密备份中保留。`GET /api/language` 需要 read 权限，例如返回 `{"language":"auto","changed":false}`。`PUT /api/language` 使用 `{"language":"ru"}` 或 `{"language":"auto"}`，需要 admin 权限或所有者会话。`PATCH /api/users/NAME` 在 people/admin 权限下接受 `{"language":"fa"}` 或 `{"language":null}`。状态代码仍为 `active`、`disabled`、`limited` 和 `expired`；用于解释状态的连接条目无法连接。
 
 ## 预览应用收到的订阅格式
 

@@ -221,7 +221,7 @@ class UserRecord(UserTrafficEvidence):
     note: PrivateNote = Field(default="", repr=False, description="Private operator note; people/admin only.")
     tag: PersonTag = Field(default="", repr=False, description="Private operator tag; people/admin only.")
     language: Language | None = Field(
-        default=None, description="Subscription status language; null uses the fleet default."
+        default=None, description="Starting connection/support page and app status language; null follows the fleet."
     )
 
 
@@ -235,7 +235,9 @@ class UserUpdate(CoreModel):
     device_limit: int | None = Field(default=None, ge=1, le=100)
     note: PrivateNote = Field(default="", repr=False)
     tag: PersonTag = Field(default="", repr=False)
-    language: Language | None = None
+    language: Language | None = Field(
+        default=None, description="Page/app language; null follows the fleet, omitted preserves the override."
+    )
 
 
 SUB_TOKEN_PATTERN = r"^[A-Za-z0-9_-]{16,64}$"

@@ -534,13 +534,13 @@
   "notice.error_paragraph": "Нужен один абзац без переносов строк и управляющих символов.",
   "notice.error_substitutions": "Допустимые подстановки: {fields}",
   "notice.error_expansion": "Используйте меньше подстановок, чтобы сообщение укладывалось в 1 024 символа.",
-  "language.invalid": "Выберите en, ru, fa или zh.",
-  "language.invalid_person": "Выберите en, ru, fa, zh или default для языка по умолчанию.",
+  "language.invalid": "Выберите auto, en, ru, fa или zh.",
+  "language.invalid_person": "Укажите en, ru, fa, zh или default (общая настройка).",
   "language.default": "Как в настройках сервиса",
-  "language.saved": "Язык подписок сохранён: {language}",
-  "language.current": "Язык подписок: {language}",
+  "language.saved": "Язык по умолчанию сохранён: {language}",
+  "language.current": "Язык по умолчанию: {language}",
   "client.label.language": "Язык подписки",
-  "events.kind.language.changed": "Язык подписок изменён",
+  "events.kind.language.changed": "Изменён язык по умолчанию",
   "preview.format": "Формат",
   "preview.rule": "Правило выбора",
   "preview.family": "Семейство приложений",
@@ -576,5 +576,7 @@
   "preview.invalid_user_agent": "User-Agent: до 512 символов, без переносов строк и управляющих символов.",
   "preview.invalid_accept": "Заголовок Accept: до 256 символов, без переносов строк и управляющих символов.",
   "preview.invalid_suffix": "Для суффикса выберите info, json, v2ray-json, mihomo, clash, stash или singbox.",
-  "preview.title": "{name}: формат подписки"
+  "preview.title": "{name}: формат подписки",
+  "language.auto": "Язык браузера пользователя",
+  "language.confirm_json": "Для смены языка по умолчанию в режиме JSON укажите --yes."
 }

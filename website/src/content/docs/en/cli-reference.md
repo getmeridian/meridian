@@ -345,7 +345,7 @@ meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--j
 meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
 meridian fleet notice clear [--yes] [--json]
-meridian fleet language [en|ru|fa|zh] [--json]
+meridian fleet language [auto|en|ru|fa|zh] [--yes] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -391,7 +391,7 @@ The `active` column counts people with growth in the last report, with its colle
 
 The service notice is operator-owned. `fleet notice set` shows a rendered preview before confirmation; `--until WHEN` sets its expiry, `--for NAME` uses real account values, and JSON changes require `--yes`. `fleet notice show` reads it; `fleet notice clear` confirms removal. See [Client management](/en/client-management/).
 
-Subscription status remarks use the explicit service default (`en`, `ru`, `fa`, or `zh`). `fleet language` reads it; `fleet language CODE` saves it. `client set NAME --language CODE` sets a person preference; `--language default` clears it. Status codes stay English. These service settings survive reviewed applies and encrypted backups.
+The default `auto` follows each person's browser on connection and support pages and keeps app status remarks in English. An explicit `en`, `ru`, `fa`, or `zh` sets the starting page language and app remarks. `fleet language` reads it; `fleet language CODE --yes --json` saves it. `client set NAME --language CODE` sets a person override; `--language default` follows the fleet. Saved page choices take priority, and people can still switch on the page. Status codes stay English. These service settings survive reviewed applies and encrypted backups.
 
 ### meridian context
 

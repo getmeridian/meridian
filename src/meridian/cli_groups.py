@@ -141,7 +141,7 @@ def client_set_cmd(
         None, "--tag", metavar="TAG", help="1–16 letters, digits, underscores (saved in uppercase); none clears"
     ),
     language: str | None = typer.Option(
-        None, "--language", metavar="LANGUAGE", help="Subscription status language: en, ru, fa, zh, or default"
+        None, "--language", metavar="LANGUAGE", help="Page and app language: en, ru, fa, zh; default follows the fleet"
     ),
     _json: Json = False,
 ) -> None:

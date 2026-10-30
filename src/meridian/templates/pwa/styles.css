@@ -405,3 +405,8 @@ svg{flex-shrink:0}
 .owner-contact .btn { width: auto; }
 .owner-notice { overflow-wrap: anywhere; }
 .owner-notice p { margin: 0; white-space: normal; }
+
+/* The head script selects these support labels before its main script loads. */
+.initial-text{display:none}
+html[lang="en"] .initial-en,html[lang="ru"] .initial-ru,
+html[lang="fa"] .initial-fa,html[lang="zh"] .initial-zh{display:inline}

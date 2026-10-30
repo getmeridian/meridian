@@ -305,17 +305,22 @@ One service-owned notice appears as a banner on connection pages and in apps tha
 
 These are operator settings: reviewed applies preserve them. `GET /api/notice?for=NAME` needs read scope; `PUT /api/notice` needs admin or the owner session and accepts `{"notice":{"text":"Hello {name}","until":null},"for_user":"person","confirm":false}` to preview. Set `confirm` to `true` to save, or `notice` to `null` to clear. Previews do not change storage or register devices. Encrypted snapshots include the notice; `notice.changed` events record who changed it without its text. No push or messaging notification is sent.
 
-## Language for subscription status messages
+## Default language
 
 ```bash
-meridian fleet language ru --json
+meridian fleet language ru --yes --json
+meridian fleet language auto --yes --json
 meridian client set person --language fa --json
 meridian client set person --language default --json
 ```
 
-Native apps can explain disabled, expired, and traffic-limited subscriptions in English (`en`), Russian (`ru`), Persian (`fa`), or Chinese (`zh`). The service default is explicitly `en`; it does not guess from User-Agent, Accept, the CLI language, or browser preferences. `meridian fleet language` reads the default; passing a code saves it immediately. Settings has the same default-language control. `client set NAME --language CODE` gives one person an override; `--language default` clears it. An omitted option preserves it, and client list/show JSON exposes the nullable `language` field.
+The default is `auto`: connection and support pages follow each person's browser, while subscription status messages in apps stay in English. Choose `en`, `ru`, `fa`, or `zh` to set the starting language of pages and app messages. `meridian fleet language` reads the setting; a code saves it immediately, and JSON changes require `--yes`. Console Settings offers the same choice.
 
-These settings live in the service, survive encrypted snapshots, and are preserved by reviewed applies. `GET /api/language` needs read scope; `PUT /api/language` with `{"language":"ru"}` needs admin or the owner session. `PATCH /api/users/NAME` accepts `{"language":"fa"}` or `{"language":null}` under people/admin access. Status values remain `active`, `disabled`, `limited`, and `expired`; only the fixed client-list remarks are translated, and their connections remain inert. The connection page keeps its own language picker.
+Set one person's language with `client set NAME --language CODE` or the language select in their console settings. `--language default` follows the fleet again; an omitted flag preserves the current override. Client list/show JSON includes the nullable `language` field.
+
+A saved page choice wins, then the person override, then the fleet default. Only `auto` uses the browser, falling back to English if its language is unsupported. People can always switch with the page's language buttons.
+
+These service settings survive reviewed applies and encrypted snapshots. `GET /api/language` needs read scope and returns, for example, `{"language":"auto","changed":false}`. `PUT /api/language` with `{"language":"ru"}` or `{"language":"auto"}` needs admin or the owner session. `PATCH /api/users/NAME` accepts `{"language":"fa"}` or `{"language":null}` under people/admin access. Status codes remain `active`, `disabled`, `limited`, and `expired`; the fixed explanatory connections remain inert.
 
 ## Preview an app's subscription format
 

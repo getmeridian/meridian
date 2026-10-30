@@ -1178,12 +1178,9 @@ function setDocumentLanguage() {
 }
 
 function detectLang() {
-  try {
-    var saved = localStorage.getItem('meridian-lang');
-    if (saved && (saved === 'en' || T[saved])) return saved;
-  } catch (e) {}
-  var bl = (navigator.language || '').slice(0, 2);
-  return T[bl] ? bl : null;
+  /* The head script has already chosen saved > person/fleet > browser > English. */
+  var lang = window.MeridianLanguage ? window.MeridianLanguage.current : document.documentElement.lang;
+  return T[lang] ? lang : 'en';
 }
 
 function highlightActiveLang() {

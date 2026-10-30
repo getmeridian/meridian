@@ -100,7 +100,7 @@
     }
     var accessForm = screen.accessSlot.querySelector("form");
     var changedAccess = !previous || previous.expire_at !== user.expire_at || previous.traffic_limit_bytes !== user.traffic_limit_bytes
-      || previous.traffic_limit_strategy !== user.traffic_limit_strategy;
+      || previous.traffic_limit_strategy !== user.traffic_limit_strategy || previous.language !== user.language;
     if (!accessForm || editable(accessForm) && (changedAccess || accessForm === savedForm)) {
       M.mount(screen.accessSlot, accessCard(user, screen));
     } else {
@@ -166,9 +166,17 @@
     var name = user.username;
     var expiry = M.expiryFields(user.expire_at, name);
     var limits = M.limitFields(user);
+    var initialLanguage = user.language || "default";
+    var language = h("select", { name: "language" },
+      h("option", { value: "default", text: M.t("language.person_default") }),
+      M.i18n.langs.map(function (code) {
+        return h("option", { value: code, lang: code, text: M.i18n.names[code] });
+      }));
+    language.value = initialLanguage;
     var form = h("form", { class: "stack", novalidate: true },
       expiry.nodes,
       limits.nodes,
+      M.field(M.t("language.person"), language, M.t("language.person_hint")),
       h("p", { class: "form-error", role: "alert" }),
       h("div", { class: "row-actions" },
         h("button", { class: "btn btn-primary btn-sm", type: "submit" }, M.t("action.save"))));
@@ -177,6 +185,7 @@
       e.preventDefault();
       var change = limits.value();
       Object.assign(change, expiry.change());
+      if (language.value !== initialLanguage) change.language = language.value === "default" ? null : language.value;
       if (!Object.keys(change).length) {
         M.resetDraft(form);
         M.toast(M.t("person.nothing_changed"));
