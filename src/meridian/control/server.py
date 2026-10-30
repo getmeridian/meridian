@@ -27,17 +27,14 @@ from urllib.parse import unquote
 from pydantic import BaseModel, ValidationError
 
 from meridian import __version__
-from meridian.control import page_routes, subscription_routes, ui_routes
+from meridian.control import ui_routes
 from meridian.control.blobs import BlobStore, fleet_artifacts, served_hashes
 from meridian.control.command_models import NodeCommandRequest, UserCutOffRequest
 from meridian.control.enrollment import Session, token_sha256
 from meridian.control.errors import ServiceError, agent_error
-from meridian.control.formats.selector import SUFFIX_FORMATS
 from meridian.control.http_errors import error_page, validation_message
 from meridian.control.login_limits import LockedOut
 from meridian.control.models import (
-    SUB_TOKEN_PATTERN,
-    USERNAME_PATTERN,
     ApplyFenceSwap,
     ClientEndpoint,
     DeployerStateDeposit,
@@ -51,7 +48,6 @@ from meridian.control.models import (
     ServiceConfig,
     ServiceSettings,
     TokenCreate,
-    TokenScope,
     UserCreate,
     UserImportBatch,
     UserPatch,
@@ -61,6 +57,7 @@ from meridian.control.models import (
 )
 from meridian.control.operations_api import read_attention, read_events, read_history_days
 from meridian.control.owner import OwnerSession
+from meridian.control.route_table import WRITE, Route, control_routes
 from meridian.control.service import ControlService
 from meridian.control.subscriptions import unknown_subscription
 from meridian.control.times import utc_now
@@ -76,7 +73,6 @@ from meridian.core.agent_protocol import (
     RenewRequest,
     StatsReport,
 )
-from meridian.core.client_devices import DEVICE_KEY_PATTERN
 from meridian.core.client_limits import ClientExtendRequest
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
@@ -85,19 +81,6 @@ MAX_BODY_BYTES = AGENT_HTTP_SURFACE.max_request_bytes
 UNAUTHENTICATED_BODY_BYTES = 64 * 1024
 _UNAUTHENTICATED_BODIES = re.compile(r"/auth/.*|/agent/v1/(?:enroll|hello|renew|poll)")
 ENFORCE_INTERVAL_SECONDS = 30
-_NAME = r"([a-z0-9][a-z0-9_.:-]{0,127})"
-# A node ID is a topology ID (`core.inputs`); an endpoint ID may also carry `.` and `:`.
-_NODE = r"([a-z0-9][a-z0-9_-]{0,47})"
-_USERNAME = f"({USERNAME_PATTERN})"
-_TOKEN_ID = r"([0-9a-f]{12})"
-_REVISION = r"([1-9][0-9]{0,15})"
-_SUB_TOKEN = "(" + SUB_TOKEN_PATTERN.removeprefix("^").removesuffix("$") + ")"
-_SUB_SUFFIX = "|".join(re.escape(suffix) for suffix in SUFFIX_FORMATS)
-_UUID = r"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
-# Topology writes, enrollment, tokens, and backups need admin. People mutations name
-# the separate people capability in ROUTES; admin covers both. A tuple allows either
-# capability, so user reads remain available without giving people fleet read access.
-WRITE: TokenScope = "admin"
 
 
 class ControlServer(ThreadingHTTPServer):
@@ -120,10 +103,6 @@ class ControlServer(ThreadingHTTPServer):
         if blobs is not None:
             service.background.blob_mirror = blobs.health
         self.ui = UiContext(service, public_path)
-
-
-# (method, path, the scope an `/api` route needs or None where the handler authenticates, handler)
-Route = tuple[str, re.Pattern[str], ScopeRequirement | None, Callable[["_Handler", re.Match[str]], Any]]
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -629,86 +608,7 @@ class _Handler(BaseHTTPRequestHandler):
         return None
 
 
-ROUTES: list[Route] = [
-    ("GET", re.compile(r"/api/health"), "read", _Handler.health),
-    ("GET", re.compile(r"/api/settings"), "read", _Handler.get_settings),
-    ("PUT", re.compile(r"/api/settings"), WRITE, _Handler.put_settings),
-    ("GET", re.compile(r"/api/privacy"), "read", _Handler.get_privacy),
-    ("PUT", re.compile(r"/api/privacy"), WRITE, _Handler.put_privacy),
-    ("GET", re.compile(rf"/api/nodes/{_NODE}"), "read", _Handler.get_node),
-    ("PUT", re.compile(rf"/api/nodes/{_NODE}"), WRITE, _Handler.put_node),
-    ("DELETE", re.compile(rf"/api/nodes/{_NODE}"), WRITE, _Handler.delete_node),
-    ("POST", re.compile(rf"/api/nodes/{_NODE}/enrollment"), "admin", _Handler.grant_enrollment),
-    ("POST", re.compile(rf"/api/nodes/{_NODE}/commands"), WRITE, _Handler.issue_command),
-    ("GET", re.compile(rf"/api/nodes/{_NODE}/commands/([0-9a-f-]{{36}})"), "read", _Handler.get_command),
-    ("GET", re.compile(rf"/api/nodes/{_NODE}/command-targets"), "read", _Handler.command_targets),
-    ("GET", re.compile(r"/api/ca"), "read", _Handler.fleet_authority),
-    ("GET", re.compile(r"/api/traffic"), "read", _Handler.traffic),
-    ("GET", re.compile(r"/api/events"), "read", _Handler.events),
-    ("GET", re.compile(r"/api/attention"), "read", _Handler.attention),
-    ("GET", re.compile(r"/api/servers"), "read", _Handler.server_usage),
-    ("GET", re.compile(r"/api/traffic/daily"), "read", _Handler.daily_traffic),
-    ("GET", re.compile(r"/api/users"), ("read", "people"), _Handler.list_users),
-    ("POST", re.compile(r"/api/users"), "people", _Handler.create_user),
-    # Credentials go in as well as out: importing users (`meridian migrate`) is the root of applying.
-    ("POST", re.compile(r"/api/import/users"), "admin", _Handler.import_users),
-    ("GET", re.compile(rf"/api/users/{_USERNAME}"), ("read", "people"), _Handler.get_user),
-    ("GET", re.compile(rf"/api/users/{_USERNAME}/usage"), ("read", "people"), _Handler.user_usage),
-    ("PUT", re.compile(rf"/api/users/{_USERNAME}"), "people", _Handler.put_user),
-    ("PATCH", re.compile(rf"/api/users(?:/{_USERNAME})?"), "people", _Handler.update_user),
-    ("POST", re.compile(rf"/api/users/{_USERNAME}/reissue"), "people", _Handler.reissue_user),
-    ("GET", re.compile(rf"/api/users/{_USERNAME}/cut-off"), "read", _Handler.cut_off_scope),
-    ("POST", re.compile(rf"/api/users/{_USERNAME}/reset-traffic"), "people", _Handler.reset_user_traffic),
-    ("POST", re.compile(rf"/api/users/{_USERNAME}/extend"), "people", _Handler.extend_user),
-    ("GET", re.compile(rf"/api/users/{_USERNAME}/devices"), ("read", "people"), _Handler.user_devices),
-    (
-        "DELETE",
-        re.compile(rf"/api/users/{_USERNAME}/devices/({DEVICE_KEY_PATTERN})"),
-        "people",
-        _Handler.delete_user_device,
-    ),
-    ("DELETE", re.compile(rf"/api/users/{_USERNAME}/devices"), "people", _Handler.clear_user_devices),
-    ("DELETE", re.compile(rf"/api/users/{_USERNAME}"), "people", _Handler.delete_user),
-    ("GET", re.compile(rf"/api/endpoints/{_NAME}"), "read", _Handler.get_endpoint),
-    ("PUT", re.compile(rf"/api/endpoints/{_NAME}"), WRITE, _Handler.put_endpoint),
-    ("DELETE", re.compile(rf"/api/endpoints/{_NAME}"), WRITE, _Handler.delete_endpoint),
-    ("GET", re.compile(r"/api/tokens"), "admin", _Handler.list_tokens),
-    ("POST", re.compile(r"/api/tokens"), "admin", _Handler.create_token),
-    ("DELETE", re.compile(rf"/api/tokens/{_TOKEN_ID}"), "admin", _Handler.revoke_token),
-    ("GET", re.compile(r"/api/revisions"), "read", _Handler.list_revisions),
-    ("POST", re.compile(r"/api/revisions"), "propose", _Handler.propose_revision),
-    ("GET", re.compile(rf"/api/revisions/{_REVISION}"), "read", _Handler.get_revision),
-    ("POST", re.compile(rf"/api/revisions/{_REVISION}/approve"), "approve", _Handler.approve_revision),
-    ("POST", re.compile(rf"/api/revisions/{_REVISION}/result"), WRITE, _Handler.record_revision_result),
-    ("GET", re.compile(r"/api/fence"), "read", _Handler.get_fence),
-    ("PUT", re.compile(r"/api/fence"), WRITE, _Handler.swap_fence),
-    # Backups: every route is `admin`, as a snapshot holds every credential the service keeps.
-    ("GET", re.compile(r"/api/backup/devices"), "admin", _Handler.list_device_keys),
-    ("POST", re.compile(r"/api/backup/devices"), "admin", _Handler.register_device_key),
-    ("DELETE", re.compile(rf"/api/backup/devices/{_TOKEN_ID}"), "admin", _Handler.revoke_device_key),
-    ("GET", re.compile(r"/api/backup/recovery-key"), "admin", _Handler.get_recovery_key),
-    ("PUT", re.compile(r"/api/backup/recovery-key"), "admin", _Handler.put_recovery_key),
-    ("PUT", re.compile(r"/api/backup/deployer-state"), "admin", _Handler.deposit_deployer_state),
-    ("GET", re.compile(r"/api/backup/snapshot"), "admin", _Handler.snapshot),
-    ("POST", re.compile(r"/agent/v1/enroll"), None, _Handler.agent_enroll),
-    ("POST", re.compile(r"/agent/v1/hello"), None, _Handler.agent_hello),
-    ("POST", re.compile(r"/agent/v1/renew"), None, _Handler.agent_renew),
-    ("POST", re.compile(r"/agent/v1/poll"), None, _Handler.agent_poll),
-    ("POST", re.compile(r"/agent/v1/report"), None, _Handler.agent_report),
-    ("POST", re.compile(r"/agent/v1/stats"), None, _Handler.agent_stats),
-    ("POST", re.compile(r"/agent/v1/command-results"), None, _Handler.agent_command_result),
-    ("GET", re.compile(r"/agent/v1/blobs/([0-9a-f]{64})"), None, _Handler.agent_blob),
-    ("GET", re.compile(r"/sub/~pwa/(?:(pwa-[0-9a-f]+)/)?([a-z][a-z0-9.]+)"), None, page_routes.asset),
-    ("GET", re.compile(r"/sub/~legacy/pwa/([a-z][a-z0-9.]+)"), None, page_routes.legacy_asset),
-    (
-        "GET",
-        re.compile(rf"/sub/~legacy/{_UUID}(?:/(index\.html|config\.json|manifest\.webmanifest))?/?"),
-        None,
-        page_routes.legacy,
-    ),
-    ("GET", re.compile(rf"/sub/{_SUB_TOKEN}/(index\.html|config\.json|manifest\.webmanifest)"), None, page_routes.page),
-    ("GET", re.compile(rf"/sub/{_SUB_TOKEN}(?:/({_SUB_SUFFIX}))?/?"), None, subscription_routes.subscription),
-]
+ROUTES: list[Route] = control_routes(_Handler)
 
 
 # The web UI's routes (`ui_routes.py`) live in their own block; `/api` routes come first.

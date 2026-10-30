@@ -1,6 +1,7 @@
 # control — Meridian's own control service (`meridian serve`)
 
 ## Design decisions
+- **HTTP route bindings** — `route_table.py` owns ordered route matching and scope bindings; the HTTP front binds its handler without importing the server back into routing.
 - Owner contact persists in the page-settings meta row inside the delivery transaction; native `support-url` prefers its link, page URLs remain personal, and short text joins status remarks only when every format's 100-character names remain bounded.
 - Step 15 adds private `users.note` and `users.tag`; PATCH accepts the existing name path or a `username` body at `/api/users`, only people/admin reads retain metadata, applies preserve it, and snapshots carry it with user rows.
 - **Server allowances and payments** — schema step 16 keeps per-server period offsets over durable accepted upload/download totals; reviewed settings persist metadata and anchors together, UTC payment repeats are computed on read, and non-agent servers are not measured.

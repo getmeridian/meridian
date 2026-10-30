@@ -12,7 +12,7 @@ _RENDERER_MANIFEST = {
     "control-subscriptions": "service-pages-v13",
     "control-commands": "node-restart-console-v3",
     "pwa": "service-pages-v25",
-    "control-service": "server-allowances-v1",
+    "control-service": "http-route-bindings-v1",
     "control-api": "server-allowances-v1",
     "firewall": "ufw-comment-v2",
     "nginx": "service-pages-v12",
