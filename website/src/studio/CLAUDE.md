@@ -38,3 +38,4 @@
 - Persist only non-secret draft progress; never persist pasted output, and never put SSH passwords in drafts, commands, storage, or URLs.
 - The Engine key lives only in this tab's sessionStorage, never localStorage, drafts, logs, or a URL left in history.
 - Cancel means "stop at the next safe point": keep the control disabled (not hidden) while `cancel_requested`, and render `cancelled` from `snapshot.cancellation`, including whether the server changed.
+- Resolve a conflict in `generated/` by regenerating (`pnpm run contracts:generate`), never by keeping both sides: a hand-merged `schemas/index.d.ts` came out unsorted and failed the Website Build drift check.
