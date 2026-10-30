@@ -137,6 +137,7 @@ that dials out to it.
   yet” entries in English, Russian, Persian, and Chinese instead of empty documents.
 - Duplicate connection names and names matching automatic groups now receive
   readable, stable suffixes, keeping Mihomo proxy names and sing-box tags unique.
+- A failed console locale now keeps English, and unavailable language files show a local retry notice instead of untranslated startup labels.
 - Token issuance now blocks dialog dismissal during the write, keeps the one-time secret in its own result step, and reloads token metadata with a recovery notice after an uncertain response.
 - People and Servers now refresh while visible, mark retained data stale on failures, offer inline retry, and bound requests; passive polls no longer keep an idle owner session signed in.
 - Console and CLI quotas now use binary GiB/TiB, with explicit Unlimited and field-level validation; API limits are bounded at signed 64-bit bytes, and the console refuses new amounts that JSON cannot represent exactly.

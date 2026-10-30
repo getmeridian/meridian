@@ -10,6 +10,15 @@
   var english = {};
   var current = {};
   var lang = "en";
+  var latest = null;
+  var notice = null;
+  // Available before any catalog arrives; these two labels also live in all four catalogs.
+  var BOOTSTRAP = {
+    en: { text: "Language files could not be loaded. Retry from this server.", retry: "Try again" },
+    ru: { text: "Не удалось загрузить файлы языка. Повторите загрузку с этого сервера.", retry: "Попробовать снова" },
+    fa: { text: "فایل‌های زبان بارگیری نشدند. دوباره از همین سرور تلاش کنید.", retry: "تلاش دوباره" },
+    zh: { text: "无法加载语言文件，请从此服务器重试。", retry: "重试" },
+  };
 
   function detect() {
     var saved = null;
@@ -24,10 +33,24 @@
   }
 
   function fetchCatalog(code) {
-    return fetch("ui/locales/" + code + ".json", { credentials: "same-origin" }).then(function (r) {
-      if (!r.ok) throw new Error("catalog " + code + ": HTTP " + r.status);
-      return r.json();
+    return M.rawApi("GET", "ui/locales/" + code + ".json", undefined, { passive: true }).then(function (catalog) {
+      if (!catalog || Array.isArray(catalog) || typeof catalog !== "object" || !Object.keys(catalog).length) {
+        throw new Error("catalog unavailable");
+      }
+      return catalog;
     });
+  }
+
+  function clearNotice() { if (notice) notice.remove(); notice = null; }
+
+  function showNotice(code, retry) {
+    clearNotice();
+    var copy = BOOTSTRAP[code] || BOOTSTRAP.en;
+    var button = M.h("button", { class: "btn btn-ghost btn-sm", type: "button", text: copy.retry,
+      onclick: function () { button.disabled = true; retry(); } });
+    notice = M.h("aside", { class: "i18n-notice notice notice-warn", role: "status", lang: code,
+      dir: code === "fa" ? "rtl" : "ltr" }, M.h("span", { text: copy.text }), button);
+    document.body.appendChild(notice);
   }
 
   function apply(code) {
@@ -43,14 +66,31 @@
     get lang() { return lang; },
     load: function (code) {
       code = LANGS.indexOf(code) >= 0 ? code : detect();
-      var both = [fetchCatalog("en"), code === "en" ? Promise.resolve(null) : fetchCatalog(code)];
-      return Promise.all(both).then(function (catalogs) {
-        english = catalogs[0] || {};
-        current = catalogs[1] || english;
-        apply(code);
-      }, function () {
-        current = english;
-        apply("en");
+      clearNotice();
+      latest = latest || M.latestOnly();
+      return new Promise(function (resolve) {
+        function attempt() {
+          var both = [fetchCatalog("en"), code === "en" ? Promise.resolve(null) : fetchCatalog(code)];
+          return latest(Promise.allSettled(both)).then(function (catalogs) {
+            var englishReady = catalogs[0].status === "fulfilled";
+            var selectedReady = code !== "en" && catalogs[1].status === "fulfilled";
+            if (englishReady) english = catalogs[0].value;
+            current = selectedReady ? catalogs[1].value : english;
+            apply(selectedReady ? code : "en");
+            if (!englishReady && !selectedReady) {
+              showNotice(code, function () {
+                attempt().then(function (ready) { if (ready && M.render) M.render(); });
+              });
+              // On first boot, keep the caller waiting until retry brings readable labels.
+              if (Object.keys(current).length) resolve();
+              return false;
+            }
+            clearNotice();
+            resolve();
+            return true;
+          });
+        }
+        attempt();
       });
     },
     choose: function (code) {

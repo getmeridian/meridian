@@ -187,3 +187,4 @@ input::placeholder { color: var(--t3); }
   max-width: calc(100vw - 32px); }
 .toast-ok { background: var(--t1); color: var(--bg); }
 .toast-error { background: var(--err); color: var(--on-err); }
+.i18n-notice { position: fixed; z-index: 200; inset-inline: 1rem; bottom: calc(1rem + env(safe-area-inset-bottom)); display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1rem; width: fit-content; max-width: calc(100% - 2rem); margin-inline: auto; font-size: .875rem; }

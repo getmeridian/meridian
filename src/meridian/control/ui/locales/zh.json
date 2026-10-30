@@ -361,5 +361,6 @@
   "live.stale": "数据已过期",
   "error.timeout": "请求超时，请重试。",
   "tokens.uncertain_title": "无法确认令牌是否已创建",
-  "tokens.uncertain_text": "令牌可能已创建，但未收到密钥，且密钥无法恢复。请检查令牌列表，并在创建新令牌之前撤销本次尝试生成的令牌。"
+  "tokens.uncertain_text": "令牌可能已创建，但未收到密钥，且密钥无法恢复。请检查令牌列表，并在创建新令牌之前撤销本次尝试生成的令牌。",
+  "i18n.unavailable": "无法加载语言文件，请从此服务器重试。"
 }

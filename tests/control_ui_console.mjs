@@ -14,6 +14,7 @@ const w = dom.window;
 const catalog = JSON.parse(fs.readFileSync(path.join(ui, 'locales', locale + '.json')));
 const events = [], writes = [], delayed = {};
 let fakeNow = Date.now(), timerId = 0, hidden = false, failPolls = false;
+let localeReady = false;
 const timers = new Map(), rounds = new Map();
 const virtual = mode.startsWith('live-') || mode.startsWith('deadline-');
 if (virtual) {
@@ -41,6 +42,13 @@ function reply(body, status = 200) {
 }
 w.fetch = (url, options) => {
   events.push({ method: options.method, url, headers: options.headers, at: fakeNow });
+  if (mode.startsWith('locale-')) {
+    const code = url.split('/').at(-1).split('.')[0];
+    if (mode === 'locale-fallback' && code === 'en') return new Promise(resolve => { delayed.english = resolve; });
+    if (!localeReady) return Promise.reject(new Error('catalog unavailable'));
+    const content = JSON.parse(fs.readFileSync(path.join(ui, 'locales', code + '.json')));
+    return Promise.resolve({ ...reply(content), json: () => Promise.resolve(content) });
+  }
   if (mode.startsWith('token-')) {
     if (url === 'api/tokens' && options.method === 'GET') return Promise.resolve(reply({ tokens: [] }));
     if (url === 'api/tokens' && options.method === 'POST') {
@@ -232,6 +240,28 @@ if (mode.startsWith('token-')) {
   report.dialog = w.document.querySelector('dialog')?.textContent || '';
   report.listReads = events.filter(event => event.url === 'api/tokens' && event.method === 'GET').length;
   report.writes = writes.length;
+}
+
+if (mode.startsWith('locale-')) {
+  w.eval(fs.readFileSync(path.join(ui, 'i18n.js'), 'utf8'));
+  let loaded = false;
+  M.i18n.load(locale).then(() => { loaded = true; });
+  await settle();
+  if (mode === 'locale-fallback') {
+    const english = JSON.parse(fs.readFileSync(path.join(ui, 'locales/en.json')));
+    delayed.english({ ...reply(english), json: () => Promise.resolve(english) });
+    await settle();
+  } else {
+    report.notice = w.document.querySelector('.i18n-notice')?.textContent || '';
+    localeReady = true;
+    w.document.querySelector('.i18n-notice button')?.click();
+    await settle();
+    report.recovered = loaded;
+    report.noticeAfter = w.document.querySelector('.i18n-notice')?.textContent || '';
+  }
+  report.label = M.t('nav.people');
+  report.lang = M.i18n.lang;
+  report.dir = w.document.documentElement.dir;
 }
 
 process.stdout.write(JSON.stringify(report));
