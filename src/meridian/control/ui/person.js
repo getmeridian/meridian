@@ -4,33 +4,56 @@
   "use strict";
   var M = (window.M = window.M || {});
   var h = M.h;
+  var generation = 0;
 
   function path(username, suffix) { return "api/users/" + encodeURIComponent(username) + (suffix || ""); }
 
   M.renderPerson = function (view, username) {
+    var screen = { view: view, username: username, generation: ++generation, stopped: false };
+    view.meridianPersonGeneration = screen.generation;
     M.mount(view, h("div", { class: "empty" }, h("span", { class: "spinner" })));
     Promise.all([M.api("GET", path(username)), M.api("GET", "ui/api/people/" + encodeURIComponent(username) + "/share")])
-      .then(function (results) { draw(view, results[0], results[1]); }, function (e) {
+      .then(function (results) { if (current(screen)) draw(screen, results[0], results[1]); }, function (e) {
+        if (!current(screen)) return;
         M.mount(view, [back(), h("div", { class: "notice notice-err", text: M.errorText(e) })]);
       });
+    return function () { screen.stopped = true; };
   };
 
   function back() {
     return h("a", { class: "back", href: "#/people" }, M.icon("back"), M.t("nav.people"));
   }
 
-  function reload(username) { M.renderPerson(document.getElementById("view"), username); }
+  function current(screen) {
+    return !screen.stopped && screen.view.isConnected && screen.view.meridianPersonGeneration === screen.generation;
+  }
 
-  function act(username, work, toastKey) {
-    return work().then(function () {
-      M.toast(M.t(toastKey));
-      reload(username);
+  function completed(screen, user, toastKey, label) {
+    if (toastKey === "person.enabled_toast" && user.status === "expired") toastKey = "person.enabled_expired_toast";
+    if (toastKey === "person.enabled_toast" && user.status === "limited") toastKey = "person.enabled_limited_toast";
+    M.toast(M.t(toastKey, { name: label }));
+    if (!current(screen)) return;
+    draw(screen, user, screen.share);
+    if (toastKey === "person.reissued_toast") {
+      M.api("GET", "ui/api/people/" + encodeURIComponent(screen.username) + "/share").then(function (share) {
+        if (current(screen)) draw(screen, screen.user, share);
+      }, function (e) { if (current(screen)) M.toast(M.errorText(e), "error"); });
+    }
+  }
+
+  function act(screen, work, toastKey) {
+    if (!current(screen)) return Promise.resolve();
+    var label = M.displayName(screen.username);
+    return work().then(function (user) {
+      completed(screen, user, toastKey, label);
     }, function (e) { if (e.code !== "cancelled") M.toast(M.errorText(e), "error"); });
   }
 
-  function draw(view, user, share) {
+  function draw(screen, user, share) {
+    screen.user = user;
+    screen.share = share;
     var name = user.username;
-    M.mount(view, [
+    M.mount(screen.view, [
       back(),
       h("div", { class: "page-head" },
         h("div", {},
@@ -40,11 +63,11 @@
             M.t("person.since", { when: M.date(user.created_at) }))),
         M.statusPill(user.status)),
       shareCard(share),
-      h("div", { class: "cards" }, usageCard(user), accessCard(user)),
-      metadataCard(user),
+      h("div", { class: "cards" }, usageCard(user, screen), accessCard(user, screen)),
+      metadataCard(user, screen),
       M.personHistory(name),
       M.devicesCard(user),
-      dangerCard(user, share.declared),
+      dangerCard(user, share.declared, screen),
     ]);
   }
 
@@ -74,7 +97,7 @@
           ] : h("p", { class: "muted small", text: M.t("person.no_page") }))));
   }
 
-  function usageCard(user) {
+  function usageCard(user, screen) {
     var name = user.username;
     return h("section", { class: "card" },
       h("h2", { text: M.t("person.traffic") }),
@@ -87,12 +110,12 @@
         h("dt", { text: M.t("person.last_online") }), h("dd", { text: M.ago(user.online_at) })),
       h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
         M.confirm(M.t("person.reset_title"), M.t("person.reset_text"), M.t("person.reset_traffic")).then(function (ok) {
-          if (ok) act(name, function () { return M.api("POST", path(name, "/reset-traffic"), {}); }, "person.reset_toast");
+          if (ok) act(screen, function () { return M.api("POST", path(name, "/reset-traffic"), {}); }, "person.reset_toast");
         });
       } }, M.t("person.reset_traffic")));
   }
 
-  function accessCard(user) {
+  function accessCard(user, screen) {
     var name = user.username;
     var disabled = user.status === "disabled";
     var expiry = M.expiryField(user.expire_at);
@@ -104,7 +127,7 @@
       h("div", { class: "row-actions" },
         h("button", { class: "btn btn-primary btn-sm", type: "submit" }, M.t("action.save")),
         user.expire_at ? h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
-          act(name, function () { return M.api("PATCH", path(name), { expire_at: null }); }, "person.saved_toast");
+          act(screen, function () { return M.api("PATCH", path(name), { expire_at: null }); }, "person.saved_toast");
         } }, M.t("person.clear_expiry")) : null));
     form.addEventListener("submit", function (e) {
       e.preventDefault();
@@ -114,9 +137,9 @@
         M.toast(M.t("person.nothing_changed"));
         return;
       }
-      M.busy(form, function () { return M.api("PATCH", path(name), change); }).then(function () {
-        M.toast(M.t("person.saved_toast"));
-        reload(name);
+      var label = M.displayName(name);
+      M.busy(form, function () { return M.api("PATCH", path(name), change); }).then(function (changed) {
+        completed(screen, changed, "person.saved_toast", label);
       }, function () { /* shown in the form */ });
     });
     return h("section", { class: "card" },
@@ -124,7 +147,7 @@
         h("h2", { text: M.t("person.access") }),
         h("button", { class: "btn btn-sm " + (disabled ? "btn-primary" : "btn-ghost"), type: "button",
           onclick: function () {
-            act(name, function () {
+            act(screen, function () {
               return M.api("PATCH", path(name), { status: disabled ? "active" : "disabled" });
             }, disabled ? "person.enabled_toast" : "person.disabled_toast");
           } }, M.t(disabled ? "person.enable" : "person.disable"))),
@@ -132,7 +155,7 @@
       form);
   }
 
-  function metadataCard(user) {
+  function metadataCard(user, screen) {
     var initialNote = user.note || "", initialTag = user.tag || "";
     var note = h("textarea", { name: "note", rows: "4" }, initialNote);
     var tag = h("input", { name: "tag", type: "text", value: initialTag, dir: "ltr", autocomplete: "off" });
@@ -165,9 +188,9 @@
       if (note.value !== initialNote) change.note = note.value;
       if (tag.value !== initialTag) change.tag = tag.value;
       if (!Object.keys(change).length) { M.toast(M.t("person.nothing_changed")); return; }
-      M.busy(form, function () { return M.api("PATCH", path(user.username), change); }).then(function () {
-        M.toast(M.t("person.saved_toast"));
-        reload(user.username);
+      var label = M.displayName(user.username);
+      M.busy(form, function () { return M.api("PATCH", path(user.username), change); }).then(function (changed) {
+        completed(screen, changed, "person.saved_toast", label);
       }, function () { /* shown in the form */ });
     });
     return h("section", { class: "card" }, h("h2", { text: M.t("person.metadata") }),
@@ -176,7 +199,7 @@
 
   /* `declared` comes with this person's share view, fresh from the service: the CLI moves a declared
    * person's connection page with their link, so a new link and removal are its commands. */
-  function dangerCard(user, declared) {
+  function dangerCard(user, declared, screen) {
     var name = user.username;
     return h("section", { class: "card card-danger" },
       h("h2", { text: M.t("person.danger") }),
@@ -187,7 +210,7 @@
         declared ? null : h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
           M.confirm(M.t("person.reissue_title"), M.t("person.reissue_confirm"), M.t("person.reissue"), true)
             .then(function (ok) {
-              if (ok) act(name, function () { return M.api("POST", path(name, "/reissue"), {}); }, "person.reissued_toast");
+              if (ok) act(screen, function () { return M.api("POST", path(name, "/reissue"), {}); }, "person.reissued_toast");
             });
         } }, M.t("person.reissue"))),
       h("div", { class: "danger-row" },
@@ -196,9 +219,11 @@
           declared ? M.command("meridian client remove " + name) : null),
         declared ? null : h("button", { class: "btn btn-danger btn-sm", type: "button", onclick: function () {
           M.confirmCutOffRemoval(name).then(function (choice) {
-            if (!choice) return;
+            if (!choice || !current(screen)) return;
+            var label = M.displayName(name);
             M.api("DELETE", path(name), { cut_off: choice.cut_off }).then(function (changed) {
-              M.toast(M.t("person.removed_toast"));
+              M.toast(M.t("person.removed_toast", { name: label }));
+              if (!current(screen)) return;
               M.go("people");
               if (changed.commands) M.showCommandResults(changed.commands);
             }, function (e) { M.toast(M.errorText(e), "error"); });

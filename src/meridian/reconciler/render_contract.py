@@ -14,6 +14,7 @@ _RENDERER_MANIFEST = {
     "pwa": "service-pages-v25",
     "control-service": "admin-openapi-v1",
     "control-api": "admin-openapi-v1",
+    "control-ui": "person-view-v1",
     "firewall": "ufw-comment-v2",
     "nginx": "service-pages-v12",
     "realm": "neutral-systemd-musl-v3",

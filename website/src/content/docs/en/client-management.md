@@ -193,6 +193,8 @@ Client accounts (keys, status, limits, traffic) live in the control service's da
 
 ## Web console
 
+Person actions name the person in their result. Enabling someone whose access is expired or whose quota is exhausted explains what still prevents connection. A result arriving after you navigate leaves the new screen in place.
+
 The control service has a web console where you can manage people from a browser, including your phone. `meridian panel` prints its address and, the first time, a one-time setup link where you choose the owner's password. You can add a sign-in code from an authenticator app afterwards, in **Settings**.
 
 | Change in the console | Shown read-only (change with `meridian`) |

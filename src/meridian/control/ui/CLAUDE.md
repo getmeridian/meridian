@@ -24,6 +24,7 @@
 - **Assets revalidate by ETag** (content hash, `no-cache`); anything holding a secret is `no-store`.
 
 ## Pitfalls
+- Capture the person and screen generation before a mutation; apply its returned record only there, name the person in feedback, and report effective expired/limited access after enabling.
 - Person metadata uses text nodes for textarea contents, validates 500 Unicode characters and the uppercase tag, and PATCHes only changed fields; a textarea `value` attribute does not populate its value.
 - Render billing dates as isolated UTC calendar dates, preserving the anchor and computed next date; a relay's null usage is not zero and must say not measured.
 - Command polling keeps successful sibling replies, times out only a node's pending records, and stops terminal read errors with an unavailable result while preserving finished outcomes.

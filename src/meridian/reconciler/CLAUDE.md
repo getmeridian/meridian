@@ -17,6 +17,7 @@
 
 ## What's done well
 - The control-service renderer stamp includes the HTTP route bindings, so routing changes refresh the installed service through a reviewed apply.
+- The control-ui renderer stamp covers owner-console assets independently of subscription and PWA rendering.
 - Private person metadata changes bump the control-service and control-api renderer stamps; the user driver still observes existence and preserves operator notes and tags.
 
 - **Unknown outcomes are fail-closed** — a timed-out mutation stays `unknown` until observed; only a successful non-converged observation allows a retry, with the same idempotency key.
