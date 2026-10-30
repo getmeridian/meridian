@@ -5,12 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "meridian-vpn"
 dynamic = ["version"]
-description = "Deploy a censorship-resistant proxy server — hardened by default, shared via QR code"
+description = "Deploy a self-hosted VPN server with a built-in web panel and shareable connection pages"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [{ name = "uburuntu" }]
-keywords = ["vpn", "proxy", "vless", "reality", "xray"]
+keywords = ["vpn", "vpn-panel", "self-hosted", "proxy", "vless", "reality", "xhttp", "hysteria2", "xray"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
