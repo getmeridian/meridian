@@ -67,6 +67,7 @@ from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPO
 from meridian.control.user_expiry import require_finite_user_expiry
 from meridian.control.user_lifecycle import extend_user_expiry, insert_user
 from meridian.control.user_policy import enforced_status, period_began, whole_seconds
+from meridian.control.user_updates import update_user
 from meridian.control.users import USER_SELECT, user_record
 from meridian.core.agent_desired import DesiredNodeState
 from meridian.core.agent_protocol import Capability, ObservedStateReport, PollRequest, StatsAck, StatsReport
@@ -494,36 +495,16 @@ class ControlService:
 
     def update_user(self, username: str, update: UserUpdate) -> UserRecord:
         """Apply the operator's change; extending an expiry or raising a limit makes the user active again."""
-        with self._transaction():
-            user = self._require_user(username)
-            changes = update.model_dump(include=update.model_fields_set)
-            require_finite_user_expiry(changes.get("expire_at"))
-            if "status" in changes and changes["status"] is None:
-                del changes["status"]
-            for field in ("traffic_limit_bytes", "traffic_limit_strategy"):
-                if field in changes and changes[field] is None:
-                    del changes[field]
-            # Enforcement below turns an expired or limited user active again once the change lifts it.
-            merged = UserRecord.model_validate({**user.model_dump(), **changes})
-            self.events.user_updated(user, merged)
-            self._db.execute(
-                "UPDATE users SET status = ?, expire_at = ?, traffic_limit_bytes = ?, traffic_limit_strategy = ?,"
-                " device_limit = ?, note = ?, tag = ? "
-                "WHERE username = ?",
-                (
-                    merged.status,
-                    merged.expire_at,
-                    merged.traffic_limit_bytes,
-                    merged.traffic_limit_strategy,
-                    merged.device_limit,
-                    merged.note,
-                    merged.tag,
-                    username,
-                ),
-            )
-            self._enforce(utc_now())
-            self._compose_all()
-            return self._require_user(username)
+        return update_user(
+            self._store,
+            username,
+            update,
+            read_user=self._require_user,
+            events=self.events,
+            now=utc_now,
+            enforce=self._enforce,
+            compose=self._compose_all,
+        )
 
     def reissue_user(self, username: str) -> UserRecord:
         """Replace link credentials and forget devices atomically; old links stop working."""
