@@ -18,6 +18,7 @@ import httpx
 
 from meridian.cluster import ClusterConfig
 from meridian.control.client import ControlClient
+from meridian.control.formats.selector import select_format
 from meridian.xray_workload import salamander_password
 from tests.systemlab.golden_corpus import HOP_BY_HOP_HEADERS, LAB_HOST_ROLES, Capture, decode_body, normalize_response
 from tests.test_control_subscription_corpus import CORPUS, DROPPED_HEADERS, _differences, _expected
@@ -55,6 +56,25 @@ def _fetch(url: str, capture: Capture) -> httpx.Response:
         return client.send(built)
 
 
+def _check_page(url: str, capture: Capture) -> bool:
+    """A browser navigation gets the connection page, which the corpus predates; its JSON moved to /info."""
+    response = _fetch(url, capture)
+    content_type = response.headers.get("content-type", "")
+    problems = []
+    if response.status_code != 200:
+        problems.append(f"status {response.status_code}")
+    if not content_type.startswith("text/html"):
+        problems.append(f"content-type {content_type}")
+    if "content-security-policy" not in response.headers:
+        problems.append("no content-security-policy")
+    if response.headers.get("cache-control") != "no-store":
+        problems.append(f"cache-control {response.headers.get('cache-control')}")
+    print(f"    {'FAIL' if problems else 'PASS'} {capture.request['id']} (page): {response.status_code} html")
+    for problem in problems:
+        print("      " + problem)
+    return bool(problems)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--topology", required=True)
@@ -82,7 +102,14 @@ def main() -> int:
     for capture in captures:
         request = capture.request
         token = UNKNOWN_TOKEN if request["user"] == "unknown" else user.sub_token
-        url = cluster.panel.subscription_url(token) + (f"/{request['selector']}" if request["selector"] else "")
+        page = (
+            request["user"] != "unknown"
+            and not request["selector"]
+            and select_format(request["user_agent"], request["accept"]) == "browser"
+        )
+        page_failed = page and _check_page(cluster.panel.subscription_url(token), capture)
+        suffix = "/info" if page else (f"/{request['selector']}" if request["selector"] else "")
+        url = cluster.panel.subscription_url(token) + suffix
         response = _fetch(url, capture)
         headers = [
             (name.decode("latin-1").lower(), value.decode("latin-1"))
@@ -97,7 +124,7 @@ def main() -> int:
         print(f"    {status} {request['id']}: {response.status_code} {served.format}")
         for problem in problems:
             print("      " + problem.replace("\n", "\n      "))
-        failures += bool(problems)
+        failures += bool(problems) or page_failed
     print(f"    {len(captures) - failures} of {len(captures)} answers match the corpus")
     return 1 if failures else 0
 
