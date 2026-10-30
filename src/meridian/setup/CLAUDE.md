@@ -1,22 +1,13 @@
 # setup — resumable setup application service
 ## Design decisions
 **Secret-free draft** — `setup.json` stores only validated server refs, topology choices, stage progress, and reviewed/applied hashes. Passwords, private keys, and API tokens use one-time runtime channels.
-
 **Atomic stage boundary** — every completed or rewound stage is validated and atomically replaced with mode `0600`; only a missing file means fresh setup.
-
 **Server shelf IDs** — human names and IPs resolve to immutable `srv-*` profile IDs before entering the draft.
-
 **Reviewed runtime** — setup hashes resolved targets and runtime pins, persists topology intent before mutation, shares runtime-only node secrets in memory, and verifies canonical subscriptions before handoff.
-
 **Retirement-bound review** — `SetupReview.review_hash` binds the plan hash to the exact retirement set and the SSH targets of every server it touches, including servers no longer in the intent (resolved from the shelf). The plan hash alone stays the persisted generation identity.
-
 **Default paths are invisible-first** — `default_exit_paths()` is the one builder for deploy, `node add`, and the wizard: Reality always, XHTTP and Hysteria2 on the domain or else the IPv4 address (IP certificate), WebSocket only with a domain. Redeploys keep saved SNI, fingerprint, and transport paths.
-
 **Client IPs are a fleet setting** — `SetupIntent.forward_client_ips` (off: Remnawave sees only 127.0.0.1) turns on `compiler/client_ips.py`'s post-pass: streams send PROXY, a local hop strips it before the camouflage fallback, the panel takes it on `CONTROL_PROXY_TLS_PORT`, and nginx-fronted inbounds trust it. Bridges and Hysteria2 never change.
-
-**Attested lazy control plane** — panel construction waits for checkpointed bootstrap; readiness binds the reviewed host, URL, listener, and only the bootstrap's own inputs (control target, runtime pins, renderer contract, profile ports/SNI, hardening) to a remote marker, so editing another server never re-runs the panel provisioner.
-
-**Two control backends** — `control_service.py` mirrors the panel bootstrap and saves the service URL and admin token in `cluster.panel`, so subscription links keep their shape; like the panel's, the URL takes the control domain when there is one (readiness refuses a URL on another name); verify dispatches on the payload; handoff, `client` commands, and `meridian test` reach users through `control_access.access_panel()`, which serves the panel subset from the service.
+**Attested control-service bootstrap** — `control_service.py` installs the service behind the control server's nginx and saves its URL and admin token where the panel's lived (`cluster.panel`), so subscription links keep their shape; the URL takes the control domain when there is one (readiness refuses a URL on another name). Readiness also needs the saved host and a remote attestation of only the bootstrap's own inputs (`service_attestation()`; what it hashes is in `reconciler/CLAUDE.md`), so editing another server never re-runs the bootstrap. Verification reads the service and each user's delivered Xray JSON; handoff, `client` commands, and `meridian test` reach users through `control_access.access_panel()`, which serves the panel subset from the service.
 
 ## What's done well
 - Downstream answers are invalidated whenever an earlier stage changes.
@@ -30,7 +21,7 @@
 - **A control-domain bootstrap renders no WSS location** — the service has no WSS listener, and an empty path rendered a second `location /` to port 0, failing `nginx -t`; compiled artifacts own WSS.
 - **A self-steal exit bootstraps with the default SNI** — the interim legacy 443 fallback dials the bootstrap SNI, and the operator's own name would point the server at itself.
 - **Review keeps a control-service fleet on its backend** — the wizard re-asks roles without `backend` and intent files omit the default, so `review` takes it from the committed intent; otherwise re-running `setup` compiled a Remnawave plan for a service fleet.
-- **The control-service bootstrap needs an agent build first** — `require_agent_build()` refuses before provisioning (wheels ship no agent yet); found at the first agent install, it left a running service with no nodes.
+- **The control-service bootstrap needs an agent build first** — `require_agent_build()` refuses before provisioning when this install has no agent build (a source install or a checkout without `make agent`); found at the first agent install, it left a running service with no nodes.
 - Never add credential-shaped fields to `SetupDraft`.
 - **The fleet document never sets what it hides** — `fleet_document.py` writes server names for `srv-*` IDs and drops transport paths (shared tokens masked as secrets); import refuses a `path:` key and carries the saved path by exit and protocol. Anything read from the file before validation guards its own shape (`exits: 42` once crashed import with a TypeError and no JSON envelope).
 - Preserve relay `listen_port` and exit `egress_overrides` in both `SetupDraft.from_intent()` and `to_intent()` (and when the wizard re-asks roles); otherwise review silently drops them.
