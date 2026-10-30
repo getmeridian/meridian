@@ -13,11 +13,11 @@ from meridian import __version__
 from meridian import cli_types as click
 from meridian.cli_backup import backup_app, restore_cmd
 from meridian.cli_catalog import command_path, requested_context, requests_help, requests_machine_output, supports_json
+from meridian.cli_context import context_app
 from meridian.cli_daemon import serve_cmd
 from meridian.cli_groups import (
     api_app,
     client_app,
-    context_app,
     dev_app,
     fleet_app,
     node_app,
