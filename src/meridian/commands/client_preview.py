@@ -61,6 +61,8 @@ def print_preview(result: SubscriptionPreview) -> None:
     table.add_row(t("preview.protocols"), ", ".join(result.protocols) or t("preview.none"))
     if result.placeholder:
         table.add_row(t("preview.placeholder"), t(f"preview.placeholder_{result.placeholder}"))
+    if result.stale_client:
+        table.add_row(t("preview.stale_client"), t(f"preview.stale_client_{result.stale_client}"))
     err_console.print(table)
     entries = Table(box=box.SIMPLE, padding=(0, 1))
     for key in ("preview.entry", "preview.protocol", "preview.result"):

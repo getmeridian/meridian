@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from meridian.control.devices import DeviceLedger, HeaderReader, browser_request
 from meridian.control.formats.entries import SubscriptionUser
 from meridian.control.formats.selector import explain_format
+from meridian.control.formats.stale_clients import stale_client
 from meridian.control.models import ClientEndpoint, PrivacySettings, ServiceSettings, UserRecord
 from meridian.control.store import Store
 from meridian.control.subscriptions import (
@@ -71,6 +72,8 @@ def serve_subscription(
         now=datetime.fromtimestamp(clock(), UTC),
         placeholder_remarks=DEVICE_LIMIT_REMARKS if "x-hwid-limit" in hwid_flags else None,
         extra_headers=hwid_flags,
+        # Read from this request's header alone: never stored, logged, or kept beside a device.
+        stale_client=None if document == "browser" else stale_client(user_agent),
     )
 
 

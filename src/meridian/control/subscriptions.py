@@ -22,12 +22,14 @@ from meridian.control.formats.links import base64_document, links
 from meridian.control.formats.mihomo import mihomo_document
 from meridian.control.formats.selector import DocumentFormat
 from meridian.control.formats.singbox import singbox_document
+from meridian.control.formats.stale_clients import stale_remarks
 from meridian.control.formats.xray_json import xray_json_document
 from meridian.control.models import ClientEndpoint
 from meridian.control.periods import next_period_start
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.notices import RenderedNotice
 from meridian.core.owner_contact import OwnerContact
+from meridian.core.subscription_preview import StaleClient
 from meridian.core.topology import ClientRoutingPolicy
 
 JSON_TYPE = "application/json; charset=utf-8"
@@ -71,8 +73,13 @@ def render_subscription(
     extra_headers: dict[str, str] | None = None,
     owner_contact: OwnerContact | None = None,
     notice: RenderedNotice | None = None,
+    stale_client: StaleClient | None = None,
 ) -> SubscriptionResponse:
-    """Render *document* for *user*; a suspended user's entries are status placeholders."""
+    """Render *document* for *user*; a suspended user's entries are status placeholders.
+
+    *stale_client* adds one inert update entry after the real ones of an app document; status
+    and availability placeholders replace every entry and the nudge with them.
+    """
     placeholders = user.placeholders if placeholder_remarks is None else placeholder_remarks
     if owner_contact is not None and user.status != "active" and placeholder_remarks is None:
         placeholders = contact_remarks(placeholders, owner_contact.text)
@@ -97,22 +104,30 @@ def render_subscription(
         notice=notice,
     )
     headers.update(extra_headers or {})
+    notices = stale_remarks(stale_client, user.language)
     if document == "xray-json":
-        body = _json(xray_json_document(endpoints, user.uuid, placeholders, client_routing=client_routing))
+        body = _json(
+            xray_json_document(endpoints, user.uuid, placeholders, client_routing=client_routing, notices=notices)
+        )
         return SubscriptionResponse(200, JSON_TYPE, body, headers)
     if document == "singbox":
         return SubscriptionResponse(
             200,
             JSON_TYPE,
-            _json(singbox_document(endpoints, user.uuid, placeholders, client_routing=client_routing)),
+            _json(singbox_document(endpoints, user.uuid, placeholders, client_routing=client_routing, notices=notices)),
             headers,
         )
     if document in ("mihomo", "stash"):
         body = mihomo_document(
-            endpoints, user.uuid, placeholders, stash=document == "stash", client_routing=client_routing
+            endpoints,
+            user.uuid,
+            placeholders,
+            stash=document == "stash",
+            client_routing=client_routing,
+            notices=notices,
         )
         return SubscriptionResponse(200, YAML_TYPE, body, headers)
-    return SubscriptionResponse(200, TEXT_TYPE, base64_document(endpoints, user.uuid, placeholders), headers)
+    return SubscriptionResponse(200, TEXT_TYPE, base64_document(endpoints, user.uuid, placeholders, notices), headers)
 
 
 def unknown_subscription() -> SubscriptionResponse:

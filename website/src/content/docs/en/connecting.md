@@ -61,6 +61,10 @@ Your connection page may show a notice from the person who runs the service, suc
 
 If access is disabled, has expired, or has reached its traffic allowance, the entries in your app explain the reason and ask you to contact the owner. The messages follow your account language or the owner's default; automatic language keeps them in English. Your page's language buttons save a preference in this browser. These explanatory entries cannot connect; ask the owner to restore access.
 
+## An update message in your app
+
+If your app is too old to use everything the service offers, or is no longer maintained, it can list one extra entry at the end that asks you to update it, or to switch from NekoRay to Throne. This is decided from the app's name and version alone, at the moment it fetches the subscription; nothing is saved. The entry cannot connect, and your real entries stay as they were. Install the newer app from the apps list on your connection page, then refresh the subscription.
+
 ## When an app shows a different list
 
 Apps receive the format they support, so their lists can differ. If a method is missing, tell the owner which app and version you use. The owner can preview the format and see why an entry was omitted without sharing your connection keys. Refresh the subscription after the owner changes the settings.

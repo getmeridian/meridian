@@ -20,6 +20,7 @@ from meridian.control.formats.entries import (
     availability_placeholders,
     presentation_endpoints,
     tls_fingerprint,
+    trailing_notices,
 )
 from meridian.control.models import ClientEndpoint
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING
@@ -32,8 +33,13 @@ def singbox_document(
     placeholders: tuple[str, ...] = (),
     *,
     client_routing: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING,
+    notices: tuple[str, ...] = (),
 ) -> dict[str, Any]:
-    """Return the sing-box document for one user."""
+    """Return the sing-box document for one user.
+
+    *notices* are inert outbounds listed last in the selector only, never in the urltest group,
+    unless placeholders replace the real entries.
+    """
     endpoints = supported_endpoints(presentation_endpoints(endpoints), "singbox")
     placeholders = availability_placeholders(endpoints, placeholders)
     if placeholders:
@@ -41,13 +47,14 @@ def singbox_document(
     else:
         proxies = [singbox_outbound(endpoint, uuid) for endpoint in endpoints]
     names = [proxy["tag"] for proxy in proxies]
+    inert = trailing_notices(endpoints, placeholders, notices)
     document = copy.deepcopy(singbox_template(client_routing=client_routing))
     for outbound in document["outbounds"]:
         if outbound["type"] == "selector":
-            outbound["outbounds"] = [AUTOMATIC, *names]
+            outbound["outbounds"] = [AUTOMATIC, *names, *inert]
         elif outbound["type"] == "urltest":
             outbound["outbounds"] = names
-    document["outbounds"] = [*document["outbounds"], *proxies]
+    document["outbounds"] = [*document["outbounds"], *proxies, *(placeholder_outbound(remark) for remark in inert)]
     return document
 
 

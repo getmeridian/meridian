@@ -32,6 +32,7 @@ from meridian.control.formats.entries import (
     presentation_endpoints,
     primaries,
     tls_fingerprint,
+    trailing_notices,
 )
 from meridian.control.models import ClientEndpoint
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING
@@ -73,8 +74,13 @@ def mihomo_document(
     *,
     stash: bool = False,
     client_routing: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING,
+    notices: tuple[str, ...] = (),
 ) -> str:
-    """Return the Mihomo document, or its Stash variant."""
+    """Return the Mihomo document, or its Stash variant.
+
+    *notices* are inert proxies listed last in the "Meridian" selector only, never in the
+    fallback group, unless placeholders replace the real entries.
+    """
     endpoints = presentation_endpoints(endpoints)
     endpoints = supported_endpoints(endpoints, "stash" if stash else "mihomo")
     placeholders = availability_placeholders(primaries(endpoints), placeholders)
@@ -87,10 +93,11 @@ def mihomo_document(
     else:
         proxies = [mihomo_proxy(endpoint, uuid) for endpoint in endpoints]
     names = [proxy["name"] for proxy in proxies]
-    document["proxies"] = proxies
+    inert = trailing_notices(endpoints, placeholders, notices)
+    document["proxies"] = [*proxies, *(placeholder_proxy(remark) for remark in inert)]
     for group in document["proxy-groups"]:
         if group["name"] == _SELECT_GROUP:
-            group["proxies"] = [*(group["proxies"] or []), *names]
+            group["proxies"] = [*(group["proxies"] or []), *names, *inert]
         elif group["name"] == AUTOMATIC:
             group["proxies"] = names
     if stash:

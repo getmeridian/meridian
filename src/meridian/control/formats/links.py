@@ -17,22 +17,38 @@ from meridian.control.formats.entries import (
     absolute,
     availability_placeholders,
     presentation_endpoints,
+    trailing_notices,
 )
 from meridian.control.models import ClientEndpoint
 
 
-def links(endpoints: list[ClientEndpoint], uuid: str, placeholders: tuple[str, ...] = ()) -> list[str]:
-    """Every entry's link in view order, or only the placeholders when there are any."""
+def links(
+    endpoints: list[ClientEndpoint],
+    uuid: str,
+    placeholders: tuple[str, ...] = (),
+    notices: tuple[str, ...] = (),
+) -> list[str]:
+    """Every entry's link in view order, or only the placeholders when there are any.
+
+    *notices* are inert entries that follow the real ones, unless placeholders replace them.
+    """
     endpoints = presentation_endpoints(endpoints)
     placeholders = availability_placeholders(endpoints, placeholders)
     if placeholders:
         return [placeholder_uri(remark) for remark in placeholders]
-    return [share_uri(endpoint, uuid) for endpoint in endpoints]
+    return [share_uri(endpoint, uuid) for endpoint in endpoints] + [
+        placeholder_uri(remark) for remark in trailing_notices(endpoints, placeholders, notices)
+    ]
 
 
-def base64_document(endpoints: list[ClientEndpoint], uuid: str, placeholders: tuple[str, ...] = ()) -> str:
+def base64_document(
+    endpoints: list[ClientEndpoint],
+    uuid: str,
+    placeholders: tuple[str, ...] = (),
+    notices: tuple[str, ...] = (),
+) -> str:
     """The Base64 document: the links one per line (no trailing newline), standard Base64."""
-    return base64.b64encode("\n".join(links(endpoints, uuid, placeholders)).encode("utf-8")).decode("ascii")
+    return base64.b64encode("\n".join(links(endpoints, uuid, placeholders, notices)).encode("utf-8")).decode("ascii")
 
 
 def share_uri(endpoint: ClientEndpoint, uuid: str) -> str:

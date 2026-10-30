@@ -331,6 +331,8 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 预览解释所选格式及首个匹配规则：明确指定的 URL 后缀、User-Agent 应用类型、`Accept: text/html` 或默认 Base64 响应。它列出包含的协议和条目，并解释每个被省略的连接：不受支持的协议或指纹副本、已停用端点、账户状态说明，或缺少主连接。预览与实际响应使用同一选择器和过滤规则，并区分浏览器 HTML 页面与 `/info` 账户 JSON。
 
+有两款应用会在订阅末尾多出一个无法连接的说明条目，使用该用户的语言：低于 1.9.17（首个支持 XHTTP 的版本）的 v2rayNG 会被提示更新，已停止维护的桌面版 NekoRay（继任者是 Throne）会被提示改用 Throne。判断只读取该次请求的 User-Agent：不保存、不记录，设备上限、隐私级别和格式选择都不变。已暂停或没有连接的订阅只显示状态条目。预览会把 `stale_client`（`outdated` 或 `abandoned`）作为单独原因报告，仍不回显 User-Agent。
+
 响应头经过脱敏：URL 被替换，编码后的配置名称和通知只保留 `base64:` 前缀。预览不返回订阅正文、URI、密钥、私有备注或标签。User-Agent 最多 512 个 Unicode 字符，Accept 最多 256 个字符，两者均为单行。输入仅用于本次请求，不保存或回显，不注册设备，也不触发备份写入。
 
 `POST /api/subscription/preview` 需要 read 权限或管理者会话。发送 `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`，省略的请求头默认为空字符串。控制台设置提供同样的表单，不接受 HWID 或设备请求头。对于通过 API 管理的端点，`enabled: false` 会将保存的端点从订阅中排除，并显示原因为 `disabled_endpoint`；默认值为 true，序列化时省略。经过审核的端点应用操作会恢复拓扑规定的连接提供方式。
