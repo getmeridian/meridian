@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+from meridian.control import service as service_module
+from meridian.control import traffic as traffic_module
 from meridian.control.models import NodeSpec, UserUpdate, users_resource_id
 from meridian.control.service import ControlService, ServiceError
 from meridian.core.agent_protocol import StatsReport, UserTraffic
@@ -17,12 +19,19 @@ FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
 TAG = "meridian-main-reality"
 PAST = "2026-01-01T00:00:00Z"
 FUTURE = "2999-01-01T00:00:00Z"
+NOW = "2026-10-29T12:00:00Z"
 
 
 @pytest.fixture
 def service(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> ControlService:
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: "2026-10-29T12:00:00Z")
-    return ControlService(tmp_path / "control.db", fleet_id=FLEET_ID, version="4.0.0")
+    monkeypatch.setattr(service_module, "utc_now", lambda: NOW)
+    monkeypatch.setattr(traffic_module, "utc_now", lambda: NOW)
+    return ControlService(
+        tmp_path / "control.db",
+        fleet_id=FLEET_ID,
+        version="4.0.0",
+        clock=lambda: datetime.fromisoformat(NOW).timestamp(),
+    )
 
 
 def _with_node(service: ControlService) -> None:
