@@ -41,7 +41,6 @@ from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.cancellation import OperationCancellation
 from meridian.core.client_devices import ClientDevicesResult
 from meridian.core.client_limits import ClientExtendRequest
-from meridian.core.client_routing import FleetRoutingRequest, FleetRoutingResult
 from meridian.core.clients import (
     ClientAddResult,
     ClientLimitsResult,
@@ -106,6 +105,7 @@ from meridian.core.plan import (
 )
 from meridian.core.relay_check import RelayCheckResult
 from meridian.core.routes import RouteListResult, RouteMutationResult
+from meridian.core.schema_delivery import delivery_schemas
 from meridian.core.schema_envelopes import make_command_envelope
 from meridian.core.schema_topology import TOPOLOGY_SCHEMAS
 from meridian.core.servers import (
@@ -382,14 +382,6 @@ _, _, FleetImportOutputEnvelope = _make_command_envelope(
     doc="Envelope schema for `meridian fleet import --json`.",
 )
 
-_, _, FleetRoutingOutputEnvelope = _make_command_envelope(
-    "FleetRouting",
-    "fleet.routing",
-    FleetRoutingResult,
-    success_statuses=Literal["ok", "changed", "no_changes"],
-    doc="Envelope schema for `meridian fleet routing --json`.",
-)
-
 _, _, ClientListOutputEnvelope = _make_command_envelope(
     "ClientList",
     "client.list",
@@ -654,7 +646,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "attention-thresholds": AttentionThresholds,
     "fleet-usage-envelope": FleetUsageOutputEnvelope,
     "fleet-import-envelope": FleetImportOutputEnvelope,
-    "fleet-routing-envelope": FleetRoutingOutputEnvelope,
+    **delivery_schemas(envelope_base=_ContractEnvelope, failure_data_type=EmptyData),
     "event": Event,
     "error": ErrorModel,
     "operation": OperationEnvelope,
@@ -724,8 +716,6 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "fleet-export": FleetExportResult,
     "fleet-history": RevisionList,
     "fleet-import": FleetImportResult,
-    "fleet-routing": FleetRoutingResult,
-    "fleet-routing-request": FleetRoutingRequest,
     "intent-change": IntentChange,
     "node-list": NodeListResult,
     "relay-list": RelayListResult,

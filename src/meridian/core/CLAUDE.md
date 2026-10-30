@@ -1,6 +1,7 @@
 # core - Meridian API contracts
 
 ## Design decisions
+- Reviewed delivery command schemas register through `schema_delivery.py`, using the catalog's shared envelope base and failure model so names and wire fields stay stable.
 - **Creation-only account settings** — `UserCreationSettings` is shared by service creation and `AccessIntent.creation_settings`; an empty mapping is omitted so existing user payloads and plans keep their hashes.
 - **Attention predicates** — `attention.py` derives typed person/node reasons from aggregate evidence, with bounded day/percentage thresholds and no stored alert flags; client list composes the same reasons when `--attention` is requested.
 - **Local lifecycle facts** — `fleet_events.py` is the durable event contract for integrations: monotonic ID, UTC time, kind, actor, subject, and a closed detail model per kind; command progress keeps its separate `events.py` contract.
