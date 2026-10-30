@@ -32,6 +32,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 ## Pitfalls
 - Device-card scenarios use the shared console DOM and form helpers, preserve real field validity, and verify the card's own count refresh after a mutation.
 - Every new admin handler needs a runnable ROUTE_SAMPLES entry so the token-scope matrix can collect and exercise its permissions.
+- Preview tests compare rule precedence and native filtering, verify read scope and zero writes across all device levels, mask encoded headers and URI remarks, and confirm reviewed apply restores an API-disabled endpoint.
 - Language tests pin unchanged English corpus bytes, translate only disabled labels in native corpus cases, assert inert placeholders in every format, and drop users.language before rewinding to a schema before step 17.
 - Notice coverage checks Unicode substitution before Base64, expiry at the exact instant, content-free actors, preview mutation hooks, encrypted restore, and the real console confirmation dialog in all four locales.
 - Owner contact tests cover reviewed-hash applies, export/import, delivery rollback, all placeholder parsers and remark bounds, locale/RTL rendering, active-link guards, and support HTML bypassing worker caches.

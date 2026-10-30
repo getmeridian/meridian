@@ -69,6 +69,7 @@ from meridian.core.fleet_events import FleetEventPage, FleetEventQuery
 from meridian.core.languages import LanguageSettings, LanguageState
 from meridian.core.notices import NoticeState, NoticeWrite
 from meridian.core.server_allowances import ServerUsageList
+from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 
 _GATEWAY_FAILURES = frozenset({502, 503, 504})
 # Transport errors raised before any request bytes left this machine.
@@ -206,6 +207,11 @@ class ControlClient:
 
     def set_language(self, settings: LanguageSettings) -> LanguageState:
         return LanguageState.model_validate(self._call("PUT", "api/language", settings.to_data()))
+
+    def preview_subscription(self, request: SubscriptionPreviewRequest) -> SubscriptionPreview:
+        return SubscriptionPreview.model_validate(
+            self._request("POST", "api/subscription/preview", request.to_data(), mutation_method="GET").json()
+        )
 
     def set_privacy(self, settings: PrivacySettings) -> PrivacyUpdateResult:
         return PrivacyUpdateResult.model_validate(self._call("PUT", "api/privacy", settings.model_dump(mode="json")))

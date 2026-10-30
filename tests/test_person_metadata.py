@@ -21,7 +21,7 @@ from meridian.control.restore import stage_restored_database
 from meridian.control.service import SCHEMA_VERSION, ControlService
 from meridian.control.snapshot import decrypt_snapshot, generate_key_pair
 from meridian.core.schema import schema_model
-from tests.support.control_service import ADMIN_TOKEN, FLEET_ID, serve_control
+from tests.support.control_service import ADMIN_TOKEN, FLEET_ID, drop_person_metadata_schema, serve_control
 from tests.support.node_commands import command_node_spec
 from tests.support.topology import single_exit_intent
 
@@ -108,8 +108,7 @@ def test_schema_step_fifteen_adds_empty_metadata_to_existing_people(tmp_path: Pa
     original = service.put_user("sample")
     service.close()
     with sqlite3.connect(database) as db:
-        db.execute("ALTER TABLE users DROP COLUMN note")
-        db.execute("ALTER TABLE users DROP COLUMN tag")
+        drop_person_metadata_schema(db)
         db.execute("UPDATE meta SET value = '14' WHERE key = 'schema_version'")
     migrated = ControlService(database, fleet_id=FLEET_ID, version="4.0.0")
     try:

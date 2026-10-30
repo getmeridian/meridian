@@ -19,6 +19,7 @@ from typing import Any
 import yaml
 
 from meridian.compiler.delivery import mihomo_template
+from meridian.control.formats.capabilities import supported_endpoints
 from meridian.control.formats.entries import (
     AUTOMATIC,
     DEFAULT_FINGERPRINT,
@@ -75,8 +76,7 @@ def mihomo_document(
 ) -> str:
     """Return the Mihomo document, or its Stash variant."""
     endpoints = presentation_endpoints(endpoints)
-    if stash:
-        endpoints = [endpoint for endpoint in endpoints if endpoint.protocol != "xhttp"]
+    endpoints = supported_endpoints(endpoints, "stash" if stash else "mihomo")
     placeholders = availability_placeholders(primaries(endpoints), placeholders)
     exclude = sorted(endpoint.remark for endpoint in copies(endpoints) if endpoint.remark not in placeholders)
     document: dict[str, Any] = yaml.safe_load(

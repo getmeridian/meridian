@@ -139,6 +139,11 @@ class ClientEndpoint(CoreModel):
     address: str = Field(min_length=1, max_length=253)
     port: int = Field(ge=1, le=65535)
     position: int = Field(ge=0, le=10_000)
+    enabled: bool = Field(
+        default=True,
+        exclude_if=lambda value: value is True,
+        description="False omits this endpoint from delivery; reviewed endpoint apply restores topology settings.",
+    )
     fingerprint: str = Field(default="", max_length=32)
     reality_sni: str = ""
     reality_public_key: str = ""

@@ -1,0 +1,91 @@
+{
+  "$defs": {
+    "FormatRule": {
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "anyOf": [
+            {
+              "enum": [
+                "mihomo",
+                "stash",
+                "singbox",
+                "clash",
+                "xray-json"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Family"
+        },
+        "match": {
+          "default": "",
+          "enum": [
+            "",
+            "text/html"
+          ],
+          "title": "Match",
+          "type": "string"
+        },
+        "rule": {
+          "enum": [
+            "suffix",
+            "user_agent",
+            "accept",
+            "default"
+          ],
+          "title": "Rule",
+          "type": "string"
+        },
+        "suffix": {
+          "default": "",
+          "enum": [
+            "",
+            "info",
+            "json",
+            "v2ray-json",
+            "mihomo",
+            "clash",
+            "stash",
+            "singbox"
+          ],
+          "title": "Suffix",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule"
+      ],
+      "title": "FormatRule",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "enum": [
+        "browser",
+        "mihomo",
+        "stash",
+        "singbox",
+        "xray-json",
+        "base64"
+      ],
+      "title": "Format",
+      "type": "string"
+    },
+    "selection": {
+      "$ref": "#/$defs/FormatRule"
+    }
+  },
+  "required": [
+    "format",
+    "selection"
+  ],
+  "title": "FormatSelection",
+  "type": "object"
+}

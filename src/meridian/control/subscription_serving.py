@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 from meridian.control.devices import DeviceLedger, HeaderReader, browser_request
 from meridian.control.formats.entries import SubscriptionUser
-from meridian.control.formats.selector import SUFFIX_FORMATS, select_format
+from meridian.control.formats.selector import explain_format
 from meridian.control.models import ClientEndpoint, PrivacySettings, ServiceSettings, UserRecord
 from meridian.control.store import Store
 from meridian.control.subscriptions import (
@@ -17,7 +17,7 @@ from meridian.control.subscriptions import (
     unknown_subscription,
 )
 from meridian.control.users import USER_SELECT, user_record
-from meridian.core.languages import LanguageState
+from meridian.core.languages import Language, LanguageState
 from meridian.core.notices import RenderedNotice
 
 
@@ -38,7 +38,7 @@ def serve_subscription(
     device_headers: HeaderReader | None = None,
 ) -> SubscriptionResponse:
     """Answer a subscription request: the document a suffix names, else the one the app reads."""
-    document = SUFFIX_FORMATS[suffix] if suffix else select_format(user_agent, accept)
+    document = explain_format(user_agent, accept, suffix).format
     if document == "browser" and not suffix:
         return render_page(sub_token)
     hwid_flags: dict[str, str] = {}
@@ -56,18 +56,7 @@ def serve_subscription(
         if privacy.device_limits != "off" and document != "browser" and not browser_request(user_agent, accept):
             with store.transaction():
                 hwid_flags = devices.fetch(record, privacy, device_headers if device_headers is not None else {})
-    user = SubscriptionUser(
-        username=record.username,
-        uuid=record.uuid,
-        short_id=record.sub_token,
-        status=record.status,
-        expires_at=datetime.fromisoformat(record.expire_at) if record.expire_at else None,
-        used_bytes=record.used_traffic_bytes,
-        limit_bytes=record.traffic_limit_bytes,
-        lifetime_used_bytes=record.lifetime_traffic_bytes,
-        limit_strategy=record.traffic_limit_strategy,
-        language=language,
-    )
+    user = subscription_user(record, language)
     endpoints = [ClientEndpoint.model_validate_json(body) for body in bodies]
     return render_subscription(
         user,
@@ -82,4 +71,20 @@ def serve_subscription(
         now=datetime.fromtimestamp(clock(), UTC),
         placeholder_remarks=DEVICE_LIMIT_REMARKS if "x-hwid-limit" in hwid_flags else None,
         extra_headers=hwid_flags,
+    )
+
+
+def subscription_user(record: UserRecord, language: Language) -> SubscriptionUser:
+    """One account projection for live delivery and preview; no private metadata travels."""
+    return SubscriptionUser(
+        username=record.username,
+        uuid=record.uuid,
+        short_id=record.sub_token,
+        status=record.status,
+        expires_at=datetime.fromisoformat(record.expire_at) if record.expire_at else None,
+        used_bytes=record.used_traffic_bytes,
+        limit_bytes=record.traffic_limit_bytes,
+        lifetime_used_bytes=record.lifetime_traffic_bytes,
+        limit_strategy=record.traffic_limit_strategy,
+        language=language,
     )

@@ -2,6 +2,7 @@
 
 ## Design decisions
 - `client show --connections` reads the same canonical list and explicit format URLs as the person screen; only its final output reveals credential paths.
+- `client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` validates transient headers before access, resolves declared and console people, and prints a read-only typed explanation with already-redacted headers.
 - `fleet language [CODE]` reads or directly saves the service default; `client set --language CODE|default` uses one partial PATCH with the existing limits and metadata, and neither action runs reviewed apply.
 - `fleet notice set|clear` requires confirmation (`--yes` for JSON) after a service-rendered preview; `--for NAME` uses the usual exact-name/display-name resolution, and these operator settings never edit or apply topology.
 - `fleet contact --text/--link` reviews and applies only the delivery contact edit, preserves omitted fields, supports explicit clearing, and requires --yes for JSON changes; exact JSON paths preserve public contact values in export/import reviews.

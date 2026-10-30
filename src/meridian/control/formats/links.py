@@ -23,10 +23,11 @@ from meridian.control.models import ClientEndpoint
 
 def links(endpoints: list[ClientEndpoint], uuid: str, placeholders: tuple[str, ...] = ()) -> list[str]:
     """Every entry's link in view order, or only the placeholders when there are any."""
+    endpoints = presentation_endpoints(endpoints)
     placeholders = availability_placeholders(endpoints, placeholders)
     if placeholders:
         return [placeholder_uri(remark) for remark in placeholders]
-    return [share_uri(endpoint, uuid) for endpoint in presentation_endpoints(endpoints)]
+    return [share_uri(endpoint, uuid) for endpoint in endpoints]
 
 
 def base64_document(endpoints: list[ClientEndpoint], uuid: str, placeholders: tuple[str, ...] = ()) -> str:

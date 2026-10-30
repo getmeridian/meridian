@@ -108,6 +108,7 @@ Manage the people who connect.
 ```
 meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client show NAME [--connections] [--json]
+meridian client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX] [--json]
 meridian client usage NAME [--days N] [--json]
 meridian client list [--attention] [--tag TAG|none] [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
@@ -165,6 +166,8 @@ Service-owned edits (`client enable`, `disable`, `set`, `reset-traffic`, and dev
 Existing VLESS sessions can outlive credential revocation. **`--cut-off`**, with `client remove` or `client reissue`, waits for each affected node to apply the revision without the old credentials, then resets its affected inbounds. Every open session on those inbounds ends, including other people's; they reconnect for a moment. If the inbound API fails, Xray restarts and all its sessions on that node end. The flag is opt-in and recommended after a leak. JSON reports each node under `data.cut_off`: `done`, `core_restart`, `failed`, or `timed_out`. Meridian waits up to five minutes; failed cut-offs exit `4`, timeouts `3`. The console offers the same choice when removing a person added there.
 
 Private metadata: `client set NAME --note TEXT --tag TAG` edits only the supplied fields. A note holds up to 500 plain-text characters, with newlines; `--note ""` clears it. A tag holds 1–16 uppercase letters A–Z, digits, or underscores; `--tag none` clears it. `client show` includes both fields, and `client list --tag TAG` filters its tag column (`none` selects untagged people). Reads and edits require people/admin scope. The console edits the same private fields; applies preserve them and encrypted snapshots carry them. See [Private notes and tags](/en/client-management/#private-notes-and-tags).
+
+`client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` explains selection and omissions without credentials. User-Agent is limited to 512 Unicode characters; Accept to 256, both one line and transient. `--suffix` forces one of the existing format URL suffixes. JSON returns `subscription-preview`; the API is the read-scoped `POST /api/subscription/preview`.
 
 ### meridian privacy
 

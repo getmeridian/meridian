@@ -9,6 +9,7 @@ from typing import Annotated
 
 import typer
 
+from meridian.cli_client_preview import client_preview_cmd
 from meridian.cli_fleet_contact import fleet_contact_cmd
 from meridian.cli_fleet_language import fleet_language_cmd
 from meridian.cli_fleet_notice import notice_app
@@ -54,6 +55,7 @@ node_app.command("restart", rich_help_panel="Operations")(node_restart_cmd)
 fleet_app.command("routing", rich_help_panel="Routing")(fleet_routing_cmd)
 fleet_app.command("contact", rich_help_panel="Connection pages")(fleet_contact_cmd)
 fleet_app.add_typer(notice_app, name="notice", rich_help_panel="Connection pages")
+client_app.command("preview", rich_help_panel="Connections")(client_preview_cmd)
 fleet_app.command("language", rich_help_panel="Connection pages")(fleet_language_cmd)
 server_app.command("set", rich_help_panel="Allowances and payments")(server_set_cmd)
 

@@ -316,3 +316,16 @@ meridian client set person --language default --json
 Native apps can explain disabled, expired, and traffic-limited subscriptions in English (`en`), Russian (`ru`), Persian (`fa`), or Chinese (`zh`). The service default is explicitly `en`; it does not guess from User-Agent, Accept, the CLI language, or browser preferences. `meridian fleet language` reads the default; passing a code saves it immediately. Settings has the same default-language control. `client set NAME --language CODE` gives one person an override; `--language default` clears it. An omitted option preserves it, and client list/show JSON exposes the nullable `language` field.
 
 These settings live in the service, survive encrypted snapshots, and are preserved by reviewed applies. `GET /api/language` needs read scope; `PUT /api/language` with `{"language":"ru"}` needs admin or the owner session. `PATCH /api/users/NAME` accepts `{"language":"fa"}` or `{"language":null}` under people/admin access. Status values remain `active`, `disabled`, `limited`, and `expired`; only the fixed client-list remarks are translated, and their connections remain inert. The connection page keeps its own language picker.
+
+## Preview an app's subscription format
+
+```bash
+meridian client preview person --user-agent "Hiddify/2" --accept application/json --json
+meridian client preview person --user-agent "Hiddify/2" --suffix json --json
+```
+
+The preview explains the selected format and the first matching rule: an explicit URL suffix, an app family from User-Agent, `Accept: text/html`, or the default Base64 answer. It lists included protocols and entries, plus every omitted endpoint and its reason: unsupported protocol or fingerprint copy, disabled endpoint, account status placeholder, or no primary connections. It uses the same selector and filters as live delivery. A browser page and `/info` account JSON are identified separately.
+
+Response headers are redacted: URLs are replaced, and encoded profile titles and notices show only their `base64:` prefix. The preview returns no body, URIs, keys, private notes, or tags. User-Agent is bounded to 512 Unicode characters and Accept to 256, each one line. Inputs are transient: they are neither stored nor echoed, never register a device, and trigger no backup write.
+
+`POST /api/subscription/preview` needs read scope or the owner session. Send `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`; omitted headers default to empty strings. Settings in the console has the same form. No HWID or device-header input is accepted. For API-managed endpoints, `enabled: false` excludes the saved endpoint from subscriptions and appears as `disabled_endpoint`; true is the default and is omitted from serialized endpoints. A reviewed endpoint apply restores topology-defined delivery.

@@ -54,3 +54,7 @@ Your connection page may show a notice from the person who runs the service, suc
 ## Status messages in your app
 
 If access is disabled, has expired, or has reached its traffic allowance, the entries in your app explain the reason and ask you to contact the owner. The owner chooses the language for these messages and can set one for your account. Your connection page keeps its own language picker. These explanatory entries cannot connect; ask the owner to restore access.
+
+## When an app shows a different list
+
+Apps receive the format they support, so their lists can differ. If a method is missing, tell the owner which app and version you use. The owner can preview the format and see why an entry was omitted without sharing your connection keys. Refresh the subscription after the owner changes the settings.

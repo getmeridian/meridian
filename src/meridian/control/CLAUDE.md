@@ -6,6 +6,8 @@
 - `person_expiry.py` serves an owner/people/admin read-only month preview; choosing a preset stores nothing, and the person form saves the resulting UTC instant through its changed-field PATCH.
 - `person_connections.py` composes read-only credentials from the canonical `/info` renderer under one state lock; `/api/users/{name}/connections` admits people/admin and owner sessions, without new stored data.
 - Xray JSON deliberately extends the corpus: Automatic stays first, followed by one shared-routing profile per primary endpoint and the existing isolated fingerprint-copy groups.
+- subscription_preview.py backs read-scoped POST /api/subscription/preview with the live selector and capabilities filters; it reads one consistent view, accepts no HWID/device inputs, stores no request data, and bypasses device registration and backup mutation hooks.
+- ClientEndpoint.enabled defaults true and omits that default from serialization; false keeps the API-managed endpoint for explanation while all live formats omit it, and reviewed endpoint apply restores topology delivery.
 - Schema step 17 adds nullable users.language; languages.py stores the explicit fleet default in snapshot-covered meta, /api/language reads with read and writes with admin, and status_remarks.py translates fixed labels while status codes and inert credentials stay stable.
 - `notices.py` stores the operator notice in snapshot-covered meta; `delivery_routes.py` registers GET/read and PUT/admin separately, PUT previews until confirm=true, applies preserve it, and notice.changed events carry the actor with no text.
 - `user_updates.py` owns the person-edit transaction; the service delegates with its clock, enforcement, composition, and event hooks so later operator fields stay atomic without growing the service module.
@@ -59,6 +61,7 @@
 
 ## Pitfalls
 - Keep enrollment/CA bootstrap and console-owner APIs internal with a reason; every agent, subscription, page, and console route also needs an explicit internal classification, while credential markers include conditionally visible people records, endpoint passwords, and encrypted snapshots.
+- Preview Accept text/html distinguishes the browser shell from suffix /info JSON; keep exact format content types and privacy's no-HWID header flags, and redact page/support URLs plus encoded title/notice values.
 - Resolve person language before rendering under the account/settings lock; an omitted edit preserves the override, explicit null uses the fleet, and User-Agent/Accept never choose a language.
 - Encode `announce` as `base64:` plus UTF-8 Base64 after per-person substitution; suppress expired notices on every read and keep previews out of SQLite, devices, and backup mutation hooks.
 - Support HTML embeds escaped public contact data from current settings, is always no-store, and stays outside service-worker caches; it never fetches person data or puts a bearer token into a background request.

@@ -61,6 +61,7 @@ from meridian.control.revisions import APPLY_FENCE_TABLE, REVISIONS_TABLE, Revis
 from meridian.control.server_allowances import ALLOWANCE_PERIODS_TABLE, advance_server_periods, read_server_usage
 from meridian.control.service_settings import read_settings, save_settings
 from meridian.control.store import Store
+from meridian.control.subscription_preview import preview_subscription
 from meridian.control.subscription_serving import serve_subscription
 from meridian.control.subscriptions import SubscriptionResponse
 from meridian.control.times import utc_now
@@ -79,6 +80,7 @@ from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.clients import ClientConnections
 from meridian.core.server_allowances import ServerUsageList
+from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 
 SCHEMA_VERSION = 17
 MAX_WAIT_SECONDS = 55
@@ -231,6 +233,18 @@ class ControlService:
 
     def settings(self) -> ServiceSettings:
         return read_settings(self._store)
+
+    def preview_subscription(self, request: SubscriptionPreviewRequest) -> SubscriptionPreview:
+        return preview_subscription(
+            self._store,
+            request,
+            read_user=self.get_user,
+            read_settings=self.settings,
+            read_notice=self.notices.render,
+            read_language=self.languages.read,
+            read_privacy=self.privacy,
+            clock=self._clock,
+        )
 
     def server_usage(self, *, now: str | None = None) -> ServerUsageList:
         return read_server_usage(self._store, now or utc_now())

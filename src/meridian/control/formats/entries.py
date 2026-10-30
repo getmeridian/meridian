@@ -61,7 +61,7 @@ def ordered(endpoints: list[ClientEndpoint]) -> list[ClientEndpoint]:
     return sorted(endpoints, key=lambda endpoint: (endpoint.position, endpoint.remark, endpoint.model_dump_json()))
 
 
-def presentation_endpoints(endpoints: list[ClientEndpoint]) -> list[ClientEndpoint]:
+def presentation_endpoints(endpoints: list[ClientEndpoint], *, include_disabled: bool = False) -> list[ClientEndpoint]:
     """Unique, bounded display names in stable order, without changing stored endpoints."""
     listed = ordered(endpoints)
     reserved = RESERVED_NAMES | {remark for remark, _ in copy_groups(listed)}
@@ -83,7 +83,7 @@ def presentation_endpoints(endpoints: list[ClientEndpoint]) -> list[ClientEndpoi
             name = candidate
         used.add(name)
         result.append(endpoint if name == endpoint.remark else endpoint.model_copy(update={"remark": name}))
-    return result
+    return result if include_disabled else [endpoint for endpoint in result if endpoint.enabled]
 
 
 def availability_placeholders(endpoints: list[ClientEndpoint], placeholders: tuple[str, ...]) -> tuple[str, ...]:

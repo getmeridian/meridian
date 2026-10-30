@@ -1,0 +1,43 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "accept": {
+      "default": "",
+      "maxLength": 256,
+      "title": "Accept",
+      "type": "string"
+    },
+    "suffix": {
+      "default": "",
+      "enum": [
+        "",
+        "info",
+        "json",
+        "v2ray-json",
+        "mihomo",
+        "clash",
+        "stash",
+        "singbox"
+      ],
+      "title": "Suffix",
+      "type": "string"
+    },
+    "user_agent": {
+      "default": "",
+      "maxLength": 512,
+      "title": "User Agent",
+      "type": "string"
+    },
+    "username": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Username",
+      "type": "string"
+    }
+  },
+  "required": [
+    "username"
+  ],
+  "title": "SubscriptionPreviewRequest",
+  "type": "object"
+}

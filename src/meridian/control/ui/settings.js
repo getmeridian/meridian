@@ -11,6 +11,7 @@
       h("div", { class: "cards" }, fleetCard(), appearanceCard()),
       M.noticeSection(),
       M.languageSection(),
+      M.formatPreviewSection(),
       M.privacySection(),
       h("h2", { class: "section-title", text: M.t("settings.security") }),
       h("div", { class: "cards" }, passwordCard(), totpCard(), passkeyCard(), sessionsCard()),

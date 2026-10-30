@@ -148,6 +148,9 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         ],
         stability="preview",
     ),
+    "client.preview": CommandOutput(
+        data_schema="subscription-preview", outcomes=[_ok("format preview read"), *_FAILURES], stability="preview"
+    ),
     "client.list": CommandOutput(
         data_schema="client-list", outcomes=[_ok("client list was collected"), *_FAILURES], stability="stable"
     ),

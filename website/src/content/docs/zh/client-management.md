@@ -316,3 +316,16 @@ meridian client set person --language default --json
 应用可用英语（`en`）、俄语（`ru`）、波斯语（`fa`）或中文（`zh`）解释停用、到期及流量用完的订阅。服务默认明确设为 `en`，不会根据 User-Agent、Accept、CLI 或浏览器语言猜测。`meridian fleet language` 读取默认值；传入语言代码则立即保存。控制台设置提供同样的选项。`client set NAME --language CODE` 为指定用户设置语言，`--language default` 恢复服务默认值。不提供该选项则保留现有设置；client list/show 的 JSON 输出包含可为 null 的 `language` 字段。
 
 这些设置保存在服务中，包含在加密快照内，并由经过审核的应用操作保留。`GET /api/language` 需要 read 权限；`PUT /api/language` 携带 `{"language":"ru"}` 需要 admin 权限或管理者会话。people/admin 权限可通过 `PATCH /api/users/NAME` 发送 `{"language":"fa"}` 或 `{"language":null}`。状态值仍为 `active`、`disabled`、`limited` 和 `expired`；只翻译应用列表中的固定提示，这些提示条目无法连接。连接页面保留自己的语言选择器。
+
+## 预览应用收到的订阅格式
+
+```bash
+meridian client preview person --user-agent "Hiddify/2" --accept application/json --json
+meridian client preview person --user-agent "Hiddify/2" --suffix json --json
+```
+
+预览解释所选格式及首个匹配规则：明确指定的 URL 后缀、User-Agent 应用类型、`Accept: text/html` 或默认 Base64 响应。它列出包含的协议和条目，并解释每个被省略的连接：不受支持的协议或指纹副本、已停用端点、账户状态说明，或缺少主连接。预览与实际响应使用同一选择器和过滤规则，并区分浏览器 HTML 页面与 `/info` 账户 JSON。
+
+响应头经过脱敏：URL 被替换，编码后的配置名称和通知只保留 `base64:` 前缀。预览不返回订阅正文、URI、密钥、私有备注或标签。User-Agent 最多 512 个 Unicode 字符，Accept 最多 256 个字符，两者均为单行。输入仅用于本次请求，不保存或回显，不注册设备，也不触发备份写入。
+
+`POST /api/subscription/preview` 需要 read 权限或管理者会话。发送 `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`，省略的请求头默认为空字符串。控制台设置提供同样的表单，不接受 HWID 或设备请求头。对于通过 API 管理的端点，`enabled: false` 会将保存的端点从订阅中排除，并显示原因为 `disabled_endpoint`；默认值为 true，序列化时省略。经过审核的端点应用操作会恢复拓扑规定的连接提供方式。

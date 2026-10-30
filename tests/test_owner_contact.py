@@ -17,7 +17,8 @@ from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.compiler import compile_topology
 from meridian.compiler.models import ServiceSettingsPayload
 from meridian.control.client import ControlClient
-from meridian.control.formats.entries import STATUS_REMARKS, SubscriptionUser
+from meridian.control.formats.entries import SubscriptionUser
+from meridian.control.formats.status_remarks import STATUS_REMARKS
 from meridian.control.models import ENDPOINT_REMARK_MAX_LENGTH, ServiceSettings
 from meridian.control.service import ControlService
 from meridian.control.subscriptions import render_subscription
@@ -204,7 +205,7 @@ def test_long_contact_text_leaves_status_placeholders_unchanged() -> None:
     )
     response = render_subscription(user, [], "base64", profile_title="Meridian", owner_contact=delivery.owner_contact)
     names = tuple(unquote(urlsplit(link).fragment) for link in base64.b64decode(response.body).decode().splitlines())
-    assert names == STATUS_REMARKS["expired"]
+    assert names == STATUS_REMARKS["en"]["expired"]
 
 
 def test_public_contact_can_be_proposed_and_stored_without_becoming_a_secret(tmp_path: Path) -> None:

@@ -27,6 +27,7 @@
 - Control subscription delivery has its own renderer stamp, so a delivery fix also refreshes the deployed control service.
 
 ## Pitfalls
+- Endpoint observation compares the typed enabled flag, so a reviewed endpoint apply restores an API-disabled entry; omitted enabled=true preserves existing compiler and service payload bytes.
 - Subscription-language settings are service-owned; reviewed delivery settings preserve the fleet default and every person's override, and translated delivery changes bump control renderer stamps.
 - Changes to notices, native headers, and banner assets bump the control API/service/subscription and PWA renderer stamps together; operator notices are never part of a reviewed settings payload.
 - Apply the exact reviewed owner contact with all other delivery settings; changing its deployed header, placeholder, support HTML, or local assets bumps the control and PWA renderer stamps.

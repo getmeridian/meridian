@@ -176,6 +176,13 @@ def redact_diagnostic_text(text: str, known: Iterable[str] = ()) -> str:
     return _UUID_RE.sub("[UUID-REDACTED]", text)
 
 
+def redact_preview_text(text: str, known: Iterable[str] = ()) -> str:
+    """Preview labels disclose no URI, even when an operator put a link in a remark."""
+    if "://" in text or text.lower().startswith(("vless:", "hysteria2:", "mailto:", "tg:")):
+        return REDACTED
+    return redact_diagnostic_text(text, known)
+
+
 def _is_json_schema_property_map(value: dict[Any, Any]) -> bool:
     """Return True for JSON Schema properties maps, not arbitrary property bags."""
     if not value:

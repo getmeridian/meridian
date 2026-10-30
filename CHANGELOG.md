@@ -55,6 +55,7 @@ that dials out to it.
   IP limits).
 
 ### Control service
+- `client preview` and console Settings explain subscription format selection, included protocols, and omitted entries through a read-scoped API. Header inputs are bounded and transient, output contains no credentials, and API-managed disabled endpoints are omitted from delivery and explained in the preview.
 - Native subscription status remarks support English, Russian, Persian, and Chinese through an explicit fleet default (`fleet language`) and nullable person overrides (`client set --language`). Status codes remain English, placeholders remain inert, and preferences survive encrypted backups and reviewed applies.
 - Owners can preview, publish, expire, and clear one notice through `fleet notice` or console Settings. Apps receive a per-person `announce` header, connection pages show a local banner, encrypted backups include the notice, and events record its author without the text.
 - The console People list continues loading users when fleet metadata is unavailable, retaining cached names and declared markers.

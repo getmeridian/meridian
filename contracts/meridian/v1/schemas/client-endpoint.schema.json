@@ -1,0 +1,102 @@
+{
+  "additionalProperties": false,
+  "description": "One public way into an exit, as subscriptions publish it.\n\nTLS transports (XHTTP, WSS, Hysteria2) carry `tls_sni`; XHTTP and WSS add `host` and\n`path`, and on a domain their `address` is that domain, so they can ride a CDN.",
+  "properties": {
+    "address": {
+      "maxLength": 253,
+      "minLength": 1,
+      "title": "Address",
+      "type": "string"
+    },
+    "enabled": {
+      "default": true,
+      "description": "False omits this endpoint from delivery; reviewed endpoint apply restores topology settings.",
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "fingerprint": {
+      "default": "",
+      "maxLength": 32,
+      "title": "Fingerprint",
+      "type": "string"
+    },
+    "fingerprint_copy": {
+      "default": false,
+      "description": "Another fingerprint of an entry listed before it: Base64 and Mihomo list it, failover groups skip it, Xray JSON gives copies their own Automatic config, and sing-box omits it.",
+      "title": "Fingerprint Copy",
+      "type": "boolean"
+    },
+    "host": {
+      "default": "",
+      "title": "Host",
+      "type": "string"
+    },
+    "path": {
+      "default": "",
+      "title": "Path",
+      "type": "string"
+    },
+    "port": {
+      "maximum": 65535,
+      "minimum": 1,
+      "title": "Port",
+      "type": "integer"
+    },
+    "position": {
+      "maximum": 10000,
+      "minimum": 0,
+      "title": "Position",
+      "type": "integer"
+    },
+    "protocol": {
+      "enum": [
+        "reality",
+        "xhttp",
+        "wss",
+        "hysteria2"
+      ],
+      "title": "Protocol",
+      "type": "string"
+    },
+    "reality_public_key": {
+      "default": "",
+      "title": "Reality Public Key",
+      "type": "string"
+    },
+    "reality_short_id": {
+      "default": "",
+      "title": "Reality Short Id",
+      "type": "string"
+    },
+    "reality_sni": {
+      "default": "",
+      "title": "Reality Sni",
+      "type": "string"
+    },
+    "remark": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Remark",
+      "type": "string"
+    },
+    "salamander_password": {
+      "default": "",
+      "title": "Salamander Password",
+      "type": "string"
+    },
+    "tls_sni": {
+      "default": "",
+      "title": "Tls Sni",
+      "type": "string"
+    }
+  },
+  "required": [
+    "remark",
+    "protocol",
+    "address",
+    "port",
+    "position"
+  ],
+  "title": "ClientEndpoint",
+  "type": "object"
+}

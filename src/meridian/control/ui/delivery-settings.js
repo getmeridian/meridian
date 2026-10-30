@@ -78,7 +78,7 @@
       if (!clearing && until.value && (!isFinite(instant.getTime()) || instant.getTime() <= Date.now())) problem = M.t("notice.until_invalid");
       if (problem) { error.textContent = problem; return null; }
       return { notice: clearing ? null : { text: text.value, until: instant ? instant.toISOString() : null },
-        for_user: person.value.trim() || null, confirm: false };
+        for_user: clearing ? null : person.value.trim() || null, confirm: false };
     }
     function run(clearing, saving) {
       var body = request(clearing);

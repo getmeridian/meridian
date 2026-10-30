@@ -10,6 +10,7 @@ import copy
 from typing import Any
 
 from meridian.compiler.delivery import singbox_template
+from meridian.control.formats.capabilities import supported_endpoints
 from meridian.control.formats.entries import (
     AUTOMATIC,
     PLACEHOLDER_ADDRESS,
@@ -33,11 +34,7 @@ def singbox_document(
     client_routing: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING,
 ) -> dict[str, Any]:
     """Return the sing-box document for one user."""
-    endpoints = [
-        endpoint
-        for endpoint in presentation_endpoints(endpoints)
-        if not endpoint.fingerprint_copy and endpoint.protocol != "xhttp"
-    ]
+    endpoints = supported_endpoints(presentation_endpoints(endpoints), "singbox")
     placeholders = availability_placeholders(endpoints, placeholders)
     if placeholders:
         proxies = [placeholder_outbound(remark) for remark in placeholders]

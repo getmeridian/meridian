@@ -3,6 +3,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export function deliveryReply(url, options, data, writes) {
+  if (url === 'api/subscription/preview') {
+    writes.push(JSON.parse(options.body));
+    return data.response;
+  }
   if (url === 'api/language') {
     if (options.method === 'GET') return { language: data.language || 'en', changed: false };
     const body = JSON.parse(options.body);
@@ -18,6 +22,22 @@ export function deliveryReply(url, options, data, writes) {
 }
 
 export async function runDeliveryScenario({ w, M, ui, mode, locale, data, view, report, events, writes, settle }) {
+  if (mode === 'delivery-format-preview') {
+    w.eval(fs.readFileSync(path.join(ui, 'format-preview.js'), 'utf8'));
+    M.mount(view, M.formatPreviewSection());
+    view.querySelector('[data-preview="person"]').value = data.person || 'person';
+    view.querySelector('[data-preview="user_agent"]').value = data.user_agent || 'Hiddify/2';
+    view.querySelector('[data-preview="accept"]').value = data.accept || '';
+    view.querySelector('[data-preview="suffix"]').value = data.suffix || '';
+    view.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+    for (let i = 0; i < 6; i++) await settle();
+    report.text = view.querySelector('[data-preview="result"]').textContent;
+    report.error = view.querySelector('.form-error').textContent;
+    report.writes = writes;
+    report.stored = w.localStorage.length;
+    report.injected = !!view.querySelector('img') || !!w.pwned;
+    return;
+  }
   if (mode === 'delivery-page-notice') {
     const panel = w.document.createElement('section');
     view.appendChild(panel);

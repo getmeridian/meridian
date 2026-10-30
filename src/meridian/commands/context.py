@@ -59,6 +59,7 @@ READS_ONLY = frozenset(
         "client.list",
         "client.show",
         "client.usage",
+        "client.preview",
         "doctor",
         "fleet.export",
         "fleet.history",

@@ -43,6 +43,7 @@ from meridian.core.fleet import FleetTopology
 from meridian.core.languages import LanguageSettings, LanguageState
 from meridian.core.notices import NoticeState, NoticeWrite
 from meridian.core.server_allowances import ServerUsageList
+from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 from meridian.core.traffic import NodeTrafficEvidence
 from meridian.remnawave import (
     XRAY_JSON_CLIENT_TYPE,
@@ -102,6 +103,9 @@ class ServiceAccessPanel:
 
     def set_language(self, settings: LanguageSettings) -> LanguageState:
         return _translated(lambda: self._client.set_language(settings))
+
+    def preview_subscription(self, request: SubscriptionPreviewRequest) -> SubscriptionPreview:
+        return _translated(lambda: self._client.preview_subscription(request))
 
     def user_usage(self, username: str, *, days: int = 30) -> UserUsage:
         return _translated(lambda: self._client.user_usage(username, days=days))
@@ -274,7 +278,13 @@ class ServiceFleetPanel(ServiceAccessPanel):
             endpoint = _translated(partial(self._client.get_endpoint, endpoint_id))
             if endpoint is not None:
                 hosts.append(
-                    Host(uuid=endpoint_id, remark=endpoint.remark, address=endpoint.address, port=endpoint.port)
+                    Host(
+                        uuid=endpoint_id,
+                        remark=endpoint.remark,
+                        address=endpoint.address,
+                        port=endpoint.port,
+                        is_disabled=not endpoint.enabled,
+                    )
                 )
         return hosts
 

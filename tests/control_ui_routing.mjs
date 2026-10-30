@@ -17,7 +17,7 @@ const catalog = JSON.parse(fs.readFileSync(path.join(ui, 'locales', locale + '.j
 M.t = (key, params = {}) => (catalog[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? ''));
 M.i18n = { langs: [locale], names: { [locale]: locale }, lang: locale };
 M.state = { auth: { passkeys: { reason: 'no_domain' } } };
-M.privacySection = M.cliHint = () => M.h('section');
+M.privacySection = M.noticeSection = M.languageSection = M.formatPreviewSection = M.cliHint = () => M.h('section');
 M.api = (method, url) => {
   requests.push({ method, url });
   const settings = { profile_title: 'Meridian', public_url: '' };

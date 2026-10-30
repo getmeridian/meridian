@@ -22,20 +22,10 @@ groups; v2RayTun documents only headers; Shadowrocket's groups live in its own c
 from __future__ import annotations
 
 import re
-from typing import Literal
 
-DocumentFormat = Literal["browser", "mihomo", "stash", "singbox", "xray-json", "base64"]
-
-# `/sub/<token>/<suffix>`: Meridian's own checks read `json`; the connection page reads `info`.
-SUFFIX_FORMATS: dict[str, DocumentFormat] = {
-    "info": "browser",
-    "json": "xray-json",
-    "v2ray-json": "xray-json",
-    "mihomo": "mihomo",
-    "clash": "mihomo",
-    "stash": "stash",
-    "singbox": "singbox",
-}
+from meridian.core.subscription_formats import SUFFIX_FORMATS as SUFFIX_FORMATS
+from meridian.core.subscription_formats import DocumentFormat as DocumentFormat
+from meridian.core.subscription_preview import FormatRule, FormatSelection, UserAgentFamily
 
 _MIHOMO = re.compile(
     r"^(?:flclash|rabbit|flowvy|murge|mihomo|prizrak-box|koala-clash|clash(?:-verge|-nyanpasu|x meta|[-.]?meta))",
@@ -50,21 +40,28 @@ _XRAY_JSON = re.compile(
     r"^(?:[Ss]treisand|Happ/|INCY/|ktor-client|V2Box|io\.github\.saeeddev94\.xray/"
     r"|v2rayNG/\d+\.\d+\.\d+|v2rayN/\d+\.\d+\.\d+|v2plus/\d+\.\d+\.\d+)"
 )
-_RULES: tuple[tuple[re.Pattern[str], DocumentFormat], ...] = (
-    (_MIHOMO, "mihomo"),
-    (_STASH, "stash"),
-    (_SINGBOX, "singbox"),
-    (_CLASH, "mihomo"),
-    (_XRAY_JSON, "xray-json"),
+_RULES: tuple[tuple[re.Pattern[str], DocumentFormat, UserAgentFamily], ...] = (
+    (_MIHOMO, "mihomo", "mihomo"),
+    (_STASH, "stash", "stash"),
+    (_SINGBOX, "singbox", "singbox"),
+    (_CLASH, "mihomo", "clash"),
+    (_XRAY_JSON, "xray-json", "xray-json"),
 )
 
 
 def select_format(user_agent: str | None, accept: str | None) -> DocumentFormat:
     """The document a request without a suffix gets."""
+    return explain_format(user_agent, accept).format
+
+
+def explain_format(user_agent: str | None, accept: str | None, suffix: str = "") -> FormatSelection:
+    """The same first-match decision used by live delivery and the read-only preview."""
+    if suffix:
+        return FormatSelection(format=SUFFIX_FORMATS[suffix], selection=FormatRule(rule="suffix", suffix=suffix))
     if "text/html" in (accept or ""):
-        return "browser"
+        return FormatSelection(format="browser", selection=FormatRule(rule="accept", match="text/html"))
     agent = (user_agent or "").strip()
-    for pattern, document in _RULES:
+    for pattern, document, family in _RULES:
         if pattern.search(agent):
-            return document
-    return "base64"
+            return FormatSelection(format=document, selection=FormatRule(rule="user_agent", family=family))
+    return FormatSelection(format="base64", selection=FormatRule(rule="default"))

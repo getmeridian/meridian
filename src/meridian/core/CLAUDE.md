@@ -2,6 +2,7 @@
 
 ## Design decisions
 - `calendar.py` shares clamped month shifts with billing; client-limit renewal previews add one or three months after max(now, expiry) in UTC and pass through the existing finite timestamp parser.
+- subscription_formats.py owns the document/suffix vocabulary; subscription_preview.py bounds transient headers and exposes typed selection, included protocols, omission reasons, and redacted service headers without credentials.
 - `languages.py` is the shared en/ru/fa/zh type; fleet defaults and nullable person overrides are operator settings, separate from CLI locale detection and reviewed topology.
 - `notices.py` owns one plain paragraph (500 Unicode characters, 1,024 after bounded expansion), five whole substitutions, an optional UTC expiry, and one preview/save request; braces never enable formatting or attribute access.
 - `OwnerContactSettings` shares the optional reviewed contact across delivery intent, compiler payloads, and pages; empty defaults omit the field, text is one plain line up to 120 characters, and HTTPS/TG/mailto links canonicalize to bounded ASCII without a lookup.
@@ -42,6 +43,7 @@
 
 ## Pitfalls
 - Treat individual connection URI and SVG QR fields as complete credentials; client show reveals only their exact producing paths, never passive output or neighboring fields.
+- Preview text redaction masks whole URIs in operator labels and known credential material; opaque Base64 headers are replaced rather than passed through a plaintext masker.
 - JSON reveal options accept exact dotted paths, including list indices; preserve authorized private note/tag fields without revealing neighboring URLs or credentials.
 - Provider labels allow Persian ZWNJ/ZWJ joiners while rejecting line breaks, bidi controls, and other control characters.
 - Preserve server metadata through setup drafts and fleet name/ref mapping; metadata names only declared physical servers and never moves automatically with an exit.
