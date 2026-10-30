@@ -19,6 +19,7 @@ MOCK_VARS = {
     "worker_path": "/connect/sub/~pwa/sw.js",
     "worker_scope": "/connect/sub/",
     "start_url": "/connect/sub/demo",
+    "notice": None,
 }
 
 
