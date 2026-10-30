@@ -13,7 +13,7 @@
 ## What's done well
 - **Check before acting** — steps read package status, file content, and unit state first, so a rerun reports `ok`, not `changed`.
 ## Pitfalls
-- Connection pages are service responses: proxy old UUID and worker paths to ctld, then remove only immediate UUID directories and `pwa` after nginx validates and reloads. A failed reload must keep those files.
+- **Connection pages are service responses** — proxy old UUID and worker paths to ctld, then remove only immediate UUID directories and `pwa` after nginx validates and reloads. A failed reload must keep those files.
 - **nginx `add_header` inheritance** — a child `location` with `add_header` drops parent headers; use maps for cache/robots policies and keep all PWA headers together.
 - **acme.sh short-lived IP certs** — 6-day certs need `--days 5` and an explicit renew window; report acme.sh's last lines (`_acme_reason`), since its first ones are only timestamps. A `rateLimited` answer names its retry time instead of port/DNS advice (a reused lab IP once got the wrong hint).
 - **nginx stream is a dynamic module** — install `libnginx-mod-stream`.
@@ -23,8 +23,7 @@
 - **Never `return 444` in HTTPS blocks** — use 403/404 (less fingerprintable).
 - **Legacy stream config yields to V4** — `ConfigureNginx` skips `stream.d/meridian.conf` once a `meridian-v4-*` stream file listens on 443, or `nginx -t` fails on a duplicate listener.
 - **Every apt-get goes through `ensure.run_apt()`** — it waits up to 5 minutes while unattended-upgrades or cloud-init holds the lock, and `apt_failure()` names the holder; never `2>/dev/null` apt, or a lock reads as an ordinary failure (the nginx install then fell through to the nginx.org path). Update and install are separate calls (`apt_update_and_install()`), and install only after a check says something is missing: `InstallNginx` runs on every certificate and nginx apply.
-- **Teardown never removes the `meridian` CLI** — an operator-installed copy is how they redeploy.
-- **Teardown keeps what may predate Meridian** — fail2ban stays on (host hardening, like SSH settings), and nginx is stopped only when no operator config remains.
+- **Teardown keeps what the operator may own** — never the `meridian` CLI (an operator-installed copy is how they redeploy); fail2ban stays on (host hardening, like SSH settings), and nginx is stopped only when no operator config remains.
 - **Teardown never deletes `/var/backups/meridian-migration`** — it holds the only copy of a migrated panel's database; `panel_stack_removal()` is the one panel-removal list teardown and `migrate` share.
 - **One unit per `systemctl` call when a unit may be absent** — multi-unit `disable --now` aborts on a missing unit and stops nothing.
 - **Realm installs only a pinned tarball** — `RelayContext.realm_sha256` comes from the reviewed plan; a target without a digest fails (it once skipped verification silently).
