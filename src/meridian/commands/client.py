@@ -210,21 +210,25 @@ def _show(*, name: str, repair_page: bool, operation: OperationContext) -> None:
         raise typer.Exit(3)
 
 
-def run_list() -> None:
+def run_list(*, attention: bool = False) -> None:
     """List the fleet's clients from the control service."""
     operation = OperationContext()
     with error_context("client.list", timer=operation.timer):
-        _list(operation=operation)
+        _list(operation=operation, attention=attention)
 
 
-def _list(*, operation: OperationContext) -> None:
+def _list(*, operation: OperationContext, attention: bool = False) -> None:
     from rich.box import ROUNDED
     from rich.table import Table
 
     cluster = load_topology_cluster()
     try:
+        panel = access_panel(cluster)
         result = collect_client_list(
-            access_panel(cluster), allowed_usernames=_readable_users(cluster), declared_usernames=_access_users(cluster)
+            panel,
+            allowed_usernames=_readable_users(cluster),
+            declared_usernames=_access_users(cluster),
+            read_attention=panel.attention if attention else None,
         )
     except RemnawaveError as e:
         fail(
@@ -250,7 +254,7 @@ def _list(*, operation: OperationContext) -> None:
         return
 
     table = Table(
-        title="Proxy Clients",
+        title=t("attention.title") if attention else "Proxy Clients",
         show_lines=False,
         pad_edge=False,
         box=ROUNDED,
@@ -261,18 +265,23 @@ def _list(*, operation: OperationContext) -> None:
     table.add_column("Traffic", style="dim")
     table.add_column("Expires", style="dim")
     table.add_column("Last seen", style="dim")
+    if attention:
+        table.add_column(t("attention.label.reason"))
 
     access = require_intent(cluster).access
     for client in result.clients.clients:
         shown = access.display_name(client.username)
         label = escape(shown if shown == client.username else f"{shown} ({client.username})")
-        table.add_row(
+        row = [
             label if client.declared else f"{label} [dim]· console[/dim]",
             format_status(client.status),
             format_traffic(client.traffic_used_bytes, client.traffic_limit_bytes),
             escape(format_expiry(client.expires_at) if client.expires_at else "-"),
             escape(client.last_seen or "-"),
-        )
+        ]
+        if attention:
+            row.append(escape(", ".join(t(f"attention.reason.{reason}") for reason in client.attention_reasons)))
+        table.add_row(*row)
 
     count = result.clients.summary.clients
     suffix = "s" if count != 1 else ""

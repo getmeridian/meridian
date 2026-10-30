@@ -13,6 +13,8 @@ export * as ApplyCommandDataSchema from "./apply-command-data.schema";
 export * as ApplyCountsSchema from "./apply-counts.schema";
 export * as ApplyEnvelopeSchema from "./apply-envelope.schema";
 export * as ApplyFailureSchema from "./apply-failure.schema";
+export * as AttentionThresholdsSchema from "./attention-thresholds.schema";
+export * as AttentionSchema from "./attention.schema";
 export * as CheckEnvelopeSchema from "./check-envelope.schema";
 export * as CheckFailureSchema from "./check-failure.schema";
 export * as CheckSchema from "./check.schema";

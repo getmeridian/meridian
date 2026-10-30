@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "expiry_days": {
+      "default": 7,
+      "maximum": 30,
+      "minimum": 1,
+      "title": "Expiry Days",
+      "type": "integer"
+    },
+    "quota_percent": {
+      "default": 80,
+      "maximum": 100,
+      "minimum": 1,
+      "title": "Quota Percent",
+      "type": "integer"
+    },
+    "unused_days": {
+      "default": 3,
+      "maximum": 365,
+      "minimum": 1,
+      "title": "Unused Days",
+      "type": "integer"
+    }
+  },
+  "title": "AttentionThresholds",
+  "type": "object"
+}

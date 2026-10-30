@@ -115,6 +115,7 @@ ROUTE_SAMPLES = {
     "fleet_authority": ("/api/ca", None),
     "traffic": ("/api/traffic", None),
     "events": ("/api/events", None),
+    "attention": ("/api/attention", None),
     "daily_traffic": ("/api/traffic/daily", None),
     "list_users": ("/api/users", None),
     "create_user": ("/api/users", {"username": "bob", "traffic_limit_bytes": 1000}),

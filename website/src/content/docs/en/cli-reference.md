@@ -109,7 +109,7 @@ Manage the people who connect.
 meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client show NAME [--repair-page] [--json]
 meridian client usage NAME [--days N] [--json]
-meridian client list [--json]
+meridian client list [--attention] [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
@@ -124,6 +124,7 @@ meridian client remove NAME [--yes] [--json]
 |------|---------|-------------|
 | `--days N` | 30 | UTC days for `client usage` or `fleet usage`, 1–730, capped at the saved retention |
 | `--json` | | Emit the result as a `meridian.output/v1` envelope (all client commands) |
+| `--attention` | off | `client list`: only people needing attention, with a reason column |
 | `--repair-page` | | Republish the client's connection page (`client show`) |
 | `--limit SIZE` | none | Traffic limit (`client add`, `client set`): `500MB`, `50GB`, `1.5TB`; `none` or `0` removes it. Units are binary (1 GB = 1024³ bytes), as the control service counts |
 | `--reset PERIOD` | never | When used traffic starts again from zero: `day`, `week`, `month`, or `never`, by calendar day, week, or month |
@@ -137,6 +138,10 @@ meridian client remove NAME [--yes] [--json]
 First reported traffic and the last reporting node come from accepted traffic growth (`first_traffic_at` and `last_traffic_node` in JSON). Historical first use can be unknown; these are aggregate counters, with no sessions or client addresses.
 
 **`client list`** — lists clients with status, traffic, expiry, and last seen, including people added in the web console (`declared: false` in JSON). With `--json`, returns `data.summary` counts and `data.clients[]`.
+
+`client list --attention` shows only people expiring within seven days (including the current instant), at or above 80% of quota, or with no lifetime traffic more than three days after creation. A reason column explains each row; JSON includes `clients[].attention_reasons`, and summary counts cover the filtered list. Undated imported traffic and reset periods still count as previous use.
+
+`GET /api/attention` needs `read` scope and also admits the signed-in owner. It returns `observed_at`, `thresholds`, `people[]` with usernames/reasons, and `nodes[]` with node IDs/reasons. Node findings include offline or not-yet-seen agents, failed apply resources, and degraded or unhealthy reported health. Optional query parameters are `expiry_days` (1–30, default 7), `quota_percent` (1–100, default 80), and `unused_days` (1–365, default 3). Attention is derived without stored flags, sessions, addresses, or device data.
 
 **`client set`** — changes a client's traffic limit, reset period, or expiry; only the options you pass change, and at least one is required. A client their limit or expiry has cut off (status `limited` or `expired`) can connect again as soon as the new values allow it. Changes take effect at once, and applies never touch them. A bad value exits `2` before Meridian connects anywhere. With `--json`, returns the client as the control service now has it in `data.client`, including `traffic_limit_bytes`, `traffic_reset`, and `expires_at` (empty means never).
 

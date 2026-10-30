@@ -8,6 +8,7 @@ from typing import Literal, Protocol, Sequence
 from pydantic import Field
 
 from meridian.control.models import UserUsage
+from meridian.core.attention import PersonAttentionReason
 from meridian.core.client_limits import canonical_expiry, traffic_reset_from_strategy
 from meridian.core.models import CoreModel
 from meridian.core.traffic import UserTrafficEvidence
@@ -72,6 +73,9 @@ class ClientRecord(UserTrafficEvidence):
     expires_at: str = Field(description="UTC timestamp; empty means never.")
     created_at: str
     last_seen: str
+    attention_reasons: list[PersonAttentionReason] = Field(
+        default_factory=list, description="Derived reasons when client list --attention was requested; never stored."
+    )
     device_limit: int | None = Field(default=None, ge=1, le=100, description="None uses the fleet's default cap.")
     declared: bool = Field(
         default=True,
@@ -186,7 +190,9 @@ class ClientLimitsResult(CoreModel):
     client: ClientRecord
 
 
-def build_client_record(user: PanelUserLike, *, declared: bool = True) -> ClientRecord:
+def build_client_record(
+    user: PanelUserLike, *, declared: bool = True, attention_reasons: Sequence[PersonAttentionReason] = ()
+) -> ClientRecord:
     """Build a redacted client record from a panel user object."""
     return ClientRecord(
         username=user.username,
@@ -198,6 +204,7 @@ def build_client_record(user: PanelUserLike, *, declared: bool = True) -> Client
         expires_at=canonical_expiry(user.expire_at),
         created_at=user.created_at,
         last_seen=user.online_at,
+        attention_reasons=list(attention_reasons),
         first_traffic_at=getattr(user, "first_traffic_at", None),
         last_traffic_node=getattr(user, "last_traffic_node", None),
         device_limit=user.hwid_device_limit,
@@ -216,10 +223,21 @@ def build_client_detail(user: PanelUserLike, *, declared: bool = True) -> Client
 
 
 def build_client_list_result(
-    users: Sequence[PanelUserLike], *, declared: Collection[str] | None = None
+    users: Sequence[PanelUserLike],
+    *,
+    declared: Collection[str] | None = None,
+    attention: Mapping[str, Sequence[PersonAttentionReason]] | None = None,
 ) -> ClientListResult:
     """Build a client list result with status counts; `declared` (when given) marks the others undeclared."""
-    records = [build_client_record(user, declared=declared is None or user.username in declared) for user in users]
+    records = [
+        build_client_record(
+            user,
+            declared=declared is None or user.username in declared,
+            attention_reasons=attention.get(user.username, ()) if attention is not None else (),
+        )
+        for user in users
+        if attention is None or user.username in attention
+    ]
     statuses = [record.status.upper() for record in records]
     active = sum(1 for status in statuses if status == "ACTIVE")
     disabled = sum(1 for status in statuses if status == "DISABLED")

@@ -18,6 +18,19 @@
       "additionalProperties": false,
       "description": "Redacted client metadata suitable for list views.",
       "properties": {
+        "attention_reasons": {
+          "description": "Derived reasons when client list --attention was requested; never stored.",
+          "items": {
+            "enum": [
+              "expiring",
+              "quota",
+              "unused"
+            ],
+            "type": "string"
+          },
+          "title": "Attention Reasons",
+          "type": "array"
+        },
         "created_at": {
           "title": "Created At",
           "type": "string"

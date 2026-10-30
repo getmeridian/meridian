@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from types import TracebackType
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 import httpx
 
@@ -52,6 +52,7 @@ from meridian.control.models import (
     UserUpdate,
     UserUsage,
 )
+from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientExtendRequest
 from meridian.core.errors import MeridianError
@@ -179,6 +180,10 @@ class ControlClient:
     def events(self, *, after: int = 0, limit: int = 100) -> FleetEventPage:
         query = FleetEventQuery(after=after, limit=limit)
         return FleetEventPage.model_validate(self._call("GET", f"api/events?after={query.after}&limit={query.limit}"))
+
+    def attention(self, thresholds: AttentionThresholds | None = None) -> AttentionList:
+        query = thresholds or AttentionThresholds()
+        return AttentionList.model_validate(self._call("GET", "api/attention?" + urlencode(query.model_dump())))
 
     def user_usage(self, username: str, *, days: int = 30) -> UserUsage:
         return UserUsage.model_validate(self._call("GET", f"api/users/{_segment(username)}/usage?days={days}"))

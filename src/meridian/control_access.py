@@ -34,6 +34,7 @@ from meridian.control.models import (
     UserUpdate,
     UserUsage,
 )
+from meridian.core.attention import AttentionList
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientLimitChange, TrafficReset
 from meridian.core.fleet import FleetTopology
@@ -101,6 +102,9 @@ class ServiceAccessPanel:
                 return None
 
         return _translated(read)
+
+    def attention(self) -> AttentionList:
+        return _translated(self._client.attention)
 
     def fetch_subscription(self, short_uuid: str, *, client_type: str = "") -> SubscriptionDocument:
         # The service names its documents by suffix (`/sub/TOKEN/mihomo`); anything else gets the Base64 list.

@@ -21,6 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from meridian.control.attention import read_attention
 from meridian.control.background_health import BackgroundHealth
 from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE, BackupLedger
 from meridian.control.delivery_settings import save_update_interval_hours, update_interval_hours
@@ -71,6 +72,7 @@ from meridian.core.agent_desired import DesiredNodeState
 from meridian.core.agent_protocol import ObservedStateReport, PollRequest, StatsAck, StatsReport
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
+from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.client_devices import DevicesRemoved
 
 SCHEMA_VERSION = 13
@@ -567,6 +569,11 @@ class ControlService:
         with self._lock:
             rows = self._db.execute(f"{USER_SELECT} ORDER BY u.username").fetchall()
         return [user_record(row) for row in rows]
+
+    def attention(self, thresholds: AttentionThresholds | None = None, *, now: str | None = None) -> AttentionList:
+        return read_attention(
+            self._store, self.list_users, self.list_nodes, thresholds or AttentionThresholds(), now or utc_now()
+        )
 
     def user_devices(self, username: str) -> UserDevices:
         with self._lock:

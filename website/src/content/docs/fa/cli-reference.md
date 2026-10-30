@@ -109,7 +109,7 @@ JSON `data` شامل `plan_hash`، `generation` و `actions[]` با `status: "co
 meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client show NAME [--repair-page] [--json]
 meridian client usage NAME [--days N] [--json]
-meridian client list [--json]
+meridian client list [--attention] [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
@@ -124,6 +124,7 @@ meridian client remove NAME [--yes] [--json]
 |------|---------|-------------|
 | `--days N` | 30 | روزهای UTC برای `client usage` یا `fleet usage`، بین 1–730 و در محدودهٔ مدت نگهداری ذخیره‌شده |
 | `--json` | | نتیجه را به عنوان پاکت `meridian.output/v1` ارسال کنید (تمام دستورات client) |
+| `--attention` | خاموش | `client list`: فقط افراد نیازمند توجه، همراه با دلیل |
 | `--repair-page` | | صفحه اتصال کلاینت را دوباره منتشر کنید (`client show`) |
 | `--limit SIZE` | بدون سقف | سقف ترافیک (`client add`، `client set`): `500MB`، `50GB`، `1.5TB`؛ `none` یا `0` آن را برمی‌دارد. واحدها دودویی‌اند (1 GB = 1024³ بایت)، همان‌طور که سرویس کنترل می‌شمارد |
 | `--reset PERIOD` | never | ترافیک مصرف‌شده کی دوباره از صفر شروع شود: `day`، `week`، `month` یا `never`، بر پایهٔ روز، هفته یا ماه تقویمی |
@@ -137,6 +138,10 @@ meridian client remove NAME [--yes] [--json]
 نخستین ترافیک ثبت‌شده و آخرین گره گزارش‌دهنده از افزایش پذیرفته‌شدهٔ شمارنده‌ها به دست می‌آیند (`first_traffic_at` و `last_traffic_node` در JSON). زمان نخستین استفاده پیش از ارتقا ممکن است نامشخص باشد؛ این داده‌ها تجمیعی‌اند و هیچ نشست یا نشانی کاربری ثبت نمی‌شود.
 
 **`client list`** — کلاینت‌ها را همراه با وضعیت، ترافیک، تاریخ انقضا و آخرین اتصال فهرست می‌کند، از جمله افرادی که در کنسول وب اضافه شده‌اند (`declared: false` در JSON). با `--json`، شمارنده‌های `data.summary` و `data.clients[]` را برمی‌گرداند.
+
+`client list --attention` فقط افرادی را نشان می‌دهد که دسترسی‌شان تا هفت روز آینده منقضی می‌شود (شامل همین لحظه)، دست‌کم ۸۰٪ سهمیه را مصرف کرده‌اند، یا بیش از سه روز از ایجاد حسابشان گذشته و هنوز هیچ ترافیکی ندارند. دلیل در ستونی جداگانه آمده است؛ JSON شامل `clients[].attention_reasons` است و شمارش خلاصه فقط افراد نمایش‌داده‌شده را در بر می‌گیرد. ترافیک واردشده بدون تاریخ دقیق و بازنشانی دوره به معنی استفاده‌نشدن نیست.
+
+`GET /api/attention` به سطح `read` نیاز دارد و برای مالک واردشده نیز قابل دسترسی است. پاسخ شامل `observed_at`، `thresholds`، `people[]` با نام کاربری و دلیل، و `nodes[]` با شناسهٔ گره و دلیل است. گره‌های قطع‌شده یا هنوز دیده‌نشده، منابعی که اعمالشان ناموفق بوده، و سلامت گزارش‌شدهٔ `degraded` یا `unhealthy` بررسی می‌شوند. پارامترهای اختیاری: `expiry_days` (۱–۳۰، پیش‌فرض ۷)، `quota_percent` (۱–۱۰۰، پیش‌فرض ۸۰) و `unused_days` (۱–۳۶۵، پیش‌فرض ۳). این فهرست بدون ذخیرهٔ پرچم، نشست، نشانی یا دادهٔ دستگاه محاسبه می‌شود.
 
 **`client set`** — سقف ترافیک، دورهٔ صفرشدن یا تاریخ انقضای کلاینت را تغییر می‌دهد؛ فقط گزینه‌هایی که می‌دهید تغییر می‌کنند و دست‌کم یکی لازم است. کلاینتی که سقف یا انقضا قطعش کرده (وضعیت `limited` یا `expired`) به‌محض اینکه مقادیر جدید اجازه دهند دوباره وصل می‌شود. تغییرها فوراً اعمال می‌شوند و apply هرگز به آن‌ها دست نمی‌زند. مقدار نادرست پیش از آنکه Meridian به جایی وصل شود با کد `2` خارج می‌شود. با `--json`، کلاینت را همان‌طور که اکنون در سرویس کنترل است در `data.client` برمی‌گرداند، از جمله `traffic_limit_bytes`، `traffic_reset` و `expires_at` (خالی یعنی بدون انقضا).
 

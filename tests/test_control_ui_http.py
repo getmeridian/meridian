@@ -166,6 +166,14 @@ def test_owner_reads_events_and_mutations_record_the_owner(fleet: Fleet) -> None
     assert reply.body["events"][0]["kind"] == "user.created"
 
 
+def test_owner_can_read_attention_without_a_password_recheck(fleet: Fleet) -> None:
+    assert fleet.set_up().status == 200
+    fleet.clock.now += CONFIRM_SECONDS + 1
+    reply = fleet.ui("GET", "/api/attention")
+    assert reply.status == 200
+    assert reply.body["people"] == [] and reply.body["nodes"] == []
+
+
 @pytest.fixture
 def fleet(tmp_path: Path) -> Iterator[Fleet]:
     yield from _serve(tmp_path, PUBLIC_PATH)

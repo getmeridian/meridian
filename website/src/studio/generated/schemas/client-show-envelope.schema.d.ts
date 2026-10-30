@@ -10,6 +10,10 @@
  */
 export type ClientShowOutputEnvelope = _ClientShowSuccessEnvelope | _ClientShowTerminalEnvelope;
 export type Command = "client.show";
+/**
+ * Derived reasons when client list --attention was requested; never stored.
+ */
+export type AttentionReasons = ("expiring" | "quota" | "unused")[];
 export type CreatedAt = string;
 /**
  * False for a person added in the control service's web console rather than the fleet's reviewed intent; the CLI reads them, and the console manages them.
@@ -129,6 +133,7 @@ export interface ClientShowResult {
  * Client metadata for a detail view.
  */
 export interface ClientDetail {
+  attention_reasons?: AttentionReasons;
   created_at: CreatedAt;
   declared?: Declared;
   device_limit?: DeviceLimit;

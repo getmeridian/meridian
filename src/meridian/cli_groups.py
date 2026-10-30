@@ -88,11 +88,12 @@ def client_show_cmd(
 @client_app.command("list")
 def client_list_cmd(
     _json: Json = False,
+    attention: bool = typer.Option(False, "--attention", help="Only people expiring soon, near quota, or never used"),
 ) -> None:
     """List managed access clients with status and traffic"""
     from meridian.commands.client import run_list
 
-    run_list()
+    run_list(attention=attention)
 
 
 @client_app.command("usage")

@@ -39,6 +39,10 @@ that dials out to it.
 - **Extend access by duration** — `client extend NAME --days N` and `POST /api/users/{name}/extend` add 1–3650 days after the later of now and the current expiry, returning the effective status. Declared and console-created people are supported; operator disable and traffic limits remain enforced.
 - **People API tokens** — the console can issue a token that manages people and their credentials without access to servers, revisions, backups, enrollment, tokens, privacy, or settings. Declared people still require the CLI to remove or reissue.
 - **Atomic CLI account creation** — `client add` creates expiry, traffic limits, reset strategy, and device caps together with the account. Interrupted applies resume with those settings, and later applies keep operator edits.
+- **Attention** — `/api/attention` and `client list --attention` find people expiring
+  within seven days, using at least 80% of their quota, or never used after three
+  days, plus offline/failing nodes and degraded or unhealthy reported health.
+  The read-scoped API has bounded thresholds; no attention history or device data is stored.
 - Node status includes durable `traffic_bytes` for read-scoped fleet adapters.
 - **Local events** — user lifecycle, enforcement, node outages and apply recovery,
   privacy audit references, and token names/scopes are recorded atomically, without

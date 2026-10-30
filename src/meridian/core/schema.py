@@ -28,6 +28,7 @@ from meridian.core.apply import (
     CompiledApplyPreview,
     CompiledApplyResult,
 )
+from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.cancellation import OperationCancellation
 from meridian.core.client_devices import ClientDevicesResult
 from meridian.core.client_limits import ClientExtendRequest
@@ -658,6 +659,8 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "fleet-event": FleetEvent,
     "fleet-event-query": FleetEventQuery,
     "service-node-status": ServiceNodeStatus,
+    "attention": AttentionList,
+    "attention-thresholds": AttentionThresholds,
     "fleet-usage-envelope": FleetUsageOutputEnvelope,
     "fleet-import-envelope": FleetImportOutputEnvelope,
     "event": Event,

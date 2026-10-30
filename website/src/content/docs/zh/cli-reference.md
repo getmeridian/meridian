@@ -109,7 +109,7 @@ JSON `data` 包含 `plan_hash`、`generation` 和 `actions[]` 带 `status: "conv
 meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client show NAME [--repair-page] [--json]
 meridian client usage NAME [--days N] [--json]
-meridian client list [--json]
+meridian client list [--attention] [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
@@ -124,6 +124,7 @@ meridian client remove NAME [--yes] [--json]
 |------|---------|-------------|
 | `--days N` | 30 | `client usage` 或 `fleet usage` 的 UTC 天数，1–730，受已保存保留时间限制 |
 | `--json` | | 将结果作为 `meridian.output/v1` 信封发出（所有客户端命令） |
+| `--attention` | 关闭 | `client list`：仅显示需要关注的用户，并列出原因 |
 | `--repair-page` | | 重新发布客户端的连接页面（`client show`） |
 | `--limit SIZE` | 无 | 流量限额（`client add`、`client set`）：`500MB`、`50GB`、`1.5TB`；`none` 或 `0` 取消限额。单位按二进制计算（1 GB = 1024³ 字节），与控制服务一致 |
 | `--reset PERIOD` | never | 已用流量何时从零重新计算：`day`、`week`、`month` 或 `never`，按自然日、周、月 |
@@ -137,6 +138,10 @@ meridian client remove NAME [--yes] [--json]
 首次记录的流量时间和最近报告流量的节点来自已接受的计数增长（JSON 中的 `first_traffic_at` 和 `last_traffic_node`）。升级前的首次使用时间可能未知；这些仅是汇总数据，不包含会话或客户端地址。
 
 **`client list`** — 列出客户端及其状态、流量、到期时间和最后在线时间，包括在网页控制台中添加的用户（JSON 中为 `declared: false`）。带 `--json`，返回 `data.summary` 计数和 `data.clients[]`。
+
+`client list --attention` 仅显示七天内到期（包含当前时刻）、已用流量达到限额的 80%，或创建超过三天且从未记录过流量的用户。原因列说明每行；JSON 包含 `clients[].attention_reasons`，汇总数量仅统计筛选后的用户。导入的历史流量即使日期未知，以及重置过的流量周期，都不会被误判为从未使用。
+
+`GET /api/attention` 需要 `read` 权限，也允许已登录的所有者访问。返回 `observed_at`、`thresholds`、含用户名和原因的 `people[]`，以及含节点 ID 和原因的 `nodes[]`。节点问题包括离线或尚未联系服务的 agent、配置应用失败，以及报告为 `degraded` 或 `unhealthy` 的健康状态。可选参数为 `expiry_days`（1–30，默认 7）、`quota_percent`（1–100，默认 80）和 `unused_days`（1–365，默认 3）。关注列表直接计算，不保存警告标记、会话、地址或设备数据。
 
 **`client set`** — 修改客户端的流量限额、重置周期或到期时间；只修改你传入的选项，至少需要一个。因限额或到期被停用的客户端（状态 `limited` 或 `expired`），只要新的值允许，就能重新连接。修改立即生效，应用永远不会改动它们。无效的值会在 Meridian 连接任何地方之前以 `2` 退出。带 `--json` 时，在 `data.client` 中返回控制服务当前的客户端信息，包括 `traffic_limit_bytes`、`traffic_reset` 和 `expires_at`（为空表示永不到期）。
 

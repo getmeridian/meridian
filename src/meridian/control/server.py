@@ -57,7 +57,7 @@ from meridian.control.models import (
     UserUpdate,
     scope_covers,
 )
-from meridian.control.operations_api import read_events
+from meridian.control.operations_api import read_attention, read_events
 from meridian.control.owner import OwnerSession
 from meridian.control.service import ControlService
 from meridian.control.subscriptions import unknown_subscription
@@ -367,6 +367,9 @@ class _Handler(BaseHTTPRequestHandler):
     def events(self, _match: re.Match[str]) -> Any:
         return read_events(self._service, self.path)
 
+    def attention(self, _match: re.Match[str]) -> Any:
+        return read_attention(self._service, self.path)
+
     def daily_traffic(self, _match: re.Match[str]) -> Any:
         return self._service.traffic.daily(days=self._history_days())
 
@@ -621,6 +624,7 @@ ROUTES: list[Route] = [
     ("GET", re.compile(r"/api/ca"), "read", _Handler.fleet_authority),
     ("GET", re.compile(r"/api/traffic"), "read", _Handler.traffic),
     ("GET", re.compile(r"/api/events"), "read", _Handler.events),
+    ("GET", re.compile(r"/api/attention"), "read", _Handler.attention),
     ("GET", re.compile(r"/api/traffic/daily"), "read", _Handler.daily_traffic),
     ("GET", re.compile(r"/api/users"), ("read", "people"), _Handler.list_users),
     ("POST", re.compile(r"/api/users"), "people", _Handler.create_user),
@@ -690,6 +694,7 @@ OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
         _Handler.user_usage,
         _Handler.daily_traffic,
         _Handler.events,
+        _Handler.attention,
         _Handler.list_users,
         _Handler.get_user,
         _Handler.create_user,

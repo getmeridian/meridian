@@ -1,6 +1,7 @@
 # commands — One module per subcommand
 
 ## Design decisions
+- **People needing attention** — `client list --attention` reads the service's derived warnings in the same panel connection, includes console people, filters its status counts, and labels each row's reasons; ordinary lists keep empty derived reasons.
 - **Local timeline** — `fleet events --since ID --limit N` reads oldest-first lifecycle facts from the service's read-scoped cursor API; the Fleet help group's Activity panel and typed `fleet-events` envelope expose the same contract.
 
 **Service-owned person edits** — enable, disable, set, reset-traffic, extend, and device removals resolve against the control service directory through `resolve_client_mutation_name`, with client show's exact-name-first and ambiguity rules; only topology-owned removal, reissue, and page publication require declared access users.
