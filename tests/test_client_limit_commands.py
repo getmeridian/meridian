@@ -28,7 +28,7 @@ from meridian.setup.single_server import single_server_intent
 from tests.support.control_service import ADMIN_TOKEN, serve_control
 from tests.support.topology import single_exit_intent
 
-GB = 1024**3
+GIB = 1024**3
 FUTURE_DAY = "2031-12-31"
 
 
@@ -47,15 +47,15 @@ def test_expiry_display(expires_at: str, shown: str) -> None:
 @pytest.mark.parametrize(
     ("strategy", "limit", "shown"),
     [
-        ("MONTH", 50 * GB, "12.4 GB / 50 GB (resets monthly)"),
-        ("NO_RESET", 50 * GB, "12.4 GB / 50 GB"),
-        ("", 0, "12.4 GB"),
-        ("MONTH_ROLLING", 50 * GB, "12.4 GB / 50 GB (resets monthly on the day they were added)"),
+        ("MONTH", 50 * GIB, "12.4 GiB / 50 GiB (resets monthly)"),
+        ("NO_RESET", 50 * GIB, "12.4 GiB / 50 GiB"),
+        ("", 0, "12.4 GiB"),
+        ("MONTH_ROLLING", 50 * GIB, "12.4 GiB / 50 GiB (resets monthly on the day they were added)"),
     ],
     ids=["monthly", "no-reset", "unlimited", "panel-rolling"],
 )
 def test_usage_line(strategy: str, limit: int, shown: str) -> None:
-    user = User(used_traffic_bytes=int(12.4 * GB), traffic_limit_bytes=limit, traffic_limit_strategy=strategy)
+    user = User(used_traffic_bytes=int(12.4 * GIB), traffic_limit_bytes=limit, traffic_limit_strategy=strategy)
     assert format_usage(build_client_record(user)) == shown
 
 
@@ -107,7 +107,7 @@ def test_client_set_changes_and_clears_limits(tmp_path: Path, capsys: pytest.Cap
     client = first["data"]["client"]
     assert (client["username"], client["status"].lower()) == ("alice", "active")
     assert (client["traffic_limit_bytes"], client["traffic_reset"], client["expires_at"]) == (
-        50 * GB,
+        50 * GIB,
         "month",
         f"{FUTURE_DAY}T23:59:59Z",
     )
@@ -134,7 +134,7 @@ def test_client_show_prints_usage_against_the_limit_and_the_expiry(
             run_show("alice")
 
     output = capsys.readouterr().err
-    assert "Traffic   " in output and "/ 50 GB (resets monthly)" in output
+    assert "Traffic   " in output and "/ 50 GiB (resets monthly)" in output
     assert f"Expires   {FUTURE_DAY}" in output
 
 
@@ -198,7 +198,7 @@ def test_client_add_sets_limits_after_the_reviewed_apply(
     assert payload["status"] == "ok" and payload["warnings"] == []
     assert carol.device_limit == 2
     assert (carol.traffic_limit_bytes, carol.traffic_reset, carol.expires_at) == (
-        50 * GB,
+        50 * GIB,
         "month",
         f"{FUTURE_DAY}T23:59:59Z",
     )

@@ -61,14 +61,15 @@ def test_list_items_and_unchanged_intents() -> None:
 _PEOPLE_HARNESS = """
 const fs = require("fs");
 global.window = {};
-const h = (tag, attrs) => ({ tag: tag, value: (attrs && attrs.value) || "" });
+const h = (tag, attrs) => ({ tag: tag, ...attrs, value: (attrs && attrs.value) || "",
+  setAttribute() {}, setCustomValidity() {}, addEventListener() {}, validity: {} });
 window.M = { h: h, has: (o, k) => Object.prototype.hasOwnProperty.call(o, k), field: () => ({}), t: (k) => k };
 eval(fs.readFileSync(process.argv[1], "utf8"));
 const [user, gb, strategy] = JSON.parse(process.argv[2]);
 const fields = window.M.limitFields(user);
 const shown = fields.gb.value;
 fields.strategy.value = user ? user.traffic_limit_strategy : "month";
-if (gb !== null) fields.gb.value = gb;
+if (gb !== null) { fields.gb.value = gb; fields.mode.value = "limited"; }
 if (strategy !== null) fields.strategy.value = strategy;
 process.stdout.write(JSON.stringify([shown, fields.value()]));
 """
@@ -89,13 +90,19 @@ def test_an_untouched_small_limit_is_shown_exactly_and_never_sent() -> None:
     """A CLI quota of 4 MB rounded to "0" GB, and saving the expiry then sent 0: unlimited."""
     user = {"traffic_limit_bytes": 4194304, "traffic_limit_strategy": "month"}
     shown, change = limit_form(user)
-    assert shown == "0.004194304" and change == {}
-    assert limit_form(user, gb="1")[1] == {"traffic_limit_bytes": 10**9}
+    assert shown == "0.00390625" and change == {}
+    assert limit_form(user, gb="1")[1] == {"traffic_limit_bytes": 1024**3}
     assert limit_form(user, strategy="day")[1] == {"traffic_limit_strategy": "day"}
 
 
 def test_a_new_person_sends_both_limit_fields() -> None:
     assert limit_form(None) == ["", {"traffic_limit_bytes": 0, "traffic_limit_strategy": "month"}]
+
+
+def test_an_untouched_large_cli_limit_does_not_block_other_edits() -> None:
+    user = {"traffic_limit_bytes": 2**63 - 1, "traffic_limit_strategy": "month"}
+    assert limit_form(user)[1] == {}
+    assert limit_form(user, strategy="day")[1] == {"traffic_limit_strategy": "day"}
 
 
 _LATEST_HARNESS = """

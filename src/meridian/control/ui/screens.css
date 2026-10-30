@@ -163,3 +163,5 @@
 /* Keep the three independent server verdicts readable in compact cards. */
 .server-badges { display: flex; flex-wrap: wrap; gap: .5rem; margin-block-end: 1rem; }
 .health-checks { padding-inline-start: 1.8rem; overflow-wrap: anywhere; }
+.field-error { color: var(--err); font-size: .85rem; margin-block: .25rem 0; }
+.field-error:empty { display: none; }

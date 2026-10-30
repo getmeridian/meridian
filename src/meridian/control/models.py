@@ -28,6 +28,7 @@ from meridian.core.agent_types import (
     Version,
 )
 from meridian.core.client_devices import ClientDevicesResult
+from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES
 from meridian.core.defaults import SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import validate_ip_address_value
 from meridian.core.models import CoreModel
@@ -199,7 +200,7 @@ class UserRecord(CoreModel):
     status: UserStatus
     created_at: Timestamp
     expire_at: Timestamp | None = None
-    traffic_limit_bytes: int = Field(default=0, ge=0, description="0 means unlimited.")
+    traffic_limit_bytes: int = Field(default=0, ge=0, le=MAX_TRAFFIC_LIMIT_BYTES, description="0 means unlimited.")
     traffic_limit_strategy: LimitStrategy = "no_reset"
     device_limit: int | None = Field(default=None, ge=1, le=100, description="None uses the fleet's default cap.")
     traffic_reset_at: Timestamp | None = Field(default=None, description="When the current traffic period began.")
@@ -215,7 +216,7 @@ class UserUpdate(CoreModel):
 
     status: Literal["active", "disabled"] | None = None
     expire_at: Timestamp | None = None
-    traffic_limit_bytes: int | None = Field(default=None, ge=0)
+    traffic_limit_bytes: int | None = Field(default=None, ge=0, le=MAX_TRAFFIC_LIMIT_BYTES)
     traffic_limit_strategy: LimitStrategy | None = None
     device_limit: int | None = Field(default=None, ge=1, le=100)
 
@@ -232,7 +233,7 @@ class UserCreate(CoreModel):
     username: str = Field(pattern=rf"^{USERNAME_PATTERN}$")
     status: Literal["active", "disabled"] = "active"
     expire_at: Timestamp | None = None
-    traffic_limit_bytes: int = Field(default=0, ge=0)
+    traffic_limit_bytes: int = Field(default=0, ge=0, le=MAX_TRAFFIC_LIMIT_BYTES)
     traffic_limit_strategy: LimitStrategy = "no_reset"
     device_limit: int | None = Field(default=None, ge=1, le=100)
 

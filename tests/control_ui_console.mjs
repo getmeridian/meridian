@@ -56,5 +56,30 @@ if (mode === 'servers') {
   report.badges = [...view.querySelectorAll('.server-badges .pill')].map(el => el.textContent);
 }
 
+if (mode === 'quota') {
+  const fields = M.limitFields(data.user || null);
+  const form = M.h('form', { novalidate: true }, fields.nodes);
+  view.appendChild(form);
+  const changes = [];
+  form.addEventListener('submit', (event) => { event.preventDefault(); changes.push(fields.value()); });
+  await settle();
+  if (fields.mode) {
+    fields.mode.value = data.mode;
+    fields.mode.dispatchEvent(new w.Event('change'));
+  }
+  if (fields.unit) {
+    fields.unit.value = data.unit;
+    fields.unit.dispatchEvent(new w.Event('change'));
+  }
+  fields.gb.value = data.amount;
+  fields.gb.dispatchEvent(new w.Event('input'));
+  form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  report.change = changes[0] || null;
+  report.error = fields.gb.validationMessage || '';
+  report.invalid = fields.gb.getAttribute('aria-invalid') === 'true';
+  report.disabled = fields.gb.disabled;
+  report.units = fields.unit ? [...fields.unit.options].map(option => option.value) : [];
+}
+
 process.stdout.write(JSON.stringify(report));
 dom.window.close();

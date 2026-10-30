@@ -6,7 +6,8 @@
   var M = (window.M = window.M || {});
   var h = M.h;
   var USERNAME = /^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\.\.[A-Za-z0-9_.-]{1,62})$/;  // models.USERNAME_PATTERN
-  var GB = 1e9;
+  var GIB = 1024 * 1024 * 1024;
+  var QUOTA_UNITS = { GiB: GIB, TiB: GIB * 1024 };
 
   M.displayName = function (username) {
     var names = (M.state.fleet && M.state.fleet.display_names) || {};
@@ -98,31 +99,92 @@
       }, function (e) { M.mount(list, h("div", { class: "notice notice-err", text: M.errorText(e) })); });
   };
 
-  /* A byte limit as the GB field's text, unrounded: a CLI quota of 4 MB once showed as 0, which saves as unlimited. */
+  /* Keep the person screen's existing helper name; amounts are now binary GiB, unrounded. */
   M.gbText = function (bytes) {
-    return bytes ? String(bytes / GB) : "";
+    return bytes ? String(bytes / GIB) : "";
   };
+
+  function quotaBytes(text, unit) {
+    var normalized = text.trim().replace(/[۰-۹٠-٩]/g, function (digit) {
+      var code = digit.charCodeAt(0);
+      return String(code >= 1776 ? code - 1776 : code - 1632);
+    }).replace(/٫/g, ".");
+    var match = /^(\d+)(?:\.(\d+))?$/.exec(normalized);
+    if (!match || normalized.length > 64 || !M.has(QUOTA_UNITS, unit)) return { error: "people.limit_invalid" };
+    var fraction = match[2] || "";
+    var numerator = BigInt(match[1] + fraction) * BigInt(QUOTA_UNITS[unit]);
+    var denominator = BigInt(10) ** BigInt(fraction.length);
+    var bytes = numerator / denominator;
+    var remainder = numerator % denominator;
+    // Match Decimal's ROUND_HALF_EVEN in core.client_limits, including half-byte inputs.
+    if (remainder * BigInt(2) > denominator || (remainder * BigInt(2) === denominator && bytes % BigInt(2))) bytes++;
+    if (bytes < BigInt(1)) return { error: "people.limit_invalid" };
+    // JSON numbers must preserve every byte. Larger existing CLI limits stay untouched on unrelated edits.
+    if (bytes > BigInt(Number.MAX_SAFE_INTEGER)) return { error: "people.limit_too_large" };
+    return { bytes: Number(bytes) };
+  }
 
   /* Limits as a form block, shared by "add" and the person screen. With a person, `value()`
    * holds only what was edited, so saving another field never rewrites the limit. */
   M.limitFields = function (user) {
-    var gb = h("input", { type: "number", min: "0", step: "any", inputmode: "decimal",
+    var initialMode = user && user.traffic_limit_bytes ? "limited" : "unlimited";
+    var initialText = user ? M.gbText(user.traffic_limit_bytes) : "";
+    var mode = h("select", {},
+      h("option", { value: "unlimited", text: M.t("people.unlimited") }),
+      h("option", { value: "limited", text: M.t("people.limited") }));
+    mode.value = initialMode;
+    var unit = h("select", {}, Object.keys(QUOTA_UNITS).map(function (key) {
+      return h("option", { value: key, text: M.t("unit." + key.toLowerCase()) });
+    }));
+    unit.value = "GiB";
+    var gb = h("input", { type: "text", maxlength: "64", inputmode: "decimal", autocomplete: "off",
       value: user ? M.gbText(user.traffic_limit_bytes) : "" });
     var strategy = h("select", {},
       ["no_reset", "day", "week", "month"].map(function (s) {
         return h("option", { value: s, selected: user ? user.traffic_limit_strategy === s : s === "month",
           text: M.t("reset." + s) });
       }));
+    var amountField = M.field(M.t("people.limit_gb"), gb, M.t("people.limit_hint"));
+    var error = h("p", { class: "field-error", role: "alert", id: gb.id + "-error" });
+    gb.setAttribute("aria-describedby", error.id);
+    var nodes = h("div", { class: "grid-2 limit-fields" },
+      M.field(M.t("people.limit_mode"), mode), M.field(M.t("people.limit_unit"), unit),
+      h("div", {}, amountField, error), M.field(M.t("people.reset"), strategy));
+    function edited() { return mode.value !== initialMode || gb.value !== initialText || unit.value !== "GiB"; }
+    function validate() {
+      var unlimited = mode.value === "unlimited";
+      gb.disabled = unit.disabled = unlimited;
+      var parsed = unlimited || (user && !edited()) ? {} : quotaBytes(gb.value, unit.value);
+      var message = parsed.error ? M.t(parsed.error) : "";
+      if (gb.validity && gb.validity.badInput) message = M.t("people.limit_invalid");
+      gb.setCustomValidity(message);
+      gb.setAttribute("aria-invalid", message ? "true" : "false");
+      error.textContent = message;
+      return !message;
+    }
+    [gb, mode, unit].forEach(function (input) { input.addEventListener(input === gb ? "input" : "change", validate); });
+    validate();
+    // The person screen owns its submit handler. Install a capturing field guard after its form is built.
+    Promise.resolve().then(function () {
+      if (gb.form) gb.form.addEventListener("submit", function (event) {
+        if (validate()) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        gb.focus();
+        gb.reportValidity();
+      }, true);
+    });
     return {
       gb: gb,
+      mode: mode,
+      unit: unit,
       strategy: strategy,
-      nodes: h("div", { class: "grid-2" },
-        M.field(M.t("people.limit_gb"), gb, M.t("people.limit_hint")),
-        M.field(M.t("people.reset"), strategy)),
+      nodes: nodes,
       value: function () {
+        if (!validate()) throw new Error(error.textContent);
         var change = {};
-        if (!user || gb.value !== M.gbText(user.traffic_limit_bytes)) {
-          change.traffic_limit_bytes = Math.max(0, Math.round((parseFloat(gb.value) || 0) * GB));
+        if (!user || edited()) {
+          change.traffic_limit_bytes = mode.value === "unlimited" ? 0 : quotaBytes(gb.value, unit.value).bytes;
         }
         if (!user || strategy.value !== user.traffic_limit_strategy) change.traffic_limit_strategy = strategy.value;
         return change;

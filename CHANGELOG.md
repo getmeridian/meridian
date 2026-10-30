@@ -137,6 +137,7 @@ that dials out to it.
   yet” entries in English, Russian, Persian, and Chinese instead of empty documents.
 - Duplicate connection names and names matching automatic groups now receive
   readable, stable suffixes, keeping Mihomo proxy names and sing-box tags unique.
+- Console and CLI quotas now use binary GiB/TiB, with explicit Unlimited and field-level validation; API limits are bounded at signed 64-bit bytes, and the console refuses new amounts that JSON cannot represent exactly.
 - `check` now reports background enforcement and blob mirror failures with safe error codes and attempt times; service warnings are rate-limited and contain no exception text.
 - Fleet and node CLI rows now carry the control service's counted node traffic instead of always showing zero.
 - Server health now includes reported checks, core versions and uptime, memory, disk, and load; `fleet status` and `check` flag unhealthy runtimes and treat stale reports as unavailable evidence.
