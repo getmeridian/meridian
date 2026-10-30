@@ -27,12 +27,6 @@ from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE, B
 from meridian.control.command_models import CommandRequest, NodeCommandRecord, UserCutOffMutation
 from meridian.control.commands import COMMAND_TABLES, CommandLedger
 from meridian.control.cutoff import CutOffLedger
-from meridian.control.delivery_settings import (
-    client_routing,
-    save_client_routing,
-    save_update_interval_hours,
-    update_interval_hours,
-)
 from meridian.control.devices import DEVICES_TABLE, DeviceLedger, HeaderReader
 from meridian.control.enrollment import NodeAuthority
 from meridian.control.errors import ServiceError
@@ -61,6 +55,7 @@ from meridian.control.owner import UI_TABLES, OwnerAuth
 from meridian.control.periods import period_start
 from meridian.control.privacy import PRIVACY_TABLES, PrivacyLedger, read_privacy
 from meridian.control.revisions import APPLY_FENCE_TABLE, REVISIONS_TABLE, RevisionLedger
+from meridian.control.service_settings import read_settings, save_settings
 from meridian.control.store import Store
 from meridian.control.subscription_serving import serve_subscription
 from meridian.control.subscriptions import SubscriptionResponse
@@ -209,20 +204,10 @@ class ControlService:
         return self._store.conditions(*checks)
 
     def put_settings(self, settings: ServiceSettings) -> ServiceSettings:
-        with self._transaction():
-            self._set_meta("profile_title", settings.profile_title)
-            self._set_meta("public_url", settings.public_url)
-            save_update_interval_hours(self._store, settings.update_interval_hours)
-            save_client_routing(self._store, settings.client_routing)
-        return settings
+        return save_settings(self._store, settings)
 
     def settings(self) -> ServiceSettings:
-        return ServiceSettings(
-            profile_title=self._meta("profile_title") or "Meridian",
-            public_url=self._meta("public_url") or "",
-            update_interval_hours=update_interval_hours(self._store),
-            client_routing=client_routing(self._store),
-        )
+        return read_settings(self._store)
 
     def privacy(self) -> PrivacySettings:
         return read_privacy(self._store)
