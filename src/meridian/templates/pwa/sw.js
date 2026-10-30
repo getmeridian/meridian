@@ -2,7 +2,7 @@
 var CACHE_VERSION = 'pwa-v1';
 var LEGACY = self.location.pathname.indexOf('/sub/~pwa/') === -1;
 var ASSET_BASE = new URL('./' + CACHE_VERSION + '/', self.location.href);
-var SHELL_ASSETS = ['styles.css', 'app.js', 'account.js', 'selfcheck.js', 'icon.svg', 'apps.json']
+var SHELL_ASSETS = ['styles.css', 'app.js', 'account.js', 'selfcheck.js', 'contact.js', 'icon.svg', 'apps.json']
   .map(function(name) { return ASSET_BASE.href + name; });
 
 self.addEventListener('install', function(event) {
@@ -36,7 +36,7 @@ self.addEventListener('fetch', function(event) {
   var url = new URL(request.url);
   if (LEGACY || request.method !== 'GET' || request.cache === 'no-store' ||
       url.origin !== ASSET_BASE.origin || url.pathname.indexOf(ASSET_BASE.pathname) !== 0 ||
-      url.pathname.endsWith('/probe.bin')) return;
+      url.pathname.endsWith('/probe.bin') || url.pathname.endsWith('/support.html')) return;
   event.respondWith(caches.match(request).then(function(cached) {
     if (cached) return cached;
     return fetch(request).then(function(response) {

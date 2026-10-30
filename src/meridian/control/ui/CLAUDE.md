@@ -1,6 +1,7 @@
 # control/ui — The owner's web console (M5, #95)
 
 ## Design decisions
+- Settings shows public owner instructions and the canonical link read-only with `meridian fleet contact`; it never writes the topology-owned presentation.
 - **New console tokens last 90 days by default** — Tokens offers 7, 30, 90 days or never, always sends the choice through the existing owner step-up, and shows expiry or an expired state alongside revocation metadata.
 - **People tokens** — after the usual owner step-up, Tokens can mint the separate people capability; it manages accounts and credentials, with the same declared-person remove/reissue guard as an owner session.
 - **Client routing is read-only** — Settings reads the service's `client_routing` (an omitted value is `ru-split`), explains the current policy, and prints `meridian fleet routing` to change it; owner sessions never write topology settings.

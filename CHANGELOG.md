@@ -6,6 +6,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+- Reviewed owner contact appears on connection and support pages in all four locales, uses a user-initiated HTTPS, Telegram, or email link, and supplies apps' support button. Short instructions can accompany inactive subscription remarks; longer ones stay on the pages.
+
 - People have private notes and one tag, editable through the people/admin API, `client set`, and the console. CLI reads show them and filter by tag; encrypted snapshots preserve them, and migration carries descriptions and valid tags with truncation notices.
 
 - Restart and client cut-off commands render service failures through their JSON error envelopes; terminal result-read errors report failed nodes instead of retryable timeouts.

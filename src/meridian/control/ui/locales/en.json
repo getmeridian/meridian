@@ -399,5 +399,8 @@
   "person.note_invalid": "Use plain text of at most 500 characters; newlines are allowed.",
   "person.tag": "Tag",
   "person.tag_hint": "1–16 uppercase letters A–Z, digits, or underscores. Leave blank to clear.",
-  "person.tag_invalid": "Use 1–16 uppercase letters A–Z, digits, or underscores, or leave blank."
+  "person.tag_invalid": "Use 1–16 uppercase letters A–Z, digits, or underscores, or leave blank.",
+  "settings.owner_contact": "Owner contact",
+  "settings.contact_none": "No contact instructions set",
+  "settings.contact_hint": "Change this public contact on your computer:"
 }

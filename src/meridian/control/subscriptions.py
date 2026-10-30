@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from urllib.parse import quote
 
 from meridian.control.formats.browser import NEVER_EXPIRES, not_found, subscription_info
+from meridian.control.formats.contact_remarks import contact_remarks
 from meridian.control.formats.entries import SubscriptionUser
 from meridian.control.formats.links import base64_document, links
 from meridian.control.formats.mihomo import mihomo_document
@@ -25,6 +26,7 @@ from meridian.control.formats.xray_json import xray_json_document
 from meridian.control.models import ClientEndpoint
 from meridian.control.periods import next_period_start
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS, SUPPORT_PAGE
+from meridian.core.owner_contact import OwnerContact
 from meridian.core.topology import ClientRoutingPolicy
 
 JSON_TYPE = "application/json; charset=utf-8"
@@ -66,9 +68,12 @@ def render_subscription(
     now: datetime | None = None,
     placeholder_remarks: tuple[str, ...] | None = None,
     extra_headers: dict[str, str] | None = None,
+    owner_contact: OwnerContact | None = None,
 ) -> SubscriptionResponse:
     """Render *document* for *user*; a suspended user's entries are status placeholders."""
     placeholders = user.placeholders if placeholder_remarks is None else placeholder_remarks
+    if owner_contact is not None and user.status != "active" and placeholder_remarks is None:
+        placeholders = contact_remarks(placeholders, owner_contact.text)
     moment = now or datetime.now(UTC)
     if document == "browser":
         info = subscription_info(
@@ -83,6 +88,7 @@ def render_subscription(
         profile_title=profile_title,
         public_url=public_url,
         update_interval_hours=update_interval_hours,
+        support_link=owner_contact.link if owner_contact is not None else "",
         now=moment,
     )
     headers.update(extra_headers or {})
@@ -115,6 +121,7 @@ def subscription_headers(
     public_url: str = "",
     update_interval_hours: int = SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
     now: datetime | None = None,
+    support_link: str = "",
 ) -> dict[str, str]:
     """The headers apps read: name, traffic and expiry, refresh interval, and page links."""
     headers = dict(COMMON_HEADERS)
@@ -127,7 +134,9 @@ def subscription_headers(
     headers["subscription-userinfo"] = (
         f"upload=0; download={user.used_bytes}; total={user.limit_bytes}; expire={expire}"
     )
-    if public_url:
+    if support_link:
+        headers["support-url"] = support_link
+    elif public_url:
         headers["support-url"] = f"{public_url}/{SUPPORT_PAGE}#{quote(user.short_id, safe='')}"
     headers["profile-title"] = "base64:" + base64.b64encode(profile_title.encode("utf-8")).decode("ascii")
     if public_url:

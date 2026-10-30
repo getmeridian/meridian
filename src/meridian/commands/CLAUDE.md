@@ -1,6 +1,7 @@
 # commands — One module per subcommand
 
 ## Design decisions
+- `fleet contact --text/--link` reviews and applies only the delivery contact edit, preserves omitted fields, supports explicit clearing, and requires --yes for JSON changes; exact JSON paths preserve public contact values in export/import reviews.
 - `client set --note TEXT --tag TAG` edits service-owned metadata with limits in one PATCH; `--note ""` and `--tag none` clear, while uppercase `NONE` remains a tag. Client reads include console people and `client list --tag` filters before status counts.
 - **People needing attention** — `client list --attention` reads the service's derived warnings in the same panel connection, includes console people, filters its status counts, and labels each row's reasons; ordinary lists keep empty derived reasons.
 - **Local timeline** — `fleet events --since ID --limit N` reads oldest-first lifecycle facts from the service's read-scoped cursor API; the Fleet help group's Activity panel and typed `fleet-events` envelope expose the same contract.

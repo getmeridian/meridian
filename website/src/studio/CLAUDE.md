@@ -15,6 +15,7 @@
 **Guided cockpit UX** — one task per screen; the journey rail, contextual help, and native `<dialog>` command sheet replace always-visible JSON/CLI panels.
 
 ## What's done well
+- Generated delivery and contact models retain the optional public contact and canonical-link constraints from Python; Studio does not define another presentation contract.
 - Generated person contracts preserve private metadata bounds and scoped-read descriptions without embedding operator data in Studio assets.
 
 - Every module is `// @ts-check` with JSDoc types from `generated/`, so `astro check` catches undefined names and wire-type drift.

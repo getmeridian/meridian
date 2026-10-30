@@ -154,6 +154,7 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
             renamed[logical_id] = SERVICE_SETTINGS_ID
             replacements[SERVICE_SETTINGS_ID] = (
                 ServiceSettingsPayload(
+                    owner_contact=intent.delivery.owner_contact,
                     profile_title=payload.profile_title,
                     update_interval_hours=payload.update_interval_hours,
                     client_routing=payload.client_routing,

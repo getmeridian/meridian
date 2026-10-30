@@ -40,3 +40,9 @@ Your app lists several entries, named by country and method, such as "🇩🇪 D
 3. **Check your device's clock.** A clock that is off by more than a minute can make connections fail; turn on automatic date and time.
 4. **Run the connection check.** Turn your VPN app off so the check sees your real network. Open your connection page, expand **Not connecting?** and **Check my connection**, and tap **Run check**. Then tap **Copy report** and send it to the person who gave you the link; the report contains no links or keys.
 5. **Ask for help.** If the connection page itself no longer opens, your network may be blocking the server. Tell the person who runs it; [recovering from a block](/en/recovery/) is part of their job, and your app picks up the new route on its next refresh.
+
+## Contact the owner
+
+Your connection page's **Not connecting?** section may include the owner's instructions and a **Contact owner** button. Use it when access has expired, the traffic allowance is used up, or the connection check still leaves you stuck. The button opens the owner's chosen website, messaging app, or email app after you click it.
+
+An app's support button may open the same contact link. If it opens a Meridian support page instead, follow the owner's instructions there or choose **Open connection page**. These instructions are provided by the person who runs your connection.

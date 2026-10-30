@@ -29,6 +29,7 @@ from meridian.core.inputs import (
     validate_domain_suffix_value,
 )
 from meridian.core.models import CoreModel
+from meridian.core.owner_contact import OwnerContactSettings
 
 ServerCapability = Literal["panel", "exit", "relay", "routing_gateway"]
 # route: through an exit or pool; direct: out of the gateway's own address; block: dropped.
@@ -368,7 +369,7 @@ def _accepted_username(name: str) -> bool:
     return True
 
 
-class DeliveryIntent(CoreModel):
+class DeliveryIntent(OwnerContactSettings):
     """Canonical Remnawave subscription presentation settings."""
 
     profile_title: ServerTitleValue = "Meridian"

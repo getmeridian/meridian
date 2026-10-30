@@ -5,10 +5,10 @@ from __future__ import annotations
 from pydantic import Field
 
 from meridian.core.inputs import OptionalCountryCodeValue, OptionalPaletteValue
-from meridian.core.models import CoreModel
+from meridian.core.owner_contact import OwnerContactSettings
 
 
-class ConnectionPageSettings(CoreModel):
+class ConnectionPageSettings(OwnerContactSettings):
     """Branding is already normalized by the deployer; pages fetch no external images."""
 
     server_name: str = Field(default="", max_length=100, exclude_if=lambda value: not value)

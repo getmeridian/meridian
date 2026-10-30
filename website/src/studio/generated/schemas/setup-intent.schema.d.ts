@@ -31,6 +31,8 @@ export type Formats = [
   "base64" | "xray_json" | "mihomo" | "singbox",
   ...("base64" | "xray_json" | "mihomo" | "singbox")[]
 ];
+export type Link = string;
+export type Text = string;
 export type ProfileTitle = string;
 export type TemplateName = string;
 export type UpdateIntervalHours = number;
@@ -169,9 +171,17 @@ export interface ControlPlaneIntent {
 export interface DeliveryIntent {
   client_routing?: ClientRouting;
   formats?: Formats;
+  owner_contact?: OwnerContact;
   profile_title?: ProfileTitle;
   template_name?: TemplateName;
   update_interval_hours?: UpdateIntervalHours;
+}
+/**
+ * Optional public owner contact, chosen through reviewed delivery intent.
+ */
+export interface OwnerContact {
+  link?: Link;
+  text?: Text;
 }
 /**
  * An ordered set of exits used for server-side failover.

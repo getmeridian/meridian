@@ -29,7 +29,7 @@ const cases = {
     };
     vm.runInNewContext(fs.readFileSync('src/meridian/templates/pwa/sw.js', 'utf8'), context);
     for (const path of ['/sub/demo', '/sub/demo/config.json', '/sub/demo/manifest.webmanifest', '/sub/demo/info',
-      '/sub/~pwa/pwa-v1/probe.bin', '/private-console/']) {
+      '/sub/~pwa/pwa-v1/probe.bin', '/sub/~pwa/pwa-v1/support.html', '/private-console/']) {
       let intercepted = false;
       handlers.fetch({ request: { url: 'https://198.51.100.1/connect' + path, method: 'GET', cache: 'default' },
         respondWith: () => { intercepted = true; } });

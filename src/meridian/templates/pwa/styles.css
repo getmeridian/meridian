@@ -398,3 +398,8 @@ svg{flex-shrink:0}
 .install-routes{list-style:none;display:flex;flex-direction:column;gap:8px;font-size:.84rem;line-height:1.5}
 .install-routes a{display:block;min-height:36px;padding-block:6px;color:var(--accent);overflow-wrap:anywhere}
 @media (max-width:479px){.import-actions{grid-template-columns:1fr}.setup-pickers{gap:8px}}
+
+.owner-contact { margin: 20px 0; text-align: start; }
+.owner-contact h3 { margin: 0 0 8px; font-size: 1rem; }
+.owner-contact p { margin: 0 0 12px; overflow-wrap: anywhere; }
+.owner-contact .btn { width: auto; }

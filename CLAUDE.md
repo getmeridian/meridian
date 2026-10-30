@@ -99,6 +99,7 @@ Updating is part of the change, not a separate task. In the SAME commit:
 When in doubt: shorter is better. A 30-line CLAUDE.md that's current beats a 100-line one that's half-stale.
 
 ## Conventions
+- Public owner contact belongs to reviewed delivery intent; page and app links are chosen by the operator and open only on user action.
 
 - Private person notes and tags are operator-owned service data; scoped reads blank them below people/admin, and delivery, events, and logs never carry their contents.
 

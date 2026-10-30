@@ -1,4 +1,27 @@
 {
+  "$defs": {
+    "OwnerContact": {
+      "additionalProperties": false,
+      "properties": {
+        "link": {
+          "default": "",
+          "maxLength": 2048,
+          "pattern": "^(?:|https://[^\\s]+|tg://[^\\s]+|mailto:[^\\s]+)$",
+          "title": "Link",
+          "type": "string"
+        },
+        "text": {
+          "default": "",
+          "maxLength": 120,
+          "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]*$",
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "title": "OwnerContact",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
   "description": "Canonical Remnawave subscription presentation settings.",
   "properties": {
@@ -25,6 +48,10 @@
       "minItems": 1,
       "title": "Formats",
       "type": "array"
+    },
+    "owner_contact": {
+      "$ref": "#/$defs/OwnerContact",
+      "description": "Optional public owner contact, chosen through reviewed delivery intent."
     },
     "profile_title": {
       "default": "Meridian",

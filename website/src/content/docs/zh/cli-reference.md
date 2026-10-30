@@ -314,6 +314,7 @@ meridian fleet history [--json]
 meridian fleet events [--since ID] [--limit N] [--json]
 meridian fleet usage [--days N] [--json]
 meridian fleet routing [ru-split|full] [--dry-run] [--yes] [--json]
+meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -351,6 +352,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 **`fleet import`** — 读取编辑后的文件（或用 `-` 从标准输入读取），每处变更一行：`+` 表示添加，`-` 表示删除，`~` 表示修改字段（`~ exit-2 sni www.example.com -> www.example.org`）。随后列出变更将删除的每个资源和审查哈希，询问确认，并像 `apply` 一样只应用这次审查。未编辑的文件会输出“没有变更”。从 `access.users` 中删除客户端等同于 `client remove`：其订阅 URL 和连接页面不再可用。添加客户端等同于 `client add`，控制服务自动提供其连接页面；用 `client show NAME` 查看链接。新的伪装 SNI 会经过与 `node sni` 相同的检查。导入会拒绝：其他 `schema`、未保存的服务器（用 `meridian server add` 保存）、文件中的传输路径、对控制服务器及其域名或后端的更改、删除或重命名控制服务器上的出口，以及把出口移到另一台服务器（请用 `node replace`）。密钥和凭据保持不变。没有终端时请传入 `--yes`；`--dry-run` 只显示变更和审查结果，不应用任何内容。
 
 **`fleet usage`** — 显示每台服务器每个 UTC 天的总字节数，包括已删除服务器仍在保留期内的用量。`--days N` 选择保留期内 1–730 天。每日历史须开启；JSON 在 `data` 中返回服务器组总量和 `nodes[].daily`。
+
+**`fleet contact`** — 显示或审阅公开的所有者联系信息。`--text TEXT` 指定一行纯文本（最多 120 个字符），`--link LINK` 指定规范化的 `https:`、`tg:` 或 `mailto:` 链接。未指定的字段保持原值；`--text ""` 和 `--link none` 清除它们。`--dry-run` 返回审阅结果；没有终端或使用 `--json` 更改时需要 `--yes`。JSON 返回 `data.owner_contact`、审阅及应用结果。控制台只读显示联系信息，服务器导出/导入会保留 `delivery.owner_contact`。页面提供说明和由用户主动打开的链接；应用将其用于支持按钮。参见[所有者联系信息](/zh/client-management/)。
 
 ### meridian context
 

@@ -41,7 +41,11 @@ function reply(body, status = 200) {
     text: () => Promise.resolve(JSON.stringify(body)) };
 }
 w.fetch = (url, options) => {
+  options = options || {};
   events.push({ method: options.method, url, headers: options.headers, at: fakeNow });
+  if (mode === 'owner-settings') {
+    return Promise.resolve(reply(url === 'api/settings' ? { profile_title: 'Meridian', owner_contact: data.contact } : { sessions: [] }));
+  }
   if (mode === 'metadata') {
     if (options.method !== 'GET') {
       const change = JSON.parse(options.body);
@@ -245,6 +249,64 @@ if (mode === 'metadata') {
     report.error = note.validationMessage || tag.validationMessage;
   }
   report.writes = writes;
+}
+
+if (mode === 'owner-page') {
+  const { createBrowser } = require(path.resolve('tests/support/pwa_browser.cjs'));
+  const browser = createBrowser(data.config, data.catalog, { language: locale });
+  if (fs.existsSync('src/meridian/templates/pwa/contact.js')) browser.load('contact.js');
+  await browser.start();
+  const holder = browser.document.getElementById('owner-contact');
+  const link = holder?.querySelector('a');
+  report.text = holder?.textContent || '';
+  report.contactLink = link?.getAttribute('href') || '';
+  report.rel = link?.getAttribute('rel') || '';
+  report.target = link?.getAttribute('target') || '';
+  report.dir = browser.document.documentElement.dir;
+  report.injected = !!holder?.querySelector('img') || !!browser.context.pwned;
+  report.externalRequests = browser.requests.filter(request => new URL(request.url, browser.context.location.href).origin !== browser.context.location.origin);
+}
+
+if (mode === 'owner-support') {
+  const pageDir = path.resolve(ui, '../../templates/pwa');
+  const support = new JSDOM(fs.readFileSync(path.join(pageDir, 'support.html'), 'utf8'), {
+    url: 'https://198.51.100.1/connect/sub/~pwa/pwa-test/support.html#sampleShortUuid00', runScripts: 'outside-only',
+  });
+  const sw = support.window;
+  sw.localStorage.setItem('meridian-lang', locale);
+  const holder = sw.document.getElementById('owner-contact');
+  if (holder) {
+    holder.setAttribute('data-owner-text', data.contact.text);
+    holder.setAttribute('data-owner-link', data.contact.link);
+  }
+  const requested = [];
+  sw.fetch = url => { requested.push(url); return Promise.reject(new Error('No requests expected')); };
+  if (fs.existsSync(path.join(pageDir, 'contact.js'))) sw.eval(fs.readFileSync(path.join(pageDir, 'contact.js'), 'utf8'));
+  sw.eval(fs.readFileSync(path.join(pageDir, 'support.js'), 'utf8'));
+  await settle();
+  const link = holder?.querySelector('a');
+  report.text = holder?.textContent || '';
+  report.contactLink = link?.getAttribute('href') || '';
+  report.rel = link?.getAttribute('rel') || '';
+  report.target = link?.getAttribute('target') || '';
+  report.pageLink = sw.document.getElementById('open-page')?.getAttribute('href') || '';
+  report.dir = sw.document.documentElement.dir;
+  report.injected = !!holder?.querySelector('img') || !!sw.pwned;
+  report.externalRequests = requested;
+  sw.close();
+}
+
+if (mode === 'owner-settings') {
+  M.privacySection = M.cliHint = () => M.h('section');
+  M.i18n = { ...M.i18n, langs: [locale], names: { [locale]: locale }, lang: locale };
+  M.state.auth = { passkeys: { reason: 'no_domain' } };
+  w.eval(fs.readFileSync(path.join(ui, 'settings.js'), 'utf8'));
+  M.renderSettings(view);
+  await settle();
+  const fleet = view.querySelector('.card');
+  report.text = fleet.textContent;
+  report.controls = fleet.querySelectorAll('input,button,select,textarea,form').length;
+  report.injected = !!fleet.querySelector('img[src="x"]') || !!w.pwned;
 }
 
 if (mode.startsWith('live-')) {

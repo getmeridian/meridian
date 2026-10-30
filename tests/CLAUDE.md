@@ -30,6 +30,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - **RFC 5737 IPs** — always `198.51.100.x` for test data, never real IPs.
 
 ## Pitfalls
+- Owner contact tests cover reviewed-hash applies, export/import, delivery rollback, all placeholder parsers and remark bounds, locale/RTL rendering, active-link guards, and support HTML bypassing worker caches.
 - Fixtures rewinding before step 15 drop `users.note` and `users.tag`; metadata coverage checks empty lower-scope reads, snapshot restoration, content-free events, and edited-field-only console PATCHes.
 - Console DOM scenarios make the document visible (`pretendToBeVisual` in jsdom); Servers and People defer their requests while hidden.
 - **Traffic period clocks** — pin both service and ledger UTC clocks and the injected registry clock; a fixture that set resets with wall time while asserting a fixed midnight failed as soon as the date changed. Match aligned labels by content, not an exact number of spaces.

@@ -399,5 +399,8 @@
   "person.note_invalid": "请使用纯文本，最多 500 个字符，支持换行。",
   "person.tag": "标签",
   "person.tag_hint": "1–16 个大写字母 A–Z、数字或下划线；留空清除。",
-  "person.tag_invalid": "请使用 1–16 个大写字母 A–Z、数字或下划线，或留空。"
+  "person.tag_invalid": "请使用 1–16 个大写字母 A–Z、数字或下划线，或留空。",
+  "settings.owner_contact": "所有者联系信息",
+  "settings.contact_none": "尚未设置联系说明",
+  "settings.contact_hint": "在自己的电脑上更改此公开联系信息："
 }

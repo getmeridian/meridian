@@ -44,8 +44,10 @@ from meridian.servers import ServerRegistry
 
 EXPORT_COMMAND = "fleet.export"
 IMPORT_COMMAND = "fleet.import"
-# A pool's probe URL is configuration, not a secret link; JSON output keeps it whole.
-_REVEALED_KEYS = frozenset({"probe_url"})
+# Public configuration fields remain complete in the final export envelope.
+_REVEALED_KEYS = frozenset(
+    {"probe_url", "data.document.delivery.owner_contact.text", "data.document.delivery.owner_contact.link"}
+)
 _STYLES = {"add": "green", "remove": "red", "change": "yellow"}
 
 
@@ -269,6 +271,12 @@ def _emit_result(
     if not is_json_mode():
         return
     status: OutputStatus = "changed" if changed else "no_changes" if not result.changes else "ok"
+    contact_paths = frozenset(
+        f"data.changes.{index}.{field}"
+        for index, change in enumerate(result.changes)
+        if change.subject == "delivery" and change.field == "owner_contact"
+        for field in ("before", "after")
+    )
     emit_json(
         command_envelope(
             command=IMPORT_COMMAND,
@@ -278,7 +286,8 @@ def _emit_result(
             exit_code=3 if warnings else 0,
             warnings=warnings or None,
             timer=operation.timer,
-        )
+        ),
+        reveal=_REVEALED_KEYS | contact_paths,
     )
 
 

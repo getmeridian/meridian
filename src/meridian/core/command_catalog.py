@@ -316,6 +316,19 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         outcomes=[_ok("the fleet document was exported"), *_FAILURES],
         stability="preview",
     ),
+    "fleet.contact": CommandOutput(
+        data_schema="fleet-contact",
+        outcomes=[
+            _ok("the current owner contact was read"),
+            _ok("the contact is unchanged", status="no_changes"),
+            _ok("dry run: the contact change was reviewed"),
+            _ok("the reviewed contact was applied", status="changed"),
+            _user("invalid contact or confirmation missing"),
+            _system("review, apply, or local-state failure"),
+            _BUG,
+        ],
+        stability="preview",
+    ),
     "fleet.routing": CommandOutput(
         data_schema="fleet-routing",
         outcomes=[

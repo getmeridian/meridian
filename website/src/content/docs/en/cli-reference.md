@@ -314,6 +314,7 @@ meridian fleet history [--json]
 meridian fleet events [--since ID] [--limit N] [--json]
 meridian fleet usage [--days N] [--json]
 meridian fleet routing [ru-split|full] [--dry-run] [--yes] [--json]
+meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -351,6 +352,8 @@ The `active` column counts people with growth in the last report, with its colle
 **`fleet import`** — reads an edited file (or `-` for standard input) and shows what it changes, one line each: `+` adds, `-` removes, and `~` changes a field (`~ exit-2 sni www.example.com -> www.example.org`). It then lists every resource the change deletes and the review hash, asks, and applies exactly that review, like `apply`. A file with no edits prints "No changes". Removing a client from `access.users` removes them like `client remove`: their subscription URL and connection page stop responding. Adding one creates them like `client add` and the service serves their page automatically; `client show NAME` prints their links. New camouflage SNIs get the checks `node sni` runs. Import refuses another `schema`, a server you haven't saved (save it with `meridian server add`), transport paths in the file, changes to the control server, its domain, or its backend, removing or renaming the exit on the control server, and moving an exit to another server (use `node replace`). Keys and credentials stay as they are. Without a terminal, pass `--yes`; `--dry-run` shows the changes and the review without applying anything.
 
 **`fleet usage`** — shows per-server byte totals for each UTC day, including retained use of removed servers. `--days N` chooses 1–730 days within retention. Daily history must be on; JSON returns fleet totals and `nodes[].daily` in `data`.
+
+**`fleet contact`** — reads or reviews public owner contact. Use `--text TEXT` for one line of plain text (up to 120 characters) and `--link LINK` for a canonical `https:`, `tg:`, or `mailto:` link. Omitted fields stay unchanged; `--text ""` and `--link none` clear them. `--dry-run` returns the review; a change without a terminal or with `--json` requires `--yes`. JSON returns `data.owner_contact`, the review, and the apply when present. The console shows the contact read-only, and fleet export/import carries `delivery.owner_contact`. The pages show the instructions and a user-initiated link; apps use that link for their support button. See [Owner contact](/en/client-management/#owner-contact-on-connection-pages).
 
 ### meridian context
 

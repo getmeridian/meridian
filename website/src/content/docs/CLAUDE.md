@@ -1,6 +1,7 @@
 # content/docs — Markdown documentation source
 
 ## Design decisions
+- Client and connecting guides explain reviewed public owner contact, user-initiated support links, explicit clearing, and bounded inactive remarks in every locale.
 - Client guides document private notes/tags, explicit clearing, tag filters, people/admin scope, snapshots, and migration bounds in all four locales.
 **Client routing policy** — split-routing.md documents reviewed `ru-split | full`, private/LAN and best-effort Xray BitTorrent bypasses, format limits, subscription refresh, read-only console settings, and separate exit geo-blocking in every locale.
 

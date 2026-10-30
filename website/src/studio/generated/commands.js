@@ -1245,6 +1245,85 @@ export const commandCatalog = {
     {
       "argv": [
         "fleet",
+        "contact"
+      ],
+      "command": "fleet.contact",
+      "data_schema": "fleet-contact",
+      "description": "Show or review the owner's public contact for connection pages and apps",
+      "envelope_schema": "fleet-contact-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "the current owner contact was read; the contact is unchanged; dry run: the contact change was reviewed; the reviewed contact was applied",
+        "1": "unexpected Meridian bug",
+        "2": "invalid contact or confirmation missing",
+        "3": "review, apply, or local-state failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--text",
+        "--link",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "the current owner contact was read",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "the contact is unchanged",
+          "status": "no_changes"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "dry run: the contact change was reviewed",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "the reviewed contact was applied",
+          "status": "changed"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "invalid contact or confirmation missing",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "review, apply, or local-state failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "no_changes",
+        "changed",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "fleet",
         "events"
       ],
       "command": "fleet.events",

@@ -7,6 +7,7 @@ import json
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
+from meridian.core.owner_contact import OwnerContact
 from meridian.models import ProtocolURL
 
 if TYPE_CHECKING:
@@ -551,6 +552,7 @@ def render_config_json(
     color: str = "",
     subscription_url: str = "",
     exit_countries: list[str] | None = None,
+    owner_contact: OwnerContact | None = None,
 ) -> str:
     """Render per-client config.json for the PWA shell.
 
@@ -591,6 +593,8 @@ def render_config_json(
         config["color"] = color
     if exit_countries:
         config["exit_countries"] = exit_countries
+    if owner_contact is not None and not owner_contact.is_empty:
+        config["owner_contact"] = owner_contact.to_data()
     if subscription_url:
         from meridian.urls import generate_qr_base64
 

@@ -23,6 +23,8 @@
     var routingExplanation = h("p", { class: "muted small" });
     var routingCommand = h("code", { dir: "ltr" });
     var publicUrl = h("p", { class: "mono small link-text" });
+    var contactText = h("p", { class: "row-title", dir: "auto" });
+    var contactLink = h("p", { class: "mono small link-text", dir: "ltr" });
     var error = h("p", { class: "form-error", role: "alert" });
     M.api("GET", "api/settings").then(function (settings) {
       title.textContent = settings.profile_title;
@@ -31,6 +33,9 @@
       routingExplanation.textContent = M.t(policy === "full" ? "settings.routing_full" : "settings.routing_ru_split");
       routingCommand.textContent = "meridian fleet routing " + (policy === "full" ? "ru-split" : "full");
       publicUrl.textContent = settings.public_url || M.t("settings.no_public_url");
+      var contact = settings.owner_contact || {};
+      contactText.textContent = contact.text || M.t("settings.contact_none");
+      contactLink.textContent = contact.link || "";
     }, function (e) { error.textContent = M.errorText(e); });
     return h("section", { class: "card" },
       h("h2", { text: M.t("settings.fleet") }),
@@ -39,7 +44,9 @@
       h("p", { class: "label", text: M.t("settings.client_routing") }), routing, routingExplanation,
       h("p", { class: "muted small" }, M.t("settings.routing_hint"), " ", routingCommand), error,
       h("p", { class: "label", text: M.t("settings.public_url") }), publicUrl,
-      h("p", { class: "muted small", text: M.t("settings.public_url_hint") }));
+      h("p", { class: "muted small", text: M.t("settings.public_url_hint") }),
+      h("p", { class: "label", text: M.t("settings.owner_contact") }), contactText, contactLink,
+      h("p", { class: "muted small" }, M.t("settings.contact_hint"), " ", h("code", { dir: "ltr", text: "meridian fleet contact" })));
   }
 
   function appearanceCard() {

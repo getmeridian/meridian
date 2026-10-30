@@ -772,6 +772,8 @@ function renderPage(config) {
 
   app.innerHTML = html;
 
+  if (window.MeridianContact) window.MeridianContact.mount(document.getElementById('owner-contact'), config.owner_contact, currentLang);
+
   loadSelfCheck();
   requestWakeLock();
   applyI18n(config.client_name, config.server_name);
@@ -1127,6 +1129,7 @@ function renderTrouble() {
   html += '<span data-t="apps.update.desc">New versions fix connection problems and keep up with new blocking. Turn on automatic updates in your app store, or check the download page now and then.</span></li>';
   html += '<li data-t="ping.link">Ask the server owner to run meridian test.</li>';
   html += '</ul>';
+  html += '<div id="owner-contact" hidden></div>';
   html += '<div class="selfcheck">';
   html += '<p class="muted" data-t="selfcheck.desc">Runs three quick tests from this device and network: clock, data flow, and subscription. Turn your VPN off first so the test sees your real network.</p>';
   html += '<button class="btn btn-primary btn-block" data-action="selfcheck-run" data-t="selfcheck.run">Run check</button>';

@@ -18,6 +18,7 @@
 **Backups (#95)** — every device that manages a control-service fleet pulls an encrypted snapshot of the service after each change (`backup/`, format in `control/snapshot.py`), sealed to its own key and a recovery key printed once.
 **Workload secrets** — `reconciler/workloads.py` allocates or reuses complete Reality key triples and persists them before remote mutation; `xray_workload.py` renders only reviewed protocols and egress.
 ## What's done well
+- Owner contact stays in reviewed delivery presentation, flows through service settings, and remains complete in contact and fleet JSON views through exact public-field paths.
 - The access adapter carries the service's private note through the legacy `User.description` slot and its tag through `User.tag`; topology and apply payloads never own either field.
 - **Forward-compatible YAML** — unknown keys land inertly in `_extra` (never store load-bearing state there); `load_topology_cluster()` refuses pre-topology files with rebuild guidance.
 - **Applied kinds are explicit** — `core/resources.APPLIED_KINDS` lists what plan/apply drives; a leftover Remnawave binding is forgotten only by migrate's cut-over (`cutover.PANEL_SIDE_KINDS`) and fails closed anywhere else.

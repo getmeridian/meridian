@@ -27,6 +27,7 @@ from meridian.core.inputs import (
     is_ip,
 )
 from meridian.core.models import CoreModel
+from meridian.core.owner_contact import OwnerContactSettings
 from meridian.core.resources import ResourceKind as ResourceKind
 from meridian.core.topology import (
     DEFAULT_TLS_FINGERPRINT,
@@ -505,7 +506,7 @@ class ControlUserPayload(CoreModel):
     creation_settings: UserCreationSettings | None = Field(default=None, exclude_if=lambda settings: settings is None)
 
 
-class ServiceSettingsPayload(CoreModel):
+class ServiceSettingsPayload(OwnerContactSettings):
     kind: Literal["service_settings"] = "service_settings"
     profile_title: str
     exit_countries: list[OptionalCountryCodeValue] = Field(

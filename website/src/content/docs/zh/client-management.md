@@ -250,3 +250,19 @@ People 令牌无法删除服务器配置文件中声明的用户，也无法为�
 可以选择 **7、30 或 90 天**，或**永不过期**；控制台新令牌默认有效期为 90 天。列表会显示到期时间并标记已过期令牌。到期和撤销都会在下一次请求时返回相同的 `401 unauthenticated` 响应。现有令牌仍保持无到期时间。请像保护密码一样保护 people 令牌，因为它可以读取用户的连接凭据。
 
 `POST /api/tokens` 接受 1–3650 的 `expires_in_days`，或用 `null` 表示永不过期。省略该字段也表示永不过期。也可改为传入将来的 UTC 时间 `expires_at`；只能选择一个到期字段。响应总会包含 `TokenRecord.expires_at`，无到期时间时为 `null`。管理令牌需要 admin API 权限或控制台所有者会话；在控制台创建令牌还需要再次确认密码。People 令牌无法签发令牌。可通过 `meridian api schema NAME` 查看 `token-create`、`token-record`、`token-issued` 和 `token-list` 模式。
+
+## 连接页面上的所有者联系信息
+
+`meridian fleet contact` 显示已审阅的服务器配置中保存的联系信息。先审阅公开说明和联系链接：
+
+```bash
+meridian fleet contact --text "需要帮助时请联系我" --link mailto:help@example.com --dry-run --json
+meridian fleet contact --text "需要帮助时请联系我" --link mailto:help@example.com --yes
+meridian fleet contact --text "" --link none --yes
+```
+
+说明为一行纯文本，最多 120 个字符。链接只能使用 `https:`、`tg:` 或 `mailto:`；Meridian 会验证并规范化链接。两个字段相互独立：未指定的选项保留原值，`--text ""` 清除说明，`--link none` 清除链接。使用 JSON 更改时需要 `--yes`；试运行和拒绝确认都会保留原配置。导出和导入会保留 `delivery.owner_contact.text` 与 `delivery.owner_contact.link`。控制台设置显示联系信息及用于更改的 CLI 命令。
+
+连接页面的帮助区和支持页面会显示公开说明及 **联系所有者** 链接，并支持全部四种界面语言。链接仅在点击后打开；页面资源均在本地。当联系信息已设置时，支持页面会保持显示它，并提供 **打开连接页面**。应用通过 `support-url` 接收链接；没有链接时，该响应头保留本地支持页面的地址。个人连接页面地址保持不变。
+
+停用的订阅可将说明附加到状态提示，但所有提示都必须保持在 100 个字符以内。较长说明不会更改这些提示，仍会显示在页面上。

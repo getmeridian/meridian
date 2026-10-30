@@ -24,6 +24,7 @@
 - Control subscription delivery has its own renderer stamp, so a delivery fix also refreshes the deployed control service.
 
 ## Pitfalls
+- Apply the exact reviewed owner contact with all other delivery settings; changing its deployed header, placeholder, support HTML, or local assets bumps the control and PWA renderer stamps.
 
 - A control-user retirement with a saved cut-off deletes credentials and queues resets atomically; a retry keeps the flag, and 404 after a lost reply means the deletion already committed.
 - **First limits travel with the reviewed user** — `ControlUserPayload.creation_settings` uses atomic account creation; a lost reply resumes by observing existence, and every later apply preserves operator-owned settings instead of PATCHing them.

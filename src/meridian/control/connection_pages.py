@@ -59,6 +59,7 @@ class ConnectionPages:
             color=settings.color,
             subscription_url=canonical,
             exit_countries=settings.exit_countries,
+            owner_contact=settings.owner_contact,
             asset_path=f"{prefix}/sub/{ASSET_SEGMENT}/{assets.version}",
             page_path=page_path,
             worker_path=f"{prefix}/sub/{ASSET_SEGMENT}/sw.js",

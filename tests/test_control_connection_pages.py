@@ -131,7 +131,10 @@ def test_assets_need_no_token_and_use_content_versions(page_fleet: tuple[str, Co
     for name in names:
         asset = httpx.get(f"{url}/sub/~pwa/{version[1]}/{name}")
         assert asset.status_code == 200, name
-        assert "immutable" in asset.headers["cache-control"]
+        if name == "support.html":
+            assert asset.headers["cache-control"] == "no-store"
+        else:
+            assert "immutable" in asset.headers["cache-control"]
         assert person.sub_token not in asset.text
     browser = httpx.get(f"{url}/sub/{person.sub_token}", headers={"Accept": "text/html"})
     assert f"/connect/sub/~pwa/{version[1]}/app.js" in browser.text
