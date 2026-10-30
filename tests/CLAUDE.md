@@ -39,4 +39,5 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - **Stall retries keep their count, not their pauses** — an autouse fixture zeroes `stall_retry.STALL_DELAYS`, so a stubbed rc 124/255 observation runs five times; inject `StallRetry(delays=, sleep=)` to assert pauses.
 - **Privacy changes are transactional** — test downgrade/audit rollback, no-op writes, history-off gaps, UTC receipt days, owner step-up races, and enabled/off snapshot restoration.
 - **V4 command JSON** — validate compiled-resource plan/apply variants through their advertised envelopes, including terminal errors.
+- **Pin the service clock beside hard-coded dates** — user edits enforce at `meridian.control.service.utc_now()`; reset tests dated 2026-10-29/30 failed on the real 2026-10-30.
 - **Older-schema snapshots** — drop later columns as well as tables before rewinding `schema_version`; retaining a new column makes its migration fail spuriously.

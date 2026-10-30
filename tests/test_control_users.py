@@ -223,7 +223,11 @@ def test_raising_the_limit_or_resetting_traffic_makes_a_limited_user_active(serv
     ],
     ids=["day", "week-starts-monday", "month"],
 )
-def test_a_new_traffic_period_resets_use(service: ControlService, strategy: str, inside: str, next_period: str) -> None:
+def test_a_new_traffic_period_resets_use(
+    service: ControlService, monkeypatch: pytest.MonkeyPatch, strategy: str, inside: str, next_period: str
+) -> None:
+    # Edits enforce at the service's own clock; a real one inside `next_period`'s period hid the reset.
+    monkeypatch.setattr("meridian.control.service.utc_now", lambda: inside.replace("23:59:59", "00:00:01"))
     alice = service.put_user("alice")
     service.update_user("alice", UserUpdate(traffic_limit_bytes=1000, traffic_limit_strategy=strategy))  # type: ignore[arg-type]
     service.enforce(inside.replace("23:59:59", "00:00:01"))
@@ -234,7 +238,10 @@ def test_a_new_traffic_period_resets_use(service: ControlService, strategy: str,
     assert service.get_user("alice").used_traffic_bytes == 0  # type: ignore[union-attr]
 
 
-def test_traffic_arriving_after_midnight_counts_toward_the_new_day_and_limits_it(service: ControlService) -> None:
+def test_traffic_arriving_after_midnight_counts_toward_the_new_day_and_limits_it(
+    service: ControlService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("meridian.control.service.utc_now", lambda: "2026-10-29T00:00:01Z")
     alice = service.put_user("alice")
     service.update_user("alice", UserUpdate(traffic_limit_bytes=1000, traffic_limit_strategy="day"))
     service.enforce("2026-10-29T00:00:01Z")
