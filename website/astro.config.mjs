@@ -63,7 +63,7 @@ export default defineConfig({
     dropContributorNotes,
     starlight({
       title: 'Meridian',
-      description: 'Deploy censorship-resistant proxy servers with one command, hardened by default.',
+      description: 'Deploy a self-hosted VPN server with a built-in web panel and one-tap connection pages.',
       logo: { src: './src/assets/logo.png', alt: '' },
       favicon: '/favicon.svg',
       defaultLocale: 'en',

@@ -2,24 +2,24 @@ import type { LandingStrings } from './en';
 
 export const zh: LandingStrings = {
   // Page metadata
-  'page.title': 'Meridian — 抗审查代理，一键正确部署',
+  'page.title': 'Meridian — 自托管 VPN，一键正确部署',
   'page.description':
-    '一条命令即可部署加固后的 VLESS+Reality 代理服务器，并生成可分享的链接。开源。',
+    '一条命令即可部署加固后的 VLESS+Reality VPN 服务器，自带网页面板与可分享的连接页面。开源。',
   'page.ogAlt': 'Meridian：与你关心的人分享安全的互联网',
 
   // Hero
-  'hero.kicker': '开源互联网自由工具',
+  'hero.kicker': '开源自托管 VPN',
   'hero.title': '与你关心的人分享<em>安全的互联网</em>',
   'hero.sub':
-    '一条命令即可搭建一台难以与普通 HTTPS 区分的代理服务器，防火墙、TLS 和路由都已为你配置好。可通过链接或二维码分享访问权限。',
+    '一条命令即可将全新 VPS 部署为难以与普通 HTTPS 区分的加固 VPN 服务器，为你提供内置网页面板，并为每个人生成一键连接页面。',
   'hero.cta': '开始使用',
   'hero.docs': '阅读文档',
-  'hero.previewAlt': '连接页面——你的朋友收到的内容',
-  'hero.caption': '你的朋友收到的页面——<a href="/demo/">查看演示</a>',
+  'hero.previewAlt': '连接页面——每个人收到的内容',
+  'hero.caption': '每个人收到的页面——<a href="/demo/">试用连接页面</a> · <a href="/demo/console/">试用网页面板</a>',
 
   // How it works
   'setup.label': '工作原理',
-  'setup.title': '两条命令，得到可用的代理',
+  'setup.title': '两条命令，搭建可用的 VPN',
   'setup.desc':
     '你需要一台 Debian 或 Ubuntu 的 VPS（每月 5 美元的就够用）和电脑上的终端。其余由 Meridian 完成。',
   'setup.step1.label': '第 1 步——安装',
@@ -36,7 +36,7 @@ export const zh: LandingStrings = {
     '可放心重复运行。再次运行会保留凭证和密钥，并就地继续或更新部署。',
 
   // Behind-the-scenes timeline (title, then the text that follows it)
-  'step.1.title': '安装控制服务',
+  'step.1.title': '安装控制服务与网页面板',
   'step.1.text': '，以及运行 <strong>Xray</strong> 的节点 agent，无需 Docker 或第三方面板',
   'step.2.title': '生成 x25519 密钥对',
   'step.2.text': '——为 Reality 认证生成唯一的加密密钥',
@@ -64,7 +64,7 @@ export const zh: LandingStrings = {
   'builder.tab.doctor': '诊断',
   'builder.tab.teardown': '卸载',
   'builder.desc.deploy':
-    '在一台服务器上部署 Reality、XHTTP 和 Hysteria2。会配置控制服务、nginx、防火墙和 TLS。',
+    '在一台服务器上部署 Reality、XHTTP 和 Hysteria2。会配置控制服务、网页面板、nginx、防火墙和 TLS。',
   'builder.desc.relay':
     '在境内服务器上添加 TCP 中继，转发到境外的出口服务器。必须先部署出口服务器。',
   'builder.desc.check':
@@ -149,10 +149,10 @@ export const zh: LandingStrings = {
     'OpenVPN 和 WireGuard 的流量有可识别的特征。VLESS+Reality 连接与访问真实网站的普通 HTTPS 很难区分。',
   'tech.dpi': '深度包检测（DPI）',
   'tech.dpi.body':
-    '<p>DPI 通过分析流量模式来识别代理协议。OpenVPN 和 WireGuard 的握手很容易被识别和封锁。</p><p><strong>VLESS+Reality</strong> 运行在 443 端口上的标准 TLS 1.3 连接之内，因此 DPI 看到的是指向伪装站点的普通 HTTPS。每台服务器还提供 XHTTP 和 Hysteria2，所以一种方式被封锁时，其他方式仍可使用。</p>',
+    '<p>DPI 通过分析流量模式来识别 VPN 和代理协议。OpenVPN 和 WireGuard 的握手很容易被识别和封锁。</p><p><strong>VLESS+Reality</strong> 运行在 443 端口上的标准 TLS 1.3 连接之内，因此 DPI 看到的是指向伪装站点的普通 HTTPS。每台服务器还提供 XHTTP 和 Hysteria2，所以一种方式被封锁时，其他方式仍可使用。</p>',
   'tech.probe': '主动探测',
   'tech.probe.body':
-    '<p>审查者会主动连接可疑的服务器并尝试识别其指纹。如果服务器的响应与它声称的网站不一致，就会被封锁。</p><p><strong>Reality</strong> 借用真实网站的 TLS 身份：默认是托管在你服务器附近的网站，或 <code>www.google.com</code>。没有你的密钥的探测会被转发到该网站，看到的是它真实的证书。只有持有你的密钥的客户端才能获得代理隧道。</p>',
+    '<p>审查者会主动连接可疑的服务器并尝试识别其指纹。如果服务器的响应与它声称的网站不一致，就会被封锁。</p><p><strong>Reality</strong> 借用真实网站的 TLS 身份：默认是托管在你服务器附近的网站，或 <code>www.google.com</code>。没有你的密钥的探测会被转发到该网站，看到的是它真实的证书。只有持有你的密钥的客户端才能进入 VPN 隧道。</p>',
   'tech.fp': 'TLS 指纹识别',
   'tech.fp.body':
     '<p>每个 TLS 客户端都会发送独特的“Client Hello”指纹。如果指纹与其声称的应用不符，审查者就会将该连接标记出来。</p><p>客户端应用使用 <strong>uTLS</strong>，发送与 Chrome 相同的 Client Hello。Meridian 还会为每个 Reality 和 XHTTP 条目发布一份 Firefox 指纹的副本，因此一种指纹被标记时，另一种仍可使用。</p>',
@@ -160,24 +160,24 @@ export const zh: LandingStrings = {
   // Showcase
   'showcase.label': '看看效果',
   'showcase.title': '你和你的用户会得到什么',
-  'showcase.desc': '两个演示都在你的浏览器中运行，使用虚构数据。随意点击：一切都不是真的，也不会发送到任何地方。',
+  'showcase.desc': '每次部署都会为每个人生成专属连接页面，并为你配备内置网页面板。两个演示都在你的浏览器中运行，使用虚构数据：随意点击，一切都不会发送到任何地方。',
   'showcase.page.title': '连接页面',
-  'showcase.page.text': '每个人打开自己的页面：选择应用，一键添加连接，并查看自己的流量和剩余天数。',
+  'showcase.page.text': '每个人在浏览器中打开自己的订阅链接：选择平台与应用，一键或扫码导入连接，查看流量与到期时间，并阅读四种语言的简明帮助。',
   'showcase.page.try': '试用连接页面',
   'showcase.page.alt': '手机上的个人连接页面：选择应用，一键添加连接，然后连接',
-  'showcase.console.title': '管理控制台',
-  'showcase.console.text': '在任何浏览器中添加用户、分享链接和二维码、设置流量限额和到期时间，并随时查看服务器状态。',
-  'showcase.console.try': '试用管理控制台',
-  'showcase.console.alt': '管理控制台的用户列表：每个人的到期时间、最近在线时间、状态，以及相对于限额的流量',
-  'showcase.person': '单个用户：链接、二维码和连接页面。',
-  'showcase.servers': '服务器：健康状况、版本和每月流量额度。',
-  'showcase.settings': '隐私：两项功能默认关闭，每个选项都会说明它存储什么。',
+  'showcase.console.title': '网页面板',
+  'showcase.console.text': '运行 meridian panel 打开你的管理面板（管理控制台）。在任何浏览器中添加用户、分享链接和二维码、设置到期时间、流量限额与设备上限、记录私有备注与标签、发布全员通知，以及签发限定权限的 API 令牌。',
+  'showcase.console.try': '试用网页面板',
+  'showcase.console.alt': '网页面板的用户列表：每个人的到期时间、最近在线时间、状态，以及相对于限额的流量',
+  'showcase.person': '单个用户：链接与二维码、流量限额、到期时间、设备上限、私有备注与标签、重发链接或立即切断会话。',
+  'showcase.servers': '服务器：实时健康状况、Xray 版本、流量、每月流量额度与续费提醒。',
+  'showcase.settings': '隐私：从不记录客户端 IP，设备限制与每日用量历史默认关闭，并清楚说明存储内容。',
 
   // Connect
   'connect.label': '连接',
   'connect.title': '扫码即连',
   'connect.desc':
-    '部署完成后，你会得到一个带二维码的连接页面。把它发给需要的人，点一下即可连接。',
+    '部署完成后，每个人都会得到一个带二维码和一键导入按钮的连接页面。把链接发给需要的人，点一下即可连接。',
   'connect.apps.more':
     '连接页面会优先列出这些应用，并为每个平台提供其他应用的链接。<a href="/demo/">查看演示</a>。',
   'connect.clock':
@@ -190,7 +190,7 @@ export const zh: LandingStrings = {
     'Meridian 架构：nginx 按 SNI 将 TCP 443 路由到 Xray Reality、XHTTP 和连接页面；Hysteria2 监听 UDP 443',
   'arch.standalone': '独立模式（无域名）',
   'arch.standalone.body':
-    '<p><strong>nginx</strong> 占用 TCP 443 端口，并通过其 stream 模块按 TLS SNI 路由连接。Reality 连接交给 <strong>Xray</strong>。其余连接进入 nginx 的 http 模块，由它通过 HTTPS 提供连接页面、订阅和 XHTTP，使用的是为服务器 IP 签发的短期 Let\'s Encrypt 证书（由 acme.sh 签发）。<strong>Hysteria2</strong> 监听 UDP 443，并启用 salamander 混淆。</p><p>Meridian 的<strong>控制服务</strong>位于 nginx 后的一条秘密路径上：它保存你的用户、提供订阅，并提供可通过 HTTPS 直接访问的网页控制台，无需 SSH 隧道。每台服务器上的小型 agent 主动连接它，因此节点不会开放额外端口。</p>',
+    '<p><strong>nginx</strong> 占用 TCP 443 端口，并通过其 stream 模块按 TLS SNI 路由连接。Reality 连接交给 <strong>Xray</strong>。其余连接进入 nginx 的 http 模块，由它通过 HTTPS 提供连接页面、订阅和 XHTTP，使用的是为服务器 IP 签发的短期 Let\'s Encrypt 证书（由 acme.sh 签发）。<strong>Hysteria2</strong> 监听 UDP 443，并启用 salamander 混淆。</p><p>Meridian 的<strong>控制服务</strong>位于 nginx 后的一条秘密路径上：它保存你的用户、提供订阅，并通过 HTTPS 直接提供网页面板，无需 SSH 隧道。每台服务器上的小型 agent 主动连接它，因此节点不会开放额外端口。</p>',
   'arch.domain': '域名模式（CDN 备用）',
   'arch.domain.body':
     '<p>使用 <code>--domain</code> 时，nginx 会为你的域名获取 Let\'s Encrypt 证书，并将该 SNI 路由到域名对应的路径。XHTTP 移到域名上，并新增 <strong>VLESS+WSS</strong>。如果由 Cloudflare 代理该域名，两者都经由 CDN 传输，即使服务器 IP 被封锁也能继续使用。控制服务和连接页面仍使用 IP 证书。</p>',
@@ -201,6 +201,6 @@ export const zh: LandingStrings = {
   // Closing call to action
   'cta.title': '准备好开始了吗？',
   'cta.desc':
-    '安装 Meridian，部署到你的服务器，并与需要的人分享访问权限。一次部署通常需要 3 到 10 分钟。',
+    '安装 Meridian，部署你的 VPN 服务器，并与需要的人分享访问权限。一次部署通常需要 3 到 10 分钟。',
   'cta.install': '安装 Meridian',
 };

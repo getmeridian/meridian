@@ -111,17 +111,17 @@ const organization = {
       </div>
     </section>
 
-    <section id="builder-section" class="section section--band">
-      <div class="container">
-        <SectionHead eyebrow={t('builder.label')} title={t('builder.title')} desc={t('builder.desc')} />
-        <CommandBuilder locale={locale} />
-      </div>
-    </section>
-
-    <section id="demo" class="section">
+    <section id="demo" class="section section--band">
       <div class="container">
         <SectionHead eyebrow={t('showcase.label')} title={t('showcase.title')} desc={t('showcase.desc')} />
         <Showcase locale={locale} />
+      </div>
+    </section>
+
+    <section id="builder-section" class="section">
+      <div class="container">
+        <SectionHead eyebrow={t('builder.label')} title={t('builder.title')} desc={t('builder.desc')} />
+        <CommandBuilder locale={locale} />
       </div>
     </section>
 
