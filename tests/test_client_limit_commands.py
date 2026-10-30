@@ -230,6 +230,33 @@ def test_single_console_case_match_resolves_for_reads_and_service_owned_edits(
         }
 
 
+@pytest.mark.parametrize("command", ["enable", "disable", "set", "extend", "reset-traffic"])
+@pytest.mark.parametrize("scope", ["admin", "people"])
+def test_service_owned_mutations_resolve_padded_console_names_like_show(
+    command: str, scope: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from meridian.commands.client_limits import run_extend
+
+    commands = {
+        "enable": run_enable,
+        "disable": run_disable,
+        "set": lambda name: run_set(name, limit="50GB", reset=None, expires=None),
+        "extend": lambda name: run_extend(name, days="7"),
+        "reset-traffic": run_reset_traffic,
+    }
+    with _fleet(tmp_path, json_mode=True) as fleet:
+        fleet.create("BOB")
+        original = fleet.client.get_user("alice")
+        if scope == "people":
+            fleet.cluster.panel.api_token = fleet.client.create_token("People desk", "people").token
+        with patch("meridian.commands.client.resolve_page_url", return_value=PageResolution()):
+            run_show("  bob\t ")
+        assert _envelope(capsys, "client-show-envelope")["data"]["client"]["username"] == "BOB"
+        commands[command]("  bob\t ")
+        assert _envelope(capsys, f"client-{command}-envelope")["data"]["client"]["username"] == "BOB"
+        assert fleet.client.get_user("alice") == original
+
+
 def test_cli_removal_and_reissue_stay_with_declared_people(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     with _fleet(tmp_path, json_mode=True) as fleet:
         before = fleet.create("carol")

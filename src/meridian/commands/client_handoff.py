@@ -79,8 +79,8 @@ def resolve_client_name(
             return matches[0]
     if found is not None:
         return found
-    if console and re.fullmatch(USERNAME_PATTERN, name):
-        return name
+    if console and re.fullmatch(USERNAME_PATTERN, name.strip()):
+        return name.strip()
     try:
         validate_access_username_value(name)
     except ValueError:

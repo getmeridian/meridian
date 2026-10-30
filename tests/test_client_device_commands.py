@@ -157,6 +157,23 @@ def test_console_people_can_have_their_devices_removed_and_cleared_from_the_cli(
     assert result["data"]["removed"] == 1 and fleet.user_devices("a.b").count == 0
 
 
+@pytest.mark.parametrize("action", ["remove", "clear"])
+def test_device_mutations_resolve_padded_console_names_like_device_reads(
+    fleet: ControlClient, tmp_path: Path, capsys: pytest.CaptureFixture[str], action: str
+) -> None:
+    write_privacy(tmp_path / "control.db", PrivacySettings(device_limits="full"))
+    fleet.put_user("a.b")
+    register(fleet, "a.b", "device-00000001")
+    run_devices("  a.b\t ")
+    assert envelope(capsys, "client-devices-envelope")["data"]["count"] == 1
+    if action == "remove":
+        run_devices("  a.b\t ", remove="device-00000001")
+    else:
+        run_devices("  a.b\t ", clear=True)
+    result = envelope(capsys, "client-devices-envelope")
+    assert result["data"]["removed"] == 1 and fleet.user_devices("a.b").count == 0
+
+
 @pytest.mark.parametrize(
     "options",
     [{"remove": "device-00000001", "clear": True}, {"remove": "unsafe/id"}],

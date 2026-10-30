@@ -24,6 +24,7 @@
 - **`fleet upgrade` never mutates beside the plan** — it reads images (`diagnostics/images.py`) and each relay's running Realm (never the saved pin, which a failed upgrade leaves ahead), applies the unchanged intent (new pins ride the render contract), then runs the fleet `check`.
 
 ## Pitfalls
+- Trim console-name fallback validation after exact and ambiguous directory matches; mutation prechecks must accept the same padded names as client show.
 - SNI review advice reads the reviewed delivery refresh interval; fleets can override the six-hour default.
 - Client show prints period use, lifetime traffic, and the UTC period start separately; lifetime totals are available even while daily history is off.
 - `console.fail()` always exits (user=2, system=3, bug=1); entry points convert library `MeridianError`s with `fail(exc)`, or the user sees a traceback.
