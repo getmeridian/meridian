@@ -64,7 +64,7 @@ meridian client list --tag TRIAL_7
 meridian client set sample --note "" --tag none
 ```
 
-Notes are plain text of up to 500 characters and may contain newlines. Tags use 1–16 uppercase letters A–Z, digits, or underscores. Empty notes and `--tag none` clear the fields; omitted options preserve them. `client list` has a tag column, and `--tag none` finds people without a tag.
+Notes are plain text of up to 500 characters and may contain newlines. Tags use 1–16 Latin letters, digits, or underscores and are saved in uppercase (`family` becomes `FAMILY`). Empty notes and `--tag none` clear the fields; omitted options preserve them. `client list` has a tag column, and `--tag none` finds people without a tag.
 
 The console's person view edits the same fields. The API accepts `PATCH /api/users` with `username`, `note`, and `tag`, or `PATCH /api/users/NAME` without `username`. These fields require `people` or `admin` scope to read and edit; lower scopes receive empty strings. They live in the control service, ride encrypted snapshots with the person, and stay out of subscriptions, connection pages, events, and logs. Applies preserve operator edits. Migration carries Remnawave descriptions and valid tags, reporting descriptions truncated to 500 characters and invalid tags left behind.
 

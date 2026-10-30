@@ -449,7 +449,7 @@
   "client.connection_formats": "Ссылки на форматы подписки",
   "client.metadata_none": "Нет",
   "client.note_invalid": "Введите обычный текст длиной до 500 символов. Переносы строк разрешены.",
-  "client.tag_invalid": "Используйте 1–16 заглавных букв A–Z, цифр или подчёркиваний; none удаляет метку.",
+  "client.tag_invalid": "Метка: 1–16 латинских букв, цифр или знаков подчёркивания (сохраняется заглавными); none удаляет метку.",
   "client.set_options_hint": "Укажите --limit, --reset, --expires, --devices, --note, --tag или --language.",
   "client.settings_updated": "Настройки {name} обновлены.",
   "fleet_contact.text": "Указания",

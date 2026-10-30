@@ -221,6 +221,13 @@
         return code !== 10 && (code < 32 || code >= 127 && code <= 159 || code >= 55296 && code <= 57343);
       });
       var noteError = characters.length > 500 || invalidText ? M.t("person.note_invalid") : "";
+      var upper = tag.value.toUpperCase();
+      if (upper !== tag.value) {
+        // Tags are uppercase; typing `family` becomes FAMILY instead of an error.
+        var caret = tag.selectionStart;
+        tag.value = upper;
+        if (caret !== null && upper.length === Array.from(upper).length) tag.setSelectionRange(caret, caret);
+      }
       var tagError = /^[A-Z0-9_]{0,16}$/.test(tag.value) ? "" : M.t("person.tag_invalid");
       note.setCustomValidity(noteError);
       tag.setCustomValidity(tagError);

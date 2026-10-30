@@ -449,7 +449,7 @@
   "client.connection_formats": "Explicit subscription formats",
   "client.metadata_none": "None",
   "client.note_invalid": "Use a plain-text note of at most 500 characters; newlines are allowed.",
-  "client.tag_invalid": "Use 1–16 uppercase letters A–Z, digits, or underscores; none clears the tag.",
+  "client.tag_invalid": "Use 1–16 Latin letters, digits, or underscores (saved in uppercase); none clears the tag.",
   "client.set_options_hint": "Pass --limit, --reset, --expires, --devices, --note, --tag, or --language.",
   "client.settings_updated": "Updated settings for {name}.",
   "fleet_contact.text": "Instructions",

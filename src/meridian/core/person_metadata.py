@@ -53,8 +53,8 @@ def parse_note_option(value: str) -> str:
 
 
 def parse_tag_option(value: str) -> str:
-    """The CLI's explicit `none` clears a tag; uppercase `NONE` remains a valid tag."""
+    """The CLI's explicit `none` clears a tag; any other spelling is uppercased, so `NONE` remains a tag."""
     try:
-        return validate_person_tag("" if value == "none" else value)
+        return validate_person_tag("" if value == "none" else value.upper())
     except ValueError as exc:
         raise PersonMetadataError("tag", str(exc)) from exc

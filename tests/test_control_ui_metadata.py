@@ -33,7 +33,7 @@ def test_person_metadata_is_plain_text_localized_and_patches_only_edits(locale: 
     assert result["writes"] == [change]
 
 
-@pytest.mark.parametrize("change", [{"tag": "lowercase"}, {"note": "x" * 501}])
+@pytest.mark.parametrize("change", [{"tag": "A-B"}, {"note": "x" * 501}])
 def test_invalid_metadata_is_explained_before_submission(change: dict[str, str]) -> None:
     result = run_console(
         "metadata",
@@ -52,3 +52,16 @@ def test_invalid_metadata_is_explained_before_submission(change: dict[str, str])
     )
     assert result["writes"] == []
     assert result["error"]
+
+
+def test_a_lowercase_tag_is_saved_in_uppercase() -> None:
+    user = {
+        "username": "sample",
+        "status": "active",
+        "created_at": "2026-10-29T00:00:00Z",
+        "expire_at": None,
+        "traffic_limit_bytes": 0,
+        "traffic_limit_strategy": "no_reset",
+    }
+    result = run_console("metadata", "en", {"user": user, "change": {"tag": "family"}})
+    assert result["writes"] == [{"tag": "FAMILY"}]

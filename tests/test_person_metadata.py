@@ -20,6 +20,7 @@ from meridian.control.models import DeviceKeyCreate, ServiceSettings, UserUpdate
 from meridian.control.restore import stage_restored_database
 from meridian.control.service import SCHEMA_VERSION, ControlService
 from meridian.control.snapshot import decrypt_snapshot, generate_key_pair
+from meridian.core.person_metadata import parse_tag_option
 from meridian.core.schema import schema_model
 from tests.support.control_service import ADMIN_TOKEN, FLEET_ID, drop_person_metadata_schema, serve_control
 from tests.support.node_commands import command_node_spec
@@ -215,3 +216,13 @@ def test_migration_import_persists_metadata_and_retries_preserve_operator_edits(
         assert service.get_user("sample").note == NOTE
     finally:
         service.close()
+
+
+@pytest.mark.parametrize(
+    ("typed", "stored"),
+    [("family", "FAMILY"), ("Trial_2", "TRIAL_2"), ("none", ""), ("NONE", "NONE"), ("None", "NONE")],
+    ids=["lowercase", "mixed", "clears", "uppercase-none-is-a-tag", "capitalised-none-is-a-tag"],
+)
+def test_cli_tags_are_saved_in_uppercase(typed: str, stored: str) -> None:
+    """A demo's `--tag family` was refused, and the note sent in the same edit went with it."""
+    assert parse_tag_option(typed) == stored

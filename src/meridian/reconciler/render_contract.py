@@ -14,7 +14,7 @@ _RENDERER_MANIFEST = {
     "pwa": "operator-notices-v1",
     "control-service": "format-preview-v1",
     "control-api": "format-preview-v1",
-    "control-ui": "person-view-v5",
+    "control-ui": "tag-uppercase-v1",
     "firewall": "ufw-comment-v2",
     "nginx": "service-pages-v12",
     "realm": "neutral-systemd-musl-v3",

@@ -449,7 +449,7 @@
   "client.connection_formats": "پیوندهای قالب اشتراک",
   "client.metadata_none": "ندارد",
   "client.note_invalid": "یادداشت باید متن ساده و حداکثر ۵۰۰ نویسه باشد. رفتن به خط جدید مجاز است.",
-  "client.tag_invalid": "از ۱ تا ۱۶ حرف بزرگ A–Z، رقم یا زیرخط استفاده کنید؛ none برچسب را پاک می‌کند.",
+  "client.tag_invalid": "از ۱ تا ۱۶ حرف لاتین، رقم یا زیرخط استفاده کنید (با حروف بزرگ ذخیره می‌شود)؛ none برچسب را پاک می‌کند.",
   "client.set_options_hint": "یکی از گزینه‌های --limit، --reset، --expires، --devices، --note، --tag یا --language را وارد کنید.",
   "client.settings_updated": "تنظیمات {name} به‌روزرسانی شد.",
   "fleet_contact.text": "راهنما",

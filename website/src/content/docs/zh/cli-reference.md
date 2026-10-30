@@ -165,7 +165,7 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 已建立的 VLESS 会话可能在凭证撤销后继续存在。`client remove` 或 `client reissue` 的 **`--cut-off`** 会等待每个受影响节点应用不含旧凭证的版本，再重置相关入站。这些入站上的所有会话都会终止，包括其他用户的会话；他们会短暂重连。若入站 API 失败，会重启 Xray 并终止该节点上的所有 Xray 会话。此选项需主动启用，建议在链接泄露时使用。JSON 在 `data.cut_off` 中报告各节点的 `done`、`core_restart`、`failed` 或 `timed_out` 状态。最多等待五分钟；失败退出码为 `4`，超时为 `3`。删除在控制台中添加的用户时，控制台也提供此选项。
 
-私人字段：`client set NAME --note TEXT --tag TAG` 只更改指定的字段。备注最多 500 个纯文本字符，支持换行；`--note ""` 清除备注。标签使用 1–16 个大写字母 A–Z、数字或下划线；`--tag none` 清除标签。`client show` 显示这两个字段，`client list --tag TAG` 筛选标签列（`none` 选择没有标签的人）。读取和编辑需要 people/admin 权限。控制台编辑相同字段；应用配置保留它们，加密快照保存它们。参见[私人备注和标签](/zh/client-management/#私人备注和标签)。
+私人字段：`client set NAME --note TEXT --tag TAG` 只更改指定的字段。备注最多 500 个纯文本字符，支持换行；`--note ""` 清除备注。标签使用 1–16 个拉丁字母、数字或下划线，保存为大写；`--tag none` 清除标签。`client show` 显示这两个字段，`client list --tag TAG` 筛选标签列（`none` 选择没有标签的人）。读取和编辑需要 people/admin 权限。控制台编辑相同字段；应用配置保留它们，加密快照保存它们。参见[私人备注和标签](/zh/client-management/#私人备注和标签)。
 
 `client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` 解释格式选择及省略原因，不泄露凭据。User-Agent 最多 512 个 Unicode 字符，Accept 最多 256 个字符，均为单行临时输入。`--suffix` 强制使用现有格式 URL 后缀。JSON 返回 `subscription-preview`；API 为需要 read 权限的 `POST /api/subscription/preview`。
 

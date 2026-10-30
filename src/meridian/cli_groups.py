@@ -138,7 +138,7 @@ def client_set_cmd(
         None, "--note", metavar="TEXT", help='Private note, up to 500 characters; "" clears'
     ),
     tag: str | None = typer.Option(
-        None, "--tag", metavar="TAG", help="1–16 uppercase letters, digits, underscores; none clears"
+        None, "--tag", metavar="TAG", help="1–16 letters, digits, underscores (saved in uppercase); none clears"
     ),
     language: str | None = typer.Option(
         None, "--language", metavar="LANGUAGE", help="Subscription status language: en, ru, fa, zh, or default"
