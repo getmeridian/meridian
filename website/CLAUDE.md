@@ -43,6 +43,8 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 - **Diagram figures are always LTR** — an RTL page reorders the punctuation in labels like `(Realm)`.
 - **The landing video is a file, not an embed** — `public/video/` comes from `video/scripts/export.mjs`; keep `preload="none"` so only the poster loads, and never embed a player from another origin.
 - **The demo shim mirrors service shapes exactly** — `/info` byte counts are decimal strings and statuses upper case; numbers there made the page reject its own account panel.
+- **A demo link never reaches a real app** — the shim rewrites the subscription URL to the demo's origin (the account panel needs it), so app-import links (`data-import`, custom schemes) show a notice instead; letting "Add to Happ" through would make a visitor's VPN app fetch `getmeridian.org/demo/…`.
+- **Leave the `2099-12-31` expiry sentinel alone** — pages test for it literally; shifting it with the other dates turned "No expiry" into a date in 2100.
 - **Month-anchored demo dates move by whole months** — the shim shifts recorded timestamps by the time since generation, but `period_*`, `counting_since`, and `traffic_reset_at` keep their day of the month.
 - **Screenshots pin UTC and `en-US`** — the browser's own zone once showed in the person screen ("Your browser time zone") and moved the period start by an hour.
 - **Sharp is direct** — Astro image optimization must keep `sharp` as an explicit dependency.

@@ -42,6 +42,11 @@ def test_demo_mutations_preserve_current_contracts_and_reset_with_a_new_document
     assert result["notice"] == "Hello Luma"
     assert result["language"] == "zh"
     assert result["reissued"] and result["token_revoked"] and result["removed"]
+    assert result["guestReissued"], "a person added in the demo can be reissued twice"
+    assert result["velaLinks"] > 0, "enabling a disabled person shows working links, not placeholders"
+    assert result["week"] == 7 and result["serverDays"] == 7
+    assert result["historyRestarted"], "history turned off and on again starts empty instead of failing"
+    assert "user.enabled" in result["events"] and "user.updated" in result["events"]
     assert result["outside"] == result["nativeApi"] == result["errors"] == []
     reset = run_console("showcase-reset", data={"directory": str(demo)})
     assert reset["note"] != result["edited"]

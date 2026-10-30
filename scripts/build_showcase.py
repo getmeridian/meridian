@@ -24,7 +24,7 @@ sys.path[:0] = [str(ROOT / "src"), str(ROOT)]
 
 from meridian import __version__  # noqa: E402
 from meridian.control.enrollment import token_sha256  # noqa: E402
-from meridian.control.models import TokenCreate, UserCreate  # noqa: E402
+from meridian.control.models import TokenCreate, UserCreate, UserUpdate  # noqa: E402
 from meridian.control.route_catalog import API_ROUTES  # noqa: E402
 from meridian.control.route_types import path_pattern  # noqa: E402
 from meridian.control.server import ControlServer  # noqa: E402
@@ -72,6 +72,10 @@ def validate_recordings(responses: dict[str, Any]) -> None:
 
 def export_showcase(directory: Path) -> None:
     directory.mkdir(parents=True, exist_ok=True)
+    # A rerun (pnpm dev) must not keep an older asset version or person beside the new export.
+    for stale in ("console", "sub"):
+        shutil.rmtree(directory / stale, ignore_errors=True)
+    (directory / "index.html").unlink(missing_ok=True)
     with tempfile.TemporaryDirectory(prefix="meridian-showcase-state-") as state:
         now = datetime.now(UTC).replace(microsecond=0)
         service = ControlService(Path(state) / "control.db", fleet_id=FLEET_ID, version=__version__)
@@ -166,17 +170,26 @@ def write_recordings(directory: Path, client: httpx.Client, service: ControlServ
     record("api/users/DemoTemplate/devices")
     record("api/users/DemoTemplate/usage?days=30")
     record("api/users/DemoTemplate/cut-off")
-    # A second credential set carries correctly generated QR codes for reissue demonstrations.
-    rotations = {}
-    for name in PEOPLE:
+    # Disabled or over-limit people get placeholder links; record their working ones too, so
+    # enabling them in the demo shows real entries. A second credential set carries correctly
+    # generated QR codes for reissue demonstrations.
+    active_shares: dict[str, Any] = {}
+    rotations: dict[str, Any] = {}
+    for name in (*PEOPLE, "DemoTemplate"):
         initial_share = responses[f"GET ui/api/people/{name}/share"]
+        before = service.get_user(name)
+        assert before is not None
+        if before.status != "active":
+            service.update_user(name, UserUpdate(status="active", traffic_limit_bytes=0))
+            active_shares[name] = record(f"ui/api/people/{name}/share")
         service.reissue_user(name)
         user = service.get_user(name)
         assert user is not None
-        rotations[name] = {
-            "user": user.model_dump(mode="json"),
-            "share": record(f"ui/api/people/{name}/share"),
-        }
+        rotations[name] = {"user": user.model_dump(mode="json"), "share": record(f"ui/api/people/{name}/share")}
+        if before.status != "active":
+            status = "disabled" if before.status == "disabled" else "active"
+            service.update_user(name, UserUpdate(status=status, traffic_limit_bytes=before.traffic_limit_bytes))
+            service.enforce()
         responses[f"GET ui/api/people/{name}/share"] = initial_share
     validate_recordings(responses)
     console = directory / "console"
@@ -198,6 +211,7 @@ def write_recordings(directory: Path, client: httpx.Client, service: ControlServ
                 "page_person": PAGE_PERSON,
                 "responses": responses,
                 "rotations": rotations,
+                "active_shares": active_shares,
             },
             ensure_ascii=False,
             separators=(",", ":"),
@@ -232,7 +246,6 @@ def write_person_page(directory: Path, client: httpx.Client, token: str, info: d
             text = text.replace("<head>", "<head>" + adapter, 1)
         (person / name).write_text(text)
     (person / "info").write_text(json.dumps(info, ensure_ascii=False))
-    (person / "probe").write_bytes(b"0" * (96 * 1024))
 
 
 def main() -> None:

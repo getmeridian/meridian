@@ -100,6 +100,19 @@ if (mode === 'showcase-navigation') {
   await M.api('POST', 'api/users', { username: 'DemoGuest', expire_at: null, traffic_limit_bytes: 0, traffic_limit_strategy: 'no_reset' });
   await M.api('GET', 'api/users/DemoGuest/usage?days=7');
   await M.api('GET', 'api/users/DemoGuest/cut-off');
+  await M.api('POST', 'api/users/DemoGuest/reissue', {});
+  report.guestReissued = (await M.api('POST', 'api/users/DemoGuest/reissue', {})).username === 'DemoGuest';
+  await M.api('PATCH', 'api/users/Vela', { status: 'active' });
+  report.velaLinks = (await M.api('GET', 'ui/api/people/Vela/share')).connections.filter(entry => entry.available).length;
+  report.week = (await M.api('GET', 'api/users/Luma/usage?days=7')).daily.length;
+  const privacy = (await M.api('GET', 'api/privacy')).settings;
+  await M.api('PUT', 'api/privacy', { ...privacy, usage_history: 'off' });
+  await M.api('PUT', 'api/privacy', { ...privacy, usage_history: 'daily' });
+  const restarted = await M.api('GET', 'api/users/Luma/usage?days=7');
+  report.historyRestarted = restarted.daily.every(row => !row.uplink_bytes && !row.downlink_bytes);
+  report.serverDays = (await M.api('GET', 'api/traffic/daily?days=7')).days;
+  await M.api('GET', 'api/users/Luma/connections');
+  report.events = (await M.api('GET', 'api/events?after=0&limit=2000')).events.map(event => event.kind);
   await M.api('DELETE', 'api/users/DemoGuest', { cut_off: false });
   report.removed = !(await M.api('GET', 'api/users')).users.some(user => user.username === 'DemoGuest');
 } else if (mode === 'showcase-reset') {
