@@ -18,7 +18,9 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 
 **One look** — landing, blog, and docs share tokens, type, header, and buttons; `src/styles/CLAUDE.md` owns the system and `starlight.css` carries it into the docs.
 
-**Self-hosted everything** — the root rule, enforced: `scripts/check-runtime-assets.mjs` fails the build on any external request in HTML, CSS, or JavaScript (literal absolute-URL loads), and both workflows rerun it after the PWA demo joins `dist`.
+**Self-hosted everything** — the root rule, enforced: `scripts/check-runtime-assets.mjs` fails the build on any external request in HTML, CSS, or JavaScript (literal absolute-URL loads), and both workflows rerun it after the demos join `dist`.
+
+**Demos are recorded, not hand-written** — `scripts/build_showcase.py` seeds a real control service with an invented fleet (`scripts/showcase_seed.py`), records the console's responses, validates each against today's models, and writes `/demo/` (one person's connection page) and `/demo/console/` (the unchanged console plus `website/demo/demo.js`, which answers its API in memory). Neither the shim nor the data ships in the package.
 
 **pnpm with guardrails** — `pnpm-workspace.yaml` blocks exotic transitive sources, enforces a one-week release age, and refuses trust downgrades; allows build scripts only for explicitly trusted packages.
 
@@ -40,4 +42,6 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 - **The build only checks diagrams** — CI has no Chromium or network for Mermaid; a changed block fails `node scripts/diagrams.mjs` until its SVG is rendered and committed. Bump `RENDER_VERSION` when the renderer's output changes.
 - **Diagram figures are always LTR** — an RTL page reorders the punctuation in labels like `(Realm)`.
 - **The landing video is a file, not an embed** — `public/video/` comes from `video/scripts/export.mjs`; keep `preload="none"` so only the poster loads, and never embed a player from another origin.
+- **The demo shim mirrors service shapes exactly** — `/info` byte counts are decimal strings and statuses upper case; numbers there made the page reject its own account panel.
+- **Month-anchored demo dates move by whole months** — the shim shifts recorded timestamps by the time since generation, but `period_*`, `counting_since`, and `traffic_reset_at` keep their day of the month.
 - **Sharp is direct** — Astro image optimization must keep `sharp` as an explicit dependency.

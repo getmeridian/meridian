@@ -5,7 +5,7 @@
   "private": true,
   "packageManager": "pnpm@10.33.3",
   "scripts": {
-    "dev": "uv run --project .. meridian dev preview --output public/demo 2>/dev/null; astro dev",
+    "dev": "uv run --project .. python ../scripts/build_showcase.py public/demo >/dev/null 2>&1; astro dev",
     "build": "node scripts/diagrams.mjs && pnpm run scripts:test && pnpm run studio:test && astro build && node scripts/check-runtime-assets.mjs",
     "contracts:generate": "node scripts/generate-contract-types.mjs",
     "contracts:check": "node scripts/generate-contract-types.mjs --check && pnpm run contracts:typecheck",

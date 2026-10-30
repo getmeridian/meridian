@@ -63,8 +63,8 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
 
-      - name: Generate PWA demo page
-        run: uv run meridian dev preview --output website/dist/demo
+      - name: Generate the website demos
+        run: uv run python scripts/build_showcase.py website/dist/demo
 
       # The demo joins dist after the build's own check.
       - name: Check the site and demo for external requests

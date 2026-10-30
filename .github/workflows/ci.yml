@@ -311,20 +311,21 @@ jobs:
           uv build --wheel
           python3 scripts/verify_package_assets.py dist/*.whl
 
-      - name: Validate PWA demo generation
+      - name: Validate the website demos
         run: |
-          uv run meridian dev preview --output website/dist/demo
-          # Verify expected files exist
+          uv run python scripts/build_showcase.py website/dist/demo
+          # The connection page demo: shared assets, a disabled worker, and rendered pages
           test -f website/dist/demo/index.html
           assets=$(echo website/dist/demo/sub/~pwa/pwa-*)
           test -f "$assets/app.js"
           test -f "$assets/styles.css"
           test -f "$assets/icon.svg"
-          test -f website/dist/demo/sub/~pwa/sw.js
-          # Verify SW is no-op (disabled for static hosting)
           grep -q "SW disabled" website/dist/demo/sub/~pwa/sw.js
-          # Verify client index.html is non-empty (jinja2 rendered correctly)
-          find website/dist/demo -mindepth 2 -name 'index.html' -size +0c | grep -q .
+          find website/dist/demo/sub -mindepth 2 -name 'index.html' -size +0c | grep -q .
+          # The owner console demo: the real console, its adapter, and recorded responses
+          test -f website/dist/demo/console/index.html
+          test -f website/dist/demo/console/ui/app.js
+          test -s website/dist/demo/console/demo-data.json
 
       - name: Check the site and demo for external requests
         run: node website/scripts/check-runtime-assets.mjs website/dist

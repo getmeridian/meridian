@@ -15,6 +15,8 @@
 
 ## What's done well
 
+- `build_showcase.py` and `showcase_seed.py` generate the website demos from a temporary real control service; neither ships in the sdist allowlist or the wheel (tested).
+
 - `subset_fonts.py` rebuilds the website's WOFF2 subsets from the upstream font releases (instanced axes, per-script `unicode-range` files; network, never CI); keep its ranges equal to `website/src/styles/fonts.css`.
 - `bump_pins.py` raises Realm, RealiTLScanner, and acme.sh (hashed here; it publishes no assets) to the newest release in each tested major and rewrites `config.py` by exact substring, refusing an ambiguous match; the weekly `bump-pins` workflow runs it and opens a PR.
 - `export_geodata_lists.py` writes `core/geodata_lists.py` from the geodata in the pinned Xray archive (network, never CI), the same files node agents install; a test fails until it is rerun after `XRAY_VERSION` moves.

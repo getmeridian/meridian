@@ -1,0 +1,31 @@
+/* Demo-only chrome. Both applications supply their own palette and type. */
+.demo-banner {
+  color: var(--t1, var(--tx, CanvasText));
+  background: var(--s2, var(--sf2, Canvas));
+  border-block-end: 1px solid var(--b1, var(--br, ButtonBorder));
+  padding: 12px 20px;
+  font: inherit;
+  font-size: .8125rem;
+  line-height: 1.5;
+}
+.demo-banner__inner {
+  max-width: 1120px;
+  margin-inline: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 24px;
+}
+.demo-banner__actions { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+.demo-banner a {
+  color: var(--ac-text, var(--accent, LinkText));
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .demo-banner { padding: 10px 16px; }
+  .demo-banner a { min-height: 32px; display: inline-flex; align-items: center; }
+}
