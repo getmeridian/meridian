@@ -17,7 +17,7 @@ import time
 import uuid as uuid_module
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -25,12 +25,10 @@ from meridian.control.attention import read_attention
 from meridian.control.background_health import BackgroundHealth
 from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE, BackupLedger
 from meridian.control.delivery_settings import save_update_interval_hours, update_interval_hours
-from meridian.control.devices import DEVICES_TABLE, DeviceLedger, HeaderReader, browser_request
+from meridian.control.devices import DEVICES_TABLE, DeviceLedger, HeaderReader
 from meridian.control.enrollment import NodeAuthority
 from meridian.control.errors import ServiceError
 from meridian.control.events import EVENT_TABLES, EventLedger
-from meridian.control.formats.entries import SubscriptionUser
-from meridian.control.formats.selector import SUFFIX_FORMATS, select_format
 from meridian.control.models import (
     ClientEndpoint,
     EnrollmentGrant,
@@ -56,12 +54,8 @@ from meridian.control.periods import period_start
 from meridian.control.privacy import PRIVACY_TABLES, PrivacyLedger, read_privacy
 from meridian.control.revisions import APPLY_FENCE_TABLE, REVISIONS_TABLE, RevisionLedger
 from meridian.control.store import Store
-from meridian.control.subscriptions import (
-    DEVICE_LIMIT_REMARKS,
-    SubscriptionResponse,
-    render_subscription,
-    unknown_subscription,
-)
+from meridian.control.subscription_serving import serve_subscription
+from meridian.control.subscriptions import SubscriptionResponse
 from meridian.control.times import utc_now
 from meridian.control.tokens import API_TOKENS_TABLE_V4, TokenRegistry
 from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPOCH_BASELINES, TrafficLedger
@@ -649,45 +643,17 @@ class ControlService:
         accept: str | None = None,
         device_headers: HeaderReader | None = None,
     ) -> SubscriptionResponse:
-        """Answer a subscription request: the document a suffix names, else the one the app reads."""
-        document = SUFFIX_FORMATS[suffix] if suffix else select_format(user_agent, accept)
-        hwid_flags: dict[str, str] = {}
-        with self._lock:
-            row = self._db.execute(f"{USER_SELECT} WHERE u.sub_token = ?", (sub_token,)).fetchone()
-            if row is None:
-                return unknown_subscription()
-            record = user_record(row)
-            bodies = [item[0] for item in self._db.execute("SELECT body FROM endpoints").fetchall()]
-            settings = self.settings()
-            privacy = self.privacy()
-            # The connection page's account check (`/info`) is never an app fetching its configs.
-            if privacy.device_limits != "off" and document != "browser" and not browser_request(user_agent, accept):
-                with self._transaction():
-                    hwid_flags = self.devices.fetch(
-                        record, privacy, device_headers if device_headers is not None else {}
-                    )
-        user = SubscriptionUser(
-            username=record.username,
-            uuid=record.uuid,
-            short_id=record.sub_token,
-            status=record.status,
-            expires_at=datetime.fromisoformat(record.expire_at) if record.expire_at else None,
-            used_bytes=record.used_traffic_bytes,
-            limit_bytes=record.traffic_limit_bytes,
-            lifetime_used_bytes=record.lifetime_traffic_bytes,
-            limit_strategy=record.traffic_limit_strategy,
-        )
-        endpoints = [ClientEndpoint.model_validate_json(body) for body in bodies]
-        return render_subscription(
-            user,
-            endpoints,
-            document,
-            profile_title=settings.profile_title,
-            public_url=settings.public_url,
-            update_interval_hours=settings.update_interval_hours,
-            now=datetime.fromtimestamp(self._clock(), UTC),
-            placeholder_remarks=DEVICE_LIMIT_REMARKS if "x-hwid-limit" in hwid_flags else None,
-            extra_headers=hwid_flags,
+        return serve_subscription(
+            self._store,
+            self.devices,
+            sub_token,
+            suffix,
+            read_settings=self.settings,
+            read_privacy=self.privacy,
+            clock=self._clock,
+            user_agent=user_agent,
+            accept=accept,
+            device_headers=device_headers,
         )
 
     # -- composition -------------------------------------------------------------------
