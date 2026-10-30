@@ -34,7 +34,7 @@ from meridian.core.agent_signing import COMMAND_CONTEXT, verify
 from meridian.reconciler.meridian_drivers import ControlUserDriver
 from meridian.remnawave import User
 from tests.support.agent_node import FakeNode
-from tests.support.control_service import ADMIN_TOKEN, FLEET_ID
+from tests.support.control_service import ADMIN_TOKEN, FLEET_ID, drop_person_metadata_schema
 from tests.support.node_commands import command_node_spec as spec
 from tests.support.topology import single_exit_intent
 
@@ -583,6 +583,7 @@ def test_schema_fourteen_keeps_token_expiry_accounting_and_events_from_schema_th
     with sqlite3.connect(path) as db:
         db.execute("DROP TABLE commands")
         db.execute("DROP TABLE agent_command_capabilities")
+        drop_person_metadata_schema(db)
         db.execute("UPDATE meta SET value = '13' WHERE key = 'schema_version'")
     migrated = ControlService(path, fleet_id=FLEET_ID, version="4.0.0", clock=clock)
     try:

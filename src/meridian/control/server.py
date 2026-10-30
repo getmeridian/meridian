@@ -54,6 +54,7 @@ from meridian.control.models import (
     TokenScope,
     UserCreate,
     UserImportBatch,
+    UserPatch,
     UserRecord,
     UserUpdate,
     scope_covers,
@@ -415,7 +416,7 @@ class _Handler(BaseHTTPRequestHandler):
         """A user as this caller may see them: the VLESS UUID and subscription token connect as the user."""
         if self.caller is not None and scope_covers(self.caller.scope, "people"):
             return user
-        return user.model_copy(update={"uuid": "", "sub_token": ""})
+        return user.model_copy(update={"uuid": "", "sub_token": "", "note": "", "tag": ""})
 
     def put_user(self, match: re.Match[str]) -> Any:
         return self._service.put_user(match[1])
@@ -427,6 +428,9 @@ class _Handler(BaseHTTPRequestHandler):
         return self._service.import_users(self._model(UserImportBatch))
 
     def update_user(self, match: re.Match[str]) -> Any:
+        if match[1] is None:
+            patch = self._model(UserPatch)
+            return self._service.update_user(patch.username, patch.change)
         return self._service.update_user(match[1], self._model(UserUpdate))
 
     def reissue_user(self, match: re.Match[str]) -> Any:
@@ -653,7 +657,7 @@ ROUTES: list[Route] = [
     ("GET", re.compile(rf"/api/users/{_USERNAME}"), ("read", "people"), _Handler.get_user),
     ("GET", re.compile(rf"/api/users/{_USERNAME}/usage"), ("read", "people"), _Handler.user_usage),
     ("PUT", re.compile(rf"/api/users/{_USERNAME}"), "people", _Handler.put_user),
-    ("PATCH", re.compile(rf"/api/users/{_USERNAME}"), "people", _Handler.update_user),
+    ("PATCH", re.compile(rf"/api/users(?:/{_USERNAME})?"), "people", _Handler.update_user),
     ("POST", re.compile(rf"/api/users/{_USERNAME}/reissue"), "people", _Handler.reissue_user),
     ("GET", re.compile(rf"/api/users/{_USERNAME}/cut-off"), "read", _Handler.cut_off_scope),
     ("POST", re.compile(rf"/api/users/{_USERNAME}/reset-traffic"), "people", _Handler.reset_user_traffic),

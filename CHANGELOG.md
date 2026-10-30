@@ -6,6 +6,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+- People have private notes and one tag, editable through the people/admin API, `client set`, and the console. CLI reads show them and filter by tag; encrypted snapshots preserve them, and migration carries descriptions and valid tags with truncation notices.
+
 - Restart and client cut-off commands render service failures through their JSON error envelopes; terminal result-read errors report failed nodes instead of retryable timeouts.
 - Console command results preserve completed nodes when siblings time out or fail to poll; terminal read errors stop polling with an unavailable result instead of a false timeout.
 - CLI client removal queues its cut-off atomically with deletion and preserves the request across apply retries; an uncertain later restart keeps an earlier node failure.

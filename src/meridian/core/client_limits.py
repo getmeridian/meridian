@@ -19,6 +19,7 @@ from pydantic import Field
 from meridian.core.agent_types import Timestamp
 from meridian.core.errors import MeridianError
 from meridian.core.models import CoreModel
+from meridian.core.person_metadata import PersonTag, PrivateNote, parse_note_option, parse_tag_option
 
 TrafficReset = Literal["never", "day", "week", "month"]
 TRAFFIC_RESETS: tuple[TrafficReset, ...] = ("never", "day", "week", "month")
@@ -73,6 +74,10 @@ class ClientLimitChange(CoreModel):
     traffic_reset: TrafficReset | None = Field(default=None, description="When used traffic starts again from zero.")
     expires_at: Timestamp | None = Field(default=None, description="UTC; null with the field set means never.")
     device_limit: int | None = Field(default=None, ge=1, le=100, description="Explicit null uses the fleet default.")
+    note: PrivateNote | None = Field(
+        default=None, repr=False, description="Omitted keeps the private note; empty clears."
+    )
+    tag: PersonTag | None = Field(default=None, repr=False, description="Omitted keeps the private tag; empty clears.")
 
     @property
     def is_empty(self) -> bool:
@@ -106,6 +111,8 @@ def build_limit_change(
     reset: str | None = None,
     expires: str | None = None,
     devices: str | None = None,
+    note: str | None = None,
+    tag: str | None = None,
     now: datetime | None = None,
 ) -> ClientLimitChange:
     """Parse the `--limit`, `--reset`, and `--expires` values that were given into one change."""
@@ -118,6 +125,10 @@ def build_limit_change(
         fields["expires_at"] = parse_expiry(expires, now=now)
     if devices is not None:
         fields["device_limit"] = parse_device_limit(devices)
+    if note is not None:
+        fields["note"] = parse_note_option(note)
+    if tag is not None:
+        fields["tag"] = parse_tag_option(tag)
     return ClientLimitChange(**fields)  # type: ignore[arg-type]
 
 

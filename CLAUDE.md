@@ -100,6 +100,8 @@ When in doubt: shorter is better. A 30-line CLAUDE.md that's current beats a 100
 
 ## Conventions
 
+- Private person notes and tags are operator-owned service data; scoped reads blank them below people/admin, and delivery, events, and logs never carry their contents.
+
 - **Shell injection**: `shlex.quote()` on ALL `conn.run()` interpolated values
 - **Demo data**: RFC 5737 IPs (`198.51.100.x`), never real server IPs
 - **Privacy**: never reference real people's names, server IPs, or domains in commits, code, or docs unless asked

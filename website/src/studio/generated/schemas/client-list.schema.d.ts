@@ -32,7 +32,15 @@ export type LastSeen = string;
  * The node whose latest accepted growth set the user's last traffic time.
  */
 export type LastTrafficNode = string | null;
+/**
+ * Private operator note; people/admin only.
+ */
+export type Note = string;
 export type Status = string;
+/**
+ * Private operator tag; people/admin only.
+ */
+export type Tag = string;
 /**
  * 0 means unlimited.
  */
@@ -71,7 +79,9 @@ export interface ClientRecord {
   id: Id;
   last_seen: LastSeen;
   last_traffic_node?: LastTrafficNode;
+  note?: Note;
   status: Status;
+  tag?: Tag;
   traffic_limit_bytes: TrafficLimitBytes;
   traffic_reset: TrafficReset;
   traffic_used_bytes: TrafficUsedBytes;

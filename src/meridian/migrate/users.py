@@ -10,15 +10,16 @@ Nothing IP- or device-based is imported.
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from meridian.control.models import SUB_TOKEN_PATTERN, LimitStrategy, UserImport, UserImportBatch, UserStatus
 from meridian.core.client_limits import NEVER_EXPIRES_YEAR
 from meridian.core.errors import previous_release_command
+from meridian.core.person_metadata import MAX_NOTE_CHARACTERS, validate_person_tag
 from meridian.migrate import MigrationError
 from meridian.remnawave import User
-from meridian.remnawave.client import ACCESS_USER_DESCRIPTION, ACCESS_USER_TAG
 
 _STATUSES: dict[str, UserStatus] = {
     "ACTIVE": "active",
@@ -80,15 +81,16 @@ def carry_users(panel_users: Sequence[User], wanted: Sequence[str], *, deployed_
     notes: dict[str, list[str]] = {}
     for name in wanted:
         user = by_name[name]
-        imports.append(_import(user))
-        dropped = _dropped(user)
+        note, tag, metadata_notes = _metadata(user)
+        imports.append(_import(user, note=note, tag=tag))
+        dropped = [*_dropped(user), *metadata_notes]
         if dropped:
             notes[name] = dropped
     skipped = sorted(set(by_name) - set(wanted))
     return CarriedUsers(batch=UserImportBatch(users=imports), notes=notes, skipped=skipped)
 
 
-def _import(user: User) -> UserImport:
+def _import(user: User, *, note: str, tag: str) -> UserImport:
     status = _STATUSES.get(user.status.upper())
     strategy = _STRATEGIES.get(user.traffic_limit_strategy.upper())
     if status is None or strategy is None:
@@ -111,10 +113,12 @@ def _import(user: User) -> UserImport:
             lifetime_traffic_bytes=max(0, user.lifetime_used_traffic_bytes),
             traffic_reset_at=_timestamp(user.last_traffic_reset_at),
             created_at=_timestamp(user.created_at),
+            note=note,
+            tag=tag,
         )
     except ValueError as exc:
         raise MigrationError(
-            f"User {user.username!r} cannot be imported: {exc}",
+            f"User {user.username!r} cannot be imported: a field is invalid.",
             hint="Check the user in the panel, then migrate.",
             category="user",
         ) from exc
@@ -127,14 +131,31 @@ def _dropped(user: User) -> list[str]:
     if user.hwid_device_limit is not None:
         dropped.append(f"HWID device limit {user.hwid_device_limit}")
     for label, value in (
-        ("description", "" if user.description == ACCESS_USER_DESCRIPTION else user.description),
-        ("tag", "" if user.tag == ACCESS_USER_TAG else user.tag),
         ("email", user.email),
         ("Telegram ID", user.telegram_id),
     ):
         if value:
             dropped.append(label)
     return dropped
+
+
+def _metadata(user: User) -> tuple[str, str, list[str]]:
+    reports: list[str] = []
+    text = user.description.replace("\r\n", "\n").replace("\r", "\n")
+    note = "".join(
+        character for character in text if character == "\n" or unicodedata.category(character) not in {"Cc", "Cs"}
+    )
+    if note != text:
+        reports.append("description control characters removed")
+    if len(note) > MAX_NOTE_CHARACTERS:
+        note = note[:MAX_NOTE_CHARACTERS]
+        reports.append("description truncated to 500 characters")
+    try:
+        tag = validate_person_tag(user.tag)
+    except ValueError:
+        tag = ""
+        reports.append("invalid tag")
+    return note, tag, reports
 
 
 def _timestamp(value: str) -> str | None:

@@ -33,6 +33,7 @@ from meridian.core.connection_pages import ConnectionPageSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import validate_ip_address_value
 from meridian.core.models import CoreModel
+from meridian.core.person_metadata import PersonTag, PrivateNote
 from meridian.core.topology import ClientRoutingPolicy, ProtocolKind, SubscriptionUpdateIntervalHours
 from meridian.core.traffic import NodeTrafficAccounting, UserTrafficEvidence
 
@@ -210,6 +211,8 @@ class UserRecord(UserTrafficEvidence):
         default=0, ge=0, description="What agents counted plus what an import carried in from before."
     )
     online_at: Timestamp | None = Field(default=None, description="When an agent last counted the user's traffic.")
+    note: PrivateNote = Field(default="", repr=False, description="Private operator note; people/admin only.")
+    tag: PersonTag = Field(default="", repr=False, description="Private operator tag; people/admin only.")
 
 
 class UserUpdate(CoreModel):
@@ -220,6 +223,8 @@ class UserUpdate(CoreModel):
     traffic_limit_bytes: int | None = Field(default=None, ge=0, le=MAX_TRAFFIC_LIMIT_BYTES)
     traffic_limit_strategy: LimitStrategy | None = None
     device_limit: int | None = Field(default=None, ge=1, le=100)
+    note: PrivateNote = Field(default="", repr=False)
+    tag: PersonTag = Field(default="", repr=False)
 
 
 SUB_TOKEN_PATTERN = r"^[A-Za-z0-9_-]{16,64}$"
@@ -232,6 +237,16 @@ class UserCreate(UserCreationSettings):
     """A new user with their first settings, created in one step (the console's "Add person")."""
 
     username: str = Field(pattern=rf"^{USERNAME_PATTERN}$")
+
+
+class UserPatch(UserUpdate):
+    """A partial edit at `PATCH /api/users`, naming the person in the JSON body."""
+
+    username: str = Field(pattern=rf"^{USERNAME_PATTERN}$")
+
+    @property
+    def change(self) -> UserUpdate:
+        return UserUpdate.model_validate(self.model_dump(include=self.model_fields_set - {"username"}))
 
 
 class UserImport(CoreModel):
@@ -254,6 +269,8 @@ class UserImport(CoreModel):
     lifetime_traffic_bytes: Count = 0
     traffic_reset_at: Timestamp | None = None
     created_at: Timestamp | None = None
+    note: PrivateNote = Field(default="", repr=False)
+    tag: PersonTag = Field(default="", repr=False)
 
 
 class UserImportBatch(CoreModel):

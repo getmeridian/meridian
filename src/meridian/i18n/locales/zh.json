@@ -441,5 +441,12 @@
   "fleet_routing.confirm": "应用客户端路由策略 {policy}？",
   "fleet_routing.failed": "客户端路由更改未能全部应用",
   "fleet_routing.failed_hint": "解决报告的问题后，重新运行 meridian apply。",
-  "fleet_routing.changed": "客户端路由现已设为 {policy}"
+  "fleet_routing.changed": "客户端路由现已设为 {policy}",
+  "client.label.note": "私人备注",
+  "client.label.tag": "标签",
+  "client.metadata_none": "无",
+  "client.note_invalid": "备注须为纯文本，最多 500 个字符，支持换行。",
+  "client.tag_invalid": "请使用 1–16 个大写字母 A–Z、数字或下划线；none 清除标签。",
+  "client.set_options_hint": "请指定 --limit、--reset、--expires、--devices、--note 或 --tag。",
+  "client.settings_updated": "已更新 {name} 的设置。"
 }

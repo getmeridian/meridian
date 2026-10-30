@@ -34,9 +34,11 @@ from meridian.core.clients import (
     PanelUserLike,
     build_client_reissue_result,
     build_client_status_result,
+    client_metadata_paths,
 )
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
+from meridian.core.person_metadata import PersonMetadataError, parse_tag_option
 from meridian.core.redaction import HANDOFF_LINK_KEYS
 from meridian.core.services.clients import ClientNotFoundError, collect_client_list, collect_client_show
 from meridian.handoff import client_handoffs, page_url
@@ -150,7 +152,7 @@ def _show(*, name: str, operation: OperationContext) -> None:
                 summary=Summary(text=f"Client {detail.username}", changed=False, counts={"clients": 1}),
                 timer=operation.timer,
             ),
-            reveal=HANDOFF_LINK_KEYS,
+            reveal=HANDOFF_LINK_KEYS | client_metadata_paths(),
         )
         return
 
@@ -167,14 +169,18 @@ def _show(*, name: str, operation: OperationContext) -> None:
     err_console.print()
 
 
-def run_list(*, attention: bool = False) -> None:
+def run_list(*, attention: bool = False, tag: str | None = None) -> None:
     """List the fleet's clients from the control service."""
     operation = OperationContext()
     with error_context("client.list", timer=operation.timer):
-        _list(operation=operation, attention=attention)
+        try:
+            wanted_tag = parse_tag_option(tag) if tag is not None else None
+        except PersonMetadataError:
+            fail(t("client.tag_invalid"), hint_type="user")
+        _list(operation=operation, attention=attention, tag=wanted_tag)
 
 
-def _list(*, operation: OperationContext, attention: bool = False) -> None:
+def _list(*, operation: OperationContext, attention: bool = False, tag: str | None = None) -> None:
     from rich.box import ROUNDED
     from rich.table import Table
 
@@ -186,6 +192,7 @@ def _list(*, operation: OperationContext, attention: bool = False) -> None:
             allowed_usernames=_readable_users(cluster),
             declared_usernames=_access_users(cluster),
             read_attention=panel.attention if attention else None,
+            tag=tag,
         )
     except RemnawaveError as e:
         fail(
@@ -206,7 +213,8 @@ def _list(*, operation: OperationContext, attention: bool = False) -> None:
                     counts=result.clients.summary.model_dump(),
                 ),
                 timer=operation.timer,
-            )
+            ),
+            reveal=client_metadata_paths(result.clients.clients),
         )
         return
 
@@ -215,15 +223,16 @@ def _list(*, operation: OperationContext, attention: bool = False) -> None:
         show_lines=False,
         pad_edge=False,
         box=ROUNDED,
-        padding=(0, 2),
+        padding=(0, 1),
     )
     table.add_column("Name", style="bold cyan")
+    table.add_column(t("client.label.tag"), style="dim")
     table.add_column("Status", justify="center")
     table.add_column("Traffic", style="dim")
     table.add_column("Expires", style="dim")
     table.add_column("Last seen", style="dim")
     if attention:
-        table.add_column(t("attention.label.reason"))
+        table.add_column(t("attention.label.reason"), no_wrap=True)
 
     access = require_intent(cluster).access
     for client in result.clients.clients:
@@ -231,6 +240,7 @@ def _list(*, operation: OperationContext, attention: bool = False) -> None:
         label = escape(shown if shown == client.username else f"{shown} ({client.username})")
         row = [
             label if client.declared else f"{label} [dim]· console[/dim]",
+            escape(client.tag or "-"),
             format_status(client.status),
             format_traffic(client.traffic_used_bytes, client.traffic_limit_bytes),
             escape(format_expiry(client.expires_at) if client.expires_at else "-"),

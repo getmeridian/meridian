@@ -94,11 +94,12 @@ def client_show_cmd(
 def client_list_cmd(
     _json: Json = False,
     attention: bool = typer.Option(False, "--attention", help="Only people expiring soon, near quota, or never used"),
+    tag: str | None = typer.Option(None, "--tag", metavar="TAG", help="Only people with this tag; none for untagged"),
 ) -> None:
     """List managed access clients with status and traffic"""
     from meridian.commands.client import run_list
 
-    run_list(attention=attention)
+    run_list(attention=attention, tag=tag)
 
 
 @client_app.command("usage")
@@ -120,6 +121,12 @@ def client_set_cmd(
     reset: TrafficResetPeriod = None,
     expires: Expires = None,
     devices: DeviceLimit = None,
+    note: str | None = typer.Option(
+        None, "--note", metavar="TEXT", help='Private note, up to 500 characters; "" clears'
+    ),
+    tag: str | None = typer.Option(
+        None, "--tag", metavar="TAG", help="1–16 uppercase letters, digits, underscores; none clears"
+    ),
     _json: Json = False,
 ) -> None:
     """Change a client's traffic limit, reset period, or expiry
@@ -134,7 +141,7 @@ def client_set_cmd(
     """
     from meridian.commands.client_limits import run_set
 
-    run_set(name, limit=limit, reset=reset, expires=expires, devices=devices)
+    run_set(name, limit=limit, reset=reset, expires=expires, devices=devices, note=note, tag=tag)
 
 
 @client_app.command("devices", rich_help_panel="Device limits")

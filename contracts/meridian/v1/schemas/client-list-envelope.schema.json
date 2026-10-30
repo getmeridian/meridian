@@ -148,8 +148,22 @@
           "description": "The node whose latest accepted growth set the user's last traffic time.",
           "title": "Last Traffic Node"
         },
+        "note": {
+          "default": "",
+          "description": "Private operator note; people/admin only.",
+          "maxLength": 500,
+          "title": "Note",
+          "type": "string"
+        },
         "status": {
           "title": "Status",
+          "type": "string"
+        },
+        "tag": {
+          "default": "",
+          "description": "Private operator tag; people/admin only.",
+          "pattern": "^[A-Z0-9_]{0,16}$",
+          "title": "Tag",
           "type": "string"
         },
         "traffic_limit_bytes": {

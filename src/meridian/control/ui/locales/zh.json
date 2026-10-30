@@ -391,5 +391,13 @@
   "settings.client_routing": "客户端路由",
   "settings.routing_ru_split": "俄罗斯目的地和私有地址、局域网直连，其他流量通过 VPN。Xray JSON 中已识别的 BitTorrent 对等连接也会直连。",
   "settings.routing_full": "互联网流量通过 VPN，包括俄罗斯目的地；私有地址、局域网以及 Xray JSON 中已识别的 BitTorrent 对等连接直连。",
-  "settings.routing_hint": "在自己的电脑上更改此策略："
+  "settings.routing_hint": "在自己的电脑上更改此策略：",
+  "person.metadata": "私人备注和标签",
+  "person.metadata_private": "仅所有者及 people/admin 令牌可读取这些字段。连接页面和订阅不会显示这些内容；加密备份会保留它们。",
+  "person.note": "私人备注",
+  "person.note_hint": "纯文本，最多 500 个字符，支持换行；留空清除。",
+  "person.note_invalid": "请使用纯文本，最多 500 个字符，支持换行。",
+  "person.tag": "标签",
+  "person.tag_hint": "1–16 个大写字母 A–Z、数字或下划线；留空清除。",
+  "person.tag_invalid": "请使用 1–16 个大写字母 A–Z、数字或下划线，或留空。"
 }

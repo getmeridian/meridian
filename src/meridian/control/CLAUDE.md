@@ -1,6 +1,7 @@
 # control — Meridian's own control service (`meridian serve`)
 
 ## Design decisions
+- Step 15 adds private `users.note` and `users.tag`; PATCH accepts the existing name path or a `username` body at `/api/users`, only people/admin reads retain metadata, applies preserve it, and snapshots carry it with user rows.
 - **Subscription HTTP** — `subscription_routes.py` writes the response through the shared public request interface; the server keeps routing and authentication.
 - **Service settings** — `service_settings.py` reads and persists delivery settings; the public service methods delegate, and every setting is saved in one store transaction.
 - **Token expiry is registry time** — schema step 12 adds nullable `api_tokens.expires_at`; old tokens remain indefinite. Issuance accepts a future UTC expiry or 1–3650 days, computed inside the insert transaction, and authentication refuses at the deadline with the same 401 as revocation, without touching last use. Historical step 4 keeps its original table definition so an older database adds expiry only once.
@@ -45,6 +46,7 @@
 - A proposal whose intent has a secret-shaped key or value (`secret_paths()`, keys per `core.redaction`) is refused, never stored; so is one whose `access` block is malformed (the console reads `access.users` on every person screen, and a `null` there broke them all).
 
 ## Pitfalls
+- Keep notes and tags out of event field catalogs and subscription projections; metadata-only edits must produce no lifecycle fact or new node document.
 - Deployer user deletion requests its cut-off in the DELETE body; a full reset queue rolls back the deletion, so no separate revision read or reset POST follows it.
 - Service expiry stops redelivery, but the first agent result can replace an expired row with no result; record that late outcome and its event atomically and never overwrite an acknowledged result.
 - Refresh wanted blobs from the whole current fleet under the blob lock, prune retired or seeded failures, and publish attempt results under that lock so a late failure cannot restore obsolete degradation; clearing an obsolete error never invents a mirror success.

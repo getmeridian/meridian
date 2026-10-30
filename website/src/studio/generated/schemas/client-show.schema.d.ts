@@ -36,7 +36,15 @@ export type LastTrafficNode = string | null;
  * Lifetime use, unaffected by traffic resets.
  */
 export type LifetimeTrafficBytes = number;
+/**
+ * Private operator note; people/admin only.
+ */
+export type Note = string;
 export type Status = string;
+/**
+ * Private operator tag; people/admin only.
+ */
+export type Tag = string;
 /**
  * 0 means unlimited.
  */
@@ -91,7 +99,9 @@ export interface ClientDetail {
   last_seen: LastSeen;
   last_traffic_node?: LastTrafficNode;
   lifetime_traffic_bytes?: LifetimeTrafficBytes;
+  note?: Note;
   status: Status;
+  tag?: Tag;
   traffic_limit_bytes: TrafficLimitBytes;
   traffic_reset: TrafficReset;
   traffic_reset_at?: TrafficResetAt;

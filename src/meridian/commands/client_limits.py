@@ -22,9 +22,16 @@ from meridian.commands.client_handoff import (
 from meridian.console import err_console, error_context, fail, is_json_mode, ok
 from meridian.control_access import AccessPanel, access_panel
 from meridian.core.client_limits import ClientExtendRequest, ClientLimitChange, ClientLimitError, build_limit_change
-from meridian.core.clients import ClientDetail, ClientRecord, build_client_limits_result, build_client_record
+from meridian.core.clients import (
+    ClientDetail,
+    ClientRecord,
+    build_client_limits_result,
+    build_client_record,
+    client_metadata_paths,
+)
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
+from meridian.core.person_metadata import PersonMetadataError
 from meridian.i18n import t
 from meridian.remnawave import RemnawaveError, User
 from meridian.renderers import emit_json
@@ -38,11 +45,19 @@ _RESET_KEYS = {
 
 
 def parse_limit_options(
-    *, limit: str | None, reset: str | None, expires: str | None, devices: str | None = None
+    *,
+    limit: str | None,
+    reset: str | None,
+    expires: str | None,
+    devices: str | None = None,
+    note: str | None = None,
+    tag: str | None = None,
 ) -> ClientLimitChange:
     """The change `--limit`, `--reset`, and `--expires` ask for; a bad value exits 2 before any connection."""
     try:
-        return build_limit_change(limit=limit, reset=reset, expires=expires, devices=devices)
+        return build_limit_change(limit=limit, reset=reset, expires=expires, devices=devices, note=note, tag=tag)
+    except PersonMetadataError as exc:
+        fail(t(f"client.{exc.field}_invalid"), hint_type="user")
     except ClientLimitError as exc:
         fail(exc)
 
@@ -84,33 +99,43 @@ def print_client_usage(record: ClientRecord) -> None:
         rows.append((last_seen, escape(record.last_seen)))
     rows.append((t("client.label.first_traffic"), escape(record.first_traffic_at or t("client.traffic_unknown"))))
     rows.append((t("client.label.last_traffic_node"), escape(record.last_traffic_node or t("client.traffic_unknown"))))
+    rows.append((t("client.label.tag"), escape(record.tag or t("client.metadata_none"))))
+    rows.append((t("client.label.note"), escape(record.note or t("client.metadata_none"))))
     # One column for every label, shown or not, so values line up the same in every view.
     width = max(cell_len(label) for label in (last_seen, *(label for label, _value in rows))) + 1
     for label, value in rows:
         padding = " " * (width - cell_len(label))
+        value = value.replace("\n", "\n" + " " * (width + 2))
         err_console.print(f"  [bold]{escape(label)}[/bold]{padding}{value}")
 
 
 def run_set(
-    name: str, *, limit: str | None, reset: str | None, expires: str | None, devices: str | None = None
+    name: str,
+    *,
+    limit: str | None,
+    reset: str | None,
+    expires: str | None,
+    devices: str | None = None,
+    note: str | None = None,
+    tag: str | None = None,
 ) -> None:
     """Change a client's traffic limit, reset period, or expiry."""
     operation = OperationContext()
     with error_context("client.set", timer=operation.timer):
-        change = parse_limit_options(limit=limit, reset=reset, expires=expires, devices=devices)
+        change = parse_limit_options(limit=limit, reset=reset, expires=expires, devices=devices, note=note, tag=tag)
         if change.is_empty:
             fail(
                 "Nothing to change",
-                hint="Pass --limit, --reset, --expires, or --devices; for example, --devices 3.",
+                hint=t("client.set_options_hint"),
                 hint_type="user",
             )
         _mutate(
             name,
             operation,
             command="client.set",
-            verb="set limits for",
+            verb="edit",
             mutate=lambda panel, user: panel.update_user_limits(user.id, change),
-            done_key="client.limits_updated",
+            done_key="client.settings_updated",
         )
 
 
@@ -186,7 +211,8 @@ def _mutate(
                 data=build_client_limits_result(updated, declared=declared).to_data(),
                 summary=Summary(text=f"{verb.capitalize()} client {name}", changed=True, counts={"clients": 1}),
                 timer=operation.timer,
-            )
+            ),
+            reveal=client_metadata_paths(),
         )
         return
     shown = cluster.topology_intent.access.display_name(name) if cluster.topology_intent else name

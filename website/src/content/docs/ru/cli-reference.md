@@ -109,8 +109,8 @@ JSON `data` содержит `plan_hash`, `generation` и `actions[]` с `status
 meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client show NAME [--json]
 meridian client usage NAME [--days N] [--json]
-meridian client list [--attention] [--json]
-meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
+meridian client list [--attention] [--tag TAG|none] [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]
@@ -161,6 +161,8 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 Команды, меняющие данные человека в сервисе (`client enable`, `disable`, `set`, `reset-traffic` и удаление регистраций устройств), работают и для людей из консоли. Точное имя пользователя имеет приоритет; имя без учёта регистра или отображаемое имя должно указывать на одного человека. При неоднозначности используйте точное имя из `client list`. Удаление человека, перевыпуск ключей и публикация страницы остаются за клиентами из топологии.
 
 Открытые сеансы VLESS могут продолжаться после отзыва ключей. **`--cut-off`** в `client remove` или `client reissue` ждёт, пока каждый затронутый сервер применит ревизию без старых ключей, затем сбрасывает нужные входы. Все их сеансы завершаются, включая сеансы других пользователей; они ненадолго переподключатся. Если API входа не сработает, перезапустится Xray и завершатся все его сеансы на этом сервере. Флаг включается явно и рекомендуется при утечке ссылки. JSON содержит результат каждого сервера в `data.cut_off`: `done`, `core_restart`, `failed` или `timed_out`. Ожидание длится до пяти минут; сбой завершает команду с кодом `4`, тайм-аут — `3`. Консоль предлагает тот же выбор при удалении человека, добавленного через неё.
+
+Личные поля: `client set NAME --note TEXT --tag TAG` меняет только указанные значения. Заметка содержит до 500 символов обычного текста с переносами строк; `--note ""` удаляет её. Метка содержит 1–16 заглавных букв A–Z, цифр или подчёркиваний; `--tag none` удаляет метку. `client show` показывает оба поля, а `client list --tag TAG` фильтрует столбец меток (`none` выбирает людей без метки). Чтение и изменение требуют прав people/admin. Консоль редактирует те же поля; применение конфигурации сохраняет их, а зашифрованные снимки переносят их вместе с данными человека. Подробнее: [Личные заметки и метки](/ru/client-management/#личные-заметки-и-метки).
 
 ### meridian privacy
 

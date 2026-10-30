@@ -22,6 +22,7 @@
 - **Assets revalidate by ETag** (content hash, `no-cache`); anything holding a secret is `no-store`.
 
 ## Pitfalls
+- Person metadata uses text nodes for textarea contents, validates 500 Unicode characters and the uppercase tag, and PATCHes only changed fields; a textarea `value` attribute does not populate its value.
 - Command polling keeps successful sibling replies, times out only a node's pending records, and stops terminal read errors with an unavailable result while preserving finished outcomes.
 - People keeps rendering and polling users when fleet metadata fails, using cached names and declared markers; user-list failures still keep stale data with retry.
 - A failed language switch keeps the previous catalog, language, and direction when both fetches fail; switch to English only after its catalog loads successfully.

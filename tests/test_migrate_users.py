@@ -55,6 +55,30 @@ def test_remnawaves_never_is_no_expiry() -> None:
     assert carry_users([_user()], ["alice"]).batch.users[0].expire_at is None
 
 
+def test_description_and_valid_tag_become_private_metadata() -> None:
+    description = "Temporary invitation\nKeep the original text"
+    carried = carry_users([_user(description=description, tag="TRIAL_7")], ["alice"])
+    person = carried.batch.users[0]
+    assert (person.note, person.tag) == (description, "TRIAL_7")
+    assert carried.notes == {}
+
+
+def test_long_description_is_truncated_and_reported_without_its_contents() -> None:
+    description = "Private text " * 50
+    carried = carry_users([_user(description=description)], ["alice"])
+    assert carried.batch.users[0].note == description[:500]
+    assert any("truncated to 500 characters" in note for note in carried.notes["alice"])
+    assert description not in str(carried.notes)
+
+
+def test_invalid_tag_is_left_behind_and_rejected_person_contacts_stay_out() -> None:
+    carried = carry_users([_user(tag="bad-tag", email="sample@example.com", telegram_id="1000001")], ["alice"])
+    person = carried.batch.users[0]
+    assert person.tag == ""
+    assert {"invalid tag", "email", "Telegram ID"}.issubset(set(carried.notes["alice"]))
+    assert "email" not in person.model_dump() and "telegram_id" not in person.model_dump()
+
+
 def test_only_intent_users_move_and_the_rest_is_named() -> None:
     carried = carry_users([_user(), _user("meridian_bridge_a"), _user("handmade")], ["alice"])
 
@@ -67,11 +91,9 @@ def test_only_intent_users_move_and_the_rest_is_named() -> None:
     [
         ({"traffic_limit_strategy": "MONTH_ROLLING"}, "monthly reset on the user's own day becomes the calendar month"),
         ({"hwid_device_limit": 3}, "HWID device limit 3"),
-        ({"description": "Grandma's tablet"}, "description"),
-        ({"tag": "FAMILY"}, "tag"),
         ({"telegram_id": "1000001"}, "Telegram ID"),
     ],
-    ids=["month-rolling", "hwid", "description", "tag", "telegram"],
+    ids=["month-rolling", "hwid", "telegram"],
 )
 def test_what_the_service_cannot_hold_is_reported(changes: dict[str, object], note: str) -> None:
     carried = carry_users([_user(**changes)], ["alice"])

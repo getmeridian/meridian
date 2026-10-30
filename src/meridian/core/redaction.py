@@ -194,31 +194,45 @@ def _is_safe_metadata_key(key: str, value: Any) -> bool:
 def redact(value: Any, *, reveal: frozenset[str] = frozenset()) -> Any:
     """Return a JSON-safe structure with obvious secrets removed.
 
-    String values under a key in ``reveal`` are kept verbatim.
+    String values under a key or exact dotted JSON path in ``reveal`` are kept verbatim.
     """
+    return _redact(value, reveal, "")
+
+
+def _child_path(path: str, key: object) -> str:
+    return f"{path}.{key}" if path else str(key)
+
+
+def _redact(value: Any, reveal: frozenset[str], path: str) -> Any:
     if isinstance(value, BaseModel):
-        return redact(value.model_dump(mode="json", by_alias=True), reveal=reveal)
+        return _redact(value.model_dump(mode="json", by_alias=True), reveal, path)
     if is_dataclass(value):
-        return {field.name: redact(getattr(value, field.name), reveal=reveal) for field in fields(value)}
+        return {
+            field.name: _redact(getattr(value, field.name), reveal, _child_path(path, field.name))
+            for field in fields(value)
+        }
     if isinstance(value, Enum):
         return value.value
     if isinstance(value, dict):
         redacted: dict[str, Any] = {}
         for key, item in value.items():
             key_str = str(key)
-            if key_str in reveal and isinstance(item, str):
+            item_path = _child_path(path, key_str)
+            if (key_str in reveal or item_path in reveal) and isinstance(item, str):
                 redacted[key_str] = item
             elif key_str == "properties" and isinstance(item, dict) and _is_json_schema_property_map(item):
-                redacted[key_str] = {str(prop): redact(schema, reveal=reveal) for prop, schema in item.items()}
+                redacted[key_str] = {
+                    str(prop): _redact(schema, reveal, _child_path(item_path, prop)) for prop, schema in item.items()
+                }
             else:
                 redacted[key_str] = (
                     REDACTED
                     if is_sensitive_key(key_str) and not _is_safe_metadata_key(key_str, item)
-                    else redact(item, reveal=reveal)
+                    else _redact(item, reveal, item_path)
                 )
         return redacted
     if isinstance(value, list | tuple | set | frozenset):
-        return [redact(v, reveal=reveal) for v in value]
+        return [_redact(v, reveal, _child_path(path, index)) for index, v in enumerate(value)]
     if isinstance(value, str):
         return redact_string(value)
     if value is None or isinstance(value, bool | int | float):

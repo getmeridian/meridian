@@ -15,6 +15,7 @@
 **Guided cockpit UX** — one task per screen; the journey rail, contextual help, and native `<dialog>` command sheet replace always-visible JSON/CLI panels.
 
 ## What's done well
+- Generated person contracts preserve private metadata bounds and scoped-read descriptions without embedding operator data in Studio assets.
 
 - Every module is `// @ts-check` with JSDoc types from `generated/`, so `astro check` catches undefined names and wire-type drift.
 - `engineSession.js` takes the Engine key from the `#k=` fragment into sessionStorage (stripped with `history.replaceState`), re-handshakes after a restart, and locks on a 401 instead of guessing.

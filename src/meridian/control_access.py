@@ -131,6 +131,9 @@ class ServiceAccessPanel:
             fields["expire_at"] = change.expires_at  # None clears the expiry
         if change.sets_devices:
             fields["device_limit"] = change.device_limit
+        for field in ("note", "tag"):
+            if getattr(change, field) is not None:
+                fields[field] = getattr(change, field)
         username = self._username(user_id)
         update = UserUpdate.model_validate(fields)
         return self._user(_translated(lambda: self._client.update_user(username, update)))
@@ -192,6 +195,8 @@ class ServiceAccessPanel:
             first_traffic_at=record.first_traffic_at,
             last_traffic_node=record.last_traffic_node,
             hwid_device_limit=record.device_limit,
+            description=record.note,
+            tag=record.tag,
         )
 
 

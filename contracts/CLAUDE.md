@@ -1,6 +1,7 @@
 # contracts — Generated meridian-core artifacts
 
 ## Design decisions
+- Administrative person schemas describe private notes and tags with their bounds; generated schemas contain no private values, and lower-scope API records keep these fields as empty strings.
 
 **Generated, checked in** — `scripts/export_contracts.py` is the source of truth. Do not hand-edit files below `contracts/meridian/`.
 

@@ -189,11 +189,19 @@ export type LastTrafficNode = string | null;
  */
 export type LifetimeTrafficBytes = number;
 /**
+ * Private operator note; people/admin only.
+ */
+export type Note = string;
+/**
  * When an agent last counted the user's traffic.
  */
 export type OnlineAt = string | null;
 export type Status2 = "active" | "disabled" | "limited" | "expired";
 export type SubToken = string;
+/**
+ * Private operator tag; people/admin only.
+ */
+export type Tag = string;
 /**
  * 0 means unlimited.
  */
@@ -359,9 +367,11 @@ export interface UserRecord {
   first_traffic_at?: FirstTrafficAt;
   last_traffic_node?: LastTrafficNode;
   lifetime_traffic_bytes?: LifetimeTrafficBytes;
+  note?: Note;
   online_at?: OnlineAt;
   status: Status2;
   sub_token: SubToken;
+  tag?: Tag;
   traffic_limit_bytes?: TrafficLimitBytes;
   traffic_limit_strategy?: TrafficLimitStrategy;
   traffic_reset_at?: TrafficResetAt;

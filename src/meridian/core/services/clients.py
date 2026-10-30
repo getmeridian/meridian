@@ -63,6 +63,7 @@ def collect_client_list(
     allowed_usernames: Collection[str] | None = None,
     declared_usernames: Collection[str] | None = None,
     read_attention: Callable[[], AttentionList] | None = None,
+    tag: str | None = None,
 ) -> ClientListServiceResult:
     """Collect redacted client list data from the panel; `declared_usernames` marks the rest undeclared."""
     with panel_client as panel:
@@ -71,6 +72,8 @@ def collect_client_list(
     if allowed_usernames is not None:
         allowed = set(allowed_usernames)
         users = [user for user in users if user.username in allowed]
+    if tag is not None:
+        users = [user for user in users if getattr(user, "tag", "") == tag]
     declared = None if declared_usernames is None else set(declared_usernames)
     return ClientListServiceResult(clients=build_client_list_result(users, declared=declared, attention=attention))
 

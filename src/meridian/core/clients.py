@@ -12,6 +12,7 @@ from meridian.control.models import UserUsage
 from meridian.core.attention import PersonAttentionReason
 from meridian.core.client_limits import canonical_expiry, traffic_reset_from_strategy
 from meridian.core.models import CoreModel
+from meridian.core.person_metadata import PersonTag, PrivateNote
 from meridian.core.traffic import UserTrafficEvidence
 
 
@@ -78,6 +79,8 @@ class ClientRecord(UserTrafficEvidence):
         default_factory=list, description="Derived reasons when client list --attention was requested; never stored."
     )
     device_limit: int | None = Field(default=None, ge=1, le=100, description="None uses the fleet's default cap.")
+    note: PrivateNote = Field(default="", repr=False, description="Private operator note; people/admin only.")
+    tag: PersonTag = Field(default="", repr=False, description="Private operator tag; people/admin only.")
     declared: bool = Field(
         default=True,
         description="False for a person added in the control service's web console rather than the fleet's "
@@ -197,6 +200,12 @@ class ClientLimitsResult(CoreModel):
     client: ClientRecord
 
 
+def client_metadata_paths(records: Sequence[ClientRecord] | None = None) -> frozenset[str]:
+    """Exact metadata paths in an authorized single-person or list JSON result."""
+    bases = ["data.client"] if records is None else [f"data.clients.{index}" for index in range(len(records))]
+    return frozenset(f"{base}.{field}" for base in bases for field in ("note", "tag"))
+
+
 def build_client_record(
     user: PanelUserLike, *, declared: bool = True, attention_reasons: Sequence[PersonAttentionReason] = ()
 ) -> ClientRecord:
@@ -215,6 +224,8 @@ def build_client_record(
         first_traffic_at=getattr(user, "first_traffic_at", None),
         last_traffic_node=getattr(user, "last_traffic_node", None),
         device_limit=user.hwid_device_limit,
+        note=getattr(user, "description", ""),
+        tag=getattr(user, "tag", ""),
         declared=declared,
     )
 

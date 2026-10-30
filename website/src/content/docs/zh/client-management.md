@@ -53,6 +53,21 @@ meridian client list
 
 显示所有客户端的状态、流量、到期时间和最近在线时间。
 
+## 私人备注和标签
+
+可为每个人保存一条私人备注和一个标签，包括在控制台添加的人：
+
+```bash
+meridian client set sample --note "临时邀请" --tag TRIAL_7
+meridian client show sample
+meridian client list --tag TRIAL_7
+meridian client set sample --note "" --tag none
+```
+
+备注为纯文本，最多 500 个字符，支持换行。标签使用 1–16 个大写字母 A–Z、数字或下划线。空备注和 `--tag none` 清除相应字段；未指定的选项保留原值。`client list` 显示标签列，`--tag none` 可查找没有标签的人。
+
+控制台的个人页面可编辑相同字段。API 接受带有 `username`、`note` 和 `tag` 的 `PATCH /api/users`，或不带 `username` 的 `PATCH /api/users/NAME`。读取和编辑需要 `people` 或 `admin` 权限；较低权限收到空字符串。字段存放在控制服务中，随个人数据进入加密快照，不会进入订阅、连接页面、事件或日志。应用配置会保留运营者的编辑。迁移会保留 Remnawave 描述和有效标签，并报告描述截断到 500 个字符及跳过的无效标签。
+
 ## 流量限额和到期时间
 
 给客户端设置每月流量额度和结束日期：

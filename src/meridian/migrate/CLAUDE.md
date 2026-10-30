@@ -1,6 +1,7 @@
 # migrate — In-place move of a Remnawave fleet onto the control service (#95)
 
 ## Design decisions
+- Descriptions become private notes, normalized to LF and truncated to 500 characters with a content-free report; valid uppercase tags carry over, invalid tags and rejected person contact fields are reported without their values.
 
 - **One command, one resumable flow** — `commands/migrate.py` reviews then confirms (no terminal and no `--yes` stops after the review; `deploy` on a Remnawave fleet offers it); the move drops client-IP forwarding, which the service cannot run yet; `flow.ControlMigrator` checkpoints each step in `ClusterConfig.control_migration` (`started → backed_up → imported → cut_over → applied → done`), so a re-run continues and a finished one is a no-op.
 - **Refuse before touching anything** — a fleet already on the service, or one `validate_meridian_backend()` refuses, stops at review with no SSH; the fence and panel users are read before any change. `run()` then holds fence.json's lease from its first step (resumes too) to the cut-over and hands its holder to the apply (`apply_reviewed_intent(fence_holder=)`), so no other apply lands between; once cut over, the apply fences itself on the service.

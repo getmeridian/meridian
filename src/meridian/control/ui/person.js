@@ -41,6 +41,7 @@
         M.statusPill(user.status)),
       shareCard(share),
       h("div", { class: "cards" }, usageCard(user), accessCard(user)),
+      metadataCard(user),
       M.personHistory(name),
       M.devicesCard(user),
       dangerCard(user, share.declared),
@@ -129,6 +130,48 @@
           } }, M.t(disabled ? "person.enable" : "person.disable"))),
       h("p", { class: "muted small", text: M.t("person.status_" + user.status) }),
       form);
+  }
+
+  function metadataCard(user) {
+    var initialNote = user.note || "", initialTag = user.tag || "";
+    var note = h("textarea", { name: "note", rows: "4" }, initialNote);
+    var tag = h("input", { name: "tag", type: "text", value: initialTag, dir: "ltr", autocomplete: "off" });
+    var error = h("p", { class: "form-error", role: "alert" });
+    var form = h("form", { class: "stack", novalidate: true },
+      M.field(M.t("person.note"), note, M.t("person.note_hint")),
+      M.field(M.t("person.tag"), tag, M.t("person.tag_hint")), error,
+      h("button", { class: "btn btn-primary btn-sm", type: "submit" }, M.t("action.save")));
+    function validate() {
+      var characters = Array.from(note.value);
+      var invalidText = characters.some(function (character) {
+        var code = character.codePointAt(0);
+        return code !== 10 && (code < 32 || code >= 127 && code <= 159 || code >= 55296 && code <= 57343);
+      });
+      var noteError = characters.length > 500 || invalidText ? M.t("person.note_invalid") : "";
+      var tagError = /^[A-Z0-9_]{0,16}$/.test(tag.value) ? "" : M.t("person.tag_invalid");
+      note.setCustomValidity(noteError);
+      tag.setCustomValidity(tagError);
+      note.setAttribute("aria-invalid", noteError ? "true" : "false");
+      tag.setAttribute("aria-invalid", tagError ? "true" : "false");
+      error.textContent = noteError || tagError;
+      return !error.textContent;
+    }
+    note.addEventListener("input", validate);
+    tag.addEventListener("input", validate);
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (!validate()) { (note.validationMessage ? note : tag).focus(); return; }
+      var change = {};
+      if (note.value !== initialNote) change.note = note.value;
+      if (tag.value !== initialTag) change.tag = tag.value;
+      if (!Object.keys(change).length) { M.toast(M.t("person.nothing_changed")); return; }
+      M.busy(form, function () { return M.api("PATCH", path(user.username), change); }).then(function () {
+        M.toast(M.t("person.saved_toast"));
+        reload(user.username);
+      }, function () { /* shown in the form */ });
+    });
+    return h("section", { class: "card" }, h("h2", { text: M.t("person.metadata") }),
+      h("p", { class: "muted small", text: M.t("person.metadata_private") }), form);
   }
 
   /* `declared` comes with this person's share view, fresh from the service: the CLI moves a declared

@@ -441,5 +441,12 @@
   "fleet_routing.confirm": "Apply client routing {policy}?",
   "fleet_routing.failed": "The client routing change did not converge",
   "fleet_routing.failed_hint": "Fix the reported cause, then rerun meridian apply.",
-  "fleet_routing.changed": "Client routing is now {policy}"
+  "fleet_routing.changed": "Client routing is now {policy}",
+  "client.label.note": "Private note",
+  "client.label.tag": "Tag",
+  "client.metadata_none": "None",
+  "client.note_invalid": "Use a plain-text note of at most 500 characters; newlines are allowed.",
+  "client.tag_invalid": "Use 1–16 uppercase letters A–Z, digits, or underscores; none clears the tag.",
+  "client.set_options_hint": "Pass --limit, --reset, --expires, --devices, --note, or --tag.",
+  "client.settings_updated": "Updated settings for {name}."
 }

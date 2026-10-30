@@ -109,8 +109,8 @@ Manage the people who connect.
 meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client show NAME [--json]
 meridian client usage NAME [--days N] [--json]
-meridian client list [--attention] [--json]
-meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
+meridian client list [--attention] [--tag TAG|none] [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]
@@ -161,6 +161,8 @@ First reported traffic and the last reporting node come from accepted traffic gr
 Service-owned edits (`client enable`, `disable`, `set`, `reset-traffic`, and device removals) also accept people added in the console. An exact service username wins; a case or display-name match must identify one person, otherwise use the exact username shown by `client list`. Removal, reissue, and connection-page publication remain tied to declared clients.
 
 Existing VLESS sessions can outlive credential revocation. **`--cut-off`**, with `client remove` or `client reissue`, waits for each affected node to apply the revision without the old credentials, then resets its affected inbounds. Every open session on those inbounds ends, including other people's; they reconnect for a moment. If the inbound API fails, Xray restarts and all its sessions on that node end. The flag is opt-in and recommended after a leak. JSON reports each node under `data.cut_off`: `done`, `core_restart`, `failed`, or `timed_out`. Meridian waits up to five minutes; failed cut-offs exit `4`, timeouts `3`. The console offers the same choice when removing a person added there.
+
+Private metadata: `client set NAME --note TEXT --tag TAG` edits only the supplied fields. A note holds up to 500 plain-text characters, with newlines; `--note ""` clears it. A tag holds 1–16 uppercase letters A–Z, digits, or underscores; `--tag none` clears it. `client show` includes both fields, and `client list --tag TAG` filters its tag column (`none` selects untagged people). Reads and edits require people/admin scope. The console edits the same private fields; applies preserve them and encrypted snapshots carry them. See [Private notes and tags](/en/client-management/#private-notes-and-tags).
 
 ### meridian privacy
 

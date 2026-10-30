@@ -441,5 +441,12 @@
   "fleet_routing.confirm": "Применить режим маршрутизации {policy} на устройствах?",
   "fleet_routing.failed": "Не удалось полностью применить изменение маршрутизации на устройствах",
   "fleet_routing.failed_hint": "Устраните указанную причину и повторите meridian apply.",
-  "fleet_routing.changed": "На устройствах выбран режим маршрутизации {policy}"
+  "fleet_routing.changed": "На устройствах выбран режим маршрутизации {policy}",
+  "client.label.note": "Личная заметка",
+  "client.label.tag": "Метка",
+  "client.metadata_none": "Нет",
+  "client.note_invalid": "Введите обычный текст длиной до 500 символов. Переносы строк разрешены.",
+  "client.tag_invalid": "Используйте 1–16 заглавных букв A–Z, цифр или подчёркиваний; none удаляет метку.",
+  "client.set_options_hint": "Укажите --limit, --reset, --expires, --devices, --note или --tag.",
+  "client.settings_updated": "Настройки {name} обновлены."
 }

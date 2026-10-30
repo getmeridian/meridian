@@ -18,6 +18,8 @@ USER_FIELDS = (
     "traffic_limit_strategy",
     "traffic_reset_at",
     "device_limit",
+    "note",
+    "tag",
 )
 # Lifetime includes the ledger and imported use; the offset leaves the current period's growth.
 USER_SELECT = (

@@ -673,6 +673,7 @@ export const commandCatalog = {
       "machine_flags": [
         "--json",
         "--attention",
+        "--tag",
         "--context"
       ],
       "outcomes": [
@@ -942,6 +943,8 @@ export const commandCatalog = {
         "--reset",
         "--expires",
         "--devices",
+        "--note",
+        "--tag",
         "--json",
         "--context"
       ],

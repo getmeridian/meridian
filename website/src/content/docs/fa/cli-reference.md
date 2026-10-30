@@ -109,8 +109,8 @@ JSON `data` شامل `plan_hash`، `generation` و `actions[]` با `status: "co
 meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client show NAME [--json]
 meridian client usage NAME [--days N] [--json]
-meridian client list [--attention] [--json]
-meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
+meridian client list [--attention] [--tag TAG|none] [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]
@@ -161,6 +161,8 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 فرمان‌های تغییر اطلاعات فرد در سرویس (`client enable`، `disable`، `set`، `reset-traffic` و حذف ثبت دستگاه‌ها) برای افراد کنسول هم کار می‌کنند. نام کاربری دقیق اولویت دارد؛ تطبیق بدون توجه به بزرگی حروف یا با نام نمایشی باید فقط یک فرد را مشخص کند. در صورت ابهام، نام دقیقِ `client list` را وارد کنید. حذف فرد، صدور دوبارهٔ اطلاعات اتصال و انتشار صفحه همچنان فقط برای افراد تعریف‌شده در توپولوژی است.
 
 نشست‌های باز VLESS ممکن است پس از لغو کلیدها هم ادامه یابند. **`--cut-off`** در `client remove` یا `client reissue` منتظر می‌ماند تا هر سرورِ مربوط نسخهٔ بدون کلیدهای قدیمی را اعمال کند، سپس ورودی‌های مربوط را بازنشانی می‌کند. همهٔ نشست‌های آن ورودی‌ها، حتی نشست‌های دیگر کاربران، بسته می‌شوند و کاربران برای لحظه‌ای دوباره وصل می‌شوند. اگر API ورودی کار نکند، Xray راه‌اندازی مجدد می‌شود و همهٔ نشست‌های آن در همان سرور بسته می‌شوند. این گزینه پیش‌فرض نیست و برای لینک فاش‌شده توصیه می‌شود. JSON نتیجهٔ هر سرور را در `data.cut_off` با وضعیت `done`، `core_restart`، `failed` یا `timed_out` نشان می‌دهد. انتظار حداکثر پنج دقیقه است؛ شکست با کد `4` و پایان زمان انتظار با کد `3` گزارش می‌شود. هنگام حذف فردی که در کنسول اضافه شده، همین گزینه در کنسول هم وجود دارد.
+
+فیلدهای خصوصی: `client set NAME --note TEXT --tag TAG` فقط مقدارهای واردشده را تغییر می‌دهد. یادداشت حداکثر ۵۰۰ نویسهٔ متن ساده با امکان چند خط دارد؛ `--note ""` آن را پاک می‌کند. برچسب ۱ تا ۱۶ حرف بزرگ A–Z، رقم یا زیرخط دارد؛ `--tag none` آن را پاک می‌کند. `client show` هر دو فیلد را نشان می‌دهد و `client list --tag TAG` ستون برچسب را فیلتر می‌کند (`none` افراد بدون برچسب را انتخاب می‌کند). خواندن و ویرایش به دسترسی people/admin نیاز دارد. کنسول همین فیلدها را ویرایش می‌کند؛ اعمال پیکربندی آن‌ها را حفظ می‌کند و پشتیبان‌های رمزگذاری‌شده آن‌ها را منتقل می‌کنند. [یادداشت‌ها و برچسب‌های خصوصی](/fa/client-management/#یادداشتها-و-برچسبهای-خصوصی).
 
 ### meridian privacy
 

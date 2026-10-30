@@ -441,5 +441,12 @@
   "fleet_routing.confirm": "مسیریابی {policy} روی دستگاه‌ها اعمال شود؟",
   "fleet_routing.failed": "تغییر مسیریابی دستگاه‌ها کامل اعمال نشد",
   "fleet_routing.failed_hint": "علت گزارش‌شده را برطرف کنید و meridian apply را دوباره اجرا کنید.",
-  "fleet_routing.changed": "مسیریابی دستگاه‌ها اکنون روی {policy} است"
+  "fleet_routing.changed": "مسیریابی دستگاه‌ها اکنون روی {policy} است",
+  "client.label.note": "یادداشت خصوصی",
+  "client.label.tag": "برچسب",
+  "client.metadata_none": "ندارد",
+  "client.note_invalid": "یادداشت باید متن ساده و حداکثر ۵۰۰ نویسه باشد. رفتن به خط جدید مجاز است.",
+  "client.tag_invalid": "از ۱ تا ۱۶ حرف بزرگ A–Z، رقم یا زیرخط استفاده کنید؛ none برچسب را پاک می‌کند.",
+  "client.set_options_hint": "یکی از گزینه‌های --limit، --reset، --expires، --devices، --note یا --tag را وارد کنید.",
+  "client.settings_updated": "تنظیمات {name} به‌روزرسانی شد."
 }

@@ -74,7 +74,7 @@ from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sh
 from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.client_devices import DevicesRemoved
 
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 MAX_WAIT_SECONDS = 55
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -105,7 +105,9 @@ CREATE TABLE IF NOT EXISTS users (
     traffic_offset_bytes INTEGER NOT NULL DEFAULT 0,
     traffic_reset_at TEXT,
     traffic_carried_bytes INTEGER NOT NULL DEFAULT 0,
-    device_limit INTEGER
+    device_limit INTEGER,
+    note TEXT NOT NULL DEFAULT '',
+    tag TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS endpoints (endpoint_id TEXT PRIMARY KEY, body TEXT NOT NULL);
 """
@@ -139,6 +141,11 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (*ACCOUNTING_MIGRATION, *EVENT_TABLES),
     # 13 -> 14: signed node commands and the capabilities accepted by each session.
     COMMAND_TABLES,
+    # 14 -> 15: private, operator-owned person notes and tags.
+    (
+        "ALTER TABLE users ADD COLUMN note TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE users ADD COLUMN tag TEXT NOT NULL DEFAULT ''",
+    ),
 )
 # meta key prefix: the last revision a deleted node was signed at.
 _RETIRED_REVISION = "retired_revision:"
@@ -446,12 +453,14 @@ class ControlService:
                     item.traffic_limit_strategy,
                     period_began(item, now),
                     carried,
+                    item.note,
+                    item.tag,
                 )
                 if existing is None:
                     self._db.execute(
                         "INSERT INTO users (uuid, sub_token, status, created_at, expire_at, traffic_limit_bytes,"
-                        " traffic_limit_strategy, traffic_reset_at, traffic_carried_bytes, traffic_offset_bytes,"
-                        " username, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        " traffic_limit_strategy, traffic_reset_at, traffic_carried_bytes, note, tag,"
+                        " traffic_offset_bytes, username, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (*values, carried - item.used_traffic_bytes, item.username, f"u{secrets.token_hex(8)}"),
                     )
                     created.append(item.username)
@@ -465,7 +474,7 @@ class ControlService:
                 self._db.execute(
                     "UPDATE users SET uuid = ?, sub_token = ?, status = ?, created_at = ?, expire_at = ?,"
                     " traffic_limit_bytes = ?, traffic_limit_strategy = ?, traffic_reset_at = ?,"
-                    " traffic_carried_bytes = ?, traffic_offset_bytes = ? WHERE username = ?",
+                    " traffic_carried_bytes = ?, note = ?, tag = ?, traffic_offset_bytes = ? WHERE username = ?",
                     (*values, counted + carried - item.used_traffic_bytes, item.username),
                 )
                 replaced.append(item.username)
@@ -490,7 +499,7 @@ class ControlService:
             self.events.user_updated(user, merged)
             self._db.execute(
                 "UPDATE users SET status = ?, expire_at = ?, traffic_limit_bytes = ?, traffic_limit_strategy = ?,"
-                " device_limit = ? "
+                " device_limit = ?, note = ?, tag = ? "
                 "WHERE username = ?",
                 (
                     merged.status,
@@ -498,6 +507,8 @@ class ControlService:
                     merged.traffic_limit_bytes,
                     merged.traffic_limit_strategy,
                     merged.device_limit,
+                    merged.note,
+                    merged.tag,
                     username,
                 ),
             )

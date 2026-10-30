@@ -1,6 +1,7 @@
 # core - Meridian API contracts
 
 ## Design decisions
+- `person_metadata.py` owns plain-text notes (500 Unicode characters, newlines allowed) and one uppercase A–Z/digit/underscore tag (1–16); empty strings clear, omitted edits preserve, and creation intent never contains them.
 - Reviewed delivery command schemas register through `schema_delivery.py`, using the catalog's shared envelope base and failure model so names and wire fields stay stable.
 - **Creation-only account settings** — `UserCreationSettings` is shared by service creation and `AccessIntent.creation_settings`; an empty mapping is omitted so existing user payloads and plans keep their hashes.
 - **Attention predicates** — `attention.py` derives typed person/node reasons from aggregate evidence, with bounded day/percentage thresholds and no stored alert flags; client list composes the same reasons when `--attention` is requested.
@@ -34,6 +35,7 @@
 - Reporter primitives let provision, apply, and deploy emit typed events without choosing a renderer.
 
 ## Pitfalls
+- JSON reveal options accept exact dotted paths, including list indices; preserve authorized private note/tag fields without revealing neighboring URLs or credentials.
 - Fleet diffs compare creation settings for each person in access-user order; adding, editing, or removing that mapping is not a fleet reorder.
 - Timestamp validates calendar dates and clock times after its wire-pattern check; preserve the input string so fractional precision and generated schemas stay unchanged.
 - A fresh healthy runtime can still be awaiting convergence; fleet status counts that separately and degrades until in_sync, while stale reports remain unavailable evidence.

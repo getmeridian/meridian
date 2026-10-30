@@ -391,5 +391,13 @@
   "settings.client_routing": "Client routing",
   "settings.routing_ru_split": "Russian destinations and private/LAN ranges go directly; other traffic uses the VPN. Detected BitTorrent peers also go directly in Xray JSON.",
   "settings.routing_full": "Internet traffic uses the VPN, including Russian destinations; private/LAN ranges and detected BitTorrent peers in Xray JSON go directly.",
-  "settings.routing_hint": "Change this policy from your computer:"
+  "settings.routing_hint": "Change this policy from your computer:",
+  "person.metadata": "Private notes and tag",
+  "person.metadata_private": "Only the owner and people/admin tokens can read these fields. They stay out of connection pages and subscriptions and ride encrypted backups.",
+  "person.note": "Private note",
+  "person.note_hint": "Plain text, up to 500 characters. Newlines are allowed; leave blank to clear.",
+  "person.note_invalid": "Use plain text of at most 500 characters; newlines are allowed.",
+  "person.tag": "Tag",
+  "person.tag_hint": "1–16 uppercase letters A–Z, digits, or underscores. Leave blank to clear.",
+  "person.tag_invalid": "Use 1–16 uppercase letters A–Z, digits, or underscores, or leave blank."
 }

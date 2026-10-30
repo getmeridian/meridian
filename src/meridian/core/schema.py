@@ -107,6 +107,7 @@ from meridian.core.relay_check import RelayCheckResult
 from meridian.core.routes import RouteListResult, RouteMutationResult
 from meridian.core.schema_delivery import delivery_schemas
 from meridian.core.schema_envelopes import make_command_envelope
+from meridian.core.schema_people import PEOPLE_SCHEMAS
 from meridian.core.schema_topology import TOPOLOGY_SCHEMAS
 from meridian.core.servers import (
     ServerBootstrapKeyRequest,
@@ -567,6 +568,7 @@ _, _, ApiWorkflowOutputEnvelope = _make_command_envelope(
 
 
 _SCHEMAS: dict[str, type[BaseModel]] = {
+    **PEOPLE_SCHEMAS,
     "output-envelope": OutputEnvelope,
     "apply-command-data": ApplyCommandData,
     "apply-counts": ApplyCounts,

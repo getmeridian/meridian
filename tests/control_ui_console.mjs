@@ -42,6 +42,15 @@ function reply(body, status = 200) {
 }
 w.fetch = (url, options) => {
   events.push({ method: options.method, url, headers: options.headers, at: fakeNow });
+  if (mode === 'metadata') {
+    if (options.method !== 'GET') {
+      const change = JSON.parse(options.body);
+      writes.push(change);
+      Object.assign(data.user, change);
+    }
+    if (url === 'api/users/sample') return Promise.resolve(reply(data.user));
+    if (url === 'ui/api/people/sample/share') return Promise.resolve(reply({ declared: false }));
+  }
   if (mode.startsWith('commands-')) {
     const node = url.split('/')[2];
     const commandId = url.split('/').at(-1);
@@ -213,6 +222,29 @@ if (mode.startsWith('expiry-')) {
   report.error = expiry.validationMessage;
   report.invalid = expiry.getAttribute('aria-invalid') === 'true';
   if (typeof cleanup === 'function') cleanup();
+}
+
+if (mode === 'metadata') {
+  M.personHistory = M.devicesCard = () => null;
+  w.eval(fs.readFileSync(path.join(ui, 'person.js'), 'utf8'));
+  M.renderPerson(view, 'sample');
+  await settle();
+  const note = view.querySelector('textarea[name="note"]');
+  const tag = view.querySelector('input[name="tag"]');
+  report.initialNote = note?.value;
+  report.initialTag = tag?.value;
+  report.text = view.textContent;
+  report.injected = !!view.querySelector('img[src="x"]') || !!w.pwned;
+  if (note && tag) {
+    if ('note' in data.change) note.value = data.change.note;
+    if ('tag' in data.change) tag.value = data.change.tag;
+    note.dispatchEvent(new w.Event('input'));
+    tag.dispatchEvent(new w.Event('input'));
+    note.form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+    await settle();
+    report.error = note.validationMessage || tag.validationMessage;
+  }
+  report.writes = writes;
 }
 
 if (mode.startsWith('live-')) {

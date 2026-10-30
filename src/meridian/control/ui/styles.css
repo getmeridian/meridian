@@ -69,7 +69,7 @@ h1, h2 { font-family: var(--heading); font-weight: 600; letter-spacing: -.015em;
 h1 { font-size: 1.75rem; }
 h2 { font-size: 1.125rem; }
 a { color: var(--ac-text); }
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
 code { font-family: var(--mono); font-size: .9em; }
 .mono { font-family: var(--mono); }
 :focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; border-radius: 6px; }
@@ -117,12 +117,13 @@ code { font-family: var(--mono); font-size: .9em; }
 /* -- forms ---------------------------------------------------------------------------------- */
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .field label { font-size: .875rem; font-weight: 600; color: var(--t1); }
-input[type="text"], input[type="password"], input[type="number"], input[type="date"], input[type="search"], select {
+input[type="text"], input[type="password"], input[type="number"], input[type="date"], input[type="search"], select, textarea {
   width: 100%; min-height: 44px; padding: 0 12px; border-radius: var(--r); border: 1px solid var(--b2);
   background: var(--s1); color: var(--t1); font-size: 1rem;
 }
 select { padding-inline-end: 32px; }
-input:focus, select:focus { outline: none; border-color: var(--ac); box-shadow: 0 0 0 3px var(--ac2); }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--ac); box-shadow: 0 0 0 3px var(--ac2); }
+textarea { resize: vertical; min-height: 100px; }
 input::placeholder { color: var(--t3); }
 .code-input { font-family: var(--mono); letter-spacing: .3em; font-size: 1.25rem; text-align: center; direction: ltr; }
 .hint { font-size: .8125rem; color: var(--t2); }

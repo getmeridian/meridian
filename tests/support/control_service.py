@@ -42,6 +42,15 @@ def drop_token_expiry_schema(db: sqlite3.Connection) -> None:
     """An older-schema fixture must not retain the column step 12 adds."""
     if "expires_at" in {column[1] for column in db.execute("PRAGMA table_info(api_tokens)")}:
         db.execute("ALTER TABLE api_tokens DROP COLUMN expires_at")
+    drop_person_metadata_schema(db)
+
+
+def drop_person_metadata_schema(db: sqlite3.Connection) -> None:
+    """Older fixtures must not retain the operator metadata added in schema step 15."""
+    columns = {column[1] for column in db.execute("PRAGMA table_info(users)")}
+    for column in ("note", "tag"):
+        if column in columns:
+            db.execute(f"ALTER TABLE users DROP COLUMN {column}")
 
 
 def drop_operations_schema(db: sqlite3.Connection) -> None:
@@ -52,6 +61,7 @@ def drop_operations_schema(db: sqlite3.Connection) -> None:
     for column in ("first_traffic_at", "last_traffic_node"):
         if column in columns:
             db.execute(f"ALTER TABLE traffic_totals DROP COLUMN {column}")
+    drop_person_metadata_schema(db)
 
 
 @contextmanager

@@ -671,6 +671,7 @@
       "machine_flags": [
         "--json",
         "--attention",
+        "--tag",
         "--context"
       ],
       "outcomes": [
@@ -940,6 +941,8 @@
         "--reset",
         "--expires",
         "--devices",
+        "--note",
+        "--tag",
         "--json",
         "--context"
       ],
