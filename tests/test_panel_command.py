@@ -65,6 +65,7 @@ def test_panel_on_a_service_fleet_prints_the_console_and_a_one_time_setup_link(t
 
         output = _plain(result.output)
         assert result.exit_code == 0, output
+        assert "Meridian web panel" in output
         assert f"{url}/" in output
         assert "Works once, for 15 minutes" in output
         assert "Remnawave" not in output

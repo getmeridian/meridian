@@ -252,7 +252,7 @@ meridian relay add 203.0.113.10 --exit 198.51.100.10
 控制服务自带一个内置网页面板（管理控制台），供唯一的所有者——你——使用。它位于随机生成的秘密路径上，与连接页面路径相互独立，因此你分享的链接绝不会暴露它。`meridian panel` 会打印它的地址；在面板还没有所有者时，还会打印一个一次性设置链接：
 
 ```
-  Meridian console
+  Meridian web panel
   URL         https://198.51.100.10/<secret-path>/
   Setup link  https://198.51.100.10/<secret-path>/#setup=…
               Works once, for 15 minutes. Open it to choose the owner's password.

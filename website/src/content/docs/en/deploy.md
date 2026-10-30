@@ -252,7 +252,7 @@ meridian relay add 203.0.113.10 --exit 198.51.100.10
 The control service comes with a built-in web panel (owner console) for one owner: you. It sits on a random secret path, separate from the connection-page path, so links you share never reveal it. `meridian panel` prints its address, and until the panel has an owner, a one-time setup link:
 
 ```
-  Meridian console
+  Meridian web panel
   URL         https://198.51.100.10/<secret-path>/
   Setup link  https://198.51.100.10/<secret-path>/#setup=…
               Works once, for 15 minutes. Open it to choose the owner's password.

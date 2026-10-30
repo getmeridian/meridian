@@ -600,7 +600,7 @@
       ],
       "command": "client.extend",
       "data_schema": "client-limits",
-      "description": "Extend a person's access by whole days, including people created in the console",
+      "description": "Extend a person's access by whole days, including people added in the web panel",
       "envelope_schema": "client-extend-envelope",
       "error_schema": "error",
       "exit_codes": {
@@ -2902,7 +2902,7 @@
       ],
       "command": "test",
       "data_schema": "test-result",
-      "description": "Test real proxy traffic from this device (no SSH needed)",
+      "description": "Test real VPN traffic from this device (no SSH needed)",
       "envelope_schema": "test-envelope",
       "error_schema": "error",
       "exit_codes": {

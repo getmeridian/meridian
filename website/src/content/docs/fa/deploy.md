@@ -252,7 +252,7 @@ meridian relay add 203.0.113.10 --exit 198.51.100.10
 سرویس کنترل یک پنل وب توکار (کنسول مالک) برای یک مالک دارد: شما. این پنل روی یک مسیر مخفی تصادفی، جدا از مسیر صفحهٔ اتصال، قرار دارد، پس لینک‌هایی که به اشتراک می‌گذارید هرگز آن را فاش نمی‌کنند. `meridian panel` نشانی آن را چاپ می‌کند و تا وقتی پنل مالک ندارد، یک لینک راه‌اندازی یک‌بارمصرف هم می‌دهد:
 
 ```
-  Meridian console
+  Meridian web panel
   URL         https://198.51.100.10/<secret-path>/
   Setup link  https://198.51.100.10/<secret-path>/#setup=…
               Works once, for 15 minutes. Open it to choose the owner's password.

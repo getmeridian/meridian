@@ -1,4 +1,4 @@
-"""End-to-end proxy connectivity workflow and CLI presentation."""
+"""End-to-end VPN connectivity workflow and CLI presentation."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ def run(
     basic: bool = False,
     timeout: float | str = 5,
 ) -> None:
-    """Verify public reachability and canonical proxy traffic without SSH."""
+    """Verify public reachability and canonical VPN traffic without SSH."""
     operation = OperationContext()
     with error_context("test", timer=operation.timer):
         try:

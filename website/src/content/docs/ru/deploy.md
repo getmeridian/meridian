@@ -252,7 +252,7 @@ meridian relay add 203.0.113.10 --exit 198.51.100.10
 В состав сервиса управления входит встроенная веб-панель (консоль владельца). Она расположена по отдельному секретному пути, который никогда не раскрывается в ссылках пользователей. Команда `meridian panel` выводит адрес панели, а до первой регистрации владельца — одноразовую ссылку для создания пароля:
 
 ```
-  Meridian console
+  Meridian web panel
   URL         https://198.51.100.10/<secret-path>/
   Setup link  https://198.51.100.10/<secret-path>/#setup=…
               Works once, for 15 minutes. Open it to choose the owner's password.

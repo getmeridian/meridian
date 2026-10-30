@@ -197,7 +197,7 @@ def client_extend_cmd(
     days: str = typer.Option(..., "--days", metavar="N", help="Days to add after now or the current expiry, 1–3650"),
     _json: Json = False,
 ) -> None:
-    """Extend a person's access by whole days, including people created in the console"""
+    """Extend a person's access by whole days, including people added in the web panel"""
     from meridian.commands.client_limits import run_extend
 
     run_extend(name, days=days)
@@ -450,7 +450,7 @@ def node_add_cmd(
     [dim]Examples:[/dim]
       [cyan]meridian node add 198.51.100.10[/cyan]
       [cyan]meridian node add 198.51.100.10 --name finland --sni www.google.com[/cyan]
-      [cyan]meridian node add 198.51.100.10 --domain proxy.example.com --yes[/cyan]
+      [cyan]meridian node add 198.51.100.10 --domain vpn.example.com --yes[/cyan]
       [cyan]meridian node add 198.51.100.10 --sni de.example.com --self-steal[/cyan]   Your own domain
       [cyan]meridian node add 198.51.100.10 --country NL[/cyan]   Registry says otherwise
     """

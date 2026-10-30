@@ -79,7 +79,7 @@ RENAMED: dict[str, str] = {
 RENAMED_OPTIONS: dict[str, str] = {"--server": "the first argument"}
 # Removed commands with no successor spelling: the refusal says where the work moved.
 RETIRED: dict[str, str] = {
-    "studio": "`meridian studio` was removed. Manage the fleet in the owner's web console: `meridian panel`.",
+    "studio": "`meridian studio` was removed. Manage the fleet in the owner's web panel: `meridian panel`.",
 }
 
 
@@ -167,12 +167,14 @@ app = typer.Typer(
     name="meridian",
     cls=_SectionedGroup,
     help=(
-        "Censorship-resistant proxy server management\n\n"
-        "Rent a server, run one command, and share a link or QR code.\n\n"
+        "Deploy and manage self-hosted VPN servers\n\n"
+        "One command turns a fresh VPS into a hardened VPN server, with a built-in "
+        "web panel and a connection page for each person.\n\n"
         "[dim]Quick start:[/dim]\n"
-        "  [cyan]meridian deploy 198.51.100.10[/cyan]   One server, shareable link at the end\n"
-        "  [cyan]meridian setup[/cyan]                  Guided wizard for several servers, relays, or routing\n"
+        "  [cyan]meridian deploy 198.51.100.10[/cyan]   One server, connection page at the end\n"
+        "  [cyan]meridian panel[/cyan]                  Web panel URL and one-time setup link\n"
         "  [cyan]meridian client add alice[/cyan]       Give another person access\n"
+        "  [cyan]meridian setup[/cyan]                  Guided wizard for several servers, relays, or routing\n"
         "  [cyan]meridian check[/cyan]                  Is everything healthy?"
     ),
     epilog=(
@@ -210,7 +212,7 @@ def main_callback(
     lang: str = typer.Option("", "--lang", help="Language for the setup wizard: en, ru, fa, zh", show_default=False),
     context: str = typer.Option("", "--context", metavar="NAME", help=CONTEXT_HELP, show_default=False),
 ) -> None:
-    """Meridian — Censorship-resistant proxy server management."""
+    """Meridian — Deploy and manage self-hosted VPN servers."""
     if ctx.resilient_parsing:
         return
 
@@ -624,7 +626,7 @@ def test_cmd(
     timeout: Timeout = "5",
     _json: Json = False,
 ) -> None:
-    """Test real proxy traffic from this device (no SSH needed)
+    """Test real VPN traffic from this device (no SSH needed)
 
     Runs one active client's delivered connection end to end. [cyan]--basic[/cyan]
     only checks reachability and cannot be combined with [cyan]--client[/cyan];
@@ -722,10 +724,10 @@ def logs_cmd(
 @app.command("panel", rich_help_panel=ADVANCED)
 def panel_cmd(
     setup_link: bool = typer.Option(
-        False, "--setup-link", hidden=True, help="Print a fresh one-time setup link for the web console"
+        False, "--setup-link", hidden=True, help="Print a fresh one-time setup link for the web panel"
     ),
 ) -> None:
-    """Show the fleet's web console URL, with a one-time setup link until it has an owner"""
+    """Show the fleet's web panel URL, with a one-time setup link until it has an owner"""
     from meridian.commands.panel import run
 
     run(setup_link=setup_link)

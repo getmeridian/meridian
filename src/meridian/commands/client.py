@@ -56,7 +56,7 @@ def _access_users(cluster: ClusterConfig) -> list[str]:
 
 def _readable_users(cluster: ClusterConfig) -> list[str] | None:
     """Who list and show may read: on a control service every user is a person of this fleet,
-    including those added in its web console; a Remnawave panel may hold others, so only declared ones."""
+    including those added in its web panel; a Remnawave panel may hold others, so only declared ones."""
     return None if cluster.runs_control_service else _access_users(cluster)
 
 
@@ -79,7 +79,7 @@ def run_add(
     expires: str | None = None,
     devices: str | None = None,
 ) -> None:
-    """Add one or more clients to the proxy cluster, optionally with traffic limits and an expiry."""
+    """Add one or more clients to the fleet, optionally with traffic limits and an expiry."""
     operation = OperationContext()
     with error_context("client.add", timer=operation.timer):
         limits = parse_limit_options(limit=limit, reset=reset, expires=expires, devices=devices)
@@ -270,7 +270,7 @@ def _list(*, operation: OperationContext, attention: bool = False, tag: str | No
 
 
 def run_remove(name: str, yes: bool = False, cut_off: bool = False) -> None:
-    """Remove a client from the proxy cluster."""
+    """Remove a client from the fleet."""
     operation = OperationContext()
     with error_context("client.remove", timer=operation.timer):
         if is_json_mode() and not yes:
