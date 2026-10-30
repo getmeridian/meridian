@@ -20,3 +20,4 @@
 - Never make a reply word equal a value the user types at a choice prompt (`exit`, `relay`, `gateway`, `control`); navigation words are matched first.
 - Persian users may type Persian digits or the Arabic comma `،`; parsing goes through `int()` and normalizes the comma.
 - Keep commands, protocol names, `local`, and device-cap `default` untranslated.
+- Wrap names in right-to-left text with `isolate()`, never literal U+2068/U+2069: it marks only Persian output, and plain terminals printed the marks around node names in every language.

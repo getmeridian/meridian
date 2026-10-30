@@ -37,6 +37,11 @@ def t(key: str, **values: object) -> str:
     return text.format(**values) if values else text
 
 
+def isolate(text: str) -> str:
+    """Keep a left-to-right name intact inside right-to-left text; other locales print it bare."""
+    return f"\u2068{text}\u2069" if _current == "fa" else text
+
+
 def step_label(name: str) -> str:
     """A provisioning step's display name: ``step.<slug>`` when cataloged, else its English name.
 

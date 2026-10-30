@@ -6,13 +6,13 @@ from collections.abc import Sequence
 
 from meridian.console import err_console, ok, warn
 from meridian.control.command_models import CutOffPlan, NodeCommandOutcome
-from meridian.i18n import t
+from meridian.i18n import isolate, t
 
 
 def cut_off_disclosure(plan: CutOffPlan) -> str:
     nodes = ", ".join(node.node_id for node in plan.nodes)
     if nodes:
-        nodes = "\u2068" + nodes + "\u2069"
+        nodes = isolate(nodes)
     return t("node_commands.cut_off_scope", nodes=nodes) if nodes else t("node_commands.no_inbounds")
 
 
@@ -24,7 +24,7 @@ def print_command_results(outcomes: Sequence[NodeCommandOutcome]) -> None:
         "timed_out": "node_commands.timed_out",
     }
     for outcome in outcomes:
-        text = f"\u2068{outcome.node_id}\u2069: {t(labels[outcome.status])}"
+        text = f"{isolate(outcome.node_id)}: {t(labels[outcome.status])}"
         if outcome.status in {"done", "core_restart"}:
             ok(text)
         else:
