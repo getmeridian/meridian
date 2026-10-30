@@ -531,6 +531,11 @@ impl<'a> Agent<'a> {
     /// not: Xray's own counters die with the core, so an outage must not leave them there.
     pub fn send_stats(&mut self) -> Result<bool, HttpError> {
         let api = self.xray_api();
+        if api.is_none() {
+            // Staleness counts from the first chance to collect: a node that waited minutes
+            // for its first document must not report a failed collection it never attempted.
+            self.collection_health = CollectionHealth::new(self.exec.now());
+        }
         if let Some((xray, api)) = &api {
             match stats::query(self.exec, xray, api) {
                 Ok(deltas) => {
@@ -709,17 +714,7 @@ impl<'a> Agent<'a> {
                 next_reconcile = Instant::now() + RECONCILE_INTERVAL;
                 next_report = Instant::now();
             }
-            if Instant::now() >= next_report {
-                let result = self.send_report();
-                next_report = Instant::now()
-                    + match result {
-                        Ok(()) => self.intervals().0,
-                        Err(err) => {
-                            debug!("report failed: {err}");
-                            Duration::from_secs(15)
-                        }
-                    };
-            }
+            // Stats first: the report carries their collection health, which is a warning before any.
             if Instant::now() >= next_stats {
                 let result = self.send_stats();
                 next_stats = Instant::now()
@@ -727,6 +722,17 @@ impl<'a> Agent<'a> {
                         Ok(_) => self.intervals().1,
                         Err(err) => {
                             debug!("stats failed: {err}");
+                            Duration::from_secs(15)
+                        }
+                    };
+            }
+            if Instant::now() >= next_report {
+                let result = self.send_report();
+                next_report = Instant::now()
+                    + match result {
+                        Ok(()) => self.intervals().0,
+                        Err(err) => {
+                            debug!("report failed: {err}");
                             Duration::from_secs(15)
                         }
                     };

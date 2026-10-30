@@ -93,3 +93,17 @@ fn stats_health_no_success_is_warn_then_fail_without_an_invented_timestamp() {
     *exec.elapsed.lock().unwrap() += Duration::from_secs(180);
     assert_eq!(collection_check(&agent).status, "fail");
 }
+
+#[test]
+fn stats_health_counts_staleness_from_the_first_xray_not_the_agents_start() {
+    let pki = TestPki::new();
+    let service = service(&pki);
+    let node = Node::new(&service.url(), &pki);
+    let exec = FakeExec::default();
+    let mut agent = Agent::new(node.options(), &exec).unwrap();
+    *exec.elapsed.lock().unwrap() += Duration::from_secs(600);
+    assert!(!agent.send_stats().unwrap(), "no xray yet");
+    service.push(document(1, 1, &supported(), &pki));
+    agent.poll_once().unwrap();
+    assert_eq!(collection_check(&agent).status, "warn");
+}
