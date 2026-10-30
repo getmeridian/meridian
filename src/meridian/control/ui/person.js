@@ -62,7 +62,7 @@
             M.displayName(name) !== name ? h("span", { class: "mono", text: name + " · " }) : null,
             M.t("person.since", { when: M.date(user.created_at) }))),
         M.statusPill(user.status)),
-      shareCard(share),
+      shareCard(share, name),
       h("div", { class: "cards" }, usageCard(user, screen), accessCard(user, screen)),
       metadataCard(user, screen),
       M.personHistory(name),
@@ -71,7 +71,7 @@
     ]);
   }
 
-  function shareCard(share) {
+  function shareCard(share, username) {
     if (!share.subscription_url) {
       return h("section", { class: "card" }, h("h2", { text: M.t("person.share") }),
         h("p", { class: "muted", text: M.t("person.no_public_url") }), M.connectionDisclosure(share));
@@ -80,7 +80,10 @@
       h("h2", { text: M.t("person.share") }),
       h("p", { class: "muted small", text: M.t("person.share_text") }),
       h("div", { class: "share" },
-        h("img", { class: "qr", src: share.qr_svg, alt: M.t("person.qr_alt"), width: "200", height: "200" }),
+        h("div", { class: "stack-sm share-qr" },
+          h("img", { class: "qr", src: share.qr_svg, alt: M.t("person.qr_alt"), width: "200", height: "200" }),
+          M.qrExportActions(share.qr_svg, { name: M.displayName(username), username: username,
+            title: share.profile_title || (M.state.fleet && M.state.fleet.profile_title) || "Meridian" })),
         h("div", { class: "stack-sm share-links" },
           h("p", { class: "label", text: M.t("person.subscription") }),
           h("code", { class: "link-text", text: share.subscription_url }),

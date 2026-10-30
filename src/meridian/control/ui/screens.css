@@ -94,6 +94,9 @@
 .facts dd { min-width: 0; overflow-wrap: anywhere; }
 .share { display: flex; gap: 20px; align-items: flex-start; }
 .share-links { flex: 1; }
+.share-qr { flex: 0 0 220px; }
+.share-qr .qr { margin-inline: auto; }
+.qr-export-actions { justify-content: center; }
 .qr { display: block; border-radius: var(--r); background: #fff; border: 1px solid var(--b1); flex-shrink: 0; }
 .individual-connections { border-top: 1px solid var(--b1); margin-top: 20px; padding-top: 12px; }
 .individual-connections > summary { cursor: pointer; font-weight: 600; padding-block: 8px; }

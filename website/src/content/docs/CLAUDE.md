@@ -2,6 +2,7 @@
 
 ## Design decisions
 - API-token guides explain scoped issuance, authenticated OpenAPI discovery, credential/scope markers, and cut-off permissions in every locale; operation tables are checked against the committed admin contract by `scripts/validate_api_docs.py`.
+- Person guides describe captioned PNG/SVG QR export, clipboard fallback, and local-only rendering in all four locales.
 - Person and CLI guides document individual credentials, explicit format URLs, their people/admin access, and the producing-output boundary in every locale.
 - Subscription guides explain Automatic-first Xray profiles and single-primary routing without mixing fingerprint alternatives.
 - The person-screen guide describes effective enable results and preserves parity across all four locales.

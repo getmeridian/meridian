@@ -24,8 +24,10 @@
             h("button", { class: "btn btn-ghost btn-sm", type: "button", disabled: !entry.available,
               onclick: function () {
                 M.dialog(M.t("person.connection_qr", { name: entry.remark }), function () {
-                  return h("img", { class: "qr connection-qr", src: entry.qr_svg,
-                    width: "280", height: "280", alt: M.t("person.qr_alt") });
+                  return [h("img", { class: "qr connection-qr", src: entry.qr_svg,
+                    width: "280", height: "280", alt: M.t("person.qr_alt") }),
+                    M.qrExportActions(entry.qr_svg, { name: M.displayName(share.username), username: share.username,
+                      title: share.profile_title || (M.state.fleet && M.state.fleet.profile_title) || "Meridian" })];
                 });
               } }, M.t("person.show_qr"))));
       }), formats.length ? [h("h3", { text: M.t("person.connection_formats") }),

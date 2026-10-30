@@ -195,6 +195,8 @@ Client accounts (keys, status, limits, traffic) live in the control service's da
 
 ## Web console
 
+The subscription QR and each individual QR offer **Download PNG** and **Download SVG**, captioned with the person's name and your fleet title. **Copy QR image** appears where image clipboard support is available; if copying is refused, the PNG downloads instead. Export uses local browser rendering and makes no outside request.
+
 Open **Individual connections** beneath the main subscription handoff to copy a named connection or show its QR code in subscription order. The disclosure starts closed and also lists explicit Xray JSON, Mihomo, and sing-box URLs. These links and QR images grant access as that person; keep them private. `meridian client show NAME --connections` and `GET /api/users/{username}/connections` show the same list. The API requires people/admin scope or an owner session; ordinary read tokens cannot read the credentials.
 
 Person actions name the person in their result. Enabling someone whose access is expired or whose quota is exhausted explains what still prevents connection. A result arriving after you navigate leaves the new screen in place.

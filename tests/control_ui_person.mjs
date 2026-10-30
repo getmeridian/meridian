@@ -26,6 +26,7 @@ const share = {
   qr_svg: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="white"/></svg>').toString('base64'),
   ...data.share,
 };
+if (data.unsafeSvg) share.qr_svg = 'data:image/svg+xml;base64,' + Buffer.from(data.unsafeSvg).toString('base64');
 function reply(body, status = 200) {
   return { ok: status >= 200 && status < 300, status, headers: { get: () => null },
     text: () => Promise.resolve(JSON.stringify(body)) };
@@ -50,6 +51,7 @@ w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
 w.HTMLDialogElement.prototype.close = function () { this.open = false; };
 const load = script => w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 load('core.js');
+load('qr-export.js');
 const M = w.M;
 M.i18n = { locale: () => locale === 'zh' ? 'zh-CN' : locale, load: () => Promise.resolve(),
   langs: ['en', 'ru', 'fa', 'zh'], names: { en: 'English', ru: 'Русский', fa: 'فارسی', zh: '中文' }, lang: locale };
@@ -84,6 +86,61 @@ if (mode === 'person-connections') {
   report.qr = w.document.querySelector('dialog img')?.getAttribute('src') || '';
   report.injected = !!view().querySelector('img[src="x"]') || !!w.pwned;
   report.outside = events.filter(event => event.url?.includes('://'));
+}
+
+if (mode === 'person-qr') {
+  const generated = [], clipboard = [], downloads = [];
+  let source = '', draws = 0, canvasSize = [];
+  Object.defineProperty(w, 'isSecureContext', { value: true });
+  w.ClipboardItem = class {
+    constructor(items) { this.items = items; }
+    static supports() { return data.clipboard !== 'unsupported'; }
+  };
+  Object.defineProperty(w.navigator, 'clipboard', { value: data.clipboard === 'absent' ? undefined : {
+    write(items) {
+      if (data.clipboard === 'throws') throw new Error('Clipboard refused');
+      if (data.clipboard === 'rejects') return Promise.reject(new Error('Clipboard refused'));
+      clipboard.push(...items);
+      return Promise.resolve();
+    },
+  } });
+  w.URL.createObjectURL = blob => { generated.push(blob); return 'blob:https://198.51.100.1/generated-' + generated.length; };
+  w.URL.revokeObjectURL = () => {};
+  w.HTMLAnchorElement.prototype.click = function () { downloads.push({ href: this.href, filename: this.download }); };
+  w.HTMLImageElement.prototype.decode = function () { source = this.src; return Promise.resolve(); };
+  w.HTMLCanvasElement.prototype.getContext = function () {
+    const canvas = this;
+    return { font: '24px sans-serif', fillStyle: '', textAlign: '',
+      measureText: text => ({ width: [...text].length * 12 }),
+      fillRect() {}, fillText() {},
+      drawImage(image) { source = image.src; draws++; canvasSize = [canvas.width, canvas.height]; },
+    };
+  };
+  w.HTMLCanvasElement.prototype.toBlob = function (done, type) { done(new w.Blob(['test-only-pixels'], { type })); };
+  M.render();
+  await settle();
+  const allActions = [...view().querySelectorAll('[data-qr-action]')];
+  report.actions = allActions.map(el => el.dataset.qrAction);
+  const action = data.action === 'copy' && !allActions.some(el => el.dataset.qrAction === 'copy') ? 'png' : data.action;
+  allActions.find(el => el.dataset.qrAction === action)?.click();
+  await settle();
+  const readBlob = blob => new Promise(resolve => {
+    const reader = new w.FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.readAsText(blob);
+  });
+  const svgBlob = generated.find(blob => blob.type === 'image/svg+xml');
+  report.svg = svgBlob ? await readBlob(svgBlob) : source.startsWith('data:image/svg+xml,') ? decodeURIComponent(source.split(',').slice(1).join(',')) : '';
+  report.downloads = downloads;
+  report.downloadTypes = generated.map(blob => blob.type);
+  report.copiedTypes = clipboard.flatMap(item => Object.keys(item.items));
+  report.canvasSize = canvasSize;
+  report.draws = draws;
+  report.outside = events.filter(event => event.url?.includes('://'));
+  report.toasts = events.filter(event => event.toast).map(event => event.toast);
+  report.generalUrlsRejected = !M.h('a', { href: 'blob:https://198.51.100.1/arbitrary' }).hasAttribute('href')
+    && !M.h('a', { href: 'data:image/png;base64,AAAA' }).hasAttribute('href')
+    && !M.h('img', { src: 'data:image/png;base64,AAAA' }).hasAttribute('src');
 }
 
 if (mode === 'person-mutation') {
