@@ -31,7 +31,7 @@ from meridian.control import ui_routes
 from meridian.control.api_models import DeletedResource, DeployerStateReceipt, UserList
 from meridian.control.blobs import BlobStore, fleet_artifacts, served_hashes
 from meridian.control.command_models import NodeCommandRequest, UserCutOffRequest
-from meridian.control.delivery_routes import DELIVERY_OWNER_ROUTES, DELIVERY_ROUTES
+from meridian.control.delivery_routes import DELIVERY_OWNER_ROUTES
 from meridian.control.enrollment import Session, token_sha256
 from meridian.control.errors import ServiceError, agent_error
 from meridian.control.http_errors import api_error_response, error_page, validation_message
@@ -632,7 +632,6 @@ ROUTES: list[Route] = control_routes(_Handler)
 
 
 # The web UI's routes (`ui_routes.py`) live in their own block; `/api` routes come first.
-ROUTES.extend(DELIVERY_ROUTES)
 ALL_ROUTES: list[Route] = [*ROUTES, *UI_ROUTES]
 # Sensitive owner changes need a recent password confirmation, held again in the write's transaction.
 OWNER_STEP_UP: frozenset[Callable[..., Any]] = frozenset({_Handler.create_token, _Handler.put_privacy})

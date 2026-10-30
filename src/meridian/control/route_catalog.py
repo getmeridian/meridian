@@ -8,12 +8,13 @@ are omitted from the published OpenAPI document.
 
 from __future__ import annotations
 
-from meridian.control import ui_routes
+from meridian.control import delivery_routes, ui_routes
 from meridian.control.api_models import (
     DeletedResource,
     DeployerStateReceipt,
     FleetEventsQuery,
     HistoryQuery,
+    NoticeQuery,
     OpenApiDocument,
     SnapshotResponse,
     UserDeleteResponse,
@@ -74,7 +75,10 @@ from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientExtendRequest
 from meridian.core.clients import ClientConnections
 from meridian.core.fleet_events import FleetEventPage
+from meridian.core.languages import LanguageSettings, LanguageState
+from meridian.core.notices import NoticeState, NoticeWrite
 from meridian.core.server_allowances import ServerUsageList
+from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 
 NOT_FOUND = ErrorResponse(404, ("not_found",))
 CONFLICT = ErrorResponse(409, ("conflict",))
@@ -706,6 +710,60 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         content_type="application/octet-stream",
         refusals=(CONFLICT,),
         description="The encrypted snapshot contains account credentials and token registry data.",
+    ),
+    route(
+        "GET",
+        "/api/notice",
+        "read",
+        delivery_routes.get_notice,
+        None,
+        NoticeState,
+        "Read the owner's notice to people.",
+        credentials=False,
+        query_model=NoticeQuery,
+        refusals=(NOT_FOUND,),
+    ),
+    route(
+        "PUT",
+        "/api/notice",
+        WRITE,
+        delivery_routes.put_notice,
+        NoticeWrite,
+        NoticeState,
+        "Set or clear the owner's notice to people.",
+        credentials=False,
+        refusals=(NOT_FOUND,),
+    ),
+    route(
+        "GET",
+        "/api/language",
+        "read",
+        delivery_routes.get_language,
+        None,
+        LanguageState,
+        "Read the fleet's language for subscription status remarks.",
+        credentials=False,
+    ),
+    route(
+        "PUT",
+        "/api/language",
+        WRITE,
+        delivery_routes.put_language,
+        LanguageSettings,
+        LanguageState,
+        "Set the fleet's language for subscription status remarks.",
+        credentials=False,
+    ),
+    route(
+        "POST",
+        "/api/subscription/preview",
+        "read",
+        delivery_routes.subscription_preview,
+        SubscriptionPreviewRequest,
+        SubscriptionPreview,
+        "Explain which format a client would receive, without credentials.",
+        credentials=False,
+        refusals=(NOT_FOUND,),
     ),
     route(
         "GET",

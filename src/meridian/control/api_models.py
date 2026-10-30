@@ -51,6 +51,12 @@ class FleetEventsQuery(CoreModel):
     limit: int = Field(default=100, ge=1, le=MAX_EVENTS)
 
 
+class NoticeQuery(CoreModel):
+    """`for` renders the notice's substitutions for one person; without it the stored text comes back."""
+
+    for_: str | None = Field(default=None, alias="for", min_length=1, max_length=64)
+
+
 class OpenApiInfo(CoreModel):
     title: str
     version: str

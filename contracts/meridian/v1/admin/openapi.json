@@ -735,6 +735,12 @@
             "title": "Address",
             "type": "string"
           },
+          "enabled": {
+            "default": true,
+            "description": "False omits this endpoint from delivery; reviewed endpoint apply restores topology settings.",
+            "title": "Enabled",
+            "type": "boolean"
+          },
           "fingerprint": {
             "default": "",
             "maxLength": 32,
@@ -1492,6 +1498,8 @@
               "command.issued",
               "command.result",
               "privacy.changed",
+              "notice.changed",
+              "language.changed",
               "token.created",
               "token.revoked"
             ],
@@ -1575,6 +1583,69 @@
           }
         },
         "title": "FleetEventsQuery",
+        "type": "object"
+      },
+      "FormatRule": {
+        "additionalProperties": false,
+        "properties": {
+          "family": {
+            "anyOf": [
+              {
+                "enum": [
+                  "mihomo",
+                  "stash",
+                  "singbox",
+                  "clash",
+                  "xray-json"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Family"
+          },
+          "match": {
+            "default": "",
+            "enum": [
+              "",
+              "text/html"
+            ],
+            "title": "Match",
+            "type": "string"
+          },
+          "rule": {
+            "enum": [
+              "suffix",
+              "user_agent",
+              "accept",
+              "default"
+            ],
+            "title": "Rule",
+            "type": "string"
+          },
+          "suffix": {
+            "default": "",
+            "enum": [
+              "",
+              "info",
+              "json",
+              "v2ray-json",
+              "mihomo",
+              "clash",
+              "stash",
+              "singbox"
+            ],
+            "title": "Suffix",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule"
+        ],
+        "title": "FormatRule",
         "type": "object"
       },
       "HealthCheck": {
@@ -1805,6 +1876,48 @@
           "token"
         ],
         "title": "IssuedToken",
+        "type": "object"
+      },
+      "LanguageSettings": {
+        "additionalProperties": false,
+        "description": "Operator-owned default for native subscription presentation; never guessed from requests.",
+        "properties": {
+          "language": {
+            "default": "en",
+            "enum": [
+              "en",
+              "ru",
+              "fa",
+              "zh"
+            ],
+            "title": "Language",
+            "type": "string"
+          }
+        },
+        "title": "LanguageSettings",
+        "type": "object"
+      },
+      "LanguageState": {
+        "additionalProperties": false,
+        "properties": {
+          "changed": {
+            "default": false,
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "language": {
+            "default": "en",
+            "enum": [
+              "en",
+              "ru",
+              "fa",
+              "zh"
+            ],
+            "title": "Language",
+            "type": "string"
+          }
+        },
+        "title": "LanguageState",
         "type": "object"
       },
       "ManagedInbound": {
@@ -2698,6 +2811,225 @@
         "title": "NodeVersions",
         "type": "object"
       },
+      "Notice": {
+        "additionalProperties": false,
+        "description": "One service-owned notice; reviewed topology applies never replace it.",
+        "properties": {
+          "text": {
+            "description": "One plain paragraph; only {name}, {expires}, {days_left}, {used}, {quota}.",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UTC expiry instant; null keeps the notice indefinitely.",
+            "title": "Until"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "Notice",
+        "type": "object"
+      },
+      "NoticeQuery": {
+        "additionalProperties": false,
+        "description": "`for` renders the notice's substitutions for one person; without it the stored text comes back.",
+        "properties": {
+          "for": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "For"
+          }
+        },
+        "title": "NoticeQuery",
+        "type": "object"
+      },
+      "NoticeState": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "allowed_substitutions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Substitutions",
+            "type": "array"
+          },
+          "changed": {
+            "default": false,
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "for_user": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "For User"
+          },
+          "notice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Notice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "preview": {
+            "maxLength": 1024,
+            "title": "Preview",
+            "type": "string"
+          }
+        },
+        "required": [
+          "notice",
+          "active",
+          "for_user",
+          "preview"
+        ],
+        "title": "NoticeState",
+        "type": "object"
+      },
+      "NoticeWrite": {
+        "additionalProperties": false,
+        "description": "The same operation previews (confirm=false) or saves (confirm=true); null clears.",
+        "properties": {
+          "confirm": {
+            "default": false,
+            "title": "Confirm",
+            "type": "boolean"
+          },
+          "for_user": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "For User"
+          },
+          "notice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Notice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "notice"
+        ],
+        "title": "NoticeWrite",
+        "type": "object"
+      },
+      "OmittedEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "fingerprint_copy": {
+            "title": "Fingerprint Copy",
+            "type": "boolean"
+          },
+          "id": {
+            "description": "Redacted service endpoint ID.",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "protocol": {
+            "enum": [
+              "reality",
+              "xhttp",
+              "wss",
+              "hysteria2"
+            ],
+            "title": "Protocol",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "unsupported_format",
+              "disabled_endpoint",
+              "status_placeholder",
+              "availability_placeholder"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "remark": {
+            "description": "Redacted presentation name, never a URI.",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Remark",
+            "type": "string"
+          },
+          "restriction": {
+            "anyOf": [
+              {
+                "enum": [
+                  "protocol",
+                  "fingerprint_copy"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Restriction"
+          }
+        },
+        "required": [
+          "id",
+          "remark",
+          "protocol",
+          "fingerprint_copy",
+          "reason"
+        ],
+        "title": "OmittedEntry",
+        "type": "object"
+      },
       "OpenApiDocument": {
         "additionalProperties": false,
         "description": "OpenAPI 3.1 with Pydantic-generated schemas for the scoped admin API.",
@@ -2862,6 +3194,47 @@
           "reasons"
         ],
         "title": "PersonAttention",
+        "type": "object"
+      },
+      "PreviewEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "fingerprint_copy": {
+            "title": "Fingerprint Copy",
+            "type": "boolean"
+          },
+          "id": {
+            "description": "Redacted service endpoint ID.",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "protocol": {
+            "enum": [
+              "reality",
+              "xhttp",
+              "wss",
+              "hysteria2"
+            ],
+            "title": "Protocol",
+            "type": "string"
+          },
+          "remark": {
+            "description": "Redacted presentation name, never a URI.",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Remark",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "remark",
+          "protocol",
+          "fingerprint_copy"
+        ],
+        "title": "PreviewEntry",
         "type": "object"
       },
       "PrivacyChange": {
@@ -4523,6 +4896,164 @@
         "title": "SubscriptionFormatUrl",
         "type": "object"
       },
+      "SubscriptionPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "enum": [
+              "browser",
+              "mihomo",
+              "stash",
+              "singbox",
+              "xray-json",
+              "base64"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "included": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewEntry"
+            },
+            "maxItems": 10000,
+            "title": "Included",
+            "type": "array"
+          },
+          "omitted": {
+            "items": {
+              "$ref": "#/components/schemas/OmittedEntry"
+            },
+            "maxItems": 10000,
+            "title": "Omitted",
+            "type": "array"
+          },
+          "placeholder": {
+            "anyOf": [
+              {
+                "enum": [
+                  "disabled",
+                  "limited",
+                  "expired",
+                  "no_connections"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placeholder"
+          },
+          "protocols": {
+            "items": {
+              "enum": [
+                "reality",
+                "xhttp",
+                "wss",
+                "hysteria2"
+              ],
+              "type": "string"
+            },
+            "maxItems": 4,
+            "title": "Protocols",
+            "type": "array"
+          },
+          "response_headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Service response headers; URIs and encoded text are redacted.",
+            "title": "Response Headers",
+            "type": "object"
+          },
+          "response_kind": {
+            "enum": [
+              "subscription",
+              "page",
+              "account_info"
+            ],
+            "title": "Response Kind",
+            "type": "string"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/FormatRule"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "disabled",
+              "limited",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "username": {
+            "description": "Redacted account name.",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "format",
+          "selection",
+          "username",
+          "status",
+          "response_kind",
+          "protocols",
+          "included",
+          "omitted",
+          "placeholder",
+          "response_headers"
+        ],
+        "title": "SubscriptionPreview",
+        "type": "object"
+      },
+      "SubscriptionPreviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "accept": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Accept",
+            "type": "string"
+          },
+          "suffix": {
+            "default": "",
+            "enum": [
+              "",
+              "info",
+              "json",
+              "v2ray-json",
+              "mihomo",
+              "clash",
+              "stash",
+              "singbox"
+            ],
+            "title": "Suffix",
+            "type": "string"
+          },
+          "user_agent": {
+            "default": "",
+            "maxLength": 512,
+            "title": "User Agent",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username"
+        ],
+        "title": "SubscriptionPreviewRequest",
+        "type": "object"
+      },
       "SystemdUnitResource": {
         "additionalProperties": false,
         "description": "A systemd unit file plus its enablement and run state.",
@@ -5075,11 +5606,12 @@
                 "credentials",
                 "created_at",
                 "traffic_reset_at",
-                "lifetime_traffic_bytes"
+                "lifetime_traffic_bytes",
+                "language"
               ],
               "type": "string"
             },
-            "maxItems": 9,
+            "maxItems": 10,
             "minItems": 1,
             "title": "Fields",
             "type": "array"
@@ -5329,6 +5861,24 @@
             "default": null,
             "title": "Expire At"
           },
+          "language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "ru",
+                  "fa",
+                  "zh"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Language"
+          },
           "note": {
             "default": "",
             "maxLength": 500,
@@ -5457,6 +6007,25 @@
             "default": null,
             "description": "When the service first accepted traffic growth; unknown for historical use.",
             "title": "First Traffic At"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "ru",
+                  "fa",
+                  "zh"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Subscription status language; null uses the fleet default.",
+            "title": "Language"
           },
           "last_traffic_node": {
             "anyOf": [
@@ -5729,6 +6298,24 @@
             ],
             "default": null,
             "title": "Expire At"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "ru",
+                  "fa",
+                  "zh"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Language"
           },
           "note": {
             "default": "",
@@ -7622,6 +8209,184 @@
         ]
       }
     },
+    "/api/language": {
+      "get": {
+        "description": "Requires read scope, or a scope that covers it.",
+        "operationId": "get_language",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LanguageState"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Read the fleet's language for subscription status remarks.",
+        "tags": [
+          "language"
+        ],
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "read"
+        ]
+      },
+      "put": {
+        "description": "Requires admin scope, or a scope that covers it.",
+        "operationId": "put_language",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LanguageSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LanguageState"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Set the fleet's language for subscription status remarks.",
+        "tags": [
+          "language"
+        ],
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "admin"
+        ]
+      }
+    },
     "/api/nodes/{node_id}": {
       "delete": {
         "description": "Requires admin scope, or a scope that covers it.",
@@ -8272,6 +9037,244 @@
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "read"
+        ]
+      }
+    },
+    "/api/notice": {
+      "get": {
+        "description": "Requires read scope, or a scope that covers it.",
+        "operationId": "get_notice",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "for",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "For"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeState"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Read the owner's notice to people.",
+        "tags": [
+          "notice"
+        ],
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "read"
+        ]
+      },
+      "put": {
+        "description": "Requires admin scope, or a scope that covers it.",
+        "operationId": "put_notice",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoticeWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeState"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Set or clear the owner's notice to people.",
+        "tags": [
+          "notice"
+        ],
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "admin"
         ]
       }
     },
@@ -9301,6 +10304,127 @@
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "admin"
+        ]
+      }
+    },
+    "/api/subscription/preview": {
+      "post": {
+        "description": "Requires read scope, or a scope that covers it.",
+        "operationId": "subscription_preview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionPreview"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Explain which format a client would receive, without credentials.",
+        "tags": [
+          "subscription"
+        ],
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "read"
         ]
       }
     },
