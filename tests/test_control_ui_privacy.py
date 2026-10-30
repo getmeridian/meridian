@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -11,12 +10,10 @@ from typing import Any
 import pytest
 
 from meridian.control.ui_routes import UI_DIR
+from tests.support.console_dom import needs_console_dom
 
 ROOT = Path(__file__).resolve().parents[1]
-pytestmark = pytest.mark.skipif(
-    shutil.which("node") is None or not (ROOT / "website/node_modules/jsdom").exists(),
-    reason="needs node and the website's installed jsdom dependency",
-)
+pytestmark = needs_console_dom
 
 
 def _run(mode: str, locale: str = "en") -> dict[str, Any]:

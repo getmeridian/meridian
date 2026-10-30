@@ -8,9 +8,10 @@ from pydantic import ValidationError
 from meridian.commands._helpers import format_traffic
 from meridian.control.models import UserCreate, UserUpdate
 from meridian.core.client_limits import ClientLimitChange, parse_traffic_limit
-from tests.test_control_ui_console import run_console
+from tests.support.console_dom import needs_console_dom, run_console
 
 
+@needs_console_dom
 @pytest.mark.parametrize(
     ("amount", "unit"),
     [
@@ -27,6 +28,7 @@ def test_console_and_cli_send_the_same_bytes(amount: str, unit: str) -> None:
     assert result["units"] == ["GiB", "TiB"]
 
 
+@needs_console_dom
 @pytest.mark.parametrize("amount", ["-1", "Infinity", "NaN", "", "8589934592", "8388608"])
 def test_invalid_console_quota_blocks_form_submission_at_the_field(amount: str) -> None:
     result = run_console("quota", data={"amount": amount, "unit": "GiB", "mode": "limited"})
@@ -34,6 +36,7 @@ def test_invalid_console_quota_blocks_form_submission_at_the_field(amount: str) 
     assert result["invalid"] is True
 
 
+@needs_console_dom
 def test_unlimited_is_an_explicit_choice() -> None:
     result = run_console("quota", data={"amount": "", "unit": "GiB", "mode": "unlimited"})
     assert result["change"]["traffic_limit_bytes"] == 0

@@ -7,7 +7,9 @@ import json
 import pytest
 
 from meridian.control.ui_routes import UI_DIR
-from tests.test_control_ui_console import run_console
+from tests.support.console_dom import needs_console_dom, run_console
+
+pytestmark = needs_console_dom
 
 
 def test_nested_identity_checks_have_distinct_labelled_titles() -> None:

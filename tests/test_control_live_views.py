@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from tests.test_control_ui_console import run_console
+from tests.support.console_dom import needs_console_dom, run_console
+
+pytestmark = needs_console_dom
 
 
 @pytest.mark.parametrize("screen", ["servers", "people"])

@@ -3,32 +3,13 @@
 from __future__ import annotations
 
 import json
-import shutil
-import subprocess
-from pathlib import Path
-from typing import Any
 
 import pytest
 
 from meridian.control.ui_routes import UI_DIR
+from tests.support.console_dom import needs_console_dom, run_console
 
-ROOT = Path(__file__).resolve().parents[1]
-pytestmark = pytest.mark.skipif(
-    shutil.which("node") is None or not (ROOT / "website/node_modules/jsdom").exists(),
-    reason="needs node and the website's installed jsdom dependency",
-)
-
-
-def run_console(mode: str, locale: str = "en", data: Any = None) -> dict[str, Any]:
-    result = subprocess.run(
-        ["node", str(ROOT / "tests/control_ui_console.mjs"), str(UI_DIR), mode, locale, json.dumps(data)],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=30,
-    )
-    return dict(json.loads(result.stdout))
+pytestmark = needs_console_dom
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])

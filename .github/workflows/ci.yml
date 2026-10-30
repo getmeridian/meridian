@@ -53,6 +53,24 @@ jobs:
               env.write(f"MERIDIAN_TEST_XRAY={binary}\n")
           PY
 
+      - uses: pnpm/action-setup@v4
+        if: matrix.python-version == '3.12'
+        with:
+          version: 10.33.3
+
+      - uses: actions/setup-node@v6
+        if: matrix.python-version == '3.12'
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
+
+      - name: Install jsdom for console DOM tests
+        if: matrix.python-version == '3.12'
+        run: |
+          cd website && pnpm install --frozen-lockfile
+          echo "MERIDIAN_TEST_CONSOLE=1" >> "$GITHUB_ENV"
+
       - name: Run tests
         run: uv run pytest tests/ -v --tb=short
 
