@@ -11,7 +11,7 @@ _RENDERER_MANIFEST = {
     "agent-spec": "service-blob-v1",
     "control-subscriptions": "stale-client-nudge-v1",
     "control-commands": "node-restart-console-v3",
-    "pwa": "page-keys-v1",
+    "pwa": "app-help-v1",
     "control-service": "stale-client-nudge-v1",
     "control-api": "stale-client-nudge-v1",
     "control-ui": "stale-client-nudge-v1",

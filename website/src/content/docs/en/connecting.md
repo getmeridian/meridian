@@ -41,7 +41,9 @@ Your app lists several entries, named by country and method, such as "🇩🇪 D
 
 ## When it stops working
 
-1. **Refresh the subscription.** Your app updates it on its own; to update it now, open the subscription (or profile) list in the app and tap **Update**. This picks up new servers and routes.
+A red or “n/a” ping in your app does not mean the connection is broken: apps test with their own probe, which can fail while the tunnel works. Connect and open a website first. If it really does not load, try these in order. The same tips are on your connection page under **Not connecting?**.
+
+1. **Refresh the subscription.** Your app updates it on its own; to update it now, open the subscription (or profile) list in the app and tap **Update**. This picks up new servers and routes. If your app has a setting like “update subscription on launch”, turn it on.
 2. **Try another entry.** Pick one with a different method, or one "via relay".
 3. **Check your device's clock.** A clock that is off by more than a minute can make connections fail; turn on automatic date and time.
 4. **Run the connection check.** Turn your VPN app off so the check sees your real network. Open your connection page, expand **Not connecting?** and **Check my connection**, and tap **Run check**. Then tap **Copy report** and send it to the person who gave you the link; the report contains no links or keys.

@@ -115,7 +115,9 @@ var T = {
     'apps.other': 'Другие приложения',
     'apps.update': 'Вовремя обновляйте приложение',
     'apps.update.desc': 'В новых версиях исправляют ошибки подключения и обходят свежие блокировки. Включите автообновление в магазине приложений или иногда проверяйте обновления вручную.',
-    'sub.refresh': 'Приложение обновляет подписку автоматически. Чтобы обновить её прямо сейчас, откройте в приложении список подписок (или профилей) и нажмите «Обновить».',
+    'ping.red': 'Красный или «n/a» пинг в приложении не значит, что подключение сломано. Приложение проверяет связь своим способом, и эта проверка может не пройти, хотя VPN работает. Просто подключитесь и откройте любой сайт.',
+    'sub.refresh': 'Приложение также само регулярно обновляет подписку. Чтобы обновить её прямо сейчас, потяните список вниз или откройте в приложении список подписок (или профилей) и нажмите «Обновить».',
+    'sub.launch': 'Если в приложении есть настройка вроде «обновлять подписку при запуске» или «автообновление», включите её.',
     'tip.webrtc': 'Если приложение работает только в режиме прокси, сайты в браузере иногда могут увидеть ваш настоящий IP-адрес (утечка WebRTC). Чтобы защититься от этого, включите в приложении режим VPN (TUN) — тогда весь трафик пойдёт через защищённое соединение. Проверить это можно на любом сайте проверки IP: адрес должен отличаться от вашего обычного.',
     router: 'Роутер',
     'router.desc': 'Как подключить сразу всю домашнюю сеть',
@@ -204,7 +206,9 @@ var T = {
     'apps.other': 'برنامه‌های دیگر',
     'apps.update': 'برنامه را به‌روز نگه دارید',
     'apps.update.desc': 'نسخه‌های جدید مشکلات اتصال را برطرف می‌کنند و با روش‌های تازهٔ مسدودسازی همگام می‌مانند. به‌روزرسانی خودکار را در فروشگاه برنامه روشن کنید یا هر از گاهی به صفحهٔ دانلود سر بزنید.',
-    'sub.refresh': 'برنامه اشتراک را خودش به‌روز می‌کند. برای به‌روزرسانی فوری، فهرست اشتراک‌ها (یا پروفایل‌ها) را در برنامه باز کنید و «به‌روزرسانی» را بزنید.',
+    'ping.red': 'پینگ قرمز یا «n/a» در برنامه به معنی خراب بودن اتصال نیست. برنامه با آزمون مخصوص خودش می‌سنجد و ممکن است آن آزمون شکست بخورد، در حالی که اتصال کار می‌کند. فقط وصل شوید و یک وب‌سایت را باز کنید.',
+    'sub.refresh': 'برنامه اشتراک را خودش هم به‌طور منظم به‌روز می‌کند. برای به‌روزرسانی فوری، فهرست را به پایین بکشید یا فهرست اشتراک‌ها (یا پروفایل‌ها) را در برنامه باز کنید و «به‌روزرسانی» را بزنید.',
+    'sub.launch': 'اگر برنامه گزینه‌ای مثل «به‌روزرسانی اشتراک هنگام اجرا» یا «به‌روزرسانی خودکار» دارد، آن را روشن کنید.',
     'tip.webrtc': 'اگر برنامه فقط به‌صورت پروکسی کار کند، گاهی وب‌سایت‌ها در مرورگر می‌توانند نشانی IP واقعی شما را ببینند (نشت WebRTC). برای جلوگیری از این، حالت VPN (یا TUN) را در برنامه روشن کنید تا همهٔ ترافیک از مسیر اتصال عبور کند. می‌توانید با هر سرویس بررسی نشت، تأیید کنید که نشانی نمایش‌داده‌شده با نشانی همیشگی شما فرق دارد.',
     router: 'روتر',
     'router.desc': 'کل شبکهٔ خانگی را متصل کنید: راهنمای راه‌اندازی',
@@ -293,7 +297,9 @@ var T = {
     'apps.other': '更多应用',
     'apps.update': '保持应用为最新版本',
     'apps.update.desc': '新版本会修复连接问题，并应对新的封锁手段。请在应用商店中开启自动更新，或不时查看下载页面。',
-    'sub.refresh': '应用会自动刷新订阅。如需立即刷新，请在应用中打开订阅（或配置）列表并点击“更新”。',
+    'ping.red': '应用里的延迟显示红色或“n/a”，并不代表连接坏了。应用用自己的方式测试，这种测试可能失败，而连接其实可用。直接连接，然后打开一个网站试试。',
+    'sub.refresh': '应用也会定期自动刷新订阅。如需立即刷新，请下拉列表，或在应用中打开订阅（或配置）列表并点击“更新”。',
+    'sub.launch': '如果应用有“启动时更新订阅”或“自动更新”之类的设置，请开启。',
     'tip.webrtc': '如果应用只以代理模式运行，浏览器中的网站有时可能获知您的真实 IP 地址（WebRTC 泄漏）。要避免这种情况，请在应用中开启 VPN（TUN）模式，让所有流量都经过连接。您可以用任意泄漏检测服务确认：显示的地址应与您平时的地址不同。',
     router: '路由器',
     'router.desc': '让整个家庭网络都能连接：设置指南',
@@ -1112,8 +1118,10 @@ function renderTrouble() {
   html += '<span class="panel-chevron">' + ICON_CHEVRON + '</span>';
   html += '</summary><div class="panel-body">';
   html += '<ul class="tips">';
+  html += '<li data-t="ping.red">A red or “n/a” ping in your app does not mean the connection is broken. Apps test with their own probe, which can fail while the tunnel works. Just connect and open a website.</li>';
   html += '<li data-t="ping.desc">Check automatic time sync on your device, then try another connection option above.</li>';
-  html += '<li data-t="sub.refresh">Your app refreshes the subscription on its own. To refresh it now, open the subscription (or profile) list in the app and tap Update.</li>';
+  html += '<li data-t="sub.refresh">Your app also refreshes the subscription regularly on its own. To refresh it now, pull the list down, or open the subscription (or profile) list in the app and tap Update.</li>';
+  html += '<li data-t="sub.launch">If your app has a setting like “update subscription on launch” or “auto-update”, turn it on.</li>';
   html += '<li data-t="tip.webrtc">Websites in your browser can sometimes see your real IP address (a WebRTC leak) when your app runs as a proxy only. To avoid it, turn on the app\'s VPN (TUN) mode so all traffic goes through the connection. You can confirm with any leak-check service: the address it shows should differ from your usual one.</li>';
   html += '<li><strong data-t="apps.update">Keep your app updated</strong> ';
   html += '<span data-t="apps.update.desc">New versions fix connection problems and keep up with new blocking. Turn on automatic updates in your app store, or check the download page now and then.</span></li>';

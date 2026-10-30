@@ -17,6 +17,7 @@ Server-hosted PWA; Meridian's only connection-page implementation.
 **Preferred store labels** — name App Store or Google Play from the validated destination hostname; keep their labels localized when the platform or language changes.
 **i18n** — English markup with `data-t` swaps; `language.js` blocks in the head before CSS/config and picks saved page choice > rendered person/fleet default > browser for `auto` > English, always setting lang/dir (Persian sets RTL); rebuild to return to English. Support's initial labels follow lang through CSS before its main script loads. Support follows the same preference; account dates/numbers use Intl, including the Persian calendar.
 **Self-check** — visitor-side clock vs server Date, a 96 KB probe stream, and subscription HTTP status; copied English reports contain no links, hostnames, UUIDs, or device data.
+**App help** — the collapsed **Not connecting?** panel under the connection list holds the plain app tips (a red ping is not a failure, refresh, update on launch, clock); it is generic and fetches nothing, and `support.html` stays contact-only.
 
 ## What's done well
 - **SW scope and privacy** — the worker caches only its content-versioned shared assets under `/sub/`; person pages, config, manifests, account checks, and probes always use the network. Old `/pwa/sw.js` URLs serve the retirement worker, which clears Meridian caches, unregisters, and reloads controlled pages to follow UUID redirects.

@@ -114,6 +114,10 @@ def test_bad_optional_catalog_keeps_valid_embedded_apps(page_data: dict[str, obj
     run_case("test_bad_optional_catalog_keeps_valid_embedded_apps", page_data)
 
 
+def test_app_help_stays_collapsed_and_reads_plainly_in_every_language(page_data: dict[str, object]) -> None:
+    run_case("test_app_help_stays_collapsed_and_reads_plainly_in_every_language", page_data)
+
+
 def test_unsupported_config_version_is_rejected_before_rendering(page_data: dict[str, object]) -> None:
     run_case("test_unsupported_config_version_is_rejected_before_rendering", page_data)
 
