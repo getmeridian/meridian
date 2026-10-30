@@ -44,7 +44,7 @@ from meridian.cli_options import (
 )
 from meridian.cli_privacy import privacy_app
 from meridian.config import DISABLE_UPDATE_CHECK
-from meridian.console import banner
+from meridian.console import banner, banner_due
 
 # Top-level `--help` sections, in display order, each with its commands in display order.
 # Typer lists plain commands before sub-apps, so the group class below imposes this order.
@@ -285,7 +285,8 @@ def main_callback(
 
         pull_after_mutations(ctx.call_on_close)  # every change to a service fleet ends with a fresh snapshot
     if not machine_output and not daemon and not (invocation is not None and invocation.help_requested):
-        banner(__version__)
+        if banner_due(__version__):
+            banner(__version__)
 
     if not DISABLE_UPDATE_CHECK and not machine_output and ctx.invoked_subcommand not in ("update", "serve"):
         from meridian.update import check_for_update

@@ -455,6 +455,19 @@ def test_beta_banner_points_testers_at_the_report_form(capsys) -> None:
     assert "beta" not in stable
 
 
+def test_the_banner_shows_once_a_day_per_version(monkeypatch) -> None:
+    """A demo session printed the beta banner before every single command."""
+    from meridian.console import banner_due
+
+    clock = [1_000_000.0]
+    monkeypatch.setattr("meridian.console.time.time", lambda: clock[0])
+    assert banner_due("4.0.0b8") is True
+    assert banner_due("4.0.0b8") is False
+    assert banner_due("4.0.0b9") is True  # an upgrade announces itself
+    clock[0] += 21 * 3600
+    assert banner_due("4.0.0b9") is True
+
+
 def test_serve_prints_no_banner_and_never_checks_for_updates(monkeypatch, tmp_path) -> None:
     checks: list[str] = []
     monkeypatch.setattr("meridian.update.check_for_update", checks.append)

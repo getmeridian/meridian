@@ -64,6 +64,14 @@ def _isolated_legacy_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
 
 
 @pytest.fixture(autouse=True)
+def _isolated_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The banner and update throttles write the cache; never into a developer's real home."""
+    import meridian.config as cfg
+
+    monkeypatch.setattr(cfg, "CACHE_DIR", tmp_path / "cache")
+
+
+@pytest.fixture(autouse=True)
 def _instant_stall_retries(monkeypatch: pytest.MonkeyPatch) -> None:
     """Stalled-connection retries keep their count but never pause the suite."""
     monkeypatch.setattr("meridian.reconciler.stall_retry.STALL_DELAYS", (0.0, 0.0, 0.0, 0.0))

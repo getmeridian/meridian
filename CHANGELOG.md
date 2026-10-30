@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+- The version and beta banner prints once a day (and after an upgrade), not before every command.
 - Russian text rewritten across the CLI, web console, connection and support pages, website, and docs, with one glossary throughout.
 - `client set --tag`, `client list --tag`, and the console save tags in uppercase instead of refusing lowercase (`family` becomes `FAMILY`); a refused tag no longer drops the note sent with it.
 - Owners can choose the default language for connection and support pages through the CLI, API, or console, with a person override in the console. The default follows each person's browser and keeps app status messages English; saved page choices still win, and language/direction are ready before the first paint.
