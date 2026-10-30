@@ -13,6 +13,9 @@ import pytest
 # imports it, and keep tests off the network-bound PyPI update check.
 os.environ["MERIDIAN_HOME"] = tempfile.mkdtemp(prefix="meridian-test-home-")
 os.environ["MERIDIAN_DISABLE_UPDATE_CHECK"] = "1"
+# Rich reads FORCE_COLOR when a console is built, often at import; a developer
+# terminal that exports it turned plain-text assertions into ANSI escapes.
+os.environ.pop("FORCE_COLOR", None)
 
 
 CONTEXT_BOUND = (
