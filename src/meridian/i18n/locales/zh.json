@@ -345,5 +345,7 @@
   "client.device_model": "型号",
   "client.device_app": "应用",
   "client.device_first_seen": "首次获取",
-  "client.device_last_seen": "最近获取"
+  "client.device_last_seen": "最近获取",
+  "client.label.lifetime": "累计流量",
+  "client.label.period_started": "周期开始"
 }

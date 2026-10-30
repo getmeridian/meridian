@@ -20,6 +20,10 @@ export type DeviceLimit = number | null;
 export type ExpiresAt = string;
 export type Id = string;
 export type LastSeen = string;
+/**
+ * Lifetime use, unaffected by traffic resets.
+ */
+export type LifetimeTrafficBytes = number;
 export type Status = string;
 /**
  * 0 means unlimited.
@@ -29,6 +33,10 @@ export type TrafficLimitBytes = number;
  * When used traffic starts again from zero: never, day, week, month, or the panel-only month_rolling (monthly from the day the client was created).
  */
 export type TrafficReset = string;
+/**
+ * UTC start of the current traffic period; empty if unknown.
+ */
+export type TrafficResetAt = string;
 export type TrafficUsedBytes = number;
 export type Username = string;
 export type ShareAvailable = boolean;
@@ -67,9 +75,11 @@ export interface ClientDetail {
   expires_at: ExpiresAt;
   id: Id;
   last_seen: LastSeen;
+  lifetime_traffic_bytes?: LifetimeTrafficBytes;
   status: Status;
   traffic_limit_bytes: TrafficLimitBytes;
   traffic_reset: TrafficReset;
+  traffic_reset_at?: TrafficResetAt;
   traffic_used_bytes: TrafficUsedBytes;
   username: Username;
 }

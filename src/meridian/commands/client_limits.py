@@ -17,7 +17,7 @@ from meridian.commands.client_state import require_access_user
 from meridian.console import err_console, error_context, fail, is_json_mode, ok
 from meridian.control_access import AccessPanel, access_panel
 from meridian.core.client_limits import ClientLimitChange, ClientLimitError, build_limit_change
-from meridian.core.clients import ClientRecord, build_client_limits_result, build_client_record
+from meridian.core.clients import ClientDetail, ClientRecord, build_client_limits_result, build_client_record
 from meridian.core.models import ErrorModel, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.i18n import t
@@ -70,6 +70,10 @@ def print_client_usage(record: ClientRecord) -> None:
             str(record.device_limit) if record.device_limit is not None else t("client.device_default"),
         ),
     ]
+    if isinstance(record, ClientDetail):
+        rows.insert(2, (t("client.label.lifetime"), escape(format_traffic(record.lifetime_traffic_bytes))))
+        if record.traffic_reset_at:
+            rows.insert(3, (t("client.label.period_started"), escape(record.traffic_reset_at)))
     last_seen = t("client.label.last_seen")
     if record.last_seen:
         rows.append((last_seen, escape(record.last_seen)))

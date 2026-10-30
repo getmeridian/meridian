@@ -42,6 +42,13 @@
           "title": "Last Seen",
           "type": "string"
         },
+        "lifetime_traffic_bytes": {
+          "default": 0,
+          "description": "Lifetime use, unaffected by traffic resets.",
+          "minimum": 0,
+          "title": "Lifetime Traffic Bytes",
+          "type": "integer"
+        },
         "status": {
           "title": "Status",
           "type": "string"
@@ -54,6 +61,12 @@
         "traffic_reset": {
           "description": "When used traffic starts again from zero: never, day, week, month, or the panel-only month_rolling (monthly from the day the client was created).",
           "title": "Traffic Reset",
+          "type": "string"
+        },
+        "traffic_reset_at": {
+          "default": "",
+          "description": "UTC start of the current traffic period; empty if unknown.",
+          "title": "Traffic Reset At",
           "type": "string"
         },
         "traffic_used_bytes": {

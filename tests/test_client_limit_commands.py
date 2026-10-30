@@ -135,7 +135,7 @@ def test_client_show_prints_usage_against_the_limit_and_the_expiry(
 
     output = capsys.readouterr().err
     assert "Traffic   " in output and "/ 50 GiB (resets monthly)" in output
-    assert f"Expires   {FUTURE_DAY}" in output
+    assert any(line.split() == ["Expires", FUTURE_DAY] for line in output.splitlines())
 
 
 @pytest.mark.parametrize(

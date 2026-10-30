@@ -21,6 +21,7 @@
 
 ## Pitfalls
 - SNI review advice reads the reviewed delivery refresh interval; fleets can override the six-hour default.
+- Client show prints period use, lifetime traffic, and the UTC period start separately; lifetime totals are available even while daily history is off.
 - `console.fail()` always exits (user=2, system=3, bug=1); entry points convert library `MeridianError`s with `fail(exc)`, or the user sees a traceback.
 - Reach Click only through `meridian.cli_types` — Typer ≥ 0.26 vendors it and production has no `click` package (architecture-tested).
 - `confirm()` returns a bool; callers must `raise typer.Exit(1)` on False.

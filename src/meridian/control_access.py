@@ -165,6 +165,8 @@ class ServiceAccessPanel:
             vless_uuid=record.uuid,
             status=record.status.upper(),
             used_traffic_bytes=record.used_traffic_bytes,
+            lifetime_used_traffic_bytes=record.lifetime_traffic_bytes,
+            last_traffic_reset_at=record.traffic_reset_at or "",
             traffic_limit_bytes=record.traffic_limit_bytes,
             traffic_limit_strategy=record.traffic_limit_strategy.upper(),
             expire_at=record.expire_at or "",

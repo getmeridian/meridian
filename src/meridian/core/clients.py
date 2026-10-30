@@ -32,6 +32,12 @@ class PanelUserLike(Protocol):
     def used_traffic_bytes(self) -> int: ...
 
     @property
+    def lifetime_used_traffic_bytes(self) -> int: ...
+
+    @property
+    def last_traffic_reset_at(self) -> str: ...
+
+    @property
     def traffic_limit_bytes(self) -> int: ...
 
     @property
@@ -84,6 +90,9 @@ class ClientHandoff(CoreModel):
 
 class ClientDetail(ClientRecord):
     """Client metadata for a detail view."""
+
+    lifetime_traffic_bytes: int = Field(default=0, ge=0, description="Lifetime use, unaffected by traffic resets.")
+    traffic_reset_at: str = Field(default="", description="UTC start of the current traffic period; empty if unknown.")
 
 
 class ClientListSummary(CoreModel):
@@ -196,7 +205,11 @@ def build_client_record(user: PanelUserLike, *, declared: bool = True) -> Client
 def build_client_detail(user: PanelUserLike, *, declared: bool = True) -> ClientDetail:
     """Build one client detail result from panel state."""
     base = build_client_record(user, declared=declared)
-    return ClientDetail(**base.model_dump())
+    return ClientDetail(
+        **base.model_dump(),
+        lifetime_traffic_bytes=getattr(user, "lifetime_used_traffic_bytes", 0),
+        traffic_reset_at=getattr(user, "last_traffic_reset_at", "") or "",
+    )
 
 
 def build_client_list_result(

@@ -26,6 +26,7 @@
 - Reporter primitives let provision, apply, and deploy emit typed events without choosing a renderer.
 
 ## Pitfalls
+- Client detail carries lifetime traffic and the current period's start through the access adapter; resetting period use never erases the lifetime figure.
 - Fleet results carry live reachability, fresh typed runtime evidence, and convergence separately; a live poll never makes an old health report available.
 - Never emit raw SSH commands, panel tokens, private keys, database URLs, or subscription secrets.
 - `redact_string()` is the only secret masker (SSH debug logs included); teach it a new secret form instead of adding a local regex.
