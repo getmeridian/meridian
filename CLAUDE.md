@@ -59,7 +59,7 @@ src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── compiler/CLAUDE.md                  — pure finite topology compiler
 ├── reconciler/CLAUDE.md                — checkpointed compiled-resource drivers
 ├── provision/CLAUDE.md                 — step pipeline + idempotency
-├── remnawave/CLAUDE.md                 — typed panel adapter and image version policy
+├── remnawave/CLAUDE.md                 — migrate's read-only panel reader and shared user/node shapes
 ├── diagnostics/CLAUDE.md               — reusable health, blocking, and probe checks
 ├── engine/CLAUDE.md                    — local Engine use-case boundary
 ├── control/CLAUDE.md                   — `meridian serve`: signed node documents, users, subscriptions
