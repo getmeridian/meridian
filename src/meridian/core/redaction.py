@@ -52,6 +52,8 @@ _SENSITIVE_KEY_PARTS = (
     "connectionurl",
 )
 _SENSITIVE_EXACT_KEYS = {
+    "uri",
+    "qr_svg",
     "token",
     "session_token",
     "sessiontoken",

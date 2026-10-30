@@ -38,6 +38,7 @@
 - Reporter primitives let provision, apply, and deploy emit typed events without choosing a renderer.
 
 ## Pitfalls
+- Treat individual connection URI and SVG QR fields as complete credentials; client show reveals only their exact producing paths, never passive output or neighboring fields.
 - JSON reveal options accept exact dotted paths, including list indices; preserve authorized private note/tag fields without revealing neighboring URLs or credentials.
 - Provider labels allow Persian ZWNJ/ZWJ joiners while rejecting line breaks, bidi controls, and other control characters.
 - Preserve server metadata through setup drafts and fleet name/ref mapping; metadata names only declared physical servers and never moves automatically with an exit.

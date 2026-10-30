@@ -1,6 +1,7 @@
 # commands — One module per subcommand
 
 ## Design decisions
+- `client show --connections` reads the same canonical list and explicit format URLs as the person screen; only its final output reveals credential paths.
 - `fleet contact --text/--link` reviews and applies only the delivery contact edit, preserves omitted fields, supports explicit clearing, and requires --yes for JSON changes; exact JSON paths preserve public contact values in export/import reviews.
 - `client set --note TEXT --tag TAG` edits service-owned metadata with limits in one PATCH; `--note ""` and `--tag none` clear, while uppercase `NONE` remains a tag. Client reads include console people and `client list --tag` filters before status counts.
 - **Reviewed server metadata** — `server set` edits only declared servers' topology metadata, previews before confirmation, and forwards the exact review hash to `apply_reviewed_intent`; `server list` reads profiles and metadata locally, while fleet allowance warnings keep runtime health separate.

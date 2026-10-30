@@ -511,6 +511,106 @@
         "title": "BinaryPinResource",
         "type": "object"
       },
+      "ClientConnection": {
+        "additionalProperties": false,
+        "description": "One canonical subscription entry; URI and QR are credentials, never passive output.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "protocol": {
+            "anyOf": [
+              {
+                "enum": [
+                  "reality",
+                  "xhttp",
+                  "wss",
+                  "hysteria2"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for an inert availability or status notice.",
+            "title": "Protocol"
+          },
+          "qr_svg": {
+            "default": "",
+            "description": "Local SVG data URI in an owner-console share view.",
+            "title": "Qr Svg",
+            "type": "string"
+          },
+          "remark": {
+            "title": "Remark",
+            "type": "string"
+          },
+          "uri": {
+            "title": "Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "remark",
+          "protocol",
+          "available",
+          "uri"
+        ],
+        "title": "ClientConnection",
+        "type": "object"
+      },
+      "ClientConnections": {
+        "additionalProperties": false,
+        "description": "Producing handoff view, shared by the API, console, and explicit CLI inspection.",
+        "properties": {
+          "connections": {
+            "items": {
+              "$ref": "#/components/schemas/ClientConnection"
+            },
+            "title": "Connections",
+            "type": "array"
+          },
+          "formats": {
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionFormatUrl"
+            },
+            "title": "Formats",
+            "type": "array"
+          },
+          "profile_title": {
+            "title": "Profile Title",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "disabled",
+              "limited",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "subscription_url": {
+            "title": "Subscription Url",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "status",
+          "profile_title",
+          "subscription_url"
+        ],
+        "title": "ClientConnections",
+        "type": "object"
+      },
       "ClientDevice": {
         "additionalProperties": false,
         "description": "An ID that can be removed; private mode exposes no metadata.",
@@ -4397,6 +4497,31 @@
         "format": "binary",
         "title": "SnapshotResponse",
         "type": "string"
+      },
+      "SubscriptionFormatUrl": {
+        "additionalProperties": false,
+        "description": "A credential-bearing URL for a format the control service already serves.",
+        "properties": {
+          "format": {
+            "enum": [
+              "xray-json",
+              "mihomo",
+              "singbox"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "format",
+          "url"
+        ],
+        "title": "SubscriptionFormatUrl",
+        "type": "object"
       },
       "SystemdUnitResource": {
         "additionalProperties": false,
@@ -10401,6 +10526,102 @@
           }
         ],
         "summary": "Ensure a person exists, preserving existing settings.",
+        "tags": [
+          "users"
+        ],
+        "x-meridian-credentials": true,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "people"
+        ]
+      }
+    },
+    "/api/users/{username}/connections": {
+      "get": {
+        "description": "Requires people scope, or a scope that covers it. Each connection URI and format URL connects as the person. This response can contain credentials; keep it private and do not log it.",
+        "operationId": "user_connections",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "username",
+            "required": true,
+            "schema": {
+              "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientConnections"
+                }
+              }
+            },
+            "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "x-meridian-credentials": true
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "List one person's individual connections and explicit format URLs.",
         "tags": [
           "users"
         ],

@@ -60,6 +60,7 @@ M.personHistory = M.devicesCard = M.privacySection = M.cliHint = () => null;
 M.renderServers = view => M.mount(view, M.h('h1', { text: M.t('nav.servers') }));
 M.renderRevisions = M.renderTokens = () => null;
 load('people.js');
+load('person-connections.js');
 load('person.js');
 load('settings.js');
 load('app.js');
@@ -68,6 +69,22 @@ await settle();
 await settle();
 const view = () => w.document.getElementById('view');
 const button = key => [...view().querySelectorAll('button')].find(el => el.textContent.includes(M.t(key)));
+
+if (mode === 'person-connections') {
+  const disclosure = view().querySelector('.individual-connections');
+  report.closed = !!disclosure && !disclosure.open;
+  report.summary = disclosure?.querySelector('summary')?.textContent || '';
+  report.remarks = [...(disclosure?.querySelectorAll('.connection-remark') || [])].map(el => el.textContent);
+  report.formats = [...(disclosure?.querySelectorAll('a') || [])].map(el => el.getAttribute('href'));
+  const copied = [];
+  M.copy = text => copied.push(text);
+  disclosure?.querySelector('.connection-entry button')?.click();
+  report.copied = copied;
+  disclosure?.querySelector('.connection-entry button:last-child')?.click();
+  report.qr = w.document.querySelector('dialog img')?.getAttribute('src') || '';
+  report.injected = !!view().querySelector('img[src="x"]') || !!w.pwned;
+  report.outside = events.filter(event => event.url?.includes('://'));
+}
 
 if (mode === 'person-mutation') {
   M.confirm = () => Promise.resolve(true);

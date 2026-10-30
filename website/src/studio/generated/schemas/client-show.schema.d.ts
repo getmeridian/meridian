@@ -59,10 +59,29 @@ export type TrafficReset = string;
 export type TrafficResetAt = string;
 export type TrafficUsedBytes = number;
 export type Username = string;
+export type Available = boolean;
+/**
+ * Null for an inert availability or status notice.
+ */
+export type Protocol = ("reality" | "xhttp" | "wss" | "hysteria2") | null;
+/**
+ * Local SVG data URI in an owner-console share view.
+ */
+export type QrSvg = string;
+export type Remark = string;
+export type Uri = string;
+export type Connections = ClientConnection[];
+export type Format = "xray-json" | "mihomo" | "singbox";
+export type Url = string;
+export type Formats = SubscriptionFormatUrl[];
+export type ProfileTitle = string;
+export type Status1 = "active" | "disabled" | "limited" | "expired";
+export type SubscriptionUrl = string;
+export type Username1 = string;
 export type ShareAvailable = boolean;
 export type ShareUrl = string;
 export type SubscriptionAvailable = boolean;
-export type SubscriptionUrl = string;
+export type SubscriptionUrl1 = string;
 export type Day = string;
 export type DownlinkBytes = number;
 export type UplinkBytes = number;
@@ -72,13 +91,17 @@ export type Daily = UserTrafficDay[];
  */
 export type Days = number;
 export type HistoryDays = number;
-export type Username1 = string;
+export type Username2 = string;
 
 /**
  * Result for showing one client.
  */
 export interface ClientShowResult {
   client: ClientDetail;
+  /**
+   * Only requested by --connections.
+   */
+  connections?: ClientConnections | null;
   handoff: ClientHandoff;
   /**
    * The last seven UTC days, absent while daily history is off.
@@ -109,13 +132,41 @@ export interface ClientDetail {
   username: Username;
 }
 /**
+ * Producing handoff view, shared by the API, console, and explicit CLI inspection.
+ */
+export interface ClientConnections {
+  connections?: Connections;
+  formats?: Formats;
+  profile_title: ProfileTitle;
+  status: Status1;
+  subscription_url: SubscriptionUrl;
+  username: Username1;
+}
+/**
+ * One canonical subscription entry; URI and QR are credentials, never passive output.
+ */
+export interface ClientConnection {
+  available: Available;
+  protocol: Protocol;
+  qr_svg?: QrSvg;
+  remark: Remark;
+  uri: Uri;
+}
+/**
+ * A credential-bearing URL for a format the control service already serves.
+ */
+export interface SubscriptionFormatUrl {
+  format: Format;
+  url: Url;
+}
+/**
  * Handoff links for one client: a page to open and a subscription to import.
  */
 export interface ClientHandoff {
   share_available: ShareAvailable;
   share_url?: ShareUrl;
   subscription_available: SubscriptionAvailable;
-  subscription_url?: SubscriptionUrl;
+  subscription_url?: SubscriptionUrl1;
 }
 /**
  * UTC days, oldest first, including zero-use days; never reconstructed from lifetime totals.
@@ -124,7 +175,7 @@ export interface UserUsage {
   daily: Daily;
   days: Days;
   history_days: HistoryDays;
-  username: Username1;
+  username: Username2;
 }
 export interface UserTrafficDay {
   day: Day;

@@ -72,6 +72,7 @@ from meridian.control.route_types import WRITE, ApiRoute, BodyScope, ErrorRespon
 from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientExtendRequest
+from meridian.core.clients import ClientConnections
 from meridian.core.fleet_events import FleetEventPage
 from meridian.core.server_allowances import ServerUsageList
 
@@ -337,6 +338,18 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         credentials=True,
         refusals=(NOT_FOUND,),
         description=USER_CREDENTIALS,
+    ),
+    route(
+        "GET",
+        "/api/users/{username}/connections",
+        "people",
+        "user_connections",
+        None,
+        ClientConnections,
+        "List one person's individual connections and explicit format URLs.",
+        credentials=True,
+        refusals=(NOT_FOUND,),
+        description="Each connection URI and format URL connects as the person.",
     ),
     route(
         "GET",

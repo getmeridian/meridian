@@ -95,6 +95,12 @@
 .share { display: flex; gap: 20px; align-items: flex-start; }
 .share-links { flex: 1; }
 .qr { display: block; border-radius: var(--r); background: #fff; border: 1px solid var(--b1); flex-shrink: 0; }
+.individual-connections { border-top: 1px solid var(--b1); margin-top: 20px; padding-top: 12px; }
+.individual-connections > summary { cursor: pointer; font-weight: 600; padding-block: 8px; }
+.individual-connections > div { padding-top: 12px; }
+.connection-entry { border-bottom: 1px solid var(--b1); padding-bottom: 16px; margin-bottom: 8px; }
+.connection-remark { font-size: 1rem; overflow-wrap: anywhere; }
+.connection-qr { max-width: 100%; height: auto; margin-inline: auto; }
 .server-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .server-name h2 { font-size: 1rem; overflow-wrap: anywhere; }
 .cli-hint { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 16px; border-radius: var(--r2);

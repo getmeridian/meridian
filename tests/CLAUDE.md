@@ -30,6 +30,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - **RFC 5737 IPs** — always `198.51.100.x` for test data, never real IPs.
 
 ## Pitfalls
+- Every new admin handler needs a runnable ROUTE_SAMPLES entry so the token-scope matrix can collect and exercise its permissions.
 - Owner contact tests cover reviewed-hash applies, export/import, delivery rollback, all placeholder parsers and remark bounds, locale/RTL rendering, active-link guards, and support HTML bypassing worker caches.
 - Fixtures rewinding before step 15 drop `users.note` and `users.tag`; metadata coverage checks empty lower-scope reads, snapshot restoration, content-free events, and edited-field-only console PATCHes.
 - Server allowance fixtures pin the settings clock beside accounting time, cover UTC boundary growth before timer resets, and verify payment/attention reads leave SQLite change counts untouched.

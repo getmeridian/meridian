@@ -400,6 +400,9 @@ class _Handler(BaseHTTPRequestHandler):
             raise ServiceError("not_found", "Unknown user.", 404)
         return self._visible(user)
 
+    def user_connections(self, match: re.Match[str]) -> Any:
+        return self._service.user_connections(match[1])
+
     def _visible(self, user: UserRecord) -> UserRecord:
         """A user as this caller may see them: the VLESS UUID and subscription token connect as the user."""
         if self.caller is not None and scope_covers(self.caller.scope, "people"):
@@ -646,6 +649,7 @@ OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
         _Handler.attention,
         _Handler.list_users,
         _Handler.get_user,
+        _Handler.user_connections,
         _Handler.create_user,
         _Handler.update_user,
         _Handler.reissue_user,

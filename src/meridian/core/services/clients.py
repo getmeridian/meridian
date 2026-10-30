@@ -10,6 +10,7 @@ from pydantic import Field
 from meridian.control.models import UserUsage
 from meridian.core.attention import AttentionList
 from meridian.core.clients import (
+    ClientConnections,
     ClientListResult,
     ClientShowResult,
     PanelUserLike,
@@ -87,6 +88,7 @@ def collect_client_show(
     allowed_usernames: Collection[str] | None = None,
     declared_usernames: Collection[str] | None = None,
     read_usage: Callable[[str], UserUsage | None] | None = None,
+    read_connections: Callable[[str], ClientConnections] | None = None,
 ) -> ClientShowServiceResult:
     """Collect one client plus deterministic handoff links."""
     if allowed_usernames is not None and username not in allowed_usernames:
@@ -98,6 +100,7 @@ def collect_client_show(
         share_url = build_share_url(user) if build_share_url else ""
         subscription_url = build_subscription_url(user.short_uuid) if build_subscription_url and user.short_uuid else ""
         usage = read_usage(username) if read_usage else None
+        connections = read_connections(username) if read_connections else None
     return ClientShowServiceResult(
         client=build_client_show_result(
             user,
@@ -105,6 +108,7 @@ def collect_client_show(
             subscription_url=subscription_url,
             declared=declared_usernames is None or username in declared_usernames,
             usage=usage,
+            connections=connections,
         ),
         share_url=share_url,
         subscription_url=subscription_url,

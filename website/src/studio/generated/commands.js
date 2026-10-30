@@ -1002,6 +1002,7 @@ export const commandCatalog = {
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json",
+        "--connections",
         "--context"
       ],
       "outcomes": [

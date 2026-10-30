@@ -1,5 +1,105 @@
 {
   "$defs": {
+    "ClientConnection": {
+      "additionalProperties": false,
+      "description": "One canonical subscription entry; URI and QR are credentials, never passive output.",
+      "properties": {
+        "available": {
+          "title": "Available",
+          "type": "boolean"
+        },
+        "protocol": {
+          "anyOf": [
+            {
+              "enum": [
+                "reality",
+                "xhttp",
+                "wss",
+                "hysteria2"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Null for an inert availability or status notice.",
+          "title": "Protocol"
+        },
+        "qr_svg": {
+          "default": "",
+          "description": "Local SVG data URI in an owner-console share view.",
+          "title": "Qr Svg",
+          "type": "string"
+        },
+        "remark": {
+          "title": "Remark",
+          "type": "string"
+        },
+        "uri": {
+          "title": "Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "remark",
+        "protocol",
+        "available",
+        "uri"
+      ],
+      "title": "ClientConnection",
+      "type": "object"
+    },
+    "ClientConnections": {
+      "additionalProperties": false,
+      "description": "Producing handoff view, shared by the API, console, and explicit CLI inspection.",
+      "properties": {
+        "connections": {
+          "items": {
+            "$ref": "#/$defs/ClientConnection"
+          },
+          "title": "Connections",
+          "type": "array"
+        },
+        "formats": {
+          "items": {
+            "$ref": "#/$defs/SubscriptionFormatUrl"
+          },
+          "title": "Formats",
+          "type": "array"
+        },
+        "profile_title": {
+          "title": "Profile Title",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "disabled",
+            "limited",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "subscription_url": {
+          "title": "Subscription Url",
+          "type": "string"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "status",
+        "profile_title",
+        "subscription_url"
+      ],
+      "title": "ClientConnections",
+      "type": "object"
+    },
     "ClientDetail": {
       "additionalProperties": false,
       "description": "Client metadata for a detail view.",
@@ -181,6 +281,31 @@
       "title": "ClientHandoff",
       "type": "object"
     },
+    "SubscriptionFormatUrl": {
+      "additionalProperties": false,
+      "description": "A credential-bearing URL for a format the control service already serves.",
+      "properties": {
+        "format": {
+          "enum": [
+            "xray-json",
+            "mihomo",
+            "singbox"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "format",
+        "url"
+      ],
+      "title": "SubscriptionFormatUrl",
+      "type": "object"
+    },
     "UserTrafficDay": {
       "additionalProperties": false,
       "properties": {
@@ -254,6 +379,18 @@
   "properties": {
     "client": {
       "$ref": "#/$defs/ClientDetail"
+    },
+    "connections": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ClientConnections"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Only requested by --connections."
     },
     "handoff": {
       "$ref": "#/$defs/ClientHandoff"

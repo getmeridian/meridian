@@ -107,7 +107,7 @@ JSON `data` 包含 `plan_hash`、`generation` 和 `actions[]` 带 `status: "conv
 
 ```
 meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
-meridian client show NAME [--json]
+meridian client show NAME [--connections] [--json]
 meridian client usage NAME [--days N] [--json]
 meridian client list [--attention] [--tag TAG|none] [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--json]
@@ -133,6 +133,8 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 **`client add`** — 把一个或多个人添加到拓扑并应用，然后为每个人打印连接页面和订阅 URL。页面根据他们真实的订阅生成，因此中继和 Hysteria2 存在时都会显示。拓扑中已有或控制服务中已存在的名称会被拒绝。名称可以使用任何文字（`client add Биба 王小明`）：页面和输出按输入原样显示名称，而控制服务只接受拉丁字母、数字、`.`、`-` 和 `_`，会得到音译后的用户名（`biba`、`wangxiaoming`）。其他 client 命令接受任一形式。如果无法生成客户端的订阅链接，客户端仍会被添加，命令以退出码 `3` 结束。`--limit`、`--reset`、`--expires` 和 `--devices` 都包含在审阅后的计划中，并与每个账户在同一事务中创建。应用失败时不会打印链接；重新运行 `meridian apply` 即可继续。之后的应用会保留管理者所做的修改。
 
 **`client show`** — 打印连接页面、订阅 URL、状态、相对限额的流量及其重置周期、到期时间和最后在线时间。**每个人的订阅 URL 同时也是连接页面的地址。**
+
+`--connections` 还会按订阅顺序打印每个连接的名称、协议和含有凭据的 URI，然后列出 Xray JSON、Mihomo 和 sing-box 的指定格式链接。JSON 将此视图放在 `data.connections` 中；凭据字段仅在本次命令的最终输出中显示。请勿将这些链接或二维码放入日志或共享报告。
 
 首次记录的流量时间和最近报告流量的节点来自已接受的计数增长（JSON 中的 `first_traffic_at` 和 `last_traffic_node`）。升级前的首次使用时间可能未知；这些仅是汇总数据，不包含会话或客户端地址。
 

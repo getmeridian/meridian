@@ -107,7 +107,7 @@ Manage the people who connect.
 
 ```
 meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
-meridian client show NAME [--json]
+meridian client show NAME [--connections] [--json]
 meridian client usage NAME [--days N] [--json]
 meridian client list [--attention] [--tag TAG|none] [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--json]
@@ -133,6 +133,8 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 **`client add`** — adds one or more people to the topology, applies it, and prints each person's connection page and subscription URL. The page is built from their real subscription, so relays and Hysteria2 appear when present. Names already in the topology or already present in the control service are refused. Names can be in any script (`client add Биба 王小明`): pages and output show them as typed, while the control service, which accepts only Latin letters, digits, `.`, `-`, and `_`, gets a transliterated username (`biba`, `wangxiaoming`). Other client commands accept either form. If a client's subscription link can't be built, the client is still added and the command exits `3`. `--limit`, `--reset`, `--expires`, and `--devices` are carried in the reviewed plan and created with each account in one transaction. A failed apply prints no links; rerun `meridian apply` to finish. Later applies preserve operator edits.
 
 **`client show`** — prints the connection page, subscription URL, status, traffic against the limit with its reset period, expiry, and last-seen time. **The subscription URL is also the page URL for every person.**
+
+`--connections` also prints each canonical connection's remark, protocol, and credential URI, followed by explicit Xray JSON, Mihomo, and sing-box URLs. JSON includes this view at `data.connections`; only this producing output reveals its credential fields. Do not put these links or QR images in logs or shared reports.
 
 First reported traffic and the last reporting node come from accepted traffic growth (`first_traffic_at` and `last_traffic_node` in JSON). Historical first use can be unknown; these are aggregate counters, with no sessions or client addresses.
 

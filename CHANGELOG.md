@@ -8,6 +8,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 - An apply after a Meridian upgrade, or after another renderer changed, no longer re-runs every server's package and hardening baseline; only a change to the baseline itself or to the server's connection does.
 - Scoped integrations can fetch OpenAPI 3.1 at `/api/openapi.json`. The same route catalog drives dispatch and authorization, marks responses that can carry credentials, and supplies checked API operation tables in all four locales.
+- The console's closed Individual connections disclosure offers named connections, protocol labels, copy and QR actions, and Xray JSON, Mihomo, and sing-box URLs. The people/admin API and `client show --connections` expose the same canonical list; credential fields remain redacted outside producing output.
+
 - Xray JSON subscriptions keep Automatic first and add a named profile for each primary connection, with the same routing and isolated fingerprint alternatives.
 
 - Console person actions update their originating screen and name the person in feedback; enabling explains when expiry or a traffic limit still blocks access.

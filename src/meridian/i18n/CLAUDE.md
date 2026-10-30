@@ -9,6 +9,7 @@
 **No markup in catalogs** — callers escape catalog text and add Rich styles themselves, so a translator can never break rendering.
 
 ## What's done well
+- Individual connection and format headings and unavailable labels match across all four CLI locales.
 - Owner-contact reviews, clearing, validation, and read-only console guidance have matching four-locale keys; operator-supplied instructions stay verbatim.
 - Private note/tag labels, bounds, clearing guidance, and scope disclosures have matching English, Russian, Persian, and Chinese catalog entries.
 

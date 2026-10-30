@@ -1,6 +1,7 @@
 # control/ui — The owner's web console (M5, #95)
 
 ## Design decisions
+- The closed Individual connections disclosure uses canonical subscription order and local QR codes; explicit format URLs and entries share the subscription link's credential permissions.
 - Settings shows public owner instructions and the canonical link read-only with `meridian fleet contact`; it never writes the topology-owned presentation.
 - **Server billing stays reviewed** — Servers composes read-only allowance/payment evidence and attention from service settings, adds cards for non-agent servers, and prints `meridian server set` to edit the topology.
 - **New console tokens last 90 days by default** — Tokens offers 7, 30, 90 days or never, always sends the choice through the existing owner step-up, and shows expiry or an expired state alongside revocation metadata.

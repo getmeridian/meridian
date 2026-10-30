@@ -38,6 +38,7 @@ from meridian.control.models import (
 from meridian.core.attention import AttentionList
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientLimitChange, TrafficReset
+from meridian.core.clients import ClientConnections
 from meridian.core.fleet import FleetTopology
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.traffic import NodeTrafficEvidence
@@ -104,6 +105,9 @@ class ServiceAccessPanel:
                 return None
 
         return _translated(read)
+
+    def user_connections(self, username: str) -> ClientConnections:
+        return _translated(lambda: self._client.user_connections(username))
 
     def attention(self) -> AttentionList:
         return _translated(self._client.attention)

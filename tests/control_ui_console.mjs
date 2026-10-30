@@ -118,7 +118,7 @@ w.fetch = (url, options) => {
     server_usage: data?.server_usage || [], server_attention: data?.server_attention || [] }));
   throw new Error('Unexpected request: ' + url);
 };
-for (const script of ['core.js', 'people.js', 'fleet.js']) {
+for (const script of ['core.js', 'people.js', 'person-connections.js', 'fleet.js']) {
   w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 }
 const M = w.M;

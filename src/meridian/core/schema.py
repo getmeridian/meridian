@@ -43,12 +43,15 @@ from meridian.core.client_devices import ClientDevicesResult
 from meridian.core.client_limits import ClientExtendRequest
 from meridian.core.clients import (
     ClientAddResult,
+    ClientConnection,
+    ClientConnections,
     ClientLimitsResult,
     ClientListResult,
     ClientReissueResult,
     ClientRemoveResult,
     ClientShowResult,
     ClientStatusResult,
+    SubscriptionFormatUrl,
 )
 from meridian.core.command_catalog import (
     CommandCatalogEntry,
@@ -658,6 +661,9 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "summary": Summary,
     "client-list": ClientListResult,
     "client-show": ClientShowResult,
+    "client-connection": ClientConnection,
+    "client-connections": ClientConnections,
+    "subscription-format-url": SubscriptionFormatUrl,
     "client-usage": UserUsage,
     "client-add": ClientAddResult,
     "client-remove": ClientRemoveResult,

@@ -8,11 +8,12 @@ from typing import Literal, Protocol, Sequence
 from pydantic import Field
 
 from meridian.control.command_models import NodeCommandOutcome
-from meridian.control.models import UserUsage
+from meridian.control.models import UserStatus, UserUsage
 from meridian.core.attention import PersonAttentionReason
 from meridian.core.client_limits import canonical_expiry, traffic_reset_from_strategy
 from meridian.core.models import CoreModel
 from meridian.core.person_metadata import PersonTag, PrivateNote
+from meridian.core.topology import ProtocolKind
 from meridian.core.traffic import UserTrafficEvidence
 
 
@@ -97,6 +98,37 @@ class ClientHandoff(CoreModel):
     subscription_url: str = ""
 
 
+class ClientConnection(CoreModel):
+    """One canonical subscription entry; URI and QR are credentials, never passive output."""
+
+    remark: str
+    protocol: ProtocolKind | None = Field(description="Null for an inert availability or status notice.")
+    available: bool
+    uri: str = Field(repr=False)
+    qr_svg: str = Field(default="", repr=False, description="Local SVG data URI in an owner-console share view.")
+
+
+SubscriptionFormat = Literal["xray-json", "mihomo", "singbox"]
+
+
+class SubscriptionFormatUrl(CoreModel):
+    """A credential-bearing URL for a format the control service already serves."""
+
+    format: SubscriptionFormat
+    url: str = Field(repr=False)
+
+
+class ClientConnections(CoreModel):
+    """Producing handoff view, shared by the API, console, and explicit CLI inspection."""
+
+    username: str
+    status: UserStatus
+    profile_title: str
+    subscription_url: str = Field(repr=False)
+    connections: list[ClientConnection] = Field(default_factory=list)
+    formats: list[SubscriptionFormatUrl] = Field(default_factory=list)
+
+
 class ClientDetail(ClientRecord):
     """Client metadata for a detail view."""
 
@@ -132,6 +164,7 @@ class ClientShowResult(CoreModel):
 
     client: ClientDetail
     handoff: ClientHandoff
+    connections: ClientConnections | None = Field(default=None, description="Only requested by --connections.")
     usage: UserUsage | None = Field(
         default=None, description="The last seven UTC days, absent while daily history is off."
     )
@@ -204,6 +237,21 @@ def client_metadata_paths(records: Sequence[ClientRecord] | None = None) -> froz
     """Exact metadata paths in an authorized single-person or list JSON result."""
     bases = ["data.client"] if records is None else [f"data.clients.{index}" for index in range(len(records))]
     return frozenset(f"{base}.{field}" for base in bases for field in ("note", "tag"))
+
+
+def connection_credential_paths(view: ClientConnections | None) -> frozenset[str]:
+    """Exact paths revealed only in the final client-show output that produced this view."""
+    if view is None:
+        return frozenset()
+    return frozenset(
+        {"data.connections.subscription_url"}
+        | {
+            f"data.connections.connections.{index}.{field}"
+            for index in range(len(view.connections))
+            for field in ("uri", "qr_svg")
+        }
+        | {f"data.connections.formats.{index}.url" for index in range(len(view.formats))}
+    )
 
 
 def build_client_record(
@@ -282,6 +330,7 @@ def build_client_show_result(
     subscription_url: str = "",
     declared: bool = True,
     usage: UserUsage | None = None,
+    connections: ClientConnections | None = None,
 ) -> ClientShowResult:
     """Build a one-client result with optional handoff links."""
     return ClientShowResult(
@@ -293,6 +342,7 @@ def build_client_show_result(
             subscription_url=subscription_url,
         ),
         usage=usage,
+        connections=connections,
     )
 
 

@@ -74,7 +74,7 @@
   function shareCard(share) {
     if (!share.subscription_url) {
       return h("section", { class: "card" }, h("h2", { text: M.t("person.share") }),
-        h("p", { class: "muted", text: M.t("person.no_public_url") }));
+        h("p", { class: "muted", text: M.t("person.no_public_url") }), M.connectionDisclosure(share));
     }
     return h("section", { class: "card" },
       h("h2", { text: M.t("person.share") }),
@@ -94,7 +94,7 @@
                 M.icon("link"), M.t("person.open_page")),
               h("button", { class: "btn btn-ghost btn-sm", type: "button",
                 onclick: function () { M.copy(share.page_url); } }, M.icon("copy"), M.t("person.copy_page"))),
-          ] : h("p", { class: "muted small", text: M.t("person.no_page") }))));
+          ] : h("p", { class: "muted small", text: M.t("person.no_page") }))), M.connectionDisclosure(share));
   }
 
   function usageCard(user, screen) {

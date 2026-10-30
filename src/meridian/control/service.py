@@ -53,6 +53,7 @@ from meridian.control.node_documents import with_users
 from meridian.control.node_health import project_runtime
 from meridian.control.owner import UI_TABLES, OwnerAuth
 from meridian.control.periods import period_start
+from meridian.control.person_connections import read_connections
 from meridian.control.privacy import PRIVACY_TABLES, PrivacyLedger, read_privacy
 from meridian.control.revisions import APPLY_FENCE_TABLE, REVISIONS_TABLE, RevisionLedger
 from meridian.control.server_allowances import ALLOWANCE_PERIODS_TABLE, advance_server_periods, read_server_usage
@@ -73,6 +74,7 @@ from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.client_devices import DevicesRemoved
+from meridian.core.clients import ClientConnections
 from meridian.core.server_allowances import ServerUsageList
 
 SCHEMA_VERSION = 16
@@ -597,6 +599,9 @@ class ControlService:
         with self._lock:
             rows = self._db.execute(f"{USER_SELECT} ORDER BY u.username").fetchall()
         return [user_record(row) for row in rows]
+
+    def user_connections(self, username: str) -> ClientConnections:
+        return read_connections(self._store, self, username)
 
     def attention(self, thresholds: AttentionThresholds | None = None, *, now: str | None = None) -> AttentionList:
         return read_attention(

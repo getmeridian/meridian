@@ -126,6 +126,7 @@ ROUTE_SAMPLES = {
     "create_user": ("/api/users", {"username": "bob", "traffic_limit_bytes": 1000}),
     "import_users": ("/api/import/users", {"users": []}),
     "get_user": ("/api/users/alice", None),
+    "user_connections": ("/api/users/alice/connections", None),
     "user_usage": ("/api/users/alice/usage", None),
     "put_user": ("/api/users/bob", {}),
     "update_user": ("/api/users/alice", {"status": "disabled"}),

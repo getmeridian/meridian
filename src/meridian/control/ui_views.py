@@ -11,7 +11,6 @@ from typing import Any, Literal
 
 import segno
 
-from meridian.control.errors import ServiceError
 from meridian.control.service import ControlService
 from meridian.control.ui_models import FleetView, ServerView, ShareView
 from meridian.core.attention import AttentionThresholds, derive_server_attention
@@ -108,20 +107,21 @@ def fleet_view(service: ControlService) -> FleetView:
 
 def share_view(service: ControlService, username: str) -> ShareView:
     """Every person's subscription is also their connection page, including console invitees."""
-    user = service.get_user(username)
-    if user is None:
-        raise ServiceError("not_found", "Unknown user.", 404)
+    connection_view = service.user_connections(username)
     declared = is_declared(service, username)
-    base = service.settings().public_url
-    if not base:
-        return ShareView(username=username, declared=declared, subscription_url="", page_url="", qr_svg="")
-    subscription = f"{base}/sub/{user.sub_token}"
+    subscription = connection_view.subscription_url
     return ShareView(
         username=username,
         declared=declared,
         subscription_url=subscription,
         page_url=subscription,
-        qr_svg=qr_data_uri(subscription),
+        qr_svg=qr_data_uri(subscription) if subscription else "",
+        profile_title=connection_view.profile_title,
+        connections=[
+            connection.model_copy(update={"qr_svg": qr_data_uri(connection.uri)})
+            for connection in connection_view.connections
+        ],
+        formats=connection_view.formats,
     )
 
 

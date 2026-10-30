@@ -195,6 +195,8 @@ Client accounts (keys, status, limits, traffic) live in the control service's da
 
 ## Web console
 
+Open **Individual connections** beneath the main subscription handoff to copy a named connection or show its QR code in subscription order. The disclosure starts closed and also lists explicit Xray JSON, Mihomo, and sing-box URLs. These links and QR images grant access as that person; keep them private. `meridian client show NAME --connections` and `GET /api/users/{username}/connections` show the same list. The API requires people/admin scope or an owner session; ordinary read tokens cannot read the credentials.
+
 Person actions name the person in their result. Enabling someone whose access is expired or whose quota is exhausted explains what still prevents connection. A result arriving after you navigate leaves the new screen in place.
 
 The control service has a web console where you can manage people from a browser, including your phone. `meridian panel` prints its address and, the first time, a one-time setup link where you choose the owner's password. You can add a sign-in code from an authenticator app afterwards, in **Settings**.

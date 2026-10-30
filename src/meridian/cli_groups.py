@@ -83,6 +83,9 @@ def client_add(
 def client_show_cmd(
     name: str = typer.Argument(..., help="Client name"),
     _json: Json = False,
+    connections: bool = typer.Option(
+        False, "--connections", help="Show individual connection credentials and format URLs"
+    ),
 ) -> None:
     """Show a client's connection page, subscription link, and status
 
@@ -91,7 +94,7 @@ def client_show_cmd(
     """
     from meridian.commands.client import run_show
 
-    run_show(name)
+    run_show(name, connections=connections)
 
 
 @client_app.command("list")

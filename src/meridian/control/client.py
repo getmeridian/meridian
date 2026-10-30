@@ -63,6 +63,7 @@ from meridian.control.models import (
 from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientExtendRequest
+from meridian.core.clients import ClientConnections
 from meridian.core.errors import MeridianError
 from meridian.core.fleet_events import FleetEventPage, FleetEventQuery
 from meridian.core.server_allowances import ServerUsageList
@@ -236,6 +237,9 @@ class ControlClient:
 
     def list_users(self) -> list[UserRecord]:
         return [UserRecord.model_validate(item) for item in self._call("GET", "api/users")["users"]]
+
+    def user_connections(self, username: str) -> ClientConnections:
+        return ClientConnections.model_validate(self._call("GET", f"api/users/{_segment(username)}/connections"))
 
     def put_user(self, username: str) -> UserRecord:
         return UserRecord.model_validate(self._call("PUT", f"api/users/{_segment(username)}", {}))

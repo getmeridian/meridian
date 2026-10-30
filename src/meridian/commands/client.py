@@ -14,6 +14,7 @@ from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import format_traffic, load_topology_cluster, require_intent
+from meridian.commands.client_connections import print_connections
 from meridian.commands.client_handoff import (
     format_status,
     get_user_or_fail,
@@ -35,6 +36,7 @@ from meridian.core.clients import (
     build_client_reissue_result,
     build_client_status_result,
     client_metadata_paths,
+    connection_credential_paths,
 )
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -102,14 +104,14 @@ def run_add(
         )
 
 
-def run_show(name: str) -> None:
+def run_show(name: str, *, connections: bool = False) -> None:
     """Display connection info for an existing client."""
     operation = OperationContext()
     with error_context("client.show", timer=operation.timer):
-        _show(name=name, operation=operation)
+        _show(name=name, operation=operation, connections=connections)
 
 
-def _show(*, name: str, operation: OperationContext) -> None:
+def _show(*, name: str, operation: OperationContext, connections: bool = False) -> None:
     cluster = load_topology_cluster()
     name = resolve_client_name(cluster, name, console_people=True, console_names=_console_names(cluster))
     if not cluster.runs_control_service:  # there the name was checked against the service's own rule
@@ -129,6 +131,7 @@ def _show(*, name: str, operation: OperationContext) -> None:
             allowed_usernames=_readable_users(cluster),
             declared_usernames=access_users,
             read_usage=panel.recent_usage if cluster.runs_control_service else None,
+            read_connections=panel.user_connections if connections else None,
         )
     except ClientNotFoundError:
         fail(
@@ -152,11 +155,13 @@ def _show(*, name: str, operation: OperationContext) -> None:
                 summary=Summary(text=f"Client {detail.username}", changed=False, counts={"clients": 1}),
                 timer=operation.timer,
             ),
-            reveal=HANDOFF_LINK_KEYS | client_metadata_paths(),
+            reveal=HANDOFF_LINK_KEYS | client_metadata_paths() | connection_credential_paths(result.client.connections),
         )
         return
 
     print_handoff_links(result.subscription_url, page_url=result.share_url)
+    if result.client.connections is not None:
+        print_connections(result.client.connections)
 
     err_console.print()
     print_client_usage(detail)
