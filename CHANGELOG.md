@@ -205,6 +205,9 @@ beta, 4.0.0b8; the second is what 4.0 changes compared with 3.x.
 - The website and README show screenshots of the connection page and the web
   panel, and `/demo/console/` is a clickable panel demo beside the connection
   page demo, both running on one invented fleet.
+- The README, website, docs, CLI, web panel, and connection pages say VPN
+  where they mean the product and call the owner's console the web panel in
+  all four languages; "proxy" stays only where it is technically exact.
 
 #### Fixed
 - `meridian apply` no longer retries the removal of a deleted server on every
