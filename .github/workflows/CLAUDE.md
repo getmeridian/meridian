@@ -29,6 +29,7 @@
 
 ## Pitfalls
 
+- **Pre-release notes read only `## [X.Y.Z]`** — beta changes go under its `### Since <previous beta>` part, never a separate `## Unreleased` heading, which no release job extracts (b9's whole changelog once sat there).
 - **Release notes depend on CHANGELOG discipline** — if human forgets to update CHANGELOG before bumping VERSION, release notes fall back to git log (less useful).
 - **Never bundle docs inline in a workflow** — `website/scripts/ai-docs.mjs` owns the AI bundles; the site build serves `/ai/reference.md`, and publish-pypi runs the script for the packaged copy.
 - **`workflow_run` needs `branches: [main]`** — without it every PR's CI completion queues a skipped Release run.
