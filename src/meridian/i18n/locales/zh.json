@@ -217,6 +217,7 @@
   "client.label.expires": "到期",
   "client.label.last_seen": "最近在线",
   "client.label.first_traffic": "首次记录的流量",
+  "client.traffic_unknown": "未记录",
   "client.label.last_traffic_node": "最近报告流量的节点",
   "fleet.label.node": "节点",
   "fleet.label.active": "活跃",

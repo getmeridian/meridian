@@ -217,6 +217,7 @@
   "client.label.expires": "Expires",
   "client.label.last_seen": "Last seen",
   "client.label.first_traffic": "First reported traffic",
+  "client.traffic_unknown": "Not recorded",
   "client.label.last_traffic_node": "Last reporting node",
   "fleet.label.node": "Node",
   "fleet.label.active": "active",

@@ -82,10 +82,8 @@ def print_client_usage(record: ClientRecord) -> None:
     last_seen = t("client.label.last_seen")
     if record.last_seen:
         rows.append((last_seen, escape(record.last_seen)))
-    if record.first_traffic_at:
-        rows.append((t("client.label.first_traffic"), escape(record.first_traffic_at)))
-    if record.last_traffic_node:
-        rows.append((t("client.label.last_traffic_node"), escape(record.last_traffic_node)))
+    rows.append((t("client.label.first_traffic"), escape(record.first_traffic_at or t("client.traffic_unknown"))))
+    rows.append((t("client.label.last_traffic_node"), escape(record.last_traffic_node or t("client.traffic_unknown"))))
     # One column for every label, shown or not, so values line up the same in every view.
     width = max(cell_len(label) for label in (last_seen, *(label for label, _value in rows))) + 1
     for label, value in rows:

@@ -46,6 +46,7 @@
 - Background enforcement and blob mirroring keep attempt/success times and fixed error codes only in memory; warn at most once per task per five minutes and never log exception text.
 - NodeStatus traffic is the ledger's node total, carried into the CLI's Node; never reconstruct it from user totals or leave the adapter's default zero.
 - Agent polls refresh reachability only; judge runtime health and convergence from a report younger than the live window, and keep stale reports as unavailable evidence.
+- Existing or imported usage with an unknown first time stays unknown after more growth; never assign a recent report as the historical first use. The last node and receipt time still advance, and known first times stay set once.
 - Startup prunes events only after fleet identity and schema checks succeed; pruning in a ledger constructor once let a refused foreign-fleet open erase older local facts.
 - Event details accept only typed field names, statuses, counts, audit IDs, and token names/scopes; never copy user records, credential values, raw report errors, addresses, or device metadata. A missing report cannot announce an apply recovery, and a repeated state or write adds no transition event.
 - Never derive displayed node totals from the last-arriving epoch or clear them with user/history/node deletion; duplicates and retired epochs leave activity alone, and a late older collection window adds bytes without replacing fresher activity.

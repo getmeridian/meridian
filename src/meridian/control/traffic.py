@@ -156,7 +156,10 @@ class TrafficLedger:
             )
         }
         growth: list[tuple[str, int, int, int, int]] = []
-        known = {row["user_id"] for row in self._store.rows("SELECT user_id FROM users")}
+        known = {
+            str(row["user_id"]): int(row["traffic_carried_bytes"])
+            for row in self._store.rows("SELECT user_id, traffic_carried_bytes FROM users")
+        }
         for user in report.users:
             if user.user_id not in known:
                 continue
@@ -177,7 +180,14 @@ class TrafficLedger:
                 (node_id, epoch, user_id, total_up, total_down),
             )
             if up or down:
-                previous = self._store.row("SELECT last_seen_at FROM traffic_totals WHERE user_id = ?", (user_id,))
+                previous = self._store.row(
+                    "SELECT uplink_bytes, downlink_bytes, last_seen_at FROM traffic_totals WHERE user_id = ?",
+                    (user_id,),
+                )
+                earlier_use = known[user_id] > 0 or bool(
+                    previous and (previous["uplink_bytes"] or previous["downlink_bytes"])
+                )
+                first_at = None if earlier_use else now
                 recent = (
                     previous is None
                     or previous["last_seen_at"] is None
@@ -192,7 +202,7 @@ class TrafficLedger:
                     " first_traffic_at = COALESCE(first_traffic_at, excluded.first_traffic_at),"
                     " last_seen_at = CASE WHEN ? THEN excluded.last_seen_at ELSE last_seen_at END,"
                     " last_traffic_node = CASE WHEN ? THEN excluded.last_traffic_node ELSE last_traffic_node END",
-                    (user_id, up, down, now, now, node_id, recent, recent),
+                    (user_id, up, down, now, first_at, node_id, recent, recent),
                 )
                 if history:
                     db.execute(

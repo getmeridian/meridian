@@ -26,8 +26,9 @@ NOW = "2026-11-01T12:00:00Z"
 
 
 @pytest.mark.parametrize("json_mode", [False, True], ids=["human", "json"])
+@pytest.mark.parametrize("used", [True, False], ids=["with-traffic", "never-used"])
 def test_traffic_evidence_reaches_client_show_and_fleet_status(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], json_mode: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], json_mode: bool, used: bool
 ) -> None:
     service = ControlService(tmp_path / "control.db", fleet_id=FLEET_ID, version="4.0.0")
     user = service.put_user("alice")
@@ -46,7 +47,9 @@ def test_traffic_evidence_reaches_client_show_and_fleet_status(
             "counter_epoch": "5b0c8a52-6c1d-4e8b-9a7f-2b5d4c3e1f00",
             "seq": 1,
             "collected_at": NOW,
-            "users": [{"user_id": user.user_id, "uplink_bytes": 10, "downlink_bytes": 20}],
+            "users": [
+                {"user_id": user.user_id, "uplink_bytes": 10 if used else 0, "downlink_bytes": 20 if used else 0}
+            ],
         }
     )
     service.record_stats("main", report, now=NOW)
@@ -56,14 +59,17 @@ def test_traffic_evidence_reaches_client_show_and_fleet_status(
     try:
         with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN) as api:
             person = api.get_user("alice")
-            assert (person.first_traffic_at, person.last_traffic_node) == (NOW, "main")
+            assert (person.first_traffic_at, person.last_traffic_node) == (
+                NOW if used else None,
+                "main" if used else None,
+            )
             node = api.node("main")
-            assert node.traffic_bytes == 30
-            assert (node.active_users, node.active_report_at, node.traffic_counting_since) == (1, NOW, NOW)
+            assert node.traffic_bytes == (30 if used else 0)
+            assert (node.active_users, node.active_report_at, node.traffic_counting_since) == (int(used), NOW, NOW)
             assert node.runtime_available() and node.in_sync
             console = httpx.get(url + "/ui/api/fleet", headers={"Authorization": f"Bearer {ADMIN_TOKEN}"}).json()
-            assert console["servers"][0]["traffic_bytes"] == 30
-            assert console["servers"][0]["active_users"] == 1
+            assert console["servers"][0]["traffic_bytes"] == (30 if used else 0)
+            assert console["servers"][0]["active_users"] == int(used)
             assert console["servers"][0]["active_report_at"] == NOW
             assert console["servers"][0]["runtime_available"] is True
             assert console["servers"][0]["runtime"]["health"] == runtime_report["health"]
@@ -79,22 +85,26 @@ def test_traffic_evidence_reaches_client_show_and_fleet_status(
             output = capsys.readouterr()
             if json_mode:
                 detail = json.loads(output.out)["data"]["client"]
-                assert (detail["first_traffic_at"], detail["last_traffic_node"]) == (NOW, "main")
+                assert (detail["first_traffic_at"], detail["last_traffic_node"]) == (
+                    NOW if used else None,
+                    "main" if used else None,
+                )
             else:
-                assert "First reported traffic" in output.err and NOW in output.err
-                assert "Last reporting node" in output.err and "main" in output.err
+                assert "First reported traffic" in output.err
+                assert "Last reporting node" in output.err
+                assert (NOW if used else "Not recorded") in output.err
             fleet.run_status()
             output = capsys.readouterr()
             if json_mode:
                 status = json.loads(output.out)["data"]["nodes"][0]
-                assert (status["active_users"], status["active_report_at"]) == (1, NOW)
-                assert status["traffic_bytes"] == 30
+                assert (status["active_users"], status["active_report_at"]) == (int(used), NOW)
+                assert status["traffic_bytes"] == (30 if used else 0)
                 assert status["live"] and status["runtime_available"] and status["in_sync"]
                 assert status["runtime"]["health"] == runtime_report["health"]
             else:
                 assert "active" in output.err and "Active in the last report" in output.err
                 assert NOW in output.err
-                assert "30 B" in output.err
+                assert ("30 B" if used else "0 B") in output.err
                 assert "Reachability: live" in output.err
                 assert "Runtime: healthy" in output.err
                 assert "Convergence: in sync" in output.err

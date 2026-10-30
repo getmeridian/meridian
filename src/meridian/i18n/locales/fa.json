@@ -217,6 +217,7 @@
   "client.label.expires": "انقضا",
   "client.label.last_seen": "آخرین اتصال",
   "client.label.first_traffic": "نخستین ترافیک ثبت‌شده",
+  "client.traffic_unknown": "ثبت نشده",
   "client.label.last_traffic_node": "آخرین گره گزارش‌دهنده",
   "fleet.label.node": "گره",
   "fleet.label.active": "فعال",

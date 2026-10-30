@@ -382,3 +382,33 @@ def test_schema_thirteen_backfills_retained_node_evidence_once_and_marks_the_acc
         assert service.get_user("alice").lifetime_traffic_bytes == (KEPT_EPOCHS + 2) * 10
         assert service._store.meta("schema_version") == "13"
         service.close()
+    service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
+    try:
+        epoch = f"{KEPT_EPOCHS + 1:08x}-6c1d-4e8b-9a7f-2b5d4c3e1f00"
+        service.record_stats("main", _report(service, epoch, 2, alice=(5, 6)), now="2026-11-01T12:00:00Z")
+        assert service.get_user("alice").first_traffic_at is None
+        assert service.get_user("alice").last_traffic_node == "main"
+    finally:
+        service.close()
+
+
+def test_imported_use_without_a_first_time_stays_unknown_when_more_traffic_arrives(service: ControlService) -> None:
+    from meridian.control.models import UserImport, UserImportBatch
+
+    service.import_users(
+        UserImportBatch(
+            users=[
+                UserImport(
+                    username="carried",
+                    uuid=EPOCH_A,
+                    sub_token="Zq8xT3vNw2LmK7pR",
+                    used_traffic_bytes=100,
+                    lifetime_traffic_bytes=100,
+                )
+            ]
+        )
+    )
+    service.record_stats("edge", _report(service, EPOCH_B, 1, carried=(3, 5)))
+    user = service.get_user("carried")
+    assert user.first_traffic_at is None
+    assert user.last_traffic_node == "edge" and user.lifetime_traffic_bytes == 108
