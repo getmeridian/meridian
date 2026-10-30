@@ -135,11 +135,16 @@ def session_token(headers: Message) -> str:
     return ""
 
 
+def passive_read(request: UiRequest) -> bool:
+    """Only read requests can opt out of renewing the owner's idle activity."""
+    return request.command in ("GET", "HEAD") and request.headers.get("X-Meridian-Passive") == "1"
+
+
 def owner_session(request: UiRequest) -> OwnerSession:
     """The signed-in owner's session (401 otherwise); writes also pass `require_same_origin`."""
     if request.command not in ("GET", "HEAD"):
         require_same_origin(request)
-    session = request.ui.service.owner.authenticate(session_token(request.headers))
+    session = request.ui.service.owner.authenticate(session_token(request.headers), touch=not passive_read(request))
     request.owner_session = session
     return session
 
@@ -226,7 +231,7 @@ def auth_state(request: UiRequest, _match: re.Match[str]) -> None:
     token = session_token(request.headers)
     if token:
         try:
-            session = ui.service.owner.authenticate(token)
+            session = ui.service.owner.authenticate(token, touch=not passive_read(request))
         except ServiceError:
             session = None
     _send_json(

@@ -126,6 +126,6 @@ setTimeout(() => process.stdout.write(JSON.stringify(seen)), 10);
 def test_a_superseded_comparison_never_lands_under_the_newer_label() -> None:
     """Picking #2 then #1: #2's late reply once replaced #1's diff while the label still said #1."""
     result = subprocess.run(
-        ["node", "-e", _LATEST_HARNESS, str(UI_DIR / "fleet.js")], capture_output=True, text=True, check=True
+        ["node", "-e", _LATEST_HARNESS, str(UI_DIR / "core.js")], capture_output=True, text=True, check=True
     )
     assert json.loads(result.stdout) == ["ok:one"]

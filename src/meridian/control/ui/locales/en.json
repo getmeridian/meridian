@@ -355,5 +355,9 @@
   "unit.mib": "MiB",
   "unit.gib": "GiB",
   "unit.tib": "TiB",
-  "unit.pib": "PiB"
+  "unit.pib": "PiB",
+  "live.never": "Not updated yet",
+  "live.updated": "Updated {seconds} s ago",
+  "live.stale": "Out of date",
+  "error.timeout": "The request timed out. Try again."
 }

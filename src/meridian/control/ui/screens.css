@@ -165,3 +165,6 @@
 .health-checks { padding-inline-start: 1.8rem; overflow-wrap: anywhere; }
 .field-error { color: var(--err); font-size: .85rem; margin-block: .25rem 0; }
 .field-error:empty { display: none; }
+.live-status { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .8rem; margin-block: 1rem; }
+.live-trouble:empty { display: none; }
+.live-retry[hidden] { display: none; }

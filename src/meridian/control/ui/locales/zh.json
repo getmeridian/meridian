@@ -355,5 +355,9 @@
   "unit.mib": "MiB",
   "unit.gib": "GiB",
   "unit.tib": "TiB",
-  "unit.pib": "PiB"
+  "unit.pib": "PiB",
+  "live.never": "尚未更新",
+  "live.updated": "{seconds} 秒前更新",
+  "live.stale": "数据已过期",
+  "error.timeout": "请求超时，请重试。"
 }

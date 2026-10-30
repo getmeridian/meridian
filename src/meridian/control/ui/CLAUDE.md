@@ -16,6 +16,7 @@
 - **Assets revalidate by ETag** (content hash, `no-cache`); anything holding a secret is `no-store`.
 
 ## Pitfalls
+- People and Servers poll only while visible (30 s / 10 s), stop on navigation, keep stale data with retry and bounded backoff, and accept replies through M.latestOnly; passive GETs carry X-Meridian-Passive and every request has a body-inclusive deadline.
 - Quotas use GiB/TiB with an explicit Unlimited choice; validate at the field before any form submits, round decimal bytes like the CLI, and refuse new values above JavaScript's exact integer range.
 - Server cards keep reachability, runtime health, and convergence separate; resource metrics and health checks come only from fresh report evidence.
 - The session cookie is scoped to `ServiceConfig.public_path` (the bootstrap writes it); without one sign-in is refused (`ui_unconfigured`), since a `/` cookie would ride every subscription request.

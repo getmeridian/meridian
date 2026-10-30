@@ -13,6 +13,15 @@ const dom = new JSDOM('<!doctype html><body><div id="view"></div></body>', {
 const w = dom.window;
 const catalog = JSON.parse(fs.readFileSync(path.join(ui, 'locales', locale + '.json')));
 const events = [], writes = [], delayed = {};
+let fakeNow = Date.now(), timerId = 0, hidden = false, failPolls = false;
+const timers = new Map(), rounds = new Map();
+const virtual = mode.startsWith('live-') || mode.startsWith('deadline-');
+if (virtual) {
+  w.Date.now = () => fakeNow;
+  w.setTimeout = (fn, delay = 0) => { const id = ++timerId; timers.set(id, { fn, at: fakeNow + delay }); return id; };
+  w.clearTimeout = (id) => timers.delete(id);
+  Object.defineProperty(w.document, 'hidden', { get: () => hidden });
+}
 const server = {
   node_id: 'main', role: 'exit', region: '', live: true,
   last_seen_at: new Date().toISOString(), agent_version: '0.1.0', revision: 2, applied_revision: 1,
@@ -31,7 +40,23 @@ function reply(body, status = 200) {
     text: () => Promise.resolve(JSON.stringify(body)) };
 }
 w.fetch = (url, options) => {
-  events.push({ method: options.method, url, headers: options.headers });
+  events.push({ method: options.method, url, headers: options.headers, at: fakeNow });
+  if (mode.startsWith('deadline-')) {
+    delayed.signal = options.signal;
+    return mode === 'deadline-fetch' ? new Promise(() => {}) : Promise.resolve({
+      ...reply(null), text: () => new Promise(() => {}),
+    });
+  }
+  if (mode.startsWith('live-')) {
+    const round = (rounds.get(url) || 0) + 1;
+    rounds.set(url, round);
+    if (mode === 'live-race') return new Promise((resolve, reject) => { delayed[url + ':' + round] = { resolve, reject }; });
+    if (failPolls) return Promise.resolve(reply({ error: { code: 'network' } }, 503));
+    if (url === 'api/users') return Promise.resolve(reply({ users: [{ username: 'sample', status: 'active',
+      used_traffic_bytes: round * 1024, traffic_limit_bytes: 0, expire_at: null, online_at: null }] }));
+    if (url === 'ui/api/fleet') return Promise.resolve(reply({ profile_title: 'Test fleet', display_names: {},
+      declared_users: [], servers: [{ ...server, traffic_bytes: round * 1024 }] }));
+  }
   if (url === 'ui/api/fleet') return Promise.resolve(reply({ servers: [server] }));
   throw new Error('Unexpected request: ' + url);
 };
@@ -48,6 +73,23 @@ w.HTMLDialogElement.prototype.close = function () { this.open = false; };
 const view = w.document.getElementById('view');
 const settle = () => new Promise(setImmediate);
 const report = {};
+async function advance(ms) {
+  const target = fakeNow + ms;
+  while (true) {
+    const due = [...timers].filter(([, timer]) => timer.at <= target).sort((a, b) => a[1].at - b[1].at)[0];
+    if (!due) break;
+    fakeNow = due[1].at;
+    timers.delete(due[0]);
+    due[1].fn();
+    await settle();
+  }
+  fakeNow = target;
+  await settle();
+}
+function visibility(value) {
+  hidden = value;
+  w.document.dispatchEvent(new w.Event('visibilitychange'));
+}
 
 if (mode === 'servers') {
   M.renderServers(view);
@@ -79,6 +121,80 @@ if (mode === 'quota') {
   report.invalid = fields.gb.getAttribute('aria-invalid') === 'true';
   report.disabled = fields.gb.disabled;
   report.units = fields.unit ? [...fields.unit.options].map(option => option.value) : [];
+}
+
+if (mode.startsWith('live-')) {
+  const interval = data.screen === 'servers' ? 10000 : 30000;
+  const cleanup = data.screen === 'servers' ? M.renderServers(view) : M.renderPeople(view);
+  await settle();
+  const fleetCalls = () => events.filter(event => event.url === 'ui/api/fleet');
+  const liveData = () => (view.querySelector('.live-data') || view).textContent;
+  if (mode === 'live-cycle') {
+    await advance(interval);
+    report.afterPoll = fleetCalls().length;
+    visibility(true);
+    await advance(interval * 2);
+    report.whileHidden = fleetCalls().length;
+    visibility(false);
+    await settle();
+    report.afterReturn = fleetCalls().length;
+    report.updated = view.querySelector('.live-updated')?.textContent || '';
+    report.passive = fleetCalls().map(call => call.headers['X-Meridian-Passive'] === '1');
+    report.cleanup = typeof cleanup === 'function';
+    if (report.cleanup) cleanup();
+    await advance(interval * 2);
+    report.afterStop = fleetCalls().length;
+  }
+  if (mode === 'live-failure') {
+    report.beforeFailure = liveData();
+    failPolls = true;
+    await advance(interval);
+    report.afterFailure = liveData();
+    report.stale = view.classList.contains('view-stale');
+    const retry = view.querySelector('.live-retry');
+    report.retryVisible = !!retry && !retry.hidden;
+    report.staleLabel = view.querySelector('.live-trouble')?.textContent || '';
+    report.updated = view.querySelector('.live-updated')?.textContent || '';
+    failPolls = false;
+    retry?.click();
+    await settle();
+    report.recovered = !view.classList.contains('view-stale') && liveData() !== report.beforeFailure;
+    report.retriedActively = fleetCalls().at(-1).headers['X-Meridian-Passive'] !== '1';
+  }
+  if (mode === 'live-backoff') {
+    failPolls = true;
+    await advance(630000);
+    const calls = fleetCalls();
+    report.gaps = calls.slice(1).map((call, index) => call.at - calls[index].at);
+  }
+  if (mode === 'live-race') {
+    visibility(true);
+    visibility(false);
+    await settle();
+    for (const url of ['api/users', 'ui/api/fleet']) {
+      const newer = delayed[url + ':2'];
+      if (newer) newer.resolve(reply(url === 'api/users' ? { users: [{ username: 'new', status: 'active' }] }
+        : { profile_title: 'New fleet', servers: [{ ...server, node_id: 'new' }] }));
+    }
+    await settle();
+    report.afterNew = liveData();
+    for (const url of ['api/users', 'ui/api/fleet']) delayed[url + ':1']?.reject(new Error('old reply failed'));
+    await settle();
+    report.afterOld = liveData();
+    report.stale = view.classList.contains('view-stale');
+    report.fleetTitle = M.state.fleet?.profile_title || '';
+  }
+  if (typeof cleanup === 'function') cleanup();
+}
+
+if (mode.startsWith('deadline-')) {
+  let error;
+  M.api('POST', 'api/tokens', { name: 'sample', scope: 'read' }).catch(value => { error = value; });
+  await settle();
+  await advance(15000);
+  report.code = error?.code || null;
+  report.uncertain = !!error?.uncertain;
+  report.aborted = !!delayed.signal?.aborted;
 }
 
 process.stdout.write(JSON.stringify(report));

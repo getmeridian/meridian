@@ -70,48 +70,64 @@
 
   // -- requests ---------------------------------------------------------------------------
 
-  function ApiError(status, code, message, retryAfter) {
+  function ApiError(status, code, message, retryAfter, uncertain) {
     this.status = status;
     this.code = code;
     this.message = message;
     this.retryAfter = retryAfter;
+    this.uncertain = !!uncertain;
   }
   ApiError.prototype = Object.create(Error.prototype);
   M.ApiError = ApiError;
 
-  function request(method, path, body) {
+  function request(method, path, body, settings) {
+    var controller = new AbortController();
+    var writing = method !== "GET" && method !== "HEAD";
     var options = {
       method: method,
       credentials: "same-origin",
       cache: "no-store",
       redirect: "error",
       headers: { "X-Meridian-Request": "1", Accept: "application/json" },
+      signal: controller.signal,
     };
+    if (!writing && settings && settings.passive) options.headers["X-Meridian-Passive"] = "1";
     if (body !== undefined) {
       options.headers["Content-Type"] = "application/json";
       options.body = JSON.stringify(body);
     }
-    return fetch(path, options).then(function (response) {
+    var expired = false;
+    var timer;
+    var deadline = new Promise(function (resolve, reject) {
+      timer = setTimeout(function () {
+        expired = true;
+        controller.abort();
+        reject(new ApiError(0, "timeout", "", 0, writing));
+      }, 15000);
+    });
+    var work = Promise.resolve().then(function () { return fetch(path, options); }).then(function (response) {
       return response.text().then(function (text) {
         var data = null;
         try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
         if (response.ok) return data;
         var error = (data && data.error) || {};
         throw new ApiError(response.status, error.code || "http_" + response.status, error.message || "",
-          Number(response.headers.get("Retry-After")) || 0);
+          Number(response.headers.get("Retry-After")) || 0, writing && response.status >= 500);
       });
-    }, function () {
-      throw new ApiError(0, "network", "");
+    }).catch(function (error) {
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(0, expired ? "timeout" : "network", "", 0, writing);
     });
+    return Promise.race([work, deadline]).finally(function () { clearTimeout(timer); });
   }
 
   /* Call the service; a 401 returns to sign-in, a 403 `reauth_required` asks for the
    * password (and code) once, then repeats the request. */
-  M.api = function (method, path, body) {
-    return request(method, path, body).catch(function (error) {
+  M.api = function (method, path, body, settings) {
+    return request(method, path, body, settings).catch(function (error) {
       if (error.status === 401 && M.onSignedOut) M.onSignedOut();
       if (error.code === "reauth_required" && M.confirmIdentity) {
-        return M.confirmIdentity().then(function () { return request(method, path, body); });
+        return M.confirmIdentity().then(function () { return request(method, path, body, settings); });
       }
       throw error;
     });
@@ -270,6 +286,87 @@
   };
 
   M.pill = function (kind, text) { return M.h("span", { class: "pill pill-" + kind, text: text }); };
+
+  /* Only the newest request may settle: superseded data and errors cannot replace current state. */
+  M.latestOnly = function () {
+    var turn = 0;
+    return function (request) {
+      var mine = ++turn;
+      var never = new Promise(function () {});
+      return request.then(function (value) { return mine === turn ? value : never; },
+        function (error) { if (mine === turn) throw error; return never; });
+    };
+  };
+
+  /* A visible screen's read refreshes: keep data on failure, label its age, and stop on disposal. */
+  M.liveView = function (view, options) {
+    if (view.meridianLiveStop) view.meridianLiveStop();
+    var latest = M.latestOnly();
+    var stopped = false, failures = 0, updatedAt = null, pollTimer = null, ageTimer = null;
+    var updated = M.h("span", { class: "live-updated muted small" });
+    var trouble = M.h("span", { class: "live-trouble small", role: "status" });
+    var retry = M.h("button", { class: "btn btn-ghost btn-sm live-retry", type: "button", hidden: true,
+      onclick: function () { refresh(false); } }, M.t("action.retry"));
+    M.mount(options.status, [updated, trouble, retry]);
+    function active() { return !stopped && view.isConnected; }
+    function age() {
+      clearTimeout(ageTimer);
+      if (!active()) return stop();
+      updated.textContent = updatedAt === null ? M.t("live.never") : M.t("live.updated", {
+        seconds: M.count(Math.max(0, Math.floor((Date.now() - updatedAt) / 1000))) });
+      if (!document.hidden) ageTimer = setTimeout(age, 1000);
+    }
+    function schedule() {
+      clearTimeout(pollTimer);
+      if (active() && !document.hidden) {
+        var delay = Math.min(120000, options.interval * Math.pow(2, Math.min(failures, 8)));
+        pollTimer = setTimeout(function () { refresh(true); }, delay);
+      }
+    }
+    function refresh(passive) {
+      clearTimeout(pollTimer);
+      if (!active() || document.hidden) return;
+      view.setAttribute("aria-busy", "true");
+      latest(Promise.resolve().then(function () { return options.load(passive); })).then(function (data) {
+        if (!active()) return;
+        options.draw(data);
+        updatedAt = Date.now();
+        failures = 0;
+        view.classList.remove("view-stale");
+        M.clear(trouble);
+        retry.hidden = true;
+        view.setAttribute("aria-busy", "false");
+        age();
+        schedule();
+      }, function (error) {
+        if (!active()) return;
+        failures++;
+        view.classList.add("view-stale");
+        M.mount(trouble, [M.pill("warn", M.t("live.stale")), " ", M.errorText(error)]);
+        retry.hidden = false;
+        view.setAttribute("aria-busy", "false");
+        if (updatedAt === null && options.empty) options.empty();
+        age();
+        schedule();
+      });
+    }
+    function visibility() {
+      clearTimeout(pollTimer);
+      clearTimeout(ageTimer);
+      if (!document.hidden && active()) { age(); refresh(true); }
+    }
+    function stop() {
+      stopped = true;
+      clearTimeout(pollTimer);
+      clearTimeout(ageTimer);
+      document.removeEventListener("visibilitychange", visibility);
+    }
+    view.meridianLiveStop = stop;
+    document.addEventListener("visibilitychange", visibility);
+    age();
+    refresh(false);
+    return stop;
+  };
 
   // -- routing -------------------------------------------------------------------------------
 

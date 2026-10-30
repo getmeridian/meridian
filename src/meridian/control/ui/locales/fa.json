@@ -355,5 +355,9 @@
   "unit.mib": "MiB",
   "unit.gib": "GiB",
   "unit.tib": "TiB",
-  "unit.pib": "PiB"
+  "unit.pib": "PiB",
+  "live.never": "هنوز به‌روز نشده است",
+  "live.updated": "{seconds} ثانیه پیش به‌روز شد",
+  "live.stale": "داده‌ها قدیمی هستند",
+  "error.timeout": "مهلت درخواست تمام شد. دوباره تلاش کنید."
 }

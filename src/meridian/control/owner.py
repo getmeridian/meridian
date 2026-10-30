@@ -227,8 +227,8 @@ class OwnerAuth:
 
     # -- sessions ----------------------------------------------------------------------
 
-    def authenticate(self, token: str) -> OwnerSession:
-        """The live session `token` opens; touches it at most once a minute. 401 otherwise."""
+    def authenticate(self, token: str, *, touch: bool = True) -> OwnerSession:
+        """The live session `token` opens; passive reads do not renew idle activity. 401 otherwise."""
         if not token:
             raise unauthenticated()
         now = self._now()
@@ -243,7 +243,7 @@ class OwnerAuth:
             if now - int(row["last_seen_at"]) >= IDLE_SECONDS or now - int(row["created_at"]) >= ABSOLUTE_SECONDS:
                 self._store.db.execute("DELETE FROM ui_sessions WHERE session_id = ?", (row["session_id"],))
                 raise unauthenticated()
-            if now - int(row["last_seen_at"]) >= TOUCH_RESOLUTION_SECONDS:
+            if touch and now - int(row["last_seen_at"]) >= TOUCH_RESOLUTION_SECONDS:
                 self._store.db.execute(
                     "UPDATE ui_sessions SET last_seen_at = ? WHERE session_id = ?", (now, row["session_id"])
                 )

@@ -48,7 +48,8 @@
   };
 
   M.renderPeople = function (view) {
-    var list = h("div", { class: "list" }, h("div", { class: "empty" }, h("span", { class: "spinner" })));
+    var list = h("div", { class: "list live-data" }, h("div", { class: "empty" }, h("span", { class: "spinner" })));
+    var status = h("div", { class: "live-status" });
     var search = h("input", { type: "search", class: "search", placeholder: M.t("people.search"),
       "aria-label": M.t("people.search"), autocomplete: "off" });
     var users = [];
@@ -87,16 +88,23 @@
         h("button", { class: "btn btn-primary", type: "button", onclick: addPerson }, M.icon("plus"),
           M.t("people.add"))),
       search,
+      status,
       list,
     ]);
     // The fleet view comes again with the list: who is declared changes whenever the deployer applies.
-    Promise.all([M.api("GET", "api/users"), M.api("GET", "ui/api/fleet").then(function (fleet) {
-      M.state.fleet = fleet;
-    }, function () { /* keep the last fleet view; the person screen and the service decide */ })])
-      .then(function (results) {
+    return M.liveView(view, {
+      status: status, interval: 30000,
+      load: function (passive) {
+        return Promise.all([M.api("GET", "api/users", undefined, { passive: passive }),
+          M.api("GET", "ui/api/fleet", undefined, { passive: passive })]);
+      },
+      draw: function (results) {
+        M.state.fleet = results[1];
         users = results[0].users || [];
         draw();
-      }, function (e) { M.mount(list, h("div", { class: "notice notice-err", text: M.errorText(e) })); });
+      },
+      empty: function () { M.clear(list); },
+    });
   };
 
   /* Keep the person screen's existing helper name; amounts are now binary GiB, unrounded. */

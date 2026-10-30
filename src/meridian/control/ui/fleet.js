@@ -25,19 +25,24 @@
   // -- servers --------------------------------------------------------------------------------
 
   M.renderServers = function (view) {
-    loading(view);
-    M.api("GET", "ui/api/fleet").then(function (fleet) {
-      M.state.fleet = fleet;
-      var servers = fleet.servers || [];
-      M.mount(view, [
+    var status = h("div", { class: "live-status" });
+    var cards = h("div", { class: "live-data" }, h("div", { class: "empty" }, h("span", { class: "spinner" })));
+    M.mount(view, [
         h("div", { class: "page-head" }, h("div", {}, h("h1", { text: M.t("nav.servers") }),
           h("p", { class: "muted", text: M.t("servers.lede") }))),
-        M.cliHint(),
-        servers.length ? h("div", { class: "cards" }, servers.map(serverCard))
-          : h("div", { class: "empty" }, h("p", { text: M.t("servers.empty") })),
-        M.fleetHistory(),
-      ]);
-    }, function (e) { failed(view, e); });
+        M.cliHint(), status, cards, M.fleetHistory(),
+    ]);
+    return M.liveView(view, {
+      status: status, interval: 10000,
+      load: function (passive) { return M.api("GET", "ui/api/fleet", undefined, { passive: passive }); },
+      draw: function (fleet) {
+        M.state.fleet = fleet;
+        var servers = fleet.servers || [];
+        M.mount(cards, servers.length ? h("div", { class: "cards" }, servers.map(serverCard))
+          : h("div", { class: "empty" }, h("p", { text: M.t("servers.empty") })));
+      },
+      empty: function () { M.clear(cards); },
+    });
   };
 
   function serverCard(server) {
@@ -124,18 +129,6 @@
     var kinds = { applied: "ok", approved: "info", proposed: "muted", failed: "err" };
     return M.pill(kinds[status] || "muted", M.t("revision." + status));
   }
-
-  /* Each call wraps one request; only the newest call's answer (or error) settles, so a slower,
-   * superseded reply never lands under the label of a newer choice. */
-  M.latestOnly = function () {
-    var turn = 0;
-    return function (request) {
-      var mine = ++turn;
-      var never = new Promise(function () {});
-      return request.then(function (value) { return mine === turn ? value : never; },
-        function (error) { if (mine === turn) throw error; return never; });
-    };
-  };
 
   function renderRevision(view, number) {
     loading(view);

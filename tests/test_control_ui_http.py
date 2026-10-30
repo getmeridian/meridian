@@ -18,7 +18,7 @@ import pytest
 from meridian.control import passwords
 from meridian.control.enrollment import token_sha256
 from meridian.control.models import PrivacySettings, RevisionProposal, RevisionResult, ServiceSettings
-from meridian.control.owner import CONFIRM_SECONDS
+from meridian.control.owner import CONFIRM_SECONDS, IDLE_SECONDS
 from meridian.control.server import ControlServer
 from meridian.control.service import ControlService
 from meridian.control.tokens import ROOT
@@ -30,6 +30,37 @@ ADMIN_TOKEN = "admin-token-for-tests-only-0123456789"
 PUBLIC_PATH = "/9f8e7d6c5b4a39281706f5e4"
 PASSWORD = "correct horse battery"
 UI = {"X-Meridian-Request": "1"}
+
+
+@pytest.mark.parametrize("path", ["/api/users", "/ui/api/fleet", "/auth/state"])
+def test_a_polling_only_tab_still_reaches_the_owner_idle_timeout(fleet: Fleet, path: str) -> None:
+    fleet.set_up()
+    for _ in range(IDLE_SECONDS // 60 - 1):
+        fleet.clock.now += 60
+        reply = fleet.ui("GET", path, headers={"X-Meridian-Passive": "1"})
+        assert reply.status == 200
+    fleet.clock.now += 60
+    reply = fleet.ui("GET", path, headers={"X-Meridian-Passive": "1"})
+    if path == "/auth/state":
+        assert reply.status == 200 and reply.body["signed_in"] is False
+    else:
+        assert reply.status == 401
+
+
+@pytest.mark.parametrize("write", [False, True], ids=["active-read", "write-with-passive-header"])
+def test_owner_activity_still_extends_idle_time(fleet: Fleet, write: bool) -> None:
+    fleet.set_up()
+    fleet.clock.now += 60
+    if write:
+        fleet.service.put_user("sample")
+        assert (
+            fleet.ui("PATCH", "/api/users/sample", {"status": "disabled"}, headers={"X-Meridian-Passive": "1"}).status
+            == 200
+        )
+    else:
+        assert fleet.ui("GET", "/api/users").status == 200
+    fleet.clock.now += IDLE_SECONDS - 30
+    assert fleet.ui("GET", "/api/users", headers={"X-Meridian-Passive": "1"}).status == 200
 
 
 class Clock:

@@ -35,6 +35,7 @@
 - Empty supported endpoint sets use inert availability placeholders in all four locales, with existing status notices taking priority; filter Stash XHTTP and sing-box XHTTP/copies before checking availability.
 - Allocate unique presentation names before filtering endpoints, reserving generated groups and direct/reject labels; preserve original suffix-shaped remarks and use the same names in proxies, tags, and copy exclusions.
 - Derive subscription suffix routing from formats.selector.SUFFIX_FORMATS; aliases override Accept and User-Agent, and Stash retains its own dialect.
+- Read polls carrying X-Meridian-Passive authenticate without touching owner idle activity, including auth/state; every write ignores the passive header and still re-checks session liveness in its transaction.
 - Bound every API quota at SQLite's signed int64 maximum before it reaches a write; create, update, and returned user records share the CLI's bound.
 - Background enforcement and blob mirroring keep attempt/success times and fixed error codes only in memory; warn at most once per task per five minutes and never log exception text.
 - NodeStatus traffic is the ledger's node total, carried into the CLI's Node; never reconstruct it from user totals or leave the adapter's default zero.

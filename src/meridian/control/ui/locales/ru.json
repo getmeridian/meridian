@@ -355,5 +355,9 @@
   "unit.mib": "MiB",
   "unit.gib": "GiB",
   "unit.tib": "TiB",
-  "unit.pib": "PiB"
+  "unit.pib": "PiB",
+  "live.never": "Данные ещё не обновлены",
+  "live.updated": "Обновлено {seconds} с назад",
+  "live.stale": "Данные устарели",
+  "error.timeout": "Время ожидания запроса истекло. Повторите попытку."
 }

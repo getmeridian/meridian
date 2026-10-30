@@ -7,6 +7,7 @@
   var h = M.h;
   var root = null;
   var setupToken = "";
+  var stopScreen = null;
 
   var SCREENS = [
     { name: "people", render: function (view, route) { return route.arg ? M.renderPerson(view, route.arg) : M.renderPeople(view); } },
@@ -26,6 +27,7 @@
   }
 
   M.onSignedOut = function () {
+    if (stopScreen) { stopScreen(); stopScreen = null; }
     M.state.auth = null;
     refreshAuth().then(M.render, showFatal);
   };
@@ -36,6 +38,7 @@
 
   /* Draw what the current state and hash call for. */
   M.render = function () {
+    if (stopScreen) { stopScreen(); stopScreen = null; }
     var auth = M.state.auth;
     document.title = (M.state.fleet && M.state.fleet.profile_title) || "Meridian";
     if (!auth) return;
@@ -92,7 +95,8 @@
         h("div", { class: "top-inner" }, nav)),
       view,
     ]);
-    screen.render(view, route);
+    var cleanup = screen.render(view, route);
+    stopScreen = typeof cleanup === "function" ? cleanup : null;
   }
 
   function showFatal(error) {
