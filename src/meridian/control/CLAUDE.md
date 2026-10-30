@@ -41,6 +41,7 @@
 - A proposal whose intent has a secret-shaped key or value (`secret_paths()`, keys per `core.redaction`) is refused, never stored; so is one whose `access` block is malformed (the console reads `access.users` on every person screen, and a `null` there broke them all).
 
 ## Pitfalls
+- Service expiry stops redelivery, but the first agent result can replace an expired row with no result; record that late outcome and its event atomically and never overwrite an acknowledged result.
 - Refresh wanted blobs from the whole current fleet under the blob lock, prune retired or seeded failures, and publish attempt results under that lock so a late failure cannot restore obsolete degradation; clearing an obsolete error never invents a mirror success.
 - Validate each new user expiry inside its write transaction, including imports and extensions; years 2099 onward project as legacy "never", so refuse them with removal guidance.
 - Sort endpoints once before allocating presentation names; primary filters and fingerprint groups preserve that order because generated numeric suffixes sort differently.

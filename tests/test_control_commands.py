@@ -270,6 +270,50 @@ def test_unanswered_commands_expire_and_old_finished_rows_are_pruned(
         assert db.execute("SELECT count(*) FROM commands").fetchone()[0] == 0
 
 
+@pytest.mark.parametrize("pruned", [False, True], ids=["prune-in-result", "already-pruned"])
+@pytest.mark.parametrize(
+    ("kind", "status", "effect"),
+    [
+        ("restart_unit", "succeeded", None),
+        ("reset_inbound", "succeeded", "core_restart"),
+        ("restart_unit", "failed", None),
+    ],
+)
+def test_review_2_1_late_execution_result_replaces_expiry_and_records_its_event(
+    http: str, service: ControlService, clock: Clock, pruned: bool, kind: str, status: str, effect: str | None
+) -> None:
+    token = session(http, clock)
+    fields = {"resource_id": "unit:netcore"} if kind == "restart_unit" else {"inbound_tag": TAG}
+    issued = issue(http, {"kind": kind, "expires_in_seconds": 60, **fields})
+    assert poll(http, token)["commands"] == [issued["command"]]
+    clock.now = int(clock.now) + 60
+    path = f"{http}/api/nodes/main/commands/{issued['command']['command_id']}"
+    if pruned:
+        assert ask(path)[1]["status"] == "expired"
+    result = {
+        "type": "command_result",
+        "command_id": issued["command"]["command_id"],
+        "status": status,
+        "effect": effect,
+        "error": {"code": "service_failed", "message": "The unit failed readiness.", "retryable": False}
+        if status == "failed"
+        else None,
+        "finished_at": clock.stamp(),
+    }
+    assert ask(f"{http}/agent/v1/command-results", "POST", result, token)[0] == 200
+    stored = ask(path)[1]
+    assert stored["status"] == status and stored["result"] == result
+    events = [event for event in service.events.list().events if event.kind == "command.result"]
+    assert [event.detail.to_data()["status"] for event in events] == ["expired", status]
+    assert events[-1].detail.to_data()["effect"] == effect
+    assert ask(f"{http}/agent/v1/command-results", "POST", result, token)[0] == 200
+    assert [event for event in service.events.list().events if event.kind == "command.result"] == events
+    different = dict(result, status="expired", error=None, effect=None)
+    assert ask(f"{http}/agent/v1/command-results", "POST", different, token)[0] == 200
+    assert ask(path)[1]["result"] == result
+    assert [event for event in service.events.list().events if event.kind == "command.result"] == events
+
+
 def test_results_scrub_credentials_names_and_user_ids(http: str, service: ControlService, clock: Clock) -> None:
     token = session(http, clock)
     user = service.put_user("person-a")
@@ -305,12 +349,15 @@ def test_command_issue_records_the_request_actor(http: str, service: ControlServ
     assert (event.kind, event.actor, event.subject) == ("command.issued", "operator", "main")
 
 
-@pytest.mark.parametrize("action", ["issue", "result"])
+@pytest.mark.parametrize("action", ["issue", "result", "late_result"])
 def test_event_insert_failure_rolls_back_the_command_mutation(
     http: str, service: ControlService, clock: Clock, action: str
 ) -> None:
     token = session(http, clock)
     issued = issue(http, {"kind": "reconcile"})
+    if action == "late_result":
+        clock.now += 301
+        service.commands.maintain()
     before = service.events.list()
     service._store.create(
         "CREATE TRIGGER refuse_command_event BEFORE INSERT ON events BEGIN SELECT RAISE(ABORT, 'event refused'); END;"
@@ -327,7 +374,7 @@ def test_event_insert_failure_rolls_back_the_command_mutation(
             "finished_at": clock.stamp(),
         }
         assert ask(f"{http}/agent/v1/command-results", "POST", result, token)[0] == 500
-    assert poll(http, token)["commands"] == [issued["command"]]
+    assert poll(http, token)["commands"] == ([] if action == "late_result" else [issued["command"]])
     assert service.events.list() == before
 
 

@@ -16,6 +16,7 @@ use crate::verify::{Trust, verify_signature_in_context};
 pub const COMMAND_CONTEXT: &[u8] = b"meridian.agent/v1 command";
 pub const COMMAND_STATE_FILE: &str = "commands.json";
 pub const MAX_REMEMBERED: usize = 1024;
+const RESULT_RETENTION_SECONDS: u64 = 7 * 86400;
 const MAX_SAFE_INTEGER: u64 = (1 << 53) - 1;
 
 #[derive(Deserialize, Debug)]
@@ -272,7 +273,15 @@ impl CommandState {
     }
 
     pub fn prune(&mut self, now: u64) {
-        self.results.retain(|entry| entry.expires_at > now);
+        self.results.retain(|entry| {
+            let finished = parse_rfc3339(&entry.result.finished_at).unwrap_or(entry.expires_at);
+            // Retain acknowledged IDs too: a rounding change or an in-flight poll can redeliver.
+            entry
+                .expires_at
+                .max(finished)
+                .saturating_add(RESULT_RETENTION_SECONDS)
+                > now
+        });
     }
 
     pub fn find(&self, id: &str) -> Option<&RememberedCommand> {
@@ -291,7 +300,9 @@ impl CommandState {
         } else if self.results.len() < MAX_REMEMBERED {
             self.results.push(entry);
         } else {
-            return Err("The command result store is full; wait for commands to expire.".into());
+            return Err(
+                "The command result store is full; wait for retained results to age out.".into(),
+            );
         }
         Ok(())
     }

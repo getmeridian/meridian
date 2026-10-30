@@ -1,5 +1,7 @@
 //! Commands run only after wire verification, and a lost acknowledgement never repeats a restart.
 
+#[path = "command_retention.rs"]
+mod retention;
 #[path = "command_sessions.rs"]
 mod sessions;
 

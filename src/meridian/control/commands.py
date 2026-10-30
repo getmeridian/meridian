@@ -188,7 +188,9 @@ class CommandLedger:
                 raise agent_error("invalid_request", "The command does not belong to this node.")
             self.prune()
             current = self.read(node_id, result.command_id)
-            if current.status in {"pending", "waiting"}:
+            # Expiry ends delivery, not an execution that started before the deadline.
+            # Preserve the first agent result, including one received after service pruning.
+            if current.result is None and current.status in {"pending", "waiting", "expired"}:
                 if current.status == "waiting":
                     raise agent_error("invalid_request", "The command is still waiting for its revision.")
                 if result.effect is not None and current.command.kind != "reset_inbound":

@@ -30,6 +30,7 @@ pub struct ServiceState {
     pub reject_results: bool,
     pub failures: HashMap<&'static str, VecDeque<(u16, &'static str)>>,
     pub expire_after_poll: bool,
+    pub clock_on_poll: Option<i64>,
     pub token_valid: bool,
     pub sessions: HashSet<String>,
     pub revoked: bool,
@@ -162,6 +163,11 @@ impl ServiceState {
         let Some(endpoint) = request.path.strip_prefix(PREFIX) else {
             return error(404, "not_found");
         };
+        if endpoint == "/poll"
+            && let Some(offset) = self.clock_on_poll.take()
+        {
+            self.clock_offset = offset;
+        }
         if let Some((status, code)) = self
             .failures
             .get_mut(endpoint)
@@ -242,6 +248,7 @@ impl FakeService {
             reject_results: false,
             failures: HashMap::new(),
             expire_after_poll: false,
+            clock_on_poll: None,
             token_valid: true,
             sessions: HashSet::new(),
             revoked: false,

@@ -35,7 +35,7 @@ impl Agent<'_> {
             .collect();
         for result in pending {
             match self.send_command_result(&result) {
-                // A restore forgets transient commands. Keep the result until expiry, but keep polling.
+                // A restore forgets transient commands. Retain the result, but keep polling.
                 Err(HttpError::Status {
                     status: 400,
                     code: Some(code),
@@ -184,7 +184,7 @@ impl Agent<'_> {
             return self.reject_command(
                 value,
                 &id,
-                "The command result store is full; wait for commands to expire.",
+                "The command result store is full; wait for retained results to age out.",
             );
         }
         next.save(&self.opts.state_dir)
