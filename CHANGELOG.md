@@ -26,6 +26,7 @@ that dials out to it.
   IP limits).
 
 ### Control service
+- Blob mirror health clears failures for retired or seeded artifacts while retaining failures for blobs still needed by another node.
 - An offline console language switch keeps the working language, labels, and text direction until a catalog loads successfully.
 - Fleet import reviews name each person's changed creation settings instead of reporting a fleet reorder.
 - Client status, limit, expiry, and device mutations accept surrounding whitespace on console names, using the same name resolution as client show.

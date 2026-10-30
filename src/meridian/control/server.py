@@ -29,7 +29,7 @@ from pydantic import BaseModel, ValidationError
 
 from meridian import __version__
 from meridian.control import ui_routes
-from meridian.control.blobs import BlobStore, served_hashes, spec_artifacts
+from meridian.control.blobs import BlobStore, fleet_artifacts, served_hashes
 from meridian.control.enrollment import Session, token_sha256
 from meridian.control.errors import ServiceError, agent_error
 from meridian.control.formats.selector import SUFFIX_FORMATS
@@ -348,11 +348,13 @@ class _Handler(BaseHTTPRequestHandler):
         spec = self._model(NodeSpec)
         status = self._service.put_node_spec(match[1], spec)
         if self.server.blobs is not None:
-            self.server.blobs.want(spec_artifacts(spec))
+            self.server.blobs.want(fleet_artifacts(self._service.node_specs))
         return status
 
     def delete_node(self, match: re.Match[str]) -> Any:
         self._service.delete_node(match[1])
+        if self.server.blobs is not None:
+            self.server.blobs.want(fleet_artifacts(self._service.node_specs))
         return {"deleted": match[1]}
 
     def grant_enrollment(self, match: re.Match[str]) -> Any:
@@ -738,7 +740,7 @@ def serve(config_path: Path) -> None:
     state_dir = Path(config.state_dir)
     service = ControlService(state_dir / "control.db", fleet_id=config.fleet_id, version=__version__)
     blobs = BlobStore(state_dir / "blobs", health=service.background.blob_mirror)
-    blobs.want(artifact for spec in service.node_specs() for artifact in spec_artifacts(spec))
+    blobs.want(fleet_artifacts(service.node_specs))
     server = ControlServer(
         (config.listen_host, config.listen_port),
         service,

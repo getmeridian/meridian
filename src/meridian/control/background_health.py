@@ -56,6 +56,11 @@ class TaskHealth:
                 "Background task %s failed (%s); the next attempt will retry", self._state.name, self._error_code
             )
 
+    def clear_error(self) -> None:
+        """Clear an obsolete failure without recording a task attempt or success."""
+        with self._lock:
+            self._state = self._state.model_copy(update={"error_code": None})
+
     def run(self, work: Callable[[], object]) -> bool:
         self.attempt()
         try:

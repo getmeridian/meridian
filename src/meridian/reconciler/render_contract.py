@@ -11,7 +11,7 @@ _RENDERER_MANIFEST = {
     "agent-spec": "service-blob-v1",
     "control-subscriptions": "presentation-order-v9",
     "pwa": "quiet-account-v23",
-    "control-service": "locale-switch-v18",
+    "control-service": "current-blob-health-v19",
     "control-api": "finite-user-expiry-v5",
     "firewall": "ufw-comment-v2",
     "nginx": "connection-noindex-v11",

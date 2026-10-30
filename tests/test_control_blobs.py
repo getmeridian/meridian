@@ -118,6 +118,16 @@ def test_a_failed_mirror_retries_when_agents_ask_at_most_once_a_minute(tmp_path:
     assert upstream.requests == [URL, URL] and store.path(SHA) is not None
 
 
+def test_a_retired_pending_blob_is_not_downloaded(tmp_path: Path) -> None:
+    workers: list[Callable[[], None]] = []
+    upstream = Upstream({URL: OSError("unreachable")})
+    blobs = BlobStore(tmp_path / "blobs", download=upstream, spawn=workers.append)
+    blobs.want([Artifact(SHA, len(ARCHIVE), (URL,))])
+    blobs.want([])
+    workers[0]()
+    assert upstream.requests == [] and blobs.health.state().error_code is None
+
+
 # -- HTTP ----------------------------------------------------------------------------------
 
 
@@ -201,6 +211,42 @@ def test_a_missing_wanted_blob_is_fetched_again_after_an_agent_asks(
     assert _request(f"{http}/agent/v1/blobs/{SHA}", token=token)[0] == 404
     assert _request(f"{http}/agent/v1/blobs/{SHA}", token=token) == (200, ARCHIVE)
     assert upstream.requests == [URL, URL]
+
+
+@pytest.mark.parametrize("resolution", ["drop", "replace", "delete"])
+def test_health_forgets_failed_artifacts_when_their_node_spec_changes(
+    served: tuple[str, list[float], Upstream], resolution: str
+) -> None:
+    http, _now, upstream = served
+    upstream.bodies[URL] = OSError("unreachable")
+    assert _request(f"{http}/api/nodes/main", "PUT", _spec([URL, "service"]).to_data(), ADMIN_TOKEN)[0] == 200
+    assert json.loads(_request(f"{http}/api/health", token=ADMIN_TOKEN)[1])["status"] == "degraded"
+    method, spec = "PUT", {"resources": []}
+    if resolution == "delete":
+        method = "DELETE"
+    elif resolution == "replace":
+        payload = b"a replacement verified archive"
+        upstream.bodies[MIRROR] = payload
+        spec = _spec([MIRROR, "service"]).to_data()
+        for resource in spec["resources"]:
+            resource.update(sha256=hashlib.sha256(payload).hexdigest(), size=len(payload))
+    assert _request(f"{http}/api/nodes/main", method, spec if method == "PUT" else None, ADMIN_TOKEN)[0] == 200
+    health = json.loads(_request(f"{http}/api/health", token=ADMIN_TOKEN)[1])
+    assert health["status"] == "ok"
+    assert next(task for task in health["background_tasks"] if task["name"] == "blob_mirror")["error_code"] is None
+
+
+def test_retiring_one_node_keeps_another_nodes_missing_blob_in_health(
+    served: tuple[str, list[float], Upstream],
+) -> None:
+    http, _now, upstream = served
+    upstream.bodies[URL] = OSError("unreachable")
+    for node in ("main", "exit"):
+        assert _request(f"{http}/api/nodes/{node}", "PUT", _spec([URL, "service"]).to_data(), ADMIN_TOKEN)[0] == 200
+    assert _request(f"{http}/api/nodes/main", "DELETE", token=ADMIN_TOKEN)[0] == 200
+    assert json.loads(_request(f"{http}/api/health", token=ADMIN_TOKEN)[1])["status"] == "degraded"
+    assert _request(f"{http}/api/nodes/exit", "DELETE", token=ADMIN_TOKEN)[0] == 200
+    assert json.loads(_request(f"{http}/api/health", token=ADMIN_TOKEN)[1])["status"] == "ok"
 
 
 def test_the_default_worker_mirrors_in_a_background_thread(tmp_path: Path) -> None:

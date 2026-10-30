@@ -80,6 +80,12 @@ def spec_artifacts(spec: NodeSpec) -> list[Artifact]:
     return list(found.values())
 
 
+def fleet_artifacts(read_specs: Callable[[], Iterable[NodeSpec]]) -> Iterable[Artifact]:
+    """Read the current fleet when consumed, so a wanted-set refresh reads inside the blob lock."""
+    for spec in read_specs():
+        yield from spec_artifacts(spec)
+
+
 def _start_thread(target: Callable[[], None]) -> None:
     threading.Thread(target=target, name="blob-mirror", daemon=True).start()
 
@@ -120,13 +126,18 @@ class BlobStore:
         digest = hashlib.sha256(data).hexdigest()
         if self.path(digest) is None:
             self._write(digest, lambda handle: handle.write(data))
+        with self._lock:
+            self._prune_failed()
         return digest
 
     def want(self, artifacts: Iterable[Artifact]) -> None:
-        """Mirror every artifact not yet stored, in the background."""
+        """Replace the wanted set with the fleet's current artifacts and mirror any missing ones."""
         with self._lock:
-            for artifact in artifacts:
-                self._wanted[artifact.sha256] = artifact
+            self._wanted = {artifact.sha256: artifact for artifact in artifacts}
+            self._pending = [digest for digest in self._pending if digest in self._wanted]
+            self._last_try = {digest: stamp for digest, stamp in self._last_try.items() if digest in self._wanted}
+            self._prune_failed()
+            for artifact in self._wanted.values():
                 if self.path(artifact.sha256) is None and artifact.sha256 not in self._pending:
                     self._pending.append(artifact.sha256)
             start = self._claim_worker()
@@ -153,6 +164,12 @@ class BlobStore:
             return True
         return False
 
+    def _prune_failed(self) -> None:
+        """Under the lock: keep failures only for wanted, missing artifacts."""
+        self._failed = {digest for digest in self._failed if digest in self._wanted and self.path(digest) is None}
+        if not self._failed:
+            self.health.clear_error()
+
     def _drain(self) -> None:
         while True:
             with self._lock:
@@ -171,14 +188,15 @@ class BlobStore:
                 self._write(artifact.sha256, lambda handle: self._download(url, handle, artifact.size), artifact.size)
                 with self._lock:
                     self._failed.discard(artifact.sha256)
-                    clear_error = not self._failed
-                self.health.succeeded(clear_error=clear_error)
+                    self.health.succeeded(clear_error=not self._failed)
                 return True
             except Exception:  # noqa: BLE001 - try the next source; an agent's miss retries later
                 continue
         with self._lock:
-            self._failed.add(artifact.sha256)
-        self.health.failed()
+            self._prune_failed()
+            if artifact.sha256 in self._wanted and self.path(artifact.sha256) is None:
+                self._failed.add(artifact.sha256)
+                self.health.failed()
         return False
 
     def _write(self, digest: str, fill: Callable[[BinaryIO], object], size: int | None = None) -> None:

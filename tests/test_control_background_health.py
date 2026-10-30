@@ -107,3 +107,46 @@ def test_another_successful_blob_does_not_hide_a_still_missing_artifact(tmp_path
     blobs.want([bad, good])
     state = blobs.health.state()
     assert state.error_code == "blob_mirror_failed" and state.last_success_at is not None
+
+
+@pytest.mark.parametrize("resolution", ["drop", "seed"])
+def test_a_retired_or_seeded_blob_clears_failure_without_inventing_a_mirror_success(
+    tmp_path: Path, resolution: str
+) -> None:
+    payload = b"verified test artifact"
+    artifact = Artifact(hashlib.sha256(payload).hexdigest(), len(payload), ("https://example.com/artifact",))
+
+    def download(_url: str, _handle: BinaryIO, _limit: int) -> None:
+        raise RuntimeError(SECRET_ERROR)
+
+    blobs = BlobStore(tmp_path / "blobs", download=download, spawn=lambda run: run())
+    blobs.want([artifact])
+    before = blobs.health.state()
+    assert before.error_code == "blob_mirror_failed"
+    if resolution == "drop":
+        blobs.want([])
+    else:
+        assert blobs.put(payload) == artifact.sha256
+    after = blobs.health.state()
+    assert after.error_code is None
+    assert after.last_attempt_at == before.last_attempt_at and after.last_success_at == before.last_success_at
+
+
+@pytest.mark.parametrize("resolution", ["drop", "seed"])
+def test_an_inflight_failure_cannot_degrade_an_artifact_that_is_retired_or_already_present(
+    tmp_path: Path, resolution: str
+) -> None:
+    payload = b"verified test artifact"
+    artifact = Artifact(hashlib.sha256(payload).hexdigest(), len(payload), ("https://example.com/artifact",))
+
+    def download(_url: str, _handle: BinaryIO, _limit: int) -> None:
+        if resolution == "drop":
+            blobs.want([])
+        else:
+            blobs.put(payload)
+        raise RuntimeError(SECRET_ERROR)
+
+    blobs = BlobStore(tmp_path / "blobs", download=download, spawn=lambda run: run())
+    blobs.want([artifact])
+    state = blobs.health.state()
+    assert state.error_code is None and state.last_attempt_at is not None and state.last_success_at is None
