@@ -52,11 +52,11 @@ def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypa
     resolved = SimpleNamespace(ip="198.51.100.10", user="root", port=22, machine_id="", conn=conn)
     runtime = MagicMock()
     runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)
-    runtime.publish_handoff.return_value = [
+    runtime.handoff.return_value = [
         HandoffLinks(
             "alice",
             subscription_url="https://198.51.100.10/pages/sub/s1",
-            page_url="https://198.51.100.10/pages/u1/",
+            page_url="https://198.51.100.10/pages/sub/s1",
         )
     ]
 
@@ -76,7 +76,7 @@ def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypa
     assert intent.access.users == ["alice"]
     assert intent.exits[0].geo_block is False and intent.harden is True
     runtime.verify.assert_called_once()
-    runtime.publish_handoff.assert_called_once_with(["alice"])
+    runtime.handoff.assert_called_once_with(["alice"])
     data = json.loads(result.stdout)["data"]
     assert data["mode"] == "first_deploy"
     assert data["sni"] == "www.google.com"
@@ -87,7 +87,7 @@ def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypa
 def _fake_runtime() -> MagicMock:
     runtime = MagicMock()
     runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)
-    runtime.publish_handoff.return_value = [HandoffLinks("default", subscription_url="https://198.51.100.10/p/sub/s")]
+    runtime.handoff.return_value = [HandoffLinks("default", subscription_url="https://198.51.100.10/p/sub/s")]
     return runtime
 
 
@@ -128,7 +128,7 @@ def test_explicit_sni_is_never_swapped_and_dead_traffic_fails(tmp_home: Path, mo
     assert result.exit_code == 3
     assert "no traffic passes" in unstyle(result.output)
     assert runtime.apply_intent.call_count == 1
-    runtime.publish_handoff.assert_not_called()
+    runtime.handoff.assert_not_called()
 
 
 def test_egress_mismatch_and_inconclusive_evidence_do_not_fail_a_deploy(tmp_home: Path, monkeypatch) -> None:
@@ -211,7 +211,7 @@ def test_cancel_during_apply_stops_before_verification_and_handoff(tmp_home: Pat
     assert envelope["summary"]["changed"] is True
     assert envelope["data"]["message"] == "Apply stopped after 4 of 12 resource actions."
     runtime.verify.assert_not_called()
-    runtime.publish_handoff.assert_not_called()
+    runtime.handoff.assert_not_called()
     assert runtime.constructed_with["cancellation"].path == tmp_home / "cancel"
 
 

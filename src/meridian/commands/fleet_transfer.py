@@ -16,11 +16,9 @@ from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import (
-    ReviewedApplyPersistenceError,
     apply_reviewed_intent,
     forget_unreachable_servers,
     load_topology_cluster,
-    persist_reviewed_apply,
     require_intent,
     reviewed_runtime,
 )
@@ -38,7 +36,6 @@ from meridian.core.fleet_document import (
 )
 from meridian.core.models import ErrorModel, OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
-from meridian.core.redaction import redact_string
 from meridian.core.topology import SetupIntent
 from meridian.core.validation import CoreInputError
 from meridian.i18n import t
@@ -113,7 +110,6 @@ def _import(source: str, *, dry_run: bool, yes: bool, forget_unreachable: bool, 
             ok(t("fleet_import.no_changes"))
         return
     _refuse_unsupported(current, updated, labels)
-    removed = [change.target for change in changes if (change.subject, change.action) == ("client", "remove")]
     added = [change.target for change in changes if (change.subject, change.action) == ("client", "add")]
 
     if not dry_run:
@@ -144,7 +140,6 @@ def _import(source: str, *, dry_run: bool, yes: bool, forget_unreachable: bool, 
     if not yes and not confirm(t("fleet_import.confirm"), default=False):
         raise typer.Exit(1)
 
-    pages = _page_ids(cluster, removed)
     result = apply_reviewed_intent(
         cluster,
         registry,
@@ -153,7 +148,6 @@ def _import(source: str, *, dry_run: bool, yes: bool, forget_unreachable: bool, 
         hint=t("fleet_import.failed_hint"),
         expected_plan_hash=review.review_hash,
     )
-    warnings = _follow_up_pages(cluster, pages, added)
     summary = t("fleet_import.applied", file=source, count=len(changes))
     applied = build_compiled_apply_result(result, exit_code=0, summary="Topology converged.")
     _emit_result(
@@ -161,16 +155,11 @@ def _import(source: str, *, dry_run: bool, yes: bool, forget_unreachable: bool, 
         operation,
         text=f"Applied {len(changes)} changes",  # JSON stays English; the human line is translated
         changed=True,
-        warnings=warnings,
     )
     if not is_json_mode():
         ok(summary)
-        for warning in warnings:
-            warn(warning.message)
         if added:
             info(t("fleet_import.new_clients"))
-    if warnings:
-        raise typer.Exit(3)
 
 
 def _print_review(source: str, changes: list[IntentChange], preview: CompiledApplyPreview) -> None:
@@ -267,61 +256,6 @@ def _refuse_unmanaged_clients(cluster: ClusterConfig, added: list[str]) -> None:
                     hint=t("fleet_import.client_taken_hint"),
                     hint_type="user",
                 )
-
-
-def _page_ids(cluster: ClusterConfig, removed: list[str]) -> dict[str, str]:
-    """Each removed client's page ID, read before the apply deletes the user."""
-    from meridian.commands.client_handoff import get_user_or_fail
-    from meridian.control_access import access_panel
-
-    if not removed:
-        return {}
-    pages: dict[str, str] = {}
-    with access_panel(cluster) as panel:
-        for name in removed:
-            user = get_user_or_fail(panel, name, action="load")
-            if user is not None and user.vless_uuid:
-                pages[name] = user.vless_uuid
-    return pages
-
-
-def _follow_up_pages(cluster: ClusterConfig, pages: dict[str, str], added: list[str]) -> list[ErrorModel]:
-    """Delete removed clients' pages and publish new clients' pages; failures become warnings."""
-    from meridian.handoff import publish_connection_pages, remove_connection_page
-
-    failures: dict[str, str] = {}
-    for name, page_id in pages.items():
-        try:
-            error = remove_connection_page(cluster, page_id)
-        except (MeridianError, OSError) as exc:
-            error = redact_string(str(exc)) or type(exc).__name__
-        if error:
-            failures[name] = error
-    if pages:
-        try:
-            persist_reviewed_apply(cluster)
-        except ReviewedApplyPersistenceError as exc:
-            fail(exc)
-    if added:
-        try:
-            published = publish_connection_pages(cluster, added)
-        except (MeridianError, OSError) as exc:
-            reason = redact_string(str(exc)) or type(exc).__name__
-            failures.update({name: reason for name in added})
-        else:
-            failures.update({links.username: links.error for links in published if not links.page_url})
-    return [
-        ErrorModel(
-            code="MERIDIAN_CLIENT_PAGE_FAILED",
-            category="system",
-            message=t("fleet_import.page_failed", name=name, error=error),
-            hint="Retry with: meridian client show NAME --repair-page",
-            retryable=True,
-            exit_code=3,
-            details={"client": name},
-        )
-        for name, error in failures.items()
-    ]
 
 
 def _emit_result(

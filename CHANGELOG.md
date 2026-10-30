@@ -51,6 +51,11 @@ that dials out to it.
   best-effort BitTorrent direct rule to reduce abuse complaints against exits.
   The default preserves existing plan and subscription bytes. Export/import
   carries the policy, and the console shows it read-only in Settings.
+- **Connection pages at subscription URLs** — the control service serves live
+  pages for every person, including console invitees, with saved branding and
+  package assets. Apps keep receiving their configs from the same URL. Old UUID
+  links redirect; a reviewed apply removes SSH-published page files and retires
+  their service workers. `client show --repair-page` is retired.
 - **Subscription refresh interval** — delivery.update_interval_hours accepts 1–168
   hours (default 6), round-trips through fleet export/import, and reaches native
   apps in profile-update-interval.

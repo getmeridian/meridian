@@ -1,7 +1,4 @@
-/* Support link — apps open support.html#<subscription id> (the panel's support-url header).
-   Pages live under the VLESS UUID, which the header cannot carry, so read it from the
-   person's own subscription and go to their page. The id stays in the fragment: it never
-   reaches the server, a CDN, or a log. */
+/* Support links carry a subscription token in the fragment and open its connection page. */
 (function() {
   'use strict';
 
@@ -30,30 +27,16 @@
 
   function unavailable() { status.textContent = text[2]; }
 
-  /* Hysteria2's password is the same UUID, so a fleet without VLESS still resolves */
-  var UUID = '([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})';
-  var LINK = new RegExp('^(?:vless|hysteria2)://' + UUID + '@', 'im');
-  /* An app's in-app browser may be served the Xray JSON instead of links */
-  var JSON_ID = new RegExp('"(?:id|password)"\\s*:\\s*"' + UUID + '"', 'i');
   var id = location.hash.slice(1);
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) { unavailable(); return; }
-
-  fetch('../sub/' + id, { cache: 'no-store' })
-    .then(function(r) {
-      if (!r.ok) throw new Error('subscription');
-      return r.text();
-    })
-    .then(function(body) {
-      var decoded = body;
-      try { decoded = atob(body.replace(/\s+/g, '')); } catch (e) { /* already plain links */ }
-      var match = LINK.exec(decoded) || JSON_ID.exec(body);
-      if (!match) throw new Error('no link');
-      var page = '../' + match[1].toLowerCase() + '/';
-      /* A disabled or removed person's subscription names no page; say so instead of a 404 */
-      return fetch(page + 'config.json', { cache: 'no-store' }).then(function(r) {
-        if (!r.ok) throw new Error('no page');
-        location.replace(page);
-      });
-    })
-    .catch(unavailable);
+  var path = location.pathname;
+  var marker = path.indexOf('/sub/~pwa/');
+  var base;
+  if (marker !== -1) base = path.slice(0, marker);
+  else {
+    marker = path.indexOf('/pwa/');
+    if (marker === -1) { unavailable(); return; }
+    base = path.slice(0, marker);
+  }
+  location.replace(base + '/sub/' + id);
 })();

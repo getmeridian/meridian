@@ -26,7 +26,7 @@ Clients belong to your whole fleet, not to one server. Every exit and relay you 
 
 The connection page is built from the person's real subscription, so it lists exactly what their apps receive: direct exits, relays, and every enabled method. It has:
 
-- Two steps: install an app recommended for their platform (Happ first, then FlClashX and Clash Mi, plus Throne on desktop), then add the connection with one tap
+- Three steps: install an app recommended for their platform (Happ first, then FlClashX and Clash Mi, plus Throne on desktop), then add the connection with one tap, then follow the app’s Connect instructions
 - A QR code for the subscription, shown beside the steps on a computer so they can set up a phone
 - Every individual connection with its own Open, Copy, and QR buttons, folded away until needed
 - A "Not connecting?" section with tips and a "Check my connection" test that copies a link-free report they can send you
@@ -43,11 +43,7 @@ To share a client's links again:
 meridian client show alice
 ```
 
-This prints the connection page and subscription URL, plus status, traffic, expiry, and when the client was last seen. If the page is missing (for example, the upload failed), republish it:
-
-```
-meridian client show alice --repair-page
-```
+This prints the personal URL, plus status, traffic, expiry, and when the client was last seen. The same URL opens the connection page in a browser and supplies configs to an app. The control service serves pages automatically for every person, including console invitees.
 
 ## List clients
 
@@ -141,13 +137,13 @@ If a client's link or connection page reaches someone it shouldn't, replace it:
 meridian client reissue alice
 ```
 
-The control service gives the client a new subscription ID and new keys. The old subscription URL and connection page return 404, and the servers refuse the old keys. Meridian deletes the old page, publishes a new one, and prints the new page and subscription URL to send the client. They import the new link once: their apps can't follow a subscription URL that no longer exists. Status, traffic limit and usage, expiry, and the device cap stay. Registered devices are cleared.
+The control service gives the client a new subscription ID and new keys. The old subscription URL and connection page return 404, and the servers refuse the old keys. Meridian prints the new subscription URL, which also opens the new connection page. They import the new link once: their apps can't follow a subscription URL that no longer exists. Status, traffic limit and usage, expiry, and the device cap stay. Registered devices are cleared.
 
 With `--json`, pass `--yes`. The new links appear only in that command's output.
 
 ## Removing a client
 
-`meridian client remove NAME` removes the client permanently: their links stop working and their connection page is deleted. A fleet keeps at least one client.
+`meridian client remove NAME` removes the client permanently: their links stop working and their connection page stops responding. A fleet keeps at least one client.
 
 Existing VLESS sessions can outlive credential revocation. **`--cut-off`**, with `client remove` or `client reissue`, waits for each affected node to apply the revision without the old credentials, then resets its affected inbounds. Every open session on those inbounds ends, including other people's; they reconnect for a moment. If the inbound API fails, Xray restarts and all its sessions on that node end. The flag is opt-in and recommended after a leak. JSON reports each node under `data.cut_off`: `done`, `core_restart`, `failed`, or `timed_out`. Meridian waits up to five minutes; failed cut-offs exit `4`, timeouts `3`. The console offers the same choice when removing a person added there.
 
@@ -178,7 +174,7 @@ Xray JSON subscriptions (Happ and other Xray-based apps) send recognized BitTorr
 
 ## Where client data lives
 
-Client accounts (keys, status, limits, traffic) live in the control service's database on your control server. The list of clients Meridian manages is part of your topology in `~/.config/meridian/cluster.yml`. Client commands use the control service's API and don't need SSH; publishing a connection page uses SSH to the control server. After every change, your machine saves an encrypted snapshot of that database (see [Backups](/en/deploy/#backups)).
+Client accounts (keys, status, limits, traffic) live in the control service's database on your control server. The list of clients Meridian manages is part of your topology in `~/.config/meridian/cluster.yml`. Client commands use the control service's API, and the service serves connection pages directly from its database. After every change, your machine saves an encrypted snapshot of that database (see [Backups](/en/deploy/#backups)).
 
 ## Web console
 
@@ -190,7 +186,7 @@ The control service has a web console where you can manage people from a browser
 | **Tokens**: create and revoke API tokens | **Revisions**: every change applied from your computer, with its plan |
 | Your password and sign-in code | The subscription title shown in apps |
 
-Changes in the console and in the CLI are the same changes: `meridian client list` shows people added in the console too, and applies never undo a status, limit, or expiry set in either. People you added with `meridian client add` stay yours on the CLI: the console can change their limits and status, but removing them or issuing a new link prints the `meridian client` command instead, because their connection page lives on the server. People added in the console get a subscription link and QR code, but no connection page.
+Changes in the console and in the CLI are the same changes: `meridian client list` shows people added in the console too, and applies never undo a status, limit, or expiry set in either. People you added with `meridian client add` stay yours on the CLI: the console can change their limits and status, but removing them or issuing a new link prints the `meridian client` command instead, because those people belong to the reviewed topology. Every person, including those added in the console, gets a connection page at their subscription URL.
 
 The console never holds SSH keys, so a stolen session can't change your servers. Every sign-in expires after 30 minutes idle and 12 hours at most, and creating a token asks for your password again.
 

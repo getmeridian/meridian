@@ -28,12 +28,15 @@ def serve_subscription(
     read_settings: Callable[[], ServiceSettings],
     read_privacy: Callable[[], PrivacySettings],
     clock: Callable[[], float],
+    render_page: Callable[[str], SubscriptionResponse],
     user_agent: str | None = None,
     accept: str | None = None,
     device_headers: HeaderReader | None = None,
 ) -> SubscriptionResponse:
     """Answer a subscription request: the document a suffix names, else the one the app reads."""
     document = SUFFIX_FORMATS[suffix] if suffix else select_format(user_agent, accept)
+    if document == "browser" and not suffix:
+        return render_page(sub_token)
     hwid_flags: dict[str, str] = {}
     with store.lock:
         row = store.db.execute(f"{USER_SELECT} WHERE u.sub_token = ?", (sub_token,)).fetchone()

@@ -594,6 +594,10 @@ class ServiceSettingsDriver:
             public_url=self.context.cluster.panel.public_base_url(),
             update_interval_hours=payload.update_interval_hours,
             client_routing=payload.client_routing,
+            server_name=self.context.cluster.branding.server_name,
+            server_icon=self.context.cluster.branding.icon,
+            color=self.context.cluster.branding.color,
+            exit_countries=payload.exit_countries,
         )
 
 

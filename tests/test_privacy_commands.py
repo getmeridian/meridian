@@ -16,7 +16,6 @@ from typer.testing import CliRunner
 from meridian.cli import app
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands.client import run_show
-from meridian.commands.client_handoff import PageResolution
 from meridian.commands.client_usage import run_usage
 from meridian.commands.fleet_usage import run_usage as run_fleet_usage
 from meridian.commands.privacy import run_set
@@ -181,7 +180,7 @@ def test_client_usage_reads_console_people_and_client_show_adds_only_seven_days_
 ) -> None:
     with _fleet(tmp_path, json_mode=True) as client:
         client.put_user("console-person")
-        with patch("meridian.commands.client.resolve_page_url", return_value=PageResolution()):
+        with patch("meridian.commands.client.page_url", return_value=""):
             run_show("alice")
             assert _envelope(capsys, "client-show-envelope")["data"]["usage"] is None
             client.set_privacy(PrivacySettings(usage_history="daily", history_days=14))

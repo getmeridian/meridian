@@ -85,7 +85,7 @@ def new_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[NewS
     monkeypatch.setattr(restore_steps, "ssh_answers", lambda entry: False)
     monkeypatch.setattr(
         restore_steps,
-        "publish_pages",
+        "restored_handoffs",
         lambda cluster, names: [
             HandoffLinks(name, subscription_url=cluster.panel.subscription_url(f"token-{name}")) for name in names
         ],

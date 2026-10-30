@@ -30,9 +30,13 @@ flowchart TD
     Internet -->|TCP 80| NginxACME["nginx<br>ACME challenges"]
 ```
 
+图中的公开方框表示由 `ctld` 处理的 URL 路由：页面路径根目录重定向旧 UUID 链接，`/sub/` 提供浏览器页面、应用配置和共享资源。
+
 nginx stream **不**终止 TLS。它从 Client Hello 中读取 SNI 并转发原始 TCP 流。控制服务、连接页面和订阅使用服务器 IP 的 Let's Encrypt 证书提供（短期有效，自动续期）。
 
-共享链接位于连接页面路径下：页面在 `/<page-path>/<id>/`，订阅在 `/<page-path>/sub/<id>`。控制服务的控制台、API 和 agent 接入点位于共享链接永远不会暴露的单独秘密路径上。
+共享链接只有一个地址：`/<page-path>/sub/<token>`。浏览器获得连接页面，应用获得适合自己的配置。控制台、API 和 agent 接入点位于共享链接永远不会暴露的独立秘密路径上。
+
+控制服务根据当前用户、连接端点、品牌设置和出口国家生成页面、`config.json` 和清单。每个人都有页面，包括在控制台中添加的用户。个人响应使用 `Cache-Control: no-store` 并禁止索引；安装包中的共享资源位于 `/<page-path>/sub/~pwa/` 下，以内容版本标识。nginx 提供 Referrer-Policy 和压缩，控制服务提供页面的 CSP 及其他浏览器保护头。旧的 `/<page-path>/<uuid>/` 链接会重定向到当前订阅 URL。应用升级会删除旧页面文件，并让旧 service worker 释放缓存的页面。
 
 ### 域名模式
 

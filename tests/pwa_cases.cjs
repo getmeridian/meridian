@@ -2,9 +2,72 @@
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const vm = require('node:vm');
 const { createBrowser, response } = require('./support/pwa_browser.cjs');
 
 const cases = {
+  test_legacy_shell_without_data_paths_still_updates_its_worker: async function(data) {
+    const browser = createBrowser(data.config, data.catalog, { legacyShell: true, info: data.info });
+    const registrations = [];
+    browser.context.navigator.serviceWorker = {
+      register: (url, options) => { registrations.push({ url, options }); return Promise.resolve(); },
+    };
+    await browser.start();
+    assert.equal(registrations[0].url, '../pwa/sw.js');
+    assert.equal(registrations[0].options.scope, '../');
+    const config = browser.requests.find(request => request.url.endsWith('config.json'));
+    assert.ok(config, 'old shells still need a config path');
+    assert.equal(config.init.cache, 'no-store');
+  },
+  test_worker_only_intercepts_shared_assets: async function() {
+    const handlers = {};
+    const context = {
+      URL, Promise,
+      self: { location: new URL('https://198.51.100.1/connect/sub/~pwa/sw.js'),
+        addEventListener: (name, callback) => { handlers[name] = callback; } },
+      caches: { match: () => Promise.resolve({ cached: true }) },
+    };
+    vm.runInNewContext(fs.readFileSync('src/meridian/templates/pwa/sw.js', 'utf8'), context);
+    for (const path of ['/sub/demo', '/sub/demo/config.json', '/sub/demo/manifest.webmanifest', '/sub/demo/info',
+      '/sub/~pwa/pwa-v1/probe.bin', '/private-console/']) {
+      let intercepted = false;
+      handlers.fetch({ request: { url: 'https://198.51.100.1/connect' + path, method: 'GET', cache: 'default' },
+        respondWith: () => { intercepted = true; } });
+      assert.equal(intercepted, false, path);
+    }
+    let shared;
+    handlers.fetch({ request: { url: 'https://198.51.100.1/connect/sub/~pwa/pwa-v1/app.js', method: 'GET', cache: 'default' },
+      respondWith: promise => { shared = promise; } });
+    assert.ok((await shared).cached, 'versioned shared assets use the cache');
+  },
+  test_legacy_service_worker_releases_old_pages: async function() {
+    const handlers = {}, deleted = [], navigated = [];
+    let unregistered = false;
+    const context = {
+      URL, Promise,
+      caches: {
+        keys: () => Promise.resolve(['pwa-01234567', 'other-app', 'pwa-other-app']),
+        delete: key => { deleted.push(key); return Promise.resolve(true); },
+      },
+      self: {
+        location: new URL('https://198.51.100.1/connect/pwa/sw.js'),
+        addEventListener: (name, callback) => { handlers[name] = callback; },
+        clients: {
+          claim: () => Promise.resolve(),
+          matchAll: () => Promise.resolve([{ url: 'https://198.51.100.1/connect/550e8400-e29b-41d4-a716-446655440000/',
+            navigate: url => { navigated.push(url); return Promise.resolve(); } }]),
+        },
+        registration: { unregister: () => { unregistered = true; return Promise.resolve(true); } },
+      },
+    };
+    vm.runInNewContext(fs.readFileSync('src/meridian/templates/pwa/sw.js', 'utf8'), context);
+    let completion;
+    handlers.activate({ waitUntil: promise => { completion = promise; } });
+    await completion;
+    assert.equal(unregistered, true, 'old worker must unregister');
+    assert.deepEqual(deleted, ['pwa-01234567'], 'only Meridian page caches belong to this worker');
+    assert.equal(navigated.length, 1, 'old pages must reload to follow the UUID redirect');
+  },
   test_preferred_store_route_names_its_destination: async function(data) {
     const browser = createBrowser(data.config, data.catalog, { info: data.info });
     await browser.start();

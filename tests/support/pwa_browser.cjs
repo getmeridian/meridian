@@ -123,7 +123,15 @@ function createBrowser(config, catalog, options = {}) {
   document.readyState = 'loading'; document.visibilityState = 'visible';
   const storage = { ...(options.storage || {}) }, requests = [], timers = new Map();
   let time = 0, timerId = 0;
-  const location = new URL(options.url || 'https://198.51.100.1/connect/demo/');
+  const location = new URL(options.url || 'https://198.51.100.1/connect/sub/demo');
+  const pagePaths = {
+    'data-config': '/connect/sub/demo/config.json', 'data-worker': '/connect/sub/~pwa/sw.js',
+    'data-scope': '/connect/sub/',
+  };
+  document.currentScript = {
+    src: options.legacyShell ? 'https://198.51.100.1/connect/pwa/app.js' : 'https://198.51.100.1/connect/sub/~pwa/pwa-test/app.js',
+    getAttribute: name => options.legacyShell ? null : pagePaths[name],
+  };
   location.replace = value => { location.replaced = value; };
   const context = {
     document, location, URL, Intl, console, Promise,

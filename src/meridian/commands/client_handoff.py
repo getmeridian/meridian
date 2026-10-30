@@ -1,34 +1,22 @@
-"""Evidence-backed subscription and connection-page handoff for client commands."""
+"""Subscription and connection-page handoff for client commands."""
 
 from __future__ import annotations
 
 import re
 from collections.abc import Collection
-from dataclasses import dataclass
 
 from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
 from meridian.commands._validation import validate_command_input
-from meridian.commands.client_state import persist_client_state, require_access_user
+from meridian.commands.client_state import require_access_user
 from meridian.console import err_console, fail
 from meridian.control.models import USERNAME_PATTERN
 from meridian.control_access import AccessPanel
-from meridian.core.clients import PanelUserLike
 from meridian.core.command_inputs import ClientNameRequest
 from meridian.core.inputs import validate_access_username_value, validate_display_name_value
 from meridian.core.topology import assign_access_usernames
 from meridian.remnawave import RemnawaveError, User
-from meridian.ssh import SSHError
-
-
-@dataclass(frozen=True)
-class PageResolution:
-    """Connection-page evidence plus any failed post-repair persistence."""
-
-    url: str = ""
-    repaired: bool = False
-    persistence_error: str = ""
 
 
 def format_status(status: str) -> str:
@@ -132,34 +120,6 @@ def get_user_or_fail(panel: AccessPanel, name: str, *, action: str) -> User | No
             hint=exc.hint or "Check panel connectivity",
             hint_type=exc.category,
         )
-
-
-def resolve_page_url(
-    cluster: ClusterConfig,
-    user: PanelUserLike,
-    *,
-    repair: bool,
-) -> PageResolution:
-    """Return an evidenced connection-page URL, republishing it when asked."""
-    from meridian.handoff import page_url, publish_connection_pages
-    from meridian.pwa import connection_page_deployed
-
-    candidate = page_url(cluster, user)
-    if not candidate:
-        return PageResolution()
-    if not repair:
-        return PageResolution(url=candidate if connection_page_deployed(cluster, user.vless_uuid) else "")
-    try:
-        links = publish_connection_pages(cluster, [user.username])
-    except (OSError, RuntimeError, SSHError, RemnawaveError):
-        return PageResolution()
-    if not links or not links[0].page_url:
-        return PageResolution()
-    return PageResolution(
-        url=links[0].page_url,
-        repaired=True,
-        persistence_error=persist_client_state(cluster),
-    )
 
 
 def print_handoff_links(subscription_url: str, *, page_url: str = "") -> None:

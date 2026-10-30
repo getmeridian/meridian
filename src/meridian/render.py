@@ -616,6 +616,10 @@ def render_pwa_shell(
     client_name: str = "",
     asset_path: str = "../pwa",
     server_name: str = "",
+    config_path: str = "config.json",
+    manifest_path: str = "manifest.webmanifest",
+    worker_path: str = "../pwa/sw.js",
+    worker_scope: str = "../",
 ) -> str:
     """Render the PWA HTML shell from the index.html.j2 template.
 
@@ -628,6 +632,10 @@ def render_pwa_shell(
         client_name=client_name,
         asset_path=asset_path,
         server_name=server_name,
+        config_path=config_path,
+        manifest_path=manifest_path,
+        worker_path=worker_path,
+        worker_scope=worker_scope,
     )
 
 
@@ -636,6 +644,7 @@ def render_manifest(
     client_name: str = "",
     asset_path: str = "../pwa",
     server_name: str = "",
+    start_url: str = ".",
 ) -> str:
     """Render the per-client PWA manifest from manifest.webmanifest.j2."""
     return _render_pwa_template(
@@ -643,6 +652,7 @@ def render_manifest(
         client_name=client_name,
         asset_path=asset_path,
         server_name=server_name,
+        start_url=start_url,
     )
 
 

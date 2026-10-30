@@ -8,7 +8,6 @@ import pytest
 
 from meridian.provision.nginx import (
     ConfigureNginx,
-    DeployPWAAssets,
     InstallNginx,
 )
 from meridian.provision.nginx_render import (
@@ -55,19 +54,39 @@ CONFIGS = {
     "domain_no_wss": render_nginx_http_config(**{**_DOMAIN, "ws_path": "", "wss_internal_port": 0}),
 }
 
-_SECURITY_HEADERS = ("X-Frame-Options", "X-Content-Type-Options", "Referrer-Policy")
-_PWA_CACHE = ("$meridian_cache", "max-age=86400", "$meridian_sw", "Service-Worker-Allowed", "stats/")
-_PWA_ROBOTS = (
-    "map $uri $meridian_robots",
-    "~^/connect/",
-    '"noindex, nofollow, noarchive"',
-    "add_header X-Robots-Tag $meridian_robots always;",
-)
-# Connection pages need alias: it strips the location prefix.
-_CONNECTION_PAGES = ("location /connect/", "alias /var/www/private/")
+_SECURITY_HEADERS = ("Referrer-Policy",)
+_CONNECTION_PAGES = ("location /connect/", "proxy_pass http://127.0.0.1:2053/sub/~legacy/")
 # Missing h2 ALPN is a fingerprinting vector.
 _HTTP2 = ("ssl;", "http2 on;", "server_tokens off")
 _NGINX_ERRORS = ("location = /", "return 403", "return 404")
+
+
+def test_public_pages_proxy_to_the_service_and_keep_old_uuid_links() -> None:
+    for name in ("ip", "domain"):
+        rendered = CONFIGS[name]
+        assert "alias /var/www/private/" not in rendered
+        assert "proxy_pass http://127.0.0.1:2053/sub/~legacy/;" in rendered
+        assert "proxy_pass http://127.0.0.1:2053/sub/;" in rendered
+
+
+def test_nginx_cutover_removes_legacy_page_artifacts_after_reload() -> None:
+    conn = MockConnection()
+    result = ConfigureNginx(domain="", ip_mode=True, **_IP).run(conn, ProvisionContext(ip="198.51.100.1"))
+    assert result.status == "changed"
+    cleanup = [call for call in conn.calls if "find /var/www/private" in call]
+    assert cleanup
+    assert "pwa" in cleanup[0]
+    assert "[0-9a-fA-F]" in cleanup[0]
+    reload_index = next(index for index, call in enumerate(conn.calls) if "reload-or-restart nginx" in call)
+    assert conn.calls.index(cleanup[0]) > reload_index
+
+
+def test_failed_nginx_reload_keeps_legacy_page_artifacts() -> None:
+    conn = MockConnection().when("reload-or-restart nginx", rc=1, stderr="reload failed")
+    result = ConfigureNginx(domain="", ip_mode=True, **_IP).run(conn, ProvisionContext(ip="198.51.100.1"))
+    assert result.status == "failed"
+    assert not any("find /var/www/private" in call for call in conn.calls)
+
 
 PRESENT = {
     "stream": (
@@ -98,12 +117,8 @@ PRESENT = {
         "ssl_certificate",
         "/etc/ssl/meridian/fullchain.pem",
         "/.well-known/acme-challenge/",
-        "no-cache, must-revalidate",
         "TLSv1.2 TLSv1.3",
-        "default-src 'self'",
         *_SECURITY_HEADERS,
-        *_PWA_CACHE,
-        *_PWA_ROBOTS,
         *_CONNECTION_PAGES,
         *_HTTP2,
         *_NGINX_ERRORS,
@@ -116,8 +131,6 @@ PRESENT = {
         "return 301",
         "$host$request_uri",
         *_SECURITY_HEADERS,
-        *_PWA_CACHE,
-        *_PWA_ROBOTS,
         *_CONNECTION_PAGES,
         *_HTTP2,
         "return 403",
@@ -486,15 +499,3 @@ class TestIssueTLSCert:
         _, issue_calls = _issue(conn)
         assert "shortlived" in issue_calls[0]
         assert ("--force" in issue_calls[0]) is forced
-
-
-class TestDeployPWAAssets:
-    def test_uploads_static_files(self):
-        result = DeployPWAAssets().run(MockConnection(), ProvisionContext(ip="198.51.100.1"))
-        assert result.status == "changed"
-        assert "PWA" in result.detail
-
-    def test_failure_returns_failed(self):
-        conn = MockConnection()
-        conn.when("cat >", rc=1)
-        assert DeployPWAAssets().run(conn, ProvisionContext(ip="198.51.100.1")).status == "failed"

@@ -34,25 +34,33 @@ class TestBuildDemoUrls:
     def test_preview_page_has_the_subscription_hero(self, tmp_path: Path) -> None:
         output_dir = tmp_path / "preview"
         run_preview(output=str(output_dir), client_name="test", no_open=True)
-        config_path = next(output_dir.glob("*/config.json"))
+        config_path = next(output_dir.glob("sub/*/config.json"))
         config = json.loads(config_path.read_text())
         assert config["subscription_url"] == "https://198.51.100.1/connect/sub/DemoShortUuid42"
         assert config["subscription_qr_b64"]
 
 
 class TestRunPreviewOutput:
+    def test_preview_uses_token_and_versioned_asset_paths(self, tmp_path: Path) -> None:
+        run_preview(output=str(tmp_path), client_name="guest", no_open=True)
+        pages = list((tmp_path / "sub").glob("*/config.json"))
+        assert len(pages) == 1
+        html = (pages[0].parent / "index.html").read_text()
+        assert "../~pwa/pwa-" in html
+        assert (tmp_path / "sub" / "~pwa" / "sw.js").is_file()
+
     def test_output_mode_writes_files(self, tmp_path: Path) -> None:
         output_dir = tmp_path / "preview"
         run_preview(output=str(output_dir), client_name="test", no_open=True)
 
         # Shared PWA assets
-        assert (output_dir / "pwa" / "app.js").is_file()
-        assert (output_dir / "pwa" / "styles.css").is_file()
-        assert (output_dir / "pwa" / "sw.js").is_file()
-        assert (output_dir / "pwa" / "icon.svg").is_file()
+        assert any((output_dir / "sub" / "~pwa").glob("*/app.js"))
+        assert any((output_dir / "sub" / "~pwa").glob("*/styles.css"))
+        assert (output_dir / "sub" / "~pwa" / "sw.js").is_file()
+        assert any((output_dir / "sub" / "~pwa").glob("*/icon.svg"))
 
         # Find client directory (UUID-named)
-        client_dirs = [d for d in output_dir.iterdir() if d.is_dir() and d.name != "pwa"]
+        client_dirs = [d for d in (output_dir / "sub").iterdir() if d.is_dir() and d.name != "~pwa"]
         assert len(client_dirs) == 1
         client_dir = client_dirs[0]
 
@@ -66,7 +74,7 @@ class TestRunPreviewOutput:
         output_dir = tmp_path / "preview"
         run_preview(output=str(output_dir), client_name="alice", no_open=True)
 
-        client_dirs = [d for d in output_dir.iterdir() if d.is_dir() and d.name != "pwa"]
+        client_dirs = [d for d in (output_dir / "sub").iterdir() if d.is_dir() and d.name != "~pwa"]
         config = json.loads((client_dirs[0] / "config.json").read_text())
         assert config["client_name"] == "alice"
         assert config["server_ip"] == "198.51.100.1"
@@ -76,7 +84,7 @@ class TestRunPreviewOutput:
         output_dir = tmp_path / "preview"
         run_preview(output=str(output_dir), no_open=True)
 
-        client_dirs = [d for d in output_dir.iterdir() if d.is_dir() and d.name != "pwa"]
+        client_dirs = [d for d in (output_dir / "sub").iterdir() if d.is_dir() and d.name != "~pwa"]
         html = (client_dirs[0] / "index.html").read_text()
         assert "app.js" in html
         assert "styles.css" in html
@@ -100,14 +108,14 @@ class TestRunPreviewOutput:
         root_html = (output_dir / "index.html").read_text()
         assert 'http-equiv="refresh"' in root_html
         # Should redirect to the client UUID directory
-        client_dirs = [d for d in output_dir.iterdir() if d.is_dir() and d.name != "pwa"]
+        client_dirs = [d for d in (output_dir / "sub").iterdir() if d.is_dir() and d.name != "~pwa"]
         assert client_dirs[0].name in root_html
 
     def test_output_disables_service_worker(self, tmp_path: Path) -> None:
         output_dir = tmp_path / "preview"
         run_preview(output=str(output_dir), no_open=True)
 
-        sw_content = (output_dir / "pwa" / "sw.js").read_text()
+        sw_content = (output_dir / "sub" / "~pwa" / "sw.js").read_text()
         assert "SW disabled" in sw_content
         # Should NOT contain the real SW cache logic
         assert "CACHE_VERSION" not in sw_content

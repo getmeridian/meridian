@@ -92,7 +92,7 @@ class _Runtime:
             subscription_urls={"default": "https://panel.example/pages/sub/default"},
         )
 
-    def publish_handoff(self, usernames):
+    def handoff(self, usernames):
         return [
             HandoffLinks(
                 name,

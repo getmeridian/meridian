@@ -107,7 +107,7 @@ JSON `data` 包含 `plan_hash`、`generation` 和 `actions[]` 带 `status: "conv
 
 ```
 meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
-meridian client show NAME [--repair-page] [--json]
+meridian client show NAME [--json]
 meridian client usage NAME [--days N] [--json]
 meridian client list [--attention] [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
@@ -125,15 +125,14 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 | `--days N` | 30 | `client usage` 或 `fleet usage` 的 UTC 天数，1–730，受已保存保留时间限制 |
 | `--json` | | 将结果作为 `meridian.output/v1` 信封发出（所有客户端命令） |
 | `--attention` | 关闭 | `client list`：仅显示需要关注的用户，并列出原因 |
-| `--repair-page` | | 重新发布客户端的连接页面（`client show`） |
 | `--limit SIZE` | 无 | 流量限额（`client add`、`client set`）：`500MB`、`50GB`、`1.5TB`；`none` 或 `0` 取消限额。单位按二进制计算（1 GB = 1024³ 字节），与控制服务一致 |
 | `--reset PERIOD` | never | 已用流量何时从零重新计算：`day`、`week`、`month` 或 `never`，按自然日、周、月 |
 | `--expires DATE` | never | 访问何时结束：`YYYY-MM-DD`（当天结束时，UTC）、ISO 时间如 `2026-12-31T18:00:00+03:00`（不带时区偏移的时间按 UTC 计），或 `never`。必须是将来的时间 |
 | `--yes`, `-y` | | 确认 `client reissue` 或 `client remove`；`--json` 需要 |
 
-**`client add`** — 把一个或多个人添加到拓扑并应用，然后为每个人打印连接页面和订阅 URL。页面根据他们真实的订阅生成，因此中继和 Hysteria2 存在时都会显示。拓扑中已有或控制服务中已存在的名称会被拒绝。名称可以使用任何文字（`client add Биба 王小明`）：页面和输出按输入原样显示名称，而控制服务只接受拉丁字母、数字、`.`、`-` 和 `_`，会得到音译后的用户名（`biba`、`wangxiaoming`）。其他 client 命令接受任一形式。如果无法生成客户端的订阅链接，客户端仍会被添加，命令以退出码 `3` 结束；仅缺少连接页面时只给出警告（用 `client show --repair-page` 修复）。`--limit`、`--reset`、`--expires` 和 `--devices` 都包含在审阅后的计划中，并与每个账户在同一事务中创建。应用失败时不会打印链接；重新运行 `meridian apply` 即可继续。之后的应用会保留管理者所做的修改。
+**`client add`** — 把一个或多个人添加到拓扑并应用，然后为每个人打印连接页面和订阅 URL。页面根据他们真实的订阅生成，因此中继和 Hysteria2 存在时都会显示。拓扑中已有或控制服务中已存在的名称会被拒绝。名称可以使用任何文字（`client add Биба 王小明`）：页面和输出按输入原样显示名称，而控制服务只接受拉丁字母、数字、`.`、`-` 和 `_`，会得到音译后的用户名（`biba`、`wangxiaoming`）。其他 client 命令接受任一形式。如果无法生成客户端的订阅链接，客户端仍会被添加，命令以退出码 `3` 结束。`--limit`、`--reset`、`--expires` 和 `--devices` 都包含在审阅后的计划中，并与每个账户在同一事务中创建。应用失败时不会打印链接；重新运行 `meridian apply` 即可继续。之后的应用会保留管理者所做的修改。
 
-**`client show`** — 打印连接页面、订阅 URL、状态、相对限额的流量及其重置周期、到期时间和最后在线时间。`--repair-page` 重新发布缺失的页面；如果失败，链接仍显示带警告和退出 `3`。
+**`client show`** — 打印连接页面、订阅 URL、状态、相对限额的流量及其重置周期、到期时间和最后在线时间。**每个人的订阅 URL 同时也是连接页面的地址。**
 
 首次记录的流量时间和最近报告流量的节点来自已接受的计数增长（JSON 中的 `first_traffic_at` 和 `last_traffic_node`）。升级前的首次使用时间可能未知；这些仅是汇总数据，不包含会话或客户端地址。
 
@@ -151,9 +150,9 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 **`client enable` / `client disable`** — 立即恢复或暂停客户端。禁用持续到你运行 `client enable`；应用（包括重新部署和 `client add`、`node add`、`relay add`）保持客户端的状态不变。
 
-**`client reissue`** — 在链接泄露后替换客户端的链接。控制服务生成新的订阅 ID 和新的密钥，因此旧的订阅 URL、连接页面和链接全部失效。Meridian 先删除旧页面，再发布新页面并打印新链接。状态、限额和到期时间保持不变。除非 `--yes`，否则要求确认；不属于你的客户端的名称会被拒绝。如果新页面无法发布，仍会显示链接并给出警告，退出码为 `3`（用 `client show --repair-page` 修复）。
+**`client reissue`** — 在链接泄露后替换客户端的链接。控制服务生成新的订阅 ID 和新的密钥，因此旧的订阅 URL、连接页面和链接全部失效。Meridian 打印新的订阅 URL，它同时打开新的连接页面。状态、限额和到期时间保持不变。除非 `--yes`，否则要求确认；不属于你的客户端的名称会被拒绝。
 
-**`client remove`** — 从拓扑中删除客户端，删除其在控制服务中的账户和连接页面。除非 `--yes`，否则要求确认。最后一个客户端无法删除。在网页控制台中添加的用户请在控制台中删除。
+**`client remove`** — 从拓扑中删除客户端，删除其在控制服务中的账户，订阅和连接页面随即停止响应。除非 `--yes`，否则要求确认。最后一个客户端无法删除。在网页控制台中添加的用户请在控制台中删除。
 
 **`client usage`** — 显示控制服务中任何人员（含控制台添加者）的每日上传、下载及总字节数。须在[隐私](/zh/privacy/)中开启每日历史；否则退出码为 `2`，并提示启用命令。历史开启时，`client show` 附最近七个 UTC 天（JSON 的 `data.usage`，关闭时为 `null`）。空白日期表示无记录的流量，不会补算过去用量。
 
@@ -347,7 +346,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 **`fleet export`** — 把集群已审查的拓扑输出为可编辑的 YAML 文件：出口及其协议路径、中继、网关、出口池、路由规则、路由、客户端和集群设置。服务器以保存的名称（没有名称时用地址）出现，从不使用内部 ID；文件以 `schema: meridian.fleet/v1` 开头。Reality 密钥、API 令牌、客户端链接以及 XHTTP 和 WSS 的传输路径都留在 Meridian 中，不会列出。`--json` 在 `data.document` 下返回同一份文档。
 
-**`fleet import`** — 读取编辑后的文件（或用 `-` 从标准输入读取），每处变更一行：`+` 表示添加，`-` 表示删除，`~` 表示修改字段（`~ exit-2 sni www.example.com -> www.example.org`）。随后列出变更将删除的每个资源和审查哈希，询问确认，并像 `apply` 一样只应用这次审查。未编辑的文件会输出“没有变更”。从 `access.users` 中删除客户端等同于 `client remove`：其链接失效，连接页面被删除。添加客户端等同于 `client add`，并发布其页面；用 `client show NAME` 查看链接。新的伪装 SNI 会经过与 `node sni` 相同的检查。导入会拒绝：其他 `schema`、未保存的服务器（用 `meridian server add` 保存）、文件中的传输路径、对控制服务器及其域名或后端的更改、删除或重命名控制服务器上的出口，以及把出口移到另一台服务器（请用 `node replace`）。密钥和凭据保持不变。没有终端时请传入 `--yes`；`--dry-run` 只显示变更和审查结果，不应用任何内容。
+**`fleet import`** — 读取编辑后的文件（或用 `-` 从标准输入读取），每处变更一行：`+` 表示添加，`-` 表示删除，`~` 表示修改字段（`~ exit-2 sni www.example.com -> www.example.org`）。随后列出变更将删除的每个资源和审查哈希，询问确认，并像 `apply` 一样只应用这次审查。未编辑的文件会输出“没有变更”。从 `access.users` 中删除客户端等同于 `client remove`：其订阅 URL 和连接页面不再可用。添加客户端等同于 `client add`，控制服务自动提供其连接页面；用 `client show NAME` 查看链接。新的伪装 SNI 会经过与 `node sni` 相同的检查。导入会拒绝：其他 `schema`、未保存的服务器（用 `meridian server add` 保存）、文件中的传输路径、对控制服务器及其域名或后端的更改、删除或重命名控制服务器上的出口，以及把出口移到另一台服务器（请用 `node replace`）。密钥和凭据保持不变。没有终端时请传入 `--yes`；`--dry-run` 只显示变更和审查结果，不应用任何内容。
 
 **`fleet usage`** — 显示每台服务器每个 UTC 天的总字节数，包括已删除服务器仍在保留期内的用量。`--days N` 选择保留期内 1–730 天。每日历史须开启；JSON 在 `data` 中返回服务器组总量和 `nodes[].daily`。
 

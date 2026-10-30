@@ -302,7 +302,7 @@ class TestPWATemplateSource:
 
     def test_app_js_prefers_the_shared_catalog(self) -> None:
         app_js = Path("src/meridian/templates/pwa/app.js").read_text()
-        assert "fetch('../pwa/apps.json'," in app_js
+        assert "fetch(ASSET_PATH + '/apps.json'," in app_js
 
     def test_every_data_t_key_is_translated(self) -> None:
         app_js = Path("src/meridian/templates/pwa/app.js").read_text()
@@ -356,14 +356,7 @@ class TestSelfCheck:
         app_js = (PWA_DIR / "app.js").read_text()
         assert 'data-action="selfcheck-run"' in app_js
         assert 'id="selfcheck-results"' in app_js
-        assert "s.src = '../pwa/selfcheck.js';" in app_js
-
-    def test_probe_and_subscription_bypass_the_service_worker(self) -> None:
-        sw = (PWA_DIR / "sw.js").read_text()
-        assert "path.indexOf('/sub/') !== -1" in sw
-        assert "path.endsWith('/probe.bin')" in sw
-        assert "event.request.method !== 'GET'" in sw
-        assert "'../pwa/selfcheck.js'" in sw
+        assert "s.src = ASSET_PATH + '/selfcheck.js';" in app_js
 
     def test_requests_skip_the_http_cache(self) -> None:
         source = (PWA_DIR / "selfcheck.js").read_text()

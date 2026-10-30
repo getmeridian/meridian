@@ -30,8 +30,8 @@ from meridian.core.topology import ClientRoutingPolicy
 JSON_TYPE = "application/json; charset=utf-8"
 TEXT_TYPE = "text/plain; charset=utf-8"
 YAML_TYPE = "text/yaml; charset=utf-8"
-# Every /sub/ answer. nginx adds Referrer-Policy itself; the panel's browser-security
-# headers (a CSP naming third-party hosts, HSTS, frame options) never belonged here.
+# Configs and /info JSON. Pages carry their own browser protections; nginx adds
+# Referrer-Policy. The panel's CSP naming third parties never belonged here.
 COMMON_HEADERS = {
     "x-content-type-options": "nosniff",
     "x-robots-tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",

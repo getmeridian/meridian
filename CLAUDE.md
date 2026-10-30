@@ -25,6 +25,7 @@ Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
 - **Plan and apply:** every fleet is a reviewed `topology_intent` in `cluster.yml`; `meridian plan` / `apply` compile it and reconcile resource drivers.
 - **Control service (#95):** `meridian serve` (`ctld`) keeps users, traffic, revisions, and operator-owned privacy in SQLite (device limits and daily history default off), serves subscriptions and the owner's web console, and signs documents that each server's Rust agent (`netagent`) pulls over HTTPS; every change pulls an encrypted snapshot to the deployer (`meridian backup`, `restore`). `meridian migrate` moves a Remnawave fleet from an earlier beta onto it in place, keeping every link.
 - **Website and Studio:** Astro, with docs on Starlight (every page also served as Markdown for agents). Static Studio consumes generated contracts; executable Studio runs through a localhost-only Engine (`meridian studio`) for server onboarding, deploy dry-runs, and deploys.
+- **Connection pages:** `ctld` serves every person's subscription URL as browser HTML or app configs, including console invitees; branding and exit countries travel through its settings, and shared PWA assets come from the installed package.
 - **Real-VM harness:** optional, local-only, in `tests/realvm/`.
 
 Full detail: [website/src/content/docs/en/architecture.md](website/src/content/docs/en/architecture.md).

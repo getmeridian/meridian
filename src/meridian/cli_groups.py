@@ -79,7 +79,6 @@ def client_add(
 def client_show_cmd(
     name: str = typer.Argument(..., help="Client name"),
     _json: Json = False,
-    repair_page: bool = typer.Option(False, "--repair-page", help="Republish the client's connection page"),
 ) -> None:
     """Show a client's connection page, subscription link, and status
 
@@ -88,7 +87,7 @@ def client_show_cmd(
     """
     from meridian.commands.client import run_show
 
-    run_show(name, repair_page=repair_page)
+    run_show(name)
 
 
 @client_app.command("list")

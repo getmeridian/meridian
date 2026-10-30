@@ -13,6 +13,7 @@
 ## What's done well
 - **Check before acting** — steps read package status, file content, and unit state first, so a rerun reports `ok`, not `changed`.
 ## Pitfalls
+- Connection pages are service responses: proxy old UUID and worker paths to ctld, then remove only immediate UUID directories and `pwa` after nginx validates and reloads. A failed reload must keep those files.
 - **nginx `add_header` inheritance** — a child `location` with `add_header` drops parent headers; use maps for cache/robots policies and keep all PWA headers together.
 - **acme.sh short-lived IP certs** — 6-day certs need `--days 5` and an explicit renew window; report acme.sh's last lines (`_acme_reason`), since its first ones are only timestamps. A `rateLimited` answer names its retry time instead of port/DNS advice (a reused lab IP once got the wrong hint).
 - **nginx stream is a dynamic module** — install `libnginx-mod-stream`.

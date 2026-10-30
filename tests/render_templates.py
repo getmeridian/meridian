@@ -14,6 +14,11 @@ MOCK_VARS = {
     "asset_path": "../pwa",
     "client_name": "default",
     "server_name": "Demo",
+    "config_path": "/connect/sub/demo/config.json",
+    "manifest_path": "/connect/sub/demo/manifest.webmanifest",
+    "worker_path": "/connect/sub/~pwa/sw.js",
+    "worker_scope": "/connect/sub/",
+    "start_url": "/connect/sub/demo",
 }
 
 

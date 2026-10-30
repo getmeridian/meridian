@@ -172,8 +172,6 @@ def _import(
         patch("meridian.commands.fleet_transfer.forget_unreachable_servers"),
         patch("meridian.commands.fleet_transfer.has_tty", return_value=tty),
         patch("meridian.commands.fleet_transfer.confirm", return_value=answer),
-        patch("meridian.commands.fleet_transfer._page_ids", return_value={}),
-        patch("meridian.commands.fleet_transfer._follow_up_pages", return_value=[]),
         patch("meridian.commands.fleet_transfer._refuse_unmanaged_clients"),
         patch("meridian.commands.sni.require_reachable_camouflage"),
         patch("meridian.commands.sni.require_own_hostname"),
@@ -397,20 +395,6 @@ class TestImportApplies:
         assert apply.call_args.kwargs["expected_plan_hash"] == "r" * 64
         err = capsys.readouterr().err
         assert "- client bob" in err and "user:bob" in err
-
-    def test_removed_clients_lose_their_page(self, registry: ServerRegistry, tmp_path: Path) -> None:
-        from meridian.commands.fleet_transfer import _follow_up_pages
-
-        cluster = _cluster()
-        with (
-            patch("meridian.handoff.remove_connection_page", return_value="") as remove_page,
-            patch("meridian.commands.fleet_transfer.persist_reviewed_apply") as persist,
-        ):
-            warnings = _follow_up_pages(cluster, {"bob": "0e6f3c1a-5d2b-4c8e-9f7a-1b2c3d4e5f61"}, [])
-
-        assert warnings == []
-        remove_page.assert_called_once_with(cluster, "0e6f3c1a-5d2b-4c8e-9f7a-1b2c3d4e5f61")
-        persist.assert_called_once_with(cluster)
 
     def test_dry_run_reviews_without_applying(
         self, registry: ServerRegistry, tmp_path: Path, capsys: pytest.CaptureFixture[str]

@@ -3,7 +3,8 @@
 The rules follow what Remnawave 3.4.5 answered each app in the golden corpus
 (`tests/systemlab/golden/`), first match wins, with Meridian's fixes:
 
-- a browser (Accept names `text/html`) gets the subscription's status as JSON;
+- a browser (Accept names `text/html`) gets the connection page from the service;
+  the explicit `info` suffix keeps selecting status JSON;
 - Mihomo apps get Mihomo YAML, and so do plain-Clash apps (Remnawave sent its default
   template with no proxies at all);
 - Stash gets Mihomo YAML in its own dialect (Remnawave sent its default template);

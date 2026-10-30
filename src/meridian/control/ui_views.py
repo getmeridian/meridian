@@ -103,7 +103,7 @@ def fleet_view(service: ControlService) -> FleetView:
 
 
 def share_view(service: ControlService, username: str) -> ShareView:
-    """The person's subscription link and QR; a page link only for people the CLI declares (it publishes pages)."""
+    """Every person's subscription is also their connection page, including console invitees."""
     user = service.get_user(username)
     if user is None:
         raise ServiceError("not_found", "Unknown user.", 404)
@@ -116,7 +116,7 @@ def share_view(service: ControlService, username: str) -> ShareView:
         username=username,
         declared=declared,
         subscription_url=subscription,
-        page_url=f"{base}/{user.uuid}/" if declared else "",
+        page_url=subscription,
         qr_svg=qr_data_uri(subscription),
     )
 

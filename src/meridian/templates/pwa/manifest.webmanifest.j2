@@ -1,7 +1,7 @@
 {
   "name": "{% if server_name %}{{ server_name|tojson }}{% elif client_name and client_name != 'default' %}Setup — {{ client_name|capitalize|tojson }}{% else %}Setup{% endif %}",
   "short_name": "{% if server_name %}{{ server_name|tojson }}{% else %}Setup{% endif %}",
-  "start_url": ".",
+  "start_url": "{{ start_url|tojson }}",
   "display": "standalone",
   "background_color": "#0c0e14",
   "theme_color": "#0c0e14",

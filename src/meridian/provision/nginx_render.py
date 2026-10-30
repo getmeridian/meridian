@@ -288,8 +288,6 @@ def render_nginx_server_block(
                    False = ACME-only, no redirect (IP mode — redirect to
                    HTTPS that returns 403 is a contradiction signal).
     """
-    csp = "default-src 'self'; img-src 'self' data:; connect-src 'self'"
-
     # Port 80 behavior: domain mode redirects (has real content),
     # IP mode serves ACME challenges only (no redirect — redirect to
     # HTTPS that returns 403 is a contradiction signal for censors).
@@ -321,26 +319,6 @@ def render_nginx_server_block(
         #
         # Architecture: nginx stream (port 443) -> nginx http (port {nginx_internal_port})
         # {tls_comment}
-
-        # --- Cache control for connection pages (map avoids add_header inheritance) ---
-        map $uri $meridian_cache {{
-            ~*/pwa/            "public, max-age=86400";
-            ~*/config\\.json$   "no-cache, must-revalidate";
-            ~*/sub\\.txt$       "no-cache, must-revalidate";
-            ~*/stats/          "no-cache, must-revalidate";
-            default            "no-store";
-        }}
-
-        map $uri $meridian_sw {{
-            ~*/sw\\.js$   "/";
-            default      "";
-        }}
-
-        # Scoped to connection pages; the map follows the cache-header pattern.
-        map $uri $meridian_robots {{
-            ~^/{info_page_path}/  "noindex, nofollow, noarchive";
-            default              "";
-        }}
 
         # WebSocket upgrade: only set Connection: upgrade when client sends Upgrade header
         map $http_upgrade $connection_upgrade {{
@@ -384,30 +362,22 @@ def render_nginx_server_block(
 
 {panel_block}
 
-            # --- Client subscriptions (raw configs for VPN apps) ---
+            # --- Subscriptions, connection pages, and packaged PWA assets ---
             # Public under the connection-page path, never the admin path:
             # only the service's /sub/ route is reachable from here.
             location /{info_page_path}/sub/ {{
                 proxy_pass http://127.0.0.1:{service_port}/sub/;
                 proxy_http_version 1.1;
                 proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $remote_addr;
-                proxy_set_header X-Forwarded-Proto $scheme;
                 add_header Referrer-Policy "no-referrer" always;
             }}
 
-            # --- Connection Info Pages (PWA with per-client config) ---
-            # alias strips the location prefix (like Caddy's handle_path).
+            # --- Legacy UUID pages and service-worker update URLs ---
+            # The service resolves UUIDs to current subscription tokens.
             location /{info_page_path}/ {{
-                alias /var/www/private/;
-
-                add_header Cache-Control $meridian_cache always;
-                add_header Service-Worker-Allowed $meridian_sw always;
-                add_header X-Robots-Tag $meridian_robots always;
-                add_header Content-Security-Policy "{csp}" always;
-                add_header X-Content-Type-Options "nosniff" always;
-                add_header X-Frame-Options "DENY" always;
+                proxy_pass http://127.0.0.1:{service_port}/sub/~legacy/;
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
                 add_header Referrer-Policy "no-referrer" always;
             }}
 

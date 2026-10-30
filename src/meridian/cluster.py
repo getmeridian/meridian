@@ -291,7 +291,6 @@ class ClusterConfig:
     managed_bindings: dict[str, ManagedResourceBinding] = field(default_factory=dict)
     allocations: dict[str, ResourceAllocation] = field(default_factory=dict)
     action_checkpoints: dict[str, ActionCheckpoint] = field(default_factory=dict)
-    connection_page_markers: list[str] = field(default_factory=list)
     # A Remnawave fleet's saved image pins, kept only until `meridian migrate` clears them.
     image_pins: dict[str, str] = field(default_factory=dict)
     # Newer server binaries (Realm) `fleet upgrade` recorded; see binary_pins.effective_binary_pins.
@@ -431,12 +430,6 @@ class ClusterConfig:
                 errors.append(f"action_checkpoints[{key}].observed_hash is not a SHA-256 hash")
             if checkpoint.attempts < 0:
                 errors.append(f"action_checkpoints[{key}].attempts cannot be negative")
-
-        markers = self.connection_page_markers
-        if len(markers) != len(set(markers)):
-            errors.append("connection_page_markers contains duplicate markers")
-        if any(re.fullmatch(r"[0-9a-f]{64}", marker) is None for marker in markers):
-            errors.append("connection_page_markers contains an invalid SHA-256 marker")
 
         for field_name, value in (
             ("active_plan_hash", self.active_plan_hash),

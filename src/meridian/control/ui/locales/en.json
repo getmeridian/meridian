@@ -118,7 +118,7 @@
   "person.page": "Connection page",
   "person.open_page": "Open page",
   "person.copy_page": "Copy page link",
-  "person.no_page": "Connection pages are published from your computer for people in your fleet file. Share the link or code instead.",
+  "person.no_page": "The public subscription address is not configured yet. Run meridian apply.",
   "person.traffic": "Traffic",
   "person.period_began": "Period began",
   "person.since_created": "When added",

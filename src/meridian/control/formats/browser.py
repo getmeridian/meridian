@@ -1,4 +1,4 @@
-"""What a browser that opens the subscription URL gets: the subscription's status as JSON.
+"""The connection page's `/sub/<token>/info` answer: subscription status as JSON.
 
 The shape is Remnawave's subscription-info answer (what its subscription page read), so
 pages and tools written against it keep working: the user's status, traffic, and expiry,

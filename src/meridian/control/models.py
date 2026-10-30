@@ -29,6 +29,7 @@ from meridian.core.agent_types import (
 )
 from meridian.core.client_devices import ClientDevicesResult
 from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES, LimitStrategy, UserCreationSettings
+from meridian.core.connection_pages import ConnectionPageSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import validate_ip_address_value
 from meridian.core.models import CoreModel
@@ -279,7 +280,7 @@ class UserImportResult(CoreModel):
     replaced: list[str] = Field(default_factory=list, description="Users a replacing import overwrote.")
 
 
-class ServiceSettings(CoreModel):
+class ServiceSettings(ConnectionPageSettings):
     profile_title: str = Field(min_length=1, max_length=100)
     update_interval_hours: SubscriptionUpdateIntervalHours = Field(
         default=SUBSCRIPTION_UPDATE_INTERVAL_HOURS,

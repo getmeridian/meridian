@@ -99,9 +99,10 @@ class TestSetupPipelinePackages:
     [{"hosted_page": True}, {"domain": "example.com"}],
     ids=["hosted-page", "domain"],
 )
-def test_a_web_server_adds_nginx_tls_and_pwa_assets(fields: dict) -> None:
+def test_a_web_server_adds_nginx_and_tls(fields: dict) -> None:
     names = step_names(bootstrap_context(harden=False, xhttp_enabled=False, **fields))
-    assert {"Install nginx", "Configure nginx", "Issue TLS certificate", "Deploy PWA assets"} <= set(names)
+    assert {"Install nginx", "Configure nginx", "Issue TLS certificate"} <= set(names)
+    assert "Deploy PWA assets" not in names
 
 
 def test_step_ordering(domain_ctx: ProvisionContext) -> None:
@@ -112,6 +113,5 @@ def test_step_ordering(domain_ctx: ProvisionContext) -> None:
         "Install nginx",
         "Configure nginx",
         "Issue TLS certificate",
-        "Deploy PWA assets",
     ]
     assert [name for name in names if name in order] == order

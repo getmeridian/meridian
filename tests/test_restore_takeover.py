@@ -115,7 +115,9 @@ def new_server(monkeypatch: pytest.MonkeyPatch) -> NewServer:
     monkeypatch.setattr(restore_steps, "install_service", lambda plan, cluster, entry, conn: None)
     monkeypatch.setattr(restore_steps, "verify_restored", lambda cluster, epoch: None)
     monkeypatch.setattr(restore_steps, "ssh_answers", lambda entry: False)
-    monkeypatch.setattr(restore_steps, "publish_pages", lambda cluster, names: [HandoffLinks(name) for name in names])
+    monkeypatch.setattr(
+        restore_steps, "restored_handoffs", lambda cluster, names: [HandoffLinks(name) for name in names]
+    )
     return NewServer()
 
 

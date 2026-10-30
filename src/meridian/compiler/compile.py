@@ -422,7 +422,7 @@ def compile_topology(
     assign_host_positions(builder, [exit_.id for exit_ in intent.exits_in_delivery_order()])
     attach_server_baselines(builder, baseline_ids)
     if intent.control.backend == "meridian":
-        builder = to_meridian_backend(builder, intent.access.creation_settings)
+        builder = to_meridian_backend(builder, intent)
     ordered = builder.ordered()
     intent_hash = canonical_hash(normalized_intent(intent))
     plan_hash = compute_plan_hash(

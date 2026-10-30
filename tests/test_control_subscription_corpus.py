@@ -1,4 +1,7 @@
-"""The control service answers every client as the golden corpus recorded, except where Meridian fixes it.
+"""Subscription configs and /info JSON follow the golden corpus, except where Meridian fixes it.
+
+Browser HTTP now serves HTML, verified by the loopback connection-page tests; this
+corpus keeps pinning the format renderers, including the page's /info JSON.
 
 Each corpus request (`tests/systemlab/golden/`) is rendered from service inputs equivalent to
 the System Lab fleet it was captured from, normalized like the corpus, and compared: status,
@@ -178,6 +181,8 @@ PANEL_SECURITY_HEADERS = frozenset(
 # instead, so no cache or CDN in front ever keeps a document that carries credentials.
 DROPPED_HEADERS = NGINX_HEADERS | PANEL_SECURITY_HEADERS | {"etag", "content-length"}
 ADDED_HEADERS = (("cache-control", "no-store"),)
+# Support links now enter the packaged, token-free PWA route inside /sub/.
+SUPPORT_PATH_CHANGE = ("/pwa/support.html", "/sub/~pwa/support.html")
 
 
 def _stash_dialect(text: str) -> str:
@@ -269,7 +274,14 @@ def _expected(capture: Capture) -> Response:
             golden = Response(
                 golden.status, golden.format, golden.encoding, golden.headers, deviation.transform(golden.body)
             )
-    headers = tuple(pair for pair in golden.headers if pair[0] not in DROPPED_HEADERS) + ADDED_HEADERS
+    headers = (
+        tuple(
+            (name, value.replace(*SUPPORT_PATH_CHANGE) if name == "support-url" else value)
+            for name, value in golden.headers
+            if name not in DROPPED_HEADERS
+        )
+        + ADDED_HEADERS
+    )
     return Response(golden.status, golden.format, golden.encoding, headers, golden.body)
 
 

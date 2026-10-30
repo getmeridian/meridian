@@ -12,8 +12,8 @@ var HEADERS_TIMEOUT_MS = 10000;
 var FLOW_LIMIT_MS = 30000;
 var SUB_TIMEOUT_MS = 10000;
 var CLOCK_WARN_MS = 60000;
-var PROBE_PATH = '../pwa/probe.bin';
-/* Replaced with the deployed asset hash at upload, like the SW cache version */
+var PROBE_PATH = (window.meridianPwaAssetPath || '../pwa') + '/probe.bin';
+/* Replaced with the installed asset hash, like the SW cache version */
 var PAGE_VERSION = 'pwa-v1';
 
 var S = {

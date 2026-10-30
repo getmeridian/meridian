@@ -50,6 +50,18 @@ def run_case(name: str, data: dict[str, object]) -> None:
     assert result.returncode == 0, result.stderr or result.stdout
 
 
+def test_legacy_service_worker_releases_old_pages(page_data: dict[str, object]) -> None:
+    run_case("test_legacy_service_worker_releases_old_pages", page_data)
+
+
+@pytest.mark.parametrize(
+    "case",
+    ["test_legacy_shell_without_data_paths_still_updates_its_worker", "test_worker_only_intercepts_shared_assets"],
+)
+def test_service_worker_paths(page_data: dict[str, object], case: str) -> None:
+    run_case(case, page_data)
+
+
 def test_account_on_another_origin_stays_hidden_and_unfetched(page_data: dict[str, object]) -> None:
     run_case("test_account_on_another_origin_stays_hidden_and_unfetched", page_data)
 

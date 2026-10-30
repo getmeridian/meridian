@@ -34,6 +34,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - **Traffic period clocks** — pin both service and ledger UTC clocks and the injected registry clock; a fixture that set resets with wall time while asserting a fixed midnight failed as soon as the date changed. Match aligned labels by content, not an exact number of spaces.
 - **Local event facts** — exercise rollback on both sides of the event insert, concurrent request actors, no-op changes, the full node live window, missing-report recovery, cursor boundaries, count/age retention, and snapshot cursor preservation; details must reject credential and raw-error fields.
 - Migration tests assert the stored version equals `SCHEMA_VERSION`, never the version current when the test was added.
+- Connection-page tests use browser HTML at `/sub/<token>`, JSON at `/info`, and token-free assets; the Node boundary supplies the rendered script paths, and legacy worker activation must release cached pages without deleting other applications' caches.
 - **`tmp_home` must patch both** — env var AND `meridian.config` attributes; patch `meridian.config.NAME`, never a command module's copy (there are none).
 - **MockConnection substring matching** — `when("grep", rc=1)` matches ANY command containing "grep". Use specific patterns.
 - **Don't restate registries** — a test that copies a constant, catalog, or schema list fails on every legitimate edit; assert behaviour or let the contract drift check do it.

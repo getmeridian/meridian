@@ -12,7 +12,6 @@ from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import (
     ReviewedApplyPersistenceError,
     apply_reviewed_intent,
-    persist_reviewed_apply,
     require_intent,
 )
 from meridian.commands.client_handoff import get_user_or_fail, print_handoff_links
@@ -35,7 +34,7 @@ def run_add_v4(
     operation: OperationContext,
     *,
     display_names: Mapping[str, str] | None = None,
-    publish_handoff: Callable[[ClusterConfig, list[str]], list[HandoffLinks]],
+    collect_handoff: Callable[[ClusterConfig, list[str]], list[HandoffLinks]],
     limits: ClientLimitChange | None = None,
 ) -> None:
     """Add access users and their first limits through the reviewed compiler and resource drivers."""
@@ -90,7 +89,7 @@ def run_add_v4(
                 )
             succeeded.append((name, user))
 
-    handoffs = publish_handoff(cluster, [name for name, _user in succeeded])
+    handoffs = collect_handoff(cluster, [name for name, _user in succeeded])
     if is_json_mode():
         result_data = build_client_add_result(
             succeeded,
@@ -106,7 +105,6 @@ def run_add_v4(
                     counts={
                         "added": len(succeeded),
                         "failed": 0,
-                        "page_deploy_failed": sum(1 for links in handoffs if not links.page_url),
                     },
                 ),
                 timer=operation.timer,
@@ -192,12 +190,11 @@ def _report_state_failure(
 def run_remove_v4(
     name: str, cluster: ClusterConfig, operation: OperationContext, *, yes: bool, cut_off: bool = False
 ) -> None:
-    """Remove an access user through the reviewed topology, then delete their page."""
+    """Remove an access user through the reviewed topology, every old link stops working."""
     from meridian.commands.node_command_results import cut_off_disclosure, print_command_results
     from meridian.config import SERVER_PROFILES_FILE
     from meridian.console import confirm
     from meridian.control.command_models import NodeCommandRecord
-    from meridian.handoff import remove_connection_page
     from meridian.i18n import t
     from meridian.node_commands import command_exit_code, command_warnings, cut_off_scope, wait_commands
     from meridian.servers import ServerRegistry
@@ -216,8 +213,6 @@ def run_remove_v4(
     if not yes and not confirm(confirmation):
         raise typer.Exit(1)
 
-    with access_panel(cluster) as panel:
-        user = get_user_or_fail(panel, name, action="load")
     commands: list[NodeCommandRecord] = []
     if cut_off:
         for binding in cluster.managed_bindings.values():
@@ -233,12 +228,7 @@ def run_remove_v4(
     )
 
     cut_off_results = wait_commands(cluster, commands) if scope is not None else None
-    page_error = remove_connection_page(cluster, user.vless_uuid) if user and user.vless_uuid else ""
-    if page_error:
-        warn(f"Client '{name}' was removed, but their connection page could not be deleted: {page_error}")
-    else:
-        persist_reviewed_apply(cluster)
-    exit_code = max(3 if page_error else 0, command_exit_code(cut_off_results or []))
+    exit_code = command_exit_code(cut_off_results or [])
     if is_json_mode():
         emit_json(
             command_envelope(

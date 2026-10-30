@@ -49,5 +49,5 @@
 - **Whatever adds a firewall rule retires it** — `migrate` deletes a Remnawave node's Docker-internal API rule (`fw-node-api`, plus its pre-rename comment) with the node runtime.
 - **Readiness checks name their transient errors** — pass `poll_until_ready(transient=...)`; anything else propagates instead of timing out silently.
 - **Verification reads both backends' plans** — `verification._v4_context` takes Hosts or client endpoints, the control runtime or service, and Inbounds embedded in a workload profile; reading only panel kinds silently dropped `test` route checks on a control-service fleet.
-- **Page evidence must be saved** — `client show` offers a page link only with a saved `connection_page_markers` entry; `publish_connection_pages()` saves after marking (it once only marked, so every new client's link vanished after `client add`).
-- **A missing PWA template raises** — never upload a blank page.
+- **Page links are subscriptions** — every service user has a live page at their subscription URL; CLI reads never need an upload or publication marker, and legacy YAML markers are consumed and dropped on save.
+- **A missing PWA template raises** — never render a blank page.

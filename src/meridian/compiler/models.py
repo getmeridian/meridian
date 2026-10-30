@@ -508,6 +508,9 @@ class ControlUserPayload(CoreModel):
 class ServiceSettingsPayload(CoreModel):
     kind: Literal["service_settings"] = "service_settings"
     profile_title: str
+    exit_countries: list[OptionalCountryCodeValue] = Field(
+        default_factory=list, max_length=250, exclude_if=lambda value: not value
+    )
     update_interval_hours: SubscriptionUpdateIntervalHours = Field(
         default=SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
         exclude_if=lambda value: value == SUBSCRIPTION_UPDATE_INTERVAL_HOURS,

@@ -30,9 +30,13 @@ flowchart TD
     Internet -->|TCP 80| NginxACME["nginx<br>ACME challenges"]
 ```
 
+بخش‌های عمومی این نمودار مسیرهای URL را نشان می‌دهند که `ctld` ارائه می‌کند: ریشهٔ مسیر صفحه پیوندهای قدیمی UUID را هدایت می‌کند و `/sub/` صفحهٔ مرورگر، پیکربندی برنامه و فایل‌های مشترک را تحویل می‌دهد.
+
 nginx stream TLS را خاتمه **نمی‌دهد**. SNI را از Client Hello می‌خواند و جریان TCP خام را forward می‌کند. سرویس کنترل، صفحات اتصال و اشتراک با گواهینامه Let's Encrypt برای IP سرور (کوتاه‌مدت، تجدید خودکار) ارائه می‌شوند.
 
-پیوندهای به‌اشتراک‌گذاری شده زیر مسیر صفحهٔ اتصال قرار دارند: صفحات در `/<page-path>/<id>/`، اشتراک در `/<page-path>/sub/<id>`. کنسول، API و نقطهٔ اتصال agentها روی مسیر مخفی جداگانه قرار دارند که پیوندهای به‌اشتراک‌گذاری شده هیچ‌گاه آن را افشا نمی‌کنند.
+پیوند مشترک یک نشانی دارد: `/<page-path>/sub/<token>`. مرورگر صفحهٔ اتصال را دریافت می‌کند و برنامه پیکربندی مناسب خود را. کنسول، API و نقطهٔ اتصال عامل‌ها روی مسیر مخفی جداگانه‌ای هستند که پیوندهای مشترک هرگز آن را افشا نمی‌کنند.
+
+سرویس صفحه، `config.json` و مانیفست آن را از کاربران، نقطه‌های اتصال، ظاهر و کشورهای سرورهای خروجیِ فعلی می‌سازد. هر فرد، از جمله کسانی که در کنسول اضافه شده‌اند، صفحه دارد. پاسخ‌های شخصی با `Cache-Control: no-store` و منع نمایه‌سازی ارائه می‌شوند؛ فایل‌های مشترکِ بستهٔ نصب‌شده زیر `/<page-path>/sub/~pwa/` نسخه‌ای بر پایهٔ محتوا دارند. nginx سیاست Referrer-Policy و فشرده‌سازی را اعمال می‌کند و سرویس CSP و دیگر سرآیندهای محافظ صفحه را می‌فرستد. پیوندهای قدیمی `/<page-path>/<uuid>/` به URL اشتراک فعلی هدایت می‌شوند. اعمال به‌روزرسانی فایل‌های قدیمی صفحه را حذف می‌کند و service worker قدیمی نسخه‌های کش‌شده را آزاد می‌کند.
 
 ### حالت Domain
 
@@ -111,7 +115,7 @@ Meridian توپولوژی را به فهرستی از منابع تبدیل می
 | 80/TCP | nginx (ACME challenges) | Public |
 | 8443 | nginx http (control service, pages, subscriptions) | Internal |
 | 8444 | nginx http, PROXY-protocol listener | Internal |
-| 3000 | Control service (console, API, agents, subscriptions) | localhost |
+| 3000 | Control service (console, API, agents, subscriptions, pages) | localhost |
 | 10000+ | Xray Reality (per-exit) | host network, firewalled |
 | 20000+ | Xray WSS (domain mode, per-exit) | host network, firewalled |
 | 30000+ | Xray XHTTP (per-exit) | host network, firewalled |

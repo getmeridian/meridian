@@ -7,10 +7,11 @@ Someone who runs a Meridian server sent you a link. This page is for you: you ne
 
 ## Open the link
 
-Open the link on the device you want to connect. It leads to your **connection page**, which recognizes your device and walks you through two steps:
+Open the link on the device you want to connect. It leads to your **connection page**, which recognizes your device and walks you through three steps:
 
 1. **Install an app.** The page recommends apps for your platform and links to their downloads.
 2. **Add the connection.** Tap **Add to …** for the app you installed. The app opens with your connection already in it.
+3. **Connect.** Turn on the connection in the app and allow VPN permission if your device asks.
 
 To set up a phone from a computer, open the link on the computer and scan the QR code beside the steps with the phone's camera or the app's scanner.
 
@@ -22,7 +23,7 @@ These apps work with Meridian. Your connection page shows the ones for your devi
 
 <!-- apps -->
 
-If you received a subscription link (its address contains `/sub/`) instead of a page, copy it and add it in the app as a subscription, usually with a **+** button and "Import from clipboard" or "Add from URL".
+Your personal link contains `/sub/` and is also your subscription URL. Open it in a browser for the connection page, or copy it into the app as a subscription, usually with a **+** button and "Import from clipboard" or "Add from URL".
 
 ## Turn on VPN (TUN) mode
 

@@ -25,7 +25,7 @@ from meridian.core.reporters import NoopReporter, Reporter
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
 from meridian.fleet_contexts import refuse_if_superseded, refuse_servers_claimed_elsewhere
-from meridian.handoff import HandoffLinks, publish_connection_pages
+from meridian.handoff import HandoffLinks, client_handoffs
 from meridian.reconciler.control_service_driver import ControlServiceDriver, ControlServiceDriverContext
 from meridian.reconciler.fence import ApplyFence, local_fence_view
 from meridian.reconciler.render_contract import RENDERER_CONTRACT
@@ -339,9 +339,9 @@ class SetupRuntime:
             panel_version=service_version,
         )
 
-    def publish_handoff(self, usernames: Sequence[str]) -> list[HandoffLinks]:
-        """Publish connection pages for verified users and return their links."""
-        return publish_connection_pages(self._cluster_loader(), usernames)
+    def handoff(self, usernames: Sequence[str]) -> list[HandoffLinks]:
+        """Read connection links for verified users from the control service."""
+        return client_handoffs(self._cluster_loader(), usernames)
 
     def _retirement_entries(
         self,

@@ -118,7 +118,7 @@
   "person.page": "连接页面",
   "person.open_page": "打开页面",
   "person.copy_page": "复制页面链接",
-  "person.no_page": "连接页面由你的电脑为服务器配置文件中的用户发布。请改为分享链接或二维码。",
+  "person.no_page": "尚未配置公开订阅地址。请运行 meridian apply。",
   "person.traffic": "流量",
   "person.period_began": "本周期开始",
   "person.since_created": "添加时",

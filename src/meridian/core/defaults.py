@@ -22,7 +22,7 @@ CONTROL_PROXY_TLS_PORT: int = 8444
 
 # The shared support page (templates/pwa/support.html), under the connection-page path;
 # apps open it as the `support-url` header with the subscription's short ID as fragment.
-SUPPORT_PAGE: str = "pwa/support.html"
+SUPPORT_PAGE: str = "sub/~pwa/support.html"
 
 # Hours between subscription refreshes (Happ and the Clash family read whole hours).
 SUBSCRIPTION_UPDATE_INTERVAL_HOURS: int = 6

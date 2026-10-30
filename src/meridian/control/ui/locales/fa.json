@@ -118,7 +118,7 @@
   "person.page": "صفحه اتصال",
   "person.open_page": "باز کردن صفحه",
   "person.copy_page": "کپی پیوند صفحه",
-  "person.no_page": "صفحه‌های اتصال برای افراد پرونده سرورها از رایانه شما منتشر می‌شوند. به‌جای آن پیوند یا کد را به اشتراک بگذارید.",
+  "person.no_page": "نشانی عمومی اشتراک هنوز تنظیم نشده است. دستور meridian apply را اجرا کنید.",
   "person.traffic": "ترافیک",
   "person.period_began": "آغاز دوره",
   "person.since_created": "هنگام افزودن",

@@ -14,7 +14,7 @@
 <meta property="og:description" content="Secure connection setup page">
 <meta property="og:type" content="website">
 <link rel="stylesheet" href="{{ asset_path }}/styles.css">
-<link rel="manifest" href="manifest.webmanifest">
+<link rel="manifest" href="{{ manifest_path }}">
 <link rel="icon" type="image/svg+xml" href="{{ asset_path }}/icon.svg">
 <link rel="apple-touch-icon" href="{{ asset_path }}/icon.svg">
 </head>
@@ -38,6 +38,6 @@
     </div>
   </div>
 </noscript>
-<script src="{{ asset_path }}/app.js"></script>
+<script src="{{ asset_path }}/app.js" data-config="{{ config_path }}" data-worker="{{ worker_path }}" data-scope="{{ worker_scope }}"></script>
 </body>
 </html>

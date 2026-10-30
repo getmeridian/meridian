@@ -125,6 +125,11 @@ class TestHelpSections:
 
 
 class TestRenamedSpellings:
+    def test_retired_page_repair_option_explains_automatic_pages(self) -> None:
+        result = runner.invoke(app, ["client", "show", "guest", "--repair-page"])
+        assert result.exit_code == 2
+        assert "served automatically" in _strip_ansi(result.output)
+
     def test_every_old_command_spelling_fails_with_a_pointer_to_the_new_one(self) -> None:
 
         for old, new in cli.RENAMED.items():

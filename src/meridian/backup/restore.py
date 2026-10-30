@@ -12,7 +12,7 @@ once it finishes (the pattern `meridian migrate` uses):
    restored fleet at the new epoch.
 4. ``applied`` — the reviewed apply converged: every agent enrolled again under the new CA, endpoints
    and settings name the new address, and the old server's resources retired or were forgotten.
-5. ``done`` — connection pages republished; each client's link is in the outcome.
+5. ``done`` — connection links read; each client's link is in the outcome.
 """
 
 from __future__ import annotations
@@ -282,8 +282,8 @@ class ControlRestorer:
             self._on_step("Applying the fleet: every agent enrolls with the restored service")
             apply(self.cluster, review.intent)
             self._checkpoint(restore, "applied")
-        self._on_step("Publishing connection pages")
-        links = publish_pages(self.cluster, list(review.intent.access.users))
+        self._on_step("Reading connection links")
+        links = restored_handoffs(self.cluster, list(review.intent.access.users))
         restore.finished_at = _iso(self._now())
         self._checkpoint(restore, "done")
         return RestoreOutcome(links=links, links_change=restore.links_change, fleet_epoch=restore.fleet_epoch)
@@ -321,8 +321,6 @@ class ControlRestorer:
         cluster.panel.server_ip = review.target.host
         cluster.panel.ssh_user = review.target.user
         cluster.panel.ssh_port = review.target.port
-        # Pages lived on the old control server; they are published again once the fleet is up.
-        cluster.connection_page_markers = []
         if not review.old_reachable:
             forget_server(cluster, review.setup.retiring, review.from_server_ref)
         self._persist(cluster)
@@ -488,10 +486,10 @@ def verify_restored(cluster: ClusterConfig, fleet_epoch: int) -> None:
         )
 
 
-def publish_pages(cluster: ClusterConfig, usernames: Sequence[str]) -> list[HandoffLinks]:
-    from meridian.handoff import publish_connection_pages
+def restored_handoffs(cluster: ClusterConfig, usernames: Sequence[str]) -> list[HandoffLinks]:
+    from meridian.handoff import client_handoffs
 
-    return publish_connection_pages(cluster, usernames)
+    return client_handoffs(cluster, usernames)
 
 
 def _dns_names(intent: SetupIntent, server_ref: str) -> tuple[str, ...]:

@@ -524,11 +524,12 @@ def _declare(service: ControlService, *names: str) -> int:
     return number
 
 
-def test_share_links_need_admin_and_pages_only_for_declared_people(fleet: Fleet) -> None:
+def test_share_links_need_admin_and_every_person_has_a_page(fleet: Fleet) -> None:
+    fleet.set_up()
     service = fleet.service
     service.put_settings(ServiceSettings(profile_title="Meridian", public_url="https://198.51.100.7/c0nn"))
     for name in ("alice", "bob"):
-        service.put_user(name)
+        assert fleet.ui("POST", "/api/users", {"username": name}).status == 200
     number = _declare(service, "alice")
     read = fleet.call("POST", "/api/tokens", {"name": "viewer", "scope": "read"}, bearer=ADMIN_TOKEN).body["token"]
     assert fleet.call("GET", "/ui/api/people/alice/share", bearer=read).status == 403
@@ -536,11 +537,15 @@ def test_share_links_need_admin_and_pages_only_for_declared_people(fleet: Fleet)
     user = service.get_user("alice")
     assert user is not None
     assert alice["subscription_url"] == f"https://198.51.100.7/c0nn/sub/{user.sub_token}"
-    assert alice["page_url"] == f"https://198.51.100.7/c0nn/{user.uuid}/"
+    assert alice["page_url"] == alice["subscription_url"]
     assert alice["qr_svg"].startswith("data:image/svg+xml")
     assert alice["declared"] is True
     bob = fleet.call("GET", "/ui/api/people/bob/share", bearer=ADMIN_TOKEN).body
-    assert bob["page_url"] == "" and bob["declared"] is False
+    assert bob["page_url"] == bob["subscription_url"] != "" and bob["declared"] is False
+    bob_user = service.get_user("bob")
+    assert bob_user is not None
+    page = fleet.call("GET", f"/sub/{bob_user.sub_token}", headers={"Accept": "text/html"})
+    assert page.status == 200 and b"<!DOCTYPE html>" in page.raw
     view = fleet.call("GET", "/ui/api/fleet", bearer=read).body
     assert view["declared_users"] == ["alice"] and view["intent_revision"] == number
 
@@ -600,7 +605,7 @@ def test_every_shipped_asset_is_reachable(fleet: Fleet) -> None:
 
 
 def test_declared_people_are_the_clis_to_remove_or_relink(fleet: Fleet) -> None:
-    """The CLI moves a declared person's page under the new UUID; a console reissue left it at the old one."""
+    """The reviewed topology owns declared credentials, even though every person now has a live page."""
     fleet.set_up()
     service = fleet.service
     for name in ("alice", "bob"):

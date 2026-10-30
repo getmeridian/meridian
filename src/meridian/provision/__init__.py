@@ -1,7 +1,7 @@
 """Provisioning engine — deploys and configures proxy servers via SSH.
 
 build_setup_steps() assembles the control-server bootstrap:
-  baseline -> control service -> nginx -> TLS -> PWA assets
+  baseline -> control service -> nginx -> TLS
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ def build_setup_steps(ctx: ProvisionContext) -> list[Step]:
     bootstrap must not add untagged ones (it used to open 443/udp always).
     """
     from meridian.provision.control_service import InstallControlService
-    from meridian.provision.nginx import ConfigureNginx, DeployPWAAssets, InstallNginx
+    from meridian.provision.nginx import ConfigureNginx, InstallNginx
     from meridian.provision.tls import IssueTLSCert
 
     if ctx.control_service is None:
@@ -56,5 +56,4 @@ def build_setup_steps(ctx: ProvisionContext) -> list[Step]:
             reality_backend_port=ctx.reality_port,
         )
         certificate = IssueTLSCert(domain="", ip_mode=True, server_ip=ctx.ip)
-    # PWA assets only; connection pages are deployed by post-provisioner API setup.
-    return [*steps, InstallNginx(), configure, certificate, DeployPWAAssets()]
+    return [*steps, InstallNginx(), configure, certificate]

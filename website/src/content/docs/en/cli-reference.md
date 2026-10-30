@@ -107,7 +107,7 @@ Manage the people who connect.
 
 ```
 meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
-meridian client show NAME [--repair-page] [--json]
+meridian client show NAME [--json]
 meridian client usage NAME [--days N] [--json]
 meridian client list [--attention] [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
@@ -125,15 +125,14 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 | `--days N` | 30 | UTC days for `client usage` or `fleet usage`, 1–730, capped at the saved retention |
 | `--json` | | Emit the result as a `meridian.output/v1` envelope (all client commands) |
 | `--attention` | off | `client list`: only people needing attention, with a reason column |
-| `--repair-page` | | Republish the client's connection page (`client show`) |
 | `--limit SIZE` | none | Traffic limit (`client add`, `client set`): `500MB`, `50GB`, `1.5TB`; `none` or `0` removes it. Units are binary (1 GB = 1024³ bytes), as the control service counts |
 | `--reset PERIOD` | never | When used traffic starts again from zero: `day`, `week`, `month`, or `never`, by calendar day, week, or month |
 | `--expires DATE` | never | When access ends: `YYYY-MM-DD` (the end of that day, UTC), an ISO time such as `2026-12-31T18:00:00+03:00` (a time without an offset is UTC), or `never`. Must be in the future |
 | `--yes`, `-y` | | Confirm `client reissue` or `client remove`; required with `--json` |
 
-**`client add`** — adds one or more people to the topology, applies it, and prints each person's connection page and subscription URL. The page is built from their real subscription, so relays and Hysteria2 appear when present. Names already in the topology or already present in the control service are refused. Names can be in any script (`client add Биба 王小明`): pages and output show them as typed, while the control service, which accepts only Latin letters, digits, `.`, `-`, and `_`, gets a transliterated username (`biba`, `wangxiaoming`). Other client commands accept either form. If a client's subscription link can't be built, the client is still added and the command exits `3`; a missing connection page alone is a warning (repair it with `client show --repair-page`). `--limit`, `--reset`, `--expires`, and `--devices` are carried in the reviewed plan and created with each account in one transaction. A failed apply prints no links; rerun `meridian apply` to finish. Later applies preserve operator edits.
+**`client add`** — adds one or more people to the topology, applies it, and prints each person's connection page and subscription URL. The page is built from their real subscription, so relays and Hysteria2 appear when present. Names already in the topology or already present in the control service are refused. Names can be in any script (`client add Биба 王小明`): pages and output show them as typed, while the control service, which accepts only Latin letters, digits, `.`, `-`, and `_`, gets a transliterated username (`biba`, `wangxiaoming`). Other client commands accept either form. If a client's subscription link can't be built, the client is still added and the command exits `3`. `--limit`, `--reset`, `--expires`, and `--devices` are carried in the reviewed plan and created with each account in one transaction. A failed apply prints no links; rerun `meridian apply` to finish. Later applies preserve operator edits.
 
-**`client show`** — prints the connection page, subscription URL, status, traffic against the limit with its reset period, expiry, and last-seen time. `--repair-page` republishes a missing page; if that fails, the links are still shown with a warning and exit `3`.
+**`client show`** — prints the connection page, subscription URL, status, traffic against the limit with its reset period, expiry, and last-seen time. **The subscription URL is also the page URL for every person.**
 
 First reported traffic and the last reporting node come from accepted traffic growth (`first_traffic_at` and `last_traffic_node` in JSON). Historical first use can be unknown; these are aggregate counters, with no sessions or client addresses.
 
@@ -151,9 +150,9 @@ First reported traffic and the last reporting node come from accepted traffic gr
 
 **`client enable` / `client disable`** — resume or suspend a client immediately. A disable lasts until you run `client enable`; applies (including redeploys and `client add`, `node add`, `relay add`) leave a client's status alone.
 
-**`client reissue`** — replaces a client's links after a leak. The control service issues a new subscription ID and new keys, so the old subscription URL, connection page, and links stop working. Meridian deletes the old page first, then publishes the new one and prints the new links. Status, limits, and expiry stay as set. Asks for confirmation unless `--yes`, and refuses names that aren't your clients. If the new page can't be published, the links are still shown with a warning and exit `3` (repair it with `client show --repair-page`).
+**`client reissue`** — replaces a client's links after a leak. The control service issues a new subscription ID and new keys, so the old subscription URL, connection page, and links stop working. Meridian prints the new subscription URL, which also opens the new connection page. Status, limits, and expiry stay as set. Asks for confirmation unless `--yes`, and refuses names that aren't your clients.
 
-**`client remove`** — removes the client from the topology, deletes their account in the control service and their connection page. Asks for confirmation unless `--yes`. The last client cannot be removed. People added in the web console are removed there.
+**`client remove`** — removes the client from the topology, deletes their account in the control service, so their subscription and page stop responding. Asks for confirmation unless `--yes`. The last client cannot be removed. People added in the web console are removed there.
 
 **`client usage`** — shows daily upload, download, and total bytes for any person in this control service, including console people. Daily history must be enabled in [Privacy](/en/privacy/); otherwise it exits `2` with the opt-in command. `client show` adds the last seven UTC days when history is on (`data.usage` in JSON, `null` when off). Empty days mean no recorded traffic; history is never backfilled.
 
@@ -347,7 +346,7 @@ The `active` column counts people with growth in the last report, with its colle
 
 **`fleet export`** — prints your fleet's reviewed topology as a YAML file you can edit: exits and their protocol paths, relays, gateways, egress pools, routing rules, routes, clients, and fleet settings. Servers appear by their saved name (or address when unnamed), never by internal ID, and the file starts with `schema: meridian.fleet/v1`. Reality keys, API tokens, client links, and the XHTTP and WSS transport paths stay in Meridian and are not listed. `--json` returns the same document under `data.document`.
 
-**`fleet import`** — reads an edited file (or `-` for standard input) and shows what it changes, one line each: `+` adds, `-` removes, and `~` changes a field (`~ exit-2 sni www.example.com -> www.example.org`). It then lists every resource the change deletes and the review hash, asks, and applies exactly that review, like `apply`. A file with no edits prints "No changes". Removing a client from `access.users` removes them like `client remove`: their links stop working and their connection page is deleted. Adding one creates them like `client add` and publishes their page; `client show NAME` prints their links. New camouflage SNIs get the checks `node sni` runs. Import refuses another `schema`, a server you haven't saved (save it with `meridian server add`), transport paths in the file, changes to the control server, its domain, or its backend, removing or renaming the exit on the control server, and moving an exit to another server (use `node replace`). Keys and credentials stay as they are. Without a terminal, pass `--yes`; `--dry-run` shows the changes and the review without applying anything.
+**`fleet import`** — reads an edited file (or `-` for standard input) and shows what it changes, one line each: `+` adds, `-` removes, and `~` changes a field (`~ exit-2 sni www.example.com -> www.example.org`). It then lists every resource the change deletes and the review hash, asks, and applies exactly that review, like `apply`. A file with no edits prints "No changes". Removing a client from `access.users` removes them like `client remove`: their subscription URL and connection page stop responding. Adding one creates them like `client add` and the service serves their page automatically; `client show NAME` prints their links. New camouflage SNIs get the checks `node sni` runs. Import refuses another `schema`, a server you haven't saved (save it with `meridian server add`), transport paths in the file, changes to the control server, its domain, or its backend, removing or renaming the exit on the control server, and moving an exit to another server (use `node replace`). Keys and credentials stay as they are. Without a terminal, pass `--yes`; `--dry-run` shows the changes and the review without applying anything.
 
 **`fleet usage`** — shows per-server byte totals for each UTC day, including retained use of removed servers. `--days N` chooses 1–730 days within retention. Daily history must be on; JSON returns fleet totals and `nodes[].daily` in `data`.
 

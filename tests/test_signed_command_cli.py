@@ -22,7 +22,6 @@ from meridian.control.command_models import (
     NodeCommandOutcome,
     NodeCommandTargets,
 )
-from meridian.handoff import HandoffLinks
 from meridian.remnawave import User
 from tests.support.node_commands import command_record
 from tests.support.topology import single_exit_intent
@@ -66,14 +65,22 @@ def person(*, reissued: bool = False) -> User:
     )
 
 
-def test_client_remove_json_preserves_all_cut_off_results_after_the_reviewed_apply(tmp_home, capsys) -> None:
+@pytest.mark.parametrize(("status", "exit_code"), [("core_restart", 0), ("failed", 4), ("timed_out", 3)])
+def test_client_remove_json_preserves_all_cut_off_results_after_the_reviewed_apply(
+    tmp_home, capsys, status, exit_code
+) -> None:
     saved = cluster()
-    panel = MagicMock()
-    panel.__enter__.return_value = panel
-    panel.get_user.return_value = person()
     outcomes = [
         NodeCommandOutcome(
-            node_id="main", status="core_restart", commands=[command_record("main", "succeeded", fallback=True)]
+            node_id="main",
+            status=status,
+            commands=[
+                command_record(
+                    "main",
+                    {"core_restart": "succeeded", "failed": "failed", "timed_out": "expired"}[status],
+                    fallback=status == "core_restart",
+                )
+            ],
         )
     ]
     scope = CutOffPlan(nodes=[CutOffNode(node_id="main", inbound_tags=["vless-reality"])])
@@ -87,7 +94,6 @@ def test_client_remove_json_preserves_all_cut_off_results_after_the_reviewed_app
     try:
         with (
             patch("meridian.commands.client.load_topology_cluster", return_value=saved),
-            patch("meridian.commands.client_v4.access_panel", return_value=panel),
             patch("meridian.node_commands.cut_off_scope", return_value=scope),
             patch(
                 "meridian.commands.client_v4.apply_reviewed_intent",
@@ -97,66 +103,68 @@ def test_client_remove_json_preserves_all_cut_off_results_after_the_reviewed_app
                 "meridian.node_commands.wait_commands",
                 side_effect=lambda *args: events.append("cut-off") or outcomes,
             ),
-            patch("meridian.handoff.remove_connection_page", return_value=""),
-            patch("meridian.commands.client_v4.persist_reviewed_apply"),
         ):
-            run_remove("person-a", yes=True, cut_off=True)
+            if exit_code:
+                with pytest.raises(typer.Exit) as raised:
+                    run_remove("person-a", yes=True, cut_off=True)
+                assert raised.value.exit_code == exit_code
+            else:
+                run_remove("person-a", yes=True, cut_off=True)
         result = json.loads(capsys.readouterr().out)
-        assert result["data"]["cut_off"][0]["status"] == "core_restart"
+        assert result["exit_code"] == exit_code
+        assert result["data"]["cut_off"][0]["status"] == status
         assert events == ["apply", "cut-off"]
     finally:
         set_json_mode(False)
 
 
-def test_reissue_queues_the_cut_off_before_publishing_and_keeps_the_new_links(tmp_home, capsys) -> None:
+@pytest.mark.parametrize(("status", "exit_code"), [("done", 0), ("failed", 4), ("timed_out", 3)])
+def test_reissue_keeps_live_page_links_and_all_cut_off_results(tmp_home, capsys, status, exit_code) -> None:
     saved = cluster()
     panel = MagicMock()
     panel.__enter__.return_value = panel
     panel.get_user.return_value = person()
-    record = command_record("main", "succeeded")
+    record = command_record("main", {"done": "succeeded", "failed": "failed", "timed_out": "expired"}[status])
     panel.revoke_user_subscription_with_cut_off.return_value = (person(reissued=True), [record])
-    links = HandoffLinks(
-        "person-a",
-        page_url="https://198.51.100.10/pages/new-page",
-        subscription_url="https://198.51.100.10/pages/sub/new-subscription-id",
-    )
+    subscription_url = saved.panel.subscription_url(person(reissued=True).short_uuid)
     scope = CutOffPlan(nodes=[CutOffNode(node_id="main", inbound_tags=["vless-reality"])])
-    outcomes = [NodeCommandOutcome(node_id="main", status="done", commands=[record])]
+    outcomes = [NodeCommandOutcome(node_id="main", status=status, commands=[record])]
     set_json_mode(True)
     try:
         with (
             patch("meridian.commands.client.load_topology_cluster", return_value=saved),
             patch("meridian.commands.client.access_panel", return_value=panel),
             patch("meridian.node_commands.cut_off_scope", return_value=scope),
-            patch("meridian.commands.client.remove_connection_page", return_value=""),
-            patch("meridian.commands.client.publish_connection_pages", return_value=[links]),
-            patch("meridian.commands.client.persist_client_state", return_value=""),
             patch("meridian.node_commands.wait_commands", return_value=outcomes),
         ):
-            run_reissue("person-a", yes=True, cut_off=True)
+            if exit_code:
+                with pytest.raises(typer.Exit) as raised:
+                    run_reissue("person-a", yes=True, cut_off=True)
+                assert raised.value.exit_code == exit_code
+            else:
+                run_reissue("person-a", yes=True, cut_off=True)
         result = json.loads(capsys.readouterr().out)
-        assert result["data"]["client"]["subscription_url"] == links.subscription_url
-        assert result["data"]["cut_off"][0]["status"] == "done"
+        assert result["exit_code"] == exit_code
+        assert result["data"]["client"]["page_url"] == result["data"]["client"]["subscription_url"] == subscription_url
+        assert result["data"]["cut_off"][0]["status"] == status
         panel.revoke_user_subscription_with_cut_off.assert_called_once_with("u-a")
         panel.revoke_user_subscription.assert_not_called()
     finally:
         set_json_mode(False)
 
 
-def test_declining_the_cut_off_confirmation_changes_no_credentials_or_pages(tmp_home) -> None:
+def test_declining_the_cut_off_confirmation_changes_no_credentials(tmp_home) -> None:
     scope = CutOffPlan(nodes=[CutOffNode(node_id="main", inbound_tags=["vless-reality"])])
     with (
         patch("meridian.commands.client.load_topology_cluster", return_value=cluster()),
         patch("meridian.node_commands.cut_off_scope", return_value=scope),
         patch("meridian.commands.client.confirm", return_value=False) as confirm,
         patch("meridian.commands.client.access_panel") as panel,
-        patch("meridian.commands.client.remove_connection_page") as page,
         pytest.raises(typer.Exit),
     ):
         run_reissue("person-a", cut_off=True)
     assert "main" in confirm.call_args.args[0] and "every open session" in confirm.call_args.args[0]
     panel.assert_not_called()
-    page.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -289,7 +297,6 @@ def test_review_5_1_service_preflight_errors_use_fail_with_the_command_json_enve
             patch("meridian.commands.node_restart.ControlClient", return_value=client),
             patch("meridian.node_commands.cut_off_scope", side_effect=error),
             patch("meridian.commands.client_v4.apply_reviewed_intent") as apply,
-            patch("meridian.commands.client.remove_connection_page") as page,
             pytest.raises(typer.Exit) as raised,
         ):
             if command == "node.restart":
@@ -304,6 +311,5 @@ def test_review_5_1_service_preflight_errors_use_fail_with_the_command_json_enve
         assert body["status"] == "failed" and body["errors"][0]["message"] == message
         assert body["errors"][0]["category"] == category
         apply.assert_not_called()
-        page.assert_not_called()
     finally:
         set_json_mode(False)

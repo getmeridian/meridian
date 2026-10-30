@@ -30,9 +30,13 @@ flowchart TD
     Internet -->|TCP 80| NginxACME["nginx<br>ACME challenges"]
 ```
 
+The public boxes in this diagram describe URL routes handled by `ctld`: the page-path root redirects legacy UUID links, while `/sub/` serves browser pages, app configs, and shared assets.
+
 nginx stream **does not** terminate TLS. It reads the SNI from the Client Hello and forwards the raw TCP stream. The control service, connection pages, and subscriptions are served with a Let's Encrypt certificate for the server's IP (short-lived, renewed automatically).
 
-Shared links live under the connection-page path: pages at `/<page-path>/<id>/`, subscriptions at `/<page-path>/sub/<id>`. The control service's console, API, and agent endpoint sit on a separate secret path that shared links never reveal.
+Shared links use one address: `/<page-path>/sub/<token>`. Browsers receive the connection page; apps receive their configurations. The control service's console, API, and agent endpoint sit on a separate secret path that shared links never reveal.
+
+The service renders each page, its `config.json`, and its manifest from current users, endpoints, branding, and exit countries. Every person has a page, including those added in the console. Person responses use `Cache-Control: no-store` and noindex; shared package assets use a content version under `/<page-path>/sub/~pwa/`. nginx supplies Referrer-Policy and compression, and the service supplies the page's CSP and other browser protections. Legacy `/<page-path>/<uuid>/` links redirect to the current subscription URL. Applying the upgrade retires the old page files and service workers.
 
 ### Domain mode
 
@@ -111,7 +115,7 @@ Clients' status, limits, and expiry belong to you, from the CLI or the console; 
 | 80/TCP | nginx (ACME challenges) | Public |
 | 8443 | nginx http (control service, pages, subscriptions) | Internal |
 | 8444 | nginx http, PROXY-protocol listener | Internal |
-| 3000 | Control service (console, API, agents, subscriptions) | localhost |
+| 3000 | Control service (console, API, agents, subscriptions, pages) | localhost |
 | 10000+ | Xray Reality (per-exit) | host network, firewalled |
 | 20000+ | Xray WSS (domain mode, per-exit) | host network, firewalled |
 | 30000+ | Xray XHTTP (per-exit) | host network, firewalled |

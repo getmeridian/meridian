@@ -1,20 +1,9 @@
-"""PWA file generation and deployment helpers.
-
-Centralizes the creation and upload of per-client PWA files
-(index.html, config.json, manifest.webmanifest) and
-shared assets (app.js, selfcheck.js, styles.css, sw.js, icon.svg, plus the
-generated apps.json catalog and probe.bin self-check payload).
-
-Called from:
-- ``DeployPWAAssets`` provisioner step (shared static assets)
-- ``meridian.handoff`` (per-client pages built from each subscription)
-- ``commands/dev.py`` (local preview)
-"""
+"""Connection-page rendering and content-versioned assets, shared by ctld and offline preview."""
 
 from __future__ import annotations
 
 import hashlib
-import shlex
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from meridian.render import (
@@ -25,9 +14,7 @@ from meridian.render import (
 )
 
 if TYPE_CHECKING:
-    from meridian.cluster import ClusterConfig
     from meridian.models import ProtocolURL
-    from meridian.ssh import ServerConnection
 
 # Static PWA assets shipped with the package (relative to templates/pwa/).
 _STATIC_FILES = (
@@ -40,8 +27,6 @@ _STATIC_FILES = (
     "support.html",
     "support.js",
 )
-# Assets whose bytes feed the service worker's cache version.
-_VERSIONED_ASSETS = ("app.js", "account.js", "selfcheck.js", "support.js", "styles.css", "apps.json")
 # Placeholder in sw.js (cache name) and selfcheck.js (reported page version).
 _VERSION_PLACEHOLDER = b"'pwa-v1'"
 
@@ -50,31 +35,28 @@ _VERSION_PLACEHOLDER = b"'pwa-v1'"
 # stay incompressible (nginx does not gzip octet-stream anyway).
 PROBE_FILE = "probe.bin"
 PROBE_BYTES = 96 * 1024
+ASSET_SEGMENT = "~pwa"  # The subscription token alphabet has no tilde.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; "
+    "manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+)
+SECURITY_HEADERS = {
+    "Content-Security-Policy": CONTENT_SECURITY_POLICY,
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-Robots-Tag": "noindex, nofollow, noarchive",
+}
+
+
+@dataclass(frozen=True)
+class PwaAssets:
+    version: str
+    files: dict[str, bytes]
 
 
 def probe_payload() -> bytes:
     """Deterministic pseudo-random bytes, so re-uploads are byte-identical."""
     return hashlib.shake_256(b"meridian-selfcheck").digest(PROBE_BYTES)
-
-
-def _page_marker(user_uuid: str) -> str:
-    return hashlib.sha256(user_uuid.encode("utf-8")).hexdigest()
-
-
-def connection_page_deployed(cluster: ClusterConfig, user_uuid: str) -> bool:
-    """Return persisted evidence that this client's page upload completed."""
-    return _page_marker(user_uuid) in cluster.connection_page_markers
-
-
-def mark_connection_page_deployed(cluster: ClusterConfig, user_uuid: str) -> None:
-    """Record non-secret page deployment evidence in cluster state."""
-    cluster.connection_page_markers = sorted({*cluster.connection_page_markers, _page_marker(user_uuid)})
-
-
-def forget_connection_page(cluster: ClusterConfig, user_uuid: str) -> None:
-    """Drop page deployment evidence after the page was removed."""
-    marker = _page_marker(user_uuid)
-    cluster.connection_page_markers = [item for item in cluster.connection_page_markers if item != marker]
 
 
 def generate_client_files(
@@ -88,6 +70,10 @@ def generate_client_files(
     color: str = "",
     subscription_url: str = "",
     exit_countries: list[str] | None = None,
+    asset_path: str = "../pwa",
+    page_path: str = "",
+    worker_path: str = "../pwa/sw.js",
+    worker_scope: str = "../",
 ) -> dict[str, str]:
     """Generate all per-client PWA files as a {filename: content} dict.
 
@@ -95,7 +81,15 @@ def generate_client_files(
     second subscription from local topology state.
     """
     return {
-        "index.html": render_pwa_shell(client_name=client_name, server_name=server_name),
+        "index.html": render_pwa_shell(
+            client_name=client_name,
+            server_name=server_name,
+            asset_path=asset_path,
+            config_path=f"{page_path}/config.json" if page_path else "config.json",
+            manifest_path=f"{page_path}/manifest.webmanifest" if page_path else "manifest.webmanifest",
+            worker_path=worker_path,
+            worker_scope=worker_scope,
+        ),
         "config.json": render_config_json(
             protocol_urls,
             server_ip=server_ip,
@@ -107,40 +101,10 @@ def generate_client_files(
             subscription_url=subscription_url,
             exit_countries=exit_countries,
         ),
-        "manifest.webmanifest": render_manifest(client_name=client_name, server_name=server_name),
+        "manifest.webmanifest": render_manifest(
+            client_name=client_name, server_name=server_name, asset_path=asset_path, start_url=page_path or "."
+        ),
     }
-
-
-def upload_client_files(
-    conn: ServerConnection,
-    reality_uuid: str,
-    files: dict[str, str],
-) -> str:
-    """Upload per-client PWA files to ``/var/www/private/{uuid}/``.
-
-    Returns empty string on success, error detail on failure.
-    """
-    q_uuid = shlex.quote(reality_uuid)
-    result = conn.run(
-        f"mkdir -p /var/www/private/{q_uuid} && chown www-data:www-data /var/www/private/{q_uuid}",
-        timeout=30,
-        sensitive=True,
-    )
-    if result.returncode != 0:
-        return f"Failed to create client directory: {result.stderr.strip()[:200]}"
-    for filename, content in files.items():
-        result = conn.put_text(
-            f"/var/www/private/{reality_uuid}/{filename}",
-            content,
-            mode="644",
-            owner="www-data:www-data",
-            timeout=30,
-            operation_name=f"upload client file {filename}",
-            sensitive=True,
-        )
-        if result.returncode != 0:
-            return f"Failed to upload {filename}: {result.stderr.strip()[:200]}"
-    return ""
 
 
 def load_pwa_static_assets() -> dict[str, bytes]:
@@ -160,45 +124,13 @@ def load_pwa_static_assets() -> dict[str, bytes]:
     return assets
 
 
-def upload_pwa_assets(conn: ServerConnection) -> str:
-    """Upload shared PWA static assets to ``/var/www/private/pwa/``.
-
-    Deploys every asset from ``load_pwa_static_assets()``. These are
-    identical for all clients and shared across connection pages.
-
-    The service worker's ``CACHE_VERSION`` and the self-check's reported
-    page version are replaced with a content-derived hash, so browsers
-    invalidate stale caches and reports name the exact deployed page.
-
-    Returns empty string on success, error detail on failure.
-    """
+def load_pwa_assets() -> PwaAssets:
+    """Version every shipped asset by its bytes; the stable worker URL revalidates."""
     assets = load_pwa_static_assets()
-
-    # Compute content hash from cacheable assets for SW cache busting
-    h = hashlib.sha256()
-    for name in _VERSIONED_ASSETS:
-        if name in assets:
-            h.update(assets[name])
-    cache_version = f"pwa-{h.hexdigest()[:8]}"
-
+    digest = hashlib.sha256()
+    for name, body in sorted(assets.items()):
+        digest.update(name.encode("ascii") + b"\0" + body)
+    version = f"pwa-{digest.hexdigest()[:16]}"
     for name in ("sw.js", "selfcheck.js"):
-        if name in assets:
-            assets[name] = assets[name].replace(_VERSION_PLACEHOLDER, f"'{cache_version}'".encode())
-
-    result = conn.run("mkdir -p /var/www/private/pwa && chown www-data:www-data /var/www/private/pwa", timeout=30)
-    if result.returncode != 0:
-        return f"Failed to create /var/www/private/pwa/: {result.stderr.strip()[:200]}"
-
-    for filename, content in assets.items():
-        result = conn.put_bytes(
-            f"/var/www/private/pwa/{filename}",
-            content,
-            mode="644",
-            owner="www-data:www-data",
-            timeout=30,
-            operation_name=f"upload pwa asset {filename}",
-            sensitive=True,
-        )
-        if result.returncode != 0:
-            return f"Failed to upload pwa/{filename}: {result.stderr.strip()[:200]}"
-    return ""
+        assets[name] = assets[name].replace(_VERSION_PLACEHOLDER, f"'{version}'".encode("ascii"))
+    return PwaAssets(version, assets)

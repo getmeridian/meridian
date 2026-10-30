@@ -141,6 +141,8 @@ def _refuse_renamed(ctx: click.Context, path: list[str], command: click.Command 
         if arg == "--":
             return
         option = arg.split("=", 1)[0]
+        if old == "client show" and option == "--repair-page":
+            _fail_renamed(ctx, old, "Connection pages are served automatically. Use `meridian client show NAME`.", rest)
         if option in RENAMED_OPTIONS:
             message = f"`{option}` is now {RENAMED_OPTIONS[option]}: `meridian {old} SERVER`"
             _fail_renamed(ctx, old, message, rest)

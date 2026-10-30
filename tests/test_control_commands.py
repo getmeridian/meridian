@@ -377,8 +377,6 @@ def test_review_3_1_cli_removal_does_not_drop_resets_when_the_node_revision_chan
             patch("meridian.commands.client_v4.apply_reviewed_intent", side_effect=apply),
             patch("meridian.node_commands.ControlClient", side_effect=lambda *args: RacingClient(*args)),
             patch("meridian.node_commands.wait_for_commands", side_effect=waited),
-            patch("meridian.handoff.remove_connection_page", return_value=""),
-            patch("meridian.commands.client_v4.persist_reviewed_apply"),
         ):
             try:
                 run_remove("person-a", yes=True, cut_off=True)

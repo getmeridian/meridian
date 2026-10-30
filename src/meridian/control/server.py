@@ -28,7 +28,7 @@ from urllib.parse import unquote
 from pydantic import BaseModel, ValidationError
 
 from meridian import __version__
-from meridian.control import subscription_routes, ui_routes
+from meridian.control import page_routes, subscription_routes, ui_routes
 from meridian.control.blobs import BlobStore, fleet_artifacts, served_hashes
 from meridian.control.command_models import NodeCommandRequest, UserCutOffRequest
 from meridian.control.enrollment import Session, token_sha256
@@ -92,6 +92,7 @@ _TOKEN_ID = r"([0-9a-f]{12})"
 _REVISION = r"([1-9][0-9]{0,15})"
 _SUB_TOKEN = "(" + SUB_TOKEN_PATTERN.removeprefix("^").removesuffix("$") + ")"
 _SUB_SUFFIX = "|".join(re.escape(suffix) for suffix in SUFFIX_FORMATS)
+_UUID = r"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
 # Topology writes, enrollment, tokens, and backups need admin. People mutations name
 # the separate people capability in ROUTES; admin covers both. A tuple allows either
 # capability, so user reads remain available without giving people fleet read access.
@@ -695,7 +696,16 @@ ROUTES: list[Route] = [
     ("POST", re.compile(r"/agent/v1/stats"), None, _Handler.agent_stats),
     ("POST", re.compile(r"/agent/v1/command-results"), None, _Handler.agent_command_result),
     ("GET", re.compile(r"/agent/v1/blobs/([0-9a-f]{64})"), None, _Handler.agent_blob),
-    ("GET", re.compile(rf"/sub/{_SUB_TOKEN}(?:/({_SUB_SUFFIX}))?"), None, subscription_routes.subscription),
+    ("GET", re.compile(r"/sub/~pwa/(?:(pwa-[0-9a-f]+)/)?([a-z][a-z0-9.]+)"), None, page_routes.asset),
+    ("GET", re.compile(r"/sub/~legacy/pwa/([a-z][a-z0-9.]+)"), None, page_routes.legacy_asset),
+    (
+        "GET",
+        re.compile(rf"/sub/~legacy/{_UUID}(?:/(index\.html|config\.json|manifest\.webmanifest))?/?"),
+        None,
+        page_routes.legacy,
+    ),
+    ("GET", re.compile(rf"/sub/{_SUB_TOKEN}/(index\.html|config\.json|manifest\.webmanifest)"), None, page_routes.page),
+    ("GET", re.compile(rf"/sub/{_SUB_TOKEN}(?:/({_SUB_SUFFIX}))?/?"), None, subscription_routes.subscription),
 ]
 
 

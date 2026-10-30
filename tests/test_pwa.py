@@ -1,4 +1,4 @@
-"""Tests for the pwa module (file generation, asset loading, upload)."""
+"""Shared connection-page rendering and package asset versions."""
 
 from __future__ import annotations
 
@@ -8,19 +8,14 @@ import zlib
 
 import pytest
 
-from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.diagnostics.blocking import STALL_CLEARANCE_BYTES
 from meridian.models import ProtocolURL
 from meridian.pwa import (
     PROBE_FILE,
-    connection_page_deployed,
     generate_client_files,
+    load_pwa_assets,
     load_pwa_static_assets,
-    mark_connection_page_deployed,
-    upload_client_files,
-    upload_pwa_assets,
 )
-from tests.support.mock_connection import MockConnection
 
 REALITY_URL = "vless://550e8400-e29b-41d4-a716-446655440000@198.51.100.1:443?security=reality#Test"
 
@@ -66,23 +61,6 @@ class TestGenerateClientFiles:
 
         config = json.loads(files["config.json"])
         assert config["subscription_url"] == canonical_url
-
-
-class TestConnectionPageMarkers:
-    def test_page_marker_survives_cluster_reload(self, tmp_path) -> None:
-        cluster = ClusterConfig(panel=PanelConfig(sub_path="connections"))
-        user_uuid = "550e8400-e29b-41d4-a716-446655440000"
-
-        mark_connection_page_deployed(cluster, user_uuid)
-        mark_connection_page_deployed(cluster, user_uuid)
-        path = tmp_path / "cluster.yml"
-        cluster.save(path)
-
-        loaded = ClusterConfig.load(path)
-        assert connection_page_deployed(loaded, user_uuid) is True
-        assert len(loaded.connection_page_markers) == 1
-        assert user_uuid not in path.read_text()
-        assert "connection_page_markers" not in loaded._extra
 
 
 class TestLoadPWAStaticAssets:
@@ -135,117 +113,18 @@ class TestLoadPWAStaticAssets:
         assert "CACHE_VERSION" in sw
 
 
-class TestUploadClientFiles:
-    @pytest.fixture()
-    def sample_files(self) -> dict[str, str]:
-        return {
-            "index.html": "<html>test</html>",
-            "config.json": '{"version": 1}',
-            "manifest.webmanifest": '{"display": "standalone"}',
-            "sub.txt": "dmxlc3M6Ly8=",
-        }
+class TestPwaAssetVersions:
+    def test_worker_and_self_check_use_the_same_content_version(self) -> None:
+        assets = load_pwa_assets()
+        assert re.fullmatch(r"pwa-[0-9a-f]{16}", assets.version)
+        assert f"CACHE_VERSION = '{assets.version}'" in assets.files["sw.js"].decode()
+        assert f"PAGE_VERSION = '{assets.version}'" in assets.files["selfcheck.js"].decode()
+        assert "'pwa-v1'" not in assets.files["sw.js"].decode()
 
-    def test_returns_empty_on_success(self, sample_files: dict[str, str]) -> None:
-        conn = MockConnection()
-        result = upload_client_files(conn, "550e8400-e29b-41d4-a716-446655440000", sample_files)
-        assert result == ""
-
-    def test_returns_error_on_failure(self, sample_files: dict[str, str]) -> None:
-        conn = MockConnection()
-        conn.when("put_bytes", rc=1)
-        result = upload_client_files(conn, "550e8400-e29b-41d4-a716-446655440000", sample_files)
-        assert result  # non-empty error string
-
-    def test_creates_directory_with_uuid(self, sample_files: dict[str, str]) -> None:
-        conn = MockConnection()
-        upload_client_files(conn, "550e8400-e29b-41d4-a716-446655440000", sample_files)
-        conn.assert_called_with_pattern("mkdir -p /var/www/private/550e8400")
-        assert conn.run_kwargs[0]["sensitive"] is True
-
-    def test_create_directory_error_redacts_uuid(self, sample_files: dict[str, str]) -> None:
-        conn = MockConnection()
-        conn.when("mkdir -p", stderr="permission denied", rc=1)
-        result = upload_client_files(conn, "550e8400-e29b-41d4-a716-446655440000", sample_files)
-        assert "550e8400" not in result
-
-    def test_uploads_all_files(self, sample_files: dict[str, str]) -> None:
-        conn = MockConnection()
-        upload_client_files(conn, "550e8400-e29b-41d4-a716-446655440000", sample_files)
-        assert len(conn.writes) == 4
-
-    def test_chown_www_data_on_files(self, sample_files: dict[str, str]) -> None:
-        conn = MockConnection()
-        upload_client_files(conn, "550e8400-e29b-41d4-a716-446655440000", sample_files)
-        assert any("chown www-data:www-data" in c for c in conn.calls)
-        assert all(kwargs["owner"] == "www-data:www-data" for _path, _data, kwargs in conn.writes)
-
-    def test_writes_expected_paths(self, sample_files: dict[str, str]) -> None:
-        conn = MockConnection()
-        upload_client_files(conn, "550e8400-e29b-41d4-a716-446655440000", sample_files)
-        written_paths = {path for path, _data, _kwargs in conn.writes}
-        for filename in sample_files:
-            assert f"/var/www/private/550e8400-e29b-41d4-a716-446655440000/{filename}" in written_paths
-
-
-class TestUploadPWAAssets:
-    def test_returns_empty_on_success(self) -> None:
-        conn = MockConnection()
-        result = upload_pwa_assets(conn)
-        assert result == ""
-
-    def test_returns_error_on_failure(self) -> None:
-        conn = MockConnection()
-        conn.when("put_bytes", rc=1)
-        result = upload_pwa_assets(conn)
-        assert result  # non-empty error string
-
-    def test_creates_pwa_directory(self) -> None:
-        conn = MockConnection()
-        upload_pwa_assets(conn)
-        conn.assert_called_with_pattern("mkdir -p /var/www/private/pwa")
-
-    def test_uploads_every_shared_asset(self) -> None:
-        conn = MockConnection()
-        upload_pwa_assets(conn)
-        assert len(conn.writes) == len(load_pwa_static_assets())
-
-    def test_uses_file_api_for_assets(self) -> None:
-        conn = MockConnection()
-        upload_pwa_assets(conn)
-        assert all(kwargs["owner"] == "www-data:www-data" for _path, _data, kwargs in conn.writes)
-        assert all(kwargs["mode"] == "644" for _path, _data, kwargs in conn.writes)
-
-    def test_sw_cache_version_is_content_hash(self) -> None:
-        conn = MockConnection()
-        upload_pwa_assets(conn)
-        sw_content = conn.write_map["/var/www/private/pwa/sw.js"].decode()
-        # Should NOT contain the static 'pwa-v1' version
-        assert "'pwa-v1'" not in sw_content
-        # Should contain a dynamic hash version like 'pwa-abcd1234'
-        assert "pwa-" in sw_content
-
-    def test_deploys_to_correct_paths(self) -> None:
-        conn = MockConnection()
-        upload_pwa_assets(conn)
-        written_paths = {path for path, _data, _kwargs in conn.writes}
-        for fname in ("app.js", "selfcheck.js", "styles.css", "sw.js", "icon.svg", "apps.json", "probe.bin"):
-            assert f"/var/www/private/pwa/{fname}" in written_paths
-
-    def test_selfcheck_reports_the_deployed_page_version(self) -> None:
-        conn = MockConnection()
-        upload_pwa_assets(conn)
-        sw = conn.write_map["/var/www/private/pwa/sw.js"].decode()
-        selfcheck = conn.write_map["/var/www/private/pwa/selfcheck.js"].decode()
-        version = re.search(r"CACHE_VERSION = '(pwa-[0-9a-f]{8})'", sw)
-        assert version is not None
-        assert f"var PAGE_VERSION = '{version.group(1)}';" in selfcheck
-
-    def test_cache_version_follows_the_app_catalog(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """A catalog-only change must still roll the service-worker cache."""
-        conn = MockConnection()
-        upload_pwa_assets(conn)
-        before = conn.write_map["/var/www/private/pwa/sw.js"]
-        monkeypatch.setattr("meridian.pwa.render_apps_catalog", lambda: '{"version": 1, "apps": []}')
-        conn = MockConnection()
-        upload_pwa_assets(conn)
-        assert conn.write_map["/var/www/private/pwa/sw.js"] != before
+    @pytest.mark.parametrize("name", ["sw.js", "icon.svg", "support.html", "apps.json"])
+    def test_every_changed_shared_asset_refreshes_the_version(self, name: str, monkeypatch: pytest.MonkeyPatch) -> None:
+        before = load_pwa_assets()
+        raw = load_pwa_static_assets()
+        raw[name] += b"\nchanged"
+        monkeypatch.setattr("meridian.pwa.load_pwa_static_assets", lambda: raw)
+        assert load_pwa_assets().version != before.version

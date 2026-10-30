@@ -4,8 +4,9 @@ Server-hosted PWA; Meridian's only connection-page implementation.
 
 ## Design decisions
 **Vanilla ES5** — no dependencies or build step; `app.js` owns setup, injecting `account.js` and `selfcheck.js` so older shells receive new features.
-**Runtime config** — fetch `config.json`; keep the canonical subscription URL, never rebuild it. Shared assets deploy under `/pwa/`, client shells/config under `/{uuid}/`.
-**Support page** — `support.html#<short id>` reads the person's own subscription for their VLESS/Hysteria2 UUID (or Xray JSON) and redirects to their page; the id stays out of request paths and logs.
+**Runtime config** — ctld renders the shell at `/sub/<token>` and live config/manifest beneath that token; config requests are no-store. Explicit script data paths handle the URL without a trailing slash. The canonical subscription URL is also the page URL.
+**Package assets** — `/sub/~pwa/<content version>/` holds shared assets; the token alphabet excludes `~`. The stable `/sub/~pwa/sw.js` revalidates, and the package-wide content hash versions its cache and self-check report.
+**Support page** — `support.html#<token>` opens the token's subscription page directly, including suspended people; the token enters the request path only when opening that page, and requests are never logged.
 **Security** — guard versions, shapes, bounds, import schemes, and image sources; escape text and attribute quotes. QR base64 is validated, and deep links never enter inline JS.
 **No indexing** — shell robots metadata and the connection-page nginx header both say `noindex, nofollow, noarchive`.
 **Catalog** — render embedded apps immediately, applying valid shared `apps.json` within 5 seconds. Replace only setup, preserving platform, app, focus, text selection, and disclosures.
@@ -17,12 +18,13 @@ Server-hosted PWA; Meridian's only connection-page implementation.
 **Self-check** — visitor-side clock vs server Date, a 96 KB probe stream, and subscription HTTP status; copied English reports contain no links, hostnames, UUIDs, or device data.
 
 ## What's done well
-- **SW scope and offline** — `{scope: '../'}` controls sibling client dirs (nginx needs `Service-Worker-Allowed: "/"`); config is network-first, shell stale-while-revalidate.
+- **SW scope and privacy** — the worker caches only its content-versioned shared assets under `/sub/`; person pages, config, manifests, account checks, and probes always use the network. Old `/pwa/sw.js` URLs serve the retirement worker, which clears Meridian caches, unregisters, and reloads controlled pages to follow UUID redirects.
 - **One clock threshold** — `CLOCK_WARN_MS` in both scripts mirrors `core.defaults.CLOCK_DRIFT_WARN_SECONDS`; skip config-based checks after an hour and say connections *can* fail.
 - **Connection remarks stay verbatim** — translate protocol hints only; show three entries first and reveal the rest locally in subscription order, with an accessible total.
 - **Graceful extras** — wake lock fails quietly, install banner dismisses, and the skeleton admits a slow load after 10 seconds.
 
 ## Pitfalls
+- **Routing comes from the subscription** — setup never promises a fixed split policy; raw protocol links carry no routing rules.
 - **Nested details CSS** — use `> summary`; suppress markers with `list-style:none`, `::-webkit-details-marker`, and `::marker`.
 - **SW staleness** — develop with `meridian dev preview --watch`, which disables the SW and reloads changed assets; every `no-store` request bypasses the SW.
 - **Catalog parity** — `_PWA_APPS` must match `website/src/data/apps.json` field for field and in order, including localized guides; CI validates.

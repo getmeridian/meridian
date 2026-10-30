@@ -4,7 +4,7 @@
 - **People needing attention** — `client list --attention` reads the service's derived warnings in the same panel connection, includes console people, filters its status counts, and labels each row's reasons; ordinary lists keep empty derived reasons.
 - **Local timeline** — `fleet events --since ID --limit N` reads oldest-first lifecycle facts from the service's read-scoped cursor API; the Fleet help group's Activity panel and typed `fleet-events` envelope expose the same contract.
 
-**Service-owned person edits** — enable, disable, set, reset-traffic, extend, and device removals resolve against the control service directory through `resolve_client_mutation_name`, with client show's exact-name-first and ambiguity rules; only topology-owned removal, reissue, and page publication require declared access users.
+**Service-owned person edits** — enable, disable, set, reset-traffic, extend, and device removals resolve against the control service directory through `resolve_client_mutation_name`, with client show's exact-name-first and ambiguity rules; only topology-owned removal and reissue require declared access users.
 **Client routing review** — `fleet routing` reads the policy from local intent; `ru-split|full` edits only delivery settings, reviews before confirmation, and sends the exact review hash through `_helpers.apply_reviewed_intent()`. A dry run and a declined review preserve local intent; JSON changes require `--yes`.
 
 **One file per command** — `cli.py` registers top-level commands and the root callback, `cli_groups.py` the sub-apps (a whole group or a leaf may live in its own `cli_*.py`, like `cli_context.py`); both parse flags and defer to the command module.
@@ -37,12 +37,12 @@
 - `confirm()` returns a bool; callers must `raise typer.Exit(1)` on False.
 - Build core request models and render wrapped validation errors before opening SSH or panel connections; rebuild a model from untrusted data, never `model_copy(update=...)`.
 - Teardown refuses a server that still holds intent roles (only a whole single-server fleet goes in one step) and deletes the saved profile last.
-- `client reissue` deletes the old page before revoking: the page directory is the old VLESS UUID, which the revoke replaces, so a page left behind could never be found again.
+- `client reissue` rotates service credentials; its new subscription URL is immediately the page URL, and no page state belongs in cluster.yml.
 - Removals refuse the control server and its dependents before review; `node remove --force` only extends the edit to relay chains into that exit.
 - `forget_unreachable_servers()` forgets in memory only; the confirmed apply saves it (a declined `fleet import` once left bindings forgotten on disk).
 - `client enable` reports the status the control service answers (`expired`/`limited` when expiry or quota still holds), never the requested one.
 - Post-mutation local save failures exit 3, say remote state changed, and keep typed partial data where the contract allows.
-- Client mutations and tests act only on `topology_intent.access.users`; `client list`/`show` also read people added in a control service's console (`declared: false`, every user there is the fleet's), never a Remnawave panel's other users. There an exact service username wins over a case-folded or display-name match, and a name folding onto two people is refused (`show alice` once returned declared `Alice`'s link).
+- Topology-owned removal and reissue act only on `topology_intent.access.users`; service-owned edits, `client list`/`show`, and connection pages also cover people added in a control service's console (`declared: false`, every user there is the fleet's), never a Remnawave panel's other users. There an exact service username wins over a case-folded or display-name match, and a name folding onto two people is refused (`show alice` once returned declared `Alice`'s link).
 - `panel` prints the web console and a one-time setup link only while it has no owner or with hidden `--setup-link` (a reset: new password, code off, every device signed out).
 - Never render saved admin credentials; handoff links (`HANDOFF_LINK_KEYS`) appear only in the producing command's final output (`emit_json(..., reveal=...)`); doctor and `logs` pass free-form text through `redact_diagnostic_text()` with `ClusterConfig.secret_values()` (bare request paths match no pattern) and never through Rich markup.
 - A bare word that is neither a saved name nor an address is refused, never dialed; `test`/`probe` targets check saved names before DNS (a dot-less name was refused as a domain); keep `--timeout` a string so bad values still get the JSON error envelope.

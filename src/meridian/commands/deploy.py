@@ -283,6 +283,7 @@ def _execute(
     info("Applying the reviewed topology; this takes a few minutes on a fresh server...")
     client = request.client_name or DEFAULT_CLIENT
     try:
+        _save_branding(request)
         for attempt, sni in enumerate(sni_candidates):
             if attempt:
                 raise_if_cancelled(
@@ -326,11 +327,10 @@ def _execute(
         raise_if_cancelled(
             cancellation,
             phase="handoff",
-            message="Deploy was cancelled after verification, before publishing connection pages.",
+            message="Deploy was cancelled after verification, before reading the connection links.",
             remote_changed=True,
         )
-        _save_branding(request)
-        (links,) = runtime.publish_handoff([client])
+        (links,) = runtime.handoff([client])
     except ReviewedApplyPersistenceError as exc:
         fail("Deploy changed the server, but local state could not be saved", hint=str(exc), hint_type="system")
     except OperationCancelledError:

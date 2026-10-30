@@ -14,7 +14,7 @@ from urllib.parse import quote
 
 from meridian.console import info, ok, warn
 from meridian.models import ProtocolURL
-from meridian.pwa import generate_client_files, load_pwa_static_assets
+from meridian.pwa import ASSET_SEGMENT
 from meridian.urls import generate_qr_base64
 
 # Demo data using RFC 5737 IPs (safe for public display)
@@ -72,7 +72,10 @@ def _write_preview_files(
     disable_sw: bool = False,
 ) -> None:
     """Generate and write all preview files to the output directory."""
+    from meridian.pwa import generate_client_files, load_pwa_assets
+
     protocol_urls = _build_demo_urls(server_ip=server_ip)
+    assets = load_pwa_assets()
 
     client_files = generate_client_files(
         protocol_urls,
@@ -80,23 +83,25 @@ def _write_preview_files(
         client_name=client_name,
         subscription_url=_demo_subscription_url(server_ip),
         exit_countries=["DE", "NL"],
+        asset_path=f"../{ASSET_SEGMENT}/{assets.version}",
+        worker_path=f"../{ASSET_SEGMENT}/sw.js",
     )
-
-    static_assets = load_pwa_static_assets()
 
     neuter_sw = watch or disable_sw
 
-    pwa_dir = output_dir / "pwa"
-    pwa_dir.mkdir(exist_ok=True)
-    for name, content in static_assets.items():
+    asset_root = output_dir / "sub" / ASSET_SEGMENT
+    pwa_dir = asset_root / assets.version
+    pwa_dir.mkdir(parents=True, exist_ok=True)
+    (asset_root / "sw.js").write_bytes(_NOOP_SW.encode() if neuter_sw else assets.files["sw.js"])
+    for name, content in assets.files.items():
         if neuter_sw and name == "sw.js":
             # Disable SW to prevent caching stale files / polluting browsers
             (pwa_dir / name).write_text(_NOOP_SW)
         else:
             (pwa_dir / name).write_bytes(content)
 
-    client_dir = output_dir / client_uuid
-    client_dir.mkdir(exist_ok=True)
+    client_dir = output_dir / "sub" / client_uuid
+    client_dir.mkdir(parents=True, exist_ok=True)
     for name, text in client_files.items():
         if watch and name == "index.html":
             # Inject live-reload script into HTML
@@ -105,7 +110,7 @@ def _write_preview_files(
 
     # Write redirect index.html at root for static hosting
     if disable_sw:
-        (output_dir / "index.html").write_text(_REDIRECT_HTML.format(uuid=client_uuid))
+        (output_dir / "index.html").write_text(_REDIRECT_HTML.format(uuid=f"sub/{client_uuid}"))
 
 
 # No-op service worker — used in watch mode and static output to prevent
@@ -213,11 +218,7 @@ def run_preview(
 
                             importlib.reload(meridian.render)
                             importlib.reload(meridian.pwa)
-                            from meridian.pwa import generate_client_files as gcf
-                            from meridian.pwa import load_pwa_static_assets as lpsa
-
-                            # Monkey-patch for this regeneration
-                            _regen(output_dir, client_uuid, server_ip, client_name, gcf, lpsa)
+                            _regen(output_dir, client_uuid, server_ip, client_name)
                     self.send_response(200)
                     self.send_header("Content-Type", "text/plain")
                     self.send_header("Cache-Control", "no-store")
@@ -231,7 +232,7 @@ def run_preview(
 
         server = http.server.HTTPServer(("localhost", port), PreviewHandler)
 
-        page_url = f"http://localhost:{port}/{client_uuid}/"
+        page_url = f"http://localhost:{port}/sub/{client_uuid}/"
         ok(f"Preview server running at {page_url}")
         if watch:
             info(f"Watching {_WATCH_DIRS[0]} for changes (live reload)")
@@ -249,38 +250,10 @@ def run_preview(
             shutil.rmtree(output_dir, ignore_errors=True)
 
 
-def _regen(
-    output_dir: Path,
-    client_uuid: str,
-    server_ip: str,
-    client_name: str,
-    generate_fn: object,
-    load_fn: object,
-) -> None:
-    """Regenerate preview files after source change (watch mode)."""
+def _regen(output_dir: Path, client_uuid: str, server_ip: str, client_name: str) -> None:
+    """Regenerate preview files after source changes."""
     try:
-        protocol_urls = _build_demo_urls(server_ip=server_ip)
-        client_files = generate_fn(  # type: ignore[operator]
-            protocol_urls,
-            server_ip=server_ip,
-            client_name=client_name,
-            subscription_url=_demo_subscription_url(server_ip),
-        )
-        static_assets = load_fn()  # type: ignore[operator]
-
-        pwa_dir = output_dir / "pwa"
-        for name, content in static_assets.items():
-            if name == "sw.js":
-                (pwa_dir / name).write_text(_NOOP_SW)
-            else:
-                (pwa_dir / name).write_bytes(content)
-
-        client_dir = output_dir / client_uuid
-        for name, content in client_files.items():
-            if name == "index.html":
-                content = content.replace("</body>", _LIVE_RELOAD_SCRIPT + "</body>")
-            (client_dir / name).write_text(content)
-
+        _write_preview_files(output_dir, client_uuid, server_ip, client_name, watch=True)
         info("Regenerated preview files")
     except (OSError, ValueError, KeyError) as exc:
         warn(f"Regeneration failed: {exc}")

@@ -501,7 +501,7 @@ class SetupWizard:
     def _handoff(self, draft: SetupDraft) -> WizardOutcome:
         verification = self._verification or self.runtime.verify(draft)
         self.prompt.say(t("handoff.ready"), style="bold green")
-        for links in self.runtime.publish_handoff(sorted(verification.subscription_urls)):
+        for links in self.runtime.handoff(sorted(verification.subscription_urls)):
             self.io.write(f"  [bold]{escape(links.name)}[/bold]")
             if links.page_url:
                 self.io.write(f"    {escape(t('handoff.page'))} [bold]{escape(links.page_url)}[/bold]")

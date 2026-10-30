@@ -2,6 +2,14 @@
 (function() {
 'use strict';
 
+/* The service supplies paths explicitly: the subscription URL has no trailing slash. */
+var PAGE_SCRIPT = document.currentScript || document.querySelector('script[data-config]');
+var ASSET_PATH = PAGE_SCRIPT ? PAGE_SCRIPT.src.slice(0, PAGE_SCRIPT.src.lastIndexOf('/')) : '../pwa';
+var CONFIG_PATH = (PAGE_SCRIPT && PAGE_SCRIPT.getAttribute('data-config')) || 'config.json';
+var WORKER_PATH = (PAGE_SCRIPT && PAGE_SCRIPT.getAttribute('data-worker')) || '../pwa/sw.js';
+var WORKER_SCOPE = (PAGE_SCRIPT && PAGE_SCRIPT.getAttribute('data-scope')) || '../';
+window.meridianPwaAssetPath = ASSET_PATH;
+
 /* -----------------------------------------------------------------------
  * i18n translations (English is the markup default)
  * ----------------------------------------------------------------------- */
@@ -1247,7 +1255,7 @@ function capitalize(s) {
  * ----------------------------------------------------------------------- */
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.register('../pwa/sw.js', { scope: '../' }).catch(function() {});
+  navigator.serviceWorker.register(WORKER_PATH, { scope: WORKER_SCOPE }).catch(function() {});
 }
 
 /* Loaded from here, not the shell, so pages rendered before it existed get it too */
@@ -1255,7 +1263,7 @@ function loadSelfCheck() {
   if (document.getElementById('selfcheck-js')) return;
   var s = document.createElement('script');
   s.id = 'selfcheck-js';
-  s.src = '../pwa/selfcheck.js';
+  s.src = ASSET_PATH + '/selfcheck.js';
   document.body.appendChild(s);
 }
 
@@ -1264,7 +1272,7 @@ function loadAccountPanel() {
   if (document.getElementById('account-js')) return;
   var script = document.createElement('script');
   script.id = 'account-js';
-  script.src = '../pwa/account.js';
+  script.src = ASSET_PATH + '/account.js';
   document.body.appendChild(script);
 }
 
@@ -1370,7 +1378,7 @@ function init() {
     window._meridianConfig.apps = catalog.apps;
     updateSetup(window._meridianConfig);
   }
-  fetch('../pwa/apps.json', { credentials: 'omit', redirect: 'error', signal: controller ? controller.signal : undefined })
+  fetch(ASSET_PATH + '/apps.json', { credentials: 'omit', redirect: 'error', signal: controller ? controller.signal : undefined })
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(value) {
       if (catalogDone || id !== initId) return;
@@ -1378,7 +1386,7 @@ function init() {
       if (validCatalog(value)) { catalog = value; applyCatalog(); }
     }, function() { catalogDone = true; clearTimeout(catalogTimer); });
 
-  fetch('config.json', { credentials: 'omit', redirect: 'error' })
+  fetch(CONFIG_PATH, { cache: 'no-store', credentials: 'omit', redirect: 'error' })
     .then(function(r) {
       if (!r.ok) throw new Error('config.json fetch failed');
       return r.json();

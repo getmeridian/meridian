@@ -26,6 +26,7 @@ from meridian.control.background_health import BackgroundHealth
 from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE, BackupLedger
 from meridian.control.command_models import CommandRequest, NodeCommandRecord, UserCutOffMutation
 from meridian.control.commands import COMMAND_TABLES, CommandLedger
+from meridian.control.connection_pages import ConnectionPages
 from meridian.control.cutoff import CutOffLedger
 from meridian.control.devices import DEVICES_TABLE, DeviceLedger, HeaderReader
 from meridian.control.enrollment import NodeAuthority
@@ -179,6 +180,7 @@ class ControlService:
         self.backups = BackupLedger(self._store, clock=clock)
         self.owner = OwnerAuth(self._store, clock=clock)
         self.devices = DeviceLedger(self._store, clock=clock)
+        self.pages = ConnectionPages(self._store, self)
         with self._transaction():
             # Documents signed by an earlier signing certificate are signed again.
             self._compose_all()
@@ -663,6 +665,7 @@ class ControlService:
             read_settings=self.settings,
             read_privacy=self.privacy,
             clock=self._clock,
+            render_page=self.pages.render,
             user_agent=user_agent,
             accept=accept,
             device_headers=device_headers,

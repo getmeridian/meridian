@@ -15,7 +15,6 @@ import typer
 
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands.client import run_add, run_disable, run_enable, run_list, run_reissue, run_remove, run_show
-from meridian.commands.client_handoff import PageResolution
 from meridian.commands.client_limits import format_expiry, format_usage, run_reset_traffic, run_set
 from meridian.compiler import compile_topology
 from meridian.console import set_json_mode
@@ -133,7 +132,7 @@ def test_client_show_prints_usage_against_the_limit_and_the_expiry(
     with _fleet(tmp_path):
         run_set("alice", limit="50GB", reset="month", expires=FUTURE_DAY)
         capsys.readouterr()
-        with patch("meridian.commands.client.resolve_page_url", return_value=PageResolution()):
+        with patch("meridian.commands.client.page_url", return_value=""):
             run_show("alice")
 
     output = capsys.readouterr().err
@@ -220,7 +219,7 @@ def test_single_console_case_match_resolves_for_reads_and_service_owned_edits(
 ) -> None:
     with _fleet(tmp_path, json_mode=True) as fleet:
         fleet.create("BOB")
-        with patch("meridian.commands.client.resolve_page_url", return_value=PageResolution()):
+        with patch("meridian.commands.client.page_url", return_value=""):
             run_show("Bob")
         assert _envelope(capsys, "client-show-envelope")["data"]["client"]["username"] == "BOB"
         run_disable("bob")
@@ -249,7 +248,7 @@ def test_service_owned_mutations_resolve_padded_console_names_like_show(
         original = fleet.client.get_user("alice")
         if scope == "people":
             fleet.cluster.panel.api_token = fleet.client.create_token("People desk", "people").token
-        with patch("meridian.commands.client.resolve_page_url", return_value=PageResolution()):
+        with patch("meridian.commands.client.page_url", return_value=""):
             run_show("  bob\t ")
         assert _envelope(capsys, "client-show-envelope")["data"]["client"]["username"] == "BOB"
         commands[command]("  bob\t ")
@@ -357,7 +356,7 @@ def test_client_add_creates_with_limits_during_the_reviewed_apply(
                 "meridian.control_access.ServiceAccessPanel.update_user_limits", side_effect=AssertionError("No PATCH")
             ),
             patch(
-                "meridian.commands.client.publish_connection_pages",
+                "meridian.commands.client.client_handoffs",
                 return_value=[HandoffLinks("carol", subscription_url="https://198.51.100.1/pages/sub/short-carol")],
             ),
         ):
@@ -396,7 +395,7 @@ def test_client_add_never_publishes_links_when_reviewed_creation_fails(
             patch("meridian.control_access.ServiceAccessPanel", return_value=panel),
             patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
             patch("meridian.servers.ServerRegistry"),
-            patch("meridian.commands.client.publish_connection_pages", return_value=[]) as publish,
+            patch("meridian.commands.client.client_handoffs", return_value=[]) as publish,
             pytest.raises(typer.Exit) as exc_info,
         ):
             run_add(["carol"], limit="50GB")
@@ -431,7 +430,7 @@ def test_client_show_reads_a_console_name_outside_remnawaves_rules(
     """The control service allows names Remnawave never did; `client list` shows them, so `show` must too."""
     with _fleet(tmp_path, json_mode=True) as fleet:
         fleet.create(username)
-        with patch("meridian.commands.client.resolve_page_url", return_value=PageResolution()):
+        with patch("meridian.commands.client.page_url", return_value=""):
             run_show(username)
         client = _envelope(capsys, "client-show-envelope")["data"]["client"]
 
@@ -444,7 +443,7 @@ def test_client_show_prefers_an_exact_console_name_and_refuses_an_ambiguous_one(
     """Declared `alice` and console `ALICE` are two people; a case-folded lookup handed out alice's link."""
     with _fleet(tmp_path, json_mode=True) as fleet:
         fleet.create("ALICE")
-        with patch("meridian.commands.client.resolve_page_url", return_value=PageResolution()):
+        with patch("meridian.commands.client.page_url", return_value=""):
             run_show("ALICE")
             client = _envelope(capsys, "client-show-envelope")["data"]["client"]
             with pytest.raises(typer.Exit) as refused:
