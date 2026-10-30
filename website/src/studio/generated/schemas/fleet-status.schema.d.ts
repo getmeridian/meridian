@@ -99,6 +99,7 @@ export type NeedsAttention = boolean;
 export type Nodes2 = number;
 export type NonactiveAccessUsers = number;
 export type OtherUsers = number;
+export type OutOfSyncNodes = number;
 export type Relays2 = number;
 export type UnhealthyRelays = number;
 export type UnknownNodes = number;
@@ -217,6 +218,7 @@ export interface FleetStatusSummary {
   nodes: Nodes2;
   nonactive_access_users: NonactiveAccessUsers;
   other_users: OtherUsers;
+  out_of_sync_nodes?: OutOfSyncNodes;
   relays: Relays2;
   unhealthy_relays: UnhealthyRelays;
   unknown_nodes: UnknownNodes;

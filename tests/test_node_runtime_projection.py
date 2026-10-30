@@ -105,3 +105,27 @@ def test_fleet_status_judges_fresh_runtime_evidence(
         ),
     ):
         assert fleet.run_status() == exit_code
+
+
+def test_a_fresh_healthy_report_does_not_call_pending_convergence_healthy(service: ControlService) -> None:
+    from meridian.adapters.cluster import topology_from_cluster
+    from meridian.core.fleet import build_fleet_status
+    from meridian.servers import ServerEntry
+    from meridian.setup.single_server import single_server_intent
+
+    service.put_node_spec("main", NodeSpec(resources=[]))
+    raw = node_report(datetime.now(UTC).isoformat().replace("+00:00", "Z"))
+    raw["applied"] = None
+    service.report("main", ObservedStateReport.model_validate(raw), raw)
+    status = service.node_status("main")
+    cluster = ClusterConfig(topology_intent=single_server_intent(None, server_ref="srv-a"))
+    topology = topology_from_cluster(cluster, servers=[ServerEntry(id="srv-a", host="198.51.100.10")])
+    topology = topology.model_copy(update={"access_users": None})
+    with (
+        patch.object(ControlClient, "node", return_value=status),
+        ServiceFleetPanel("https://198.51.100.10/", ADMIN_TOKEN, node_ids=["main"], endpoint_ids=[]) as panel,
+    ):
+        result = build_fleet_status(topology, panel_healthy=True, api_nodes=panel.list_nodes())
+    assert result.summary.health == "degraded"
+    assert result.nodes[0].live is True and result.nodes[0].runtime_available is True
+    assert result.summary.out_of_sync_nodes == 1

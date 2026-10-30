@@ -291,6 +291,11 @@
           "title": "Other Users",
           "type": "integer"
         },
+        "out_of_sync_nodes": {
+          "default": 0,
+          "title": "Out Of Sync Nodes",
+          "type": "integer"
+        },
         "relays": {
           "title": "Relays",
           "type": "integer"

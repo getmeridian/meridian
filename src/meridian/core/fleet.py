@@ -271,6 +271,7 @@ class FleetStatusSummary(CoreModel):
     connected_nodes: int
     disconnected_nodes: int
     failed_nodes: int = 0
+    out_of_sync_nodes: int = 0
     disabled_nodes: int
     unknown_nodes: int
     unhealthy_relays: int
@@ -282,6 +283,7 @@ class FleetStatusSummary(CoreModel):
         return (
             f"{self.nodes} node(s), {self.relays} relay(s), "
             f"{self.active_users} active user(s), {self.missing_access_users} missing access user(s), "
+            f"{self.out_of_sync_nodes} node(s) awaiting convergence, "
             f"{self.unhealthy_relays} unreachable relay listener(s), "
             f"{self.unknown_relays + self.unknown_relay_hops} unverified relay route(s)"
         )
@@ -486,6 +488,7 @@ def build_fleet_status(
     other_users = len(user_statuses) - active_users - disabled_users
     disconnected_nodes = sum(1 for node in nodes if node.status == "disconnected")
     failed_nodes = sum(1 for node in nodes if node.status == "failed")
+    out_of_sync_nodes = sum(1 for node in nodes if node.runtime_available is True and node.in_sync is False)
     disabled_nodes = sum(1 for node in nodes if node.status == "disabled")
     unknown_nodes = sum(1 for node in nodes if node.status == "unknown")
     unhealthy_relays = sum(1 for relay in relays if relay.health == "unhealthy")
@@ -498,7 +501,14 @@ def build_fleet_status(
     )
     # Disabled, limited, or expired clients are operator or panel decisions, not faults.
     health: FleetHealth
-    if disconnected_nodes or failed_nodes or disabled_nodes or unhealthy_relays or missing_access_users:
+    if (
+        disconnected_nodes
+        or failed_nodes
+        or out_of_sync_nodes
+        or disabled_nodes
+        or unhealthy_relays
+        or missing_access_users
+    ):
         health = "degraded"
     elif (
         not panel_healthy
@@ -525,6 +535,7 @@ def build_fleet_status(
         connected_nodes=sum(1 for node in nodes if node.status == "connected"),
         disconnected_nodes=disconnected_nodes,
         failed_nodes=failed_nodes,
+        out_of_sync_nodes=out_of_sync_nodes,
         disabled_nodes=disabled_nodes,
         unknown_nodes=unknown_nodes,
         unhealthy_relays=unhealthy_relays,

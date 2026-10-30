@@ -301,6 +301,7 @@ def _run_status(*, operation: OperationContext) -> int:
                         "unknown_relay_hops": status.summary.unknown_relay_hops,
                         "disconnected_nodes": status.summary.disconnected_nodes,
                         "failed_nodes": status.summary.failed_nodes,
+                        "out_of_sync_nodes": status.summary.out_of_sync_nodes,
                         "disabled_nodes": status.summary.disabled_nodes,
                         "unknown_nodes": status.summary.unknown_nodes,
                     },
