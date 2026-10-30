@@ -74,9 +74,6 @@
           return latest(Promise.allSettled(both)).then(function (catalogs) {
             var englishReady = catalogs[0].status === "fulfilled";
             var selectedReady = code !== "en" && catalogs[1].status === "fulfilled";
-            if (englishReady) english = catalogs[0].value;
-            current = selectedReady ? catalogs[1].value : english;
-            apply(selectedReady ? code : "en");
             if (!englishReady && !selectedReady) {
               showNotice(code, function () {
                 attempt().then(function (ready) { if (ready && M.render) M.render(); });
@@ -85,6 +82,9 @@
               if (Object.keys(current).length) resolve();
               return false;
             }
+            if (englishReady) english = catalogs[0].value;
+            current = selectedReady ? catalogs[1].value : english;
+            apply(selectedReady ? code : "en");
             clearNotice();
             resolve();
             return true;

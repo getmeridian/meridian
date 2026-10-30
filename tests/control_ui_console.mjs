@@ -60,6 +60,7 @@ w.fetch = (url, options) => {
   }
   if (mode.startsWith('locale-')) {
     const code = url.split('/').at(-1).split('.')[0];
+    if (mode === 'locale-switch' && code === 'en' && !data.englishReady) return Promise.reject(new Error('English unavailable'));
     if (mode === 'locale-fallback' && code === 'en') return new Promise(resolve => { delayed.english = resolve; });
     if (!localeReady) return Promise.reject(new Error('catalog unavailable'));
     const content = JSON.parse(fs.readFileSync(path.join(ui, 'locales', code + '.json')));
@@ -286,6 +287,13 @@ if (mode.startsWith('token-')) {
 
 if (mode.startsWith('locale-')) {
   w.eval(fs.readFileSync(path.join(ui, 'i18n.js'), 'utf8'));
+  if (mode === 'locale-switch') {
+    localeReady = true;
+    await M.i18n.load(data.previous);
+    report.before = { label: M.t('nav.people'), lang: M.i18n.lang,
+      rootLang: w.document.documentElement.lang, dir: w.document.documentElement.dir };
+    localeReady = false;
+  }
   let loaded = false;
   M.i18n.load(locale).then(() => { loaded = true; });
   await settle();
@@ -295,6 +303,12 @@ if (mode.startsWith('locale-')) {
     await settle();
   } else {
     report.notice = w.document.querySelector('.i18n-notice')?.textContent || '';
+    if (mode === 'locale-switch') {
+      report.after = { label: M.t('nav.people'), lang: M.i18n.lang,
+        rootLang: w.document.documentElement.lang, dir: w.document.documentElement.dir };
+      report.switchResolved = loaded;
+      data.englishReady = true;
+    }
     localeReady = true;
     w.document.querySelector('.i18n-notice button')?.click();
     await settle();

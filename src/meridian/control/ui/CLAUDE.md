@@ -18,6 +18,7 @@
 - **Assets revalidate by ETag** (content hash, `no-cache`); anything holding a secret is `no-store`.
 
 ## Pitfalls
+- A failed language switch keeps the previous catalog, language, and direction when both fetches fail; switch to English only after its catalog loads successfully.
 - Both person expiry forms validate the converted UTC end of day before submitting; a local date before 2099 can cross into the legacy no-expiry range.
 - A successful token response without a secret is still uncertain; refresh the metadata list and explain recovery instead of closing an empty result.
 - Scroll focused fields clear of a sticky dialog footer after layout; native focus scrolling treated a covered input as visible on a phone.
