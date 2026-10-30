@@ -45,7 +45,7 @@ CLI یک package Python است (`src/meridian/`) که از طریق PyPI به‌
 - `compiler/` — تبدیل topology به لیست منابع مرور‌شده و hash-identified (بدون I/O)
 - `reconciler/` — مشاهده و اعمال آن منابع با checkpoints
 - `provision/` — مراحل آماده‌سازی سرور (package‌ها، hardening، سرویس کنترل، Realm)
-- `control/` — سرویس کنترل (`meridian serve`): کاربران، اشتراک‌ها، اسناد امضاشدهٔ گره‌ها، پشتیبان‌ها و کنسول وب
+- `control/` — سرویس کنترل (`meridian serve`): کاربران، اشتراک‌ها، اسناد امضاشدهٔ گره‌ها، پشتیبان‌ها و پنل وب
 - `backup/` — snapshotها، کلیدهای دستگاه و `meridian restore`
 
 agent گره یک crate به زبان Rust در `agent/` در ریشهٔ مخزن است؛ buildهای آن درون بستهٔ Python عرضه می‌شوند.

@@ -29,7 +29,7 @@ meridian deploy [SERVER] [flags]
 | `--harden / --no-harden` | 启 | 仅 SSH 密钥登录、fail2ban 和 UFW 防火墙。`--no-harden` 用于与其他服务共享的服务器 |
 | `--warp / --no-warp` | 关 | 通过 Cloudflare WARP 发送出站流量 |
 | `--geo-block` / `--no-geo-block` | 启 | 在出口拒绝俄罗斯域名和 IP（`geosite:category-ru` + `geoip:ru`）。Xray JSON 和 Mihomo 订阅已经从设备直接发送它们 |
-| `--country CC` | 地址注册机构 | 显示在连接名称中和控制台服务器列表中的两字母国家代码。不指定时，首次部署会向服务器地址所属的区域互联网注册机构查询（通过 IANA 的 RDAP 引导服务，不使用 geo-IP 服务）；重新部署则沿用已保存的国家 |
+| `--country CC` | 地址注册机构 | 显示在连接名称中和网页面板服务器列表中的两字母国家代码。不指定时，首次部署会向服务器地址所属的区域互联网注册机构查询（通过 IANA 的 RDAP 引导服务，不使用 geo-IP 服务）；重新部署则沿用已保存的国家 |
 | `--yes` | | 跳过确认提示 |
 | `--json` | | 将最终部署结果作为 `meridian.output/v1` 信封发出 |
 | `--events=jsonl` | | 在 stderr 上以 JSONL 形式流式传输类型化进度事件 |
@@ -136,7 +136,7 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 首次记录的流量时间和最近报告流量的节点来自已接受的计数增长（JSON 中的 `first_traffic_at` 和 `last_traffic_node`）。升级前的首次使用时间可能未知；这些仅是汇总数据，不包含会话或客户端地址。
 
-**`client list`** — 列出客户端及其状态、流量、到期时间和最后在线时间，包括在网页控制台中添加的用户（JSON 中为 `declared: false`）。带 `--json`，返回 `data.summary` 计数和 `data.clients[]`。
+**`client list`** — 列出客户端及其状态、流量、到期时间和最后在线时间，包括在网页面板中添加的用户（JSON 中为 `declared: false`）。带 `--json`，返回 `data.summary` 计数和 `data.clients[]`。
 
 `client list --attention` 仅显示七天内到期（包含当前时刻）、已用流量达到限额的 80%，或创建超过三天且从未记录过流量的用户。原因列说明每行；JSON 包含 `clients[].attention_reasons`，汇总数量仅统计筛选后的用户。导入的历史流量即使日期未知，以及重置过的流量周期，都不会被误判为从未使用。
 
@@ -152,17 +152,17 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 **`client reissue`** — 在链接泄露后替换客户端的链接。控制服务生成新的订阅 ID 和新的密钥，因此旧的订阅 URL、连接页面和链接全部失效。Meridian 打印新的订阅 URL，它同时打开新的连接页面。状态、限额和到期时间保持不变。除非 `--yes`，否则要求确认；不属于你的客户端的名称会被拒绝。
 
-**`client remove`** — 从拓扑中删除客户端，删除其在控制服务中的账户，订阅和连接页面随即停止响应。除非 `--yes`，否则要求确认。最后一个客户端无法删除。在网页控制台中添加的用户请在控制台中删除。
+**`client remove`** — 从拓扑中删除客户端，删除其在控制服务中的账户，订阅和连接页面随即停止响应。除非 `--yes`，否则要求确认。最后一个客户端无法删除。在网页面板中添加的用户请在网页面板中删除。
 
-**`client usage`** — 显示控制服务中任何人员（含控制台添加者）的每日上传、下载及总字节数。须在[隐私](/zh/privacy/)中开启每日历史；否则退出码为 `2`，并提示启用命令。历史开启时，`client show` 附最近七个 UTC 天（JSON 的 `data.usage`，关闭时为 `null`）。空白日期表示无记录的流量，不会补算过去用量。
+**`client usage`** — 显示控制服务中任何人员（含网页面板添加者）的每日上传、下载及总字节数。须在[隐私](/zh/privacy/)中开启每日历史；否则退出码为 `2`，并提示启用命令。历史开启时，`client show` 附最近七个 UTC 天（JSON 的 `data.usage`，关闭时为 `null`）。空白日期表示无记录的流量，不会补算过去用量。
 
-**`client devices`** — private 显示数量，full 显示设备详情；off 不读取设备。`--json` 返回 `username`、`level`、`count`、有效 `limit`、`devices` 和 `removed`。`--remove ID` 或 `--clear` 清除登记而不撤销凭证；重复操作报告零条删除。也可通过 CLI 查看和清除控制台添加的用户的设备登记。`client set --devices N` 设置上限，`--devices default` 使用集群上限。参见[设备限制](/zh/client-management/#限制设备数量)。重新签发链接会清除全部设备登记并保留上限。
+**`client devices`** — private 显示数量，full 显示设备详情；off 不读取设备。`--json` 返回 `username`、`level`、`count`、有效 `limit`、`devices` 和 `removed`。`--remove ID` 或 `--clear` 清除登记而不撤销凭证；重复操作报告零条删除。也可通过 CLI 查看和清除网页面板添加的用户的设备登记。`client set --devices N` 设置上限，`--devices default` 使用集群上限。参见[设备限制](/zh/client-management/#限制设备数量)。重新签发链接会清除全部设备登记并保留上限。
 
-修改服务中用户设置的命令（`client enable`、`disable`、`set`、`reset-traffic` 以及删除设备注册）也适用于控制台添加的用户。精确匹配的服务用户名优先；忽略大小写或按显示名称匹配时必须只对应一个用户。若有歧义，请使用 `client list` 中显示的精确用户名。删除用户、重新签发凭据和发布连接页面仍仅适用于拓扑中声明的用户。
+修改服务中用户设置的命令（`client enable`、`disable`、`set`、`reset-traffic` 以及删除设备注册）也适用于网页面板添加的用户。精确匹配的服务用户名优先；忽略大小写或按显示名称匹配时必须只对应一个用户。若有歧义，请使用 `client list` 中显示的精确用户名。删除用户、重新签发凭据和发布连接页面仍仅适用于拓扑中声明的用户。
 
-已建立的 VLESS 会话可能在凭证撤销后继续存在。`client remove` 或 `client reissue` 的 **`--cut-off`** 会等待每个受影响节点应用不含旧凭证的版本，再重置相关入站。这些入站上的所有会话都会终止，包括其他用户的会话；他们会短暂重连。若入站 API 失败，会重启 Xray 并终止该节点上的所有 Xray 会话。此选项需主动启用，建议在链接泄露时使用。JSON 在 `data.cut_off` 中报告各节点的 `done`、`core_restart`、`failed` 或 `timed_out` 状态。最多等待五分钟；失败退出码为 `4`，超时为 `3`。删除在控制台中添加的用户时，控制台也提供此选项。
+已建立的 VLESS 会话可能在凭证撤销后继续存在。`client remove` 或 `client reissue` 的 **`--cut-off`** 会等待每个受影响节点应用不含旧凭证的版本，再重置相关入站。这些入站上的所有会话都会终止，包括其他用户的会话；他们会短暂重连。若入站 API 失败，会重启 Xray 并终止该节点上的所有 Xray 会话。此选项需主动启用，建议在链接泄露时使用。JSON 在 `data.cut_off` 中报告各节点的 `done`、`core_restart`、`failed` 或 `timed_out` 状态。最多等待五分钟；失败退出码为 `4`，超时为 `3`。删除在网页面板中添加的用户时，网页面板也提供此选项。
 
-私人字段：`client set NAME --note TEXT --tag TAG` 只更改指定的字段。备注最多 500 个纯文本字符，支持换行；`--note ""` 清除备注。标签使用 1–16 个拉丁字母、数字或下划线，保存为大写；`--tag none` 清除标签。`client show` 显示这两个字段，`client list --tag TAG` 筛选标签列（`none` 选择没有标签的人）。读取和编辑需要 people/admin 权限。控制台编辑相同字段；应用配置保留它们，加密快照保存它们。参见[私人备注和标签](/zh/client-management/#私人备注和标签)。
+私人字段：`client set NAME --note TEXT --tag TAG` 只更改指定的字段。备注最多 500 个纯文本字符，支持换行；`--note ""` 清除备注。标签使用 1–16 个拉丁字母、数字或下划线，保存为大写；`--tag none` 清除标签。`client show` 显示这两个字段，`client list --tag TAG` 筛选标签列（`none` 选择没有标签的人）。读取和编辑需要 people/admin 权限。网页面板编辑相同字段；应用配置保留它们，加密快照保存它们。参见[私人备注和标签](/zh/client-management/#私人备注和标签)。
 
 `client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` 解释格式选择及省略原因，不泄露凭据。User-Agent 最多 512 个 Unicode 字符，Accept 最多 256 个字符，均为单行临时输入。`--suffix` 强制使用现有格式 URL 后缀。JSON 返回 `subscription-preview`；API 为需要 read 权限的 `POST /api/subscription/preview`。
 
@@ -260,7 +260,7 @@ meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 
 **`node list`** — 列出节点及其 agent 的实时状态、版本和流量。如果控制服务无法访问，已配置的节点会显示为 `unknown`，命令以退出码 `3` 结束。
 
-**`node restart`** — 向节点代理发送签名命令，并等待服务就绪。默认或 `--core` 重启 Xray（`netcore`）；`--all` 逐一重启当前节点文档管理的所有运行中服务。每个服务重启时，其现有连接都会中断。`--core` 和 `--all` 互斥；`--json` 需要 `--yes`。JSON 在 `data.nodes[]` 中保留各条命令及节点的 `done`、`failed` 或 `timed_out` 结果。失败退出码为 `4`，等待五分钟后超时的退出码为 `3`。控制台的服务器视图提供 **重启 Xray** 按钮，并展示相同的重连提示和执行结果。
+**`node restart`** — 向节点 agent 发送签名命令，并等待服务就绪。默认或 `--core` 重启 Xray（`netcore`）；`--all` 逐一重启当前节点文档管理的所有运行中服务。每个服务重启时，其现有连接都会中断。`--core` 和 `--all` 互斥；`--json` 需要 `--yes`。JSON 在 `data.nodes[]` 中保留各条命令及节点的 `done`、`failed` 或 `timed_out` 结果。失败退出码为 `4`，等待五分钟后超时的退出码为 `3`。网页面板的服务器视图提供 **重启 Xray** 按钮，并展示相同的重连提示和执行结果。
 
 **`node remove`** — 从拓扑中移除一个出口或路由网关。它会列出将被删除的所有资源（节点记录和文档、其 agent 和 Xray、防火墙规则、客户端接入点），请求确认后原样执行该审查计划；服务器本身仍保留在已保存的服务器列表中。控制服务器不能通过此命令移除（请使用 `meridian teardown`）；仍有中继指向该出口时也会拒绝（请先移除中继或传入 `--force`）；有路由网关经由该出口接入集群，或移除后会破坏拓扑（例如导致出口池为空或失去默认出口）时同样会拒绝。绑定到被移除网关的路由规则会一并删除。
 
@@ -367,13 +367,13 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 **`fleet inventory`** — 列出已配置的服务器、角色、节点和中继，并在控制服务可达时附带实时状态。绝不会输出 API 令牌或秘密路径。如果实时状态不可用，仍会显示已配置的清单并附带警告，命令以退出码 `3` 结束。要判断 `apply` 是否有待执行的变更，请使用 `plan --json`。
 
-**`fleet history`** — 控制服务记录的每一次经过审核的应用，最新的在前：编号、时间、作者（机器的令牌名称；CLI 自身的令牌为 `root`，控制台为 `owner`）、状态（`proposed`、`approved`、`applied` 或 `failed`）以及计划哈希的开头部分。`--json` 返回 `data.revisions[]`。
+**`fleet history`** — 控制服务记录的每一次经过审核的应用，最新的在前：编号、时间、作者（机器的令牌名称；CLI 自身的令牌为 `root`，网页面板为 `owner`）、状态（`proposed`、`approved`、`applied` 或 `failed`）以及计划哈希的开头部分。`--json` 返回 `data.revisions[]`。
 
 **`fleet events`** — 查看本地用户、令牌和隐私变更，以及节点离线和恢复事件。从 `--since ID` 之后按时间顺序显示（默认 `0`）。`--limit N` 返回 1–2000 条事件，默认 100 条。JSON 包含 `data.events[]`、`next_cursor` 和 `has_more`；继续读取时使用返回的游标。每条事件包含 UTC 时间、类型、执行者（令牌名称、`root`、`owner` 或 `system`）、对象，以及更改的字段名、令牌权限范围或隐私审计记录 ID 等简短详情。不会记录凭据、原始错误、客户端地址或设备数据。最多保留最近 180 天内的 2,000 条事件，并纳入快照。`GET /api/events?after=ID&limit=N` 需要 `read` 权限，也允许已登录的所有者访问。
 
 **`fleet upgrade`** — 通过一次已审核的应用让集群保持最新。控制服务和每个节点 agent 会升级到当前 Meridian 附带的构建，每个 agent 就地升级并保留其节点身份；要获取更新的构建，请先运行 `meridian update`。中继无需等待 Meridian 更新即可升级到最新的 Realm 版本：选用 GitHub 上已测试主版本内的最新版本，连同 GitHub 为每个压缩包发布的 sha256 一起记录到 `cluster.yml`，每个中继在安装前都会校验。它会显示每台服务器上运行的版本并标为 `current` 或 `upgrade`，确认后应用已审核的计划，并在每台服务器上运行 `meridian check`。如果某个版本无法读取，命令会在任何改动之前以退出码 `3` 结束。
 
-**`fleet routing`** — 从本地拓扑读取当前客户端路由策略，并解释两种选项。`ru-split`（默认）让匹配规则的俄罗斯目的地、私有地址和局域网直连；`full` 让互联网流量通过 VPN，包括俄罗斯目的地，同时保留私有地址和局域网直连。两种策略均保留 QUIC 封锁，以及 Xray JSON 对已识别 BitTorrent 对等连接的直连规则，以减少针对出口服务器的滥用投诉。传入策略即可编辑拓扑、审核、确认，并应用此次审核的内容。没有终端或使用 `--json` 时，更改需要 `--yes`；`--dry-run` 显示审核结果而不应用。JSON 返回 `data.client_routing`、`choices[]` 以及适用的审核和应用结果。应用会在下次刷新订阅或手动刷新后收到策略。控制台在“设置”中只读显示策略。出口地理封锁单独设置；Base64 链接不携带路由规则。有关格式限制及如何在出口允许俄罗斯目的地，请参见[客户端路由](/zh/split-routing/)。
+**`fleet routing`** — 从本地拓扑读取当前客户端路由策略，并解释两种选项。`ru-split`（默认）让匹配规则的俄罗斯目的地、私有地址和局域网直连；`full` 让互联网流量通过 VPN，包括俄罗斯目的地，同时保留私有地址和局域网直连。两种策略均保留 QUIC 封锁，以及 Xray JSON 对已识别 BitTorrent 对等连接的直连规则，以减少针对出口服务器的滥用投诉。传入策略即可编辑拓扑、审核、确认，并应用此次审核的内容。没有终端或使用 `--json` 时，更改需要 `--yes`；`--dry-run` 显示审核结果而不应用。JSON 返回 `data.client_routing`、`choices[]` 以及适用的审核和应用结果。应用会在下次刷新订阅或手动刷新后收到策略。网页面板在“设置”中只读显示策略。出口地理封锁单独设置；Base64 链接不携带路由规则。有关格式限制及如何在出口允许俄罗斯目的地，请参见[客户端路由](/zh/split-routing/)。
 
 **`fleet export`** — 把集群已审查的拓扑输出为可编辑的 YAML 文件：出口及其协议路径、中继、网关、出口池、路由规则、路由、客户端和集群设置。服务器以保存的名称（没有名称时用地址）出现，从不使用内部 ID；文件以 `schema: meridian.fleet/v1` 开头。Reality 密钥、API 令牌、客户端链接以及 XHTTP 和 WSS 的传输路径都留在 Meridian 中，不会列出。`--json` 在 `data.document` 下返回同一份文档。
 
@@ -381,8 +381,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 **`fleet usage`** — 显示每台服务器每个 UTC 天的总字节数，包括已删除服务器仍在保留期内的用量。`--days N` 选择保留期内 1–730 天。每日历史须开启；JSON 在 `data` 中返回服务器组总量和 `nodes[].daily`。
 
-**`fleet contact`** — 显示或审阅公开的所有者联系信息。`--text TEXT` 指定一行纯文本（最多 120 个字符），`--link LINK` 指定规范化的 `https:`、`tg:` 或 `mailto:` 链接。未指定的字段保持原值；`--text ""` 和 `--link none` 清除它们。`--dry-run` 返回审阅结果；没有终端或使用 `--json` 更改时需要 `--yes`。JSON 返回 `data.owner_contact`、审阅及应用结果。控制台只读显示联系信息，服务器导出/导入会保留 `delivery.owner_contact`。页面提供说明和由用户主动打开的链接；应用将其用于支持按钮。参见[所有者联系信息](/zh/client-management/)。
-**服务器流量额度** — `fleet status` 和控制台的只读“服务器”页面显示周期用量、服务商、重置日、下次付款日期以及服务器提醒。用量是已接受用户流量的估算值（上传 + 下载），不包含协议开销、服务器自身下载以及中继转发流量。报告计入接收时所在的 UTC 周期，因此延迟报告可能增加后一个周期的用量。中继及未运行代理的控制服务器显示 **未计量**，不显示用量数字。控制台提供 `meridian server set NAME` 修改命令。
+**`fleet contact`** — 显示或审阅公开的所有者联系信息。`--text TEXT` 指定一行纯文本（最多 120 个字符），`--link LINK` 指定规范化的 `https:`、`tg:` 或 `mailto:` 链接。未指定的字段保持原值；`--text ""` 和 `--link none` 清除它们。`--dry-run` 返回审阅结果；没有终端或使用 `--json` 更改时需要 `--yes`。JSON 返回 `data.owner_contact`、审阅及应用结果。网页面板只读显示联系信息，服务器导出/导入会保留 `delivery.owner_contact`。页面提供说明和由用户主动打开的链接；应用将其用于支持按钮。参见[所有者联系信息](/zh/client-management/)。
+**服务器流量额度** — `fleet status` 和网页面板的只读“服务器”页面显示周期用量、服务商、重置日、下次付款日期以及服务器提醒。用量是已接受用户流量的估算值（上传 + 下载），不包含协议开销、服务器自身下载以及中继转发流量。报告计入接收时所在的 UTC 周期，因此延迟报告可能增加后一个周期的用量。中继及未运行 agent 的控制服务器显示 **未计量**，不显示用量数字。网页面板提供 `meridian server set NAME` 修改命令。
 
 `GET /api/servers` 需要 read 权限，返回 `server-usage` 合同：服务器信息、UTC 周期边界、已计数字节、计量开始时间、下次付款以及计量范围。`GET /api/attention` 增加 `servers[]`：达到 80% 时为 `allowance_near`，达到 100% 时为 `allowance_exceeded`，付款日期在 7 天内时为 `payment_due`，已过期的单次日期为 `payment_overdue`。查询参数 `allowance_percent` 和 `allowance_exceeded_percent` 的范围是 1–100，前者不得高于后者；`payment_days` 的范围是 1–30。额度与付款提醒会设置 `summary.needs_attention`；部署健康状态和退出码继续表示服务运行状态。
 
@@ -450,11 +450,11 @@ RealiTLScanner 扫描 IPv4 范围；仅 IPv6 的服务器退出 `3`。选择结�
 
 ### meridian test
 
-从你的设备测试交付的代理流量。不需要 SSH。
+从你的设备测试交付的 VPN 流量。不需要 SSH。
 
 完整测试会选择一个活跃客户端，获取控制服务下发给该客户端的同一份 Xray JSON，并通过自动回退组以及目标服务器的每条路径发送真实流量。首次运行可能需要最多 120 秒下载并校验固定版本的 Xray 运行时。流量检查会轮换多个独立的公网 IP 观测服务并与直连请求比对，因此观测服务本身故障会判定为“不确定”（inconclusive），而不会误报为连接失败。在受控环境中可通过 `MERIDIAN_CONNECT_TEST_URL` 指定观测服务地址。
 
-每条路径都会报告首字节时间（TTFB）。当某条路径失败时，Meridian 会向其端点发起普通 TCP 连接，以区分是**能连上但无流量通过**（服务器有响应，但代理会话无法传输数据：凭据不匹配或连接被阻断）还是**无法连接**（该端口没有任何响应）。使用 `--json` 时，`data.transports` 会列出每条路径的结果（`ok`、`no_traffic`、`unreachable`、`failed`、`egress_mismatch`、`inconclusive`、`invalid`）及 `first_byte_ms`。
+每条路径都会报告首字节时间（TTFB）。当某条路径失败时，Meridian 会向其端点发起普通 TCP 连接，以区分是**能连上但无流量通过**（服务器有响应，但 VPN 会话无法传输数据：凭据不匹配或连接被阻断）还是**无法连接**（该端口没有任何响应）。使用 `--json` 时，`data.transports` 会列出每条路径的结果（`ok`、`no_traffic`、`unreachable`、`failed`、`egress_mismatch`、`inconclusive`、`invalid`）及 `first_byte_ms`。
 
 如果控制服务宕机、返回 HTTP `429` 或 `5xx` 导致无法获取订阅，命令以退出码 `3` 结束。其他订阅被拒情况（如 `400` 或 `422`）视为测试失败，退出码为 `4`。
 
@@ -471,7 +471,7 @@ meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
 
 #### 审查者的视角：`meridian test --probe`
 
-`--probe` 不发送代理流量，而是从审查方主动探测器的视角检查服务器，看部署是否会暴露自身特征。它可用于任意 IP 或域名，当目标属于你保存的拓扑时还会执行更严格的检查。
+`--probe` 不发送流量，而是从审查方主动探测器的视角检查服务器，看部署是否会暴露自身特征。它可用于任意 IP 或域名，当目标属于你保存的拓扑时还会执行更严格的检查。
 
 检查内容紧跟实际部署：公开与内部端口暴露情况、HTTP/TLS 响应行为、SNI 一致性与伪装、常见代理与管理面板路径、WebSocket 升级、反向 DNS、HTTP/2、旧版 TLS 协议以及已配置的域名。`--sni` 可覆盖通用 TLS 探测使用的 SNI。对于纯 UDP 监听端口，命令不会凭空猜测，而是提示需要运行完整的 `meridian test`。
 
@@ -514,7 +514,7 @@ meridian logs [SERVER] [--lines N] [--grep TEXT] [--component NAME]
 
 ### meridian panel
 
-显示网页控制台的地址；在控制台还没有所有者时，同时显示一次性设置链接。
+显示网页面板的地址；在面板还没有所有者时，同时显示一次性设置链接。
 
 ```
 meridian panel [--setup-link]
@@ -522,9 +522,9 @@ meridian panel [--setup-link]
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
-| `--setup-link` | | 即使控制台已有所有者，也打印一个重置链接：它会设置新密码、关闭登录验证码，并让所有设备退出登录 |
+| `--setup-link` | | 即使面板已有所有者，也打印一个重置链接：它会设置新密码、关闭登录验证码，并让所有设备退出登录 |
 
-设置链接只能使用一次，有效期 15 分钟；打开它来设置所有者的密码。控制台有所有者之后，`panel` 会打印地址以及是否已开启登录验证码。请像保护密码一样保护地址和设置链接。在控制台中你可以管理用户和 API 令牌；服务器、修订和订阅标题在那里是只读的。详见[网页控制台](/zh/client-management/#网页控制台)。
+设置链接只能使用一次，有效期 15 分钟；打开它来设置所有者的密码。面板有所有者之后，`panel` 会打印地址以及是否已开启登录验证码。请像保护密码一样保护地址和设置链接。在网页面板中你可以管理用户、通知、语言、隐私和 API 令牌；服务器、修订和拓扑设置在那里是只读的。详见[网页面板](/zh/client-management/#网页面板)。
 
 ### meridian teardown
 
@@ -554,7 +554,7 @@ meridian backup revoke ID
 | `--name NAME` | 这台电脑的主机名 | `backup pull`：这台机器的密钥首次注册时使用的名称 |
 | `--yes`, `-y` | | `backup recovery-key`：不询问直接替换已有的恢复密钥 |
 
-每个修改集群的命令执行之后，Meridian 都会把控制服务的最新快照保存到 `cluster.yml` 旁边的 `snapshots/` 中（保留最近几份）。快照包含用户、限额、流量、修订、API 令牌，以及这台机器的 `cluster.yml` 和 `servers.json` 副本，因此可以在一台什么都没有的机器上重建集群。它加密给每台已注册机器的密钥和恢复密钥，从不包含签名密钥、会话或控制台密码。保存失败只会给出警告，绝不会让触发它的命令失败。
+每个修改集群的命令执行之后，Meridian 都会把控制服务的最新快照保存到 `cluster.yml` 旁边的 `snapshots/` 中（保留最近几份）。快照包含用户、限额、流量、修订、API 令牌，以及这台机器的 `cluster.yml` 和 `servers.json` 副本，因此可以在一台什么都没有的机器上重建集群。它加密给每台已注册机器的密钥和恢复密钥，从不包含签名密钥、会话或网页面板密码。保存失败只会给出警告，绝不会让触发它的命令失败。
 
 **`backup pull`** — 立即保存一份快照。机器上的首次 pull 会创建它的密钥（`device.key`，只有你能读取）并向控制服务注册。
 
@@ -584,7 +584,7 @@ meridian restore --to SERVER [--snapshot FILE] [--recovery-key] [--force]
 | `--ssh-port PORT` | 22 | 新服务器上的 SSH 端口 |
 | `--yes`, `-y` | | 跳过确认 |
 
-restore 会打开快照，审核它要做的事并请求确认。然后它用快照在新服务器上安装控制服务，在拓扑中把控制服务器（以及旧服务器上的出口，如果有的话）移到新地址，并运行常规的已审核应用。恢复后的服务会获得新的证书颁发机构、新的签名密钥和新的 API 令牌，因此每个 agent 都会重新注册，被查扣的服务器无法签发你的节点会接受的任何内容。用户保留各自的账户、限额和流量。控制台所有者需要通过 `meridian panel` 给出的链接设置新密码。
+restore 会打开快照，审核它要做的事并请求确认。然后它用快照在新服务器上安装控制服务，在拓扑中把控制服务器（以及旧服务器上的出口，如果有的话）移到新地址，并运行常规的已审核应用。恢复后的服务会获得新的证书颁发机构、新的签名密钥和新的 API 令牌，因此每个 agent 都会重新注册，被查扣的服务器无法签发你的节点会接受的任何内容。用户保留各自的账户、限额和流量。网页面板所有者需要通过 `meridian panel` 给出的链接设置新密码。
 
 使用裸 IP 时，每个订阅 URL 都包含控制服务器的地址，因此所有链接都会改变：审核时会说明这一点，结束时会打印每个客户端的新链接。使用域名时，只要域名的 DNS 记录指向新服务器，链接就保持不变；审核时会列出这些记录。
 

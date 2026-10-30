@@ -15,12 +15,12 @@ description: 常见问题、解决方案和诊断工具。
   通过 SSH 按角色检查集群中的每台服务器。
 
 安装后，无法连接         → meridian test IP
-  "从我现在所在的网络能连上代理吗？"
-  检查：已配置的监听端口、TLS/SNI、下发的订阅以及真实代理流量。
+  "从我现在所在的网络能连上 VPN 吗？"
+  检查：已配置的监听端口、TLS/SNI、下发的订阅以及真实 VPN 流量。
   无需 SSH — 在客户端设备上运行。
 
 安装后，检查暴露面       → meridian test IP --probe
-  "这次部署是否暴露了代理特征或管理后台？"
+  "这次部署是否暴露了 VPN 特征或管理后台？"
   检查：公开端口、TLS/HTTP 行为、路径、SNI、DNS 和拓扑策略。
   无需 SSH — 在客户端设备上运行。
 
@@ -38,7 +38,7 @@ description: 常见问题、解决方案和诊断工具。
 **原因：**
 1. 云厂商防火墙或安全组拦截了端口 443 入站流量
 2. ISP 或所在网络完全封锁了服务器 IP
-3. 服务器宕机或代理服务未运行
+3. 服务器宕机或 VPN 服务未运行
 4. 服务器上的 UFW 未放行端口 443
 
 **修复：**
@@ -111,7 +111,7 @@ description: 常见问题、解决方案和诊断工具。
 
 查看日志：`meridian logs IP -c node -n 50` 会显示 agent（`netagent`）和 Xray（`netcore`）。常见原因包括宿主机端口冲突（Xray 直接绑定拓扑中的端口，这些端口必须空闲），或出口无法通过 TCP 443 访问控制服务器（agent 会主动连接它；请检查服务商的出站防火墙）。
 
-**修复：** 运行 `meridian check IP` 并按提示修复，然后运行 `meridian apply`：它会为丢失身份的 agent 重新注册，并升级运行旧构建的 agent。`meridian fleet status` 会显示每个 agent 是否在线、是否已应用当前配置；控制台的 **Servers** 页面也显示同样的信息。
+**修复：** 运行 `meridian check IP` 并按提示修复，然后运行 `meridian apply`：它会为丢失身份的 agent 重新注册，并升级运行旧构建的 agent。`meridian fleet status` 会显示每个 agent 是否在线、是否已应用当前配置；网页面板的 **Servers** 页面也显示同样的信息。
 
 ### 磁盘空间不足
 
@@ -123,7 +123,7 @@ description: 常见问题、解决方案和诊断工具。
 
 ## 之前正常，现在无法连接
 
-**最常见的原因：** 服务器 IP 被封锁。运行 `meridian test IP`，其检查结果会区分网络连通性、TLS、订阅和代理协议执行故障。TCP 失败也可能是云防火墙拦截或服务器停机所致。
+**最常见的原因：** 服务器 IP 被封锁。运行 `meridian test IP`，其检查结果会区分网络连通性、TLS、订阅和隧道故障。TCP 失败也可能是云防火墙拦截或服务器停机所致。
 
 恢复方案（添加替代出口、配置中继、启用 CDN 备用线路）见 [IP 封锁恢复](/zh/recovery/)。
 
@@ -181,7 +181,7 @@ meridian doctor
 | Server | 系统版本、运行时长（是否刚重启？）、磁盘与内存占用 |
 | Services | `ctld`（控制服务）、`netagent`（agent）和 `netcore`（Xray）是否处于运行状态？ |
 | Exit node Logs | agent 和 Xray 的启动报错、"failed to start" 记录、证书问题 |
-| Listening Ports | 端口 443 应显示 nginx。若缺失，说明代理未运行 |
+| Listening Ports | 端口 443 应显示 nginx。若缺失，说明 nginx 未运行 |
 | Firewall (UFW) | 端口 443/tcp 应为 ALLOW。若未列出，说明被防火墙拦截 |
 | Camouflage Target | 应显示 CONNECTED 及证书链 |
 | Domain DNS | 应解析为服务器 IP |
@@ -197,7 +197,7 @@ meridian doctor
 | Automatic fallback | 下发的自动回退策略成功承载真实流量 | 负载均衡、路由、凭据或节点端点故障 |
 | Protocol checks | 每个目标出站均成功承载真实流量 | 特定协议的监听端口、防火墙或下发配置故障 |
 
-完整测试会轮换多个独立的公网 IP 观测服务，同时进行直连比对。如果代理通道和直连通道都无法获取 IP，结果会判定为“不确定”（inconclusive），而不会误报为协议故障。仅在你自己运行已知观测服务时才需设置 `MERIDIAN_CONNECT_TEST_URL`。
+完整测试会轮换多个独立的公网 IP 观测服务，同时进行直连比对。如果 VPN 隧道和直连通道都无法获取 IP，结果会判定为“不确定”（inconclusive），而不会误报为协议故障。仅在你自己运行已知观测服务时才需设置 `MERIDIAN_CONNECT_TEST_URL`。
 
 首次运行完整测试时，可能需要最多 120 秒从 GitHub 下载并校验固定版本的 Xray。初始化完成后，`--timeout`（默认 `5`，范围 `1`–`30`）会限制单次网络操作的超时时间。退出码 `0` 表示全部通过，`4` 表示测试完成但发现问题，`3` 表示缺少必要证据而无法得出结论。`--basic` 模式无法验证仅使用 UDP 的 Hysteria2 流量。
 

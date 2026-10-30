@@ -129,7 +129,7 @@ meridian relay add 203.0.113.11 --exit 198.51.100.10 --name ru-spb
 meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-mobile --sni allowed.example.com
 ```
 
-使用 `--sni` 时，只有该中继在订阅中的条目宣布这个名称。Meridian 在出口上为中继提供一个只能从中继最后一跳访问的专用侦听器，以及一个模仿该名称的 Reality 侦听器（相同密钥）。它只把该名称路由到 Reality，其余流量都发往该站点，因此没有有效密钥而到达中继的探测会看到该站点的真实证书，而不是代理应答。出口自己的伪装目标和其他条目不变。出口必须能以 TLS 1.3 和 HTTP/2 访问该名称；以后可用 `meridian relay sni RELAY NEW_SNI` 更改。
+使用 `--sni` 时，只有该中继在订阅中的条目宣布这个名称。Meridian 在出口上为中继提供一个只能从中继最后一跳访问的专用侦听器，以及一个模仿该名称的 Reality 侦听器（相同密钥）。它只把该名称路由到 Reality，其余流量都发往该站点，因此没有有效密钥而到达中继的探测会看到该站点的真实证书，而不是 VPN 服务器应答。出口自己的伪装目标和其他条目不变。出口必须能以 TLS 1.3 和 HTTP/2 访问该名称；以后可用 `meridian relay sni RELAY NEW_SNI` 更改。
 
 然后检查中继，并在目标移动网络下实测：
 

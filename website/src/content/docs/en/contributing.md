@@ -45,7 +45,7 @@ Key modules:
 - `compiler/` — turns the topology into a reviewed, hash-identified list of resources (no I/O)
 - `reconciler/` — observes and applies those resources with checkpoints
 - `provision/` — server preparation steps (packages, hardening, the control service, Realm)
-- `control/` — the control service (`meridian serve`): users, subscriptions, signed node documents, backups, and the web console
+- `control/` — the control service (`meridian serve`): users, subscriptions, signed node documents, backups, and the web panel
 - `backup/` — snapshots, device keys, and `meridian restore`
 
 The node agent is a Rust crate in `agent/` at the repository root; its builds ship inside the Python package.

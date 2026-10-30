@@ -87,7 +87,7 @@ Every machine that manages the fleet saves an encrypted snapshot of the control 
 
 - **Links**: on a bare IP, every subscription URL contains the control server's address, so each link changes; restore prints every client's new link to send. With a domain, links stay the same once you point its DNS record at the new server; the review names the records.
 - **Old server**: restore refuses while the old control server still answers, because two control services would split the fleet. If it answers but you no longer trust it (seized, for example), pass `--force`.
-- **Keys**: the new server gets a new fleet authority and new signing keys, so a seized server can't sign anything your nodes accept. The console owner sets a new password through the link `meridian panel` prints.
+- **Keys**: the new server gets a new fleet authority and new signing keys, so a seized server can't sign anything your nodes accept. The web panel owner sets a new password through the link `meridian panel` prints.
 - **Another machine**: on a machine without the fleet, copy the snapshot file over and run `meridian restore --to NEW_IP --snapshot FILE --recovery-key`, then paste the recovery key when asked. The snapshot carries the fleet's own files; that machine still needs SSH access to the new server and to your exits.
 
 The recovery key is shown once, at the end of your first deploy; `meridian backup recovery-key` makes a new one. Keep it offline, away from the machines that manage the fleet. See [`meridian restore`](/en/cli-reference/#meridian-restore).

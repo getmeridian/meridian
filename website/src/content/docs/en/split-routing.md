@@ -15,12 +15,12 @@ Split routing sends Russian traffic **directly** from the device and everything 
 
 ```
 Russian sites   → Device → Direct → Internet (local ISP)
-Everything else → Device → Proxy → VPS → Internet
+Everything else → Device → VPN → VPS → Internet
 ```
 
 You get both:
 - **VPS protection** — the server-side block stays on as a safety net
-- **Working Russian sites** — the device sends them directly, never through the proxy
+- **Working Russian sites** — the device sends them directly, never through the VPN
 
 ## How it works in Meridian
 
@@ -50,7 +50,7 @@ meridian fleet routing ru-split --yes
 
 The bare command shows the current choice and explains both policies. A change edits the topology, shows the review, and applies exactly that review after confirmation. Without a terminal or with `--json`, pass `--yes`; `--dry-run --json` returns the review without applying it. Apps receive the policy at their next subscription refresh (six hours by default, set by `delivery.update_interval_hours`) or after a manual refresh. The setup wizard keeps `ru-split` without an extra question.
 
-`fleet export` and `fleet import` preserve `delivery.client_routing: full`. The `ru-split` default is omitted; removing the field from an exported file restores it. The console shows the policy read-only in Settings with the CLI command that changes it.
+`fleet export` and `fleet import` preserve `delivery.client_routing: full`. The `ru-split` default is omitted; removing the field from an exported file restores it. The web panel shows the policy read-only in Settings with the CLI command that changes it.
 
 Apps that import a plain Base64 link list receive no routing rules. Configure split or full routing in those apps yourself, or use a structured subscription. Hiddify receives the sing-box document and follows its inline rules.
 
@@ -63,7 +63,7 @@ The control service builds every structured subscription from one client routing
 | Layer | What it does | Protects against |
 |-------|-------------|-----------------|
 | **Server-side geo-block** | Drops Russia-bound traffic at the exit | VPS IP showing up in Russian service logs |
-| **Split routing on the device** | Sends Russian traffic directly | Broken Russian sites, needless proxy load |
+| **Split routing on the device** | Sends Russian traffic directly | Broken Russian sites, needless VPN load |
 
 With `ru-split`, destinations matched by the client's Russian bypass rules do not reach the exit. If a device has no routing rules (a Base64 import or an older app), the exit still blocks Russian destinations while its geo-block is on.
 
@@ -86,4 +86,4 @@ That traffic never reaches the exit, so the exit's geo-block stays as it is. Unl
 
 ## DNS considerations
 
-In Xray JSON subscriptions, names that match no rule are resolved through the proxy, so foreign lookups don't leak to the local ISP. With `ru-split`, Mihomo matches Russian IP ranges only for connections made by IP and never resolves other names locally. If your app has a separate DNS setting, enable its DNS leak protection for proxied traffic.
+In Xray JSON subscriptions, names that match no rule are resolved through the VPN tunnel, so foreign lookups don't leak to the local ISP. With `ru-split`, Mihomo matches Russian IP ranges only for connections made by IP and never resolves other names locally. If your app has a separate DNS setting, enable its DNS leak protection for tunneled traffic.

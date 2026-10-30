@@ -1,4 +1,4 @@
-"""Node management -- add, list, check, remove proxy nodes in the fleet.
+"""Node management -- add, list, check, remove nodes in the fleet.
 
 Nodes are servers running the node agent and its Xray core. Their runtime
 state lives in the control service; cluster.yml stores topology for local

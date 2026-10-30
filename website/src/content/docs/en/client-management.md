@@ -1,9 +1,15 @@
 ---
 title: Client Management
-description: Add users, share connection details, and manage access keys.
+description: Manage people from the web panel or CLI, share connection pages, and set limits and access keys.
 ---
 
+You can manage people from any browser in the built-in [web panel](#web-panel) (`meridian panel`) or from the terminal with `meridian client`. Both work on the same accounts in the control service.
+
 ## Add a client
+
+In the web panel, open **People** and click **Add person** to create an account, set an optional traffic limit, expiry date, device cap, language, note, and tag, and copy their connection page link or QR code.
+
+From the terminal:
 
 ```
 meridian client add alice
@@ -12,7 +18,7 @@ meridian client add alice
 This gives "alice" their own key and prints two things to share:
 
 - **A connection page link** with a QR code — the easiest thing to send
-- **A subscription URL** for importing directly into an Xray/V2Ray app
+- **A subscription URL** for importing directly into a VPN app
 
 Add several people at once:
 
@@ -43,7 +49,7 @@ To share a client's links again:
 meridian client show alice
 ```
 
-This prints the personal URL, plus status, traffic, expiry, and when the client was last seen. The same URL opens the connection page in a browser and supplies configs to an app. The control service serves pages automatically for every person, including console invitees.
+This prints the personal URL, plus status, traffic, expiry, and when the client was last seen. The same URL opens the connection page in a browser and supplies configs to an app. The control service serves pages automatically for every person, including those added in the web panel.
 
 ## List clients
 
@@ -55,7 +61,7 @@ Shows every client with status, traffic, expiry, and last seen.
 
 ## Private notes and tags
 
-Keep a private note and one tag for each person, including people added in the console:
+Keep a private note and one tag for each person, including people added in the web panel:
 
 ```bash
 meridian client set sample --note "Temporary invitation" --tag TRIAL_7
@@ -66,7 +72,7 @@ meridian client set sample --note "" --tag none
 
 Notes are plain text of up to 500 characters and may contain newlines. Tags use 1–16 Latin letters, digits, or underscores and are saved in uppercase (`family` becomes `FAMILY`). Empty notes and `--tag none` clear the fields; omitted options preserve them. `client list` has a tag column, and `--tag none` finds people without a tag.
 
-The console's person view edits the same fields. The API accepts `PATCH /api/users` with `username`, `note`, and `tag`, or `PATCH /api/users/NAME` without `username`. These fields require `people` or `admin` scope to read and edit; lower scopes receive empty strings. They live in the control service, ride encrypted snapshots with the person, and stay out of subscriptions, connection pages, events, and logs. Applies preserve operator edits. Migration carries Remnawave descriptions and valid tags, reporting descriptions truncated to 500 characters and invalid tags left behind.
+The web panel's person view edits the same fields. The API accepts `PATCH /api/users` with `username`, `note`, and `tag`, or `PATCH /api/users/NAME` without `username`. These fields require `people` or `admin` scope to read and edit; lower scopes receive empty strings. They live in the control service, ride encrypted snapshots with the person, and stay out of subscriptions, connection pages, events, and logs. Applies preserve operator edits. Migration carries Remnawave descriptions and valid tags, reporting descriptions truncated to 500 characters and invalid tags left behind.
 
 ## Limit traffic and set an expiry
 
@@ -129,7 +135,7 @@ meridian client devices alice --remove ID
 meridian client devices alice --clear
 ```
 
-Private mode shows only “N of M devices”; JSON also returns fingerprint IDs for removing one. Full mode lists IDs, systems and versions, models, apps, and first/last fetch times. The person's console view has the same count or list, with a clear button and, in full mode, individual remove buttons.
+Private mode shows only “N of M devices”; JSON also returns fingerprint IDs for removing one. Full mode lists IDs, systems and versions, models, apps, and first/last fetch times. The person's view in the web panel has the same count or list, with a clear button and, in full mode, individual remove buttons.
 
 A known device stays allowed when you lower its cap. A new device over the cap gets a subscription placeholder asking the person to remove a device or request a higher cap. Counting needs a valid `x-hwid` header from the app; browsers, connection-page fetches, and apps that send no supported HWID are always served and never counted. Removing a registration frees a slot; the device can register again on its next refresh. Limits govern subscription refreshes and do not revoke a configuration already imported into an app. `client reissue` replaces the credentials and clears all registrations while keeping the cap. Remnawave's device registrations are never imported by `migrate`.
 
@@ -160,13 +166,13 @@ With `--json`, pass `--yes`. The new links appear only in that command's output.
 
 `meridian client remove NAME` removes the client permanently: their links stop working and their connection page stops responding. A fleet keeps at least one client.
 
-Existing VLESS sessions can outlive credential revocation. **`--cut-off`**, with `client remove` or `client reissue`, waits for each affected node to apply the revision without the old credentials, then resets its affected inbounds. Every open session on those inbounds ends, including other people's; they reconnect for a moment. If the inbound API fails, Xray restarts and all its sessions on that node end. The flag is opt-in and recommended after a leak. JSON reports each node under `data.cut_off`: `done`, `core_restart`, `failed`, or `timed_out`. Meridian waits up to five minutes; failed cut-offs exit `4`, timeouts `3`. The console offers the same choice when removing a person added there.
+Existing VLESS sessions can outlive credential revocation. **`--cut-off`**, with `client remove` or `client reissue`, waits for each affected node to apply the revision without the old credentials, then resets its affected inbounds. Every open session on those inbounds ends, including other people's; they reconnect for a moment. If the inbound API fails, Xray restarts and all its sessions on that node end. The flag is opt-in and recommended after a leak. JSON reports each node under `data.cut_off`: `done`, `core_restart`, `failed`, or `timed_out`. Meridian waits up to five minutes; failed cut-offs exit `4`, timeouts `3`. The web panel offers the same choice when reissuing or removing a person.
 
 ## Subscription links
 
 Xray JSON lists **Automatic** first, then one named profile for each primary connection. Each named profile keeps the subscription's routing rules and uses only that connection. Fingerprint alternatives remain in separate automatic groups.
 
-Subscription URLs look like `https://198.51.100.10/<page-path>/sub/<id>`. They live under the connection-page path; the control service's console stays on a separate secret path that shared links never reveal.
+Subscription URLs look like `https://198.51.100.10/<page-path>/sub/<id>`. They live under the connection-page path; the control service's web panel stays on a separate secret path that shared links never reveal.
 
 Every subscription asks apps to refresh it every 6 hours (the `profile-update-interval` header, which apps such as Happ and Clash Verge follow), so when you add an exit or relay, clients pick it up within a few hours without a new link. Apps that ignore the header refresh on their own schedule; a manual refresh in the app picks up changes at once.
 
@@ -193,7 +199,19 @@ Xray JSON subscriptions (Happ and other Xray-based apps) send recognized BitTorr
 
 Client accounts (keys, status, limits, traffic) live in the control service's database on your control server. The list of clients Meridian manages is part of your topology in `~/.config/meridian/cluster.yml`. Client commands use the control service's API, and the service serves connection pages directly from its database. After every change, your machine saves an encrypted snapshot of that database (see [Backups](/en/deploy/#backups)).
 
-## Web console
+## Web panel
+
+The control service includes a built-in web panel (also called the management panel or owner console) where you can manage people from any browser, including your phone. `meridian panel` prints its address and, the first time, a one-time setup link where you choose the owner's password. You can add a sign-in code from an authenticator app afterwards, in **Settings**.
+
+| Change in the web panel | Shown read-only (change with `meridian`) |
+|---|---|
+| **People**: add, share a link and QR code, enable or disable, set expiry, traffic limit and reset period, device cap, language, private note and tag, reset traffic, clear devices, issue a new link, remove (with optional session cut-off) | **Servers**: every exit, relay, and gateway, whether its agent is online and up to date, its version, traffic, monthly allowance, and payment date; **Restart Xray** on a node |
+| **Settings**: default page and app language, owner notice for everyone, subscription format preview, and **Privacy** (device limits and daily usage history) | **Revisions** and **Settings**: every change applied from your computer, plus the subscription title, client routing policy, and public owner contact |
+| **Tokens**: create and revoke scoped API tokens, password, and authenticator sign-in code | |
+
+Changes in the web panel and in the CLI are the same changes: `meridian client list` shows people added in the web panel too, and applies never undo a status, limit, or expiry set in either. People you added with `meridian client add` stay yours on the CLI: the web panel can change their limits and status, but removing them or issuing a new link prints the `meridian client` command instead, because those people belong to the reviewed topology. Every person, including those added in the web panel, gets a connection page at their subscription URL.
+
+The web panel never holds SSH keys, so a stolen session can't change your servers. Every sign-in expires after 30 minutes idle and 12 hours at most, and creating a token asks for your password again.
 
 Changed person and password forms ask **Leave** or **Stay** before navigation, browser back, sign-out, or dialog dismissal. Reverting the fields removes the prompt; saving clears only that form's edits. Drafts stay in memory and are never saved in browser storage. Person status and usage refresh every 30 seconds while visible, preserving edited inputs and focus. Passive refresh does not extend the owner session's idle timeout.
 
@@ -205,31 +223,19 @@ Open **Individual connections** beneath the main subscription handoff to copy a 
 
 Person actions name the person in their result. Enabling someone whose access is expired or whose quota is exhausted explains what still prevents connection. A result arriving after you navigate leaves the new screen in place.
 
-The control service has a web console where you can manage people from a browser, including your phone. `meridian panel` prints its address and, the first time, a one-time setup link where you choose the owner's password. You can add a sign-in code from an authenticator app afterwards, in **Settings**.
-
-| Change in the console | Shown read-only (change with `meridian`) |
-|---|---|
-| **People**: add, share a link and QR code, enable or disable, set expiry, traffic limit and reset period, reset traffic, issue a new link, remove | **Servers**: every exit and gateway, whether its agent is online and up to date, its version, and its traffic |
-| **Tokens**: create and revoke API tokens | **Revisions**: every change applied from your computer, with its plan |
-| Your password and sign-in code | The subscription title shown in apps |
-
-Changes in the console and in the CLI are the same changes: `meridian client list` shows people added in the console too, and applies never undo a status, limit, or expiry set in either. People you added with `meridian client add` stay yours on the CLI: the console can change their limits and status, but removing them or issuing a new link prints the `meridian client` command instead, because those people belong to the reviewed topology. Every person, including those added in the console, gets a connection page at their subscription URL.
-
-The console never holds SSH keys, so a stolen session can't change your servers. Every sign-in expires after 30 minutes idle and 12 hours at most, and creating a token asks for your password again.
-
 ### API tokens
 
 Scripts and community bots, such as a Telegram bot that tells people how much traffic they have left, talk to the control service's API. Give each one its own token:
 
-1. Open the console (`meridian panel` prints the address), go to **Tokens**, and choose **Create token**.
-2. Name it after the bot and pick **Read**. The console shows the token once; store it with the bot's secrets.
-3. Point the bot at the console address and send the token as `Authorization: Bearer <token>`. API paths go below that address, for example `https://198.51.100.10/<secret-path>/api/users/alice`. The address contains the secret path, so keep it as private as the token.
+1. Open the web panel (`meridian panel` prints the address), go to **Tokens**, and choose **Create token**.
+2. Name it after the bot and pick **Read**. The panel shows the token once; store it with the bot's secrets.
+3. Point the bot at the panel address and send the token as `Authorization: Bearer <token>`. API paths go below that address, for example `https://198.51.100.10/<secret-path>/api/users/alice`. The address contains the secret path, so keep it as private as the token.
 
 #### OpenAPI contract
 
-Fetch **`GET /api/openapi.json`** below the console address with the same `Authorization: Bearer <token>` header. Any valid API token can read the document, including `people`; expired or revoked tokens receive `401`. It is an English **OpenAPI 3.1** contract with the installed service's version, request and response schemas, errors, and required scopes. A checked-in copy lives at `contracts/meridian/v1/admin/openapi.json`; when using that copy, set your client's base URL to the console address, including the secret path.
+Fetch **`GET /api/openapi.json`** below the panel address with the same `Authorization: Bearer <token>` header. Any valid API token can read the document, including `people`; expired or revoked tokens receive `401`. It is an English **OpenAPI 3.1** contract with the installed service's version, request and response schemas, errors, and required scopes. A checked-in copy lives at `contracts/meridian/v1/admin/openapi.json`; when using that copy, set your client's base URL to the panel address, including the secret path.
 
-`x-meridian-scopes` lists alternative required scopes. `x-meridian-credentials: true` on an operation and its successful response means that response can carry credentials: keep it private and do not log it. User reads carry connection credentials only for `people` or `admin`; read tokens receive empty UUIDs and subscription tokens. Endpoint responses may carry a transport password, and encrypted snapshots contain credentials too. Agent enrollment, agent protocol, subscriptions, pages, and console sessions have separate surfaces and are excluded.
+`x-meridian-scopes` lists alternative required scopes. `x-meridian-credentials: true` on an operation and its successful response means that response can carry credentials: keep it private and do not log it. User reads carry connection credentials only for `people` or `admin`; read tokens receive empty UUIDs and subscription tokens. Endpoint responses may carry a transport password, and encrypted snapshots contain credentials too. Agent enrollment, agent protocol, subscriptions, pages, and web panel sessions have separate surfaces and are excluded.
 
 The operation tables below are checked against the contract. A read token sees:
 
@@ -243,7 +249,7 @@ The operation tables below are checked against the contract. A read token sees:
 | `GET /api/events` | A bounded page of local lifecycle events |
 | `GET /api/attention` | Derived account, node, and server warnings |
 
-Read tokens never see anyone's keys or subscription ID. Choose **People** for a bot that manages accounts and shares connection credentials. Creating it requires the same password confirmation as any other console token.
+Read tokens never see anyone's keys or subscription ID. Choose **People** for a bot that manages accounts and shares connection credentials. Creating it requires the same password confirmation as any other web panel token.
 
 | Scope | Access |
 |---|---|
@@ -271,9 +277,9 @@ A people token cannot remove or reissue a person declared in the fleet file: the
 
 Reissue and deletion accept an optional `{"cut_off": true}` body to end existing sessions after the credential change is applied. This also requires `admin`, as declared by `x-meridian-conditional-scopes`, and can briefly disconnect other people on the affected inbounds. Without that choice, the response keeps its usual account or deletion shape; with it, the response includes the queued commands.
 
-Choose **7, 30, or 90 days**, or **Never expires**; new console tokens default to 90 days. The list shows the expiry and marks expired tokens. Expiry and revocation both refuse the next request with the same `401 unauthenticated` response. Existing tokens keep no expiry. Treat a people token as a password, because it grants access to people's connection credentials.
+Choose **7, 30, or 90 days**, or **Never expires**; new web panel tokens default to 90 days. The list shows the expiry and marks expired tokens. Expiry and revocation both refuse the next request with the same `401 unauthenticated` response. Existing tokens keep no expiry. Treat a people token as a password, because it grants access to people's connection credentials.
 
-`POST /api/tokens` accepts `expires_in_days` from 1 to 3650, or `null` for no expiry. Omitting it also means no expiry. You may instead supply a future UTC `expires_at`; choose one expiry field. `TokenRecord.expires_at` is always returned, including `null`. Token operations require admin API access or an owner console session; creation in the console also requires password confirmation. A people token cannot mint tokens. The `token-create`, `token-record`, `token-issued`, and `token-list` schemas are available through `meridian api schema NAME`.
+`POST /api/tokens` accepts `expires_in_days` from 1 to 3650, or `null` for no expiry. Omitting it also means no expiry. You may instead supply a future UTC `expires_at`; choose one expiry field. `TokenRecord.expires_at` is always returned, including `null`. Token operations require admin API access or an owner web panel session; creation in the web panel also requires password confirmation. A people token cannot mint tokens. The `token-create`, `token-record`, `token-issued`, and `token-list` schemas are available through `meridian api schema NAME`.
 
 ## Owner contact on connection pages
 
@@ -285,7 +291,7 @@ meridian fleet contact --text "Ask for help" --link mailto:help@example.com --ye
 meridian fleet contact --text "" --link none --yes
 ```
 
-Instructions are one line of plain text, up to 120 characters. Links must use `https:`, `tg:`, or `mailto:`; Meridian validates and canonicalizes them. The fields are independent: omitted options keep their values, `--text ""` clears instructions, and `--link none` clears the link. A JSON change requires `--yes`; a dry run and a declined review preserve your fleet. Export/import carries `delivery.owner_contact.text` and `delivery.owner_contact.link`. Settings in the console shows the contact with the CLI command to change it.
+Instructions are one line of plain text, up to 120 characters. Links must use `https:`, `tg:`, or `mailto:`; Meridian validates and canonicalizes them. The fields are independent: omitted options keep their values, `--text ""` clears instructions, and `--link none` clears the link. A JSON change requires `--yes`; a dry run and a declined review preserve your fleet. Export/import carries `delivery.owner_contact.text` and `delivery.owner_contact.link`. Settings in the web panel shows the contact with the CLI command to change it.
 
 The connection page's help section and the support page show these public instructions and a **Contact owner** link in all four interface languages. The link opens only when clicked; the pages use local assets. When contact is configured, the support page keeps it visible and offers **Open connection page**. Apps receive the link in `support-url`; without a link, that header keeps its local support-page URL. The personal page URL stays unchanged.
 
@@ -301,7 +307,7 @@ meridian fleet notice clear --yes
 
 One service-owned notice appears as a banner on connection pages and in apps that support the `announce` subscription header. Use one paragraph of plain text, up to 500 Unicode characters. The only substitutions are `{name}`, `{expires}`, `{days_left}`, `{used}`, and `{quota}`; unknown or malformed braces are refused with the allowed list. Substitution happens once for each person before UTF-8 Base64 encoding, with the `base64:` prefix apps expect. Rendered notices are bounded to 1,024 characters.
 
-`--until` accepts a future UTC instant or a date (end of that day in UTC); omit it for no expiry. Expired notices stop being delivered. `--for NAME` renders real account values for the confirmation; without it the preview uses sample values. `show --for NAME` reads the saved notice and its preview. Saving and clearing require confirmation, and JSON changes require `--yes`. Console Settings offers the same editor and rendered confirmation.
+`--until` accepts a future UTC instant or a date (end of that day in UTC); omit it for no expiry. Expired notices stop being delivered. `--for NAME` renders real account values for the confirmation; without it the preview uses sample values. `show --for NAME` reads the saved notice and its preview. Saving and clearing require confirmation, and JSON changes require `--yes`. Settings in the web panel offers the same editor and rendered confirmation.
 
 These are operator settings: reviewed applies preserve them. `GET /api/notice?for=NAME` needs read scope; `PUT /api/notice` needs admin or the owner session and accepts `{"notice":{"text":"Hello {name}","until":null},"for_user":"person","confirm":false}` to preview. Set `confirm` to `true` to save, or `notice` to `null` to clear. Previews do not change storage or register devices. Encrypted snapshots include the notice; `notice.changed` events record who changed it without its text. No push or messaging notification is sent.
 
@@ -314,9 +320,9 @@ meridian client set person --language fa --json
 meridian client set person --language default --json
 ```
 
-The default is `auto`: connection and support pages follow each person's browser, while subscription status messages in apps stay in English. Choose `en`, `ru`, `fa`, or `zh` to set the starting language of pages and app messages. `meridian fleet language` reads the setting; a code saves it immediately, and JSON changes require `--yes`. Console Settings offers the same choice.
+The default is `auto`: connection and support pages follow each person's browser, while subscription status messages in apps stay in English. Choose `en`, `ru`, `fa`, or `zh` to set the starting language of pages and app messages. `meridian fleet language` reads the setting; a code saves it immediately, and JSON changes require `--yes`. Settings in the web panel offers the same choice.
 
-Set one person's language with `client set NAME --language CODE` or the language select in their console settings. `--language default` follows the fleet again; an omitted flag preserves the current override. Client list/show JSON includes the nullable `language` field.
+Set one person's language with `client set NAME --language CODE` or the language select in their web panel settings. `--language default` follows the fleet again; an omitted flag preserves the current override. Client list/show JSON includes the nullable `language` field.
 
 A saved page choice wins, then the person override, then the fleet default. Only `auto` uses the browser, falling back to English if its language is unsupported. People can always switch with the page's language buttons.
 
@@ -335,4 +341,4 @@ Two apps earn one inert extra entry at the end of their subscription, in the per
 
 Response headers are redacted: URLs are replaced, and encoded profile titles and notices show only their `base64:` prefix. The preview returns no body, URIs, keys, private notes, or tags. User-Agent is bounded to 512 Unicode characters and Accept to 256, each one line. Inputs are transient: they are neither stored nor echoed, never register a device, and trigger no backup write.
 
-`POST /api/subscription/preview` needs read scope or the owner session. Send `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`; omitted headers default to empty strings. Settings in the console has the same form. No HWID or device-header input is accepted. For API-managed endpoints, `enabled: false` excludes the saved endpoint from subscriptions and appears as `disabled_endpoint`; true is the default and is omitted from serialized endpoints. A reviewed endpoint apply restores topology-defined delivery.
+`POST /api/subscription/preview` needs read scope or the owner session. Send `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`; omitted headers default to empty strings. Settings in the web panel has the same form. No HWID or device-header input is accepted. For API-managed endpoints, `enabled: false` excludes the saved endpoint from subscriptions and appears as `disabled_endpoint`; true is the default and is omitted from serialized endpoints. A reviewed endpoint apply restores topology-defined delivery.

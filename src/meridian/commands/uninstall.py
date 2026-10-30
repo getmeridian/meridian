@@ -1,4 +1,4 @@
-"""Remove proxy from server."""
+"""Remove Meridian from a server."""
 
 from __future__ import annotations
 

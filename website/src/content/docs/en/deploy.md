@@ -225,7 +225,7 @@ The preset is a single route named `ai` covering `geosite:category-ai-!cn`, `ant
 
 ## Geo-blocking
 
-By default, the server blocks Russian domains (`geosite:category-ru`) and Russian IP ranges (`geoip:ru`) through the proxy. This keeps your VPS IP out of Russian services' logs, which lowers the chance of it being found and blocked.
+By default, the server blocks Russian domains (`geosite:category-ru`) and Russian IP ranges (`geoip:ru`) through the VPN. This keeps your VPS IP out of Russian services' logs, which lowers the chance of it being found and blocked.
 
 Turn it off if your users need those sites through Meridian:
 
@@ -247,20 +247,20 @@ After the exit is running, add a relay on a domestic server so users keep a way 
 meridian relay add 203.0.113.10 --exit 198.51.100.10
 ```
 
-## Web console
+## Web panel
 
-The control service comes with a web console for one owner: you. It sits on a random secret path, separate from the connection-page path, so links you share never reveal it. `meridian panel` prints its address, and until the console has an owner, a one-time setup link:
+The control service comes with a built-in web panel (owner console) for one owner: you. It sits on a random secret path, separate from the connection-page path, so links you share never reveal it. `meridian panel` prints its address, and until the panel has an owner, a one-time setup link:
 
 ```
-  Meridian console
+  Meridian web panel
   URL         https://198.51.100.10/<secret-path>/
   Setup link  https://198.51.100.10/<secret-path>/#setup=…
               Works once, for 15 minutes. Open it to choose the owner's password.
 ```
 
-After choosing a password you can turn on a sign-in code from an authenticator app. In the console you add people, share their links and QR codes, set limits and expiry, and create API tokens; servers, revisions, and the subscription title are shown read-only, with the `meridian` command that changes them. See [Web console](/en/client-management/#web-console).
+After choosing a password you can turn on a sign-in code from an authenticator app. In the web panel you add people, share their links and QR codes, set expiry dates, traffic limits, and device caps, keep private notes and tags, post a notice for everyone, choose privacy levels, and issue scoped API tokens; server health, traffic, monthly allowances, revisions, and topology settings are shown read-only, with the `meridian` command that changes them. See [Web panel](/en/client-management/#web-panel).
 
-Treat the console address like a password. If you lose the password or the authenticator, `meridian panel --setup-link` prints a reset link: it sets a new password, turns the sign-in code off, and signs out every device.
+Treat the panel address like a password. If you lose the password or the authenticator, `meridian panel --setup-link` prints a reset link: it sets a new password, turns the sign-in code off, and signs out every device.
 
 ## Backups
 

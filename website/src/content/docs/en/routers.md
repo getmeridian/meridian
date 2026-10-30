@@ -3,7 +3,7 @@ title: Use Meridian on a router
 description: Connect a home router to your Meridian server with podkop on OpenWrt or XKeen on Keenetic, so every device is covered without an app.
 ---
 
-A router that runs a proxy client covers every device in the house, including TVs and consoles that can't run an app. This guide shows two common setups: **podkop** on OpenWrt and **XKeen** on Keenetic. Both are community projects, so check their pages for the current steps before you start.
+A router that connects to your Meridian VPN server covers every device in the house, including TVs and game consoles that can't run an app. This guide shows two common setups: **podkop** on OpenWrt and **XKeen** on Keenetic. Both are community projects, so check their pages for the current steps before you start.
 
 ## Get the link
 
@@ -31,7 +31,7 @@ Recent Xray servers turn away sing-box (podkop) and Mihomo clients by default, b
 
 ## OpenWrt with podkop
 
-[podkop](https://podkop.net/) routes only the domains and lists you choose through a proxy, and sends everything else directly. That suits Russian users: domestic sites stay on the normal connection with no extra rules.
+[podkop](https://podkop.net/) routes only the domains and lists you choose through the tunnel, and sends everything else directly. That suits Russian users: domestic sites stay on the normal connection with no extra rules.
 
 **Requirements** (from the [podkop docs](https://podkop.net/docs/install)): OpenWrt 24.10 (25.12 works through apk), and about 20 MB of free flash. If sing-box isn't installed yet, podkop needs 40 MB free in `/overlay`. When space is short, the podkop FAQ suggests `sing-box-tiny`.
 
@@ -97,7 +97,7 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/jameszeroX/XKeen/main/insta
 
 The link carries every value: the part before `@` is the UUID, then the address and port. In the query, `pbk` is `publicKey`, `sid` is `shortId`, `sni` is `serverName`, and `fp` is `fingerprint`. Keep `flow` as `xtls-rprx-vision` when the link has it.
 
-Set routing in `05_routing.json`. The XKeen guide describes two ways: send only chosen domains and IP lists through the proxy, or send `.ru`, `.su`, and `.рф` direct and everything else through it. Then check and start:
+Set routing in `05_routing.json`. The XKeen guide describes two ways: send only chosen domains and IP lists through the tunnel, or send `.ru`, `.su`, and `.рф` direct and everything else through it. Then check and start:
 
 ```
 xkeen -xtest

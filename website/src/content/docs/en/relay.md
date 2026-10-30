@@ -129,7 +129,7 @@ Rent a small server on a domestic provider whose address is allowed on your user
 meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-mobile --sni allowed.example.com
 ```
 
-With `--sni`, only this relay's entry in the subscription announces that name. Meridian gives the relay its own listener on the exit, reachable only from the relay's last hop, and a Reality listener (same keys) that imitates the name. It routes only that name to Reality and sends everything else to that site, so a prober that reaches the relay without a valid key sees the site's real certificate instead of a proxy answer. The exit's own camouflage target and its other entries don't change. The exit must reach the name with TLS 1.3 and HTTP/2; change it later with `meridian relay sni RELAY NEW_SNI`.
+With `--sni`, only this relay's entry in the subscription announces that name. Meridian gives the relay its own listener on the exit, reachable only from the relay's last hop, and a Reality listener (same keys) that imitates the name. It routes only that name to Reality and sends everything else to that site, so a prober that reaches the relay without a valid key sees the site's real certificate instead of a VPN server. The exit's own camouflage target and its other entries don't change. The exit must reach the name with TLS 1.3 and HTTP/2; change it later with `meridian relay sni RELAY NEW_SNI`.
 
 Then check the relay and test from the network that matters:
 

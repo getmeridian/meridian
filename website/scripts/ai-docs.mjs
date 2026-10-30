@@ -75,7 +75,10 @@ function bundle(heading, intro, slugs) {
 export function llmsFull() {
   return bundle(
     'Meridian documentation',
-    ['Deploy censorship-resistant proxy servers with one command, hardened by default.', `Source: ${SITE}`],
+    [
+      'Deploy a hardened self-hosted VPN server with one command, with a built-in web panel and a connection page for each person.',
+      `Source: ${SITE}`,
+    ],
     DOCS_SLUGS,
   );
 }

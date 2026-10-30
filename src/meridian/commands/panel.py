@@ -1,6 +1,6 @@
-"""`meridian panel` — open the fleet's web console yourself.
+"""`meridian panel` — open the fleet's web panel yourself.
 
-Prints the control service's console URL and, until the console has an owner
+Prints the control service's web panel URL and, until the panel has an owner
 (or with `--setup-link`), a one-time setup link.
 """
 
@@ -15,7 +15,7 @@ from meridian.core.errors import LocalStateError, RemnawaveFleetError
 
 
 def run(*, setup_link: bool = False) -> None:
-    """Print the web console's URL; a setup link only on request or first use."""
+    """Print the web panel's URL; a setup link only on request or first use."""
     try:
         cluster = ClusterConfig.load()
     except (LocalStateError, OSError, ValueError) as exc:
@@ -29,7 +29,7 @@ def run(*, setup_link: bool = False) -> None:
 
 
 def _console(cluster: ClusterConfig, *, setup_link: bool) -> None:
-    """The control service's web console: its URL, and a one-time setup link when one is due."""
+    """The control service's web panel: its URL, and a one-time setup link when one is due."""
     url = cluster.panel.display_url
     try:
         # Minting a link changes nothing a snapshot keeps (`ui_*` tables never ride one), so no backup pull follows.
@@ -39,7 +39,7 @@ def _console(cluster: ClusterConfig, *, setup_link: bool) -> None:
             grant = client.issue_setup_link(reset=setup_link) if setup_link or not owner.exists else None
     except ControlServiceNotFound:
         fail(
-            "This control service predates the web console.",
+            "This control service predates the web panel.",
             hint="Update it from here, then run meridian panel again: meridian apply",
             hint_type="user",
         )
@@ -47,7 +47,7 @@ def _console(cluster: ClusterConfig, *, setup_link: bool) -> None:
         fail(exc)
 
     err_console.print()
-    err_console.print("  [bold]Meridian console[/bold]")
+    err_console.print("  [bold]Meridian web panel[/bold]")
     err_console.print(f"  URL         [bold]{escape(url)}[/bold]")
     if grant is not None:
         err_console.print(f"  Setup link  [bold]{escape(url)}#setup={escape(grant.token)}[/bold]")
@@ -66,6 +66,6 @@ def _console(cluster: ClusterConfig, *, setup_link: bool) -> None:
         err_console.print("  [dim]Lost the password? A fresh setup link: meridian panel --setup-link[/dim]")
     err_console.print()
     err_console.print("  [dim]Treat the URL and any setup link like passwords; neither is ever saved in a log.[/dim]")
-    err_console.print("  [bold]The console changes[/bold] people, API tokens, and privacy settings.")
+    err_console.print("  [bold]The web panel changes[/bold] people, API tokens, and privacy settings.")
     err_console.print("  [bold]Servers change here[/bold], with meridian: the control server never holds SSH keys.")
     err_console.print()
