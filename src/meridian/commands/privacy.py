@@ -183,7 +183,7 @@ def print_state(state: PrivacyState) -> None:
         table.add_column(t(label))
     for change in state.changes:
         table.add_row(
-            change.changed_at.replace("T", " ").removesuffix("Z") + " UTC",
+            change.changed_at.replace("T", " ").removesuffix("Z"),
             escape(change.author),
             escape(_settings_text(change.before)),
             escape(_settings_text(change.after)),
