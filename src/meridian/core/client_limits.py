@@ -55,6 +55,12 @@ class UserCreationSettings(CoreModel):
     device_limit: int | None = Field(default=None, ge=1, le=100)
 
 
+class ClientExtendRequest(CoreModel):
+    """Add whole days after the later of now and the person's current expiry."""
+
+    days: int = Field(ge=1, le=3650, strict=True)
+
+
 class ClientLimitChange(CoreModel):
     """A partial change to one client's limits; omitted fields keep their value.
 

@@ -61,6 +61,7 @@ meridian client add alice --json
 meridian client set alice --limit 50GB --reset month --expires 2026-12-31 --json
 meridian client set alice --limit none --expires never --json
 meridian client reset-traffic alice --json
+meridian client extend alice --days 7 --json
 
 # Opt in to daily usage after reviewing its disclosure, then read person and server totals
 meridian privacy show --json

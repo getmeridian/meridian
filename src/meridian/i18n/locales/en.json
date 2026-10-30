@@ -222,6 +222,8 @@
   "client.resets.month_rolling": "resets monthly on the day they were added",
   "client.expires_never": "never",
   "client.limits_updated": "Updated limits for '{name}'",
+  "client.extended": "Extended access for '{name}'",
+  "client.extend_days_invalid": "Days must be an integer from 1 to 3650.",
   "client.console_note": "· console: added in the web console; status, limits, and devices can also be changed in the CLI.",
   "client.traffic_reset": "Reset traffic for '{name}'; their usage starts again from zero.",
   "client.limits_hint": "Change limits: meridian client set NAME --limit SIZE --reset PERIOD --expires DATE --devices N",

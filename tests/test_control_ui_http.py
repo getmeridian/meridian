@@ -197,6 +197,18 @@ def test_the_console_can_mint_a_people_token_after_step_up(fleet: Fleet) -> None
     assert issued.body["scope"] == "people"
 
 
+def test_owner_can_extend_declared_and_console_people(fleet: Fleet, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("meridian.control.service.utc_now", lambda: "2026-10-29T12:00:00Z")
+    fleet.set_up()
+    for name in ("alice", "bob"):
+        fleet.service.put_user(name)
+    _declare(fleet.service, "alice")
+    for name in ("alice", "bob"):
+        reply = fleet.ui("POST", f"/api/users/{name}/extend", {"days": 7})
+        assert reply.status == 200, reply.body
+        assert (reply.body["expire_at"], reply.body["status"]) == ("2026-11-05T12:00:00Z", "active")
+
+
 def test_only_the_root_token_issues_setup_links(fleet: Fleet) -> None:
     admin = fleet.call("POST", "/api/tokens", {"name": "laptop", "scope": "admin"}, bearer=ADMIN_TOKEN).body["token"]
     assert fleet.call("POST", "/api/owner/setup-link", {}, bearer=admin).status == 403

@@ -53,6 +53,7 @@ from meridian.control.models import (
     UserUsage,
 )
 from meridian.core.client_devices import DevicesRemoved
+from meridian.core.client_limits import ClientExtendRequest
 from meridian.core.errors import MeridianError
 
 _GATEWAY_FAILURES = frozenset({502, 503, 504})
@@ -209,6 +210,12 @@ class ControlClient:
 
     def reset_user_traffic(self, username: str) -> UserRecord:
         return UserRecord.model_validate(self._call("POST", f"api/users/{_segment(username)}/reset-traffic", {}))
+
+    def extend_user(self, username: str, *, days: int) -> UserRecord:
+        request = ClientExtendRequest(days=days)
+        return UserRecord.model_validate(
+            self._call("POST", f"api/users/{_segment(username)}/extend", request.model_dump(mode="json"))
+        )
 
     def user_devices(self, username: str) -> UserDevices:
         return UserDevices.model_validate(self._call("GET", f"api/users/{_segment(username)}/devices"))

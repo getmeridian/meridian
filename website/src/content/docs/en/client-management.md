@@ -226,6 +226,7 @@ Read tokens never see anyone's keys or subscription ID. Choose **People** for a 
 | `POST /api/users` | Create a person with `username`, `status`, `expire_at`, `traffic_limit_bytes`, `traffic_limit_strategy`, and `device_limit` in one transaction |
 | `PATCH /api/users/{username}` | Change the status, expiry, traffic limit or reset strategy, or device cap; omitted fields keep their values |
 | `POST /api/users/{username}/reset-traffic` | Reset used traffic |
+| `POST /api/users/{username}/extend` | Send `{"days": N}` (1–3650) to add days after the later of now and the current expiry; no expiry starts from now |
 | `POST /api/users/{username}/reissue` | Replace connection credentials and clear device registrations |
 | `DELETE /api/users/{username}` | Remove a person |
 | `GET /api/users/{username}/devices` | Read registrations allowed by the owner's privacy level |

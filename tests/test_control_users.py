@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -18,7 +20,8 @@ FUTURE = "2999-01-01T00:00:00Z"
 
 
 @pytest.fixture
-def service(tmp_path: Path) -> ControlService:
+def service(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> ControlService:
+    monkeypatch.setattr("meridian.control.service.utc_now", lambda: "2026-10-29T12:00:00Z")
     return ControlService(tmp_path / "control.db", fleet_id=FLEET_ID, version="4.0.0")
 
 
@@ -64,6 +67,70 @@ def test_disabling_a_user_takes_them_out_of_node_documents(service: ControlServi
     assert _delivered(service) == [bob.user_id]
     service.update_user("alice", UserUpdate(status="active"))
     assert sorted(_delivered(service)) == sorted([alice.user_id, bob.user_id])
+
+
+@pytest.mark.parametrize(
+    ("expiry", "expected"),
+    [
+        (None, "2026-11-05T12:00:00Z"),
+        ("2026-01-01T00:00:00Z", "2026-11-05T12:00:00Z"),
+        ("2026-12-01T00:00:00Z", "2026-12-08T00:00:00Z"),
+    ],
+    ids=["no-expiry", "expired", "future-expiry"],
+)
+def test_extend_adds_days_after_now_or_the_existing_expiry(
+    service: ControlService, monkeypatch: pytest.MonkeyPatch, expiry: str | None, expected: str
+) -> None:
+    monkeypatch.setattr("meridian.control.service.utc_now", lambda: "2026-10-29T12:00:00Z")
+    service.put_user("alice")
+    service.update_user("alice", UserUpdate(expire_at=expiry))
+
+    extended = service.extend_user("alice", days=7)
+
+    assert (extended.expire_at, extended.status) == (expected, "active")
+
+
+def test_extend_updates_the_node_document_when_expiry_is_lifted(service: ControlService) -> None:
+    _with_node(service)
+    alice = service.put_user("alice")
+    service.update_user("alice", UserUpdate(expire_at=PAST))
+    assert _delivered(service) == []
+    assert service.extend_user("alice", days=7).status == "active"
+    assert _delivered(service) == [alice.user_id]
+
+
+@pytest.mark.parametrize("status", ["disabled", "limited"])
+def test_extend_keeps_operator_disable_and_traffic_enforcement(service: ControlService, status: str) -> None:
+    alice = service.put_user("alice")
+    if status == "limited":
+        service.update_user("alice", UserUpdate(traffic_limit_bytes=1000))
+        _count(service, alice.user_id, 1200, seq=1)
+    else:
+        service.update_user("alice", UserUpdate(status="disabled"))
+    assert service.extend_user("alice", days=7).status == status
+
+
+def test_concurrent_extensions_both_add_their_days(service: ControlService) -> None:
+    service.put_user("alice")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        replies = list(pool.map(lambda _index: service.extend_user("alice", days=7), range(2)))
+    assert {reply.expire_at for reply in replies} == {"2026-11-05T12:00:00Z", "2026-11-12T12:00:00Z"}
+    assert service.get_user("alice").expire_at == "2026-11-12T12:00:00Z"
+
+
+def test_extend_preserves_a_fractional_future_expiry(service: ControlService) -> None:
+    service.put_user("alice")
+    service.update_user("alice", UserUpdate(expire_at="2026-12-01T00:00:00.5Z"))
+    extended = service.extend_user("alice", days=7)
+    assert datetime.fromisoformat(extended.expire_at) == datetime.fromisoformat("2026-12-08T00:00:00.5Z")
+
+
+def test_extension_overflow_rolls_back_with_a_specific_refusal(service: ControlService) -> None:
+    service.put_user("alice")
+    original = service.update_user("alice", UserUpdate(expire_at="9999-12-31T00:00:00Z"))
+    with pytest.raises(ServiceError, match="year 9999") as refused:
+        service.extend_user("alice", days=1)
+    assert refused.value.status == 400 and service.get_user("alice") == original
 
 
 def test_update_keeps_fields_it_does_not_name(service: ControlService) -> None:

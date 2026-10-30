@@ -22,6 +22,8 @@ export * as ClientDevicesEnvelopeSchema from "./client-devices-envelope.schema";
 export * as ClientDevicesSchema from "./client-devices.schema";
 export * as ClientDisableEnvelopeSchema from "./client-disable-envelope.schema";
 export * as ClientEnableEnvelopeSchema from "./client-enable-envelope.schema";
+export * as ClientExtendEnvelopeSchema from "./client-extend-envelope.schema";
+export * as ClientExtendRequestSchema from "./client-extend-request.schema";
 export * as ClientLimitsSchema from "./client-limits.schema";
 export * as ClientListEnvelopeSchema from "./client-list-envelope.schema";
 export * as ClientListSchema from "./client-list.schema";

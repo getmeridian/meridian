@@ -123,6 +123,7 @@ ROUTE_SAMPLES = {
     "update_user": ("/api/users/alice", {"status": "disabled"}),
     "reissue_user": ("/api/users/alice/reissue", {}),
     "reset_user_traffic": ("/api/users/alice/reset-traffic", {}),
+    "extend_user": ("/api/users/alice/extend", {"days": 7}),
     "user_devices": ("/api/users/alice/devices", None),
     "delete_user_device": ("/api/users/alice/devices/" + "a" * 64, None),
     "clear_user_devices": ("/api/users/alice/devices", None),
@@ -376,6 +377,7 @@ def test_people_can_manage_console_people_and_devices_with_credentials(fleet: Fl
         changed = client.update_user("bob", UserUpdate(status="disabled", device_limit=3))
         assert (changed.status, changed.device_limit) == ("disabled", 3)
         assert client.reset_user_traffic("bob").used_traffic_bytes == 0
+        assert client.extend_user("bob", days=7).status == "disabled"
         reissued = client.reissue_user("bob")
         assert reissued.uuid != created.uuid and reissued.sub_token != created.sub_token
         assert client.user_devices("bob").devices == []
@@ -421,3 +423,11 @@ def test_people_declared_refusal_is_checked_inside_the_write(fleet: Fleet, monke
     code, answer = _request(fleet.url + "/api/users/alice/reissue", "POST", {}, _mint(fleet, "people")["token"])
     assert (code, answer["error"]["code"]) == (409, "declared_user")
     assert fleet.service.get_user("alice") == before
+
+
+@pytest.mark.parametrize("days", [0, 3651, -1, 1.5, "7", None, True])
+def test_extend_api_requires_one_bounded_integer(fleet: Fleet, days: Any) -> None:
+    original = fleet.service.put_user("alice")
+    status, answer = _request(fleet.url + "/api/users/alice/extend", "POST", {"days": days}, ADMIN_TOKEN)
+    assert (status, answer["error"]["code"]) == (400, "invalid_request")
+    assert fleet.service.get_user("alice") == original

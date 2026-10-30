@@ -597,6 +597,63 @@ export const commandCatalog = {
     {
       "argv": [
         "client",
+        "extend",
+        "NAME"
+      ],
+      "command": "client.extend",
+      "data_schema": "client-limits",
+      "description": "Extend a person's access by whole days, including people created in the console",
+      "envelope_schema": "client-extend-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "client access was extended; effective status and expiry were returned",
+        "1": "unexpected Meridian bug",
+        "2": "client not found or invalid days",
+        "3": "system or panel failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--days",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "client access was extended; effective status and expiry were returned",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "client not found or invalid days",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or panel failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
         "list"
       ],
       "command": "client.list",

@@ -23,6 +23,7 @@ from meridian.core.apply import (
 )
 from meridian.core.cancellation import OperationCancellation
 from meridian.core.client_devices import ClientDevicesResult
+from meridian.core.client_limits import ClientExtendRequest
 from meridian.core.clients import (
     ClientAddResult,
     ClientLimitsResult,
@@ -489,6 +490,13 @@ _, _, ClientDevicesOutputEnvelope = _make_command_envelope(
     doc="Envelope schema for `meridian client devices --json`.",
 )
 
+_, _, ClientExtendOutputEnvelope = _make_command_envelope(
+    "ClientExtend",
+    "client.extend",
+    ClientLimitsResult,
+    doc="Envelope schema for `meridian client extend --json`.",
+)
+
 _, _, NodeListOutputEnvelope = _make_command_envelope(
     "NodeList",
     "node.list",
@@ -594,6 +602,8 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "client-set-envelope": ClientSetOutputEnvelope,
     "client-reset-traffic-envelope": ClientResetTrafficOutputEnvelope,
     "client-devices-envelope": ClientDevicesOutputEnvelope,
+    "client-extend-envelope": ClientExtendOutputEnvelope,
+    "client-extend-request": ClientExtendRequest,
     "node-list-envelope": NodeListOutputEnvelope,
     "relay-list-envelope": RelayListOutputEnvelope,
     "route-add-envelope": RouteAddOutputEnvelope,

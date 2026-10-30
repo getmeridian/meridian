@@ -67,6 +67,7 @@ from meridian.control.ui_views import is_declared
 from meridian.core.agent_http import AGENT_HTTP_SURFACE
 from meridian.core.agent_protocol import EnrollRequest, ObservedStateReport, PollRequest, RenewRequest, StatsReport
 from meridian.core.client_devices import DEVICE_KEY_PATTERN
+from meridian.core.client_limits import ClientExtendRequest
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 MAX_BODY_BYTES = AGENT_HTTP_SURFACE.max_request_bytes
@@ -406,6 +407,10 @@ class _Handler(BaseHTTPRequestHandler):
     def reset_user_traffic(self, match: re.Match[str]) -> Any:
         return self._service.reset_user_traffic(match[1])
 
+    def extend_user(self, match: re.Match[str]) -> Any:
+        request = self._model(ClientExtendRequest)
+        return self._service.extend_user(match[1], days=request.days)
+
     def user_devices(self, match: re.Match[str]) -> Any:
         return self._service.user_devices(match[1])
 
@@ -620,6 +625,7 @@ ROUTES: list[Route] = [
     ("PATCH", re.compile(rf"/api/users/{_USERNAME}"), "people", _Handler.update_user),
     ("POST", re.compile(rf"/api/users/{_USERNAME}/reissue"), "people", _Handler.reissue_user),
     ("POST", re.compile(rf"/api/users/{_USERNAME}/reset-traffic"), "people", _Handler.reset_user_traffic),
+    ("POST", re.compile(rf"/api/users/{_USERNAME}/extend"), "people", _Handler.extend_user),
     ("GET", re.compile(rf"/api/users/{_USERNAME}/devices"), ("read", "people"), _Handler.user_devices),
     (
         "DELETE",
@@ -682,6 +688,7 @@ OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
         _Handler.update_user,
         _Handler.reissue_user,
         _Handler.reset_user_traffic,
+        _Handler.extend_user,
         _Handler.user_devices,
         _Handler.delete_user_device,
         _Handler.clear_user_devices,

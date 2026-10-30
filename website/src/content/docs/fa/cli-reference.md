@@ -112,6 +112,7 @@ meridian client usage NAME [--days N] [--json]
 meridian client list [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client reset-traffic NAME [--json]
+meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
@@ -138,6 +139,8 @@ meridian client remove NAME [--yes] [--json]
 **`client set`** — سقف ترافیک، دورهٔ صفرشدن یا تاریخ انقضای کلاینت را تغییر می‌دهد؛ فقط گزینه‌هایی که می‌دهید تغییر می‌کنند و دست‌کم یکی لازم است. کلاینتی که سقف یا انقضا قطعش کرده (وضعیت `limited` یا `expired`) به‌محض اینکه مقادیر جدید اجازه دهند دوباره وصل می‌شود. تغییرها فوراً اعمال می‌شوند و apply هرگز به آن‌ها دست نمی‌زند. مقدار نادرست پیش از آنکه Meridian به جایی وصل شود با کد `2` خارج می‌شود. با `--json`، کلاینت را همان‌طور که اکنون در سرویس کنترل است در `data.client` برمی‌گرداند، از جمله `traffic_limit_bytes`، `traffic_reset` و `expires_at` (خالی یعنی بدون انقضا).
 
 **`client reset-traffic`** — ترافیک مصرف‌شدهٔ کلاینت را از صفر شروع می‌کند، همان کاری که دورهٔ جدید می‌کرد؛ کلاینتی که سقف قطعش کرده دوباره می‌تواند وصل شود.
+
+**`client extend`** — از زمان فعلی یا تاریخ انقضای حساب، هر کدام دیرتر باشد، ۱ تا ۳۶۵۰ روز کامل اضافه می‌کند. اگر حساب انقضا ندارد، مدت از اکنون حساب می‌شود. `--days N` الزامی است. محاسبه و اجرای محدودیت‌ها در یک تراکنش سرویس انجام می‌شوند، پس تمدیدهای هم‌زمان هر دو حساب می‌شوند. دسترسی منقضی‌شده دوباره برقرار می‌شود، ولی غیرفعال‌سازی مدیر و سقف ترافیک حفظ می‌شوند. JSON وضعیت و انقضای مؤثر را در `data.client` برمی‌گرداند.
 
 **`client enable` / `client disable`** — کلاینت را فوراً فعال یا تعلیق کنید. کلاینت تعلیق‌شده تا وقتی `client enable` را اجرا نکنید غیرفعال می‌ماند؛ apply (از جمله بازاستقرار و `client add`، `node add`، `relay add`) وضعیت کلاینت را تغییر نمی‌دهد.
 

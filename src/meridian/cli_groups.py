@@ -162,6 +162,18 @@ def client_reset_traffic_cmd(
     run_reset_traffic(name)
 
 
+@client_app.command("extend", rich_help_panel="Limits and expiry")
+def client_extend_cmd(
+    name: str = typer.Argument(..., help="Client name"),
+    days: str = typer.Option(..., "--days", metavar="N", help="Days to add after now or the current expiry, 1–3650"),
+    _json: Json = False,
+) -> None:
+    """Extend a person's access by whole days, including people created in the console"""
+    from meridian.commands.client_limits import run_extend
+
+    run_extend(name, days=days)
+
+
 @client_app.command("remove")
 def client_remove(
     name: str = typer.Argument(..., help="Client name"),

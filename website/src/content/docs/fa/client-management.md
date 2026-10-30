@@ -226,6 +226,7 @@ URL‌های اشتراک مثل `https://198.51.100.10/<page-path>/sub/<id>` ه
 | `POST /api/users` | ساخت حساب با `username`، `status`، `expire_at`، `traffic_limit_bytes`، `traffic_limit_strategy` و `device_limit` در یک تراکنش |
 | `PATCH /api/users/{username}` | تغییر وضعیت، انقضا، سقف و دورهٔ بازنشانی ترافیک یا سقف دستگاه؛ فیلدهای ارسال‌نشده حفظ می‌شوند |
 | `POST /api/users/{username}/reset-traffic` | بازنشانی ترافیک مصرف‌شده |
+| `POST /api/users/{username}/extend` | ارسال `{"days": N}` (۱–۳۶۵۰) برای افزودن روزها پس از دیرترِ زمان فعلی و انقضای حساب؛ حساب بدون انقضا از اکنون شروع می‌کند |
 | `POST /api/users/{username}/reissue` | جایگزینی اطلاعات اتصال و پاک‌کردن ثبت دستگاه‌ها |
 | `DELETE /api/users/{username}` | حذف یک فرد |
 | `GET /api/users/{username}/devices` | خواندن ثبت‌ها در حد سطح حریم خصوصی انتخاب‌شده توسط مالک |

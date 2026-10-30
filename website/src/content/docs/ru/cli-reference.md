@@ -112,6 +112,7 @@ meridian client usage NAME [--days N] [--json]
 meridian client list [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client reset-traffic NAME [--json]
+meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
@@ -138,6 +139,8 @@ meridian client remove NAME [--yes] [--json]
 **`client set`** — меняет лимит трафика, период сброса или срок доступа клиента; меняется только то, что вы передали, и нужен хотя бы один флаг. Клиент, которого отключил лимит или срок (статус `limited` или `expired`), снова может подключиться, как только новые значения это позволяют. Изменения действуют сразу, и применения их не трогают. Неверное значение завершает команду с кодом `2` раньше, чем Meridian куда-либо подключится. С `--json` возвращает в `data.client` клиента таким, каким его теперь видит сервис управления, включая `traffic_limit_bytes`, `traffic_reset` и `expires_at` (пусто — бессрочно).
 
 **`client reset-traffic`** — обнуляет использованный трафик клиента, как это сделал бы новый период; клиент, которого отключил лимит, снова может подключиться.
+
+**`client extend`** — добавляет 1–3650 целых дней к текущему сроку доступа или к настоящему времени, если срок прошёл или не задан. Обязателен `--days N`. Расчёт и проверка ограничений проходят в одной транзакции сервиса, поэтому одновременные продления складываются. Истёкший доступ восстанавливается, но отключение оператором и лимит трафика продолжают действовать. JSON возвращает итоговые статус и срок в `data.client`.
 
 **`client enable` / `client disable`** — возобновить или приостановить клиента немедленно. Отключённый клиент остаётся отключённым, пока вы не выполните `client enable`: применения (включая переразворачивание, `client add`, `node add` и `relay add`) статус клиента не меняют.
 

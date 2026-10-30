@@ -112,6 +112,7 @@ meridian client usage NAME [--days N] [--json]
 meridian client list [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client reset-traffic NAME [--json]
+meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
@@ -138,6 +139,8 @@ meridian client remove NAME [--yes] [--json]
 **`client set`** — changes a client's traffic limit, reset period, or expiry; only the options you pass change, and at least one is required. A client their limit or expiry has cut off (status `limited` or `expired`) can connect again as soon as the new values allow it. Changes take effect at once, and applies never touch them. A bad value exits `2` before Meridian connects anywhere. With `--json`, returns the client as the control service now has it in `data.client`, including `traffic_limit_bytes`, `traffic_reset`, and `expires_at` (empty means never).
 
 **`client reset-traffic`** — starts the client's used traffic from zero, as a new period would; a client their limit has cut off can connect again.
+
+**`client extend`** — adds 1–3650 whole days after the later of now and the current expiry; a person without expiry gets now plus that duration. `--days N` is required. The calculation and enforcement share one service transaction, so concurrent extensions both count. An expired person can connect again, while operator disable and traffic limits still apply. JSON returns the effective status and expiry in `data.client`.
 
 **`client enable` / `client disable`** — resume or suspend a client immediately. A disable lasts until you run `client enable`; applies (including redeploys and `client add`, `node add`, `relay add`) leave a client's status alone.
 

@@ -165,6 +165,15 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         outcomes=[_ok("client traffic was reset"), _user("client not found or input error"), *_PANEL_FAILURES],
         stability="stable",
     ),
+    "client.extend": CommandOutput(
+        data_schema="client-limits",
+        outcomes=[
+            _ok("client access was extended; effective status and expiry were returned"),
+            _user("client not found or invalid days"),
+            *_PANEL_FAILURES,
+        ],
+        stability="stable",
+    ),
     "client.devices": CommandOutput(
         data_schema="client-devices",
         outcomes=[

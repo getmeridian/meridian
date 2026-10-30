@@ -222,6 +222,8 @@
   "client.resets.month_rolling": "сброс каждый месяц в день добавления",
   "client.expires_never": "бессрочно",
   "client.limits_updated": "Лимиты для «{name}» обновлены",
+  "client.extended": "Срок доступа для «{name}» продлён",
+  "client.extend_days_invalid": "Число дней должно быть целым от 1 до 3650.",
   "client.console_note": "· console: добавлен в веб-консоли; статус, лимиты и устройства можно менять и через CLI.",
   "client.traffic_reset": "Трафик «{name}» сброшен: учёт начинается с нуля.",
   "client.limits_hint": "Изменить лимиты: meridian client set NAME --limit SIZE --reset PERIOD --expires DATE --devices N",

@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime
 
+from pydantic import ValidationError
 from rich.cells import cell_len
 from rich.markup import escape
 
@@ -20,7 +21,7 @@ from meridian.commands.client_handoff import (
 )
 from meridian.console import err_console, error_context, fail, is_json_mode, ok
 from meridian.control_access import AccessPanel, access_panel
-from meridian.core.client_limits import ClientLimitChange, ClientLimitError, build_limit_change
+from meridian.core.client_limits import ClientExtendRequest, ClientLimitChange, ClientLimitError, build_limit_change
 from meridian.core.clients import ClientDetail, ClientRecord, build_client_limits_result, build_client_record
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -122,6 +123,24 @@ def run_reset_traffic(name: str) -> None:
             verb="reset traffic for",
             mutate=lambda panel, user: panel.reset_user_traffic(user.id),
             done_key="client.traffic_reset",
+        )
+
+
+def run_extend(name: str, *, days: str) -> None:
+    """Extend access from the later of now or the current expiry; report the service's effective status."""
+    operation = OperationContext()
+    with error_context("client.extend", timer=operation.timer):
+        try:
+            request = ClientExtendRequest(days=int(days))
+        except (ValueError, ValidationError):
+            fail(t("client.extend_days_invalid"), hint_type="user")
+        _mutate(
+            name,
+            operation,
+            command="client.extend",
+            verb="extend access for",
+            mutate=lambda panel, user: panel.extend_user(user.id, days=request.days),
+            done_key="client.extended",
         )
 
 

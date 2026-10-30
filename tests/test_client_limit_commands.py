@@ -240,6 +240,48 @@ def test_cli_removal_and_reissue_stay_with_declared_people(tmp_path: Path, capsy
         assert fleet.client.get_user("carol") == before
 
 
+@pytest.mark.parametrize("scope", ["admin", "people"])
+def test_extend_cli_resolves_console_people_and_reports_the_effective_expiry_and_status(
+    scope: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from typer.testing import CliRunner
+
+    from meridian.cli import app
+
+    monkeypatch.setattr("meridian.control.service.utc_now", lambda: "2026-10-29T12:00:00Z")
+    with _fleet(tmp_path, json_mode=True) as fleet:
+        fleet.create("ALICE")
+        fleet.client.update_user("ALICE", UserUpdate(status="disabled", expire_at="2026-12-01T00:00:00Z"))
+        if scope == "people":
+            fleet.cluster.panel.api_token = fleet.client.create_token("People desk", "people").token
+        result = CliRunner().invoke(app, ["client", "extend", "ALICE", "--days", "7", "--json"])
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.stdout)
+        schema_model("client-extend-envelope").model_validate(payload)
+        client = payload["data"]["client"]
+        assert (client["username"], client["status"].lower(), client["expires_at"], client["declared"]) == (
+            "ALICE",
+            "disabled",
+            "2026-12-08T00:00:00Z",
+            False,
+        )
+        assert fleet.client.get_user("alice").expire_at is None
+
+
+@pytest.mark.parametrize("days", ["0", "3651", "bad", "1.5"])
+def test_extend_bad_days_fail_before_opening_service_access(
+    days: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from meridian.commands.client_limits import run_extend
+
+    with _fleet(tmp_path, json_mode=True), patch("meridian.commands.client_limits.access_panel") as access:
+        with pytest.raises(typer.Exit) as refused:
+            run_extend("alice", days=days)
+        assert refused.value.exit_code == 2
+        assert _envelope(capsys, "client-extend-envelope")["status"] == "failed"
+        access.assert_not_called()
+
+
 def test_client_add_creates_with_limits_during_the_reviewed_apply(
     tmp_path: Path, tmp_home: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

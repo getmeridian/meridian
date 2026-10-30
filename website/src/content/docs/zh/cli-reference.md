@@ -112,6 +112,7 @@ meridian client usage NAME [--days N] [--json]
 meridian client list [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client reset-traffic NAME [--json]
+meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
@@ -138,6 +139,8 @@ meridian client remove NAME [--yes] [--json]
 **`client set`** — 修改客户端的流量限额、重置周期或到期时间；只修改你传入的选项，至少需要一个。因限额或到期被停用的客户端（状态 `limited` 或 `expired`），只要新的值允许，就能重新连接。修改立即生效，应用永远不会改动它们。无效的值会在 Meridian 连接任何地方之前以 `2` 退出。带 `--json` 时，在 `data.client` 中返回控制服务当前的客户端信息，包括 `traffic_limit_bytes`、`traffic_reset` 和 `expires_at`（为空表示永不到期）。
 
 **`client reset-traffic`** — 让客户端的已用流量从零开始计算，与进入新周期相同；因限额被停用的客户端可以重新连接。
+
+**`client extend`** — 从当前时间和原到期时间中较晚者起增加 1–3650 个完整日；未设到期时间则从现在起算。必须提供 `--days N`。计算和限制检查在同一个服务事务中完成，因此并发的延长操作都会累加。已到期用户可以恢复访问，但管理者的禁用设置和流量限额仍然有效。JSON 在 `data.client` 中返回实际状态和到期时间。
 
 **`client enable` / `client disable`** — 立即恢复或暂停客户端。禁用持续到你运行 `client enable`；应用（包括重新部署和 `client add`、`node add`、`relay add`）保持客户端的状态不变。
 

@@ -226,6 +226,7 @@ URL подписки выглядят как `https://198.51.100.10/<page-path>/
 | `POST /api/users` | Создать человека с `username`, `status`, `expire_at`, `traffic_limit_bytes`, `traffic_limit_strategy` и `device_limit` в одной транзакции |
 | `PATCH /api/users/{username}` | Изменить статус, срок действия, лимит и период сброса трафика или число устройств; пропущенные поля сохраняются |
 | `POST /api/users/{username}/reset-traffic` | Сбросить использованный трафик |
+| `POST /api/users/{username}/extend` | Отправить `{"days": N}` (1–3650), чтобы добавить дни к текущему сроку или к настоящему времени, если срок прошёл или не задан |
 | `POST /api/users/{username}/reissue` | Заменить данные подключения и очистить регистрации устройств |
 | `DELETE /api/users/{username}` | Удалить человека |
 | `GET /api/users/{username}/devices` | Прочитать регистрации в пределах выбранного владельцем уровня приватности |

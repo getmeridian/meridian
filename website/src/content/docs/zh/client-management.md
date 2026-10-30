@@ -226,6 +226,7 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 | `POST /api/users` | 在一个事务中创建用户，同时设置 `username`、`status`、`expire_at`、`traffic_limit_bytes`、`traffic_limit_strategy` 和 `device_limit` |
 | `PATCH /api/users/{username}` | 修改状态、到期时间、流量限额或重置策略、设备上限；未发送的字段保持原值 |
 | `POST /api/users/{username}/reset-traffic` | 重置已用流量 |
+| `POST /api/users/{username}/extend` | 发送 `{"days": N}`（1–3650），从当前时间和原到期时间中较晚者起增加天数；未设到期时间则从现在起算 |
 | `POST /api/users/{username}/reissue` | 更换连接凭据并清除设备注册 |
 | `DELETE /api/users/{username}` | 删除用户 |
 | `GET /api/users/{username}/devices` | 按所有者选择的隐私级别读取设备注册 |

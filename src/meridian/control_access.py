@@ -133,6 +133,11 @@ class ServiceAccessPanel:
         username = self._username(user_id)
         return self._user(_translated(lambda: self._client.reset_user_traffic(username)))
 
+    def extend_user(self, user_id: str, *, days: int) -> User:
+        """Extend expiry and return the effective status after service enforcement."""
+        username = self._username(user_id)
+        return self._user(_translated(lambda: self._client.extend_user(username, days=days)))
+
     def revoke_user_subscription(self, user_id: str) -> User:
         username = self._username(user_id)
         return self._user(_translated(lambda: self._client.reissue_user(username)))

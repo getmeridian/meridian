@@ -63,6 +63,7 @@ from meridian.control.subscriptions import (
 from meridian.control.times import utc_now
 from meridian.control.tokens import API_TOKENS_TABLE, TokenRegistry
 from meridian.control.traffic import DAILY_TABLES, PER_EPOCH_BASELINES, TrafficLedger
+from meridian.control.user_lifecycle import extend_user_expiry
 from meridian.control.user_policy import enforced_status, period_began, whole_seconds
 from meridian.control.users import USER_SELECT, user_record
 from meridian.core.agent_desired import DesiredNodeState
@@ -507,6 +508,18 @@ class ControlService:
             )
             self._compose_all()
             return self._require_user(username)
+
+    def extend_user(self, username: str, *, days: int) -> UserRecord:
+        """Extend from now or the current expiry, preserving operator disable and enforcing traffic limits."""
+        return extend_user_expiry(
+            self._store,
+            username,
+            days=days,
+            now=utc_now,
+            read_user=self._require_user,
+            enforce=self._enforce,
+            compose=self._compose_all,
+        )
 
     def reset_user_traffic(self, username: str) -> UserRecord:
         """Start the user's traffic period now; a user limited by it becomes active again."""
