@@ -2,6 +2,8 @@
 
 ## Design decisions
 
+**People API access** — the API-token section in client-management documents the separate people capability, credential access, and transactional declared-user refusals in all four locales.
+
 **Per-locale directories** — each locale (en, ru, fa, zh) has its own folder with identically named markdown files. English is the source; other locales are translations.
 
 **Frontmatter schema** — Starlight's plain `docsSchema` (`title`, `description`). Sections and page order live in one list, `src/lib/docs-sidebar.mjs`, shared by every locale.

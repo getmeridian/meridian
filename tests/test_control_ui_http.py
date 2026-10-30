@@ -186,6 +186,17 @@ def test_the_owner_can_manage_device_slots_with_csrf_but_no_new_credential(
 # -- setup links ------------------------------------------------------------------------------
 
 
+def test_the_console_can_mint_a_people_token_after_step_up(fleet: Fleet) -> None:
+    fleet.set_up()
+    fleet.clock.now += CONFIRM_SECONDS + 1
+    body = {"name": "People desk", "scope": "people"}
+    assert fleet.ui("POST", "/api/tokens", body).status == 403
+    assert fleet.ui("POST", "/auth/confirm", {"password": PASSWORD}).status == 200
+    issued = fleet.ui("POST", "/api/tokens", body)
+    assert issued.status == 200, issued.body
+    assert issued.body["scope"] == "people"
+
+
 def test_only_the_root_token_issues_setup_links(fleet: Fleet) -> None:
     admin = fleet.call("POST", "/api/tokens", {"name": "laptop", "scope": "admin"}, bearer=ADMIN_TOKEN).body["token"]
     assert fleet.call("POST", "/api/owner/setup-link", {}, bearer=admin).status == 403

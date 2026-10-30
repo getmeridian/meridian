@@ -211,6 +211,8 @@
   "scope.propose_hint": "also propose revisions",
   "scope.approve": "Approve",
   "scope.approve_hint": "also approve others' revisions",
+  "scope.people": "People",
+  "scope.people_hint": "manage people and their links",
   "scope.admin": "Admin",
   "scope.admin_hint": "everything, including people's links",
   "settings.fleet": "Fleet",

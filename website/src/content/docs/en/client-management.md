@@ -209,4 +209,28 @@ A read token sees:
 | `GET /api/traffic` | Traffic totals per person |
 | `GET /api/health` | The service's version |
 
-Read tokens never see anyone's keys or subscription ID. Tokens don't expire on their own: revoke one in **Tokens** and anything using it loses access at once. No token the console creates can change people or servers; those changes go through the console itself or the `meridian` CLI.
+Read tokens never see anyone's keys or subscription ID. Choose **People** for a bot that manages accounts and shares connection credentials. Creating it requires the same password confirmation as any other console token.
+
+| Scope | Access |
+|---|---|
+| `read` | View the fleet and people without connection credentials |
+| `propose` | Read access, plus proposing revisions |
+| `approve` | Propose access, plus approving other callers' revisions |
+| `people` | Read and manage people, including their UUIDs and subscription tokens |
+| `admin` | Both sets of permissions, including topology writes, enrollment, tokens, and backups; issued through the deployer's API access |
+
+`people` is separate from the read → propose → approve chain. It can access only `/api/users`: it cannot read or change nodes, endpoints, the apply fence, revisions, backups, enrollment, API tokens, privacy, or settings. Admin includes people access.
+
+| People endpoint | Action |
+|---|---|
+| `POST /api/users` | Create a person with `username`, `status`, `expire_at`, `traffic_limit_bytes`, `traffic_limit_strategy`, and `device_limit` in one transaction |
+| `PATCH /api/users/{username}` | Change the status, expiry, traffic limit or reset strategy, or device cap; omitted fields keep their values |
+| `POST /api/users/{username}/reset-traffic` | Reset used traffic |
+| `POST /api/users/{username}/reissue` | Replace connection credentials and clear device registrations |
+| `DELETE /api/users/{username}` | Remove a person |
+| `GET /api/users/{username}/devices` | Read registrations allowed by the owner's privacy level |
+| `DELETE /api/users/{username}/devices[/{device_key}]` | Clear all registrations, or remove one |
+
+A people token cannot remove or reissue a person declared in the fleet file: the API returns `409 declared_user` with the CLI command to run. This also applies while an approved or failed apply still declares the person. An unapproved proposal does not declare anyone. Status, limits, expiry, and device caps remain editable.
+
+Tokens don't expire on their own: revoke one in **Tokens** and anything using it loses access at once. Treat a people token as a password, because it grants access to people's connection credentials.

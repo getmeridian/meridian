@@ -18,11 +18,22 @@ import pytest
 from meridian.control.client import ControlClient, ControlServiceAuthError, ControlServiceScopeError
 from meridian.control.enrollment import token_sha256
 from meridian.control.errors import ServiceError
-from meridian.control.models import TOKEN_SCOPES, ClientEndpoint, TokenCreate, TokenRecord
+from meridian.control.models import (
+    TOKEN_SCOPES,
+    ClientEndpoint,
+    PrivacySettings,
+    RevisionProposal,
+    RevisionResult,
+    TokenCreate,
+    TokenRecord,
+    UserCreate,
+    UserUpdate,
+    scope_covers,
+)
 from meridian.control.server import ROUTES, ControlServer
 from meridian.control.service import SCHEMA_VERSION, ControlService
 from meridian.control.snapshot import generate_key_pair
-from meridian.control.tokens import LAST_USED_RESOLUTION_SECONDS, Caller
+from meridian.control.tokens import LAST_USED_RESOLUTION_SECONDS, ROOT, Caller
 from tests.support.control_service import drop_device_privacy_schema
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
@@ -89,44 +100,61 @@ def _mint(fleet: Fleet, scope: str, name: str = "device") -> dict[str, Any]:
 
 
 BACKUP_KEY = generate_key_pair().public
-# The scope each `/api` route needs; `{victim}` is another token's ID.
-SCOPE_MATRIX = [
-    ("GET", "/api/health", None, "read"),
-    ("GET", "/api/settings", None, "read"),
-    ("GET", "/api/nodes/main", None, "read"),
-    ("GET", "/api/ca", None, "read"),
-    ("GET", "/api/traffic", None, "read"),
-    ("GET", "/api/users", None, "read"),
-    ("GET", "/api/users/alice", None, "read"),
-    ("GET", "/api/endpoints/main:reality", None, "read"),
-    ("GET", "/api/revisions", None, "read"),
-    ("GET", "/api/fence", None, "read"),
-    ("POST", "/api/revisions", {"intent": {}, "plan_hash": "a" * 64, "review_hash": "b" * 64}, "propose"),
-    ("PUT", "/api/settings", {"profile_title": "Fleet"}, "admin"),
-    ("PUT", "/api/nodes/edge", {"resources": []}, "admin"),
-    ("DELETE", "/api/nodes/main", None, "admin"),
-    ("POST", "/api/nodes/main/enrollment", {}, "admin"),
-    ("PUT", "/api/users/bob", {}, "admin"),
-    ("PATCH", "/api/users/alice", {"status": "disabled"}, "admin"),
-    ("POST", "/api/users/alice/reissue", {}, "admin"),
-    ("POST", "/api/users/alice/reset-traffic", {}, "admin"),
-    ("POST", "/api/import/users", {"users": []}, "admin"),
-    ("DELETE", "/api/users/alice", None, "admin"),
-    ("PUT", "/api/endpoints/main:xhttp", ENDPOINT, "admin"),
-    ("DELETE", "/api/endpoints/main:reality", None, "admin"),
-    ("GET", "/api/tokens", None, "admin"),
-    ("POST", "/api/tokens", {"name": "laptop", "scope": "read"}, "admin"),
-    ("DELETE", "/api/tokens/{victim}", None, "admin"),
-    ("GET", "/api/backup/devices", None, "admin"),
-    ("POST", "/api/backup/devices", {"name": "laptop", "public_key": BACKUP_KEY}, "admin"),
-    ("GET", "/api/backup/recovery-key", None, "admin"),
-    ("PUT", "/api/backup/recovery-key", {"public_key": BACKUP_KEY}, "admin"),
-    (
-        "PUT",
+# Samples carry no permissions: every requirement comes directly from server.ROUTES.
+ROUTE_SAMPLES = {
+    "health": ("/api/health", None),
+    "get_settings": ("/api/settings", None),
+    "put_settings": ("/api/settings", {"profile_title": "Fleet"}),
+    "get_privacy": ("/api/privacy", None),
+    "put_privacy": ("/api/privacy", {}),
+    "get_node": ("/api/nodes/main", None),
+    "put_node": ("/api/nodes/edge", {"resources": []}),
+    "delete_node": ("/api/nodes/main", None),
+    "grant_enrollment": ("/api/nodes/main/enrollment", {}),
+    "fleet_authority": ("/api/ca", None),
+    "traffic": ("/api/traffic", None),
+    "daily_traffic": ("/api/traffic/daily", None),
+    "list_users": ("/api/users", None),
+    "create_user": ("/api/users", {"username": "bob", "traffic_limit_bytes": 1000}),
+    "import_users": ("/api/import/users", {"users": []}),
+    "get_user": ("/api/users/alice", None),
+    "user_usage": ("/api/users/alice/usage", None),
+    "put_user": ("/api/users/bob", {}),
+    "update_user": ("/api/users/alice", {"status": "disabled"}),
+    "reissue_user": ("/api/users/alice/reissue", {}),
+    "reset_user_traffic": ("/api/users/alice/reset-traffic", {}),
+    "user_devices": ("/api/users/alice/devices", None),
+    "delete_user_device": ("/api/users/alice/devices/" + "a" * 64, None),
+    "clear_user_devices": ("/api/users/alice/devices", None),
+    "delete_user": ("/api/users/alice", None),
+    "get_endpoint": ("/api/endpoints/main:reality", None),
+    "put_endpoint": ("/api/endpoints/main:xhttp", ENDPOINT),
+    "delete_endpoint": ("/api/endpoints/main:reality", None),
+    "list_tokens": ("/api/tokens", None),
+    "create_token": ("/api/tokens", {"name": "laptop", "scope": "read"}),
+    "revoke_token": ("/api/tokens/{victim}", None),
+    "list_revisions": ("/api/revisions", None),
+    "propose_revision": ("/api/revisions", {"intent": {}, "plan_hash": "a" * 64, "review_hash": "b" * 64}),
+    "get_revision": ("/api/revisions/1", None),
+    "approve_revision": ("/api/revisions/1/approve", {}),
+    "record_revision_result": ("/api/revisions/1/result", {"status": "applied"}),
+    "get_fence": ("/api/fence", None),
+    "swap_fence": ("/api/fence", {}),
+    "list_device_keys": ("/api/backup/devices", None),
+    "register_device_key": ("/api/backup/devices", {"name": "laptop", "public_key": BACKUP_KEY}),
+    "revoke_device_key": ("/api/backup/devices/{victim}", None),
+    "get_recovery_key": ("/api/backup/recovery-key", None),
+    "put_recovery_key": ("/api/backup/recovery-key", {"public_key": BACKUP_KEY}),
+    "deposit_deployer_state": (
         "/api/backup/deployer-state",
         {"cluster_yml": "version: 3\n", "servers_json": "[]", "generation": 0},
-        "admin",
     ),
+    "snapshot": ("/api/backup/snapshot", None),
+}
+SCOPE_MATRIX = [
+    (method, *ROUTE_SAMPLES[handler.__name__], needed)
+    for method, pattern, needed, handler in ROUTES
+    if pattern.pattern.startswith("/api")
 ]
 
 
@@ -134,7 +162,7 @@ SCOPE_MATRIX = [
 @pytest.mark.parametrize(
     ("method", "path", "body", "needed"), SCOPE_MATRIX, ids=[f"{row[0]} {row[1]}" for row in SCOPE_MATRIX]
 )
-def test_scope_matrix(fleet: Fleet, method: str, path: str, body: Any, needed: str, held: str) -> None:
+def test_scope_matrix(fleet: Fleet, method: str, path: str, body: Any, needed: Any, held: str) -> None:
     assert _request(f"{fleet.url}/api/users/alice", "PUT", {}, ADMIN_TOKEN)[0] == 200
     assert _request(f"{fleet.url}/api/nodes/main", "PUT", {"resources": []}, ADMIN_TOKEN)[0] == 200
     assert _request(f"{fleet.url}/api/endpoints/main:reality", "PUT", ENDPOINT, ADMIN_TOKEN)[0] == 200
@@ -143,8 +171,9 @@ def test_scope_matrix(fleet: Fleet, method: str, path: str, body: Any, needed: s
 
     status, answer = _request(fleet.url + path.format(victim=victim), method, body, token)
 
-    if held == "root" or TOKEN_SCOPES.index(held) >= TOKEN_SCOPES.index(needed):
-        assert status == 200, answer
+    requirements = (needed,) if isinstance(needed, str) else needed
+    if held == "root" or any(scope_covers(held, scope) for scope in requirements):
+        assert status not in (401, 403), answer
     else:
         assert status == 403 and answer["error"]["code"] == "insufficient_scope"
 
@@ -154,6 +183,21 @@ def test_every_admin_route_declares_a_scope() -> None:
         pattern.pattern for _, pattern, scope, _ in ROUTES if pattern.pattern.startswith("/api") and not scope
     ]
     assert undeclared == []
+
+
+def test_every_api_route_has_a_matching_permission_sample() -> None:
+    for _method, pattern, _scope, handler in ROUTES:
+        if pattern.pattern.startswith("/api"):
+            assert pattern.fullmatch(ROUTE_SAMPLES[handler.__name__][0].format(victim="0123456789ab")), handler.__name__
+
+
+def test_people_access_is_declared_only_on_user_routes() -> None:
+    for _method, pattern, needed, _handler in ROUTES:
+        if needed is None:
+            continue
+        requirements = (needed,) if isinstance(needed, str) else needed
+        assert any(scope_covers("people", scope) for scope in requirements) == pattern.pattern.startswith("/api/users")
+        assert all(scope_covers("admin", scope) for scope in requirements)
 
 
 @pytest.mark.parametrize(
@@ -272,8 +316,12 @@ def test_a_version_three_database_gains_api_tokens(tmp_path: Path) -> None:
     assert service.tokens.authenticate(issued.token).scope == "read"
 
 
-@pytest.mark.parametrize(("scope", "sees"), [("read", False), ("propose", False), ("approve", False), ("admin", True)])
-def test_only_admin_reads_the_credentials_that_connect_as_a_user(fleet: Fleet, scope: str, sees: bool) -> None:
+@pytest.mark.parametrize(
+    ("scope", "sees"), [("read", False), ("propose", False), ("approve", False), ("people", True), ("admin", True)]
+)
+def test_only_people_and_admin_read_the_credentials_that_connect_as_a_user(
+    fleet: Fleet, scope: str, sees: bool
+) -> None:
     alice = fleet.service.put_user("alice")
     token = _mint(fleet, scope)["token"]
 
@@ -283,3 +331,93 @@ def test_only_admin_reads_the_credentials_that_connect_as_a_user(fleet: Fleet, s
     for record in (listed["users"][0], one):
         assert record["username"] == "alice"
         assert (record["uuid"], record["sub_token"]) == ((alice.uuid, alice.sub_token) if sees else ("", ""))
+
+
+def test_people_is_orthogonal_to_revision_scopes_and_admin_covers_it() -> None:
+    assert scope_covers("people", "people")
+    assert scope_covers("admin", "people")
+    for scope in ("read", "propose", "approve"):
+        assert not scope_covers(scope, "people")
+        assert not scope_covers("people", scope)
+
+
+def test_people_reads_credentials_and_edits_people_without_fleet_access(fleet: Fleet) -> None:
+    alice = fleet.service.put_user("alice")
+    token = _mint(fleet, "people")["token"]
+    for path in ("/api/users", "/api/users/alice"):
+        status, answer = _request(fleet.url + path, token=token)
+        assert status == 200
+        record = answer["users"][0] if "users" in answer else answer
+        assert (record["uuid"], record["sub_token"]) == (alice.uuid, alice.sub_token)
+    status, updated = _request(
+        f"{fleet.url}/api/users/alice", "PATCH", {"status": "disabled", "traffic_limit_bytes": 1000}, token
+    )
+    assert status == 200 and (updated["status"], updated["traffic_limit_bytes"]) == ("disabled", 1000)
+    for method, path, body, _needed in SCOPE_MATRIX:
+        if path.startswith("/api/users"):
+            continue
+        status, answer = _request(fleet.url + path.format(victim="0123456789ab"), method, body, token)
+        assert (status, answer["error"]["code"]) == (403, "insufficient_scope"), path
+    for path in ("/ui/api/fleet", "/ui/api/people/alice/share"):
+        assert _request(fleet.url + path, token=token)[0] == 403
+
+
+def test_people_can_manage_console_people_and_devices_with_credentials(fleet: Fleet) -> None:
+    with ControlClient(fleet.url, ADMIN_TOKEN) as root:
+        root.set_privacy(PrivacySettings(device_limits="private"))
+    with ControlClient(fleet.url, _mint(fleet, "people")["token"]) as client:
+        created = client.create_user(UserCreate(username="bob", traffic_limit_bytes=1000, device_limit=2))
+        assert client.get_user("bob") == created
+        assert client.list_users() == [created]
+        fleet.service.subscription(created.sub_token, device_headers={"x-hwid": "test-device-0001"})
+        devices = client.user_devices("bob")
+        assert devices.count == 1
+        assert client.delete_user_devices("bob", devices.devices[0].device_key).deleted == 1
+        changed = client.update_user("bob", UserUpdate(status="disabled", device_limit=3))
+        assert (changed.status, changed.device_limit) == ("disabled", 3)
+        assert client.reset_user_traffic("bob").used_traffic_bytes == 0
+        reissued = client.reissue_user("bob")
+        assert reissued.uuid != created.uuid and reissued.sub_token != created.sub_token
+        assert client.user_devices("bob").devices == []
+        assert client.delete_user_devices("bob", "a" * 64).deleted == 0
+        assert client.delete_user_devices("bob").deleted == 0
+        client.delete_user("bob")
+        assert client.get_user("bob") is None
+
+
+def _declare(fleet: Fleet, status: str) -> None:
+    revision = fleet.service.revisions.propose(
+        RevisionProposal(intent={"access": {"users": ["alice"]}}, plan_hash="a" * 64, review_hash="b" * 64), caller=ROOT
+    )
+    if status != "proposed":
+        fleet.service.revisions.approve(revision.number, caller=ROOT)
+    if status in ("applied", "failed"):
+        fleet.service.revisions.record_result(revision.number, RevisionResult(status=status))
+
+
+@pytest.mark.parametrize("status", ["proposed", "approved", "failed", "applied"])
+@pytest.mark.parametrize(("method", "path"), [("POST", "/api/users/alice/reissue"), ("DELETE", "/api/users/alice")])
+def test_people_cannot_remove_or_reissue_declared_people(fleet: Fleet, status: str, method: str, path: str) -> None:
+    before = fleet.service.put_user("alice")
+    _declare(fleet, status)
+    token = _mint(fleet, "people")["token"]
+    code, answer = _request(fleet.url + path, method, {} if method == "POST" else None, token)
+    if status == "proposed":
+        assert code == 200
+    else:
+        assert (code, answer["error"]["code"]) == (409, "declared_user")
+        assert fleet.service.get_user("alice") == before
+
+
+def test_people_declared_refusal_is_checked_inside_the_write(fleet: Fleet, monkeypatch: pytest.MonkeyPatch) -> None:
+    before = fleet.service.put_user("alice")
+    original = fleet.service.reissue_user
+
+    def declare_then_reissue(username: str) -> Any:
+        _declare(fleet, "approved")
+        return original(username)
+
+    monkeypatch.setattr(fleet.service, "reissue_user", declare_then_reissue)
+    code, answer = _request(fleet.url + "/api/users/alice/reissue", "POST", {}, _mint(fleet, "people")["token"])
+    assert (code, answer["error"]["code"]) == (409, "declared_user")
+    assert fleet.service.get_user("alice") == before

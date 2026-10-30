@@ -211,6 +211,8 @@
   "scope.propose_hint": "ещё и предлагать ревизии",
   "scope.approve": "Одобрение",
   "scope.approve_hint": "ещё и одобрять чужие ревизии",
+  "scope.people": "Люди",
+  "scope.people_hint": "управлять людьми и их ссылками",
   "scope.admin": "Администратор",
   "scope.admin_hint": "всё, включая ссылки людей",
   "settings.fleet": "Серверы",

@@ -1,7 +1,7 @@
 """Scoped API tokens for `/api`: one revocable credential per device or agent.
 
-Every token holds one scope (`read` < `propose` < `approve` < `admin`, each
-including the ones before it) and is stored only as SHA-256, with its name,
+Every token holds one scope (`read` < `propose` < `approve`, or `people`, with
+`admin` covering both) and is stored only as SHA-256, with its name,
 scope, and times. `last_used_at` is coarse, written at most once a minute, and
 nothing records where a token was used from.
 

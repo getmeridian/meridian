@@ -209,4 +209,28 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 | `GET /api/traffic` | 每个用户的流量总计 |
 | `GET /api/health` | 服务的版本 |
 
-只读令牌永远看不到任何人的密钥或订阅 ID。令牌不会自行过期：在 **Tokens** 中撤销后，使用它的任何程序都会立即失去访问权限。控制台创建的令牌都无法修改用户或服务器；这些修改只能通过控制台本身或 `meridian` CLI 完成。
+只读令牌看不到用户的密钥或订阅 ID。如果机器人需要管理账户并分发连接凭据，请选择**用户**权限。创建这种令牌与创建其他控制台令牌一样，需要再次确认密码。
+
+| 权限 | 允许的操作 |
+|---|---|
+| `read` | 查看服务器和用户，不包含连接凭据 |
+| `propose` | 只读权限，以及提交修订提案 |
+| `approve` | 提案权限，以及批准其他调用者的修订 |
+| `people` | 查看和管理用户，包括 UUID 和订阅令牌 |
+| `admin` | 包含两组权限，还可修改拓扑、注册 agent、管理令牌和备份；通过部署者的 API 管理权限签发 |
+
+`people` 独立于 read → propose → approve 权限链。它只能访问 `/api/users`，无法访问节点、连接端点、应用锁、修订、备份、agent 注册、API 令牌、隐私或设置。Admin 包含 people 权限。
+
+| 用户 API 端点 | 操作 |
+|---|---|
+| `POST /api/users` | 在一个事务中创建用户，同时设置 `username`、`status`、`expire_at`、`traffic_limit_bytes`、`traffic_limit_strategy` 和 `device_limit` |
+| `PATCH /api/users/{username}` | 修改状态、到期时间、流量限额或重置策略、设备上限；未发送的字段保持原值 |
+| `POST /api/users/{username}/reset-traffic` | 重置已用流量 |
+| `POST /api/users/{username}/reissue` | 更换连接凭据并清除设备注册 |
+| `DELETE /api/users/{username}` | 删除用户 |
+| `GET /api/users/{username}/devices` | 按所有者选择的隐私级别读取设备注册 |
+| `DELETE /api/users/{username}/devices[/{device_key}]` | 清除全部注册，或删除一项 |
+
+People 令牌无法删除服务器配置文件中声明的用户，也无法为他们重新签发连接凭据。API 会返回 `409 declared_user` 和需要运行的 CLI 命令。已经批准或失败的应用仍声明该用户时，这项限制同样有效；未经批准的提案不会声明任何用户。状态、限额、到期时间和设备上限仍可修改。
+
+令牌不会自行过期：在 **Tokens** 中撤销后，使用它的程序会立即失去访问权限。请像保护密码一样保护 people 令牌，因为它可以读取用户的连接凭据。

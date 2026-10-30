@@ -46,6 +46,7 @@ from meridian.control.models import (
     RecoveryKeyUpdate,
     RevisionProposal,
     RevisionResult,
+    ScopeRequirement,
     ServiceConfig,
     ServiceSettings,
     TokenCreate,
@@ -81,11 +82,9 @@ _TOKEN_ID = r"([0-9a-f]{12})"
 _REVISION = r"([1-9][0-9]{0,15})"
 _SUB_TOKEN = "(" + SUB_TOKEN_PATTERN.removeprefix("^").removesuffix("$") + ")"
 _SUB_SUFFIX = "|".join(re.escape(suffix) for suffix in SUFFIX_FORMATS)
-# Every write that changes what the fleet runs or who may use it needs `admin`: it is
-# part of applying a revision. Revisions themselves take `propose` (record one) and
-# `approve` (approve someone else's; `revisions.py`), and recording a revision's result
-# or moving the apply fence is applying, so `admin`. Credentials (enrollment grants,
-# API tokens) always need `admin`; reads stay `read`.
+# Topology writes, enrollment, tokens, and backups need admin. People mutations name
+# the separate people capability in ROUTES; admin covers both. A tuple allows either
+# capability, so user reads remain available without giving people fleet read access.
 WRITE: TokenScope = "admin"
 
 
@@ -112,7 +111,7 @@ class ControlServer(ThreadingHTTPServer):
 
 
 # (method, path, the scope an `/api` route needs or None where the handler authenticates, handler)
-Route = tuple[str, re.Pattern[str], TokenScope | None, Callable[["_Handler", re.Match[str]], Any]]
+Route = tuple[str, re.Pattern[str], ScopeRequirement | None, Callable[["_Handler", re.Match[str]], Any]]
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -203,7 +202,7 @@ class _Handler(BaseHTTPRequestHandler):
             raise unauthenticated()
         return token.strip()
 
-    def _authorize(self, needed: TokenScope) -> Caller:
+    def _authorize(self, needed: ScopeRequirement) -> Caller:
         """The request's caller: 401 for a missing, wrong, or revoked token, 403 when its scope falls short.
 
         A request without `Authorization` may instead carry the web owner's session
@@ -218,8 +217,11 @@ class _Handler(BaseHTTPRequestHandler):
                 caller = ROOT
             else:
                 caller = self.server.service.tokens.authenticate(token)
-        if not scope_covers(caller.scope, needed):
-            raise ServiceError("insufficient_scope", f"This needs a token with the {needed} scope.", 403)
+        requirements = (needed,) if isinstance(needed, str) else needed
+        if not any(scope_covers(caller.scope, scope) for scope in requirements):
+            raise ServiceError(
+                "insufficient_scope", f"This needs a token with the {' or '.join(requirements)} scope.", 403
+            )
         return caller
 
     @property
@@ -381,7 +383,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _visible(self, user: UserRecord) -> UserRecord:
         """A user as this caller may see them: the VLESS UUID and subscription token connect as the user."""
-        if self.caller is not None and scope_covers(self.caller.scope, "admin"):
+        if self.caller is not None and scope_covers(self.caller.scope, "people"):
             return user
         return user.model_copy(update={"uuid": "", "sub_token": ""})
 
@@ -421,11 +423,11 @@ class _Handler(BaseHTTPRequestHandler):
     def _refuse_declared(self, username: str, command: str) -> AbstractContextManager[None]:
         """A person the deployer declared is the CLI's to remove or relink: only it moves their connection page.
 
-        An API token (the CLI itself, or a script acting for the deployer) stays allowed;
-        the web owner is told the command instead. Checked in the write's transaction, so an
-        apply that declares the person meanwhile still wins.
+        An admin API token stays allowed; a people token or the web owner is told the
+        command instead. Checked in the write's transaction, so an apply that declares
+        the person meanwhile still wins.
         """
-        if self.owner_session is None:
+        if self.owner_session is None and (self.caller is None or self.caller.scope != "people"):
             return nullcontext()
 
         def undeclared() -> None:
@@ -458,7 +460,9 @@ class _Handler(BaseHTTPRequestHandler):
             return self._service.tokens.issue(request, issuer=self.caller)
         # An admin token would reach every route `OWNER_ROUTES` keeps from the console.
         if request.scope == "admin":
-            raise ServiceError("insufficient_scope", "The console mints tokens up to approve; admin ones never.", 403)
+            raise ServiceError(
+                "insufficient_scope", "The console can create read, propose, approve, or people tokens.", 403
+            )
         owner = self._service.owner
         return self._service.tokens.issue(request, issuer=self.caller, still_allowed=lambda: owner.hold_recent(session))
 
@@ -606,25 +610,25 @@ ROUTES: list[Route] = [
     ("GET", re.compile(r"/api/ca"), "read", _Handler.fleet_authority),
     ("GET", re.compile(r"/api/traffic"), "read", _Handler.traffic),
     ("GET", re.compile(r"/api/traffic/daily"), "read", _Handler.daily_traffic),
-    ("GET", re.compile(r"/api/users"), "read", _Handler.list_users),
-    ("POST", re.compile(r"/api/users"), WRITE, _Handler.create_user),
+    ("GET", re.compile(r"/api/users"), ("read", "people"), _Handler.list_users),
+    ("POST", re.compile(r"/api/users"), "people", _Handler.create_user),
     # Credentials go in as well as out: importing users (`meridian migrate`) is the root of applying.
     ("POST", re.compile(r"/api/import/users"), "admin", _Handler.import_users),
-    ("GET", re.compile(rf"/api/users/{_USERNAME}"), "read", _Handler.get_user),
-    ("GET", re.compile(rf"/api/users/{_USERNAME}/usage"), "read", _Handler.user_usage),
-    ("PUT", re.compile(rf"/api/users/{_USERNAME}"), WRITE, _Handler.put_user),
-    ("PATCH", re.compile(rf"/api/users/{_USERNAME}"), WRITE, _Handler.update_user),
-    ("POST", re.compile(rf"/api/users/{_USERNAME}/reissue"), WRITE, _Handler.reissue_user),
-    ("POST", re.compile(rf"/api/users/{_USERNAME}/reset-traffic"), WRITE, _Handler.reset_user_traffic),
-    ("GET", re.compile(rf"/api/users/{_USERNAME}/devices"), "read", _Handler.user_devices),
+    ("GET", re.compile(rf"/api/users/{_USERNAME}"), ("read", "people"), _Handler.get_user),
+    ("GET", re.compile(rf"/api/users/{_USERNAME}/usage"), ("read", "people"), _Handler.user_usage),
+    ("PUT", re.compile(rf"/api/users/{_USERNAME}"), "people", _Handler.put_user),
+    ("PATCH", re.compile(rf"/api/users/{_USERNAME}"), "people", _Handler.update_user),
+    ("POST", re.compile(rf"/api/users/{_USERNAME}/reissue"), "people", _Handler.reissue_user),
+    ("POST", re.compile(rf"/api/users/{_USERNAME}/reset-traffic"), "people", _Handler.reset_user_traffic),
+    ("GET", re.compile(rf"/api/users/{_USERNAME}/devices"), ("read", "people"), _Handler.user_devices),
     (
         "DELETE",
         re.compile(rf"/api/users/{_USERNAME}/devices/({DEVICE_KEY_PATTERN})"),
-        WRITE,
+        "people",
         _Handler.delete_user_device,
     ),
-    ("DELETE", re.compile(rf"/api/users/{_USERNAME}/devices"), WRITE, _Handler.clear_user_devices),
-    ("DELETE", re.compile(rf"/api/users/{_USERNAME}"), WRITE, _Handler.delete_user),
+    ("DELETE", re.compile(rf"/api/users/{_USERNAME}/devices"), "people", _Handler.clear_user_devices),
+    ("DELETE", re.compile(rf"/api/users/{_USERNAME}"), "people", _Handler.delete_user),
     ("GET", re.compile(rf"/api/endpoints/{_NAME}"), "read", _Handler.get_endpoint),
     ("PUT", re.compile(rf"/api/endpoints/{_NAME}"), WRITE, _Handler.put_endpoint),
     ("DELETE", re.compile(rf"/api/endpoints/{_NAME}"), WRITE, _Handler.delete_endpoint),

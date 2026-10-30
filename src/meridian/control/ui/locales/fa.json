@@ -211,6 +211,8 @@
   "scope.propose_hint": "به‌علاوه پیشنهاد بازبینی",
   "scope.approve": "تأیید",
   "scope.approve_hint": "به‌علاوه تأیید بازبینی دیگران",
+  "scope.people": "افراد",
+  "scope.people_hint": "مدیریت افراد و لینک‌های آن‌ها",
   "scope.admin": "مدیر",
   "scope.admin_hint": "همه‌چیز، از جمله پیوندهای افراد",
   "settings.fleet": "سرورها",

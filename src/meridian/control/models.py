@@ -7,7 +7,7 @@ these models are what the deployer stores and reads over `/api`.
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import BeforeValidator, Field, field_validator, model_validator
 
@@ -401,13 +401,18 @@ class TrafficSummary(CoreModel):
     users: list[UserTrafficTotal]
 
 
-TokenScope = Literal["read", "propose", "approve", "admin"]
-# Each scope includes every scope before it.
-TOKEN_SCOPES: tuple[TokenScope, ...] = ("read", "propose", "approve", "admin")
+TokenScope = Literal["read", "propose", "approve", "people", "admin"]
+# People is separate from read < propose < approve; admin includes both capabilities.
+TOKEN_SCOPES: tuple[TokenScope, ...] = ("read", "propose", "approve", "people", "admin")
+ScopeRequirement: TypeAlias = TokenScope | tuple[TokenScope, ...]
 
 
 def scope_covers(held: TokenScope, needed: TokenScope) -> bool:
     """Whether a token holding `held` may do what `needed` guards."""
+    if held == "admin" or held == needed:
+        return True
+    if held == "people" or needed == "people":
+        return False
     return TOKEN_SCOPES.index(held) >= TOKEN_SCOPES.index(needed)
 
 

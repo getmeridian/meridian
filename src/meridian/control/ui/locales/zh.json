@@ -211,6 +211,8 @@
   "scope.propose_hint": "还可提出修订",
   "scope.approve": "批准",
   "scope.approve_hint": "还可批准他人的修订",
+  "scope.people": "用户",
+  "scope.people_hint": "管理用户及其连接链接",
   "scope.admin": "管理员",
   "scope.admin_hint": "全部权限，包括用户的链接",
   "settings.fleet": "服务器",
