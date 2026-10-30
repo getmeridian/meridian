@@ -30,6 +30,7 @@
 - Reporter primitives let provision, apply, and deploy emit typed events without choosing a renderer.
 
 ## Pitfalls
+- Fleet diffs compare creation settings for each person in access-user order; adding, editing, or removing that mapping is not a fleet reorder.
 - Timestamp validates calendar dates and clock times after its wire-pattern check; preserve the input string so fractional precision and generated schemas stay unchanged.
 - A fresh healthy runtime can still be awaiting convergence; fleet status counts that separately and degrades until in_sync, while stale reports remain unavailable evidence.
 - Client detail carries lifetime traffic and the current period's start through the access adapter; resetting period use never erases the lifetime figure.

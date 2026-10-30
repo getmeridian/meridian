@@ -165,6 +165,18 @@ def _access_changes(before: AccessIntent, after: AccessIntent) -> list[IntentCha
                     after=after.display_name(user),
                 )
             )
+        old_settings = before.creation_settings.get(user)
+        new_settings = after.creation_settings.get(user)
+        if old_settings != new_settings:
+            changes.append(
+                _change(
+                    name="client",
+                    target=user,
+                    field="creation_settings",
+                    before=old_settings.model_dump(mode="json") if old_settings else {},
+                    after=new_settings.model_dump(mode="json") if new_settings else {},
+                )
+            )
     if before.squad_name != after.squad_name:
         changes.append(
             _change(

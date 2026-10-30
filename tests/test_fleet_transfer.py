@@ -285,6 +285,27 @@ class TestRoundTrip:
 
 
 class TestDiff:
+    @pytest.mark.parametrize("edit", ["add", "change", "remove"])
+    def test_creation_settings_edits_name_each_person_in_fleet_order(self, registry: ServerRegistry, edit: str) -> None:
+        current = _intent()
+        document = fleet_document(current, registry)
+        original = {"bob": {"status": "disabled"}, "alice": {"traffic_limit_bytes": 10}}
+        if edit != "add":
+            document["access"]["creation_settings"] = original
+            current = intent_from_document(parse_fleet_document(dump_fleet_document(document)), current, registry)
+        document["access"]["creation_settings"] = (
+            {} if edit == "remove" else {"bob": {"device_limit": 2}, "alice": {"traffic_limit_bytes": 20}}
+        )
+        updated = intent_from_document(parse_fleet_document(dump_fleet_document(document)), current, registry)
+
+        changes = intent_changes(current, updated)
+        assert [(change.subject, change.target, change.field) for change in changes] == [
+            ("client", "alice", "creation_settings"),
+            ("client", "bob", "creation_settings"),
+        ]
+        assert all(change.before != change.after for change in changes)
+        assert all(change_line(change).startswith(f"~ {change.target} creation_settings ") for change in changes)
+
     def test_lines_read_like_the_review(self, registry: ServerRegistry) -> None:
         current = _intent()
 
