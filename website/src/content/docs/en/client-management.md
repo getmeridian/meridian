@@ -164,6 +164,8 @@ Existing VLESS sessions can outlive credential revocation. **`--cut-off`**, with
 
 ## Subscription links
 
+Xray JSON lists **Automatic** first, then one named profile for each primary connection. Each named profile keeps the subscription's routing rules and uses only that connection. Fingerprint alternatives remain in separate automatic groups.
+
 Subscription URLs look like `https://198.51.100.10/<page-path>/sub/<id>`. They live under the connection-page path; the control service's console stays on a separate secret path that shared links never reveal.
 
 Every subscription asks apps to refresh it every 6 hours (the `profile-update-interval` header, which apps such as Happ and Clash Verge follow), so when you add an exit or relay, clients pick it up within a few hours without a new link. Apps that ignore the header refresh on their own schedule; a manual refresh in the app picks up changes at once.

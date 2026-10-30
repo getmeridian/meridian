@@ -13,6 +13,7 @@ a body rule that says which recorded answer a client gets instead, and why.
 
 from __future__ import annotations
 
+import copy
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -22,7 +23,7 @@ from typing import Any
 import pytest
 import yaml
 
-from meridian.control.formats.entries import SubscriptionUser
+from meridian.control.formats.entries import SubscriptionUser, presentation_endpoints, primaries
 from meridian.control.formats.selector import SUFFIX_FORMATS, select_format
 from meridian.control.models import ClientEndpoint
 from meridian.control.subscriptions import SubscriptionResponse, render_subscription, unknown_subscription
@@ -226,8 +227,27 @@ _AS_SINGBOX = (
     "Hiddify (sing-box inside) got Base64 without failover; Meridian sends sing-box JSON with its urltest group."
 )
 _AS_BASE64 = "Remnawave refused a missing or empty User-Agent with 403; Meridian serves Base64 like any unknown app."
+_AS_INDIVIDUAL_XRAY = (
+    "Meridian keeps Automatic first and adds one named profile per primary endpoint with shared routing; "
+    "fingerprint-copy groups stay isolated."
+)
 
 DEVIATIONS: dict[str, Deviation] = {
+    **{
+        request: Deviation(_AS_INDIVIDUAL_XRAY, request)
+        for request in (
+            "happ",
+            "incy",
+            "ktor-client",
+            "saeeddev94-xray",
+            "selector-json",
+            "streisand",
+            "v2box",
+            "v2plus",
+            "v2rayn",
+            "v2rayng",
+        )
+    },
     "clash-for-android": Deviation(_AS_MIHOMO, "mihomo"),
     "disabled--clash-for-android": Deviation(_AS_MIHOMO, "disabled--flclashx"),
     "stash": Deviation(_AS_STASH, "mihomo", _stash_dialect),
@@ -240,6 +260,22 @@ DEVIATIONS: dict[str, Deviation] = {
 # Apps that stay on Base64 although they lack failover there: no subscription format they
 # document carries a failover group (see `formats.selector`). Named so the choice is explicit.
 KEPT_BASE64 = ("nekobox", "throne", "v2raytun", "shadowrocket")
+
+
+def _individual_xray_profiles(text: str, endpoints: list[ClientEndpoint]) -> str:
+    """Extend the captured automatic profile without changing its routing or copy profiles."""
+    configs = json.loads(text)
+    automatic = configs[0]
+    proxies = [outbound for outbound in automatic["outbounds"] if outbound["tag"].startswith("MERIDIAN_PROXY")]
+    local = [outbound for outbound in automatic["outbounds"] if outbound not in proxies]
+    individuals = []
+    for endpoint, outbound in zip(primaries(presentation_endpoints(endpoints)), proxies, strict=True):
+        profile = copy.deepcopy(automatic)
+        profile["remarks"] = endpoint.remark
+        profile["outbounds"] = [{**outbound, "tag": "MERIDIAN_PROXY"}, *local]
+        individuals.append(profile)
+    return json.dumps([automatic, *individuals, *configs[1:]])
+
 
 # -- rendering and comparison ----------------------------------------------------------------
 
@@ -273,6 +309,14 @@ def _expected(capture: Capture) -> Response:
         if deviation.transform is not None:
             golden = Response(
                 golden.status, golden.format, golden.encoding, golden.headers, deviation.transform(golden.body)
+            )
+        if deviation.reason == _AS_INDIVIDUAL_XRAY:
+            golden = Response(
+                golden.status,
+                golden.format,
+                golden.encoding,
+                golden.headers,
+                _individual_xray_profiles(golden.body, FLEETS[capture.topology].endpoints),
             )
     headers = (
         tuple(

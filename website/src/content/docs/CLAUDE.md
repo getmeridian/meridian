@@ -2,6 +2,7 @@
 
 ## Design decisions
 - API-token guides explain scoped issuance, authenticated OpenAPI discovery, credential/scope markers, and cut-off permissions in every locale; operation tables are checked against the committed admin contract by `scripts/validate_api_docs.py`.
+- Subscription guides explain Automatic-first Xray profiles and single-primary routing without mixing fingerprint alternatives.
 - The person-screen guide describes effective enable results and preserves parity across all four locales.
 - Client and connecting guides explain reviewed public owner contact, user-initiated support links, explicit clearing, and bounded inactive remarks in every locale.
 - Client guides document private notes/tags, explicit clearing, tag filters, people/admin scope, snapshots, and migration bounds in all four locales.

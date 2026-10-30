@@ -9,7 +9,7 @@ _RENDERER_MANIFEST = {
     "compiler": COMPILER_VERSION,
     "agent-runtime": "signed-commands-v4",
     "agent-spec": "service-blob-v1",
-    "control-subscriptions": "service-pages-v13",
+    "control-subscriptions": "service-pages-v14",
     "control-commands": "node-restart-console-v3",
     "pwa": "service-pages-v25",
     "control-service": "admin-openapi-v1",

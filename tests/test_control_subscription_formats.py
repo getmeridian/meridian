@@ -20,7 +20,15 @@ from urllib.parse import unquote, urlsplit
 import pytest
 import yaml
 
-from meridian.control.formats.entries import NO_CONNECTIONS_REMARKS, STATUS_REMARKS, SubscriptionUser, UserStatus
+from meridian.compiler.delivery import xray_json_template
+from meridian.control.formats.entries import (
+    NO_CONNECTIONS_REMARKS,
+    STATUS_REMARKS,
+    SubscriptionUser,
+    UserStatus,
+    presentation_endpoints,
+    primaries,
+)
 from meridian.control.formats.selector import DocumentFormat, select_format
 from meridian.control.formats.xray_json import xray_json_document
 from meridian.control.models import ClientEndpoint
@@ -347,6 +355,23 @@ def test_documents_pass_the_client_parsers(topology: str, status: UserStatus) ->
         assert proxy_outbounds(primary)
 
 
+@pytest.mark.parametrize("topology", ["single", "fleet", "domain"])
+@pytest.mark.parametrize("routing", ["ru-split", "full"])
+def test_xray_offers_one_named_profile_per_primary_with_the_shared_routing(topology: str, routing: str) -> None:
+    endpoints = ALL_FLEETS[topology].endpoints
+    configs = xray_json_document(endpoints, UUID, client_routing=routing)
+    primary_endpoints = primaries(presentation_endpoints(endpoints))
+    assert configs[0]["remarks"] == "Automatic"
+    assert [config["remarks"] for config in configs[1 : 1 + len(primary_endpoints)]] == [
+        endpoint.remark for endpoint in primary_endpoints
+    ]
+    automatic = proxy_outbounds(configs[0])
+    for profile, outbound in zip(configs[1:], automatic, strict=False):
+        assert proxy_outbounds(profile) == [{**outbound, "tag": "MERIDIAN_PROXY"}]
+        assert profile["routing"] == xray_json_template(client_routing=routing)["routing"]
+        assert profile["burstObservatory"] == configs[0]["burstObservatory"]
+
+
 @pytest.mark.parametrize("status", ["disabled", "limited", "expired"])
 def test_a_suspended_user_sees_why_in_every_format(status: UserStatus) -> None:
     remarks = list(STATUS_REMARKS[status])
@@ -494,6 +519,7 @@ def test_a_safari_paths_two_copies_get_an_automatic_config_each() -> None:
     }
     assert fingerprints == {
         "Automatic": ["safari"],
+        "Reality · Safari": ["safari"],
         "Automatic · Chrome": ["chrome"],
         "Automatic · Firefox": ["firefox"],
     }

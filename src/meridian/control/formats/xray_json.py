@@ -1,7 +1,8 @@
 """Xray JSON: a list of full client configs, as Happ, v2rayNG, Streisand, and others import it.
 
 The first config, "Automatic", puts every primary entry behind the health-checked
-`MERIDIAN_AUTO` balancer (`compiler.delivery.xray_json_template`); fingerprint copies get
+`MERIDIAN_AUTO` balancer (`compiler.delivery.xray_json_template`); each primary then gets
+its own named config with one eligible proxy and the same routing. Fingerprint copies get
 one "Automatic · <fingerprint>" config per fingerprint, so no balancer ever mixes fingerprints. A
 suspended user gets one config per placeholder with no proxy at all (the balancer falls
 back to BLOCK). `meridian test` reads the first config (`xray_client.parse_xray_subscription`).
@@ -37,12 +38,14 @@ def xray_json_document(
     *,
     client_routing: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING,
 ) -> list[dict[str, Any]]:
-    """Return the Xray JSON document: one config per automatic group (or per placeholder)."""
+    """Automatic first, individual primary profiles, then isolated copy groups (or placeholders)."""
     endpoints = presentation_endpoints(endpoints)
     placeholders = availability_placeholders(primaries(endpoints), placeholders)
     if placeholders:
         return [_config([], uuid, remark, client_routing) for remark in placeholders]
-    configs = [_config(primaries(endpoints), uuid, AUTOMATIC, client_routing)]
+    primary = primaries(endpoints)
+    configs = [_config(primary, uuid, AUTOMATIC, client_routing)]
+    configs += [_config([endpoint], uuid, endpoint.remark, client_routing) for endpoint in primary]
     configs += [_config(members, uuid, remark, client_routing) for remark, members in copy_groups(endpoints)]
     return configs
 
