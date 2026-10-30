@@ -97,7 +97,7 @@
       status: status, interval: 30000,
       load: function (passive) {
         return Promise.all([M.api("GET", "api/users", undefined, { passive: passive }),
-          M.api("GET", "ui/api/fleet", undefined, { passive: passive })]);
+          M.api("GET", "ui/api/fleet", undefined, { passive: passive }).catch(function () { return M.state.fleet || {}; })]);
       },
       draw: function (results) {
         M.state.fleet = results[1];

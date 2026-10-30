@@ -86,6 +86,7 @@ w.fetch = (url, options) => {
     rounds.set(url, round);
     if (mode === 'live-race') return new Promise((resolve, reject) => { delayed[url + ':' + round] = { resolve, reject }; });
     if (failPolls) return Promise.resolve(reply({ error: { code: 'network' } }, 503));
+    if (mode === 'live-fleet-failure' && url === 'ui/api/fleet') return Promise.resolve(reply({ error: { code: 'network' } }, 503));
     if (url === 'api/users') return Promise.resolve(reply({ users: [{ username: 'sample', status: 'active',
       used_traffic_bytes: round * 1024, traffic_limit_bytes: 0, expire_at: null, online_at: null }] }));
     if (url === 'ui/api/fleet') return Promise.resolve(reply({ profile_title: 'Test fleet', display_names: {},
@@ -184,10 +185,24 @@ if (mode.startsWith('expiry-')) {
 
 if (mode.startsWith('live-')) {
   const interval = data.screen === 'servers' ? 10000 : 30000;
+  if (mode === 'live-fleet-failure') M.state.fleet = data.fleet;
   const cleanup = data.screen === 'servers' ? M.renderServers(view) : M.renderPeople(view);
   await settle();
   const fleetCalls = () => events.filter(event => event.url === 'ui/api/fleet');
   const liveData = () => (view.querySelector('.live-data') || view).textContent;
+  if (mode === 'live-fleet-failure') {
+    report.names = [...view.querySelectorAll('.name')].map(el => el.textContent);
+    report.declared = view.querySelectorAll('.tag').length;
+    report.initial = liveData();
+    await advance(interval);
+    report.afterPoll = liveData();
+    report.fleet = M.state.fleet;
+    failPolls = true;
+    await advance(interval);
+    report.afterUserFailure = liveData();
+    report.stale = view.classList.contains('view-stale');
+    report.retryVisible = !!view.querySelector('.live-retry') && !view.querySelector('.live-retry').hidden;
+  }
   if (mode === 'live-cycle') {
     await advance(interval);
     report.afterPoll = fleetCalls().length;

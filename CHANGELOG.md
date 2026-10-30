@@ -26,6 +26,7 @@ that dials out to it.
   IP limits).
 
 ### Control service
+- The console People list continues loading users when fleet metadata is unavailable, retaining cached names and declared markers.
 - Blob mirror health clears failures for retired or seeded artifacts while retaining failures for blobs still needed by another node.
 - An offline console language switch keeps the working language, labels, and text direction until a catalog loads successfully.
 - Fleet import reviews name each person's changed creation settings instead of reporting a fleet reorder.

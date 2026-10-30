@@ -26,6 +26,19 @@ def test_poll_failure_keeps_stale_data_and_inline_retry_recovers(screen: str) ->
     assert result["recovered"] is True and result["retriedActively"] is True
 
 
+@pytest.mark.parametrize("cached", [False, True], ids=["no-cache", "cached-fleet"])
+def test_people_loads_and_polls_users_when_the_fleet_request_fails(cached: bool) -> None:
+    fleet = {"display_names": {"sample": "Saved person"}, "declared_users": ["sample"]} if cached else None
+    result = run_console("live-fleet-failure", data={"screen": "people", "fleet": fleet})
+    assert result["names"] == ["Saved person" if cached else "sample"]
+    assert result["declared"] == (1 if cached else 0)
+    if cached:
+        assert result["fleet"] == fleet
+    assert "1 KiB" in result["initial"] and "2 KiB" in result["afterPoll"]
+    assert result["afterUserFailure"] == result["afterPoll"]
+    assert result["stale"] is True and result["retryVisible"] is True
+
+
 def test_poll_errors_back_off_and_cap_the_delay() -> None:
     result = run_console("live-backoff", data={"screen": "servers"})
     assert result["gaps"][:5] == [10_000, 20_000, 40_000, 80_000, 120_000]
