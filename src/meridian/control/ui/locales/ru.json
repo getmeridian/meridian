@@ -200,6 +200,7 @@
   "servers.waiting": "Ожидание",
   "servers.traffic": "Трафик",
   "servers.failed": "Часть настроек не применилась:",
+  "servers.failed_badge": "Не применено",
   "role.exit": "Выходной сервер",
   "role.gateway": "Шлюз маршрутизации",
   "role.node": "Сервер",

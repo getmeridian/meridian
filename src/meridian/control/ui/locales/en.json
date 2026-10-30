@@ -200,6 +200,7 @@
   "servers.waiting": "Waiting",
   "servers.traffic": "Traffic",
   "servers.failed": "Some parts failed to apply:",
+  "servers.failed_badge": "Not applied",
   "role.exit": "Exit",
   "role.gateway": "Gateway",
   "role.node": "Server",

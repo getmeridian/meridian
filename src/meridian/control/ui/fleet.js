@@ -60,7 +60,7 @@
 
   function serverCard(server, usage, attention) {
     var sync = !server.runtime_available ? M.pill("muted", M.t("servers.convergence_unavailable"))
-      : server.failed && server.failed.length ? M.pill("err", M.t("servers.failed")) : server.in_sync
+      : server.failed && server.failed.length ? M.pill("err", M.t("servers.failed_badge")) : server.in_sync
       ? M.pill("ok", M.t("servers.in_sync"))
       : server.applied_revision ? M.pill("warn", M.t("servers.applying")) : M.pill("muted", M.t("servers.waiting"));
     var runtime = server.runtime_available ? server.runtime : null;

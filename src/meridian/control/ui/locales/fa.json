@@ -200,6 +200,7 @@
   "servers.waiting": "در انتظار",
   "servers.traffic": "ترافیک",
   "servers.failed": "بخش‌هایی اعمال نشدند:",
+  "servers.failed_badge": "اعمال نشد",
   "role.exit": "خروجی",
   "role.gateway": "دروازه",
   "role.node": "سرور",

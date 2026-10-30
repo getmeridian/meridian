@@ -200,6 +200,7 @@
   "servers.waiting": "等待中",
   "servers.traffic": "流量",
   "servers.failed": "部分配置未能应用：",
+  "servers.failed_badge": "未应用",
   "role.exit": "出口",
   "role.gateway": "网关",
   "role.node": "服务器",

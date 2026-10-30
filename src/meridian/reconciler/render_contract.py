@@ -14,7 +14,7 @@ _RENDERER_MANIFEST = {
     "pwa": "russian-copy-v1",
     "control-service": "page-language-v1",
     "control-api": "page-language-v1",
-    "control-ui": "russian-copy-v1",
+    "control-ui": "failed-badge-v1",
     "firewall": "ufw-comment-v2",
     "nginx": "service-pages-v12",
     "realm": "neutral-systemd-musl-v3",
