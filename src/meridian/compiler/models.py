@@ -29,6 +29,7 @@ from meridian.core.inputs import (
 from meridian.core.models import CoreModel
 from meridian.core.owner_contact import OwnerContactSettings
 from meridian.core.resources import ResourceKind as ResourceKind
+from meridian.core.server_allowances import ServerAllowanceSpec
 from meridian.core.topology import (
     DEFAULT_TLS_FINGERPRINT,
     ClientRoutingPolicy,
@@ -509,6 +510,9 @@ class ControlUserPayload(CoreModel):
 class ServiceSettingsPayload(OwnerContactSettings):
     kind: Literal["service_settings"] = "service_settings"
     profile_title: str
+    servers: dict[ServerReferenceValue, ServerAllowanceSpec] = Field(
+        default_factory=dict, exclude_if=lambda servers: not servers
+    )
     exit_countries: list[OptionalCountryCodeValue] = Field(
         default_factory=list, max_length=250, exclude_if=lambda value: not value
     )

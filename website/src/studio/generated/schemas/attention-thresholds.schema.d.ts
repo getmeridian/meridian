@@ -5,12 +5,18 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
+export type AllowanceExceededPercent = number;
+export type AllowancePercent = number;
 export type ExpiryDays = number;
+export type PaymentDays = number;
 export type QuotaPercent = number;
 export type UnusedDays = number;
 
 export interface AttentionThresholds {
+  allowance_exceeded_percent?: AllowanceExceededPercent;
+  allowance_percent?: AllowancePercent;
   expiry_days?: ExpiryDays;
+  payment_days?: PaymentDays;
   quota_percent?: QuotaPercent;
   unused_days?: UnusedDays;
 }

@@ -46,6 +46,11 @@ export type SshUser2 = string;
 export type Relays = RelayInventory[];
 export type Id = string;
 export type Ip2 = string;
+export type AllowanceBytes = number | null;
+export type PayEvery = ("month" | "year") | null;
+export type PayOn = string | null;
+export type Provider = string;
+export type ResetDay = number;
 export type Name2 = string;
 export type Advertised = boolean;
 export type Chain = string;
@@ -59,6 +64,7 @@ export type Servers = ServerInventory[];
 export type Nodes1 = "available" | "unavailable" | "not_requested" | "unknown";
 export type Panel = "available" | "unavailable" | "not_requested" | "unknown";
 export type Relays1 = "available" | "unavailable" | "not_requested" | "unknown";
+export type ServerUsage = "available" | "unavailable" | "not_requested" | "unknown";
 export type Users = "available" | "unavailable" | "not_requested" | "unknown";
 export type Nodes2 = number;
 export type Relays2 = number;
@@ -164,11 +170,22 @@ export interface RelayHostRef {
 export interface ServerInventory {
   id: Id;
   ip: Ip2;
+  metadata?: ServerMetadata | null;
   name: Name2;
   relay_hops?: RelayHops;
   roles: Roles;
   ssh_port: SshPort3;
   ssh_user: SshUser3;
+}
+/**
+ * Deployer-owned metadata keyed to a server declared in the topology.
+ */
+export interface ServerMetadata {
+  allowance_bytes?: AllowanceBytes;
+  pay_every?: PayEvery;
+  pay_on?: PayOn;
+  provider?: Provider;
+  reset_day?: ResetDay;
 }
 export interface RelayHopMembership {
   advertised: Advertised;
@@ -180,6 +197,7 @@ export interface FleetSources {
   nodes?: Nodes1;
   panel?: Panel;
   relays?: Relays1;
+  server_usage?: ServerUsage;
   users?: Users;
 }
 export interface FleetInventorySummary {

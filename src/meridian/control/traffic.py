@@ -29,6 +29,7 @@ from meridian.control.models import (
     UserUsage,
 )
 from meridian.control.privacy import history_cutoff, prune_history_rows, read_privacy
+from meridian.control.server_allowances import advance_server_periods
 from meridian.control.store import Store
 from meridian.control.times import utc_now
 from meridian.core.agent_protocol import StatsAck, StatsReport
@@ -171,6 +172,7 @@ class TrafficLedger:
                 )
             growth.append((user.user_id, user.uplink_bytes, user.downlink_bytes, up, down))
         now = now or utc_now()
+        advance_server_periods(self._store, now)
         history = read_privacy(self._store).usage_history == "daily"
         day = history_cutoff(1, now)
         for user_id, total_up, total_down, up, down in growth:

@@ -39,6 +39,7 @@ from meridian.core.attention import AttentionList
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientLimitChange, TrafficReset
 from meridian.core.fleet import FleetTopology
+from meridian.core.server_allowances import ServerUsageList
 from meridian.core.traffic import NodeTrafficEvidence
 from meridian.remnawave import (
     XRAY_JSON_CLIENT_TYPE,
@@ -219,6 +220,9 @@ class ServiceFleetPanel(ServiceAccessPanel):
         except RemnawaveNetworkError:
             return False
         return True
+
+    def server_usage(self) -> ServerUsageList:
+        return _translated(self._client.server_usage)
 
     def list_nodes(self) -> list[Node]:
         nodes: list[Node] = []

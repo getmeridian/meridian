@@ -39,10 +39,20 @@ from meridian.compiler.models import (
     SubscriptionSettingsPayload,
     make_resource,
 )
+from meridian.core.server_allowances import ServerAllowanceSpec
 from meridian.core.topology import SetupIntent
 
 CONTROL_SERVICE_ID = "control:service"
 SERVICE_SETTINGS_ID = "settings:service"
+
+
+def _server_settings(intent: SetupIntent) -> dict[str, ServerAllowanceSpec]:
+    agents = {item.server_ref: item.id for item in intent.exits}
+    agents.update({item.server_ref: item.id for item in intent.routing_gateways})
+    return {
+        ref: ServerAllowanceSpec(node_id=agents.get(ref), metadata=metadata)
+        for ref, metadata in sorted(intent.server_metadata.items())
+    }
 
 
 def validate_meridian_backend(intent: SetupIntent) -> None:
@@ -155,6 +165,7 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
             replacements[SERVICE_SETTINGS_ID] = (
                 ServiceSettingsPayload(
                     owner_contact=intent.delivery.owner_contact,
+                    servers=_server_settings(intent),
                     profile_title=payload.profile_title,
                     update_interval_hours=payload.update_interval_hours,
                     client_routing=payload.client_routing,

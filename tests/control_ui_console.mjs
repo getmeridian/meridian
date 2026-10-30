@@ -114,7 +114,8 @@ w.fetch = (url, options) => {
     if (url === 'ui/api/fleet') return Promise.resolve(reply({ profile_title: 'Test fleet', display_names: {},
       declared_users: [], servers: [{ ...server, traffic_bytes: round * 1024 }] }));
   }
-  if (url === 'ui/api/fleet') return Promise.resolve(reply({ servers: [server] }));
+  if (url === 'ui/api/fleet') return Promise.resolve(reply({ servers: data?.servers || [server],
+    server_usage: data?.server_usage || [], server_attention: data?.server_attention || [] }));
   throw new Error('Unexpected request: ' + url);
 };
 for (const script of ['core.js', 'people.js', 'fleet.js']) {
@@ -176,6 +177,9 @@ if (mode === 'servers') {
   await settle();
   report.text = view.textContent;
   report.badges = [...view.querySelectorAll('.server-badges .pill')].map(el => el.textContent);
+  report.images = view.querySelectorAll('img').length;
+  report.pwned = !!w.pwned;
+  report.requests = events.filter(event => event.method);
 }
 
 if (mode === 'quota') {

@@ -48,9 +48,4 @@ def validate_deployment_contract(
 
 def deployment_server_refs(intent: SetupIntent) -> set[str]:
     """Return the exact server references that can receive mutations."""
-    return {
-        intent.control.server_ref,
-        *(exit_.server_ref for exit_ in intent.exits),
-        *(gateway.server_ref for gateway in intent.routing_gateways),
-        *(server_ref for relay in intent.transparent_relays for server_ref in relay.hop_server_refs),
-    }
+    return set(intent.declared_server_refs())

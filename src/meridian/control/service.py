@@ -55,6 +55,7 @@ from meridian.control.owner import UI_TABLES, OwnerAuth
 from meridian.control.periods import period_start
 from meridian.control.privacy import PRIVACY_TABLES, PrivacyLedger, read_privacy
 from meridian.control.revisions import APPLY_FENCE_TABLE, REVISIONS_TABLE, RevisionLedger
+from meridian.control.server_allowances import ALLOWANCE_PERIODS_TABLE, advance_server_periods, read_server_usage
 from meridian.control.service_settings import read_settings, save_settings
 from meridian.control.store import Store
 from meridian.control.subscription_serving import serve_subscription
@@ -72,8 +73,9 @@ from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.client_devices import DevicesRemoved
+from meridian.core.server_allowances import ServerUsageList
 
-SCHEMA_VERSION = 15
+SCHEMA_VERSION = 16
 MAX_WAIT_SECONDS = 55
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -112,6 +114,7 @@ CREATE TABLE IF NOT EXISTS endpoints (endpoint_id TEXT PRIMARY KEY, body TEXT NO
 """
 _SCHEMA += "\n".join(PRIVACY_TABLES) + "\n" + DEVICES_TABLE + ";\n"
 _SCHEMA += ";\n".join(COMMAND_TABLES) + ";\n"
+_SCHEMA += ALLOWANCE_PERIODS_TABLE + ";\n"
 # Statements that bring a database from version N to N + 1 (index N - 1).
 _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (
@@ -145,6 +148,8 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "ALTER TABLE users ADD COLUMN note TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE users ADD COLUMN tag TEXT NOT NULL DEFAULT ''",
     ),
+    # 15 -> 16: server allowance offsets over durable accepted node totals.
+    (ALLOWANCE_PERIODS_TABLE,),
 )
 # meta key prefix: the last revision a deleted node was signed at.
 _RETIRED_REVISION = "retired_revision:"
@@ -216,6 +221,9 @@ class ControlService:
 
     def settings(self) -> ServiceSettings:
         return read_settings(self._store)
+
+    def server_usage(self, *, now: str | None = None) -> ServerUsageList:
+        return read_server_usage(self._store, now or utc_now())
 
     def privacy(self) -> PrivacySettings:
         return read_privacy(self._store)
@@ -619,6 +627,7 @@ class ControlService:
         return user
 
     def _enforce(self, now: str) -> list[str]:
+        advance_server_periods(self._store, now)
         changed: list[str] = []
         for user in self.list_users():
             start = period_start(user.traffic_limit_strategy, datetime.fromisoformat(now))

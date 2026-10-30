@@ -20,6 +20,99 @@
       },
       "title": "OwnerContact",
       "type": "object"
+    },
+    "ServerAllowanceSpec": {
+      "additionalProperties": false,
+      "description": "Settings for a declared server; agent identity is separate from signed node documents.",
+      "properties": {
+        "metadata": {
+          "$ref": "#/$defs/ServerMetadata"
+        },
+        "node_id": {
+          "anyOf": [
+            {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Node Id"
+        }
+      },
+      "required": [
+        "metadata"
+      ],
+      "title": "ServerAllowanceSpec",
+      "type": "object"
+    },
+    "ServerMetadata": {
+      "additionalProperties": false,
+      "description": "Deployer-owned metadata keyed to a server declared in the topology.",
+      "properties": {
+        "allowance_bytes": {
+          "anyOf": [
+            {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Allowance Bytes"
+        },
+        "pay_every": {
+          "anyOf": [
+            {
+              "enum": [
+                "month",
+                "year"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pay Every"
+        },
+        "pay_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pay On"
+        },
+        "provider": {
+          "default": "",
+          "maxLength": 80,
+          "title": "Provider",
+          "type": "string"
+        },
+        "reset_day": {
+          "default": 1,
+          "maximum": 31,
+          "minimum": 1,
+          "title": "Reset Day",
+          "type": "integer"
+        }
+      },
+      "title": "ServerMetadata",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -86,6 +179,19 @@
       "maxLength": 100,
       "title": "Server Name",
       "type": "string"
+    },
+    "servers": {
+      "patternProperties": {
+        "^[^\\r\\n\\t]+$": {
+          "$ref": "#/$defs/ServerAllowanceSpec"
+        }
+      },
+      "propertyNames": {
+        "maxLength": 120,
+        "minLength": 1
+      },
+      "title": "Servers",
+      "type": "object"
     },
     "update_interval_hours": {
       "default": 6,

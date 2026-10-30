@@ -32,6 +32,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 ## Pitfalls
 - Owner contact tests cover reviewed-hash applies, export/import, delivery rollback, all placeholder parsers and remark bounds, locale/RTL rendering, active-link guards, and support HTML bypassing worker caches.
 - Fixtures rewinding before step 15 drop `users.note` and `users.tag`; metadata coverage checks empty lower-scope reads, snapshot restoration, content-free events, and edited-field-only console PATCHes.
+- Server allowance fixtures pin the settings clock beside accounting time, cover UTC boundary growth before timer resets, and verify payment/attention reads leave SQLite change counts untouched.
 - Console DOM scenarios make the document visible (`pretendToBeVisual` in jsdom); Servers and People defer their requests while hidden.
 - **Traffic period clocks** — pin both service and ledger UTC clocks and the injected registry clock; a fixture that set resets with wall time while asserting a fixed midnight failed as soon as the date changed. Match aligned labels by content, not an exact number of spaces.
 - **Local event facts** — exercise rollback on both sides of the event insert, concurrent request actors, no-op changes, the full node live window, missing-report recovery, cursor boundaries, count/age retention, and snapshot cursor preservation; details must reject credential and raw-error fields.

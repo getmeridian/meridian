@@ -38,14 +38,27 @@
       draw: function (fleet) {
         M.state.fleet = fleet;
         var servers = fleet.servers || [];
-        M.mount(cards, servers.length ? h("div", { class: "cards" }, servers.map(serverCard))
+        var usage = fleet.server_usage || [];
+        var attention = fleet.server_attention || [];
+        function reasons(item) {
+          var finding = attention.find(function (row) { return row.server_ref === item.server_ref; });
+          return finding ? finding.reasons : [];
+        }
+        var all = servers.map(function (server) {
+          var item = usage.find(function (row) { return row.node_id === server.node_id; });
+          return serverCard(server, item, item ? reasons(item) : []);
+        });
+        usage.filter(function (item) {
+          return !item.node_id || !servers.some(function (server) { return server.node_id === item.node_id; });
+        }).forEach(function (item) { all.push(billingCard(item, reasons(item))); });
+        M.mount(cards, all.length ? h("div", { class: "cards" }, all)
           : h("div", { class: "empty" }, h("p", { text: M.t("servers.empty") })));
       },
       empty: function () { M.clear(cards); },
     });
   };
 
-  function serverCard(server) {
+  function serverCard(server, usage, attention) {
     var sync = !server.runtime_available ? M.pill("muted", M.t("servers.convergence_unavailable"))
       : server.failed && server.failed.length ? M.pill("err", M.t("servers.failed")) : server.in_sync
       ? M.pill("ok", M.t("servers.in_sync"))
@@ -99,8 +112,57 @@
           return h("li", { class: "mono small", text: line });
         })))
         : null,
+      usage ? allowanceDetails(usage, attention) : h("p", { class: "muted small", text: M.t("server_allowance.approximate") }),
       h("div", { class: "row-actions" }, h("button", { class: "btn btn-ghost btn-sm", type: "button",
         onclick: function () { M.restartNode(server.node_id); } }, M.t("commands.restart"))));
+  }
+
+  function billingDate(value) { return "\u2066" + String(value || "").slice(0, 10) + "\u2069"; }
+
+  function billingCard(usage, attention) {
+    return h("section", { class: "card server" },
+      h("div", { class: "card-head" }, h("h2", { class: "mono", text: usage.server_ref })),
+      allowanceDetails(usage, attention));
+  }
+
+  function allowanceDetails(usage, attention) {
+    var metadata = usage.metadata || {};
+    var measured = usage.measurement === "accepted_user_traffic";
+    var repeats = { month: "server_allowance.month", year: "server_allowance.year", none: "server_allowance.one_off" };
+    var labels = {
+      allowance_near: "server_allowance.allowance_near", allowance_exceeded: "server_allowance.allowance_exceeded",
+      payment_due: "server_allowance.payment_due", payment_overdue: "server_allowance.payment_overdue",
+    };
+    return h("div", { class: "stack" },
+      h("h3", { text: M.t("server_allowance.title") }),
+      h("dl", { class: "facts" },
+        metadata.provider ? [h("dt", { text: M.t("server_allowance.provider") }),
+          h("dd", { text: metadata.provider })] : null,
+        h("dt", { text: M.t("server_allowance.allowance") }),
+        h("dd", { text: metadata.allowance_bytes != null ? M.bytes(metadata.allowance_bytes) : M.t("server_allowance.not_set") }),
+        metadata.allowance_bytes != null ? [h("dt", { text: M.t("server_allowance.reset_day") }),
+          h("dd", { text: "\u2068" + M.count(metadata.reset_day) + "\u2069" })] : null,
+        measured && usage.used_bytes != null ? [h("dt", { text: M.t("server_allowance.used") }),
+          h("dd", { text: M.bytes(usage.used_bytes) + " / " + M.bytes(metadata.allowance_bytes) }),
+          h("dt", { text: M.t("server_allowance.period") }),
+          h("dd", { text: billingDate(usage.period_start) + " → " + billingDate(usage.period_end) })] : null,
+        metadata.pay_on ? [h("dt", { text: M.t("server_allowance.payment_anchor") }),
+          h("dd", { text: billingDate(metadata.pay_on) }),
+          h("dt", { text: M.t("server_allowance.repeat") }),
+          h("dd", { text: M.t(repeats[metadata.pay_every || "none"]) })] : null,
+        usage.next_payment_on ? [h("dt", { text: M.t("server_allowance.next_payment") }),
+          h("dd", { text: billingDate(usage.next_payment_on) })] : null),
+      h("p", { class: "muted small", text: M.t(measured ? "server_allowance.approximate" : "server_allowance.not_measured") }),
+      metadata.allowance_bytes != null ? h("p", { class: "muted small", text: M.t("server_allowance.short_month") }) : null,
+      usage.counting_since && usage.counting_since !== usage.period_start ? h("p", { class: "notice notice-warn small",
+        text: M.t("server_allowance.since", { date: billingDate(usage.counting_since) }) }) : null,
+      (attention || []).map(function (reason) {
+        return M.has(labels, reason) ? h("p", { class: "notice " +
+          (reason === "allowance_exceeded" || reason === "payment_overdue" ? "notice-err" : "notice-warn"),
+          text: M.t(labels[reason]) }) : null;
+      }),
+      h("p", { class: "muted small", text: M.t("server_allowance.edit_hint") }),
+      M.command("meridian server set " + usage.server_ref));
   }
 
   // -- revisions --------------------------------------------------------------------------------

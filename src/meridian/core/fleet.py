@@ -8,7 +8,9 @@ from urllib.parse import urlsplit, urlunsplit
 from pydantic import Field
 
 from meridian.control.models import NodeRuntime
+from meridian.core.attention import AttentionThresholds, ServerAttention, derive_server_attention
 from meridian.core.models import CoreModel
+from meridian.core.server_allowances import ServerMetadata, ServerUsage, ServerUsageList
 from meridian.core.topology import ProtocolKind
 from meridian.core.traffic import NodeTrafficEvidence
 
@@ -106,6 +108,7 @@ class TopologyServerMember(CoreModel):
     ssh_user: str
     ssh_port: int
     relay_hops: list[RelayHopMembership] = Field(default_factory=list)
+    metadata: ServerMetadata | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class FleetTopology(CoreModel):
@@ -125,6 +128,7 @@ class FleetTopology(CoreModel):
 
 
 class FleetSources(CoreModel):
+    server_usage: SourceAvailability = Field(default="not_requested", exclude_if=lambda value: value == "not_requested")
     panel: SourceAvailability = "unknown"
     nodes: SourceAvailability = "unknown"
     users: SourceAvailability = "unknown"
@@ -144,6 +148,7 @@ class ServerInventory(CoreModel):
     ssh_user: str
     ssh_port: int
     relay_hops: list[RelayHopMembership] = Field(default_factory=list)
+    metadata: ServerMetadata | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class PanelInventory(CoreModel):
@@ -261,6 +266,7 @@ class FleetStatusRelay(CoreModel):
 class FleetStatusSummary(CoreModel):
     health: FleetHealth
     needs_attention: bool
+    servers_needing_attention: int = 0
     nodes: int
     relays: int
     users: int
@@ -297,6 +303,8 @@ class FleetStatus(CoreModel):
     servers: list[ServerInventory] = Field(default_factory=list)
     nodes: list[FleetStatusNode] = Field(default_factory=list)
     relays: list[FleetStatusRelay] = Field(default_factory=list)
+    server_usage: list[ServerUsage] = Field(default_factory=list)
+    server_attention: list[ServerAttention] = Field(default_factory=list)
 
 
 def public_url(url: str) -> str:
@@ -405,6 +413,7 @@ def build_server_inventory(topology: FleetTopology) -> list[ServerInventory]:
                 ssh_user=server.ssh_user,
                 ssh_port=server.ssh_port,
                 relay_hops=server.relay_hops,
+                metadata=server.metadata,
             )
             for server in topology.servers
         ]
@@ -448,6 +457,7 @@ def build_fleet_status(
     relay_health: Mapping[tuple[str, int], bool] | None = None,
     sources: FleetSources | None = None,
     node_evidence: Mapping[str, NodeTrafficEvidence] | None = None,
+    server_usage: ServerUsageList | None = None,
 ) -> FleetStatus:
     """Build fleet health status from local state plus live observations."""
     api_by_uuid = {node.uuid: node for node in api_nodes or []}
@@ -502,7 +512,10 @@ def build_fleet_status(
         1 for server in topology.servers for hop in server.relay_hops if not hop.advertised and hop.health == "unknown"
     )
     missing_required_sources = (
-        sources.panel == "unavailable" or sources.nodes == "unavailable" or sources.users == "unavailable"
+        sources.panel == "unavailable"
+        or sources.nodes == "unavailable"
+        or sources.users == "unavailable"
+        or sources.server_usage == "unavailable"
     )
     # Disabled, limited, or expired clients are operator or panel decisions, not faults.
     health: FleetHealth
@@ -525,10 +538,17 @@ def build_fleet_status(
         health = "unknown"
     else:
         health = "healthy"
-    needs_attention = health != "healthy"
+    allowance_usage = server_usage.servers if server_usage is not None else []
+    server_attention = (
+        derive_server_attention(allowance_usage, AttentionThresholds(), server_usage.observed_at)
+        if server_usage
+        else []
+    )
+    needs_attention = health != "healthy" or bool(server_attention)
     summary = FleetStatusSummary(
         health=health,
         needs_attention=needs_attention,
+        servers_needing_attention=len(server_attention),
         nodes=len(nodes),
         relays=len(relays),
         users=len(user_statuses),
@@ -548,6 +568,8 @@ def build_fleet_status(
         unknown_relay_hops=unknown_relay_hops,
     )
     return FleetStatus(
+        server_usage=allowance_usage,
+        server_attention=server_attention,
         panel=PanelStatus(url=topology.panel_url, healthy=panel_healthy),
         summary=summary,
         sources=sources,

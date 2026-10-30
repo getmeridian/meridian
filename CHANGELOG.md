@@ -9,6 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - Reviewed owner contact appears on connection and support pages in all four locales, uses a user-initiated HTTPS, Telegram, or email link, and supplies apps' support button. Short instructions can accompany inactive subscription remarks; longer ones stay on the pages.
 
 - People have private notes and one tag, editable through the people/admin API, `client set`, and the console. CLI reads show them and filter by tag; encrypted snapshots preserve them, and migration carries descriptions and valid tags with truncation notices.
+- `meridian server set` reviews per-server monthly bandwidth allowances, reset days, provider labels, and optional repeating payment dates. Fleet status, server lists and exports, the read-only console, and the attention API show them; usage is approximate accepted upload + download, and servers without a traffic agent are not measured.
 
 - Restart and client cut-off commands render service failures through their JSON error envelopes; terminal result-read errors report failed nodes instead of retryable timeouts.
 - Console command results preserve completed nodes when siblings time out or fail to poll; terminal read errors stop polling with an unavailable result instead of a false timeout.

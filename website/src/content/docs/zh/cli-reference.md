@@ -191,7 +191,8 @@ meridian privacy set [--devices off|private|full] [--device-limit N] [--history 
 
 ```
 meridian server add [USER@]IP[:PORT]|local [--name NAME] [--user USER] [--ssh-port PORT]
-meridian server list
+meridian server list [--json]
+meridian server set NAME [--allowance SIZE] [--reset-day DAY] [--provider TEXT] [--pay-on DATE] [--pay-every month|year|none] [--dry-run] [--yes] [--json]
 meridian server remove NAME_OR_IP [--yes]
 ```
 
@@ -203,6 +204,27 @@ meridian server remove NAME_OR_IP [--yes]
 | `--yes`, `-y` | | 跳过删除确认（`server remove`） |
 
 `server add local` 会保存当前这台机器；之后的命令会直接在本机上运行，而不通过 SSH。名称和地址必须唯一；`server add` 遇到冲突时会报错拒绝，而不会改写已有服务器。`server remove` 仅删除已保存的连接配置，只要该服务器仍在拓扑中承担角色就会拒绝删除。
+
+**流量额度和付款日期** 保存在经过审阅的拓扑中，可用于已声明的出口、中继、网关和控制服务器。`server set NAME` 接受已保存的服务器名称、连接配置 ID 或地址。省略的选项保留原值；不带选项时读取当前设置。`server list --json` 返回已保存的连接配置、`metadata` 和计算得到的下次付款日期。
+
+| 服务器设置 | 默认值 | 含义 |
+|---|---|---|
+| `--allowance SIZE` | 未设置 | 每月字节额度，例如 20TB 或 50GiB；`none` 清除。与用户配额相同，GB/TB 是二进制单位 GiB/TiB 的别名 |
+| `--reset-day DAY` | 1 | UTC 时间每月第 1–31 天的零点；较短月份使用最后一天 |
+| `--provider TEXT` | 空 | 单行纯文本，最多 80 个字符；`none` 清除名称 |
+| `--pay-on DATE` | 未设置 | YYYY-MM-DD，也可填写已过期的单次付款日期；`none` 同时清除日期和重复周期 |
+| `--pay-every PERIOD` | none | `month`、`year` 或 `none`；重复付款需要指定日期 |
+| `--dry-run` | | 审阅变更，暂不应用 |
+| `--yes`、`-y` | | 应用已审阅的变更并跳过确认；JSON 模式或没有终端时必须使用 |
+| `--json` | | 为 `server list` 或 `server set` 输出 `meridian.output/v1` 信封 |
+
+```bash
+meridian server set edge --allowance 20TB --reset-day 15 --provider "示例服务商" --pay-on 2026-11-15 --pay-every month --dry-run --json
+meridian server set edge --allowance 20TB --reset-day 15 --yes
+meridian server set edge --allowance none --pay-on none --yes
+```
+
+启用额度或更改重置日后，计量从服务收到此次变更时开始；此前本周期的用量未知。仅更改额度大小、服务商或付款日期会保留周期用量。每月和每年的付款日期在读取时计算：原日期按 UTC 过去后，自动选择下一次，并在较短月份和闰年之后恢复原始基准日。单次日期过期后保持逾期状态。`fleet export` 导出以已保存服务器名称为键的 `server_metadata`，`fleet import` 通过同样的审阅和应用流程处理。移除服务器的最后一个角色会删除其信息；迁移出口时，信息仍属于原物理服务器。额度与提醒用于提示，不会阻止流量。
 
 ### meridian node
 
@@ -354,6 +376,9 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 **`fleet usage`** — 显示每台服务器每个 UTC 天的总字节数，包括已删除服务器仍在保留期内的用量。`--days N` 选择保留期内 1–730 天。每日历史须开启；JSON 在 `data` 中返回服务器组总量和 `nodes[].daily`。
 
 **`fleet contact`** — 显示或审阅公开的所有者联系信息。`--text TEXT` 指定一行纯文本（最多 120 个字符），`--link LINK` 指定规范化的 `https:`、`tg:` 或 `mailto:` 链接。未指定的字段保持原值；`--text ""` 和 `--link none` 清除它们。`--dry-run` 返回审阅结果；没有终端或使用 `--json` 更改时需要 `--yes`。JSON 返回 `data.owner_contact`、审阅及应用结果。控制台只读显示联系信息，服务器导出/导入会保留 `delivery.owner_contact`。页面提供说明和由用户主动打开的链接；应用将其用于支持按钮。参见[所有者联系信息](/zh/client-management/)。
+**服务器流量额度** — `fleet status` 和控制台的只读“服务器”页面显示周期用量、服务商、重置日、下次付款日期以及服务器提醒。用量是已接受用户流量的估算值（上传 + 下载），不包含协议开销、服务器自身下载以及中继转发流量。报告计入接收时所在的 UTC 周期，因此延迟报告可能增加后一个周期的用量。中继及未运行代理的控制服务器显示 **未计量**，不显示用量数字。控制台提供 `meridian server set NAME` 修改命令。
+
+`GET /api/servers` 需要 read 权限，返回 `server-usage` 合同：服务器信息、UTC 周期边界、已计数字节、计量开始时间、下次付款以及计量范围。`GET /api/attention` 增加 `servers[]`：达到 80% 时为 `allowance_near`，达到 100% 时为 `allowance_exceeded`，付款日期在 7 天内时为 `payment_due`，已过期的单次日期为 `payment_overdue`。查询参数 `allowance_percent` 和 `allowance_exceeded_percent` 的范围是 1–100，前者不得高于后者；`payment_days` 的范围是 1–30。额度与付款提醒会设置 `summary.needs_attention`；部署健康状态和退出码继续表示服务运行状态。
 
 ### meridian context
 

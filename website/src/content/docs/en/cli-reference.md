@@ -191,7 +191,8 @@ Manage saved SSH servers (`~/.config/meridian/servers.json`).
 
 ```
 meridian server add [USER@]IP[:PORT]|local [--name NAME] [--user USER] [--ssh-port PORT]
-meridian server list
+meridian server list [--json]
+meridian server set NAME [--allowance SIZE] [--reset-day DAY] [--provider TEXT] [--pay-on DATE] [--pay-every month|year|none] [--dry-run] [--yes] [--json]
 meridian server remove NAME_OR_IP [--yes]
 ```
 
@@ -203,6 +204,27 @@ meridian server remove NAME_OR_IP [--yes]
 | `--yes`, `-y` | | Skip the removal confirmation (`server remove`) |
 
 `server add local` saves the machine you are on; later commands run on it directly instead of over SSH. Names and addresses must be unique; `server add` refuses collisions instead of retargeting an existing server. `server remove` deletes only the saved profile and refuses while the server still has a role in your topology.
+
+**Allowances and payment dates** belong to declared exits, relays, gateways, and the control server in the reviewed topology. `server set NAME` accepts a saved server name, profile ID, or address. Omitted options keep their values; a bare command reads them. `server list --json` returns saved profiles with `metadata` and the computed next payment date.
+
+| Server setting | Default | Meaning |
+|---|---|---|
+| `--allowance SIZE` | not set | Monthly bytes, such as 20TB or 50GiB; `none` clears it. GB/TB are binary aliases for GiB/TiB, as with client quotas |
+| `--reset-day DAY` | 1 | UTC midnight on day 1–31; a short month uses its last day |
+| `--provider TEXT` | empty | Plain text on one line, up to 80 characters; `none` clears it |
+| `--pay-on DATE` | not set | YYYY-MM-DD, including a past one-off payment; `none` clears both date and repeat |
+| `--pay-every PERIOD` | none | `month`, `year`, or `none`; a repeat needs a payment date |
+| `--dry-run` | | Review the metadata edit without applying it |
+| `--yes`, `-y` | | Apply the reviewed change without confirmation; required with JSON or without a terminal |
+| `--json` | | A `meridian.output/v1` envelope for `server list` or `server set` |
+
+```bash
+meridian server set edge --allowance 20TB --reset-day 15 --provider "Example provider" --pay-on 2026-11-15 --pay-every month --dry-run --json
+meridian server set edge --allowance 20TB --reset-day 15 --yes
+meridian server set edge --allowance none --pay-on none --yes
+```
+
+Enabling an allowance or changing its reset day starts tracking when the service receives that apply; earlier use in the current period is unknown. Changing only the allowance amount, provider, or payment date preserves period use. Monthly and yearly payment repeats advance on read after the date passes in UTC, preserving the original day through short months and leap years; one-off dates stay overdue. `fleet export` includes `server_metadata` keyed by saved server name, and `fleet import` reviews it through the same apply. Removing a server's final role drops its metadata; moving an exit keeps metadata with the physical server. Allowances and reminders are informational and do not block traffic.
 
 ### meridian node
 
@@ -354,6 +376,9 @@ The `active` column counts people with growth in the last report, with its colle
 **`fleet usage`** — shows per-server byte totals for each UTC day, including retained use of removed servers. `--days N` chooses 1–730 days within retention. Daily history must be on; JSON returns fleet totals and `nodes[].daily` in `data`.
 
 **`fleet contact`** — reads or reviews public owner contact. Use `--text TEXT` for one line of plain text (up to 120 characters) and `--link LINK` for a canonical `https:`, `tg:`, or `mailto:` link. Omitted fields stay unchanged; `--text ""` and `--link none` clear them. `--dry-run` returns the review; a change without a terminal or with `--json` requires `--yes`. JSON returns `data.owner_contact`, the review, and the apply when present. The console shows the contact read-only, and fleet export/import carries `delivery.owner_contact`. The pages show the instructions and a user-initiated link; apps use that link for their support button. See [Owner contact](/en/client-management/#owner-contact-on-connection-pages).
+**Server allowances** — `fleet status` and the read-only console Servers screen show current period use, provider, reset day, next payment date, and server attention. Usage is approximate accepted user traffic (upload + download): protocol overhead, the server's own downloads, and relay forwarding are excluded. Reports count in their UTC receipt period, so delayed reports can affect a later period. Relays and a control server without an agent say **not measured**, with no usage figure. The console prints `meridian server set NAME` for edits.
+
+`GET /api/servers` needs read scope and returns the `server-usage` contract: metadata, UTC period boundaries, counted bytes, tracking start, next payment, and measurement coverage. `GET /api/attention` adds `servers[]` with `allowance_near` at 80%, `allowance_exceeded` at 100%, `payment_due` within 7 days, and `payment_overdue` for past one-off dates. Its `allowance_percent` and `allowance_exceeded_percent` query thresholds are bounded to 1–100, with the first no higher than the second; `payment_days` is 1–30. Billing warnings set `summary.needs_attention`; fleet health and exit codes continue to describe runtime health.
 
 ### meridian context
 

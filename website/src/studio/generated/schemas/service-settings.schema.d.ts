@@ -20,6 +20,12 @@ export type ProfileTitle = string;
 export type PublicUrl = string;
 export type ServerIcon = string;
 export type ServerName = string;
+export type AllowanceBytes = number | null;
+export type PayEvery = ("month" | "year") | null;
+export type PayOn = string | null;
+export type Provider = string;
+export type ResetDay = number;
+export type NodeId = string | null;
 export type UpdateIntervalHours = number;
 
 export interface ServiceSettings {
@@ -31,6 +37,7 @@ export interface ServiceSettings {
   public_url?: PublicUrl;
   server_icon?: ServerIcon;
   server_name?: ServerName;
+  servers?: Servers;
   update_interval_hours?: UpdateIntervalHours;
 }
 /**
@@ -39,4 +46,27 @@ export interface ServiceSettings {
 export interface OwnerContact {
   link?: Link;
   text?: Text;
+}
+export interface Servers {
+  [k: string]: ServerAllowanceSpec;
+}
+/**
+ * Settings for a declared server; agent identity is separate from signed node documents.
+ *
+ * This interface was referenced by `Servers`'s JSON-Schema definition
+ * via the `patternProperty` "^[^\r\n\t]+$".
+ */
+export interface ServerAllowanceSpec {
+  metadata: ServerMetadata;
+  node_id?: NodeId;
+}
+/**
+ * Deployer-owned metadata keyed to a server declared in the topology.
+ */
+export interface ServerMetadata {
+  allowance_bytes?: AllowanceBytes;
+  pay_every?: PayEvery;
+  pay_on?: PayOn;
+  provider?: Provider;
+  reset_day?: ResetDay;
 }

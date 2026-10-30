@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from meridian.core.apply import CompiledApplyPreview, CompiledApplyResult
 from meridian.core.models import CoreModel
+from meridian.core.server_allowances import ServerMetadata
 from meridian.core.topology import AccessIntent, ExitIntent, SetupIntent
 
 FLEET_DOCUMENT_SCHEMA: Final = "meridian.fleet/v1"
@@ -97,18 +98,14 @@ def map_server_refs(document: dict[str, Any], rename: Callable[[str], str]) -> N
         hops = relay.get("hop_server_refs")
         if isinstance(hops, list):
             relay["hop_server_refs"] = [one(hop) for hop in hops]
+    metadata = document.get("server_metadata")
+    if isinstance(metadata, dict):
+        document["server_metadata"] = {one(ref): value for ref, value in metadata.items()}
 
 
 def intent_server_refs(intent: SetupIntent) -> list[str]:
     """Every server the intent names, in document order, once each."""
-    found: list[str] = []
-
-    def note(ref: str) -> str:
-        found.append(ref)
-        return ref
-
-    map_server_refs(intent.model_dump(mode="json"), note)
-    return list(dict.fromkeys(found))
+    return intent.declared_server_refs()
 
 
 def relabel_servers(intent: SetupIntent, labels: Mapping[str, str]) -> SetupIntent:
@@ -136,6 +133,11 @@ def intent_changes(before: SetupIntent, after: SetupIntent) -> list[IntentChange
             continue
         if name == "access":
             changes.extend(_access_changes(old, new))
+        elif name == "server_metadata":
+            for ref in sorted(old.keys() | new.keys()):
+                changes.extend(
+                    _field_changes("server", ref, old.get(ref, ServerMetadata()), new.get(ref, ServerMetadata()))
+                )
         elif name in _COLLECTIONS:
             changes.extend(_collection_changes(_COLLECTIONS[name], name, old, new))
         elif isinstance(old, BaseModel):

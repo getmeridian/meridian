@@ -1,5 +1,6 @@
 # compiler — pure finite topology compilation
 ## Design decisions
+- **Server accounting settings** — declared server metadata compiles into the service-settings payload with an optional exit/gateway node ID; relay and control-only servers have no agent identity, and metadata never enters node workloads.
 **Reviewed client policies** — `DeliveryIntent.client_routing` selects `ru-split` (default, omitted from serialization) or `full`; `delivery.client_routes()` derives both from `DEFAULT_CLIENT_ROUTES`, removing only Russian bypasses for `full`. Private/LAN bypasses, QUIC blocking, and Xray's best-effort BitTorrent direct rule stay in both; structured formats share the selection within their existing matcher support, and Base64 links carry no routing rules.
 **Finite resources** — only explicitly typed V4 payloads are emitted; this is not a generic provider or Terraform layer.
 **Pure and deterministic** — output depends only on `SetupIntent` and a secret-free `DeploymentContract`: no I/O, secrets, clock reads, or randomness (tested). It never holds generated credentials or private Reality keys.

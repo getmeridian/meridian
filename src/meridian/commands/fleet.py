@@ -14,6 +14,7 @@ from rich.markup import escape
 
 from meridian.adapters.cluster import topology_from_local_cluster
 from meridian.commands._helpers import format_traffic, load_topology_cluster
+from meridian.commands.server_display import print_metadata, print_server_usage
 from meridian.console import err_console, error_context, fail, is_json_mode, warn
 from meridian.control_access import fleet_panel
 from meridian.core.errors import LocalStateError, MeridianError
@@ -169,7 +170,9 @@ def _render_status(status: FleetStatus) -> None:
 
         err_console.print()
         err_console.print("  [bold]Nodes[/bold]")
-        table = Table(box=None, padding=(0, 1), caption=t("fleet.active_report"))
+        table = Table(
+            box=None, padding=(0, 1), caption=t("fleet.active_report") + "\n" + t("server_metadata.approximate")
+        )
         table.add_column(t("fleet.label.node"))
         table.add_column(t("client.label.status"))
         table.add_column(t("client.label.traffic"))
@@ -247,6 +250,17 @@ def _render_status(status: FleetStatus) -> None:
 
             err_console.print(f"    {escape(relay.ip)}  {label} -> {target_label}  listener: {relay_state}")
 
+    print_server_usage(status.server_usage, status.server_attention)
+    if status.sources.server_usage == "unavailable":
+        for server in status.servers:
+            if server.metadata is not None:
+                err_console.print("    [bold]" + escape(server.name or server.id) + "[/bold]")
+                print_metadata(server.metadata)
+                if "exit" in server.roles or "routing_gateway" in server.roles:
+                    warn(t("server_metadata.unavailable"))
+                else:
+                    err_console.print("      " + escape(t("server_metadata.not_measured")))
+
     internal_hops = [(server, hop) for server in status.servers for hop in server.relay_hops if not hop.advertised]
     if internal_hops:
         err_console.print()
@@ -295,6 +309,9 @@ def _run_status(*, operation: OperationContext) -> int:
             check_relays=_check_relays_health,
             classify_error=_classify_panel_error,
             read_node_evidence=panel.node_evidence,
+            read_server_usage=panel.server_usage
+            if cluster.topology_intent and cluster.topology_intent.server_metadata
+            else None,
         )
     except MeridianError as exc:
         fail(exc)
@@ -326,6 +343,7 @@ def _run_status(*, operation: OperationContext) -> int:
                         "out_of_sync_nodes": status.summary.out_of_sync_nodes,
                         "disabled_nodes": status.summary.disabled_nodes,
                         "unknown_nodes": status.summary.unknown_nodes,
+                        "servers_needing_attention": status.summary.servers_needing_attention,
                     },
                 ),
                 exit_code=exit_code,

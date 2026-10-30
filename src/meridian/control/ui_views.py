@@ -14,6 +14,7 @@ import segno
 from meridian.control.errors import ServiceError
 from meridian.control.service import ControlService
 from meridian.control.ui_models import FleetView, ServerView, ShareView
+from meridian.core.attention import AttentionThresholds, derive_server_attention
 
 _QR_DARK = "#1A1D2E"
 _QR_LIGHT = "#FFFFFF"
@@ -92,7 +93,10 @@ def fleet_view(service: ControlService) -> FleetView:
             )
         )
     settings = service.settings()
+    usage = service.server_usage()
     return FleetView(
+        server_usage=usage.servers,
+        server_attention=derive_server_attention(usage.servers, AttentionThresholds(), usage.observed_at),
         profile_title=settings.profile_title,
         public_url=settings.public_url,
         declared_users=declared,

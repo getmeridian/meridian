@@ -91,6 +91,11 @@ export type BridgePathRef = string;
 export type Id5 = string;
 export type ServerRef2 = string;
 export type RoutingGateways = RoutingGatewayIntent[];
+export type AllowanceBytes = number | null;
+export type PayEvery = ("month" | "year") | null;
+export type PayOn = string | null;
+export type Provider = string;
+export type ResetDay = number;
 export type ExitRef = string;
 /**
  * @minItems 1
@@ -116,6 +121,7 @@ export interface SetupIntent {
   harden?: Harden;
   routes?: Routes;
   routing_gateways?: RoutingGateways;
+  server_metadata?: ServerMetadata;
   transparent_relays?: TransparentRelays;
 }
 /**
@@ -249,6 +255,22 @@ export interface RoutingGatewayIntent {
   bridge_path_ref: BridgePathRef;
   id: Id5;
   server_ref: ServerRef2;
+}
+export interface ServerMetadata {
+  [k: string]: ServerMetadata1;
+}
+/**
+ * Deployer-owned metadata keyed to a server declared in the topology.
+ *
+ * This interface was referenced by `ServerMetadata`'s JSON-Schema definition
+ * via the `patternProperty` "^[^\r\n\t]+$".
+ */
+export interface ServerMetadata1 {
+  allowance_bytes?: AllowanceBytes;
+  pay_every?: PayEvery;
+  pay_on?: PayOn;
+  provider?: Provider;
+  reset_day?: ResetDay;
 }
 /**
  * A client-first Realm hop list whose first server is the advertised endpoint.

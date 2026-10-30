@@ -592,6 +592,7 @@ class ServiceSettingsDriver:
         return ServiceSettings(
             owner_contact=payload.owner_contact,
             profile_title=payload.profile_title,
+            servers=payload.servers,
             public_url=self.context.cluster.panel.public_base_url(),
             update_interval_hours=payload.update_interval_hours,
             client_routing=payload.client_routing,

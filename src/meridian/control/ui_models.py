@@ -8,7 +8,9 @@ from pydantic import Field
 
 from meridian.control.models import NodeRuntime
 from meridian.core.agent_types import OpaqueToken
+from meridian.core.attention import ServerAttention
 from meridian.core.models import CoreModel
+from meridian.core.server_allowances import ServerUsage
 from meridian.core.traffic import NodeTrafficEvidence
 
 # Long enough for any passphrase the policy accepts; longer bodies are refused before hashing.
@@ -107,6 +109,8 @@ class FleetView(CoreModel):
     display_names: dict[str, str]
     intent_revision: int | None
     servers: list[ServerView]
+    server_usage: list[ServerUsage] = Field(default_factory=list)
+    server_attention: list[ServerAttention] = Field(default_factory=list)
 
 
 class ShareView(CoreModel):

@@ -3,6 +3,7 @@
 ## Design decisions
 - Client and connecting guides explain reviewed public owner contact, user-initiated support links, explicit clearing, and bounded inactive remarks in every locale.
 - Client guides document private notes/tags, explicit clearing, tag filters, people/admin scope, snapshots, and migration bounds in all four locales.
+- **Server allowance guide** — the fleet/server CLI reference documents reviewed metadata, binary GB/TB aliases, UTC receipt periods and clamped reset days, approximate coverage, unmeasured relays, and computed payment reminders in every locale.
 **Client routing policy** — split-routing.md documents reviewed `ru-split | full`, private/LAN and best-effort Xray BitTorrent bypasses, format limits, subscription refresh, read-only console settings, and separate exit geo-blocking in every locale.
 
 **People API access** — the API-token section in client-management documents the separate people capability, credential access, and transactional declared-user refusals in all four locales.

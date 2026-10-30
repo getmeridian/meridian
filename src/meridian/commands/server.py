@@ -10,9 +10,8 @@ from rich.markup import escape
 
 from meridian import config
 from meridian.cluster import ClusterConfig
-from meridian.commands._helpers import fail_meridian_v3_state, has_meridian_v3_state
 from meridian.commands._validation import validate_command_input
-from meridian.console import confirm, err_console, fail, info, line, ok
+from meridian.console import confirm, fail, info, ok
 from meridian.core.command_inputs import ServerAddRequest, ServerRemoveRequest
 from meridian.core.errors import LocalStateError
 from meridian.i18n import t
@@ -89,26 +88,10 @@ def register_server(
 
 
 def run_list() -> None:
-    """Display all registered servers."""
-    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
-    try:
-        entries = registry.list()
-    except LocalStateError as exc:
-        fail(exc)
+    """Display saved servers with metadata from the reviewed topology."""
+    from meridian.commands.server_list import run_list as list_servers
 
-    if not entries:
-        if has_meridian_v3_state():
-            fail_meridian_v3_state()
-        info("No servers configured. Run: meridian deploy IP")
-        return
-
-    err_console.print()
-    err_console.print(f"  [bold]{'NAME':<15s}  {'IP':<39s}  {'USER':<8s}  {'PORT':<5s}[/bold]")
-    line()
-    for entry in entries:
-        label = escape(entry.name) if entry.name else "--"
-        err_console.print(f"  {label:<15s}  {escape(entry.host):<39s}  {escape(entry.user):<8s}  {entry.port:<5d}")
-    err_console.print()
+    list_servers()
 
 
 def run_remove(query: str, *, yes: bool = False) -> None:

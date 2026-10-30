@@ -477,6 +477,70 @@
       "title": "ProtocolPathIntent",
       "type": "object"
     },
+    "ServerMetadata": {
+      "additionalProperties": false,
+      "description": "Deployer-owned metadata keyed to a server declared in the topology.",
+      "properties": {
+        "allowance_bytes": {
+          "anyOf": [
+            {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Allowance Bytes"
+        },
+        "pay_every": {
+          "anyOf": [
+            {
+              "enum": [
+                "month",
+                "year"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pay Every"
+        },
+        "pay_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pay On"
+        },
+        "provider": {
+          "default": "",
+          "maxLength": 80,
+          "title": "Provider",
+          "type": "string"
+        },
+        "reset_day": {
+          "default": 1,
+          "maximum": 31,
+          "minimum": 1,
+          "title": "Reset Day",
+          "type": "integer"
+        }
+      },
+      "title": "ServerMetadata",
+      "type": "object"
+    },
     "SetupAccessSelection": {
       "additionalProperties": false,
       "description": "Human access and canonical subscription delivery choices.",
@@ -939,6 +1003,19 @@
       "default": "meridian.setup/v1",
       "title": "Schema",
       "type": "string"
+    },
+    "server_metadata": {
+      "patternProperties": {
+        "^[^\\r\\n\\t]+$": {
+          "$ref": "#/$defs/ServerMetadata"
+        }
+      },
+      "propertyNames": {
+        "maxLength": 120,
+        "minLength": 1
+      },
+      "title": "Server Metadata",
+      "type": "object"
     },
     "server_refs": {
       "items": {

@@ -1,6 +1,7 @@
 # reconciler — Declarative plan / apply engine
 
 ## Design decisions
+- **Server metadata uses settings** — the reviewed service-settings driver sends server allowances and payment metadata independently of signed node resources, preserving node document hashes for metadata-only edits.
 - **Page settings use the service driver** — carry the deployer's saved branding and the plan's exit countries with the public URL and delivery interval, so all people see changes on their next page request.
 
 - **Checkpointed apply** — `resource_executor.py` re-observes every immutable compiler action, persists each transition, and cuts over a generation only after all dependencies and postconditions succeed.

@@ -29,11 +29,12 @@ from meridian.cli_options import (
     Yes,
     enable_json_output,
 )
+from meridian.cli_server_metadata import server_set_cmd
 
 client_app = typer.Typer(
     help="Manage who can connect: add, show, list, limit, reissue, enable, disable, remove", no_args_is_help=True
 )
-server_app = typer.Typer(help="Save and name servers you reach over SSH", no_args_is_help=True)
+server_app = typer.Typer(help="Save servers and review bandwidth allowances and payment dates", no_args_is_help=True)
 node_app = typer.Typer(
     help="Add, list, restart, replace, or remove exit servers, or change their SNI", no_args_is_help=True
 )
@@ -50,6 +51,7 @@ fleet_app.command("usage")(fleet_usage_cmd)
 node_app.command("restart", rich_help_panel="Operations")(node_restart_cmd)
 fleet_app.command("routing", rich_help_panel="Routing")(fleet_routing_cmd)
 fleet_app.command("contact", rich_help_panel="Connection pages")(fleet_contact_cmd)
+server_app.command("set", rich_help_panel="Allowances and payments")(server_set_cmd)
 
 
 @client_app.command("add")
@@ -257,8 +259,8 @@ def server_add_cmd(
 
 
 @server_app.command("list")
-def server_list_cmd() -> None:
-    """List saved servers"""
+def server_list_cmd(_json: Json = False) -> None:
+    """List saved servers with reviewed allowances and payment dates"""
     from meridian.commands.server import run_list
 
     run_list()

@@ -4,6 +4,7 @@
 - `OwnerContactSettings` shares the optional reviewed contact across delivery intent, compiler payloads, and pages; empty defaults omit the field, text is one plain line up to 120 characters, and HTTPS/TG/mailto links canonicalize to bounded ASCII without a lookup.
 - `person_metadata.py` owns plain-text notes (500 Unicode characters, newlines allowed) and one uppercase A–Z/digit/underscore tag (1–16); empty strings clear, omitted edits preserve, and creation intent never contains them.
 - Reviewed delivery command schemas register through `schema_delivery.py`, using the catalog's shared envelope base and failure model so names and wire fields stay stable.
+- **Server metadata** — `server_allowances.py` owns reviewed allowances, bounded provider labels, payment dates, and nullable measurement contracts; `server_calendar.py` preserves UTC reset/payment anchors through short months and leap years, and empty topology metadata is omitted.
 - **Server schema registration** — `schema_servers.py` owns the server entries in the public catalog; `schema.py` composes that mapping with the other contract families.
 - **Creation-only account settings** — `UserCreationSettings` is shared by service creation and `AccessIntent.creation_settings`; an empty mapping is omitted so existing user payloads and plans keep their hashes.
 - **Attention predicates** — `attention.py` derives typed person/node reasons from aggregate evidence, with bounded day/percentage thresholds and no stored alert flags; client list composes the same reasons when `--attention` is requested.
@@ -38,6 +39,8 @@
 
 ## Pitfalls
 - JSON reveal options accept exact dotted paths, including list indices; preserve authorized private note/tag fields without revealing neighboring URLs or credentials.
+- Provider labels allow Persian ZWNJ/ZWJ joiners while rejecting line breaks, bidi controls, and other control characters.
+- Preserve server metadata through setup drafts and fleet name/ref mapping; metadata names only declared physical servers and never moves automatically with an exit.
 - Fleet diffs compare creation settings for each person in access-user order; adding, editing, or removing that mapping is not a fleet reorder.
 - Timestamp validates calendar dates and clock times after its wire-pattern check; preserve the input string so fractional precision and generated schemas stay unchanged.
 - A fresh healthy runtime can still be awaiting convergence; fleet status counts that separately and degrades until in_sync, while stale reports remain unavailable evidence.

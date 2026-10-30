@@ -1,11 +1,32 @@
 {
   "additionalProperties": false,
   "properties": {
+    "allowance_exceeded_percent": {
+      "default": 100,
+      "maximum": 100,
+      "minimum": 1,
+      "title": "Allowance Exceeded Percent",
+      "type": "integer"
+    },
+    "allowance_percent": {
+      "default": 80,
+      "maximum": 100,
+      "minimum": 1,
+      "title": "Allowance Percent",
+      "type": "integer"
+    },
     "expiry_days": {
       "default": 7,
       "maximum": 30,
       "minimum": 1,
       "title": "Expiry Days",
+      "type": "integer"
+    },
+    "payment_days": {
+      "default": 7,
+      "maximum": 30,
+      "minimum": 1,
+      "title": "Payment Days",
       "type": "integer"
     },
     "quota_percent": {

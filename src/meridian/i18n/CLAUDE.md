@@ -15,6 +15,7 @@
 - `tests/test_i18n.py` enforces key order/parity, identical placeholders, no reply-word collisions, and that every literal key used in code exists.
 
 ## Pitfalls
+- Server allowance text must disclose accepted upload/download coverage and excluded overhead, host downloads, and relay forwarding in every locale; unmeasured servers never display a zero usage figure.
 
 - Never make a reply word equal a value the user types at a choice prompt (`exit`, `relay`, `gateway`, `control`); navigation words are matched first.
 - Persian users may type Persian digits or the Arabic comma `،`; parsing goes through `int()` and normalizes the comma.

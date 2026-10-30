@@ -92,6 +92,39 @@ export type Ip1 = string;
 export type Name2 = string;
 export type Port = number;
 export type Relays = FleetStatusRelay[];
+/**
+ * @minItems 1
+ * @maxItems 2
+ */
+export type Reasons =
+  | ["allowance_near" | "allowance_exceeded" | "payment_due" | "payment_overdue"]
+  | [
+      "allowance_near" | "allowance_exceeded" | "payment_due" | "payment_overdue",
+      "allowance_near" | "allowance_exceeded" | "payment_due" | "payment_overdue"
+    ];
+export type ServerRef = string;
+/**
+ * Tracking starts at apply; earlier period use is unknown.
+ */
+export type CountingSince = string | null;
+export type Coverage =
+  | "Approximate accepted user traffic (upload + download); excludes protocol overhead, the server's own downloads, and relay forwarding."
+  | "Not measured: this server runs no traffic agent.";
+export type LifetimeBytes = number | null;
+export type Measurement = "accepted_user_traffic" | "not_measured";
+export type AllowanceBytes = number | null;
+export type PayEvery = ("month" | "year") | null;
+export type PayOn = string | null;
+export type Provider = string;
+export type ResetDay = number;
+export type NextPaymentOn = string | null;
+export type NodeId = string | null;
+export type PeriodEnd = string | null;
+export type PeriodStart = string | null;
+export type ServerRef1 = string;
+export type UsedBytes = number | null;
+export type ServerAttention = ServerAttention1[];
+export type ServerUsage1 = ServerUsage[];
 export type Id = string;
 export type Ip2 = string;
 export type Name3 = string;
@@ -107,6 +140,7 @@ export type Servers = ServerInventory[];
 export type Nodes1 = "available" | "unavailable" | "not_requested" | "unknown";
 export type Panel = "available" | "unavailable" | "not_requested" | "unknown";
 export type Relays1 = "available" | "unavailable" | "not_requested" | "unknown";
+export type ServerUsage2 = "available" | "unavailable" | "not_requested" | "unknown";
 export type Users = "available" | "unavailable" | "not_requested" | "unknown";
 export type ActiveUsers1 = number;
 export type ConnectedNodes = number;
@@ -122,6 +156,7 @@ export type NonactiveAccessUsers = number;
 export type OtherUsers = number;
 export type OutOfSyncNodes = number;
 export type Relays2 = number;
+export type ServersNeedingAttention = number;
 export type UnhealthyRelays = number;
 export type UnknownNodes = number;
 export type UnknownRelayHops = number;
@@ -179,6 +214,8 @@ export interface FleetStatus {
   nodes?: Nodes;
   panel: PanelStatus;
   relays?: Relays;
+  server_attention?: ServerAttention;
+  server_usage?: ServerUsage1;
   servers?: Servers;
   sources?: FleetSources;
   summary: FleetStatusSummary;
@@ -256,9 +293,41 @@ export interface FleetStatusRelay {
   name: Name2;
   port: Port;
 }
+export interface ServerAttention1 {
+  reasons: Reasons;
+  server_ref: ServerRef;
+  usage: ServerUsage;
+}
+/**
+ * Current UTC allowance period, using accepted traffic by receipt time, or not measured.
+ */
+export interface ServerUsage {
+  counting_since: CountingSince;
+  coverage: Coverage;
+  lifetime_bytes: LifetimeBytes;
+  measurement: Measurement;
+  metadata: ServerMetadata;
+  next_payment_on: NextPaymentOn;
+  node_id: NodeId;
+  period_end: PeriodEnd;
+  period_start: PeriodStart;
+  server_ref: ServerRef1;
+  used_bytes: UsedBytes;
+}
+/**
+ * Deployer-owned metadata keyed to a server declared in the topology.
+ */
+export interface ServerMetadata {
+  allowance_bytes?: AllowanceBytes;
+  pay_every?: PayEvery;
+  pay_on?: PayOn;
+  provider?: Provider;
+  reset_day?: ResetDay;
+}
 export interface ServerInventory {
   id: Id;
   ip: Ip2;
+  metadata?: ServerMetadata | null;
   name: Name3;
   relay_hops?: RelayHops;
   roles: Roles;
@@ -275,6 +344,7 @@ export interface FleetSources {
   nodes?: Nodes1;
   panel?: Panel;
   relays?: Relays1;
+  server_usage?: ServerUsage2;
   users?: Users;
 }
 export interface FleetStatusSummary {
@@ -292,6 +362,7 @@ export interface FleetStatusSummary {
   other_users: OtherUsers;
   out_of_sync_nodes?: OutOfSyncNodes;
   relays: Relays2;
+  servers_needing_attention?: ServersNeedingAttention;
   unhealthy_relays: UnhealthyRelays;
   unknown_nodes: UnknownNodes;
   unknown_relay_hops?: UnknownRelayHops;

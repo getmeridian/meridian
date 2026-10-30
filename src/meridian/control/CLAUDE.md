@@ -3,6 +3,7 @@
 ## Design decisions
 - Owner contact persists in the page-settings meta row inside the delivery transaction; native `support-url` prefers its link, page URLs remain personal, and short text joins status remarks only when every format's 100-character names remain bounded.
 - Step 15 adds private `users.note` and `users.tag`; PATCH accepts the existing name path or a `username` body at `/api/users`, only people/admin reads retain metadata, applies preserve it, and snapshots carry it with user rows.
+- **Server allowances and payments** — schema step 16 keeps per-server period offsets over durable accepted upload/download totals; reviewed settings persist metadata and anchors together, UTC payment repeats are computed on read, and non-agent servers are not measured.
 - **HTTP error rendering** — `http_errors.py` owns generic nginx error pages and bounded field validation messages; the HTTP front delegates their rendering.
 - **Subscription HTTP** — `subscription_routes.py` writes the response through the shared public request interface; the server keeps routing and authentication.
 - **Service settings** — `service_settings.py` reads and persists delivery settings; the public service methods delegate, and every setting is saved in one store transaction.
@@ -50,6 +51,8 @@
 ## Pitfalls
 - Support HTML embeds escaped public contact data from current settings, is always no-store, and stays outside service-worker caches; it never fetches person data or puts a bearer token into a background request.
 - Keep notes and tags out of event field catalogs and subscription projections; metadata-only edits must produce no lifecycle fact or new node document.
+- Advance server allowance offsets inside the accounting transaction before accepted growth; label changes and allowance amounts preserve use, while enabling or changing the reset day starts tracking at apply with earlier period use unknown.
+- Server allowance reads and attention never write; receipt-period usage excludes overhead, host downloads, and relay forwarding, and one-off past payment dates remain overdue.
 - Deployer user deletion requests its cut-off in the DELETE body; a full reset queue rolls back the deletion, so no separate revision read or reset POST follows it.
 - Service expiry stops redelivery, but the first agent result can replace an expired row with no result; record that late outcome and its event atomically and never overwrite an acknowledged result.
 - Refresh wanted blobs from the whole current fleet under the blob lock, prune retired or seeded failures, and publish attempt results under that lock so a late failure cannot restore obsolete degradation; clearing an obsolete error never invents a mirror success.

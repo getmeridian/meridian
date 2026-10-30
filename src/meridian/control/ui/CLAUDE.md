@@ -2,6 +2,7 @@
 
 ## Design decisions
 - Settings shows public owner instructions and the canonical link read-only with `meridian fleet contact`; it never writes the topology-owned presentation.
+- **Server billing stays reviewed** — Servers composes read-only allowance/payment evidence and attention from service settings, adds cards for non-agent servers, and prints `meridian server set` to edit the topology.
 - **New console tokens last 90 days by default** — Tokens offers 7, 30, 90 days or never, always sends the choice through the existing owner step-up, and shows expiry or an expired state alongside revocation metadata.
 - **People tokens** — after the usual owner step-up, Tokens can mint the separate people capability; it manages accounts and credentials, with the same declared-person remove/reissue guard as an owner session.
 - **Client routing is read-only** — Settings reads the service's `client_routing` (an omitted value is `ru-split`), explains the current policy, and prints `meridian fleet routing` to change it; owner sessions never write topology settings.
@@ -24,6 +25,7 @@
 
 ## Pitfalls
 - Person metadata uses text nodes for textarea contents, validates 500 Unicode characters and the uppercase tag, and PATCHes only changed fields; a textarea `value` attribute does not populate its value.
+- Render billing dates as isolated UTC calendar dates, preserving the anchor and computed next date; a relay's null usage is not zero and must say not measured.
 - Command polling keeps successful sibling replies, times out only a node's pending records, and stops terminal read errors with an unavailable result while preserving finished outcomes.
 - People keeps rendering and polling users when fleet metadata fails, using cached names and declared markers; user-list failures still keep stale data with retry.
 - A failed language switch keeps the previous catalog, language, and direction when both fetches fail; switch to English only after its catalog loads successfully.

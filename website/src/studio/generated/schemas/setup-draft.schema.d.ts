@@ -131,6 +131,11 @@ export type SourceGatewayRef = string;
 export type TargetRef = string;
 export type Routes = OrderedRouteIntent[];
 export type Schema = "meridian.setup/v1";
+export type AllowanceBytes = number | null;
+export type PayEvery = ("month" | "year") | null;
+export type PayOn = string | null;
+export type Provider = string;
+export type ResetDay = number;
 export type ServerRefs = string[];
 export type UpdatedAt = string;
 export type VerifiedAt = string;
@@ -149,6 +154,7 @@ export interface SetupDraft {
   roles?: SetupRoleSelection | null;
   routing?: SetupRoutingSelection | null;
   schema?: Schema;
+  server_metadata?: ServerMetadata;
   server_refs?: ServerRefs;
   updated_at?: UpdatedAt;
   verified_at?: VerifiedAt;
@@ -333,4 +339,20 @@ export interface OrderedRouteIntent {
   priority: Priority;
   source_gateway_ref?: SourceGatewayRef;
   target_ref?: TargetRef;
+}
+export interface ServerMetadata {
+  [k: string]: ServerMetadata1;
+}
+/**
+ * Deployer-owned metadata keyed to a server declared in the topology.
+ *
+ * This interface was referenced by `ServerMetadata`'s JSON-Schema definition
+ * via the `patternProperty` "^[^\r\n\t]+$".
+ */
+export interface ServerMetadata1 {
+  allowance_bytes?: AllowanceBytes;
+  pay_every?: PayEvery;
+  pay_on?: PayOn;
+  provider?: Provider;
+  reset_day?: ResetDay;
 }

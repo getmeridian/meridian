@@ -14,6 +14,7 @@ from meridian.core.inputs import (
     TopologyIdValue,
 )
 from meridian.core.models import CoreModel
+from meridian.core.server_allowances import ServerMetadata
 from meridian.core.topology import (
     AccessIntent,
     ControlPlaneIntent,
@@ -149,6 +150,9 @@ class SetupDraft(CoreModel):
     current_stage: SetupStage = "servers"
     completed_stages: list[SetupStage] = Field(default_factory=list)
     server_refs: list[ServerReferenceValue] = Field(default_factory=list)
+    server_metadata: dict[ServerReferenceValue, ServerMetadata] = Field(
+        default_factory=dict, exclude_if=lambda metadata: not metadata
+    )
     roles: SetupRoleSelection | None = None
     paths: SetupPathSelection | None = None
     routing: SetupRoutingSelection | None = None
@@ -161,16 +165,7 @@ class SetupDraft(CoreModel):
     @classmethod
     def from_intent(cls, intent: SetupIntent) -> SetupDraft:
         """Start the resumable journey at review for a complete typed intent."""
-        server_refs = list(
-            dict.fromkeys(
-                [
-                    intent.control.server_ref,
-                    *[exit_.server_ref for exit_ in intent.exits],
-                    *[server_ref for relay in intent.transparent_relays for server_ref in relay.hop_server_refs],
-                    *[gateway.server_ref for gateway in intent.routing_gateways],
-                ]
-            )
-        )
+        server_refs = intent.declared_server_refs()
         roles = SetupRoleSelection(
             control=intent.control,
             harden=intent.harden,
@@ -210,6 +205,7 @@ class SetupDraft(CoreModel):
             current_stage="review",
             completed_stages=list(SETUP_STAGE_ORDER[:5]),
             server_refs=server_refs,
+            server_metadata=intent.server_metadata,
             roles=roles,
             paths=SetupPathSelection(
                 exits=[
@@ -339,6 +335,7 @@ class SetupDraft(CoreModel):
             for gateway in self.roles.routing_gateways
         ]
         return SetupIntent(
+            server_metadata={ref: metadata for ref, metadata in self.server_metadata.items() if ref in role_servers},
             control=self.roles.control,
             exits=exits,
             transparent_relays=relays,

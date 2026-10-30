@@ -358,7 +358,22 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         stability="preview",
     ),
     "server.add": None,
-    "server.list": None,
+    "server.list": CommandOutput(
+        data_schema="server-list",
+        outcomes=[_ok("saved servers and reviewed metadata were read"), *_FAILURES],
+        stability="preview",
+    ),
+    "server.set": CommandOutput(
+        data_schema="server-set",
+        outcomes=[
+            _ok("current metadata was read"),
+            _ok("metadata is unchanged", status="no_changes"),
+            _ok("dry run: server metadata was reviewed"),
+            _ok("reviewed server metadata was applied", status="changed"),
+            *_FAILURES,
+        ],
+        stability="preview",
+    ),
     "server.remove": None,
     "context.list": CommandOutput(
         data_schema="context-list",

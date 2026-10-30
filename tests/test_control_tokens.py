@@ -119,6 +119,7 @@ ROUTE_SAMPLES = {
     "traffic": ("/api/traffic", None),
     "events": ("/api/events", None),
     "attention": ("/api/attention", None),
+    "server_usage": ("/api/servers", None),
     "daily_traffic": ("/api/traffic/daily", None),
     "list_users": ("/api/users", None),
     "create_user": ("/api/users", {"username": "bob", "traffic_limit_bytes": 1000}),

@@ -23,6 +23,7 @@
 - Pure modules have Node tests (`pnpm run studio:test`, run by `pnpm run build`; fetch mocked, views under jsdom) — no Playwright needed.
 
 ## Pitfalls
+- Preserve `ServerUsage.measurement` alongside nullable usage/period fields when consuming generated fleet contracts; null usage must not become a measured zero.
 
 - Do not hand-edit `generated/`; change Python contracts, export contracts, then regenerate.
 - Build every DeployRequest (Engine calls and `deploy.json`) with `buildDeployRequestFromJourney()`; it keeps only generated-schema keys, because `DeployRequest` forbids extras and a removed option (`pq`) once made every Studio request a 422.

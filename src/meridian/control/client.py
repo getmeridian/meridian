@@ -65,6 +65,7 @@ from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientExtendRequest
 from meridian.core.errors import MeridianError
 from meridian.core.fleet_events import FleetEventPage, FleetEventQuery
+from meridian.core.server_allowances import ServerUsageList
 
 _GATEWAY_FAILURES = frozenset({502, 503, 504})
 # Transport errors raised before any request bytes left this machine.
@@ -177,6 +178,9 @@ class ControlClient:
 
     def settings(self) -> ServiceSettings:
         return ServiceSettings.model_validate(self._call("GET", "api/settings"))
+
+    def server_usage(self) -> ServerUsageList:
+        return ServerUsageList.model_validate(self._call("GET", "api/servers"))
 
     def put_settings(self, settings: ServiceSettings) -> ServiceSettings:
         return ServiceSettings.model_validate(self._call("PUT", "api/settings", settings.model_dump(mode="json")))

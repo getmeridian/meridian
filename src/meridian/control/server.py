@@ -388,6 +388,9 @@ class _Handler(BaseHTTPRequestHandler):
     def attention(self, _match: re.Match[str]) -> Any:
         return read_attention(self._service, self.path)
 
+    def server_usage(self, _match: re.Match[str]) -> Any:
+        return self._service.server_usage()
+
     def daily_traffic(self, _match: re.Match[str]) -> Any:
         return self._service.traffic.daily(days=self._history_days())
 
@@ -643,6 +646,7 @@ ROUTES: list[Route] = [
     ("GET", re.compile(r"/api/traffic"), "read", _Handler.traffic),
     ("GET", re.compile(r"/api/events"), "read", _Handler.events),
     ("GET", re.compile(r"/api/attention"), "read", _Handler.attention),
+    ("GET", re.compile(r"/api/servers"), "read", _Handler.server_usage),
     ("GET", re.compile(r"/api/traffic/daily"), "read", _Handler.daily_traffic),
     ("GET", re.compile(r"/api/users"), ("read", "people"), _Handler.list_users),
     ("POST", re.compile(r"/api/users"), "people", _Handler.create_user),

@@ -295,6 +295,7 @@ def _v4_members(
             ssh_user=servers[server_ref].user,
             ssh_port=servers[server_ref].port,
             relay_hops=relay_hops.get(server_ref, []),
+            metadata=intent.server_metadata.get(server_ref),
         )
         for server_ref, role_values in roles.items()
     ]

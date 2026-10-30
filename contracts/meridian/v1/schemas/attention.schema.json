@@ -3,11 +3,32 @@
     "AttentionThresholds": {
       "additionalProperties": false,
       "properties": {
+        "allowance_exceeded_percent": {
+          "default": 100,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Allowance Exceeded Percent",
+          "type": "integer"
+        },
+        "allowance_percent": {
+          "default": 80,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Allowance Percent",
+          "type": "integer"
+        },
         "expiry_days": {
           "default": 7,
           "maximum": 30,
           "minimum": 1,
           "title": "Expiry Days",
+          "type": "integer"
+        },
+        "payment_days": {
+          "default": 7,
+          "maximum": 30,
+          "minimum": 1,
+          "title": "Payment Days",
           "type": "integer"
         },
         "quota_percent": {
@@ -90,6 +111,244 @@
       ],
       "title": "PersonAttention",
       "type": "object"
+    },
+    "ServerAttention": {
+      "additionalProperties": false,
+      "properties": {
+        "reasons": {
+          "items": {
+            "enum": [
+              "allowance_near",
+              "allowance_exceeded",
+              "payment_due",
+              "payment_overdue"
+            ],
+            "type": "string"
+          },
+          "maxItems": 2,
+          "minItems": 1,
+          "title": "Reasons",
+          "type": "array"
+        },
+        "server_ref": {
+          "title": "Server Ref",
+          "type": "string"
+        },
+        "usage": {
+          "$ref": "#/$defs/ServerUsage"
+        }
+      },
+      "required": [
+        "server_ref",
+        "reasons",
+        "usage"
+      ],
+      "title": "ServerAttention",
+      "type": "object"
+    },
+    "ServerMetadata": {
+      "additionalProperties": false,
+      "description": "Deployer-owned metadata keyed to a server declared in the topology.",
+      "properties": {
+        "allowance_bytes": {
+          "anyOf": [
+            {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Allowance Bytes"
+        },
+        "pay_every": {
+          "anyOf": [
+            {
+              "enum": [
+                "month",
+                "year"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pay Every"
+        },
+        "pay_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pay On"
+        },
+        "provider": {
+          "default": "",
+          "maxLength": 80,
+          "title": "Provider",
+          "type": "string"
+        },
+        "reset_day": {
+          "default": 1,
+          "maximum": 31,
+          "minimum": 1,
+          "title": "Reset Day",
+          "type": "integer"
+        }
+      },
+      "title": "ServerMetadata",
+      "type": "object"
+    },
+    "ServerUsage": {
+      "additionalProperties": false,
+      "description": "Current UTC allowance period, using accepted traffic by receipt time, or not measured.",
+      "properties": {
+        "counting_since": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Tracking starts at apply; earlier period use is unknown.",
+          "title": "Counting Since"
+        },
+        "coverage": {
+          "enum": [
+            "Approximate accepted user traffic (upload + download); excludes protocol overhead, the server's own downloads, and relay forwarding.",
+            "Not measured: this server runs no traffic agent."
+          ],
+          "title": "Coverage",
+          "type": "string"
+        },
+        "lifetime_bytes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lifetime Bytes"
+        },
+        "measurement": {
+          "enum": [
+            "accepted_user_traffic",
+            "not_measured"
+          ],
+          "title": "Measurement",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/ServerMetadata"
+        },
+        "next_payment_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Payment On"
+        },
+        "node_id": {
+          "anyOf": [
+            {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Node Id"
+        },
+        "period_end": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Period End"
+        },
+        "period_start": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Period Start"
+        },
+        "server_ref": {
+          "maxLength": 120,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n\\t]+$",
+          "title": "Server Ref",
+          "type": "string"
+        },
+        "used_bytes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Used Bytes"
+        }
+      },
+      "required": [
+        "server_ref",
+        "node_id",
+        "metadata",
+        "measurement",
+        "coverage",
+        "used_bytes",
+        "lifetime_bytes",
+        "period_start",
+        "period_end",
+        "counting_since",
+        "next_payment_on"
+      ],
+      "title": "ServerUsage",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -114,6 +373,13 @@
         "$ref": "#/$defs/PersonAttention"
       },
       "title": "People",
+      "type": "array"
+    },
+    "servers": {
+      "items": {
+        "$ref": "#/$defs/ServerAttention"
+      },
+      "title": "Servers",
       "type": "array"
     },
     "thresholds": {

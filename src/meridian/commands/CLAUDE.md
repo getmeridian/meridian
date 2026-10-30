@@ -3,6 +3,7 @@
 ## Design decisions
 - `fleet contact --text/--link` reviews and applies only the delivery contact edit, preserves omitted fields, supports explicit clearing, and requires --yes for JSON changes; exact JSON paths preserve public contact values in export/import reviews.
 - `client set --note TEXT --tag TAG` edits service-owned metadata with limits in one PATCH; `--note ""` and `--tag none` clear, while uppercase `NONE` remains a tag. Client reads include console people and `client list --tag` filters before status counts.
+- **Reviewed server metadata** — `server set` edits only declared servers' topology metadata, previews before confirmation, and forwards the exact review hash to `apply_reviewed_intent`; `server list` reads profiles and metadata locally, while fleet allowance warnings keep runtime health separate.
 - **People needing attention** — `client list --attention` reads the service's derived warnings in the same panel connection, includes console people, filters its status counts, and labels each row's reasons; ordinary lists keep empty derived reasons.
 - **Local timeline** — `fleet events --since ID --limit N` reads oldest-first lifecycle facts from the service's read-scoped cursor API; the Fleet help group's Activity panel and typed `fleet-events` envelope expose the same contract.
 
@@ -30,6 +31,7 @@
 
 ## Pitfalls
 - Keep attention labels readable beside the tag column in an 80-column terminal: compact table padding and preserve reason cells.
+- Omitted server options preserve values; clearing `--pay-on none` also clears its repeat, and a declined or dry-run metadata review must never save intent.
 - Catch control-service errors inside the command's error_context, including preflight and result waits; the context supplies JSON metadata but never catches exceptions, and non-retryable poll errors are failed outcomes.
 - CLI removal carries cut-off into reviewed user retirement's atomic DELETE; never queue resets after deletion, and never let a later uncertain issue downgrade an earlier failed node.
 - Trim console-name fallback validation after exact and ambiguous directory matches; mutation prechecks must accept the same padded names as client show.

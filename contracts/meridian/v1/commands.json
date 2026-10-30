@@ -2439,6 +2439,144 @@
     },
     {
       "argv": [
+        "server",
+        "list"
+      ],
+      "command": "server.list",
+      "data_schema": "server-list",
+      "description": "List saved servers with reviewed allowances and payment dates",
+      "envelope_schema": "server-list-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "saved servers and reviewed metadata were read",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "saved servers and reviewed metadata were read",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "server",
+        "set",
+        "NAME"
+      ],
+      "command": "server.set",
+      "data_schema": "server-set",
+      "description": "Review and apply a server's allowance, provider, or payment date",
+      "envelope_schema": "server-set-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "current metadata was read; metadata is unchanged; dry run: server metadata was reviewed; reviewed server metadata was applied",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--allowance",
+        "--reset-day",
+        "--provider",
+        "--pay-on",
+        "--pay-every",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "current metadata was read",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "metadata is unchanged",
+          "status": "no_changes"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "dry run: server metadata was reviewed",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "reviewed server metadata was applied",
+          "status": "changed"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "no_changes",
+        "changed",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
         "test",
         "[TARGET]"
       ],

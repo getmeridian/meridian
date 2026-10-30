@@ -108,7 +108,7 @@ from meridian.core.routes import RouteListResult, RouteMutationResult
 from meridian.core.schema_delivery import delivery_schemas
 from meridian.core.schema_envelopes import make_command_envelope
 from meridian.core.schema_people import PEOPLE_SCHEMAS
-from meridian.core.schema_servers import SERVER_SCHEMAS
+from meridian.core.schema_servers import SERVER_SCHEMAS, server_command_schemas
 from meridian.core.schema_topology import TOPOLOGY_SCHEMAS
 from meridian.core.verification import (
     FleetTestResult,
@@ -669,6 +669,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "server-add-request": ServerAddRequest,
     "server-remove-request": ServerRemoveRequest,
     **SERVER_SCHEMAS,
+    **server_command_schemas(_ContractEnvelope, EmptyData),
     **TOPOLOGY_SCHEMAS,
     "node-add-request": NodeAddRequest,
     "node-target-request": NodeTargetRequest,

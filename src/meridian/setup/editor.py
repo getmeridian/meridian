@@ -330,6 +330,12 @@ def _override_kind(value: str) -> EgressOverrideMatch:
 def _validated(payload: dict[str, Any]) -> SetupIntent:
     """Validate an edited intent, surfacing the first rule it breaks as a plain message."""
     try:
+        metadata = payload.pop("server_metadata", {})
+        updated = SetupIntent.model_validate(payload)
+        if not metadata:
+            return updated
+        refs = set(updated.declared_server_refs())
+        payload["server_metadata"] = {ref: settings for ref, settings in metadata.items() if ref in refs}
         return SetupIntent.model_validate(payload)
     except ValidationError as exc:
         message = str(exc.errors()[0].get("msg", exc)).removeprefix("Value error, ")

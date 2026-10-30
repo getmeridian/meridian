@@ -31,9 +31,10 @@ from meridian.core.client_devices import ClientDevicesResult
 from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES, LimitStrategy, UserCreationSettings
 from meridian.core.connection_pages import ConnectionPageSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
-from meridian.core.inputs import validate_ip_address_value
+from meridian.core.inputs import ServerReferenceValue, validate_ip_address_value
 from meridian.core.models import CoreModel
 from meridian.core.person_metadata import PersonTag, PrivateNote
+from meridian.core.server_allowances import ServerAllowanceSpec
 from meridian.core.topology import ClientRoutingPolicy, ProtocolKind, SubscriptionUpdateIntervalHours
 from meridian.core.traffic import NodeTrafficAccounting, UserTrafficEvidence
 
@@ -298,6 +299,9 @@ class UserImportResult(CoreModel):
 
 
 class ServiceSettings(ConnectionPageSettings):
+    servers: dict[ServerReferenceValue, ServerAllowanceSpec] = Field(
+        default_factory=dict, exclude_if=lambda servers: not servers
+    )
     profile_title: str = Field(min_length=1, max_length=100)
     update_interval_hours: SubscriptionUpdateIntervalHours = Field(
         default=SUBSCRIPTION_UPDATE_INTERVAL_HOURS,

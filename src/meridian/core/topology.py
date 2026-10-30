@@ -30,6 +30,7 @@ from meridian.core.inputs import (
 )
 from meridian.core.models import CoreModel
 from meridian.core.owner_contact import OwnerContactSettings
+from meridian.core.server_allowances import ServerMetadata
 
 ServerCapability = Literal["panel", "exit", "relay", "routing_gateway"]
 # route: through an exit or pool; direct: out of the gateway's own address; block: dropped.
@@ -410,6 +411,22 @@ class SetupIntent(CoreModel):
     # Pass each client's real address to Xray and the panel (PROXY protocol, X-Forwarded-For).
     # Off by default: Remnawave then never stores where users connect from.
     forward_client_ips: bool = False
+    server_metadata: dict[ServerReferenceValue, ServerMetadata] = Field(
+        default_factory=dict, exclude_if=lambda metadata: not metadata
+    )
+
+    def declared_server_refs(self) -> list[str]:
+        """Servers holding reviewed roles, in document order, once each."""
+        return list(
+            dict.fromkeys(
+                [
+                    self.control.server_ref,
+                    *(exit_.server_ref for exit_ in self.exits),
+                    *(server_ref for relay in self.transparent_relays for server_ref in relay.hop_server_refs),
+                    *(gateway.server_ref for gateway in self.routing_gateways),
+                ]
+            )
+        )
 
     def gateway_routes(self, gateway_ref: str) -> list[OrderedRouteIntent]:
         """The enabled rules one routing gateway applies, in first-match order."""
@@ -424,6 +441,9 @@ class SetupIntent(CoreModel):
 
     @model_validator(mode="after")
     def validate_references(self) -> Self:
+        unknown_servers = sorted(self.server_metadata.keys() - set(self.declared_server_refs()))
+        if unknown_servers:
+            raise ValueError("Server metadata refers to undeclared servers: " + ", ".join(unknown_servers) + ".")
         resources = [
             *[exit_.id for exit_ in self.exits],
             *[relay.id for relay in self.transparent_relays],

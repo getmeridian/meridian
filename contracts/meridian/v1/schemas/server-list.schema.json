@@ -1,0 +1,150 @@
+{
+  "$defs": {
+    "ServerListEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "declared": {
+          "title": "Declared",
+          "type": "boolean"
+        },
+        "host": {
+          "title": "Host",
+          "type": "string"
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ServerMetadata"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "next_payment_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Payment On"
+        },
+        "server_ref": {
+          "maxLength": 120,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n\\t]+$",
+          "title": "Server Ref",
+          "type": "string"
+        },
+        "ssh_port": {
+          "title": "Ssh Port",
+          "type": "integer"
+        },
+        "ssh_user": {
+          "title": "Ssh User",
+          "type": "string"
+        }
+      },
+      "required": [
+        "server_ref",
+        "name",
+        "host",
+        "ssh_user",
+        "ssh_port",
+        "declared",
+        "metadata"
+      ],
+      "title": "ServerListEntry",
+      "type": "object"
+    },
+    "ServerMetadata": {
+      "additionalProperties": false,
+      "description": "Deployer-owned metadata keyed to a server declared in the topology.",
+      "properties": {
+        "allowance_bytes": {
+          "anyOf": [
+            {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Allowance Bytes"
+        },
+        "pay_every": {
+          "anyOf": [
+            {
+              "enum": [
+                "month",
+                "year"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pay Every"
+        },
+        "pay_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pay On"
+        },
+        "provider": {
+          "default": "",
+          "maxLength": 80,
+          "title": "Provider",
+          "type": "string"
+        },
+        "reset_day": {
+          "default": 1,
+          "maximum": 31,
+          "minimum": 1,
+          "title": "Reset Day",
+          "type": "integer"
+        }
+      },
+      "title": "ServerMetadata",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Saved server profiles with their topology-owned metadata; no credentials or guessed usage.",
+  "properties": {
+    "servers": {
+      "items": {
+        "$ref": "#/$defs/ServerListEntry"
+      },
+      "title": "Servers",
+      "type": "array"
+    }
+  },
+  "required": [
+    "servers"
+  ],
+  "title": "ServerListResult",
+  "type": "object"
+}
