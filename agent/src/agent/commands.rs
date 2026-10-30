@@ -14,9 +14,7 @@ use crate::timeutil::now_unix;
 
 impl Agent<'_> {
     fn command_now(&self) -> u64 {
-        self.session
-            .as_ref()
-            .map_or_else(now_unix, |session| session.server_now(now_unix()))
+        now_unix().saturating_add_signed(self.server_offset)
     }
 
     pub(super) fn retry_command_results(&mut self) -> Result<(), HttpError> {
@@ -120,6 +118,9 @@ impl Agent<'_> {
     }
 
     fn process_command(&mut self, value: &Value, poll_epoch: u64) -> Result<(), HttpError> {
+        if self.session.is_none() {
+            self.open_session()?;
+        }
         let id = value
             .get("command_id")
             .and_then(Value::as_str)
@@ -131,7 +132,9 @@ impl Agent<'_> {
         let trust = self.trust.as_ref().ok_or_else(|| {
             HttpError::Protocol("No fleet signing certificate is trusted.".into())
         })?;
-        let session = self.session.as_ref().expect("poll uses an open session");
+        let session = self.session.as_ref().ok_or_else(|| {
+            HttpError::Protocol("No command session could be opened; retry the poll.".into())
+        })?;
         let verified = match verify_command(
             value,
             trust,
@@ -335,11 +338,19 @@ impl Agent<'_> {
     }
 
     pub(super) fn renew_now(&mut self) -> Result<(), HttpError> {
+        self.open_session()?;
+        let bootstrap = self.bootstrap.clone();
         let identity = self
             .identity
             .as_ref()
-            .ok_or_else(|| HttpError::Protocol("This node is not enrolled.".into()))?;
-        let renewed = session::renew(&self.client, &self.bootstrap, identity)?;
+            .ok_or_else(|| HttpError::Protocol("This node is not enrolled.".into()))?
+            .clone();
+        let mut renewed =
+            self.with_session(|client, _| session::renew(client, &bootstrap, &identity))?;
+        // A retrying hello may have refreshed the signing certificate.
+        if let Some(current) = &self.identity {
+            renewed.service = current.service.clone();
+        }
         renewed
             .save(&self.opts.state_dir)
             .map_err(HttpError::Protocol)?;

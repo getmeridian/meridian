@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+- Node commands survive a session lost during reports or stats, keep the service clock, and retry credential renewal after reopening an expired session.
 - Signed node commands are queued durably, delivered only to agents that accept their kinds, and expose per-node outcomes through the admin API.
 - Node agents execute signed restarts, inbound resets, reconciliation, reports, and credential renewal, with readiness checks and durable results that prevent a redelivery from repeating an action.
 - `client remove` and `client reissue` offer `--cut-off` to end existing sessions after old credentials are revoked. The confirmation discloses other people's reconnects and a possible Xray restart; the console offers it for people added there, and results distinguish success, fallback restart, failure, and timeout.

@@ -28,6 +28,8 @@ pub struct ServiceState {
     pub result_refusals: usize,
     pub clock_offset: i64,
     pub reject_results: bool,
+    pub failures: HashMap<&'static str, VecDeque<(u16, &'static str)>>,
+    pub expire_after_poll: bool,
     pub token_valid: bool,
     pub sessions: HashSet<String>,
     pub revoked: bool,
@@ -160,6 +162,13 @@ impl ServiceState {
         let Some(endpoint) = request.path.strip_prefix(PREFIX) else {
             return error(404, "not_found");
         };
+        if let Some((status, code)) = self
+            .failures
+            .get_mut(endpoint)
+            .and_then(VecDeque::pop_front)
+        {
+            return error(status, code);
+        }
         let body = || request.json();
         match endpoint {
             "/enroll" => return self.enroll(&body()),
@@ -179,6 +188,10 @@ impl ServiceState {
             },
             "/poll" => {
                 let desired = self.documents.pop_front().unwrap_or(Value::Null);
+                if self.expire_after_poll {
+                    self.expire_after_poll = false;
+                    self.sessions.clear();
+                }
                 ok(json!({
                     "type": "poll_result", "fleet_epoch": 1, "desired": desired,
                     "commands": self.commands, "poll_after_seconds": 0,
@@ -227,6 +240,8 @@ impl FakeService {
             result_refusals: 0,
             clock_offset: 0,
             reject_results: false,
+            failures: HashMap::new(),
+            expire_after_poll: false,
             token_valid: true,
             sessions: HashSet::new(),
             revoked: false,

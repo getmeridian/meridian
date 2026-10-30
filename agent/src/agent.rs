@@ -87,6 +87,8 @@ pub struct Agent<'a> {
     /// The service certificate's key, once credentials exist; nothing applies without it.
     trust: Option<Trust>,
     session: Option<Session>,
+    /// Keep the negotiated clock even if a best-effort request drops the session.
+    server_offset: i64,
     /// The service revoked this node's certificate: only a fresh enrollment token helps.
     revoked: bool,
     /// The service refused this agent's protocol; no hello is sent before this instant.
@@ -160,6 +162,7 @@ impl<'a> Agent<'a> {
             identity: None,
             trust: None,
             session: None,
+            server_offset: 0,
             revoked: false,
             protocol_refused_until: None,
             traffic,
@@ -238,14 +241,20 @@ impl<'a> Agent<'a> {
     /// Make sure there is an open session: enroll if the bootstrap holds a token, say hello
     /// when the session is missing or about to expire, and renew the certificate when due.
     pub fn connect(&mut self) -> Result<(), HttpError> {
+        self.open_session()?;
+        let now = now_unix();
+        if self.session.as_ref().is_some_and(|s| now >= s.renew_after) {
+            self.renew_certificate(now);
+        }
+        Ok(())
+    }
+
+    fn open_session(&mut self) -> Result<(), HttpError> {
         let now = now_unix();
         if let Some(session) = &self.session
             && session.fresh(now)
             && self.client.has_session()
         {
-            if now >= session.renew_after {
-                self.renew_certificate(now);
-            }
             return Ok(());
         }
         self.forget_session();
@@ -312,11 +321,8 @@ impl<'a> Agent<'a> {
             self.adopt(updated);
         }
         debug!("session open until {}", session.expires_at);
-        let due = now >= session.renew_after;
+        self.server_offset = session.server_offset;
         self.session = Some(session);
-        if due {
-            self.renew_certificate(now);
-        }
         Ok(())
     }
 
@@ -399,12 +405,12 @@ impl<'a> Agent<'a> {
         &mut self,
         call: impl Fn(&Client, &Session) -> Result<T, HttpError>,
     ) -> Result<T, HttpError> {
-        self.connect()?;
+        self.open_session()?;
         let first = call(&self.client, self.session.as_ref().expect("connected"));
         match first {
             Err(HttpError::Status { status: 401, .. }) => {
                 self.forget_session();
-                self.connect()?;
+                self.open_session()?;
                 call(&self.client, self.session.as_ref().expect("connected"))
             }
             Err(err) if err.code() == Some("credential_revoked") => {
