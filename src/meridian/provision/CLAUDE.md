@@ -14,7 +14,7 @@
 - **Check before acting** — steps read package status, file content, and unit state first, so a rerun reports `ok`, not `changed`.
 ## Pitfalls
 - **nginx `add_header` inheritance** — a child `location` with `add_header` drops parent headers; use maps for cache/robots policies and keep all PWA headers together.
-- **acme.sh short-lived IP certs** — 6-day certs need `--days 5` and an explicit renew window; report acme.sh's last lines (`_acme_reason`), since its first ones are only timestamps.
+- **acme.sh short-lived IP certs** — 6-day certs need `--days 5` and an explicit renew window; report acme.sh's last lines (`_acme_reason`), since its first ones are only timestamps. A `rateLimited` answer names its retry time instead of port/DNS advice (a reused lab IP once got the wrong hint).
 - **nginx stream is a dynamic module** — install `libnginx-mod-stream`.
 - **nginx ≥ 1.25 comes from nginx.org** — `http2 on;` needs it; keep old conffiles (`--force-confdef --force-confold`) and add the `sites-enabled` include on every run, not only after Meridian's own install (a preinstalled nginx.org build never got it, and the ACME listener failed). The system-lab image pre-installs a stock 1.27.
 - **Internal TLS servers need `absolute_redirect off` and `http2 on`** — behind the 443 stream router on 127.0.0.1:8443, slash redirects point browsers at `:8443`, and Xray's fingerprinted XHTTP client speaks HTTP/2 whatever ALPN says.

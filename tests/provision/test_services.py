@@ -420,6 +420,28 @@ class TestIssueTLSCert:
         assert "Verification error details: Invalid response: 404" in result.detail
         assert "PM UTC" not in result.detail
 
+    def test_acme_rate_limit_names_the_retry_time_instead_of_port_and_dns_advice(self):
+        conn = MockConnection()
+        conn.when("acme.sh --info", rc=1)
+        conn.when(
+            "acme.sh --issue",
+            stdout=(
+                "[Thu Oct 29 03:55:00 PM UTC 2026] Error creating new order. {\n"
+                '  "type": "urn:ietf:params:acme:error:rateLimited",\n'
+                '  "detail": "too many certificates (5) already issued for this exact set of identifiers in the'
+                ' last 168h0m0s, retry after 2026-10-30 08:14:36 UTC: see https://example.org/docs/rate-limits/",\n'
+                '  "status": 429\n}\n'
+                "[Thu Oct 29 03:55:00 PM UTC 2026] Please add '--debug' or '--log' to see more information."
+            ),
+            rc=1,
+        )
+        result = IssueTLSCert(domain="", ip_mode=True, server_ip="198.51.100.1").run(
+            conn, ProvisionContext(ip="198.51.100.1")
+        )
+        assert result.status == "failed"
+        assert "after 2026-10-30 08:14:36 UTC" in result.detail
+        assert "Check port 80" not in result.detail and "not sent over self-signed TLS" in result.detail
+
     def test_install_cert_failure_returns_failed(self):
         conn = _acme()
         conn.when("acme.sh --install-cert", stderr="copy failed", rc=1)
