@@ -67,6 +67,17 @@ def test_repeated_hwid_headers_use_the_first_value_and_a_request_off_sub_counts_
         assert [device.device_key for device in admin.user_devices("alice").devices] == ["device-00000001"]
 
 
+def test_the_connection_pages_account_check_registers_no_device(tmp_path: Path) -> None:
+    """The page's `/info` fetch is a browser reading status, never an app taking a device slot."""
+    with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN) as admin:
+        user = admin.put_user("alice")
+        write_privacy(tmp_path / "control.db", PrivacySettings(device_limits="full"))
+        with httpx.Client(base_url=url, trust_env=False) as app:
+            answer = app.get(f"/sub/{user.sub_token}/info", headers={"X-Hwid": "device-00000001"})
+            assert answer.status_code == 200 and answer.json()["isFound"] is True
+        assert admin.user_devices("alice").count == 0
+
+
 def test_a_partial_http_cap_edit_keeps_other_limits_and_an_explicit_null_uses_the_default(tmp_path: Path) -> None:
     with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN) as admin:
         admin.put_user("alice")

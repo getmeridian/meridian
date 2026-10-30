@@ -32,6 +32,7 @@ from meridian.control import ui_routes
 from meridian.control.blobs import BlobStore, served_hashes, spec_artifacts
 from meridian.control.enrollment import Session, token_sha256
 from meridian.control.errors import ServiceError, agent_error
+from meridian.control.formats.selector import SUFFIX_FORMATS
 from meridian.control.login_limits import LockedOut
 from meridian.control.models import (
     SUB_TOKEN_PATTERN,
@@ -649,7 +650,7 @@ ROUTES: list[Route] = [
     ("POST", re.compile(r"/agent/v1/report"), None, _Handler.agent_report),
     ("POST", re.compile(r"/agent/v1/stats"), None, _Handler.agent_stats),
     ("GET", re.compile(r"/agent/v1/blobs/([0-9a-f]{64})"), None, _Handler.agent_blob),
-    ("GET", re.compile(rf"/sub/{_SUB_TOKEN}(?:/(json|mihomo|singbox))?"), None, _Handler.subscription),
+    ("GET", re.compile(rf"/sub/{_SUB_TOKEN}(?:/({'|'.join(SUFFIX_FORMATS)}))?"), None, _Handler.subscription),
 ]
 
 

@@ -348,8 +348,9 @@ def _fetch(url: str, headers: dict[str, str], method: str = "GET") -> tuple[int,
         ("", {"User-Agent": "Mozilla/5.0", "Accept": "text/html"}, "application/json", '"isFound":true'),
         ("/mihomo", {"User-Agent": "curl/8.5.0"}, "text/yaml", "proxy-groups:"),
         ("/singbox", {"User-Agent": "curl/8.5.0"}, "application/json", '"type":"urltest"'),
+        ("/info", {"User-Agent": "Happ/3.2.1"}, "application/json", '"isFound":true'),
     ],
-    ids=["happ", "mihomo", "sing-box", "empty-ua", "browser", "suffix-mihomo", "suffix-singbox"],
+    ids=["happ", "mihomo", "sing-box", "empty-ua", "browser", "suffix-mihomo", "suffix-singbox", "suffix-info"],
 )
 def test_subscription_route_passes_the_request_to_the_renderer(
     http: str, service: ControlService, suffix: str, headers: dict[str, str], content_type: str, marker: str

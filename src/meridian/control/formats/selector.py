@@ -25,8 +25,13 @@ from typing import Literal
 
 DocumentFormat = Literal["browser", "mihomo", "stash", "singbox", "xray-json", "base64"]
 
-# `/sub/<token>/<suffix>`: Meridian's own checks read `json`.
-SUFFIX_FORMATS: dict[str, DocumentFormat] = {"json": "xray-json", "mihomo": "mihomo", "singbox": "singbox"}
+# `/sub/<token>/<suffix>`: Meridian's own checks read `json`; the connection page reads `info`.
+SUFFIX_FORMATS: dict[str, DocumentFormat] = {
+    "info": "browser",
+    "json": "xray-json",
+    "mihomo": "mihomo",
+    "singbox": "singbox",
+}
 
 _MIHOMO = re.compile(
     r"^(?:flclash|rabbit|flowvy|murge|mihomo|prizrak-box|koala-clash|clash(?:-verge|-nyanpasu|x meta|[-.]?meta))",

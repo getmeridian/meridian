@@ -623,7 +623,8 @@ class ControlService:
             bodies = [item[0] for item in self._db.execute("SELECT body FROM endpoints").fetchall()]
             settings = self.settings()
             privacy = self.privacy()
-            if privacy.device_limits != "off" and not browser_request(user_agent, accept):
+            # The connection page's account check (`/info`) is never an app fetching its configs.
+            if privacy.device_limits != "off" and document != "browser" and not browser_request(user_agent, accept):
                 with self._transaction():
                     hwid_flags = self.devices.fetch(
                         record, privacy, device_headers if device_headers is not None else {}
