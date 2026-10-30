@@ -297,7 +297,7 @@ def _list(*, operation: OperationContext, attention: bool = False) -> None:
     err_console.print()
 
 
-def run_remove(name: str, yes: bool = False) -> None:
+def run_remove(name: str, yes: bool = False, cut_off: bool = False) -> None:
     """Remove a client from the proxy cluster."""
     operation = OperationContext()
     with error_context("client.remove", timer=operation.timer):
@@ -310,10 +310,10 @@ def run_remove(name: str, yes: bool = False) -> None:
         cluster = load_topology_cluster()
         name = resolve_client_name(cluster, name)
         validate_client_name(name)
-        run_remove_v4(name, cluster, operation, yes=yes)
+        run_remove_v4(name, cluster, operation, yes=yes, cut_off=cut_off)
 
 
-def run_reissue(name: str, yes: bool = False) -> None:
+def run_reissue(name: str, yes: bool = False, cut_off: bool = False) -> None:
     """Replace a client's subscription and connection page; the old ones stop working."""
     operation = OperationContext()
     with error_context("client.reissue", timer=operation.timer):
@@ -336,12 +336,28 @@ def run_reissue(name: str, yes: bool = False) -> None:
         name = found
         validate_client_name(name)
         shown = access.display_name(name)
-        if not yes and not confirm(t("client.reissue_confirm", name=shown)):
+        from meridian.commands.node_command_results import cut_off_disclosure
+        from meridian.node_commands import cut_off_scope
+
+        scope = cut_off_scope(cluster, name) if cut_off else None
+        confirmation = t("client.reissue_confirm", name=shown)
+        if scope is not None:
+            confirmation += "\n\n" + cut_off_disclosure(scope)
+            if yes and not is_json_mode():
+                warn(cut_off_disclosure(scope))
+        if not yes and not confirm(confirmation):
             raise typer.Exit(1)
-        _reissue(cluster, name, shown, operation)
+        _reissue(cluster, name, shown, operation, cut_off=cut_off)
 
 
-def _reissue(cluster: ClusterConfig, name: str, shown: str, operation: OperationContext) -> None:
+def _reissue(
+    cluster: ClusterConfig, name: str, shown: str, operation: OperationContext, *, cut_off: bool = False
+) -> None:
+    from meridian.commands.node_command_results import print_command_results
+    from meridian.control.command_models import NodeCommandRecord
+    from meridian.node_commands import command_exit_code, command_warnings, wait_commands
+
+    commands: list[NodeCommandRecord] = []
     with access_panel(cluster) as panel:
         user = get_user_or_fail(panel, name, action="load")
         if user is None:
@@ -362,7 +378,10 @@ def _reissue(cluster: ClusterConfig, name: str, shown: str, operation: Operation
                 hint_type="system",
             )
         try:
-            reissued = panel.revoke_user_subscription(user.id)
+            if cut_off:
+                reissued, commands = panel.revoke_user_subscription_with_cut_off(user.id)
+            else:
+                reissued = panel.revoke_user_subscription(user.id)
         except RemnawaveError as exc:
             fail(
                 f"Could not reissue client '{name}': {exc}",
@@ -396,14 +415,16 @@ def _reissue(cluster: ClusterConfig, name: str, shown: str, operation: Operation
                 operation="reissuing links for client", client=name, reason=persistence_error
             )
         )
-    exit_code = 3 if warnings else 0
+    cut_off_results = wait_commands(cluster, commands) if cut_off else None
+    warnings.extend(command_warnings(cut_off_results or []))
+    exit_code = max(3 if warnings else 0, command_exit_code(cut_off_results or []))
 
     if is_json_mode():
         emit_json(
             command_envelope(
                 command="client.reissue",
                 data=build_client_reissue_result(
-                    reissued, page_url=links.page_url, subscription_url=subscription_url
+                    reissued, page_url=links.page_url, subscription_url=subscription_url, cut_off=cut_off_results
                 ).to_data(),
                 summary=Summary(text=f"Reissued links for client {name}", changed=True, counts={"reissued": 1}),
                 exit_code=exit_code,
@@ -416,6 +437,7 @@ def _reissue(cluster: ClusterConfig, name: str, shown: str, operation: Operation
             raise typer.Exit(exit_code)
         return
 
+    print_command_results(cut_off_results or [])
     ok(t("client.reissued", name=shown))
     print_handoff_links(subscription_url, page_url=links.page_url)
     err_console.print()

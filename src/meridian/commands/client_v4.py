@@ -189,11 +189,16 @@ def _report_state_failure(
     fail(exc)
 
 
-def run_remove_v4(name: str, cluster: ClusterConfig, operation: OperationContext, *, yes: bool) -> None:
+def run_remove_v4(
+    name: str, cluster: ClusterConfig, operation: OperationContext, *, yes: bool, cut_off: bool = False
+) -> None:
     """Remove an access user through the reviewed topology, then delete their page."""
+    from meridian.commands.node_command_results import cut_off_disclosure, print_command_results
     from meridian.config import SERVER_PROFILES_FILE
     from meridian.console import confirm
     from meridian.handoff import remove_connection_page
+    from meridian.i18n import t
+    from meridian.node_commands import command_exit_code, command_warnings, cut_off_after_apply, cut_off_scope
     from meridian.servers import ServerRegistry
     from meridian.setup.editor import remove_access_user_from_intent
 
@@ -201,7 +206,13 @@ def run_remove_v4(name: str, cluster: ClusterConfig, operation: OperationContext
         updated = remove_access_user_from_intent(require_intent(cluster), name)
     except ValueError as exc:
         fail(str(exc), hint="Check client names with: meridian client list", hint_type="user")
-    if not yes and not confirm(f"Remove client '{name}'? Their links stop working immediately."):
+    scope = cut_off_scope(cluster, name) if cut_off else None
+    confirmation = t("node_commands.remove_confirm", name=require_intent(cluster).access.display_name(name))
+    if scope is not None:
+        confirmation += "\n\n" + cut_off_disclosure(scope)
+        if yes and not is_json_mode():
+            warn(cut_off_disclosure(scope))
+    if not yes and not confirm(confirmation):
         raise typer.Exit(1)
 
     with access_panel(cluster) as panel:
@@ -214,22 +225,26 @@ def run_remove_v4(name: str, cluster: ClusterConfig, operation: OperationContext
         hint="The client is out of the topology; rerun `meridian apply` to finish.",
     )
 
+    cut_off_results = cut_off_after_apply(cluster, scope) if scope is not None else None
     page_error = remove_connection_page(cluster, user.vless_uuid) if user and user.vless_uuid else ""
     if page_error:
         warn(f"Client '{name}' was removed, but their connection page could not be deleted: {page_error}")
     else:
         persist_reviewed_apply(cluster)
+    exit_code = max(3 if page_error else 0, command_exit_code(cut_off_results or []))
     if is_json_mode():
         emit_json(
             command_envelope(
                 command="client.remove",
-                data=build_client_remove_result(name).to_data(),
+                data=build_client_remove_result(name, cut_off=cut_off_results).to_data(),
                 summary=Summary(text=f"Removed client {name}", changed=True, counts={"removed": 1}),
-                exit_code=3 if page_error else 0,
+                exit_code=exit_code,
+                warnings=command_warnings(cut_off_results or []),
                 timer=operation.timer,
             )
         )
     else:
         ok(f"Removed client '{name}'. Their links no longer work.")
-    if page_error:
-        raise typer.Exit(3)
+        print_command_results(cut_off_results or [])
+    if exit_code:
+        raise typer.Exit(exit_code)

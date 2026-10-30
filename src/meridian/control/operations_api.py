@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from urllib.parse import parse_qs, urlsplit
 
 from meridian.control.errors import ServiceError
@@ -23,6 +24,14 @@ def query_options(path: str, defaults: dict[str, str]) -> dict[str, str]:
             raise ServiceError("invalid_request", f"{name} must appear once.", 400)
         values[name] = options[0]
     return values
+
+
+def read_history_days(path: str) -> int:
+    """The history endpoints' single day count, preserving their existing defaults and bounds."""
+    values = parse_qs(urlsplit(path).query, keep_blank_values=True).get("days", ["30"])
+    if len(values) != 1 or not re.fullmatch(r"[0-9]{1,3}", values[0]) or not 1 <= int(values[0]) <= 730:
+        raise ServiceError("invalid_request", "days must be one integer between 1 and 730.", 400)
+    return int(values[0])
 
 
 def read_events(service: ControlService, path: str) -> FleetEventPage:

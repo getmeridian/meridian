@@ -24,8 +24,9 @@ from typing import Any
 from meridian.control.attention import read_attention
 from meridian.control.background_health import BackgroundHealth
 from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE, BackupLedger
-from meridian.control.command_models import CommandRequest, NodeCommandRecord
+from meridian.control.command_models import CommandRequest, NodeCommandRecord, UserCutOffMutation
 from meridian.control.commands import COMMAND_TABLES, CommandLedger
+from meridian.control.cutoff import CutOffLedger
 from meridian.control.delivery_settings import save_update_interval_hours, update_interval_hours
 from meridian.control.devices import DEVICES_TABLE, DeviceLedger, HeaderReader
 from meridian.control.enrollment import NodeAuthority
@@ -172,6 +173,7 @@ class ControlService:
         self.events.prune()
         self.authority = NodeAuthority(self._store, fleet_id, clock=clock)
         self.commands = CommandLedger(self._store, self.authority, clock=clock, events=self.events)
+        self.cutoffs = CutOffLedger(self._store, self.commands)
         self.tokens = TokenRegistry(self._store, clock=clock, events=self.events)
         self.revisions = RevisionLedger(self._store, self.tokens, fleet_id, clock=clock)
         self.backups = BackupLedger(self._store, clock=clock)
@@ -254,6 +256,7 @@ class ControlService:
                 self._set_meta(_RETIRED_REVISION + node_id, str(row["revision"]))
             self._db.execute("DELETE FROM nodes WHERE node_id = ?", (node_id,))
             self.events.forget_node(node_id)
+            self.commands.expire_node(node_id)
             self.authority.forget_node(node_id)
 
     def grant_enrollment(self, node_id: str) -> EnrollmentGrant:
@@ -311,6 +314,9 @@ class ControlService:
 
     def issue_command(self, node_id: str, request: CommandRequest) -> NodeCommandRecord:
         return self.commands.issue(node_id, request)
+
+    def cut_off_user(self, username: str, *, reissue: bool = False) -> UserCutOffMutation:
+        return self.cutoffs.change(username, self.reissue_user if reissue else self.delete_user)
 
     def poll(
         self,
@@ -675,6 +681,7 @@ class ControlService:
     def _compose_all(self) -> None:
         for (node_id,) in self._db.execute("SELECT node_id FROM nodes WHERE spec IS NOT NULL").fetchall():
             self._compose(str(node_id))
+        self.cutoffs.finish()
 
     def _compose(self, node_id: str) -> None:
         """Sign a new revision when the node's resources changed, and wake its poll."""

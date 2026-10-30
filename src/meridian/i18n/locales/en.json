@@ -408,5 +408,12 @@
   "events.kind.command.result": "Node command finished",
   "events.kind.privacy.changed": "Privacy changed",
   "events.kind.token.created": "Token created",
-  "events.kind.token.revoked": "Token revoked"
+  "events.kind.token.revoked": "Token revoked",
+  "node_commands.cut_off_scope": "End every open session on the affected inbounds on {nodes}. Other people reconnect for a moment. If an inbound reset fails, Xray restarts and all its sessions on that node close.",
+  "node_commands.no_inbounds": "There are no managed inbounds to reset.",
+  "node_commands.remove_confirm": "Remove client '{name}'? Their links stop working immediately.",
+  "node_commands.done": "done",
+  "node_commands.core_restart": "done with a core restart",
+  "node_commands.failed": "failed",
+  "node_commands.timed_out": "timed out"
 }

@@ -26,6 +26,7 @@ from meridian.core.agent_protocol import StatsReport
 from meridian.core.agent_signing import COMMAND_CONTEXT, verify
 from tests.support.agent_node import FakeNode
 from tests.support.control_service import ADMIN_TOKEN, FLEET_ID
+from tests.support.node_commands import command_node_spec as spec
 
 COMMAND_KINDS = ["reconcile", "report", "reset_inbound", "restart_unit", "renew_credential"]
 TAG = "vless-reality"
@@ -76,33 +77,6 @@ def ask(url: str, method: str = "GET", body: Any = None, token: str = ADMIN_TOKE
             return response.status, json.load(response)
     except urllib.error.HTTPError as exc:
         return exc.code, json.load(exc)
-
-
-def spec() -> NodeSpec:
-    return NodeSpec.model_validate(
-        {
-            "resources": [
-                {
-                    "id": "xray:config",
-                    "kind": "xray_config",
-                    "path": "/etc/netagent/core.json",
-                    "config": {"inbounds": [{"tag": TAG, "protocol": "vless", "settings": {"clients": []}}]},
-                    "api_address": "127.0.0.1:10085",
-                },
-                {
-                    "id": "unit:netcore",
-                    "kind": "systemd_unit",
-                    "name": "netcore.service",
-                    "depends_on": ["xray:config"],
-                    "content": "[Service]\nExecStart=/usr/local/lib/netagent/netcore run\n",
-                    "enabled": True,
-                    "state": "started",
-                    "restart_on": ["xray:config"],
-                },
-            ],
-            "managed_inbounds": [{"tag": TAG, "protocol": "vless"}],
-        }
-    )
 
 
 def session(http: str, clock: Clock, *, node_id: str = "main", capabilities: list[str] | None = None) -> str:
@@ -409,3 +383,100 @@ def test_schema_fourteen_keeps_token_expiry_accounting_and_events_from_schema_th
         assert issued.status == "pending"
     finally:
         migrated.close()
+
+
+@pytest.mark.parametrize("action", ["remove", "reissue"])
+def test_cut_off_is_atomic_and_waits_for_the_revision_without_the_old_credentials(
+    action: str, http: str, service: ControlService, clock: Clock
+) -> None:
+    user = service.put_user("person-a")
+    token = session(http, clock)
+    before = poll(http, token)["desired"]
+    method = "DELETE" if action == "remove" else "POST"
+    suffix = "" if action == "remove" else "/reissue"
+    status, changed = ask(f"{http}/api/users/person-a{suffix}", method, {"cut_off": True})
+    assert status == 200, changed
+    commands = changed["commands"]
+    assert len(commands) == 1 and commands[0]["status"] == "waiting"
+    assert commands[0]["node_id"] == "main" and commands[0]["command"]["inbound_tag"] == TAG
+    assert all(value not in json.dumps(commands) for value in (user.username, user.user_id, user.uuid, user.sub_token))
+    after = poll(http, token, have={key: before[key] for key in ("fleet_epoch", "revision", "sha256")})
+    assert after["commands"] == [] and after["desired"]["revision"] > before["revision"]
+    wire = json.dumps(after["desired"]["resources"])
+    assert user.uuid not in wire
+    assert ask(f"{http}/agent/v1/report", "POST", report(after["desired"]), token)[0] == 200
+    wanted = {key: after["desired"][key] for key in ("fleet_epoch", "revision", "sha256")}
+    assert poll(http, token, have=wanted)["commands"] == [commands[0]["command"]]
+    current = service.get_user(user.username)
+    assert current is None if action == "remove" else current is not None and current.uuid != user.uuid
+
+
+def test_a_full_command_queue_rolls_back_a_cut_off_mutation(http: str, service: ControlService, clock: Clock) -> None:
+    user = service.put_user("person-a")
+    session(http, clock)
+    before = service.node_status("main")
+    for _ in range(64):
+        service.issue_command("main", ReconcileCreate())
+    events = service.events.list()
+    status, body = ask(f"{http}/api/users/person-a", "DELETE", {"cut_off": True})
+    assert status == 409 and body["error"]["code"] == "command_queue_full"
+    assert service.get_user(user.username) == user
+    assert service.node_status("main").revision == before.revision
+    assert service.events.list() == events
+
+
+def test_cut_off_scope_lists_managed_inbounds_and_excludes_nodes_without_them(
+    http: str, service: ControlService, clock: Clock
+) -> None:
+    service.put_user("person-a")
+    session(http, clock)
+    service.put_node_spec("another", spec())
+    service.put_node_spec("no-users", NodeSpec(resources=[]))
+    status, plan = ask(f"{http}/api/users/person-a/cut-off")
+    assert status == 200
+    assert plan == {
+        "nodes": [{"node_id": "another", "inbound_tags": [TAG]}, {"node_id": "main", "inbound_tags": [TAG]}]
+    }
+
+
+def test_a_successful_reset_must_disclose_which_action_ended_sessions(http: str, clock: Clock) -> None:
+    token = session(http, clock)
+    record = issue(http, {"kind": "reset_inbound", "inbound_tag": TAG})
+    result = {
+        "type": "command_result",
+        "command_id": record["command"]["command_id"],
+        "status": "succeeded",
+        "error": None,
+        "effect": None,
+        "finished_at": clock.stamp(),
+    }
+    assert ask(f"{http}/agent/v1/command-results", "POST", result, token)[0] == 400
+    assert poll(http, token)["commands"] == [record["command"]]
+
+
+def test_deleting_a_node_expires_commands_before_a_replacement_can_receive_them(
+    http: str, service: ControlService, clock: Clock
+) -> None:
+    session(http, clock)
+    record = issue(http, {"kind": "restart_unit", "resource_id": "unit:netcore"})
+    service.delete_node("main")
+    token = session(http, clock)
+    assert poll(http, token)["commands"] == []
+    assert ask(f"{http}/api/nodes/main/commands/{record['command']['command_id']}")[1]["status"] == "expired"
+    results = [event for event in service.events.list().events if event.kind == "command.result"]
+    assert len(results) == 1 and results[0].detail.to_data()["status"] == "expired"
+
+
+@pytest.mark.parametrize("action", ["remove", "reissue"])
+def test_people_tokens_cannot_end_sessions_during_credential_mutations(
+    http: str, service: ControlService, clock: Clock, action: str
+) -> None:
+    user = service.put_user("person-a")
+    session(http, clock)
+    token = service.tokens.issue(TokenCreate(name="accounts", scope="people"), issuer=ROOT)
+    method = "DELETE" if action == "remove" else "POST"
+    suffix = "" if action == "remove" else "/reissue"
+    status, body = ask(f"{http}/api/users/person-a{suffix}", method, {"cut_off": True}, token.token)
+    assert status == 403 and body["error"]["code"] == "insufficient_scope"
+    assert service.get_user(user.username) == user
+    assert not any(event.kind.startswith("command.") for event in service.events.list().events)

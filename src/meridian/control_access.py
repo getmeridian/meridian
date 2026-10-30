@@ -23,6 +23,7 @@ from meridian.control.client import (
     ControlServiceHistoryOff,
     ControlServiceScopeError,
 )
+from meridian.control.command_models import NodeCommandRecord
 from meridian.control.models import (
     LimitStrategy,
     PrivacySettings,
@@ -146,6 +147,12 @@ class ServiceAccessPanel:
     def revoke_user_subscription(self, user_id: str) -> User:
         username = self._username(user_id)
         return self._user(_translated(lambda: self._client.reissue_user(username)))
+
+    def revoke_user_subscription_with_cut_off(self, user_id: str) -> tuple[User, list[NodeCommandRecord]]:
+        result = _translated(lambda: self._client.reissue_user_with_cut_off(self._username(user_id)))
+        if result.user is None:
+            raise RemnawaveError("The reissue response contains no user.", category="bug")
+        return self._user(result.user), result.commands
 
     def user_devices(self, user_id: str) -> UserDevices:
         username = self._username(user_id)

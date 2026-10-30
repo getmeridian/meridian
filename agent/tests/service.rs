@@ -154,4 +154,62 @@ fn the_rust_agent_enrolls_applies_and_counts_traffic_against_the_python_service(
     assert_eq!(alice["uplink_bytes"], 1200);
     assert_eq!(alice["downlink_bytes"], 34000);
     assert!(alice["last_seen_at"].is_string());
+
+    // The Rust verifier accepts Python-signed commands, and the service stores their typed results.
+    let restart = service.ask(r#"command {"kind":"restart_unit","resource_id":"unit:netcore"}"#);
+    exec.clear();
+    agent.poll_once().unwrap();
+    assert_eq!(exec.count("systemctl restart netcore.service"), 1);
+    let id = restart["command"]["command_id"].as_str().unwrap();
+    assert_eq!(
+        service.ask(&format!("command-result {id}"))["status"],
+        "succeeded"
+    );
+
+    let person = service.ask("user person-a");
+    agent.poll_once().unwrap();
+    let person_id = person["user_id"].as_str().unwrap();
+    exec.live_sessions.lock().unwrap().insert(
+        "vless-reality".into(),
+        [person_id.into(), user_id.clone()].into(),
+    );
+    let reissued = service.ask("reissue-cut-off person-a");
+    assert_eq!(reissued["commands"][0]["status"], "waiting");
+    exec.clear();
+    agent.poll_once().unwrap();
+    assert!(
+        exec.live_sessions
+            .lock()
+            .unwrap()
+            .contains_key("vless-reality")
+    );
+    assert_eq!(exec.count("systemctl restart netcore.service"), 0);
+    agent.poll_once().unwrap();
+    assert!(
+        !exec
+            .live_sessions
+            .lock()
+            .unwrap()
+            .contains_key("vless-reality")
+    );
+    let id = reissued["commands"][0]["command"]["command_id"]
+        .as_str()
+        .unwrap();
+    let finished = service.ask(&format!("command-result {id}"));
+    assert_eq!(finished["status"], "succeeded");
+    assert_eq!(finished["result"]["effect"], "inbound_reset");
+    assert_eq!(exec.count("systemctl restart netcore.service"), 0);
+
+    let removed = service.ask("remove-cut-off person-a");
+    agent.poll_once().unwrap(); // the revision without the old credentials must apply first
+    *exec.api_down.lock().unwrap() = true;
+    exec.clear();
+    agent.poll_once().unwrap();
+    let id = removed["commands"][0]["command"]["command_id"]
+        .as_str()
+        .unwrap();
+    let finished = service.ask(&format!("command-result {id}"));
+    assert_eq!(finished["status"], "succeeded");
+    assert_eq!(finished["result"]["effect"], "core_restart");
+    assert_eq!(exec.count("systemctl restart netcore.service"), 1);
 }

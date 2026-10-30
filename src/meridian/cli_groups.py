@@ -11,6 +11,7 @@ import typer
 
 from meridian.cli_fleet_usage import fleet_usage_cmd
 from meridian.cli_options import (
+    CutOff,
     DeviceLimit,
     Expires,
     ForgetUnreachable,
@@ -180,11 +181,12 @@ def client_remove(
     name: str = typer.Argument(..., help="Client name"),
     yes: Yes = False,
     _json: Json = False,
+    cut_off: CutOff = False,
 ) -> None:
     """Remove a client permanently; their links stop working"""
     from meridian.commands.client import run_remove
 
-    run_remove(name, yes=yes)
+    run_remove(name, yes=yes, cut_off=cut_off)
 
 
 @client_app.command("reissue")
@@ -192,6 +194,7 @@ def client_reissue_cmd(
     name: str = typer.Argument(..., help="Client name"),
     yes: Yes = False,
     _json: Json = False,
+    cut_off: CutOff = False,
 ) -> None:
     """Replace a client's links after a leak; the old page and subscription stop working
 
@@ -202,7 +205,7 @@ def client_reissue_cmd(
     """
     from meridian.commands.client import run_reissue
 
-    run_reissue(name, yes=yes)
+    run_reissue(name, yes=yes, cut_off=cut_off)
 
 
 @client_app.command("enable")

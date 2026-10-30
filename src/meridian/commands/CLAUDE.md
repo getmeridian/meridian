@@ -20,6 +20,7 @@
 **Retired spellings** — `cli.RENAMED`/`RENAMED_OPTIONS` refuse old commands and flags with exit 2 and a pointer to the new spelling.
 
 ## What's done well
+- `client remove|reissue --cut-off` discloses every affected node and other people's reconnects before confirmation; the service delivers resets only after the credential-removal revision is reported applied, and the CLI preserves typed per-node outcomes and new links even on failure.
 
 - **`fleet upgrade` never mutates beside the plan** — it reads images (`diagnostics/images.py`) and each relay's running Realm (never the saved pin, which a failed upgrade leaves ahead), applies the unchanged intent (new pins ride the render contract), then runs the fleet `check`.
 

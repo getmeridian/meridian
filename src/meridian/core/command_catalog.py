@@ -188,6 +188,8 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         outcomes=[
             _ok("client was removed"),
             _ok("client was removed but their connection page could not be deleted", exit_code=3),
+            _ok("client was removed but an open-session cut-off timed out", exit_code=3),
+            _ok("client was removed but an open-session cut-off failed", exit_code=4),
             _user("client not found or input error"),
             *_PANEL_FAILURES,
         ],
@@ -198,6 +200,8 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         outcomes=[
             _ok("client links were reissued and the new page published"),
             _ok("links were reissued but the old page, new page, or local evidence save was incomplete", exit_code=3),
+            _ok("links were reissued but an open-session cut-off timed out", exit_code=3),
+            _ok("links were reissued but an open-session cut-off failed", exit_code=4),
             _user("client not found, not one of the fleet's clients, or confirmation missing"),
             *_PANEL_FAILURES,
         ],

@@ -149,6 +149,8 @@ With `--json`, pass `--yes`. The new links appear only in that command's output.
 
 `meridian client remove NAME` removes the client permanently: their links stop working and their connection page is deleted. A fleet keeps at least one client.
 
+Existing VLESS sessions can outlive credential revocation. **`--cut-off`**, with `client remove` or `client reissue`, waits for each affected node to apply the revision without the old credentials, then resets its affected inbounds. Every open session on those inbounds ends, including other people's; they reconnect for a moment. If the inbound API fails, Xray restarts and all its sessions on that node end. The flag is opt-in and recommended after a leak. JSON reports each node under `data.cut_off`: `done`, `core_restart`, `failed`, or `timed_out`. Meridian waits up to five minutes; failed cut-offs exit `4`, timeouts `3`. The console offers the same choice when removing a person added there.
+
 ## Subscription links
 
 Subscription URLs look like `https://198.51.100.10/<page-path>/sub/<id>`. They live under the connection-page path; the control service's console stays on a separate secret path that shared links never reveal.

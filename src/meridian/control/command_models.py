@@ -6,6 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, RootModel
 
+from meridian.control.models import UserRecord
 from meridian.core.agent_protocol import AgentCommand, Capability, CommandResult, CommandResultStatus
 from meridian.core.agent_types import InboundTag, NodeId, NodeStateRef, ResourceId
 from meridian.core.models import CoreModel
@@ -71,3 +72,35 @@ class NodeCommandTargets(CoreModel):
     units: list[CommandUnitTarget]
     inbounds: list[InboundTag]
     capabilities: list[Capability]
+
+
+class CutOffNode(CoreModel):
+    node_id: NodeId
+    inbound_tags: list[InboundTag]
+
+
+class CutOffPlan(CoreModel):
+    """Every managed inbound that may hold the person's open sessions; contains no person or credential."""
+
+    nodes: list[CutOffNode]
+
+
+class UserCutOffRequest(CoreModel):
+    cut_off: bool = False
+
+
+class UserCutOffMutation(CoreModel):
+    user: UserRecord | None
+    commands: list[NodeCommandRecord]
+
+
+NodeCommandOutcomeStatus = Literal["done", "core_restart", "failed", "timed_out"]
+
+
+class NodeCommandOutcome(CoreModel):
+    """One node's terminal result, preserving every inbound/unit command and any partial success."""
+
+    node_id: NodeId
+    status: NodeCommandOutcomeStatus
+    commands: list[NodeCommandRecord] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)

@@ -408,5 +408,12 @@
   "events.kind.command.result": "节点命令已完成",
   "events.kind.privacy.changed": "隐私设置已更改",
   "events.kind.token.created": "已创建令牌",
-  "events.kind.token.revoked": "已撤销令牌"
+  "events.kind.token.revoked": "已撤销令牌",
+  "node_commands.cut_off_scope": "将终止节点 {nodes} 上相关入站的所有现有会话。其他用户会短暂重连。若入站 API 重置失败，Xray 会重启并终止该节点上的所有 Xray 会话。",
+  "node_commands.no_inbounds": "没有需要重置的受管入站。",
+  "node_commands.remove_confirm": "删除用户“{name}”？其链接会立即失效。",
+  "node_commands.done": "已完成",
+  "node_commands.core_restart": "通过重启 Xray 完成",
+  "node_commands.failed": "失败",
+  "node_commands.timed_out": "等待超时"
 }

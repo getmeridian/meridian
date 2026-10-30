@@ -116,8 +116,8 @@ meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
-meridian client reissue NAME [--yes] [--json]
-meridian client remove NAME [--yes] [--json]
+meridian client reissue NAME [--cut-off] [--yes] [--json]
+meridian client remove NAME [--cut-off] [--yes] [--json]
 ```
 
 | 标志 | 默认值 | 说明 |
@@ -160,6 +160,8 @@ meridian client remove NAME [--yes] [--json]
 **`client devices`** — private 显示数量，full 显示设备详情；off 不读取设备。`--json` 返回 `username`、`level`、`count`、有效 `limit`、`devices` 和 `removed`。`--remove ID` 或 `--clear` 清除登记而不撤销凭证；重复操作报告零条删除。也可通过 CLI 查看和清除控制台添加的用户的设备登记。`client set --devices N` 设置上限，`--devices default` 使用集群上限。参见[设备限制](/zh/client-management/#限制设备数量)。重新签发链接会清除全部设备登记并保留上限。
 
 修改服务中用户设置的命令（`client enable`、`disable`、`set`、`reset-traffic` 以及删除设备注册）也适用于控制台添加的用户。精确匹配的服务用户名优先；忽略大小写或按显示名称匹配时必须只对应一个用户。若有歧义，请使用 `client list` 中显示的精确用户名。删除用户、重新签发凭据和发布连接页面仍仅适用于拓扑中声明的用户。
+
+已建立的 VLESS 会话可能在凭证撤销后继续存在。`client remove` 或 `client reissue` 的 **`--cut-off`** 会等待每个受影响节点应用不含旧凭证的版本，再重置相关入站。这些入站上的所有会话都会终止，包括其他用户的会话；他们会短暂重连。若入站 API 失败，会重启 Xray 并终止该节点上的所有 Xray 会话。此选项需主动启用，建议在链接泄露时使用。JSON 在 `data.cut_off` 中报告各节点的 `done`、`core_restart`、`failed` 或 `timed_out` 状态。最多等待五分钟；失败退出码为 `4`，超时为 `3`。删除在控制台中添加的用户时，控制台也提供此选项。
 
 ### meridian privacy
 

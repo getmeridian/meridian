@@ -9,7 +9,14 @@ from urllib.parse import quote, urlencode
 
 import httpx
 
-from meridian.control.command_models import CommandRequest, NodeCommandRecord, NodeCommandTargets
+from meridian.control.command_models import (
+    CommandRequest,
+    CutOffPlan,
+    NodeCommandRecord,
+    NodeCommandTargets,
+    UserCutOffMutation,
+    UserCutOffRequest,
+)
 from meridian.control.models import (
     ApplyFenceRecord,
     ApplyFenceState,
@@ -149,6 +156,16 @@ class ControlClient:
     def command_targets(self, node_id: str) -> NodeCommandTargets:
         return NodeCommandTargets.model_validate(
             self._call("GET", f"api/nodes/{quote(node_id, safe='')}/command-targets")
+        )
+
+    def cut_off_scope(self, username: str) -> CutOffPlan:
+        return CutOffPlan.model_validate(self._call("GET", f"api/users/{quote(username, safe='')}/cut-off"))
+
+    def reissue_user_with_cut_off(self, username: str) -> UserCutOffMutation:
+        return UserCutOffMutation.model_validate(
+            self._call(
+                "POST", f"api/users/{quote(username, safe='')}/reissue", UserCutOffRequest(cut_off=True).to_data()
+            )
         )
 
     def ping(self) -> bool:

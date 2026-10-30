@@ -6,7 +6,15 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, RootModel
 
-from meridian.control.command_models import NodeCommandRecord, NodeCommandRequest, NodeCommandTargets
+from meridian.control.command_models import (
+    CutOffPlan,
+    NodeCommandOutcome,
+    NodeCommandRecord,
+    NodeCommandRequest,
+    NodeCommandTargets,
+    UserCutOffMutation,
+    UserCutOffRequest,
+)
 from meridian.control.models import (
     IssuedToken,
     PrivacySettings,
@@ -671,6 +679,10 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "node-command-request": NodeCommandRequest,
     "node-command-record": NodeCommandRecord,
     "node-command-targets": NodeCommandTargets,
+    "node-command-outcome": NodeCommandOutcome,
+    "cut-off-plan": CutOffPlan,
+    "user-cut-off-request": UserCutOffRequest,
+    "user-cut-off-result": UserCutOffMutation,
     "relay-deploy-request": RelayDeployRequest,
     "relay-target-request": RelayTargetRequest,
     "deploy-command-data": DeployCommandData,

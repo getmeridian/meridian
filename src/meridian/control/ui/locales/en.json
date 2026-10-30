@@ -370,5 +370,17 @@
   "error.timeout": "The request timed out. Try again.",
   "tokens.uncertain_title": "Token creation wasn't confirmed",
   "tokens.uncertain_text": "A token may have been created, but no secret was received. Its secret cannot be recovered. Check the token list and revoke it before creating another.",
-  "i18n.unavailable": "Language files could not be loaded. Retry from this server."
+  "i18n.unavailable": "Language files could not be loaded. Retry from this server.",
+  "commands.title": "Node command results",
+  "commands.cut_off_label": "End open sessions now",
+  "commands.cut_off_help": "Recommended after a leaked link. This closes every open session on affected inbounds, including other people's. They reconnect for a moment. If the inbound API fails, Xray restarts and all its sessions on that node close.",
+  "commands.scope": "Affected nodes: {nodes}",
+  "commands.no_inbounds": "There are no managed inbounds to reset.",
+  "commands.waiting": "Waiting for access changes to apply",
+  "commands.pending": "Waiting for the node",
+  "commands.done": "Done",
+  "commands.core_restart": "Done with a core restart",
+  "commands.failed": "Failed",
+  "commands.timed_out": "Timed out",
+  "error.command_queue_full": "This node has 64 unanswered commands. Wait for them to finish and retry."
 }

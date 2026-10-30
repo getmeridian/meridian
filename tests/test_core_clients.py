@@ -104,7 +104,7 @@ def test_client_mutation_results_preserve_public_wire_shapes() -> None:
     assert added.to_data() == {
         "clients": [{"username": "alice", "id": "17", "status": "active", "page_url": "", "subscription_url": ""}]
     }
-    assert removed.to_data() == {"client": {"username": "alice"}}
+    assert removed.to_data() == {"client": {"username": "alice"}, "cut_off": None}
     assert enabled.to_data() == {"client": {"username": "alice", "status": "active"}}
     assert disabled.to_data() == {"client": {"username": "alice", "status": "disabled"}}
 

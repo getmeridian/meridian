@@ -408,5 +408,12 @@
   "events.kind.command.result": "فرمان سرور پایان یافت",
   "events.kind.privacy.changed": "تنظیمات حریم خصوصی تغییر کرد",
   "events.kind.token.created": "توکن ایجاد شد",
-  "events.kind.token.revoked": "توکن لغو شد"
+  "events.kind.token.revoked": "توکن لغو شد",
+  "node_commands.cut_off_scope": "همهٔ نشست‌های باز در ورودی‌های مربوطِ سرورهای {nodes} پایان می‌یابند. دیگر کاربران برای لحظه‌ای دوباره وصل می‌شوند. اگر بازنشانی ورودی از طریق API ناموفق باشد، Xray راه‌اندازی مجدد می‌شود و همهٔ نشست‌های آن در همان سرور بسته می‌شوند.",
+  "node_commands.no_inbounds": "ورودیِ مدیریت‌شده‌ای برای بازنشانی وجود ندارد.",
+  "node_commands.remove_confirm": "کاربر «{name}» حذف شود؟ لینک‌های او بلافاصله از کار می‌افتند.",
+  "node_commands.done": "انجام شد",
+  "node_commands.core_restart": "با راه‌اندازی مجدد Xray انجام شد",
+  "node_commands.failed": "ناموفق",
+  "node_commands.timed_out": "زمان انتظار پایان یافت"
 }

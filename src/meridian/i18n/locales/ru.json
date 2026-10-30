@@ -408,5 +408,12 @@
   "events.kind.command.result": "Команда сервера завершена",
   "events.kind.privacy.changed": "Настройки приватности изменены",
   "events.kind.token.created": "Токен создан",
-  "events.kind.token.revoked": "Токен отозван"
+  "events.kind.token.revoked": "Токен отозван",
+  "node_commands.cut_off_scope": "Будут завершены все открытые сеансы на затронутых входах серверов {nodes}. Остальные пользователи ненадолго переподключатся. Если сброс через API не сработает, Xray перезапустится и закроет все свои сеансы на этом сервере.",
+  "node_commands.no_inbounds": "Управляемых входов для сброса нет.",
+  "node_commands.remove_confirm": "Удалить клиента «{name}»? Его ссылки сразу перестанут работать.",
+  "node_commands.done": "выполнено",
+  "node_commands.core_restart": "выполнено с перезапуском Xray",
+  "node_commands.failed": "не выполнено",
+  "node_commands.timed_out": "время ожидания истекло"
 }

@@ -152,14 +152,14 @@
           h("p", { class: "muted small", text: M.t(declared ? "person.remove_declared" : "person.remove_text") }),
           declared ? M.command("meridian client remove " + name) : null),
         declared ? null : h("button", { class: "btn btn-danger btn-sm", type: "button", onclick: function () {
-          M.confirm(M.t("person.remove_title", { name: M.displayName(name) }), M.t("person.remove_confirm"),
-            M.t("person.remove"), true).then(function (ok) {
-            if (!ok) return;
-            M.api("DELETE", path(name)).then(function () {
+          M.confirmCutOffRemoval(name).then(function (choice) {
+            if (!choice) return;
+            M.api("DELETE", path(name), { cut_off: choice.cut_off }).then(function (changed) {
               M.toast(M.t("person.removed_toast"));
               M.go("people");
+              if (changed.commands) M.showCommandResults(changed.commands);
             }, function (e) { M.toast(M.errorText(e), "error"); });
-          });
+          }, function (e) { M.toast(M.errorText(e), "error"); });
         } }, M.t("person.remove"))));
   }
 })();

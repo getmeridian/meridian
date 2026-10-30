@@ -13,6 +13,7 @@
 - **Device controls** — `devices.js` owns the person card: counts/clear in private, metadata/remove in full, no device data in off. Cap edits PATCH only `device_limit`; blank uses the fleet default. Confirmation explains that removed registrations can return; global privacy choices stay in Settings.
 
 ## What's done well
+- Person removal offers an opt-in open-session cut-off with the affected nodes and the reconnect/core-restart disclosure; command results poll only same-origin reads, and declared people keep the CLI ownership guard.
 - **CSP with no exceptions for script** — `default-src 'none'`, `script-src 'self'`, `frame-ancestors 'none'`, `Referrer-Policy: no-referrer` on every console response; `test_control_ui_assets.py` refuses inline script, style, handlers, HTML sinks, outside URLs, and locale drift.
 - **Every mutating request is same-origin twice** — `SameSite=Strict` plus the `X-Meridian-Request: 1` header `M.api` adds (and a matching `Origin`/`Sec-Fetch-Site` when sent).
 - **Assets revalidate by ETag** (content hash, `no-cache`); anything holding a secret is `no-store`.

@@ -23,14 +23,14 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, TypeVar
-from urllib.parse import parse_qs, unquote, urlsplit
+from urllib.parse import unquote
 
 from pydantic import BaseModel, ValidationError
 
 from meridian import __version__
 from meridian.control import ui_routes
 from meridian.control.blobs import BlobStore, fleet_artifacts, served_hashes
-from meridian.control.command_models import NodeCommandRequest
+from meridian.control.command_models import NodeCommandRequest, UserCutOffRequest
 from meridian.control.enrollment import Session, token_sha256
 from meridian.control.errors import ServiceError, agent_error
 from meridian.control.formats.selector import SUFFIX_FORMATS
@@ -58,14 +58,14 @@ from meridian.control.models import (
     UserUpdate,
     scope_covers,
 )
-from meridian.control.operations_api import read_attention, read_events
+from meridian.control.operations_api import read_attention, read_events, read_history_days
 from meridian.control.owner import OwnerSession
 from meridian.control.service import ControlService
 from meridian.control.subscriptions import unknown_subscription
 from meridian.control.times import utc_now
 from meridian.control.tokens import ROOT, WEB_OWNER, Caller, unauthenticated
 from meridian.control.ui_routes import UI_ROUTES, UiContext, owner_session
-from meridian.control.ui_views import is_declared
+from meridian.control.user_access import refuse_declared
 from meridian.core.agent_http import AGENT_HTTP_SURFACE
 from meridian.core.agent_protocol import (
     CommandResult,
@@ -396,10 +396,7 @@ class _Handler(BaseHTTPRequestHandler):
         return self._service.traffic.user_usage(match[1], days=self._history_days())
 
     def _history_days(self) -> int:
-        values = parse_qs(urlsplit(self.path).query, keep_blank_values=True).get("days", ["30"])
-        if len(values) != 1 or not re.fullmatch(r"[0-9]{1,3}", values[0]) or not 1 <= int(values[0]) <= 730:
-            raise ServiceError("invalid_request", "days must be one integer between 1 and 730.", 400)
-        return int(values[0])
+        return read_history_days(self.path)
 
     def list_users(self, _match: re.Match[str]) -> Any:
         return {"users": [self._visible(user).model_dump(mode="json") for user in self._service.list_users()]}
@@ -429,8 +426,21 @@ class _Handler(BaseHTTPRequestHandler):
         return self._service.update_user(match[1], self._model(UserUpdate))
 
     def reissue_user(self, match: re.Match[str]) -> Any:
+        cut_off = self._cut_off_requested()
         with self._refuse_declared(match[1], "meridian client reissue"):
+            if cut_off:
+                return self._service.cut_off_user(match[1], reissue=True)
             return self._service.reissue_user(match[1])
+
+    def cut_off_scope(self, match: re.Match[str]) -> Any:
+        return self._service.cutoffs.scope(match[1])
+
+    def _cut_off_requested(self) -> bool:
+        body = self._body()
+        cut_off = UserCutOffRequest.model_validate_json(body).cut_off if body else False
+        if cut_off:
+            self._authorize(WRITE)
+        return cut_off
 
     def reset_user_traffic(self, match: re.Match[str]) -> Any:
         return self._service.reset_user_traffic(match[1])
@@ -449,27 +459,15 @@ class _Handler(BaseHTTPRequestHandler):
         return self._service.delete_user_devices(match[1])
 
     def delete_user(self, match: re.Match[str]) -> Any:
+        cut_off = self._cut_off_requested()
         with self._refuse_declared(match[1], "meridian client remove"):
+            if cut_off:
+                return self._service.cut_off_user(match[1])
             self._service.delete_user(match[1])
         return {"deleted": match[1]}
 
     def _refuse_declared(self, username: str, command: str) -> AbstractContextManager[None]:
-        """A person the deployer declared is the CLI's to remove or relink: only it moves their connection page.
-
-        An admin API token stays allowed; a people token or the web owner is told the
-        command instead. Checked in the write's transaction, so an apply that declares
-        the person meanwhile still wins.
-        """
-        if self.owner_session is None and (self.caller is None or self.caller.scope != "people"):
-            return nullcontext()
-
-        def undeclared() -> None:
-            if is_declared(self._service, username):
-                raise ServiceError(
-                    "declared_user", f"The fleet file declares {username}; run `{command} {username}` instead.", 409
-                )
-
-        return self._service.conditions(undeclared)
+        return refuse_declared(self._service, username, command, self.caller, self.owner_session)
 
     def get_endpoint(self, match: re.Match[str]) -> Any:
         endpoint = self._service.get_endpoint(match[1])
@@ -665,6 +663,7 @@ ROUTES: list[Route] = [
     ("PUT", re.compile(rf"/api/users/{_USERNAME}"), "people", _Handler.put_user),
     ("PATCH", re.compile(rf"/api/users/{_USERNAME}"), "people", _Handler.update_user),
     ("POST", re.compile(rf"/api/users/{_USERNAME}/reissue"), "people", _Handler.reissue_user),
+    ("GET", re.compile(rf"/api/users/{_USERNAME}/cut-off"), "read", _Handler.cut_off_scope),
     ("POST", re.compile(rf"/api/users/{_USERNAME}/reset-traffic"), "people", _Handler.reset_user_traffic),
     ("POST", re.compile(rf"/api/users/{_USERNAME}/extend"), "people", _Handler.extend_user),
     ("GET", re.compile(rf"/api/users/{_USERNAME}/devices"), ("read", "people"), _Handler.user_devices),
@@ -737,6 +736,8 @@ OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
         _Handler.delete_user_device,
         _Handler.clear_user_devices,
         _Handler.delete_user,
+        _Handler.cut_off_scope,
+        _Handler.get_command,
         _Handler.list_tokens,
         _Handler.create_token,
         _Handler.revoke_token,

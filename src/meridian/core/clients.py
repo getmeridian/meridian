@@ -7,6 +7,7 @@ from typing import Literal, Protocol, Sequence
 
 from pydantic import Field
 
+from meridian.control.command_models import NodeCommandOutcome
 from meridian.control.models import UserUsage
 from meridian.core.attention import PersonAttentionReason
 from meridian.core.client_limits import canonical_expiry, traffic_reset_from_strategy
@@ -153,6 +154,9 @@ class ClientReissueResult(CoreModel):
     """Result for reissuing one client's links; the old ones no longer work."""
 
     client: ClientCreated
+    cut_off: list[NodeCommandOutcome] | None = Field(
+        default=None, description="Per-node open-session results when --cut-off was requested."
+    )
 
 
 class ClientReference(CoreModel):
@@ -165,6 +169,9 @@ class ClientRemoveResult(CoreModel):
     """Result for removing one client."""
 
     client: ClientReference
+    cut_off: list[NodeCommandOutcome] | None = Field(
+        default=None, description="Per-node open-session results when --cut-off was requested."
+    )
 
 
 # What a client is after enable/disable: enabling an expired or over-quota client leaves it so.
@@ -298,7 +305,9 @@ def build_client_add_result(
     )
 
 
-def build_client_reissue_result(user: PanelUserLike, *, page_url: str, subscription_url: str) -> ClientReissueResult:
+def build_client_reissue_result(
+    user: PanelUserLike, *, page_url: str, subscription_url: str, cut_off: Sequence[NodeCommandOutcome] | None = None
+) -> ClientReissueResult:
     """Build the result returned after reissuing one client's links."""
     return ClientReissueResult(
         client=ClientCreated(
@@ -307,13 +316,18 @@ def build_client_reissue_result(user: PanelUserLike, *, page_url: str, subscript
             status=user.status.lower(),
             page_url=page_url,
             subscription_url=subscription_url,
-        )
+        ),
+        cut_off=list(cut_off) if cut_off is not None else None,
     )
 
 
-def build_client_remove_result(username: str) -> ClientRemoveResult:
+def build_client_remove_result(
+    username: str, *, cut_off: Sequence[NodeCommandOutcome] | None = None
+) -> ClientRemoveResult:
     """Build the stable result returned after removing one client."""
-    return ClientRemoveResult(client=ClientReference(username=username))
+    return ClientRemoveResult(
+        client=ClientReference(username=username), cut_off=list(cut_off) if cut_off is not None else None
+    )
 
 
 def build_client_status_result(username: str, status: ClientMutationStatus) -> ClientStatusResult:

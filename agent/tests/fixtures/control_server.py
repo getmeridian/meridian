@@ -26,6 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
 from meridian.control.blobs import BlobStore
+from meridian.control.command_models import NodeCommandRequest
 from meridian.control.enrollment import token_sha256
 from meridian.control.models import NodeSpec, users_resource_id
 from meridian.control.server import ControlServer
@@ -113,6 +114,15 @@ def main() -> None:
             print(json.dumps(service.node_status(NODE_ID).model_dump(mode="json")), flush=True)
         elif command.startswith("user "):
             print(json.dumps(service.put_user(command.split()[1]).model_dump(mode="json")), flush=True)
+        elif command.startswith("command "):
+            request = NodeCommandRequest.model_validate_json(command.removeprefix("command "))
+            print(service.issue_command(NODE_ID, request.root).model_dump_json(), flush=True)
+        elif command.startswith("command-result "):
+            print(service.commands.get(NODE_ID, command.split()[1]).model_dump_json(), flush=True)
+        elif command.startswith("reissue-cut-off "):
+            print(service.cut_off_user(command.split()[1], reissue=True).model_dump_json(), flush=True)
+        elif command.startswith("remove-cut-off "):
+            print(service.cut_off_user(command.split()[1]).model_dump_json(), flush=True)
     server.shutdown()
     server.server_close()
 

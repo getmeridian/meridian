@@ -370,5 +370,17 @@
   "error.timeout": "请求超时，请重试。",
   "tokens.uncertain_title": "无法确认令牌是否已创建",
   "tokens.uncertain_text": "令牌可能已创建，但未收到密钥，且密钥无法恢复。请检查令牌列表，并在创建新令牌之前撤销本次尝试生成的令牌。",
-  "i18n.unavailable": "无法加载语言文件，请从此服务器重试。"
+  "i18n.unavailable": "无法加载语言文件，请从此服务器重试。",
+  "commands.title": "节点命令结果",
+  "commands.cut_off_label": "立即终止现有会话",
+  "commands.cut_off_help": "链接泄露时建议启用。相关入站的所有会话都会终止，包括其他用户的会话；他们会短暂重连。若入站 API 失败，会重启 Xray 并终止该节点上的所有 Xray 会话。",
+  "commands.scope": "受影响的节点：{nodes}",
+  "commands.no_inbounds": "没有需要重置的受管入站。",
+  "commands.waiting": "等待访问设置生效",
+  "commands.pending": "等待节点响应",
+  "commands.done": "已完成",
+  "commands.core_restart": "通过重启 Xray 完成",
+  "commands.failed": "失败",
+  "commands.timed_out": "等待超时",
+  "error.command_queue_full": "此节点有 64 条命令尚未响应。请等待它们完成后重试。"
 }

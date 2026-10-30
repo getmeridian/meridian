@@ -66,7 +66,7 @@ def test_every_request_carries_the_csrf_header() -> None:
 # or person.js's `path(name, "/suffix")`.
 _API_CALL = re.compile(
     r'M\.api\("([A-Z]+)", (?:"([^"]+)"( \+ [\w.]+(?:\([\w.]+\))?(?: \+ "([^"]*)")?)?'
-    r'|path\(\w+(?:, "([^"]+)"( \+ encodeURIComponent\(\w+\))?)?\))'
+    r'|path\(\w+(?:, "([^"]+)"( \+ encodeURIComponent\(\w+\))?)?\)|commandPath\((\w+)\))'
 )
 _ID_SAMPLES = ("1", "0123456789ab")  # usernames and revision numbers; token IDs
 
@@ -75,7 +75,7 @@ def test_every_route_the_console_calls_admits_an_owner_session() -> None:
     """`server.OWNER_ROUTES` is an allowlist, so a screen calling an unlisted route would always fail."""
     calls = [match.groups() for source in JS.values() for match in _API_CALL.finditer(source)]
     assert len(calls) > 15
-    for method, literal, joined, tail, person_suffix, device_joined in calls:
+    for method, literal, joined, tail, person_suffix, device_joined, node_command in calls:
         if literal is None:
             literal, joined, tail = "api/users/", True, person_suffix
         paths = [
@@ -84,6 +84,8 @@ def test_every_route_the_console_calls_admits_an_owner_session() -> None:
             )[0]
             for sample in _ID_SAMPLES
         ]
+        if node_command:
+            paths = ["/api/nodes/main/commands/1b6f3c1e-8f6a-4d2b-9c41-7a5e2d9f0c13"]
         routes = [route for route in ALL_ROUTES for path in paths if route[0] == method and route[1].fullmatch(path)]
         assert routes, f"{method} {paths[0]} matches no route"
         scope, handler = routes[0][2], routes[0][3]

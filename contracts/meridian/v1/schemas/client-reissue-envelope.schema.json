@@ -41,12 +41,101 @@
       "properties": {
         "client": {
           "$ref": "#/$defs/ClientCreated"
+        },
+        "cut_off": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/NodeCommandOutcome"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Per-node open-session results when --cut-off was requested.",
+          "title": "Cut Off"
         }
       },
       "required": [
         "client"
       ],
       "title": "ClientReissueResult",
+      "type": "object"
+    },
+    "CommandResult": {
+      "additionalProperties": false,
+      "description": "Outcome of one command. Sending it again for the same `command_id` is harmless.",
+      "properties": {
+        "command_id": {
+          "description": "Idempotency key of a command: a lowercase UUID chosen by the service, never reused.",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Command Id",
+          "type": "string"
+        },
+        "effect": {
+          "anyOf": [
+            {
+              "enum": [
+                "inbound_reset",
+                "core_restart"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For a successful reset_inbound: whether the inbound API reset or a fallback core restart ended its sessions. Null for other outcomes. Sent only by sessions negotiating command kinds.",
+          "title": "Effect"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Set when `status` is `failed` or `rejected`."
+        },
+        "finished_at": {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Finished At",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "rejected",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "type": {
+          "const": "command_result",
+          "default": "command_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "command_id",
+        "status",
+        "error",
+        "finished_at",
+        "effect"
+      ],
+      "title": "CommandResult",
       "type": "object"
     },
     "EmptyData": {
@@ -110,6 +199,524 @@
         "message"
       ],
       "title": "MeridianError",
+      "type": "object"
+    },
+    "NodeCommandOutcome": {
+      "additionalProperties": false,
+      "description": "One node's terminal result, preserving every inbound/unit command and any partial success.",
+      "properties": {
+        "commands": {
+          "items": {
+            "$ref": "#/$defs/NodeCommandRecord"
+          },
+          "title": "Commands",
+          "type": "array"
+        },
+        "errors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Errors",
+          "type": "array"
+        },
+        "node_id": {
+          "description": "Node identifier: the server's lowercase topology ID, unique within the fleet.",
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Node Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "done",
+            "core_restart",
+            "failed",
+            "timed_out"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "status"
+      ],
+      "title": "NodeCommandOutcome",
+      "type": "object"
+    },
+    "NodeCommandRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "discriminator": {
+            "mapping": {
+              "reconcile": "#/$defs/ReconcileCommand",
+              "renew_credential": "#/$defs/RenewCredentialCommand",
+              "report": "#/$defs/ReportCommand",
+              "reset_inbound": "#/$defs/ResetInboundCommand",
+              "restart_unit": "#/$defs/RestartUnitCommand"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ReconcileCommand"
+            },
+            {
+              "$ref": "#/$defs/ReportCommand"
+            },
+            {
+              "$ref": "#/$defs/ResetInboundCommand"
+            },
+            {
+              "$ref": "#/$defs/RestartUnitCommand"
+            },
+            {
+              "$ref": "#/$defs/RenewCredentialCommand"
+            }
+          ],
+          "title": "Command"
+        },
+        "node_id": {
+          "description": "Node identifier: the server's lowercase topology ID, unique within the fleet.",
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Node Id",
+          "type": "string"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommandResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "waiting",
+            "pending",
+            "succeeded",
+            "failed",
+            "rejected",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "wait_for": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NodeStateRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "node_id",
+        "command",
+        "status",
+        "wait_for",
+        "result"
+      ],
+      "title": "NodeCommandRecord",
+      "type": "object"
+    },
+    "NodeStateRef": {
+      "additionalProperties": false,
+      "description": "Points at one desired-state document by epoch, revision, and content hash.",
+      "properties": {
+        "fleet_epoch": {
+          "description": "Fleet epoch. A restore of the control service bumps it. An agent remembers the highest epoch it accepted and refuses desired state and commands from an older one (a resurrected old control server).",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Fleet Epoch",
+          "type": "integer"
+        },
+        "revision": {
+          "description": "Desired-state revision for one node. Ordering is (fleet_epoch, revision): within an epoch revisions only grow; a higher epoch wins even with a lower revision.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "sha256": {
+          "description": "The document's `sha256` (hash of its `resources`).",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fleet_epoch",
+        "revision",
+        "sha256"
+      ],
+      "title": "NodeStateRef",
+      "type": "object"
+    },
+    "ReconcileCommand": {
+      "additionalProperties": false,
+      "description": "Re-observe every resource now and repair drift.",
+      "properties": {
+        "command_id": {
+          "description": "Idempotency key of a command: a lowercase UUID chosen by the service, never reused.",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Command Id",
+          "type": "string"
+        },
+        "expires_at": {
+          "description": "The agent answers `expired` instead of running it after this time.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "fleet_epoch": {
+          "description": "Fleet epoch. A restore of the control service bumps it. An agent remembers the highest epoch it accepted and refuses desired state and commands from an older one (a resurrected old control server).",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Fleet Epoch",
+          "type": "integer"
+        },
+        "issued_at": {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Issued At",
+          "type": "string"
+        },
+        "kind": {
+          "const": "reconcile",
+          "default": "reconcile",
+          "title": "Kind",
+          "type": "string"
+        },
+        "signature": {
+          "$ref": "#/$defs/ServiceSignature",
+          "description": "Context line `meridian.agent/v1 command`."
+        }
+      },
+      "required": [
+        "command_id",
+        "fleet_epoch",
+        "issued_at",
+        "expires_at",
+        "signature",
+        "kind"
+      ],
+      "title": "ReconcileCommand",
+      "type": "object"
+    },
+    "RenewCredentialCommand": {
+      "additionalProperties": false,
+      "description": "Run `renew` now, for example after the service rotated the CA's intermediate.",
+      "properties": {
+        "command_id": {
+          "description": "Idempotency key of a command: a lowercase UUID chosen by the service, never reused.",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Command Id",
+          "type": "string"
+        },
+        "expires_at": {
+          "description": "The agent answers `expired` instead of running it after this time.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "fleet_epoch": {
+          "description": "Fleet epoch. A restore of the control service bumps it. An agent remembers the highest epoch it accepted and refuses desired state and commands from an older one (a resurrected old control server).",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Fleet Epoch",
+          "type": "integer"
+        },
+        "issued_at": {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Issued At",
+          "type": "string"
+        },
+        "kind": {
+          "const": "renew_credential",
+          "default": "renew_credential",
+          "title": "Kind",
+          "type": "string"
+        },
+        "signature": {
+          "$ref": "#/$defs/ServiceSignature",
+          "description": "Context line `meridian.agent/v1 command`."
+        }
+      },
+      "required": [
+        "command_id",
+        "fleet_epoch",
+        "issued_at",
+        "expires_at",
+        "signature",
+        "kind"
+      ],
+      "title": "RenewCredentialCommand",
+      "type": "object"
+    },
+    "ReportCommand": {
+      "additionalProperties": false,
+      "description": "Send `report` now, and `stats` too when asked.",
+      "properties": {
+        "command_id": {
+          "description": "Idempotency key of a command: a lowercase UUID chosen by the service, never reused.",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Command Id",
+          "type": "string"
+        },
+        "expires_at": {
+          "description": "The agent answers `expired` instead of running it after this time.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "fleet_epoch": {
+          "description": "Fleet epoch. A restore of the control service bumps it. An agent remembers the highest epoch it accepted and refuses desired state and commands from an older one (a resurrected old control server).",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Fleet Epoch",
+          "type": "integer"
+        },
+        "include_stats": {
+          "title": "Include Stats",
+          "type": "boolean"
+        },
+        "issued_at": {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Issued At",
+          "type": "string"
+        },
+        "kind": {
+          "const": "report",
+          "default": "report",
+          "title": "Kind",
+          "type": "string"
+        },
+        "signature": {
+          "$ref": "#/$defs/ServiceSignature",
+          "description": "Context line `meridian.agent/v1 command`."
+        }
+      },
+      "required": [
+        "command_id",
+        "fleet_epoch",
+        "issued_at",
+        "expires_at",
+        "signature",
+        "kind",
+        "include_stats"
+      ],
+      "title": "ReportCommand",
+      "type": "object"
+    },
+    "ResetInboundCommand": {
+      "additionalProperties": false,
+      "description": "Remove and re-add one Xray inbound through gRPC to end open sessions after an urgent cut-off.",
+      "properties": {
+        "command_id": {
+          "description": "Idempotency key of a command: a lowercase UUID chosen by the service, never reused.",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Command Id",
+          "type": "string"
+        },
+        "expires_at": {
+          "description": "The agent answers `expired` instead of running it after this time.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "fleet_epoch": {
+          "description": "Fleet epoch. A restore of the control service bumps it. An agent remembers the highest epoch it accepted and refuses desired state and commands from an older one (a resurrected old control server).",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Fleet Epoch",
+          "type": "integer"
+        },
+        "inbound_tag": {
+          "description": "Xray inbound tag.",
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Inbound Tag",
+          "type": "string"
+        },
+        "issued_at": {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Issued At",
+          "type": "string"
+        },
+        "kind": {
+          "const": "reset_inbound",
+          "default": "reset_inbound",
+          "title": "Kind",
+          "type": "string"
+        },
+        "signature": {
+          "$ref": "#/$defs/ServiceSignature",
+          "description": "Context line `meridian.agent/v1 command`."
+        }
+      },
+      "required": [
+        "command_id",
+        "fleet_epoch",
+        "issued_at",
+        "expires_at",
+        "signature",
+        "kind",
+        "inbound_tag"
+      ],
+      "title": "ResetInboundCommand",
+      "type": "object"
+    },
+    "ResourceError": {
+      "additionalProperties": false,
+      "description": "Why a resource or command did not converge.",
+      "properties": {
+        "code": {
+          "enum": [
+            "download_failed",
+            "hash_mismatch",
+            "path_not_allowed",
+            "write_failed",
+            "disk_full",
+            "validation_failed",
+            "reload_failed",
+            "service_failed",
+            "xray_api_failed",
+            "rolled_back",
+            "timeout",
+            "unsupported",
+            "internal"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "description": "Operator-facing text. Never carries secrets, client addresses, or raw command lines.",
+          "maxLength": 1000,
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "description": "True when the agent will retry on its own.",
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retryable"
+      ],
+      "title": "ResourceError",
+      "type": "object"
+    },
+    "RestartUnitCommand": {
+      "additionalProperties": false,
+      "description": "Restart a systemd unit the desired state manages, named by its resource ID.",
+      "properties": {
+        "command_id": {
+          "description": "Idempotency key of a command: a lowercase UUID chosen by the service, never reused.",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Command Id",
+          "type": "string"
+        },
+        "expires_at": {
+          "description": "The agent answers `expired` instead of running it after this time.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "fleet_epoch": {
+          "description": "Fleet epoch. A restore of the control service bumps it. An agent remembers the highest epoch it accepted and refuses desired state and commands from an older one (a resurrected old control server).",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Fleet Epoch",
+          "type": "integer"
+        },
+        "issued_at": {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Issued At",
+          "type": "string"
+        },
+        "kind": {
+          "const": "restart_unit",
+          "default": "restart_unit",
+          "title": "Kind",
+          "type": "string"
+        },
+        "resource_id": {
+          "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "signature": {
+          "$ref": "#/$defs/ServiceSignature",
+          "description": "Context line `meridian.agent/v1 command`."
+        }
+      },
+      "required": [
+        "command_id",
+        "fleet_epoch",
+        "issued_at",
+        "expires_at",
+        "signature",
+        "kind",
+        "resource_id"
+      ],
+      "title": "RestartUnitCommand",
+      "type": "object"
+    },
+    "ServiceSignature": {
+      "additionalProperties": false,
+      "description": "Ed25519 signature by the control service's signing key.\n\nThe key's certificate is issued by the fleet's pinned internal CA and reaches\nthe agent in `EnrollResponse` and `HelloResponse`. The agent verifies the\nsignature before acting, so a TLS interception or a self-signed fallback\ncertificate on 443 can never inject desired state or commands.",
+      "properties": {
+        "key_id": {
+          "description": "SHA-256 of the DER signing certificate that made the signature.",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Key Id",
+          "type": "string"
+        },
+        "signature": {
+          "description": "Ed25519 signature (64 bytes) in standard base64.",
+          "maxLength": 88,
+          "minLength": 88,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+          "title": "Signature",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key_id",
+        "signature"
+      ],
+      "title": "ServiceSignature",
       "type": "object"
     },
     "Summary": {

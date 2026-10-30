@@ -116,8 +116,8 @@ meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
-meridian client reissue NAME [--yes] [--json]
-meridian client remove NAME [--yes] [--json]
+meridian client reissue NAME [--cut-off] [--yes] [--json]
+meridian client remove NAME [--cut-off] [--yes] [--json]
 ```
 
 | Flag | Default | Description |
@@ -160,6 +160,8 @@ First reported traffic and the last reporting node come from accepted traffic gr
 **`client devices`** — shows a count in private mode and device details in full mode; off reads no devices. `--json` returns `username`, `level`, `count`, the effective `limit`, `devices`, and `removed`. `--remove ID` or `--clear` forgets registrations without revoking credentials; a repeat reports zero removals. Reads and removals include people added in the console. `client set --devices N` sets a cap; `--devices default` uses the fleet cap. See [Device limits](/en/client-management/#limit-devices). Reissuing a client clears all device registrations and keeps the cap.
 
 Service-owned edits (`client enable`, `disable`, `set`, `reset-traffic`, and device removals) also accept people added in the console. An exact service username wins; a case or display-name match must identify one person, otherwise use the exact username shown by `client list`. Removal, reissue, and connection-page publication remain tied to declared clients.
+
+Existing VLESS sessions can outlive credential revocation. **`--cut-off`**, with `client remove` or `client reissue`, waits for each affected node to apply the revision without the old credentials, then resets its affected inbounds. Every open session on those inbounds ends, including other people's; they reconnect for a moment. If the inbound API fails, Xray restarts and all its sessions on that node end. The flag is opt-in and recommended after a leak. JSON reports each node under `data.cut_off`: `done`, `core_restart`, `failed`, or `timed_out`. Meridian waits up to five minutes; failed cut-offs exit `4`, timeouts `3`. The console offers the same choice when removing a person added there.
 
 ### meridian privacy
 

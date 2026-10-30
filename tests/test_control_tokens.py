@@ -128,6 +128,7 @@ ROUTE_SAMPLES = {
     "put_user": ("/api/users/bob", {}),
     "update_user": ("/api/users/alice", {"status": "disabled"}),
     "reissue_user": ("/api/users/alice/reissue", {}),
+    "cut_off_scope": ("/api/users/alice/cut-off", None),
     "reset_user_traffic": ("/api/users/alice/reset-traffic", {}),
     "extend_user": ("/api/users/alice/extend", {"days": 7}),
     "user_devices": ("/api/users/alice/devices", None),
@@ -199,11 +200,12 @@ def test_every_api_route_has_a_matching_permission_sample() -> None:
 
 
 def test_people_access_is_declared_only_on_user_routes() -> None:
-    for _method, pattern, needed, _handler in ROUTES:
+    for _method, pattern, needed, handler in ROUTES:
         if needed is None:
             continue
         requirements = (needed,) if isinstance(needed, str) else needed
-        assert any(scope_covers("people", scope) for scope in requirements) == pattern.pattern.startswith("/api/users")
+        manages_people = pattern.pattern.startswith("/api/users") and handler.__name__ != "cut_off_scope"
+        assert any(scope_covers("people", scope) for scope in requirements) == manages_people
         assert all(scope_covers("admin", scope) for scope in requirements)
 
 

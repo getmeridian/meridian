@@ -116,8 +116,8 @@ meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
-meridian client reissue NAME [--yes] [--json]
-meridian client remove NAME [--yes] [--json]
+meridian client reissue NAME [--cut-off] [--yes] [--json]
+meridian client remove NAME [--cut-off] [--yes] [--json]
 ```
 
 | پرچم | پیش‌فرض | توضیح |
@@ -160,6 +160,8 @@ meridian client remove NAME [--yes] [--json]
 **`client devices`** — در private تعداد و در full اطلاعات دستگاه‌ها را نشان می‌دهد؛ off هیچ دستگاهی را نمی‌خواند. `--json` فیلدهای `username`، `level`، `count`، سقف مؤثر `limit`، `devices` و `removed` را برمی‌گرداند. `--remove ID` یا `--clear` ثبت‌ها را بدون لغو اعتبارنامه فراموش می‌کند؛ تکرار آن صفر حذف گزارش می‌دهد. ثبت‌های افراد کنسول را هم می‌توان از CLI مشاهده و حذف کرد. `client set --devices N` سقف را تعیین و `--devices default` سقف مجموعه را انتخاب می‌کند. بخش [سقف دستگاه‌ها](/fa/client-management/#سقف-دستگاهها) را ببینید. صدور لینک جدید همهٔ ثبت‌ها را پاک می‌کند و سقف را نگه می‌دارد.
 
 فرمان‌های تغییر اطلاعات فرد در سرویس (`client enable`، `disable`، `set`، `reset-traffic` و حذف ثبت دستگاه‌ها) برای افراد کنسول هم کار می‌کنند. نام کاربری دقیق اولویت دارد؛ تطبیق بدون توجه به بزرگی حروف یا با نام نمایشی باید فقط یک فرد را مشخص کند. در صورت ابهام، نام دقیقِ `client list` را وارد کنید. حذف فرد، صدور دوبارهٔ اطلاعات اتصال و انتشار صفحه همچنان فقط برای افراد تعریف‌شده در توپولوژی است.
+
+نشست‌های باز VLESS ممکن است پس از لغو کلیدها هم ادامه یابند. **`--cut-off`** در `client remove` یا `client reissue` منتظر می‌ماند تا هر سرورِ مربوط نسخهٔ بدون کلیدهای قدیمی را اعمال کند، سپس ورودی‌های مربوط را بازنشانی می‌کند. همهٔ نشست‌های آن ورودی‌ها، حتی نشست‌های دیگر کاربران، بسته می‌شوند و کاربران برای لحظه‌ای دوباره وصل می‌شوند. اگر API ورودی کار نکند، Xray راه‌اندازی مجدد می‌شود و همهٔ نشست‌های آن در همان سرور بسته می‌شوند. این گزینه پیش‌فرض نیست و برای لینک فاش‌شده توصیه می‌شود. JSON نتیجهٔ هر سرور را در `data.cut_off` با وضعیت `done`، `core_restart`، `failed` یا `timed_out` نشان می‌دهد. انتظار حداکثر پنج دقیقه است؛ شکست با کد `4` و پایان زمان انتظار با کد `3` گزارش می‌شود. هنگام حذف فردی که در کنسول اضافه شده، همین گزینه در کنسول هم وجود دارد.
 
 ### meridian privacy
 

@@ -24,6 +24,7 @@ from meridian.control.service import ControlService
 from meridian.control.tokens import ROOT
 from meridian.control.ui_routes import CONTENT_SECURITY_POLICY, SESSION_COOKIE, UI_DIR, passkey_state
 from tests.support.control_service import write_privacy
+from tests.support.node_commands import command_node_spec
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
 ADMIN_TOKEN = "admin-token-for-tests-only-0123456789"
@@ -610,12 +611,27 @@ def test_declared_people_are_the_clis_to_remove_or_relink(fleet: Fleet) -> None:
     for method, path in (("POST", "/api/users/alice/reissue"), ("DELETE", "/api/users/alice")):
         refused = fleet.ui(method, path, {} if method == "POST" else None)
         assert refused.status == 409 and refused.body["error"]["code"] == "declared_user", path
+        refused = fleet.ui(method, path, {"cut_off": True})
+        assert refused.status == 409 and refused.body["error"]["code"] == "declared_user", path
     after = service.get_user("alice")
     assert after is not None and after.uuid == before.uuid
     assert fleet.ui("GET", "/ui/api/people/alice/share").body["declared"] is True
     assert fleet.ui("POST", "/api/users/bob/reissue", {}).status == 200  # the console's own people stay its own
     assert fleet.ui("DELETE", "/api/users/bob").status == 200
     assert fleet.call("POST", "/api/users/alice/reissue", {}, bearer=ADMIN_TOKEN).status == 200  # the CLI may
+
+
+def test_the_owner_can_remove_its_person_with_a_cut_off_and_read_the_result(fleet: Fleet) -> None:
+    fleet.set_up()
+    fleet.service.put_user("person-a")
+    fleet.service.put_node_spec("main", command_node_spec())
+    scope = fleet.ui("GET", "/api/users/person-a/cut-off")
+    assert scope.status == 200 and scope.body["nodes"][0]["node_id"] == "main"
+    removed = fleet.ui("DELETE", "/api/users/person-a", {"cut_off": True})
+    assert removed.status == 200 and fleet.service.get_user("person-a") is None
+    record = removed.body["commands"][0]
+    read = fleet.ui("GET", f"/api/nodes/main/commands/{record['command']['command_id']}")
+    assert read.status == 200 and read.body["status"] == "waiting"
     assert fleet.call("DELETE", "/api/users/alice", bearer=ADMIN_TOKEN).status == 200
 
 

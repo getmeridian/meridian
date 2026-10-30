@@ -722,7 +722,8 @@ export const commandCatalog = {
         "0": "client links were reissued and the new page published",
         "1": "unexpected Meridian bug",
         "2": "client not found, not one of the fleet's clients, or confirmation missing",
-        "3": "links were reissued but the old page, new page, or local evidence save was incomplete; system or panel failure",
+        "3": "links were reissued but the old page, new page, or local evidence save was incomplete; links were reissued but an open-session cut-off timed out; system or panel failure",
+        "4": "links were reissued but an open-session cut-off failed",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
@@ -730,6 +731,7 @@ export const commandCatalog = {
       "machine_flags": [
         "--yes",
         "--json",
+        "--cut-off",
         "--context"
       ],
       "outcomes": [
@@ -743,6 +745,18 @@ export const commandCatalog = {
           "category": "none",
           "exit_code": 3,
           "meaning": "links were reissued but the old page, new page, or local evidence save was incomplete",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 3,
+          "meaning": "links were reissued but an open-session cut-off timed out",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 4,
+          "meaning": "links were reissued but an open-session cut-off failed",
           "status": "ok"
         },
         {
@@ -785,7 +799,8 @@ export const commandCatalog = {
         "0": "client was removed",
         "1": "unexpected Meridian bug",
         "2": "client not found or input error",
-        "3": "client was removed but their connection page could not be deleted; system or panel failure",
+        "3": "client was removed but their connection page could not be deleted; client was removed but an open-session cut-off timed out; system or panel failure",
+        "4": "client was removed but an open-session cut-off failed",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
@@ -793,6 +808,7 @@ export const commandCatalog = {
       "machine_flags": [
         "--yes",
         "--json",
+        "--cut-off",
         "--context"
       ],
       "outcomes": [
@@ -806,6 +822,18 @@ export const commandCatalog = {
           "category": "none",
           "exit_code": 3,
           "meaning": "client was removed but their connection page could not be deleted",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 3,
+          "meaning": "client was removed but an open-session cut-off timed out",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 4,
+          "meaning": "client was removed but an open-session cut-off failed",
           "status": "ok"
         },
         {

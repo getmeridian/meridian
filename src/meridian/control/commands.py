@@ -193,6 +193,10 @@ class CommandLedger:
                     raise agent_error("invalid_request", "The command is still waiting for its revision.")
                 if result.effect is not None and current.command.kind != "reset_inbound":
                     raise agent_error("invalid_request", "Only an inbound reset reports a reset effect.")
+                if current.command.kind == "reset_inbound" and result.status == "succeeded" and result.effect is None:
+                    raise agent_error(
+                        "invalid_request", "A successful inbound reset must disclose whether the core restarted."
+                    )
                 if result.error is not None:
                     known = [
                         str(value)
@@ -224,6 +228,19 @@ class CommandLedger:
         with self._store.transaction():
             self.prune()
 
+    def expire_node(self, node_id: str) -> None:
+        """Called in node deletion's transaction; a replacement never inherits pending operations."""
+        expired = self._store.rows(
+            "SELECT command_id, node_id, body FROM commands WHERE node_id = ? AND status IN ('waiting', 'pending')",
+            (node_id,),
+        )
+        self._store.db.execute(
+            "UPDATE commands SET status = 'expired', finished_at = ? WHERE node_id = ?"
+            " AND status IN ('waiting', 'pending')",
+            (int(self._clock()), node_id),
+        )
+        self._record_expired(expired)
+
     def prune(self) -> None:
         """Expire unanswered commands and discard finished rows older than seven days, inside a transaction."""
         now = self._clock()
@@ -237,7 +254,11 @@ class CommandLedger:
             " AND (expires_at <= ? OR fleet_epoch != ? OR key_id != ?)",
             (now, self._store.fleet_epoch, self._authority.service_key_id),
         )
-        for row in expired:
+        self._record_expired(expired)
+        self._store.db.execute("DELETE FROM commands WHERE finished_at < ?", (now - RETENTION_SECONDS,))
+
+    def _record_expired(self, rows: list[sqlite3.Row]) -> None:
+        for row in rows:
             command = AgentCommandSpec.model_validate_json(row["body"]).root
             self._events.append(
                 "command.result",
@@ -245,7 +266,6 @@ class CommandLedger:
                 actor="system",
                 detail=CommandResultDetail(command_id=command.command_id, kind=command.kind, status="expired"),
             )
-        self._store.db.execute("DELETE FROM commands WHERE finished_at < ?", (now - RETENTION_SECONDS,))
 
     def require_node(self, node_id: str) -> sqlite3.Row:
         row = self._store.row("SELECT * FROM nodes WHERE node_id = ?", (node_id,))

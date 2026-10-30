@@ -27,6 +27,14 @@ Timeout = Annotated[
     str, typer.Option("--timeout", metavar="SECONDS", help="Per-network-operation timeout, 1-30 seconds")
 ]
 Yes = Annotated[bool, typer.Option("--yes", "-y", help=YES_HELP)]
+CutOff = Annotated[
+    bool,
+    typer.Option(
+        "--cut-off",
+        help="End every open session on affected inbounds after revocation; other people reconnect. "
+        "If the inbound API fails, restart the core. Opt-in; recommended after a leak.",
+    ),
+]
 ForgetUnreachable = Annotated[
     bool,
     typer.Option(
