@@ -582,6 +582,7 @@ export type Kind2 =
   | "command.issued"
   | "command.result"
   | "privacy.changed"
+  | "notice.changed"
   | "token.created"
   | "token.revoked";
 /**

@@ -339,6 +339,9 @@ meridian fleet events [--since ID] [--limit N] [--json]
 meridian fleet usage [--days N] [--json]
 meridian fleet routing [ru-split|full] [--dry-run] [--yes] [--json]
 meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--json]
+meridian fleet notice show [--for NAME] [--json]
+meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
+meridian fleet notice clear [--yes] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -381,6 +384,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 **سهمیهٔ سرورها** — `fleet status` و صفحهٔ فقط‌خواندنی «سرورها» در کنسول، مصرف دوره، ارائه‌دهنده، روز بازنشانی، پرداخت بعدی و هشدارهای سرور را نشان می‌دهند. مصرف، برآورد ترافیک پذیرفته‌شدهٔ کاربران است (ارسال + دریافت)؛ سربار پروتکل، دریافت‌های خود سرور و ترافیک عبوری سرورهای واسط را شامل نمی‌شود. هر گزارش در دورهٔ دریافتش به وقت UTC شمارش می‌شود؛ بنابراین گزارش دیررس می‌تواند مصرف دورهٔ بعدی را افزایش دهد. برای سرورهای واسط و سرور کنترل بدون عامل، عبارت **اندازه‌گیری نمی‌شود** نمایش داده می‌شود و عدد مصرفی وجود ندارد. کنسول دستور `meridian server set NAME` را برای تغییر نشان می‌دهد.
 
 `GET /api/servers` به دسترسی read نیاز دارد و قرارداد `server-usage` را برمی‌گرداند: اطلاعات سرور، مرزهای دوره به وقت UTC، بایت‌های شمارش‌شده، آغاز شمارش، پرداخت بعدی و محدودهٔ اندازه‌گیری. `GET /api/attention` بخش `servers[]` را اضافه می‌کند: `allowance_near` در 80٪، `allowance_exceeded` در 100٪، `payment_due` تا 7 روز پیش از پرداخت و `payment_overdue` برای تاریخ گذشتهٔ یک‌باره. آستانه‌های `allowance_percent` و `allowance_exceeded_percent` در درخواست، بین 1 تا 100 هستند و اولی نباید از دومی بیشتر باشد؛ `payment_days` بین 1 تا 30 است. هشدارهای سهمیه و پرداخت، `summary.needs_attention` را فعال می‌کنند؛ وضعیت مجموعه و کدهای خروج همچنان وضعیت اجرای سرویس‌ها را توصیف می‌کنند.
+
+پیام متعلق به مدیر سرویس است. `fleet notice set` پیش‌نمایش را قبل از تأیید نشان می‌دهد؛ `--until WHEN` پایان اعتبار را تعیین می‌کند و `--for NAME` اطلاعات حساب را جای‌گذاری می‌کند. تغییر در حالت JSON نیاز به `--yes` دارد. `fleet notice show` پیام را می‌خواند و `fleet notice clear` حذف را تأیید می‌کند. به [مدیریت کاربران](/fa/client-management/) مراجعه کنید.
 
 ### meridian context
 

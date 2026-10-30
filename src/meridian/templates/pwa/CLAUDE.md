@@ -3,6 +3,7 @@
 Server-hosted PWA; Meridian's only connection-page implementation.
 
 ## Design decisions
+- `notice.js` renders owner text with text nodes and four local labels, hides it at expiry, and makes no requests; the existing no-store account check refreshes it in memory without adding notice text to saved account snapshots.
 - `contact.js` renders bounded plain instructions and HTTPS/TG/mailto anchors with text nodes and four locale labels; it performs no fetch and opens no link before a click.
 - Configured owner contact keeps the support page visible with an explicit Open connection page action; without contact the existing direct redirect remains. Its escaped server-rendered attributes carry no person token, and its HTML is no-store and excluded from the worker.
 **Vanilla ES5** — no dependencies or build step; `app.js` owns setup, injecting `account.js` and `selfcheck.js` so older shells receive new features.

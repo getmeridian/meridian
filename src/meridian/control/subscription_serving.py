@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from meridian.control.devices import DeviceLedger, HeaderReader, browser_request
 from meridian.control.formats.entries import SubscriptionUser
 from meridian.control.formats.selector import SUFFIX_FORMATS, select_format
-from meridian.control.models import ClientEndpoint, PrivacySettings, ServiceSettings
+from meridian.control.models import ClientEndpoint, PrivacySettings, ServiceSettings, UserRecord
 from meridian.control.store import Store
 from meridian.control.subscriptions import (
     DEVICE_LIMIT_REMARKS,
@@ -17,6 +17,7 @@ from meridian.control.subscriptions import (
     unknown_subscription,
 )
 from meridian.control.users import USER_SELECT, user_record
+from meridian.core.notices import RenderedNotice
 
 
 def serve_subscription(
@@ -27,6 +28,7 @@ def serve_subscription(
     *,
     read_settings: Callable[[], ServiceSettings],
     read_privacy: Callable[[], PrivacySettings],
+    read_notice: Callable[[UserRecord], RenderedNotice | None],
     clock: Callable[[], float],
     render_page: Callable[[str], SubscriptionResponse],
     user_agent: str | None = None,
@@ -46,6 +48,7 @@ def serve_subscription(
         bodies = [item[0] for item in store.db.execute("SELECT body FROM endpoints").fetchall()]
         settings = read_settings()
         privacy = read_privacy()
+        notice = read_notice(record)
         # The connection page's account check (`/info`) is never an app fetching its configs.
         if privacy.device_limits != "off" and document != "browser" and not browser_request(user_agent, accept):
             with store.transaction():
@@ -71,6 +74,7 @@ def serve_subscription(
         update_interval_hours=settings.update_interval_hours,
         client_routing=settings.client_routing,
         owner_contact=settings.owner_contact,
+        notice=notice,
         now=datetime.fromtimestamp(clock(), UTC),
         placeholder_remarks=DEVICE_LIMIT_REMARKS if "x-hwid-limit" in hwid_flags else None,
         extra_headers=hwid_flags,

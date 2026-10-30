@@ -4,6 +4,7 @@
 - Person/password drafts live only in memory; changed forms guard routes, history traversal, sign-out, and their own dialog dismissal with Leave/Stay, while visible person reads refresh status and usage passively every 30 seconds.
 - Person and add forms use native local date/time with the browser zone and exact UTC instant; core-computed +1/+3 calendar-month previews only fill a draft, and No expiry PATCHes null when saved.
 - The closed Individual connections disclosure uses canonical subscription order and local QR codes; explicit format URLs and entries share the subscription link's credential permissions.
+- `delivery-settings.js` owns Settings' service notice editor; preview and save use the same admin API, confirmation shows the rendered literal text, and the optional expiry is entered locally and saved in UTC.
 - Settings shows public owner instructions and the canonical link read-only with `meridian fleet contact`; it never writes the topology-owned presentation.
 - **Server billing stays reviewed** — Servers composes read-only allowance/payment evidence and attention from service settings, adds cards for non-agent servers, and prints `meridian server set` to edit the topology.
 - **New console tokens last 90 days by default** — Tokens offers 7, 30, 90 days or never, always sends the choice through the existing owner step-up, and shows expiry or an expired state alongside revocation metadata.
@@ -32,6 +33,7 @@
 - Ignore disabled draft fields and keep the submitted baseline before locking a save; clear only successful saves or actually discarded forms, and a confirmed person deletion discards its obsolete drafts once.
 - Validate edited expiry instants as whole-second future UTC values before 2099; preserve untouched fractional timestamps and reject nonexistent local times in a DST gap.
 - Capture the person and screen generation before a mutation; apply its returned record only there, name the person in feedback, and report effective expired/limited access after enabling.
+- Notice confirmations pass literal strings to `M.confirm`, which creates its own text node; passing a DOM node displays an object label instead of the reviewed message.
 - Person metadata uses text nodes for textarea contents, validates 500 Unicode characters and the uppercase tag, and PATCHes only changed fields; a textarea `value` attribute does not populate its value.
 - Render billing dates as isolated UTC calendar dates, preserving the anchor and computed next date; a relay's null usage is not zero and must say not measured.
 - Command polling keeps successful sibling replies, times out only a node's pending records, and stops terminal read errors with an unavailable result while preserving finished outcomes.

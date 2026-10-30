@@ -1,0 +1,56 @@
+/* Delivery scenarios compose with the shared console DOM boundary. */
+import fs from 'node:fs';
+import path from 'node:path';
+
+export function deliveryReply(url, options, data, writes) {
+  if (url !== 'api/notice') throw new Error('Unexpected delivery request: ' + url);
+  const body = options.method === 'GET' ? { notice: data.notice || null, for_user: null, confirm: false }
+    : JSON.parse(options.body);
+  if (options.method !== 'GET') writes.push(body);
+  return { ...body, active: !!body.notice, changed: body.confirm,
+    preview: body.notice ? body.notice.text.replace(/\{name\}/g, body.for_user || 'person') : '' };
+}
+
+export async function runDeliveryScenario({ w, M, ui, mode, locale, data, view, report, events, writes, settle }) {
+  if (mode === 'delivery-page-notice') {
+    const panel = w.document.createElement('section');
+    view.appendChild(panel);
+    w.eval(fs.readFileSync(path.join(ui, '../../templates/pwa/notice.js'), 'utf8'));
+    w.MeridianNotice.mount(panel, data.notice, locale);
+    report.text = panel.textContent;
+    report.hidden = panel.hidden;
+    report.injected = !!panel.querySelector('img') || !!w.pwned;
+    report.requests = events.length;
+    report.stored = w.localStorage.length;
+    return;
+  }
+  w.eval(fs.readFileSync(path.join(ui, 'delivery-settings.js'), 'utf8'));
+  const confirmations = [];
+  const confirm = M.confirm;
+  M.confirm = async (title, text, label, danger) => {
+    const pending = confirm(title, text, label, danger);
+    await settle();
+    const dialog = w.document.querySelector('dialog');
+    confirmations.push({ title, text: dialog.querySelector('p').textContent });
+    dialog.querySelectorAll('.actions button')[data.confirm === false ? 0 : 1].click();
+    return pending;
+  };
+  M.mount(view, M.noticeSection());
+  await settle();
+  report.initialText = view.querySelector('textarea').value;
+  if (data.text !== undefined) view.querySelector('textarea').value = data.text;
+  if (data.person) view.querySelector('[data-notice="person"]').value = data.person;
+  if (data.until) view.querySelector('[data-notice="until"]').value = data.until;
+  const form = view.querySelector('form');
+  if (data.action === 'clear') form.querySelectorAll('.row-actions button')[1].click();
+  else if (data.action === 'preview') form.querySelectorAll('.row-actions button')[0].click();
+  else form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  for (let i = 0; i < 6; i++) await settle();
+  report.text = view.textContent;
+  report.preview = view.querySelector('[data-notice="preview"]').textContent;
+  report.error = view.querySelector('.form-error').textContent;
+  report.confirmations = confirmations;
+  report.writes = writes;
+  report.injected = !!view.querySelector('img[src="x"]') || !!w.pwned;
+  report.stored = w.localStorage.length;
+}

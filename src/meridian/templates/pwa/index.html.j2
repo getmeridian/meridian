@@ -20,6 +20,7 @@
 </head>
 <body>
 <div class="wrap" id="app">
+  {% if notice %}<section class="notice owner-notice" dir="auto" role="status"><p>{{ notice.text }}</p></section>{% endif %}
   <div class="skeleton">
     <div class="skel skel-title"></div>
     <div class="skel skel-sub"></div>
@@ -39,6 +40,7 @@
   </div>
 </noscript>
 <script src="{{ asset_path }}/contact.js"></script>
+<script src="{{ asset_path }}/notice.js"></script>
 <script src="{{ asset_path }}/app.js" data-config="{{ config_path }}" data-worker="{{ worker_path }}" data-scope="{{ worker_scope }}"></script>
 </body>
 </html>

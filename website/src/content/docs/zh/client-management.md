@@ -290,3 +290,17 @@ meridian fleet contact --text "" --link none --yes
 连接页面的帮助区和支持页面会显示公开说明及 **联系所有者** 链接，并支持全部四种界面语言。链接仅在点击后打开；页面资源均在本地。当联系信息已设置时，支持页面会保持显示它，并提供 **打开连接页面**。应用通过 `support-url` 接收链接；没有链接时，该响应头保留本地支持页面的地址。个人连接页面地址保持不变。
 
 停用的订阅可将说明附加到状态提示，但所有提示都必须保持在 100 个字符以内。较长说明不会更改这些提示，仍会显示在页面上。
+
+## 管理者通知
+
+```bash
+meridian fleet notice set "{name}，今晚将进行维护" --until 2027-01-01T00:00:00Z --for person --yes
+meridian fleet notice show --for person --json
+meridian fleet notice clear --yes
+```
+
+控制服务保存一条通知，在连接页面横幅以及支持 `announce` 订阅头的应用中显示。请输入单段纯文本，最多 500 个 Unicode 字符。仅允许 `{name}`、`{expires}`、`{days_left}`、`{used}` 和 `{quota}`；未知或不完整的大括号会被拒绝，并列出允许的字段。每位用户的值只替换一次，然后以 UTF-8 Base64 编码，并加上应用所需的 `base64:` 前缀。替换后的通知最多 1,024 个字符。
+
+`--until` 接受未来的 UTC 时间或日期（该日期在 UTC 的最后一秒）；省略则永久有效。通知到期后不再发送。`--for NAME` 在确认预览中使用真实账户信息；省略则使用示例值。`show --for NAME` 读取保存的通知并预览。保存和清除都需要确认，JSON 模式下需要 `--yes`。控制台设置提供同样的编辑器和预览确认。
+
+这些设置由管理者维护，经过审核的应用操作会保留它们。`GET /api/notice?for=NAME` 需要 read 权限；`PUT /api/notice` 需要 admin 权限或管理者会话。发送 `{"notice":{"text":"你好，{name}","until":null},"for_user":"person","confirm":false}` 可预览；将 `confirm` 设为 `true` 可保存，将 `notice` 设为 `null` 可清除。预览不会写入存储或注册设备。加密快照包含通知；`notice.changed` 事件记录修改者，不记录正文。不会发送推送或即时消息通知。

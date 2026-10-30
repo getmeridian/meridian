@@ -7,6 +7,7 @@ import json
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
+from meridian.core.notices import RenderedNotice
 from meridian.core.owner_contact import OwnerContact
 from meridian.models import ProtocolURL
 
@@ -553,6 +554,7 @@ def render_config_json(
     subscription_url: str = "",
     exit_countries: list[str] | None = None,
     owner_contact: OwnerContact | None = None,
+    notice: RenderedNotice | None = None,
 ) -> str:
     """Render per-client config.json for the PWA shell.
 
@@ -595,6 +597,8 @@ def render_config_json(
         config["exit_countries"] = exit_countries
     if owner_contact is not None and not owner_contact.is_empty:
         config["owner_contact"] = owner_contact.to_data()
+    if notice is not None:
+        config["notice"] = notice.to_data()
     if subscription_url:
         from meridian.urls import generate_qr_base64
 
@@ -624,6 +628,7 @@ def render_pwa_shell(
     manifest_path: str = "manifest.webmanifest",
     worker_path: str = "../pwa/sw.js",
     worker_scope: str = "../",
+    notice: RenderedNotice | None = None,
 ) -> str:
     """Render the PWA HTML shell from the index.html.j2 template.
 
@@ -640,6 +645,7 @@ def render_pwa_shell(
         manifest_path=manifest_path,
         worker_path=worker_path,
         worker_scope=worker_scope,
+        notice=notice,
     )
 
 

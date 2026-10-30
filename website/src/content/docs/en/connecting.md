@@ -46,3 +46,7 @@ Your app lists several entries, named by country and method, such as "🇩🇪 D
 Your connection page's **Not connecting?** section may include the owner's instructions and a **Contact owner** button. Use it when access has expired, the traffic allowance is used up, or the connection check still leaves you stuck. The button opens the owner's chosen website, messaging app, or email app after you click it.
 
 An app's support button may open the same contact link. If it opens a Meridian support page instead, follow the owner's instructions there or choose **Open connection page**. These instructions are provided by the person who runs your connection.
+
+## Messages from the owner
+
+Your connection page may show a notice from the person who runs the service, such as a maintenance time. Some apps show the same notice after refreshing the subscription. Account values in it are filled in for you. An expired notice disappears; the page loads it from the same service and makes no outside requests.

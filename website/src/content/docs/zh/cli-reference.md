@@ -339,6 +339,9 @@ meridian fleet events [--since ID] [--limit N] [--json]
 meridian fleet usage [--days N] [--json]
 meridian fleet routing [ru-split|full] [--dry-run] [--yes] [--json]
 meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--json]
+meridian fleet notice show [--for NAME] [--json]
+meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
+meridian fleet notice clear [--yes] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -381,6 +384,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 **服务器流量额度** — `fleet status` 和控制台的只读“服务器”页面显示周期用量、服务商、重置日、下次付款日期以及服务器提醒。用量是已接受用户流量的估算值（上传 + 下载），不包含协议开销、服务器自身下载以及中继转发流量。报告计入接收时所在的 UTC 周期，因此延迟报告可能增加后一个周期的用量。中继及未运行代理的控制服务器显示 **未计量**，不显示用量数字。控制台提供 `meridian server set NAME` 修改命令。
 
 `GET /api/servers` 需要 read 权限，返回 `server-usage` 合同：服务器信息、UTC 周期边界、已计数字节、计量开始时间、下次付款以及计量范围。`GET /api/attention` 增加 `servers[]`：达到 80% 时为 `allowance_near`，达到 100% 时为 `allowance_exceeded`，付款日期在 7 天内时为 `payment_due`，已过期的单次日期为 `payment_overdue`。查询参数 `allowance_percent` 和 `allowance_exceeded_percent` 的范围是 1–100，前者不得高于后者；`payment_days` 的范围是 1–30。额度与付款提醒会设置 `summary.needs_attention`；部署健康状态和退出码继续表示服务运行状态。
+
+通知由管理者维护，保存在控制服务中。`fleet notice set` 先显示预览，再请求确认；`--until WHEN` 设置到期时间，`--for NAME` 使用真实账户信息，JSON 修改需要 `--yes`。`fleet notice show` 读取通知；`fleet notice clear` 确认清除。参见[客户端管理](/zh/client-management/)。
 
 ### meridian context
 

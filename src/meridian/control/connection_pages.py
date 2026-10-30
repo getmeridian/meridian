@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 from meridian.control.store import Store
 from meridian.control.subscriptions import SubscriptionResponse, unknown_subscription
 from meridian.core.inputs import is_ip
+from meridian.core.notices import RenderedNotice
 from meridian.pwa import ASSET_SEGMENT, SECURITY_HEADERS, PwaAssets, generate_client_files, load_pwa_assets
 from meridian.subscription_links import subscription_protocol_urls
 
@@ -60,6 +61,7 @@ class ConnectionPages:
             subscription_url=canonical,
             exit_countries=settings.exit_countries,
             owner_contact=settings.owner_contact,
+            notice=RenderedNotice.model_validate(info["notice"]) if "notice" in info else None,
             asset_path=f"{prefix}/sub/{ASSET_SEGMENT}/{assets.version}",
             page_path=page_path,
             worker_path=f"{prefix}/sub/{ASSET_SEGMENT}/sw.js",

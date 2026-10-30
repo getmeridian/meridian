@@ -736,6 +736,7 @@ function renderPage(config) {
   }
 
   html += renderHero(config);
+  html += '<section class="notice owner-notice" id="owner-notice" aria-live="polite" hidden></section>';
   html += '<section class="card account" id="account-panel" aria-live="polite" hidden></section>';
 
   html += '<div class="install-banner" id="install-banner">';
@@ -773,6 +774,7 @@ function renderPage(config) {
   app.innerHTML = html;
 
   if (window.MeridianContact) window.MeridianContact.mount(document.getElementById('owner-contact'), config.owner_contact, currentLang);
+  if (window.MeridianNotice) window.MeridianNotice.mount(document.getElementById('owner-notice'), config.notice, currentLang);
 
   loadSelfCheck();
   requestWakeLock();

@@ -339,6 +339,9 @@ meridian fleet events [--since ID] [--limit N] [--json]
 meridian fleet usage [--days N] [--json]
 meridian fleet routing [ru-split|full] [--dry-run] [--yes] [--json]
 meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--json]
+meridian fleet notice show [--for NAME] [--json]
+meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
+meridian fleet notice clear [--yes] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -381,6 +384,8 @@ The `active` column counts people with growth in the last report, with its colle
 **Server allowances** — `fleet status` and the read-only console Servers screen show current period use, provider, reset day, next payment date, and server attention. Usage is approximate accepted user traffic (upload + download): protocol overhead, the server's own downloads, and relay forwarding are excluded. Reports count in their UTC receipt period, so delayed reports can affect a later period. Relays and a control server without an agent say **not measured**, with no usage figure. The console prints `meridian server set NAME` for edits.
 
 `GET /api/servers` needs read scope and returns the `server-usage` contract: metadata, UTC period boundaries, counted bytes, tracking start, next payment, and measurement coverage. `GET /api/attention` adds `servers[]` with `allowance_near` at 80%, `allowance_exceeded` at 100%, `payment_due` within 7 days, and `payment_overdue` for past one-off dates. Its `allowance_percent` and `allowance_exceeded_percent` query thresholds are bounded to 1–100, with the first no higher than the second; `payment_days` is 1–30. Billing warnings set `summary.needs_attention`; fleet health and exit codes continue to describe runtime health.
+
+The service notice is operator-owned. `fleet notice set` shows a rendered preview before confirmation; `--until WHEN` sets its expiry, `--for NAME` uses real account values, and JSON changes require `--yes`. `fleet notice show` reads it; `fleet notice clear` confirms removal. See [Client management](/en/client-management/).
 
 ### meridian context
 

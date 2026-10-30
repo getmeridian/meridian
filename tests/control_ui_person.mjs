@@ -80,6 +80,7 @@ M.t = (key, params = {}) => (catalog[key] || key).replace(/\{(\w+)\}/g, (_, name
 M.toast = text => events.push({ toast: text });
 M.takeSetupToken = () => '';
 M.personHistory = M.devicesCard = M.privacySection = M.cliHint = () => null;
+M.noticeSection = M.languageSection = M.formatPreviewSection = () => null;
 M.renderServers = view => M.mount(view, M.h('h1', { text: M.t('nav.servers') }));
 M.renderRevisions = M.renderTokens = () => null;
 load('auth.js');

@@ -36,6 +36,7 @@ FleetEventKind = Literal[
     "command.issued",
     "command.result",
     "privacy.changed",
+    "notice.changed",
     "token.created",
     "token.revoked",
 ]
@@ -128,6 +129,7 @@ _DETAIL_TYPES: dict[FleetEventKind, type[CoreModel]] = {
     "command.issued": CommandIssuedDetail,
     "command.result": CommandResultDetail,
     "privacy.changed": PrivacyEventDetail,
+    "notice.changed": EmptyEventDetail,
     "token.created": TokenEventDetail,
     "token.revoked": TokenEventDetail,
 }

@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { deliveryReply, runDeliveryScenario } from './control_ui_delivery.mjs';
 
 const require = createRequire(new URL('../website/package.json', import.meta.url));
 const { JSDOM } = require('jsdom');
@@ -43,6 +44,7 @@ function reply(body, status = 200) {
 w.fetch = (url, options) => {
   options = options || {};
   events.push({ method: options.method, url, headers: options.headers, at: fakeNow });
+  if (mode.startsWith('delivery-')) return Promise.resolve(reply(deliveryReply(url, options, data, writes)));
   if (mode === 'owner-settings') {
     return Promise.resolve(reply(url === 'api/settings' ? { profile_title: 'Meridian', owner_contact: data.contact } : { sessions: [] }));
   }
@@ -131,6 +133,7 @@ w.HTMLDialogElement.prototype.close = function () { this.open = false; };
 const view = w.document.getElementById('view');
 const settle = () => new Promise(setImmediate);
 const report = {};
+if (mode.startsWith('delivery-')) await runDeliveryScenario({ w, M, ui, mode, locale, data, view, report, events, writes, settle });
 async function advance(ms) {
   const target = fakeNow + ms;
   while (true) {
@@ -311,7 +314,7 @@ if (mode === 'owner-support') {
 }
 
 if (mode === 'owner-settings') {
-  M.privacySection = M.cliHint = () => M.h('section');
+  M.privacySection = M.noticeSection = M.cliHint = () => M.h('section');
   M.i18n = { ...M.i18n, langs: [locale], names: { [locale]: locale }, lang: locale };
   M.state.auth = { passkeys: { reason: 'no_domain' } };
   w.eval(fs.readFileSync(path.join(ui, 'settings.js'), 'utf8'));

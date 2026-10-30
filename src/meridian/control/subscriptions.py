@@ -26,6 +26,7 @@ from meridian.control.formats.xray_json import xray_json_document
 from meridian.control.models import ClientEndpoint
 from meridian.control.periods import next_period_start
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS, SUPPORT_PAGE
+from meridian.core.notices import RenderedNotice
 from meridian.core.owner_contact import OwnerContact
 from meridian.core.topology import ClientRoutingPolicy
 
@@ -69,6 +70,7 @@ def render_subscription(
     placeholder_remarks: tuple[str, ...] | None = None,
     extra_headers: dict[str, str] | None = None,
     owner_contact: OwnerContact | None = None,
+    notice: RenderedNotice | None = None,
 ) -> SubscriptionResponse:
     """Render *document* for *user*; a suspended user's entries are status placeholders."""
     placeholders = user.placeholders if placeholder_remarks is None else placeholder_remarks
@@ -82,6 +84,8 @@ def render_subscription(
             subscription_url(public_url, user.short_id),
             moment,
         )
+        if notice is not None:
+            info["notice"] = notice.to_data()
         return SubscriptionResponse(200, JSON_TYPE, _json(info), dict(COMMON_HEADERS) | _refill_headers(user, moment))
     headers = subscription_headers(
         user,
@@ -90,6 +94,7 @@ def render_subscription(
         update_interval_hours=update_interval_hours,
         support_link=owner_contact.link if owner_contact is not None else "",
         now=moment,
+        notice=notice,
     )
     headers.update(extra_headers or {})
     if document == "xray-json":
@@ -122,6 +127,7 @@ def subscription_headers(
     update_interval_hours: int = SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
     now: datetime | None = None,
     support_link: str = "",
+    notice: RenderedNotice | None = None,
 ) -> dict[str, str]:
     """The headers apps read: name, traffic and expiry, refresh interval, and page links."""
     headers = dict(COMMON_HEADERS)
@@ -142,6 +148,8 @@ def subscription_headers(
     if public_url:
         headers["profile-web-page-url"] = subscription_url(public_url, user.short_id)
     headers["profile-update-interval"] = str(update_interval_hours)
+    if notice is not None:
+        headers["announce"] = "base64:" + base64.b64encode(notice.text.encode("utf-8")).decode("ascii")
     return headers
 
 

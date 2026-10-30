@@ -2,7 +2,7 @@
 var CACHE_VERSION = 'pwa-v1';
 var LEGACY = self.location.pathname.indexOf('/sub/~pwa/') === -1;
 var ASSET_BASE = new URL('./' + CACHE_VERSION + '/', self.location.href);
-var SHELL_ASSETS = ['styles.css', 'app.js', 'account.js', 'selfcheck.js', 'contact.js', 'icon.svg', 'apps.json']
+var SHELL_ASSETS = ['styles.css', 'app.js', 'account.js', 'selfcheck.js', 'contact.js', 'notice.js', 'icon.svg', 'apps.json']
   .map(function(name) { return ASSET_BASE.href + name; });
 
 self.addEventListener('install', function(event) {

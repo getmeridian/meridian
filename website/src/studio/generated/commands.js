@@ -1632,6 +1632,194 @@ export const commandCatalog = {
     {
       "argv": [
         "fleet",
+        "notice",
+        "clear"
+      ],
+      "command": "fleet.notice.clear",
+      "data_schema": "notice-state",
+      "description": "Confirm removal of the notice from apps and connection pages",
+      "envelope_schema": "fleet-notice-clear-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "notice cleared; notice already absent",
+        "1": "unexpected Meridian bug",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "notice cleared",
+          "status": "changed"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "notice already absent",
+          "status": "no_changes"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "changed",
+        "no_changes",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "fleet",
+        "notice",
+        "set",
+        "TEXT"
+      ],
+      "command": "fleet.notice.set",
+      "data_schema": "notice-state",
+      "description": "Preview and confirm the owner's notice for apps and connection pages",
+      "envelope_schema": "fleet-notice-set-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "notice saved; notice unchanged",
+        "1": "unexpected Meridian bug",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--until",
+        "--for",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "notice saved",
+          "status": "changed"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "notice unchanged",
+          "status": "no_changes"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "changed",
+        "no_changes",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "fleet",
+        "notice",
+        "show"
+      ],
+      "command": "fleet.notice.show",
+      "data_schema": "notice-state",
+      "description": "Show the saved notice and a rendered preview",
+      "envelope_schema": "fleet-notice-show-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "notice read",
+        "1": "unexpected Meridian bug",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--for",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "notice read",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "fleet",
         "routing",
         "[POLICY]"
       ],

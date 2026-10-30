@@ -4,6 +4,7 @@
 - `admin/openapi.json` is the English OpenAPI 3.1 contract generated from the control route catalog and Pydantic models; it uses the package version on export and the installed service version at runtime, with explicit credential and scope extensions.
 - Calendar-renewal schemas describe the one/three-month preview and exact UTC result; previews never mutate a user.
 - Individual connection and format URL schemas compose client-show's optional view; generated artifacts describe credentials without embedding them.
+- Notice schemas publish the bounded template, rendered result, and shared confirm=false/true request; command envelopes keep preview text separate from content-free event details.
 - Owner contact request/result schemas and inherited presentation fields export their text bounds and allowed URI schemes; default empty contact stays omitted from intent and settings payloads.
 - Administrative person schemas describe private notes and tags with their bounds; generated schemas contain no private values, and lower-scope API records keep these fields as empty strings.
 - **Server billing contracts** — server list/set envelopes, metadata, service settings, and nullable period usage are exported from `core/schema_servers.py`; fleet and attention contracts compose the same server evidence.

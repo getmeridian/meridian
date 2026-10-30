@@ -55,6 +55,7 @@ that dials out to it.
   IP limits).
 
 ### Control service
+- Owners can preview, publish, expire, and clear one notice through `fleet notice` or console Settings. Apps receive a per-person `announce` header, connection pages show a local banner, encrypted backups include the notice, and events record its author without the text.
 - The console People list continues loading users when fleet metadata is unavailable, retaining cached names and declared markers.
 - Blob mirror health clears failures for retired or seeded artifacts while retaining failures for blobs still needed by another node.
 - An offline console language switch keeps the working language, labels, and text direction until a catalog loads successfully.

@@ -403,3 +403,5 @@ svg{flex-shrink:0}
 .owner-contact h3 { margin: 0 0 8px; font-size: 1rem; }
 .owner-contact p { margin: 0 0 12px; overflow-wrap: anywhere; }
 .owner-contact .btn { width: auto; }
+.owner-notice { overflow-wrap: anywhere; }
+.owner-notice p { margin: 0; white-space: normal; }

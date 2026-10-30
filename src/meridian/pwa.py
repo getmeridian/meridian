@@ -6,6 +6,7 @@ import hashlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from meridian.core.notices import RenderedNotice
 from meridian.core.owner_contact import OwnerContact
 from meridian.render import (
     render_apps_catalog,
@@ -22,6 +23,7 @@ _STATIC_FILES = (
     "app.js",
     "account.js",
     "contact.js",
+    "notice.js",
     "selfcheck.js",
     "styles.css",
     "sw.js",
@@ -73,6 +75,7 @@ def generate_client_files(
     subscription_url: str = "",
     exit_countries: list[str] | None = None,
     owner_contact: OwnerContact | None = None,
+    notice: RenderedNotice | None = None,
     asset_path: str = "../pwa",
     page_path: str = "",
     worker_path: str = "../pwa/sw.js",
@@ -92,6 +95,7 @@ def generate_client_files(
             manifest_path=f"{page_path}/manifest.webmanifest" if page_path else "manifest.webmanifest",
             worker_path=worker_path,
             worker_scope=worker_scope,
+            notice=notice,
         ),
         "config.json": render_config_json(
             protocol_urls,
@@ -104,6 +108,7 @@ def generate_client_files(
             subscription_url=subscription_url,
             exit_countries=exit_countries,
             owner_contact=owner_contact,
+            notice=notice,
         ),
         "manifest.webmanifest": render_manifest(
             client_name=client_name, server_name=server_name, asset_path=asset_path, start_url=page_path or "."

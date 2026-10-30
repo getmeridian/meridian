@@ -51,6 +51,7 @@ from meridian.control.models import (
 )
 from meridian.control.node_documents import with_users
 from meridian.control.node_health import project_runtime
+from meridian.control.notices import NoticeLedger
 from meridian.control.owner import UI_TABLES, OwnerAuth
 from meridian.control.periods import period_start
 from meridian.control.person_connections import read_connections
@@ -194,6 +195,7 @@ class ControlService:
         self.backups = BackupLedger(self._store, clock=clock)
         self.owner = OwnerAuth(self._store, clock=clock)
         self.devices = DeviceLedger(self._store, clock=clock)
+        self.notices = NoticeLedger(self._store, self.events, read_user=self.get_user, clock=clock)
         self.pages = ConnectionPages(self._store, self)
         with self._transaction():
             # Documents signed by an earlier signing certificate are signed again.
@@ -669,6 +671,7 @@ class ControlService:
             suffix,
             read_settings=self.settings,
             read_privacy=self.privacy,
+            read_notice=self.notices.render,
             clock=self._clock,
             render_page=self.pages.render,
             user_agent=user_agent,

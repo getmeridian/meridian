@@ -66,6 +66,7 @@ from meridian.core.client_limits import ClientExtendRequest
 from meridian.core.clients import ClientConnections
 from meridian.core.errors import MeridianError
 from meridian.core.fleet_events import FleetEventPage, FleetEventQuery
+from meridian.core.notices import NoticeState, NoticeWrite
 from meridian.core.server_allowances import ServerUsageList
 
 _GATEWAY_FAILURES = frozenset({502, 503, 504})
@@ -188,6 +189,16 @@ class ControlClient:
 
     def privacy(self) -> PrivacyState:
         return PrivacyState.model_validate(self._call("GET", "api/privacy"))
+
+    def notice(self, for_user: str | None = None) -> NoticeState:
+        query = "?" + urlencode({"for": for_user}) if for_user is not None else ""
+        return NoticeState.model_validate(self._call("GET", "api/notice" + query))
+
+    def set_notice(self, request: NoticeWrite) -> NoticeState:
+        method = "PUT" if request.confirm else "GET"
+        return NoticeState.model_validate(
+            self._request("PUT", "api/notice", request.model_dump(mode="json"), mutation_method=method).json()
+        )
 
     def set_privacy(self, settings: PrivacySettings) -> PrivacyUpdateResult:
         return PrivacyUpdateResult.model_validate(self._call("PUT", "api/privacy", settings.model_dump(mode="json")))
@@ -386,14 +397,17 @@ class ControlClient:
     def _call(self, method: str, path: str, body: Any = None) -> Any:
         return self._request(method, path, body).json()
 
-    def _request(self, method: str, path: str, body: Any = None) -> httpx.Response:
+    def _request(
+        self, method: str, path: str, body: Any = None, *, mutation_method: str | None = None
+    ) -> httpx.Response:
+        activity = mutation_method or method
         try:
             response = self._client.request(method, path, json=body)
         except httpx.RequestError as exc:
             lost = ControlServiceError
             if not isinstance(exc, _NEVER_SENT):
-                self._reported(method)  # the write may have committed before its reply was lost
-                lost = self._failure(method)
+                self._reported(activity)  # the write may have committed before its reply was lost
+                lost = self._failure(activity)
             raise lost(
                 f"Could not reach the control service: {type(exc).__name__}",
                 hint="Check that the control server answers on 443, then retry.",
@@ -423,21 +437,21 @@ class ControlClient:
                 category="user",
             )
         if response.status_code >= 500:
-            self._reported(method)  # a gateway timeout or a crash after the commit: perhaps changed
+            self._reported(activity)  # a gateway timeout or a crash after the commit: perhaps changed
         if response.status_code in _GATEWAY_FAILURES:
             # nginx answers for a stopped or hung service: unreachable, not a refusal.
-            raise self._failure(method)(
+            raise self._failure(activity)(
                 f"The control service did not answer (HTTP {response.status_code} from the control server's proxy).",
                 hint="Check the service: meridian check; on the server, systemctl status ctld.",
                 category="system",
                 retryable=True,
             )
         if response.status_code >= 400:
-            raise (self._failure(method) if response.status_code >= 500 else ControlServiceError)(
+            raise (self._failure(activity) if response.status_code >= 500 else ControlServiceError)(
                 f"Control service error: {_message(response)}",
                 category="system" if response.status_code >= 500 else "user",
             )
-        self._reported(method)
+        self._reported(activity)
         return response
 
     @staticmethod

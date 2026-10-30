@@ -290,3 +290,17 @@ Instructions are one line of plain text, up to 120 characters. Links must use `h
 The connection page's help section and the support page show these public instructions and a **Contact owner** link in all four interface languages. The link opens only when clicked; the pages use local assets. When contact is configured, the support page keeps it visible and offers **Open connection page**. Apps receive the link in `support-url`; without a link, that header keeps its local support-page URL. The personal page URL stays unchanged.
 
 Inactive subscriptions may append the instructions to their status remarks when every remark still fits the 100-character bound. Longer instructions leave the placeholders unchanged and remain visible on the pages.
+
+## Notices from the owner
+
+```bash
+meridian fleet notice set "Hello {name}: maintenance tonight" --until 2027-01-01T00:00:00Z --for person --yes
+meridian fleet notice show --for person --json
+meridian fleet notice clear --yes
+```
+
+One service-owned notice appears as a banner on connection pages and in apps that support the `announce` subscription header. Use one paragraph of plain text, up to 500 Unicode characters. The only substitutions are `{name}`, `{expires}`, `{days_left}`, `{used}`, and `{quota}`; unknown or malformed braces are refused with the allowed list. Substitution happens once for each person before UTF-8 Base64 encoding, with the `base64:` prefix apps expect. Rendered notices are bounded to 1,024 characters.
+
+`--until` accepts a future UTC instant or a date (end of that day in UTC); omit it for no expiry. Expired notices stop being delivered. `--for NAME` renders real account values for the confirmation; without it the preview uses sample values. `show --for NAME` reads the saved notice and its preview. Saving and clearing require confirmation, and JSON changes require `--yes`. Console Settings offers the same editor and rendered confirmation.
+
+These are operator settings: reviewed applies preserve them. `GET /api/notice?for=NAME` needs read scope; `PUT /api/notice` needs admin or the owner session and accepts `{"notice":{"text":"Hello {name}","until":null},"for_user":"person","confirm":false}` to preview. Set `confirm` to `true` to save, or `notice` to `null` to clear. Previews do not change storage or register devices. Encrypted snapshots include the notice; `notice.changed` events record who changed it without its text. No push or messaging notification is sent.

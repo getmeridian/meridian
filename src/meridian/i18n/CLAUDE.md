@@ -10,6 +10,7 @@
 
 ## What's done well
 - Individual connection and format headings and unavailable labels match across all four CLI locales.
+- Notice preview, expiry, confirmation, clearing, and content-free timeline labels exist in all four CLI locales; operator text remains verbatim.
 - Owner-contact reviews, clearing, validation, and read-only console guidance have matching four-locale keys; operator-supplied instructions stay verbatim.
 - Private note/tag labels, bounds, clearing guidance, and scope disclosures have matching English, Russian, Persian, and Chinese catalog entries.
 

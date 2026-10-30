@@ -339,6 +339,9 @@ meridian fleet events [--since ID] [--limit N] [--json]
 meridian fleet usage [--days N] [--json]
 meridian fleet routing [ru-split|full] [--dry-run] [--yes] [--json]
 meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--json]
+meridian fleet notice show [--for NAME] [--json]
+meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
+meridian fleet notice clear [--yes] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -381,6 +384,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 **Лимиты серверов** — `fleet status` и экран «Серверы» консоли показывают расход за период, провайдера, день сброса, следующую оплату и предупреждения. Расход — приблизительный объём принятого пользовательского трафика (отправка + загрузка): без накладных расходов протокола, собственных загрузок сервера и пересылки промежуточными серверами. Отчёты учитываются в периоде их получения по UTC, поэтому задержанный отчёт может увеличить расход более позднего периода. Для промежуточных серверов и управляющего сервера без агента указано **не измеряется**, без числа расхода. Консоль показывает `meridian server set NAME` для изменения параметров.
 
 `GET /api/servers` требует права read и возвращает контракт `server-usage`: сведения о сервере, границы периода по UTC, учтённые байты, начало учёта, следующую оплату и охват измерения. `GET /api/attention` добавляет `servers[]`: `allowance_near` при 80%, `allowance_exceeded` при 100%, `payment_due` за 7 дней до оплаты и `payment_overdue` для прошедшей разовой даты. Пороги запроса `allowance_percent` и `allowance_exceeded_percent` принимают 1–100, первый не выше второго; `payment_days` принимает 1–30. Предупреждения об оплате и лимитах устанавливают `summary.needs_attention`; состояние серверов и коды выхода по-прежнему описывают работу сервисов.
+
+Сообщение хранится в управляющем сервисе. `fleet notice set` показывает предпросмотр перед подтверждением; `--until WHEN` задаёт срок, `--for NAME` подставляет данные аккаунта, а изменение в JSON требует `--yes`. `fleet notice show` читает сообщение; `fleet notice clear` подтверждает удаление. Подробнее: [Управление клиентами](/ru/client-management/).
 
 ### meridian context
 

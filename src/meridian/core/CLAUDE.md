@@ -2,6 +2,7 @@
 
 ## Design decisions
 - `calendar.py` shares clamped month shifts with billing; client-limit renewal previews add one or three months after max(now, expiry) in UTC and pass through the existing finite timestamp parser.
+- `notices.py` owns one plain paragraph (500 Unicode characters, 1,024 after bounded expansion), five whole substitutions, an optional UTC expiry, and one preview/save request; braces never enable formatting or attribute access.
 - `OwnerContactSettings` shares the optional reviewed contact across delivery intent, compiler payloads, and pages; empty defaults omit the field, text is one plain line up to 120 characters, and HTTPS/TG/mailto links canonicalize to bounded ASCII without a lookup.
 - `person_metadata.py` owns plain-text notes (500 Unicode characters, newlines allowed) and one uppercase A–Z/digit/underscore tag (1–16); empty strings clear, omitted edits preserve, and creation intent never contains them.
 - Reviewed delivery command schemas register through `schema_delivery.py`, using the catalog's shared envelope base and failure model so names and wire fields stay stable.

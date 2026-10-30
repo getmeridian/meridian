@@ -6,6 +6,7 @@
 - `person_expiry.py` serves an owner/people/admin read-only month preview; choosing a preset stores nothing, and the person form saves the resulting UTC instant through its changed-field PATCH.
 - `person_connections.py` composes read-only credentials from the canonical `/info` renderer under one state lock; `/api/users/{name}/connections` admits people/admin and owner sessions, without new stored data.
 - Xray JSON deliberately extends the corpus: Automatic stays first, followed by one shared-routing profile per primary endpoint and the existing isolated fingerprint-copy groups.
+- `notices.py` stores the operator notice in snapshot-covered meta; `delivery_routes.py` registers GET/read and PUT/admin separately, PUT previews until confirm=true, applies preserve it, and notice.changed events carry the actor with no text.
 - `user_updates.py` owns the person-edit transaction; the service delegates with its clock, enforcement, composition, and event hooks so later operator fields stay atomic without growing the service module.
 - Owner contact persists in the page-settings meta row inside the delivery transaction; native `support-url` prefers its link, page URLs remain personal, and short text joins status remarks only when every format's 100-character names remain bounded.
 - Step 15 adds private `users.note` and `users.tag`; PATCH accepts the existing name path or a `username` body at `/api/users`, only people/admin reads retain metadata, applies preserve it, and snapshots carry it with user rows.
@@ -57,6 +58,7 @@
 
 ## Pitfalls
 - Keep enrollment/CA bootstrap and console-owner APIs internal with a reason; every agent, subscription, page, and console route also needs an explicit internal classification, while credential markers include conditionally visible people records, endpoint passwords, and encrypted snapshots.
+- Encode `announce` as `base64:` plus UTF-8 Base64 after per-person substitution; suppress expired notices on every read and keep previews out of SQLite, devices, and backup mutation hooks.
 - Support HTML embeds escaped public contact data from current settings, is always no-store, and stays outside service-worker caches; it never fetches person data or puts a bearer token into a background request.
 - Keep notes and tags out of event field catalogs and subscription projections; metadata-only edits must produce no lifecycle fact or new node document.
 - Advance server allowance offsets inside the accounting transaction before accepted growth; label changes and allowance amounts preserve use, while enabling or changing the reset day starts tracking at apply with earlier period use unknown.

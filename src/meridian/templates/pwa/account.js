@@ -169,13 +169,15 @@ function render() {
 function refresh() {
   if (checking || !infoUrl) { if (!infoUrl) render(); return; }
   checking = true; failed = false; verified = false; render();
-  var id = ++requestId, done = false;
+  var id = ++requestId, done = false, notice = null;
   var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
   function finish(answer) {
     if (done || id !== requestId) return;
     done = true; clearTimeout(timer); checking = false; failed = !answer;
     if (answer) {
       snapshot = answer; verified = true;
+      if (window._meridianConfig) window._meridianConfig.notice = notice;
+      if (window.MeridianNotice) window.MeridianNotice.mount(document.getElementById('owner-notice'), notice, lang());
       /* Only this projection is saved: no links, IPs, username, or device data. */
       try { localStorage.setItem(storageKey, JSON.stringify(snapshot)); } catch (e) {}
     }
@@ -183,7 +185,11 @@ function refresh() {
   }
   var timer = setTimeout(function() { if (controller) controller.abort(); finish(null); }, INFO_TIMEOUT_MS);
   fetch(infoUrl, { method: 'GET', cache: 'no-store', credentials: 'omit', redirect: 'error', signal: controller ? controller.signal : undefined })
-    .then(function(response) { return response.json().then(function(body) { return readInfo(body, response.status); }); })
+    .then(function(response) { return response.json().then(function(body) {
+      var answer = readInfo(body, response.status);
+      notice = body.notice || null;
+      return answer;
+    }); })
     .then(finish, function() { finish(null); });
 }
 function bindPage() {

@@ -40,6 +40,7 @@ from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientLimitChange, TrafficReset
 from meridian.core.clients import ClientConnections
 from meridian.core.fleet import FleetTopology
+from meridian.core.notices import NoticeState, NoticeWrite
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.traffic import NodeTrafficEvidence
 from meridian.remnawave import (
@@ -88,6 +89,12 @@ class ServiceAccessPanel:
 
     def set_privacy(self, settings: PrivacySettings) -> PrivacyUpdateResult:
         return _translated(lambda: self._client.set_privacy(settings))
+
+    def notice(self, for_user: str | None = None) -> NoticeState:
+        return _translated(lambda: self._client.notice(for_user))
+
+    def set_notice(self, request: NoticeWrite) -> NoticeState:
+        return _translated(lambda: self._client.set_notice(request))
 
     def user_usage(self, username: str, *, days: int = 30) -> UserUsage:
         return _translated(lambda: self._client.user_usage(username, days=days))

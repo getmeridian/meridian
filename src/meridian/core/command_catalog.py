@@ -329,6 +329,23 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         ],
         stability="preview",
     ),
+    "fleet.notice.show": CommandOutput(
+        data_schema="notice-state", outcomes=[_ok("notice read"), *_FAILURES], stability="preview"
+    ),
+    "fleet.notice.set": CommandOutput(
+        data_schema="notice-state",
+        outcomes=[_ok("notice saved", status="changed"), _ok("notice unchanged", status="no_changes"), *_FAILURES],
+        stability="preview",
+    ),
+    "fleet.notice.clear": CommandOutput(
+        data_schema="notice-state",
+        outcomes=[
+            _ok("notice cleared", status="changed"),
+            _ok("notice already absent", status="no_changes"),
+            *_FAILURES,
+        ],
+        stability="preview",
+    ),
     "fleet.routing": CommandOutput(
         data_schema="fleet-routing",
         outcomes=[
