@@ -6,7 +6,7 @@
 - **Local lifecycle facts** — `fleet_events.py` is the durable event contract for integrations: monotonic ID, UTC time, kind, actor, subject, and a closed detail model per kind; command progress keeps its separate `events.py` contract.
 - **Traffic evidence** — `core/traffic.py` is the shared aggregate evidence contract: first accepted use and last reporting node per person, plus active people and collection/receipt times in each node's latest report; unknown historical evidence remains null.
 - **No CLI globals** - core never imports Typer, Rich, console, config, or command modules (tested); CLI and future UI clients are adapters. Core constants live in `core/defaults.py`.
-- **Envelope first** - JSON clients get one stable `meridian.output/v1` shape; command data lives under `data`.
+- **Envelope first** - JSON clients get one stable `meridian.output/v1` shape; command data lives under `data`. `schema_envelopes.py` builds standard command envelopes from the catalog's base and failure model, preserving names, fields, and discriminator mappings; `schema.py` keeps a thin delegation.
 - **Events are a public set** - long-running flows report typed JSONL-ready events; add a name to `core.events` before emitting it.
 - **Workflows are renderable data** - wizard-style interactions expose typed fields and sections; CLI and UI decide how to render them.
 - **Command metadata is schema-neutral** - `command_catalog.COMMAND_OUTPUTS` maps every public command path to its JSON output (schemas, outcomes, stability) or `None`; argv, flags, and help come from the Typer tree via `meridian.cli_catalog`, and nothing here imports schema registration.

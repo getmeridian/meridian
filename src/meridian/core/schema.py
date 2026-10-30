@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, RootModel, create_model
+from pydantic import BaseModel, Field, RootModel
 
 from meridian.control.models import (
     IssuedToken,
@@ -95,6 +95,7 @@ from meridian.core.plan import (
 )
 from meridian.core.relay_check import RelayCheckResult
 from meridian.core.routes import RouteListResult, RouteMutationResult
+from meridian.core.schema_envelopes import make_command_envelope
 from meridian.core.schema_topology import TOPOLOGY_SCHEMAS
 from meridian.core.servers import (
     ServerBootstrapKeyRequest,
@@ -202,48 +203,16 @@ def _make_command_envelope(
     failure_data_type: Any = EmptyData,
     doc: str = "",
 ) -> tuple[type[_ContractEnvelope], type[_ContractEnvelope], type[RootModel]]:  # type: ignore[type-arg]
-    """Build (SuccessEnvelope, TerminalEnvelope, OutputEnvelope) for a command.
-
-    The generated models produce identical JSON Schemas to the hand-written
-    classes they replace — same ``$defs`` keys, same discriminator mapping.
-
-    Args:
-        prefix: PascalCase prefix for class names (e.g. ``"FleetStatus"``).
-        command: Literal command string (e.g. ``"fleet.status"``).
-        data_type: Pydantic model (or union of models) for the success ``data`` field.
-        success_statuses: Literal type for success status values.
-            Defaults to ``Literal["ok"]``.
-        failure_data_type: Pydantic model for the terminal ``data`` field.
-            Defaults to :class:`EmptyData`.
-        doc: Docstring for the root envelope model.
-    """
-    cmd_literal = Literal[command]  # type: ignore[valid-type]
-    if success_statuses is None:
-        success_statuses = Literal["ok"]
-    failed_status: Any = Literal["failed"]
-
-    success_cls = create_model(
-        f"_{prefix}SuccessEnvelope",
-        __base__=_ContractEnvelope,
-        command=(cmd_literal, ...),
-        status=(success_statuses, ...),
-        data=(data_type, ...),
-        errors=(list[ErrorModel], Field(max_length=0)),
+    """Use the shared factory with the catalog's base and empty failure-data model."""
+    return make_command_envelope(
+        prefix,
+        command,
+        data_type,
+        envelope_base=_ContractEnvelope,
+        success_statuses=success_statuses,
+        failure_data_type=failure_data_type,
+        doc=doc,
     )
-
-    terminal_cls = create_model(
-        f"_{prefix}TerminalEnvelope",
-        __base__=_ContractEnvelope,
-        command=(cmd_literal, ...),
-        status=(failed_status, ...),
-        data=(failure_data_type, ...),
-        errors=(list[ErrorModel], Field(min_length=1)),
-    )
-
-    union_type = Annotated[Union[success_cls, terminal_cls], Field(discriminator="status")]  # type: ignore[valid-type]
-    root_cls = type(f"{prefix}OutputEnvelope", (RootModel[union_type],), {"__doc__": doc})
-
-    return success_cls, terminal_cls, root_cls
 
 
 # --- Plan ---
