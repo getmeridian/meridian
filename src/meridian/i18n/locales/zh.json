@@ -222,6 +222,7 @@
   "client.resets.month_rolling": "每月在添加当天重置",
   "client.expires_never": "永不",
   "client.limits_updated": "已更新“{name}”的限制",
+  "client.console_note": "· console：在网页控制台中添加；也可通过 CLI 修改状态、限额和设备注册。",
   "client.traffic_reset": "已重置“{name}”的流量，用量从零开始计算。",
   "client.limits_hint": "修改限制：meridian client set NAME --limit SIZE --reset PERIOD --expires DATE --devices N",
   "sni.exit_subject": "出口 {exit}",

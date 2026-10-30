@@ -118,6 +118,7 @@ that dials out to it.
 - Connection pages show account status, current and lifetime traffic, expiry,
   and freshness in all four languages, with a clearly marked offline answer
   and an explanation when an account cannot connect.
+- **CLI edits for console people** — enable, disable, limits, expiry, traffic resets, and device removals now accept people created in the control service's console, using the same exact-name and ambiguity rules as `client show`.
 - **`meridian fleet upgrade`** covers the control service, node agents, and
   Realm; there are no Remnawave images left to upgrade. After
   `meridian update` it moves the service and agents to the new build (agents

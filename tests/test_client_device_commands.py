@@ -139,7 +139,7 @@ def test_private_human_output_shows_a_count_without_fingerprints(
     assert "1 of 3 devices" in text and fingerprint not in text and "device-00000001" not in text
 
 
-def test_console_people_can_be_read_but_cli_removal_stays_with_declared_clients(
+def test_console_people_can_have_their_devices_removed_and_cleared_from_the_cli(
     fleet: ControlClient,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -149,9 +149,12 @@ def test_console_people_can_be_read_but_cli_removal_stays_with_declared_clients(
     register(fleet, "a.b", "device-00000001")
     run_devices("a.b")
     assert envelope(capsys, "client-devices-envelope")["data"]["count"] == 1
-    with pytest.raises(typer.Exit) as refused:
-        run_devices("a.b", clear=True)
-    assert refused.value.exit_code == 2 and fleet.user_devices("a.b").count == 1
+    run_devices("a.b", remove="device-00000001")
+    assert envelope(capsys, "client-devices-envelope")["data"]["removed"] == 1
+    register(fleet, "a.b", "device-00000002")
+    run_devices("a.b", clear=True)
+    result = envelope(capsys, "client-devices-envelope")
+    assert result["data"]["removed"] == 1 and fleet.user_devices("a.b").count == 0
 
 
 @pytest.mark.parametrize(

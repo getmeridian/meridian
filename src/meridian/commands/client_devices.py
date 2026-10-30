@@ -7,8 +7,7 @@ from rich.markup import escape
 from rich.table import Table
 
 from meridian.commands._helpers import load_topology_cluster
-from meridian.commands.client_handoff import get_user_or_fail, resolve_client_name, validate_client_name
-from meridian.commands.client_state import require_access_user
+from meridian.commands.client_handoff import get_user_or_fail, resolve_client_mutation_name, resolve_client_name
 from meridian.console import err_console, error_context, fail, is_json_mode
 from meridian.control_access import access_panel
 from meridian.core.client_devices import ClientDevice, ClientDevicesResult
@@ -34,12 +33,12 @@ def run_devices(name: str, *, remove: str | None = None, clear: bool = False) ->
         cluster = load_topology_cluster()
         mutating = remove is not None or clear
         if mutating:
-            name = resolve_client_name(cluster, name)
-            validate_client_name(name)
-            require_access_user(cluster, name)
+            resolve_client_name(cluster, name, console_people=True)
         try:
             with access_panel(cluster) as panel:
-                if not mutating:
+                if mutating:
+                    name = resolve_client_mutation_name(cluster, panel, name)
+                else:
                     name = resolve_client_name(
                         cluster, name, console_people=True, console_names=[user.username for user in panel.list_users()]
                     )

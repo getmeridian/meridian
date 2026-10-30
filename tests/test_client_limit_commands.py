@@ -14,7 +14,7 @@ import pytest
 import typer
 
 from meridian.cluster import ClusterConfig, PanelConfig
-from meridian.commands.client import run_add, run_enable, run_list, run_show
+from meridian.commands.client import run_add, run_disable, run_enable, run_list, run_reissue, run_remove, run_show
 from meridian.commands.client_handoff import PageResolution
 from meridian.commands.client_limits import format_expiry, format_usage, run_reset_traffic, run_set
 from meridian.compiler import compile_topology
@@ -88,7 +88,7 @@ def _fleet(tmp_path: Path, *, json_mode: bool = False) -> Iterator[SimpleNamespa
             client = stack.enter_context(ControlClient(url, ADMIN_TOKEN))
             client.put_user("alice")
             stack.enter_context(patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster))
-            yield SimpleNamespace(cluster=cluster, create=client.put_user)
+            yield SimpleNamespace(cluster=cluster, create=client.put_user, client=client)
     finally:
         set_json_mode(False)
 
@@ -172,6 +172,72 @@ def test_client_set_refuses_a_name_that_is_not_a_fleet_client(tmp_path: Path) ->
     with _fleet(tmp_path), pytest.raises(typer.Exit) as exc_info:
         run_set("mallory", limit="50GB", reset=None, expires=None)
     assert exc_info.value.exit_code == 2
+
+
+@pytest.mark.parametrize("username", ["ab", "a.b", "c" * 37, "ALICE"], ids=["short", "dotted", "long", "exact-case"])
+def test_client_set_can_edit_console_people_with_the_services_name_rules(
+    username: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with _fleet(tmp_path, json_mode=True) as fleet:
+        fleet.create(username)
+        run_set(username, limit="50GB", reset="month", expires=FUTURE_DAY, devices="2")
+        client = _envelope(capsys, "client-set-envelope")["data"]["client"]
+
+    assert (client["username"], client["traffic_limit_bytes"], client["device_limit"]) == (username, 50 * GIB, 2)
+    assert client["declared"] is False
+
+
+@pytest.mark.parametrize("command", ["enable", "disable", "set", "reset-traffic"])
+@pytest.mark.parametrize("scope", ["admin", "people"])
+def test_service_owned_edits_prefer_exact_console_names_and_refuse_ambiguity(
+    command: str, scope: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    commands = {
+        "enable": run_enable,
+        "disable": run_disable,
+        "set": lambda name: run_set(name, limit="50GB", reset=None, expires=None),
+        "reset-traffic": run_reset_traffic,
+    }
+    with _fleet(tmp_path, json_mode=True) as fleet:
+        fleet.create("ALICE")
+        if scope == "people":
+            fleet.cluster.panel.api_token = fleet.client.create_token("People desk", "people").token
+        original = fleet.client.get_user("alice")
+        commands[command]("ALICE")
+        assert _envelope(capsys, f"client-{command}-envelope")["data"]["client"]["username"] == "ALICE"
+        before_ambiguous = fleet.client.get_user("ALICE")
+        with pytest.raises(typer.Exit) as refused:
+            commands[command]("Alice")
+        assert refused.value.exit_code == 2
+        assert "could mean ALICE, alice" in capsys.readouterr().out
+        assert fleet.client.get_user("ALICE") == before_ambiguous
+        assert fleet.client.get_user("alice") == original
+
+
+def test_single_console_case_match_resolves_for_reads_and_service_owned_edits(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with _fleet(tmp_path, json_mode=True) as fleet:
+        fleet.create("BOB")
+        with patch("meridian.commands.client.resolve_page_url", return_value=PageResolution()):
+            run_show("Bob")
+        assert _envelope(capsys, "client-show-envelope")["data"]["client"]["username"] == "BOB"
+        run_disable("bob")
+        assert _envelope(capsys, "client-disable-envelope")["data"]["client"] == {
+            "username": "BOB",
+            "status": "disabled",
+        }
+
+
+def test_cli_removal_and_reissue_stay_with_declared_people(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    with _fleet(tmp_path, json_mode=True) as fleet:
+        before = fleet.create("carol")
+        for command in (run_remove, run_reissue):
+            with pytest.raises(typer.Exit) as refused:
+                command("carol", yes=True)
+            assert refused.value.exit_code == 2
+            capsys.readouterr()
+        assert fleet.client.get_user("carol") == before
 
 
 def test_client_add_creates_with_limits_during_the_reviewed_apply(

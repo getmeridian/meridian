@@ -675,12 +675,14 @@ class TestRunDisable:
         # Apply leaves a client's status to the operator, so the old "until the next apply" warning is gone.
         warning.assert_not_called()
 
-    def test_v4_disable_rejects_unmanaged_panel_user(self, tmp_home: Path) -> None:
+    def test_v4_disable_refuses_a_person_missing_from_the_service(self, tmp_home: Path) -> None:
+        panel = _make_panel_mock()
+        panel.get_user.return_value = None
         with (
-            _cli(_make_cluster(tmp_home, users=["default"])) as panel_cls,
+            _cli(_make_cluster(tmp_home, users=["default"]), panel),
             pytest.raises(typer.Exit) as exc_info,
         ):
             run_disable(name="alice")
 
         assert exc_info.value.exit_code == 2
-        panel_cls.assert_not_called()
+        panel.disable_user.assert_not_called()

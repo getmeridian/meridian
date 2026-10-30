@@ -300,6 +300,6 @@ def build_client_status_result(username: str, status: ClientMutationStatus) -> C
     return ClientStatusResult(client=ClientStatus(username=username, status=status))
 
 
-def build_client_limits_result(user: PanelUserLike) -> ClientLimitsResult:
+def build_client_limits_result(user: PanelUserLike, *, declared: bool = True) -> ClientLimitsResult:
     """Build the result returned after changing one client's limits or resetting their traffic."""
-    return ClientLimitsResult(client=build_client_record(user))
+    return ClientLimitsResult(client=build_client_record(user, declared=declared))

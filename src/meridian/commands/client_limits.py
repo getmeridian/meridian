@@ -12,8 +12,12 @@ from rich.cells import cell_len
 from rich.markup import escape
 
 from meridian.commands._helpers import format_traffic, load_topology_cluster
-from meridian.commands.client_handoff import format_status, get_user_or_fail, resolve_client_name, validate_client_name
-from meridian.commands.client_state import require_access_user
+from meridian.commands.client_handoff import (
+    format_status,
+    get_user_or_fail,
+    resolve_client_mutation_name,
+    resolve_client_name,
+)
 from meridian.console import err_console, error_context, fail, is_json_mode, ok
 from meridian.control_access import AccessPanel, access_panel
 from meridian.core.client_limits import ClientLimitChange, ClientLimitError, build_limit_change
@@ -131,12 +135,15 @@ def _mutate(
     done_key: str,
 ) -> None:
     cluster = load_topology_cluster()
-    name = resolve_client_name(cluster, name)
-    validate_client_name(name)
-    require_access_user(cluster, name)
+    # Validate before opening access, preserving the typed name until the service's exact-name check.
+    resolve_client_name(cluster, name, console_people=True)
     with access_panel(cluster) as panel:
+        name = resolve_client_mutation_name(cluster, panel, name)
+        declared = cluster.topology_intent is not None and name in cluster.topology_intent.access.users
         user = get_user_or_fail(panel, name, action="load")
         if user is None:
+            if not declared:
+                fail(f"Client '{name}' not found", hint="Check names with meridian client list.", hint_type="user")
             fail(
                 f"Client '{name}' is declared but missing from the panel",
                 hint="Run `meridian apply` to restore it, then retry.",
@@ -155,7 +162,7 @@ def _mutate(
         emit_json(
             command_envelope(
                 command=command,
-                data=build_client_limits_result(updated).to_data(),
+                data=build_client_limits_result(updated, declared=declared).to_data(),
                 summary=Summary(text=f"{verb.capitalize()} client {name}", changed=True, counts={"clients": 1}),
                 timer=operation.timer,
             )

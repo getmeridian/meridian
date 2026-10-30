@@ -19,6 +19,7 @@ from meridian.commands.client_handoff import (
     get_user_or_fail,
     new_client_usernames,
     print_handoff_links,
+    resolve_client_mutation_name,
     resolve_client_name,
     resolve_page_url,
     validate_client_name,
@@ -27,7 +28,6 @@ from meridian.commands.client_limits import format_expiry, parse_limit_options, 
 from meridian.commands.client_state import (
     build_client_persistence_warning,
     persist_client_state,
-    require_access_user,
 )
 from meridian.commands.client_usage import print_usage
 from meridian.commands.client_v4 import run_add_v4, run_remove_v4
@@ -282,7 +282,7 @@ def _list(*, operation: OperationContext) -> None:
     err_console.print()
     err_console.print(f"  [dim]Total: {count} client{suffix}[/dim]")
     if not all(client.declared for client in result.clients.clients):
-        err_console.print("  [dim]· console: added in the web console; change them there.[/dim]")
+        err_console.print(f"  [dim]{escape(t('client.console_note'))}[/dim]")
     err_console.print()
     err_console.print("  [dim]Add: meridian client add NAME  |  Remove: meridian client remove NAME[/dim]")
     err_console.print()
@@ -445,10 +445,9 @@ def _set_enabled(name: str, action: Literal["enable", "disable"]) -> None:
     operation = OperationContext()
     with error_context(f"client.{action}", timer=operation.timer):
         cluster = load_topology_cluster()
-        name = resolve_client_name(cluster, name)
-        validate_client_name(name)
-        require_access_user(cluster, name)
+        resolve_client_name(cluster, name, console_people=True)
         with access_panel(cluster) as panel:
+            name = resolve_client_mutation_name(cluster, panel, name)
             client = get_user_or_fail(panel, name, action="load")
             if client is None:
                 fail(

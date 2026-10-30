@@ -10,7 +10,7 @@ from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
 from meridian.commands._validation import validate_command_input
-from meridian.commands.client_state import persist_client_state
+from meridian.commands.client_state import persist_client_state, require_access_user
 from meridian.console import err_console, fail
 from meridian.control.models import USERNAME_PATTERN
 from meridian.control_access import AccessPanel
@@ -55,7 +55,7 @@ def resolve_client_name(
 ) -> str:
     """The panel username a typed client name means: a username or a display name (Биба).
 
-    `console_people` (reads only) also accepts a name the control service allows, for a
+    `console_people` also accepts a name the control service allows, for a
     person added in its console: such names may hold dots or fall outside Remnawave's lengths.
     `console_names` are the service's usernames: an exact one wins over a case-folded or
     display-name match, and a name that folds onto two people is refused.
@@ -75,6 +75,8 @@ def resolve_client_name(
                 hint="Use the exact username, as `meridian client list` shows it.",
                 hint_type="user",
             )
+        if matches:
+            return matches[0]
     if found is not None:
         return found
     if console and re.fullmatch(USERNAME_PATTERN, name):
@@ -88,6 +90,20 @@ def resolve_client_name(
             hint_type="user",
         )
     return name
+
+
+def resolve_client_mutation_name(cluster: ClusterConfig, panel: AccessPanel, name: str) -> str:
+    """Resolve a service-owned edit against the same directory and name rules as client show."""
+    if not cluster.runs_control_service:
+        name = resolve_client_name(cluster, name)
+        validate_client_name(name)
+        require_access_user(cluster, name)
+        return name
+    try:
+        names = [user.username for user in panel.list_users()]
+    except RemnawaveError as exc:
+        fail(f"Could not read clients: {exc}", hint=exc.hint or "Check panel connectivity", hint_type=exc.category)
+    return resolve_client_name(cluster, name, console_people=True, console_names=names)
 
 
 def new_client_usernames(cluster: ClusterConfig, names: list[str]) -> tuple[list[str], dict[str, str]]:

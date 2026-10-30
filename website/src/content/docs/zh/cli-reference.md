@@ -129,7 +129,7 @@ meridian client remove NAME [--yes] [--json]
 | `--expires DATE` | never | 访问何时结束：`YYYY-MM-DD`（当天结束时，UTC）、ISO 时间如 `2026-12-31T18:00:00+03:00`（不带时区偏移的时间按 UTC 计），或 `never`。必须是将来的时间 |
 | `--yes`, `-y` | | 确认 `client reissue` 或 `client remove`；`--json` 需要 |
 
-**`client add`** — 把一个或多个人添加到拓扑并应用，然后为每个人打印连接页面和订阅 URL。页面根据他们真实的订阅生成，因此中继和 Hysteria2 存在时都会显示。拓扑中已有或控制服务中已存在的名称会被拒绝。名称可以使用任何文字（`client add Биба 王小明`）：页面和输出按输入原样显示名称，而控制服务只接受拉丁字母、数字、`.`、`-` 和 `_`，会得到音译后的用户名（`biba`、`wangxiaoming`）。其他 client 命令接受任一形式。如果无法生成客户端的订阅链接，客户端仍会被添加，命令以退出码 `3` 结束；仅缺少连接页面时只给出警告（用 `client show --repair-page` 修复）。`--limit`、`--reset` 和 `--expires` 会在客户端创建后，为每个添加的名称设置与 `client set` 相同的限额；如果设置失败，客户端仍已添加，命令给出警告并以 `3` 退出。
+**`client add`** — 把一个或多个人添加到拓扑并应用，然后为每个人打印连接页面和订阅 URL。页面根据他们真实的订阅生成，因此中继和 Hysteria2 存在时都会显示。拓扑中已有或控制服务中已存在的名称会被拒绝。名称可以使用任何文字（`client add Биба 王小明`）：页面和输出按输入原样显示名称，而控制服务只接受拉丁字母、数字、`.`、`-` 和 `_`，会得到音译后的用户名（`biba`、`wangxiaoming`）。其他 client 命令接受任一形式。如果无法生成客户端的订阅链接，客户端仍会被添加，命令以退出码 `3` 结束；仅缺少连接页面时只给出警告（用 `client show --repair-page` 修复）。`--limit`、`--reset`、`--expires` 和 `--devices` 都包含在审阅后的计划中，并与每个账户在同一事务中创建。应用失败时不会打印链接；重新运行 `meridian apply` 即可继续。之后的应用会保留管理者所做的修改。
 
 **`client show`** — 打印连接页面、订阅 URL、状态、相对限额的流量及其重置周期、到期时间和最后在线时间。`--repair-page` 重新发布缺失的页面；如果失败，链接仍显示带警告和退出 `3`。
 
@@ -147,7 +147,9 @@ meridian client remove NAME [--yes] [--json]
 
 **`client usage`** — 显示控制服务中任何人员（含控制台添加者）的每日上传、下载及总字节数。须在[隐私](/zh/privacy/)中开启每日历史；否则退出码为 `2`，并提示启用命令。历史开启时，`client show` 附最近七个 UTC 天（JSON 的 `data.usage`，关闭时为 `null`）。空白日期表示无记录的流量，不会补算过去用量。
 
-**`client devices`** — private 显示数量，full 显示设备详情；off 不读取设备。`--json` 返回 `username`、`level`、`count`、有效 `limit`、`devices` 和 `removed`。`--remove ID` 或 `--clear` 清除登记而不撤销凭证；重复操作报告零条删除。也可以查看控制台添加的用户，但应在控制台管理他们的登记。`client set --devices N` 设置上限，`--devices default` 使用集群上限。参见[设备限制](/zh/client-management/#限制设备数量)。重新签发链接会清除全部设备登记并保留上限。
+**`client devices`** — private 显示数量，full 显示设备详情；off 不读取设备。`--json` 返回 `username`、`level`、`count`、有效 `limit`、`devices` 和 `removed`。`--remove ID` 或 `--clear` 清除登记而不撤销凭证；重复操作报告零条删除。也可通过 CLI 查看和清除控制台添加的用户的设备登记。`client set --devices N` 设置上限，`--devices default` 使用集群上限。参见[设备限制](/zh/client-management/#限制设备数量)。重新签发链接会清除全部设备登记并保留上限。
+
+修改服务中用户设置的命令（`client enable`、`disable`、`set`、`reset-traffic` 以及删除设备注册）也适用于控制台添加的用户。精确匹配的服务用户名优先；忽略大小写或按显示名称匹配时必须只对应一个用户。若有歧义，请使用 `client list` 中显示的精确用户名。删除用户、重新签发凭据和发布连接页面仍仅适用于拓扑中声明的用户。
 
 ### meridian privacy
 
