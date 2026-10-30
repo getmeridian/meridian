@@ -28,8 +28,8 @@ from meridian.compiler.models import (
     ResourcePlan,
     ServiceSettingsPayload,
 )
-from meridian.control.client import ControlClient, ControlServiceUncertain
-from meridian.control.models import ClientEndpoint, NodeSpec, NodeStatus, ServiceSettings
+from meridian.control.client import ControlClient, ControlServiceConflict, ControlServiceUncertain
+from meridian.control.models import ClientEndpoint, NodeSpec, NodeStatus, ServiceSettings, UserCreate
 from meridian.control_artifacts import AgentBinary
 from meridian.core.agent_protocol import AgentBootstrap
 from meridian.core.agent_types import AGENT_PROTOCOL, canonical_sha256
@@ -537,7 +537,15 @@ class ControlUserDriver:
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
         payload = payload_of(action, ControlUserPayload)
         with self.context.client() as client:
-            client.put_user(payload.username)
+            if payload.creation_settings is None:
+                client.put_user(payload.username)
+            else:
+                try:
+                    client.create_user(UserCreate(username=payload.username, **payload.creation_settings.model_dump()))
+                except ControlServiceConflict:
+                    # Creation-only: a previous apply or concurrent creator owns the existing settings.
+                    if client.get_user(payload.username) is None:
+                        raise
         return ResourceApplyReceipt(remote_id=payload.username)
 
     def retire(self, binding: ManagedResourceBinding) -> None:

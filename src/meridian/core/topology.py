@@ -9,6 +9,7 @@ from typing import Annotated, Final, Literal, Self
 
 from pydantic import Field, HttpUrl, ValidationInfo, field_validator, model_validator
 
+from meridian.core.client_limits import UserCreationSettings
 from meridian.core.defaults import SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import (
     AccessUsernameValue,
@@ -295,6 +296,11 @@ class AccessIntent(CoreModel):
     display_names: dict[AccessUsernameValue, DisplayNameValue] = Field(
         default_factory=dict, exclude_if=lambda names: not names
     )
+    creation_settings: dict[AccessUsernameValue, UserCreationSettings] = Field(
+        default_factory=dict,
+        exclude_if=lambda settings: not settings,
+        description="First account settings only; reviewed applies never replace an existing person's settings.",
+    )
 
     @field_validator("users")
     @classmethod
@@ -311,6 +317,9 @@ class AccessIntent(CoreModel):
         shown = [self.display_name(user).casefold() for user in self.users]
         if len(shown) != len(set(shown)):
             raise ValueError("Each person needs a different name.")
+        unknown_settings = sorted(set(self.creation_settings) - set(self.users))
+        if unknown_settings:
+            raise ValueError("Creation settings refer to unknown users: " + ", ".join(unknown_settings))
         return self
 
     def display_name(self, username: str) -> str:

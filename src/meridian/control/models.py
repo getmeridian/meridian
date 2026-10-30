@@ -28,7 +28,7 @@ from meridian.core.agent_types import (
     Version,
 )
 from meridian.core.client_devices import ClientDevicesResult
-from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES
+from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES, LimitStrategy, UserCreationSettings
 from meridian.core.defaults import SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import validate_ip_address_value
 from meridian.core.models import CoreModel
@@ -160,7 +160,6 @@ class ClientEndpoint(CoreModel):
 
 
 UserStatus = Literal["active", "disabled", "limited", "expired"]
-LimitStrategy = Literal["no_reset", "day", "week", "month"]
 DeviceLimitLevel = Literal["off", "private", "full"]
 UsageHistoryLevel = Literal["off", "daily"]
 
@@ -227,15 +226,10 @@ SUB_TOKEN_PATTERN = r"^[A-Za-z0-9_-]{16,64}$"
 USERNAME_PATTERN = r"(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\.\.[A-Za-z0-9_.-]{1,62})"
 
 
-class UserCreate(CoreModel):
+class UserCreate(UserCreationSettings):
     """A new user with their first settings, created in one step (the console's "Add person")."""
 
     username: str = Field(pattern=rf"^{USERNAME_PATTERN}$")
-    status: Literal["active", "disabled"] = "active"
-    expire_at: Timestamp | None = None
-    traffic_limit_bytes: int = Field(default=0, ge=0, le=MAX_TRAFFIC_LIMIT_BYTES)
-    traffic_limit_strategy: LimitStrategy = "no_reset"
-    device_limit: int | None = Field(default=None, ge=1, le=100)
 
 
 class UserImport(CoreModel):

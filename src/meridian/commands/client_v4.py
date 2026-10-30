@@ -16,17 +16,16 @@ from meridian.commands._helpers import (
     require_intent,
 )
 from meridian.commands.client_handoff import get_user_or_fail, print_handoff_links
-from meridian.commands.client_limits import limits_warning
 from meridian.commands.client_state import build_client_persistence_warning
 from meridian.console import err_console, fail, is_json_mode, ok, warn
 from meridian.control_access import access_panel
-from meridian.core.client_limits import ClientLimitChange
+from meridian.core.client_limits import ClientLimitChange, UserCreationSettings
 from meridian.core.clients import build_client_add_result, build_client_remove_result
-from meridian.core.models import ErrorModel, Summary
+from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.redaction import HANDOFF_LINK_KEYS, redact_string
 from meridian.handoff import HandoffLinks
-from meridian.remnawave import RemnawaveError, User
+from meridian.remnawave import User
 from meridian.renderers import emit_json
 
 
@@ -39,7 +38,7 @@ def run_add_v4(
     publish_handoff: Callable[[ClusterConfig, list[str]], list[HandoffLinks]],
     limits: ClientLimitChange | None = None,
 ) -> None:
-    """Add access users through the reviewed compiler and resource drivers, then set any requested limits."""
+    """Add access users and their first limits through the reviewed compiler and resource drivers."""
     from meridian.config import SERVER_PROFILES_FILE
     from meridian.servers import ServerRegistry
     from meridian.setup.editor import add_access_users_to_intent
@@ -63,7 +62,13 @@ def run_add_v4(
                     hint_type="user",
                 )
 
-    updated = add_access_users_to_intent(intent, names, display_names)
+    settings = limits.for_creation() if limits is not None else UserCreationSettings()
+    updated = add_access_users_to_intent(
+        intent,
+        names,
+        display_names,
+        creation_settings={name: settings for name in names} if settings != UserCreationSettings() else None,
+    )
     result = apply_reviewed_intent(
         cluster,
         ServerRegistry(SERVER_PROFILES_FILE),
@@ -74,7 +79,6 @@ def run_add_v4(
     )
 
     succeeded: list[tuple[str, User]] = []
-    warnings: list[ErrorModel] = []
     with access_panel(cluster) as refreshed_panel:
         for name in names:
             user = get_user_or_fail(refreshed_panel, name, action="verify")
@@ -84,12 +88,6 @@ def run_add_v4(
                     hint="Retry `meridian apply` and inspect the access-user resource.",
                     hint_type="system",
                 )
-            if limits is not None and not limits.is_empty:
-                # Limits are operator-owned panel state, set after the reviewed apply created the user.
-                try:
-                    user = refreshed_panel.update_user_limits(user.id, limits)
-                except RemnawaveError as exc:
-                    warnings.append(limits_warning(name, exc))
             succeeded.append((name, user))
 
     handoffs = publish_handoff(cluster, [name for name, _user in succeeded])
@@ -109,17 +107,12 @@ def run_add_v4(
                         "added": len(succeeded),
                         "failed": 0,
                         "page_deploy_failed": sum(1 for links in handoffs if not links.page_url),
-                        "limits_failed": len(warnings),
                     },
                 ),
-                exit_code=3 if warnings else 0,
-                warnings=warnings,
                 timer=operation.timer,
             ),
             reveal=HANDOFF_LINK_KEYS,
         )
-        if warnings:
-            raise typer.Exit(3)
         return
 
     shown = display_names or {}
@@ -140,9 +133,7 @@ def run_add_v4(
     err_console.print()
     err_console.print("  [dim]View all clients:  meridian client list[/dim]")
     err_console.print()
-    for warning in warnings:
-        warn(warning.message)
-    if handoff_failed or warnings:
+    if handoff_failed:
         raise typer.Exit(3)
 
 

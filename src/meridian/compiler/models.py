@@ -16,6 +16,7 @@ from meridian.compiler.names import (
     RemnawaveTemplateName,
     RemnawaveUsername,
 )
+from meridian.core.client_limits import UserCreationSettings
 from meridian.core.defaults import SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import (
     IPAddressValue,
@@ -497,6 +498,7 @@ class ClientEndpointPayload(CoreModel):
 class ControlUserPayload(CoreModel):
     kind: Literal["control_user"] = "control_user"
     username: RemnawaveUsername
+    creation_settings: UserCreationSettings | None = Field(default=None, exclude_if=lambda settings: settings is None)
 
 
 class ServiceSettingsPayload(CoreModel):

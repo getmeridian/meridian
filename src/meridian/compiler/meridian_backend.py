@@ -12,6 +12,8 @@ panel probes have no equivalent. Once Remnawave is gone the compiler emits these
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from meridian.compiler.builder import PlanBuilder
 from meridian.compiler.client_delivery import ALT_FINGERPRINT_TAG
 from meridian.compiler.errors import TopologyCompileError
@@ -39,6 +41,7 @@ from meridian.compiler.models import (
     SubscriptionSettingsPayload,
     make_resource,
 )
+from meridian.core.client_limits import UserCreationSettings
 from meridian.core.topology import SetupIntent
 
 CONTROL_SERVICE_ID = "control:service"
@@ -59,7 +62,7 @@ def validate_meridian_backend(intent: SetupIntent) -> None:
         raise TopologyCompileError("Meridian's control service does not support client IP forwarding yet.")
 
 
-def to_meridian_backend(builder: PlanBuilder) -> PlanBuilder:
+def to_meridian_backend(builder: PlanBuilder, creation_settings: Mapping[str, UserCreationSettings]) -> PlanBuilder:
     """Return a builder whose panel-shaped resources are replaced by Meridian's own kinds."""
     old = builder.resources
     renamed: dict[str, str | None] = {}
@@ -144,7 +147,9 @@ def to_meridian_backend(builder: PlanBuilder) -> PlanBuilder:
             account_id = f"account:{logical_id.removeprefix('user:')}"
             renamed[logical_id] = account_id
             replacements[account_id] = (
-                ControlUserPayload(username=payload.username),
+                ControlUserPayload(
+                    username=payload.username, creation_settings=creation_settings.get(payload.username)
+                ),
                 [CONTROL_SERVICE_ID],
                 _exists(account_id),
             )

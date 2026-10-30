@@ -9,6 +9,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from meridian.core.client_limits import UserCreationSettings
 from meridian.core.inputs import TOPOLOGY_ID_MAX_LENGTH, is_ip
 from meridian.core.topology import (
     AccessIntent,
@@ -23,7 +24,11 @@ from meridian.setup.default_paths import default_exit_paths
 
 
 def add_access_users_to_intent(
-    intent: SetupIntent, usernames: list[str], display_names: Mapping[str, str] | None = None
+    intent: SetupIntent,
+    usernames: list[str],
+    display_names: Mapping[str, str] | None = None,
+    *,
+    creation_settings: Mapping[str, UserCreationSettings] | None = None,
 ) -> SetupIntent:
     """Return validated intent with new access users in stable request order."""
     existing = set(intent.access.users)
@@ -35,6 +40,7 @@ def add_access_users_to_intent(
         squad_name=intent.access.squad_name,
         users=[*intent.access.users, *usernames],
         display_names={**intent.access.display_names, **(display_names or {})},
+        creation_settings={**intent.access.creation_settings, **(creation_settings or {})},
     ).model_dump(mode="json")
     return SetupIntent.model_validate(payload)
 
@@ -51,6 +57,9 @@ def remove_access_user_from_intent(intent: SetupIntent, username: str) -> SetupI
         squad_name=intent.access.squad_name,
         users=remaining,
         display_names={user: name for user, name in intent.access.display_names.items() if user != username},
+        creation_settings={
+            user: settings for user, settings in intent.access.creation_settings.items() if user != username
+        },
     ).model_dump(mode="json")
     return SetupIntent.model_validate(payload)
 

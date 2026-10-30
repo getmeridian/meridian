@@ -1,7 +1,87 @@
 {
+  "$defs": {
+    "UserCreationSettings": {
+      "additionalProperties": false,
+      "description": "First service-owned settings, applied only when an access account is created.",
+      "properties": {
+        "device_limit": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Device Limit"
+        },
+        "expire_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expire At"
+        },
+        "status": {
+          "default": "active",
+          "enum": [
+            "active",
+            "disabled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "traffic_limit_bytes": {
+          "default": 0,
+          "maximum": 9223372036854775807,
+          "minimum": 0,
+          "title": "Traffic Limit Bytes",
+          "type": "integer"
+        },
+        "traffic_limit_strategy": {
+          "default": "no_reset",
+          "enum": [
+            "no_reset",
+            "day",
+            "week",
+            "month"
+          ],
+          "title": "Traffic Limit Strategy",
+          "type": "string"
+        }
+      },
+      "title": "UserCreationSettings",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
   "description": "Meridian-owned access squad and human users.\n\n`users` are panel usernames (Latin only, as Remnawave requires); `display_names`\nkeeps the name as typed, in any script, for users whose username differs from it.",
   "properties": {
+    "creation_settings": {
+      "description": "First account settings only; reviewed applies never replace an existing person's settings.",
+      "patternProperties": {
+        "^[A-Za-z0-9_-]+$": {
+          "$ref": "#/$defs/UserCreationSettings"
+        }
+      },
+      "propertyNames": {
+        "maxLength": 36,
+        "minLength": 3
+      },
+      "title": "Creation Settings",
+      "type": "object"
+    },
     "display_names": {
       "patternProperties": {
         "^[A-Za-z0-9_-]+$": {

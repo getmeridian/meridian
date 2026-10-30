@@ -44,6 +44,7 @@ from meridian.control.models import (
     TokenScope,
     TrafficDailySummary,
     TrafficSummary,
+    UserCreate,
     UserDevices,
     UserImportBatch,
     UserImportResult,
@@ -190,6 +191,10 @@ class ControlClient:
 
     def put_user(self, username: str) -> UserRecord:
         return UserRecord.model_validate(self._call("PUT", f"api/users/{_segment(username)}", {}))
+
+    def create_user(self, create: UserCreate) -> UserRecord:
+        """Create an account with its first settings in one transaction; an existing name is a conflict."""
+        return UserRecord.model_validate(self._call("POST", "api/users", create.model_dump(mode="json")))
 
     def import_users(self, batch: UserImportBatch) -> UserImportResult:
         """Create users with given credentials and usage; all or nothing (`ControlServiceConflict` on a clash)."""

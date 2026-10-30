@@ -17,12 +17,15 @@ from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands.client import run_add, run_enable, run_list, run_show
 from meridian.commands.client_handoff import PageResolution
 from meridian.commands.client_limits import format_expiry, format_usage, run_reset_traffic, run_set
+from meridian.compiler import compile_topology
 from meridian.console import set_json_mode
 from meridian.control.client import ControlClient
 from meridian.control.models import UserUpdate
 from meridian.core.clients import build_client_record
 from meridian.core.schema import schema_model
 from meridian.handoff import HandoffLinks
+from meridian.reconciler.meridian_drivers import ControlUserDriver
+from meridian.reconciler.resources import build_resource_actions
 from meridian.remnawave import User
 from meridian.setup.single_server import single_server_intent
 from tests.support.control_service import ADMIN_TOKEN, serve_control
@@ -171,20 +174,37 @@ def test_client_set_refuses_a_name_that_is_not_a_fleet_client(tmp_path: Path) ->
     assert exc_info.value.exit_code == 2
 
 
-def test_client_add_sets_limits_after_the_reviewed_apply(
+def test_client_add_creates_with_limits_during_the_reviewed_apply(
     tmp_path: Path, tmp_home: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     with _fleet(tmp_path, json_mode=True) as fleet:
         runtime = MagicMock()
 
         def apply_intent(intent: Any, *_args: object, **_kwargs: object) -> SimpleNamespace:
-            fleet.create("carol")
+            plan = compile_topology(intent)
+            action = next(
+                action for action in build_resource_actions(plan, 1) if action.resource.logical_id == "account:carol"
+            )
+            driver = ControlUserDriver(
+                SimpleNamespace(client=lambda: ControlClient(fleet.cluster.panel.url, ADMIN_TOKEN))
+            )
+            driver.apply(action, None)
+            with access_panel_for(fleet.cluster) as panel:
+                created = panel.get_user("carol")
+            assert created is not None
+            assert created.traffic_limit_bytes == 50 * GIB
+            assert created.traffic_limit_strategy == "MONTH"
+            assert created.expire_at == f"{FUTURE_DAY}T23:59:59Z"
+            assert created.hwid_device_limit == 2
             return SimpleNamespace(all_succeeded=True, changed=True, failed=[])
 
         runtime.apply_intent.side_effect = apply_intent
         with (
             patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
             patch("meridian.servers.ServerRegistry"),
+            patch(
+                "meridian.control_access.ServiceAccessPanel.update_user_limits", side_effect=AssertionError("No PATCH")
+            ),
             patch(
                 "meridian.commands.client.publish_connection_pages",
                 return_value=[HandoffLinks("carol", subscription_url="https://198.51.100.1/pages/sub/short-carol")],
@@ -210,17 +230,14 @@ def access_panel_for(cluster: ClusterConfig) -> Any:
     return access_panel(cluster)
 
 
-def test_client_add_reports_limits_it_could_not_set_as_a_partial_result(
+def test_client_add_never_publishes_links_when_reviewed_creation_fails(
     tmp_path: Path, tmp_home: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from meridian.remnawave import RemnawaveError
-
     panel = MagicMock()
     panel.__enter__.return_value = panel
-    panel.get_user.side_effect = [None, User(id="102", username="carol", short_uuid="short-carol", status="ACTIVE")]
-    panel.update_user_limits.side_effect = RemnawaveError("Panel API error: 400")
+    panel.get_user.return_value = None
     runtime = MagicMock()
-    runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, changed=True, failed=[])
+    runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=False, failure_summary="Creation reply lost")
     set_json_mode(True)
     try:
         with (
@@ -228,7 +245,7 @@ def test_client_add_reports_limits_it_could_not_set_as_a_partial_result(
             patch("meridian.control_access.ServiceAccessPanel", return_value=panel),
             patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
             patch("meridian.servers.ServerRegistry"),
-            patch("meridian.commands.client.publish_connection_pages", return_value=[]),
+            patch("meridian.commands.client.publish_connection_pages", return_value=[]) as publish,
             pytest.raises(typer.Exit) as exc_info,
         ):
             run_add(["carol"], limit="50GB")
@@ -237,9 +254,10 @@ def test_client_add_reports_limits_it_could_not_set_as_a_partial_result(
 
     payload = json.loads(capsys.readouterr().out)
     assert exc_info.value.exit_code == 3
-    assert payload["data"]["clients"][0]["username"] == "carol"
-    assert payload["warnings"][0]["code"] == "MERIDIAN_CLIENT_LIMITS_FAILED"
-    assert "meridian client set carol" in payload["warnings"][0]["hint"]
+    assert payload["status"] == "failed" and payload["data"] == {}
+    assert "Creation reply lost" in payload["errors"][0]["hint"]
+    publish.assert_not_called()
+    panel.update_user_limits.assert_not_called()
 
 
 def test_client_list_shows_console_people_marked(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

@@ -1,6 +1,7 @@
 # core - Meridian API contracts
 
 ## Design decisions
+- **Creation-only account settings** — `UserCreationSettings` is shared by service creation and `AccessIntent.creation_settings`; an empty mapping is omitted so existing user payloads and plans keep their hashes.
 - **No CLI globals** - core never imports Typer, Rich, console, config, or command modules (tested); CLI and future UI clients are adapters. Core constants live in `core/defaults.py`.
 - **Envelope first** - JSON clients get one stable `meridian.output/v1` shape; command data lives under `data`.
 - **Events are a public set** - long-running flows report typed JSONL-ready events; add a name to `core.events` before emitting it.

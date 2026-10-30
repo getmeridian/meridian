@@ -649,4 +649,7 @@ def _access_intent(names: Sequence[str], previous: AccessIntent | None) -> Acces
     return AccessIntent(
         users=users,
         display_names={user: name for user, name in zip(users, names, strict=True) if user != name},
+        creation_settings={user: settings for user, settings in previous.creation_settings.items() if user in users}
+        if previous is not None
+        else {},
     )

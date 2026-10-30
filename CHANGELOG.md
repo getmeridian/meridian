@@ -35,6 +35,7 @@ that dials out to it.
   existing explicit formats.
 - **Subscription status** — `/sub/<token>/info` returns account status and connection
   links for every client. Responses are not cached and support HEAD.
+- **Atomic CLI account creation** — `client add` creates expiry, traffic limits, reset strategy, and device caps together with the account. Interrupted applies resume with those settings, and later applies keep operator edits.
 - **Privacy settings** — device limits and usage history default to off.
   `meridian privacy show|set` and Settings → Privacy disclose what each level
   stores and what a seized control server reveals. Changes record the author,

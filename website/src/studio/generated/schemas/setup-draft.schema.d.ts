@@ -5,6 +5,11 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
+export type DeviceLimit = number | null;
+export type ExpireAt = string | null;
+export type Status = "active" | "disabled";
+export type TrafficLimitBytes = number;
+export type TrafficLimitStrategy = "no_reset" | "day" | "week" | "month";
 export type SquadName = string;
 /**
  * @minItems 1
@@ -156,9 +161,29 @@ export interface SetupAccessSelection {
  * keeps the name as typed, in any script, for users whose username differs from it.
  */
 export interface AccessIntent {
+  creation_settings?: CreationSettings;
   display_names?: DisplayNames;
   squad_name?: SquadName;
   users: Users;
+}
+/**
+ * First account settings only; reviewed applies never replace an existing person's settings.
+ */
+export interface CreationSettings {
+  [k: string]: UserCreationSettings;
+}
+/**
+ * First service-owned settings, applied only when an access account is created.
+ *
+ * This interface was referenced by `CreationSettings`'s JSON-Schema definition
+ * via the `patternProperty` "^[A-Za-z0-9_-]+$".
+ */
+export interface UserCreationSettings {
+  device_limit?: DeviceLimit;
+  expire_at?: ExpireAt;
+  status?: Status;
+  traffic_limit_bytes?: TrafficLimitBytes;
+  traffic_limit_strategy?: TrafficLimitStrategy;
 }
 export interface DisplayNames {
   /**

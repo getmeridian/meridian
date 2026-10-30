@@ -18,7 +18,7 @@ from meridian.console import err_console, error_context, fail, is_json_mode, ok
 from meridian.control_access import AccessPanel, access_panel
 from meridian.core.client_limits import ClientLimitChange, ClientLimitError, build_limit_change
 from meridian.core.clients import ClientDetail, ClientRecord, build_client_limits_result, build_client_record
-from meridian.core.models import ErrorModel, Summary
+from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.i18n import t
 from meridian.remnawave import RemnawaveError, User
@@ -82,19 +82,6 @@ def print_client_usage(record: ClientRecord) -> None:
     for label, value in rows:
         padding = " " * (width - cell_len(label))
         err_console.print(f"  [bold]{escape(label)}[/bold]{padding}{value}")
-
-
-def limits_warning(name: str, exc: RemnawaveError) -> ErrorModel:
-    """The partial-result warning when a client was added but their limits could not be set."""
-    return ErrorModel(
-        code="MERIDIAN_CLIENT_LIMITS_FAILED",
-        category="system",
-        message=f"Client '{name}' was added, but their limits could not be set: {exc}",
-        hint=f"Set them with: meridian client set {name} --limit/--reset/--expires/--devices",
-        retryable=True,
-        exit_code=3,
-        details={"client": name},
-    )
 
 
 def run_set(

@@ -22,6 +22,7 @@ from meridian.core.models import CoreModel
 
 TrafficReset = Literal["never", "day", "week", "month"]
 TRAFFIC_RESETS: tuple[TrafficReset, ...] = ("never", "day", "week", "month")
+LimitStrategy = Literal["no_reset", "day", "week", "month"]
 
 # Remnawave needs an expiry on every user, so Meridian stores "never" there as a far-future date;
 # any expiry from this year on reads back as "never", and operators cannot type one.
@@ -42,6 +43,16 @@ class ClientLimitError(MeridianError):
 
     def __init__(self, message: str, *, hint: str) -> None:
         super().__init__(message, hint=hint, category="user")
+
+
+class UserCreationSettings(CoreModel):
+    """First service-owned settings, applied only when an access account is created."""
+
+    status: Literal["active", "disabled"] = "active"
+    expire_at: Timestamp | None = None
+    traffic_limit_bytes: int = Field(default=0, ge=0, le=MAX_TRAFFIC_LIMIT_BYTES)
+    traffic_limit_strategy: LimitStrategy = "no_reset"
+    device_limit: int | None = Field(default=None, ge=1, le=100)
 
 
 class ClientLimitChange(CoreModel):
@@ -68,6 +79,19 @@ class ClientLimitChange(CoreModel):
     @property
     def sets_devices(self) -> bool:
         return "device_limit" in self.model_fields_set
+
+    def for_creation(self) -> UserCreationSettings:
+        """Use creation defaults for fields the operator did not specify."""
+        reset = self.traffic_reset
+        strategy: LimitStrategy = "no_reset"
+        if reset is not None and reset != "never":
+            strategy = reset
+        return UserCreationSettings(
+            expire_at=self.expires_at,
+            traffic_limit_bytes=self.traffic_limit_bytes or 0,
+            traffic_limit_strategy=strategy,
+            device_limit=self.device_limit,
+        )
 
 
 def build_limit_change(
