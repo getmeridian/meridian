@@ -9,7 +9,7 @@
 
 **Dead-code report** — `find_dead_code.py` (stdlib `ast`) builds a reference graph over `src/meridian`: imports resolve precisely through re-exports, attributes and production strings match members by name. Liveness spreads from production roots (src top level, `scripts/`, entry points, registration decorators), then from `tests/`; it reports `dead`, `test-only`, and `unused-param` as sorted warnings in `make ci` and CI, failing only under `--strict`.
 
-**Conditional Studio packaging** — `hatch_build.py` bundles, when `website/dist` exists (so clean source installs work), only the Studio page's closure: `studio/` plus every file its HTML, CSS `url()`, and JS imports reach, and the font licenses whenever a font rides along. `verify_package_assets.py` checks the page is there and nothing outside the Engine's served roots rides along; `--release` (publish-pypi) also requires the generated AI reference. The sdist is an allowlist (`only-include` in `pyproject.toml`): the package, this hook, `VERSION`, and `CHANGELOG.md`.
+**Package hook** — `hatch_build.py` is the wheel and sdist build hook; `verify_package_assets.py` checks a wheel carries the agent guide, and `--release` (publish-pypi) also requires the generated AI reference. The sdist is an allowlist (`only-include` in `pyproject.toml`): the package, this hook, `VERSION`, and `CHANGELOG.md`.
 
 **Bundled node agent** — the same hook packages each `agent/dist/netagent-<target>` build `make agent` wrote, with its `.sha256` and `.version`, as `meridian/agent_dist/` (the sdist carries them under `src/meridian/agent_dist/`, so a wheel built from it keeps them and needs no Rust); `verify_package_assets.py --release` and `--agent-only` require both builds and check their digests. Wheels stay `py3-none-any`: the binaries run on remote hosts.
 
@@ -24,6 +24,5 @@
 
 ## Pitfalls
 
-- Studio links to other site pages must be absolute `https://` URLs; a site-relative link fails the build, because the wheel would not contain the page.
 - Allowlist only real false positives in `dead_code_allowlist.txt`, each with a `# reason`; delete genuine dead code (and the tests keeping it alive) instead. Teach the analyzer a recurring reference pattern rather than allowlisting every name it hides.
 - Hatch drops gitignored files, so a generated file the package needs goes in `[tool.hatch.build] artifacts`; `ai-reference.md` was built in every release and shipped in none.

@@ -77,9 +77,6 @@ def test_a_built_wheel_and_sdist_exclude_demo_shim_data_and_seeder(showcase: Pat
     shutil.copy2(ROOT / "scripts/build_showcase.py", checkout / "scripts/build_showcase.py")
     shutil.copytree(ROOT / "website/demo", checkout / "website/demo")
     shutil.copytree(showcase, checkout / "website/dist/demo")
-    studio = checkout / "website/dist/studio"
-    studio.mkdir()
-    (studio / "index.html").write_text("<!doctype html><title>Studio</title>")
     subprocess.run(
         [
             sys.executable,
@@ -96,7 +93,6 @@ def test_a_built_wheel_and_sdist_exclude_demo_shim_data_and_seeder(showcase: Pat
     sdist = next((checkout / "dist").glob("*.tar.gz"))
     with ZipFile(wheel) as archive:
         names = archive.namelist()
-        assert "meridian/studio_assets/studio/index.html" in names
         assert "meridian/control/ui/app.js" in names
         assert not any(
             "demo.js" in name or "demo-data" in name or "build_showcase" in name or "showcase_seed" in name

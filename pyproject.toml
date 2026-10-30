@@ -52,12 +52,8 @@ dev = [
     "mypy>=1.0",
     "types-PyYAML>=6.0",
     "hatchling>=1.31.0",
-    "fastapi>=0.128",
-    "uvicorn>=0.30",
     "pexpect>=4.9; sys_platform != 'win32'",
 ]
-# Experimental local web UI (`meridian studio`): pip install 'meridian-vpn[studio]'
-studio = ["fastapi>=0.128", "uvicorn>=0.30"]
 
 [dependency-groups]
 # Cloud SDKs for the local-only real-VM harness (tests/realvm/); never published.
