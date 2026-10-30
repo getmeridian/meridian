@@ -48,6 +48,7 @@
 - Sort endpoints once before allocating presentation names; primary filters and fingerprint groups preserve that order because generated numeric suffixes sort differently.
 - Xray availability checks primary endpoints; fingerprint copies alone must show the same inert availability notices as Mihomo and sing-box.
 - Attention shares NodeStatus runtime freshness and degradation with fleet views; stale reports cannot supply current health or apply failures, and failing checks count even under a healthy summary.
+- The topology owns `client_routing`: persist it in the delivery settings transaction, read old databases as `ru-split`, and pass it to every structured subscription renderer, including Xray fingerprint groups and Stash.
 - The topology owns subscription refresh hours (1–168, default 6); persist them with the other service settings in one transaction, and read old databases as six hours.
 - ClientEndpoint strips one matching pair of IPv6 brackets at the API boundary; structured server addresses stay bare, and only URI authorities add brackets.
 - Enforcement and subscription refill dates share control.periods UTC boundaries: weeks start Monday, and months advance by calendar month rather than a fixed number of days.

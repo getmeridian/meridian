@@ -29,10 +29,10 @@ from meridian.core.agent_types import (
 )
 from meridian.core.client_devices import ClientDevicesResult
 from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES, LimitStrategy, UserCreationSettings
-from meridian.core.defaults import SUBSCRIPTION_UPDATE_INTERVAL_HOURS
+from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import validate_ip_address_value
 from meridian.core.models import CoreModel
-from meridian.core.topology import ProtocolKind, SubscriptionUpdateIntervalHours
+from meridian.core.topology import ClientRoutingPolicy, ProtocolKind, SubscriptionUpdateIntervalHours
 from meridian.core.traffic import NodeTrafficAccounting, UserTrafficEvidence
 
 
@@ -284,6 +284,9 @@ class ServiceSettings(CoreModel):
     update_interval_hours: SubscriptionUpdateIntervalHours = Field(
         default=SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
         exclude_if=lambda value: value == SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
+    )
+    client_routing: ClientRoutingPolicy = Field(
+        default=DEFAULT_CLIENT_ROUTING, exclude_if=lambda value: value == DEFAULT_CLIENT_ROUTING
     )
     public_url: str = Field(
         default="",

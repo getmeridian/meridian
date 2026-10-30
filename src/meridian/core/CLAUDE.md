@@ -23,6 +23,7 @@
 - **Two names per person** - `AccessIntent.users` are Remnawave usernames (Latin only); `display_names` keeps the typed name when it differs and is omitted when empty. `assign_access_usernames()` is the one place that maps typed names to usernames (known first, Latin names claim themselves, the rest transliterate via anyascii); look people up with `find_user()`.
 
 ## What's done well
+- Client routing has one `ru-split | full` type; new intent and settings fields omit `ru-split`, preserving existing serialized plans and payloads.
 - Delivery refresh intervals use one integer contract (1–168 hours); the six-hour default is omitted from new intent and settings fields to preserve existing serialization.
 - Each command kind is its own hello capability; successful `reset_inbound` results disclose `inbound_reset` or `core_restart` through the nullable `effect` field, without carrying a user identifier.
 - No barrel re-exports in `__init__.py`; consumers import specific submodules.

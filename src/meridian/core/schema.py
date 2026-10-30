@@ -41,6 +41,7 @@ from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.cancellation import OperationCancellation
 from meridian.core.client_devices import ClientDevicesResult
 from meridian.core.client_limits import ClientExtendRequest
+from meridian.core.client_routing import FleetRoutingRequest, FleetRoutingResult
 from meridian.core.clients import (
     ClientAddResult,
     ClientLimitsResult,
@@ -197,11 +198,6 @@ class _ContractEnvelope(CoreModel):
     summary: Summary
     warnings: list[ErrorModel]
     errors: list[ErrorModel]
-
-
-# ---------------------------------------------------------------------------
-# Envelope factory — replaces per-command copy-pasted envelope classes
-# ---------------------------------------------------------------------------
 
 
 def _make_command_envelope(
@@ -384,6 +380,14 @@ _, _, FleetImportOutputEnvelope = _make_command_envelope(
     FleetImportResult,
     success_statuses=Literal["ok", "changed", "no_changes"],
     doc="Envelope schema for `meridian fleet import --json`.",
+)
+
+_, _, FleetRoutingOutputEnvelope = _make_command_envelope(
+    "FleetRouting",
+    "fleet.routing",
+    FleetRoutingResult,
+    success_statuses=Literal["ok", "changed", "no_changes"],
+    doc="Envelope schema for `meridian fleet routing --json`.",
 )
 
 _, _, ClientListOutputEnvelope = _make_command_envelope(
@@ -650,6 +654,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "attention-thresholds": AttentionThresholds,
     "fleet-usage-envelope": FleetUsageOutputEnvelope,
     "fleet-import-envelope": FleetImportOutputEnvelope,
+    "fleet-routing-envelope": FleetRoutingOutputEnvelope,
     "event": Event,
     "error": ErrorModel,
     "operation": OperationEnvelope,
@@ -719,6 +724,8 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "fleet-export": FleetExportResult,
     "fleet-history": RevisionList,
     "fleet-import": FleetImportResult,
+    "fleet-routing": FleetRoutingResult,
+    "fleet-routing-request": FleetRoutingRequest,
     "intent-change": IntentChange,
     "node-list": NodeListResult,
     "relay-list": RelayListResult,

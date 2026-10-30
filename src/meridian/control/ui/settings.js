@@ -19,16 +19,25 @@
   function fleetCard() {
     // The title is the fleet file's (`delivery.profile_title`): every apply sets it, so it is shown, not edited.
     var title = h("p", { class: "row-title" });
+    var routing = h("p", { class: "row-title mono", dir: "ltr" });
+    var routingExplanation = h("p", { class: "muted small" });
+    var routingCommand = h("code", { dir: "ltr" });
     var publicUrl = h("p", { class: "mono small link-text" });
     var error = h("p", { class: "form-error", role: "alert" });
     M.api("GET", "api/settings").then(function (settings) {
       title.textContent = settings.profile_title;
+      var policy = settings.client_routing || "ru-split";
+      routing.textContent = policy;
+      routingExplanation.textContent = M.t(policy === "full" ? "settings.routing_full" : "settings.routing_ru_split");
+      routingCommand.textContent = "meridian fleet routing " + (policy === "full" ? "ru-split" : "full");
       publicUrl.textContent = settings.public_url || M.t("settings.no_public_url");
     }, function (e) { error.textContent = M.errorText(e); });
     return h("section", { class: "card" },
       h("h2", { text: M.t("settings.fleet") }),
       h("p", { class: "label", text: M.t("settings.title") }), title,
-      h("p", { class: "muted small", text: M.t("settings.title_hint") }), error,
+      h("p", { class: "muted small", text: M.t("settings.title_hint") }),
+      h("p", { class: "label", text: M.t("settings.client_routing") }), routing, routingExplanation,
+      h("p", { class: "muted small" }, M.t("settings.routing_hint"), " ", routingCommand), error,
       h("p", { class: "label", text: M.t("settings.public_url") }), publicUrl,
       h("p", { class: "muted small", text: M.t("settings.public_url_hint") }));
   }

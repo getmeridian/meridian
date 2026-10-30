@@ -316,6 +316,19 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         outcomes=[_ok("the fleet document was exported"), *_FAILURES],
         stability="preview",
     ),
+    "fleet.routing": CommandOutput(
+        data_schema="fleet-routing",
+        outcomes=[
+            _ok("the current policy and choices were read"),
+            _ok("the policy is already selected", status="no_changes"),
+            _ok("dry run: the policy change was reviewed"),
+            _ok("the reviewed policy was applied", status="changed"),
+            _user("invalid policy or confirmation missing"),
+            _system("review, apply, or local-state failure"),
+            _BUG,
+        ],
+        stability="preview",
+    ),
     "fleet.import": CommandOutput(
         data_schema="fleet-import",
         outcomes=[

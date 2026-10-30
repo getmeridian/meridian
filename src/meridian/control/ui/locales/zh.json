@@ -387,5 +387,9 @@
   "commands.restart": "重启 Xray",
   "commands.restart_title": "重启节点 {node} 上的 Xray",
   "commands.restart_text": "此节点上的所有 Xray 会话都会终止。使用它的所有人都会短暂重连。",
-  "commands.no_core": "此节点没有正在运行的受管 Xray 服务。请先应用节点配置。"
+  "commands.no_core": "此节点没有正在运行的受管 Xray 服务。请先应用节点配置。",
+  "settings.client_routing": "客户端路由",
+  "settings.routing_ru_split": "俄罗斯目的地和私有地址、局域网直连，其他流量通过 VPN。Xray JSON 中已识别的 BitTorrent 对等连接也会直连。",
+  "settings.routing_full": "互联网流量通过 VPN，包括俄罗斯目的地；私有地址、局域网以及 Xray JSON 中已识别的 BitTorrent 对等连接直连。",
+  "settings.routing_hint": "在自己的电脑上更改此策略："
 }

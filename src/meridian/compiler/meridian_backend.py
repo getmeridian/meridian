@@ -157,7 +157,9 @@ def to_meridian_backend(builder: PlanBuilder, creation_settings: Mapping[str, Us
             renamed[logical_id] = SERVICE_SETTINGS_ID
             replacements[SERVICE_SETTINGS_ID] = (
                 ServiceSettingsPayload(
-                    profile_title=payload.profile_title, update_interval_hours=payload.update_interval_hours
+                    profile_title=payload.profile_title,
+                    update_interval_hours=payload.update_interval_hours,
+                    client_routing=payload.client_routing,
                 ),
                 [CONTROL_SERVICE_ID],
                 _exists(SERVICE_SETTINGS_ID),

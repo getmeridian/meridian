@@ -33,6 +33,8 @@ from meridian.control.formats.entries import (
     tls_fingerprint,
 )
 from meridian.control.models import ClientEndpoint
+from meridian.core.defaults import DEFAULT_CLIENT_ROUTING
+from meridian.core.topology import ClientRoutingPolicy
 
 _SELECT_GROUP = "Meridian"
 _STASH_PRIVATE_RULE = ("GEOIP,private,", "GEOIP,LAN,")
@@ -69,6 +71,7 @@ def mihomo_document(
     placeholders: tuple[str, ...] = (),
     *,
     stash: bool = False,
+    client_routing: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING,
 ) -> str:
     """Return the Mihomo document, or its Stash variant."""
     endpoints = presentation_endpoints(endpoints)
@@ -76,7 +79,9 @@ def mihomo_document(
         endpoints = [endpoint for endpoint in endpoints if endpoint.protocol != "xhttp"]
     placeholders = availability_placeholders(primaries(endpoints), placeholders)
     exclude = sorted(endpoint.remark for endpoint in copies(endpoints) if endpoint.remark not in placeholders)
-    document: dict[str, Any] = yaml.safe_load(mihomo_template(exclude_from_failover=exclude))
+    document: dict[str, Any] = yaml.safe_load(
+        mihomo_template(exclude_from_failover=exclude, client_routing=client_routing)
+    )
     if placeholders:
         proxies = [placeholder_proxy(remark) for remark in placeholders]
     else:

@@ -24,7 +24,8 @@ from meridian.control.formats.singbox import singbox_document
 from meridian.control.formats.xray_json import xray_json_document
 from meridian.control.models import ClientEndpoint
 from meridian.control.periods import next_period_start
-from meridian.core.defaults import SUBSCRIPTION_UPDATE_INTERVAL_HOURS, SUPPORT_PAGE
+from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS, SUPPORT_PAGE
+from meridian.core.topology import ClientRoutingPolicy
 
 JSON_TYPE = "application/json; charset=utf-8"
 TEXT_TYPE = "text/plain; charset=utf-8"
@@ -61,6 +62,7 @@ def render_subscription(
     profile_title: str,
     public_url: str = "",
     update_interval_hours: int = SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
+    client_routing: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING,
     now: datetime | None = None,
     placeholder_remarks: tuple[str, ...] | None = None,
     extra_headers: dict[str, str] | None = None,
@@ -85,14 +87,19 @@ def render_subscription(
     )
     headers.update(extra_headers or {})
     if document == "xray-json":
-        body = _json(xray_json_document(endpoints, user.uuid, placeholders))
+        body = _json(xray_json_document(endpoints, user.uuid, placeholders, client_routing=client_routing))
         return SubscriptionResponse(200, JSON_TYPE, body, headers)
     if document == "singbox":
         return SubscriptionResponse(
-            200, JSON_TYPE, _json(singbox_document(endpoints, user.uuid, placeholders)), headers
+            200,
+            JSON_TYPE,
+            _json(singbox_document(endpoints, user.uuid, placeholders, client_routing=client_routing)),
+            headers,
         )
     if document in ("mihomo", "stash"):
-        body = mihomo_document(endpoints, user.uuid, placeholders, stash=document == "stash")
+        body = mihomo_document(
+            endpoints, user.uuid, placeholders, stash=document == "stash", client_routing=client_routing
+        )
         return SubscriptionResponse(200, YAML_TYPE, body, headers)
     return SubscriptionResponse(200, TEXT_TYPE, base64_document(endpoints, user.uuid, placeholders), headers)
 

@@ -9,7 +9,7 @@ _RENDERER_MANIFEST = {
     "compiler": COMPILER_VERSION,
     "agent-runtime": "signed-commands-v4",
     "agent-spec": "service-blob-v1",
-    "control-subscriptions": "yaml12-quoting-v10",
+    "control-subscriptions": "client-routing-v11",
     "control-commands": "node-restart-console-v3",
     "pwa": "quiet-account-v23",
     "control-service": "people-fleet-fallback-v20",

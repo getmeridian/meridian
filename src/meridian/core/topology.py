@@ -10,7 +10,7 @@ from typing import Annotated, Final, Literal, Self
 from pydantic import Field, HttpUrl, ValidationInfo, field_validator, model_validator
 
 from meridian.core.client_limits import UserCreationSettings
-from meridian.core.defaults import SUBSCRIPTION_UPDATE_INTERVAL_HOURS
+from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import (
     AccessUsernameValue,
     DisplayNameValue,
@@ -59,6 +59,7 @@ EgressOverrideAction = Literal["warp", "direct", "block"]
 # v2fly geosite/geoip list names: "netflix", "category-ru", "geolocation-!cn", "google@cn".
 _GEO_LIST_NAME = re.compile(r"[a-z0-9][a-z0-9!@._-]{0,63}")
 DeliveryFormat = Literal["base64", "xray_json", "mihomo", "singbox"]
+ClientRoutingPolicy = Literal["ru-split", "full"]
 SubscriptionUpdateIntervalHours = Annotated[int, Field(ge=1, le=168)]
 
 
@@ -376,6 +377,12 @@ class DeliveryIntent(CoreModel):
     update_interval_hours: SubscriptionUpdateIntervalHours = Field(
         default=SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
         exclude_if=lambda value: value == SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
+    )
+    client_routing: ClientRoutingPolicy = Field(
+        default=DEFAULT_CLIENT_ROUTING,
+        exclude_if=lambda value: value == DEFAULT_CLIENT_ROUTING,
+        description="Client routing: ru-split bypasses Russian destinations; full tunnels them. "
+        "Both bypass private/LAN ranges and retain Xray's best-effort BitTorrent bypass.",
     )
 
     @field_validator("formats")

@@ -312,6 +312,7 @@ meridian fleet inventory [--json]
 meridian fleet history [--json]
 meridian fleet events [--since ID] [--limit N] [--json]
 meridian fleet usage [--days N] [--json]
+meridian fleet routing [ru-split|full] [--dry-run] [--yes] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -322,10 +323,10 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 | `--since ID` | 0 | `fleet events`：读取此游标之后的事件 |
 | `--limit N` | 100 | `fleet events`：返回 1–2000 条事件 |
 | `--days N` | 30 | `client usage` 或 `fleet usage` 的 UTC 天数，1–730，受已保存保留时间限制 |
-| `--json` | | 将结果作为 `meridian.output/v1` 信封发出（`status`、`inventory`、`history`、`export`、`import`） |
+| `--json` | | 将结果作为 `meridian.output/v1` 信封发出（`status`、`inventory`、`history`、`routing`、`export`、`import`、`usage`） |
 | `--tested` | | `fleet upgrade`：跳过 GitHub；Realm 保持在已测试的版本或你已升级到的版本 |
-| `--yes`, `-y` | | `fleet upgrade`、`fleet import`：跳过确认 |
-| `--dry-run` | | `fleet import`：显示变更和审查结果，不应用任何内容 |
+| `--yes`, `-y` | | `fleet upgrade`、`fleet routing`、`fleet import`：跳过确认 |
+| `--dry-run` | | `fleet routing`、`fleet import`：显示变更和审查结果，不应用任何内容 |
 | `--forget-unreachable` | | `fleet import`：忘记已移除且 SSH 端口无响应的服务器上部署的内容 |
 
 **`fleet status`** — 控制服务健康状态、每个 agent 的最近报告及其是否已应用当前配置、中继监听端口以及客户端数量。已声明但缺失的客户端会使健康状态降级；已禁用、达到限额或过期的客户端会正常统计，属于你的主动设置而非故障。中继监听端口可达只能证明 TCP 连通，因此未经完整验证的中继路由会使健康状态保持为 `unknown`；请用 `meridian test` 测试完整路径。退出码 `0` 表示健康，`4` 表示降级，`3` 表示未知。
@@ -341,6 +342,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 **`fleet events`** — 查看本地用户、令牌和隐私变更，以及节点离线和恢复事件。从 `--since ID` 之后按时间顺序显示（默认 `0`）。`--limit N` 返回 1–2000 条事件，默认 100 条。JSON 包含 `data.events[]`、`next_cursor` 和 `has_more`；继续读取时使用返回的游标。每条事件包含 UTC 时间、类型、执行者（令牌名称、`root`、`owner` 或 `system`）、对象，以及更改的字段名、令牌权限范围或隐私审计记录 ID 等简短详情。不会记录凭据、原始错误、客户端地址或设备数据。最多保留最近 180 天内的 2,000 条事件，并纳入快照。`GET /api/events?after=ID&limit=N` 需要 `read` 权限，也允许已登录的所有者访问。
 
 **`fleet upgrade`** — 通过一次已审核的应用让集群保持最新。控制服务和每个节点 agent 会升级到当前 Meridian 附带的构建，每个 agent 就地升级并保留其节点身份；要获取更新的构建，请先运行 `meridian update`。中继无需等待 Meridian 更新即可升级到最新的 Realm 版本：选用 GitHub 上已测试主版本内的最新版本，连同 GitHub 为每个压缩包发布的 sha256 一起记录到 `cluster.yml`，每个中继在安装前都会校验。它会显示每台服务器上运行的版本并标为 `current` 或 `upgrade`，确认后应用已审核的计划，并在每台服务器上运行 `meridian check`。如果某个版本无法读取，命令会在任何改动之前以退出码 `3` 结束。
+
+**`fleet routing`** — 从本地拓扑读取当前客户端路由策略，并解释两种选项。`ru-split`（默认）让匹配规则的俄罗斯目的地、私有地址和局域网直连；`full` 让互联网流量通过 VPN，包括俄罗斯目的地，同时保留私有地址和局域网直连。两种策略均保留 QUIC 封锁，以及 Xray JSON 对已识别 BitTorrent 对等连接的直连规则，以减少针对出口服务器的滥用投诉。传入策略即可编辑拓扑、审核、确认，并应用此次审核的内容。没有终端或使用 `--json` 时，更改需要 `--yes`；`--dry-run` 显示审核结果而不应用。JSON 返回 `data.client_routing`、`choices[]` 以及适用的审核和应用结果。应用会在下次刷新订阅或手动刷新后收到策略。控制台在“设置”中只读显示策略。出口地理封锁单独设置；Base64 链接不携带路由规则。有关格式限制及如何在出口允许俄罗斯目的地，请参见[客户端路由](/zh/split-routing/)。
 
 **`fleet export`** — 把集群已审查的拓扑输出为可编辑的 YAML 文件：出口及其协议路径、中继、网关、出口池、路由规则、路由、客户端和集群设置。服务器以保存的名称（没有名称时用地址）出现，从不使用内部 ID；文件以 `schema: meridian.fleet/v1` 开头。Reality 密钥、API 令牌、客户端链接以及 XHTTP 和 WSS 的传输路径都留在 Meridian 中，不会列出。`--json` 在 `data.document` 下返回同一份文档。
 

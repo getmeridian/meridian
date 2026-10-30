@@ -403,6 +403,7 @@ def compile_topology(
         SubscriptionSettingsPayload(
             profile_title=intent.delivery.profile_title,
             update_interval_hours=intent.delivery.update_interval_hours,
+            client_routing=intent.delivery.client_routing,
         ),
         dependencies=[control_id],
     )

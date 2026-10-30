@@ -1550,6 +1550,84 @@ export const commandCatalog = {
     {
       "argv": [
         "fleet",
+        "routing",
+        "[POLICY]"
+      ],
+      "command": "fleet.routing",
+      "data_schema": "fleet-routing",
+      "description": "Show or change client routing: ru-split or full",
+      "envelope_schema": "fleet-routing-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "the current policy and choices were read; the policy is already selected; dry run: the policy change was reviewed; the reviewed policy was applied",
+        "1": "unexpected Meridian bug",
+        "2": "invalid policy or confirmation missing",
+        "3": "review, apply, or local-state failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "the current policy and choices were read",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "the policy is already selected",
+          "status": "no_changes"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "dry run: the policy change was reviewed",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "the reviewed policy was applied",
+          "status": "changed"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "invalid policy or confirmation missing",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "review, apply, or local-state failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "no_changes",
+        "changed",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "fleet",
         "status"
       ],
       "command": "fleet.status",

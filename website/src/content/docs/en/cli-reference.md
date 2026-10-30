@@ -312,6 +312,7 @@ meridian fleet inventory [--json]
 meridian fleet history [--json]
 meridian fleet events [--since ID] [--limit N] [--json]
 meridian fleet usage [--days N] [--json]
+meridian fleet routing [ru-split|full] [--dry-run] [--yes] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -322,10 +323,10 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 | `--since ID` | 0 | `fleet events`: read events after this cursor |
 | `--limit N` | 100 | `fleet events`: return 1–2000 events |
 | `--days N` | 30 | UTC days for `client usage` or `fleet usage`, 1–730, capped at the saved retention |
-| `--json` | | Emit the result as a `meridian.output/v1` envelope (`status`, `inventory`, `history`, `export`, `import`) |
+| `--json` | | Emit the result as a `meridian.output/v1` envelope (`status`, `inventory`, `history`, `routing`, `export`, `import`, `usage`) |
 | `--tested` | | `fleet upgrade`: skip GitHub; Realm stays on the tested version or what you already upgraded to |
-| `--yes`, `-y` | | `fleet upgrade`, `fleet import`: skip the confirmation |
-| `--dry-run` | | `fleet import`: show the changes and the review, apply nothing |
+| `--yes`, `-y` | | `fleet upgrade`, `fleet routing`, `fleet import`: skip the confirmation |
+| `--dry-run` | | `fleet routing`, `fleet import`: show the changes and the review, apply nothing |
 | `--forget-unreachable` | | `fleet import`: forget what was deployed on a removed server whose SSH port does not answer |
 
 **`fleet status`** — control service health, each agent's last report and whether it applied the current configuration, relay listeners, and client counts. Missing declared clients degrade health; disabled, limited, or expired clients are counted but are your choice, not a fault. A reachable relay listener only proves TCP, so unverified relay routes keep health `unknown`; use `meridian test` to check the full path. Exit `0` means healthy, `4` degraded, and `3` unknown.
@@ -341,6 +342,8 @@ The `active` column counts people with growth in the last report, with its colle
 **`fleet events`** — local lifecycle changes and node outages/recovery, oldest first after `--since ID` (default `0`). `--limit N` returns 1–2000 events, default 100. JSON returns `data.events[]`, `next_cursor`, and `has_more`; continue with the returned cursor. Each entry has a UTC time, kind, actor (token name, `root`, `owner`, or `system`), subject, and small details such as changed field names, token scope, or a privacy audit row ID. Credentials, raw errors, client addresses, and device data are excluded. The service keeps at most 2,000 events or 180 days, whichever is smaller, and includes them in snapshots. `GET /api/events?after=ID&limit=N` needs `read` scope and also admits the signed-in owner.
 
 **`fleet upgrade`** — brings the fleet up to date in one reviewed apply. The control service and every node agent move to the build this Meridian ships, and each agent upgrades in place, keeping its node's identity; run `meridian update` first to get newer ones. Relays move to the newest Realm release without waiting for a Meridian update: GitHub's newest release in the tested major, recorded in `cluster.yml` with the sha256 GitHub publishes for each archive, which every relay checks before installing. It shows what each server runs as `current` or `upgrade`, then, after you confirm, applies the reviewed plan and runs `meridian check` on every server. A version that cannot be read stops the command with exit `3` before anything changes.
+
+**`fleet routing`** — reads the current client policy from local topology and explains both choices. `ru-split` (default) sends matched Russian destinations and private/LAN ranges directly; `full` tunnels internet traffic, including Russian destinations, and keeps private/LAN ranges direct. Both retain QUIC blocking and Xray JSON's best-effort BitTorrent direct rule to reduce abuse complaints against exits. Pass a policy to edit the intent, review it, confirm, and apply exactly that review. Without a terminal or with `--json`, a change requires `--yes`; `--dry-run` shows the review without applying it. JSON returns `data.client_routing`, `choices[]`, and the review and apply when present. Apps receive the choice on their next subscription refresh or a manual refresh. The console shows it read-only in Settings. Exit geo-blocking stays separate; Base64 links carry no routing rules. See [Client routing](/en/split-routing/) for format limits and how to allow Russian destinations at an exit.
 
 **`fleet export`** — prints your fleet's reviewed topology as a YAML file you can edit: exits and their protocol paths, relays, gateways, egress pools, routing rules, routes, clients, and fleet settings. Servers appear by their saved name (or address when unnamed), never by internal ID, and the file starts with `schema: meridian.fleet/v1`. Reality keys, API tokens, client links, and the XHTTP and WSS transport paths stay in Meridian and are not listed. `--json` returns the same document under `data.document`.
 

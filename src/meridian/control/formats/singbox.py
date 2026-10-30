@@ -21,9 +21,17 @@ from meridian.control.formats.entries import (
     tls_fingerprint,
 )
 from meridian.control.models import ClientEndpoint
+from meridian.core.defaults import DEFAULT_CLIENT_ROUTING
+from meridian.core.topology import ClientRoutingPolicy
 
 
-def singbox_document(endpoints: list[ClientEndpoint], uuid: str, placeholders: tuple[str, ...] = ()) -> dict[str, Any]:
+def singbox_document(
+    endpoints: list[ClientEndpoint],
+    uuid: str,
+    placeholders: tuple[str, ...] = (),
+    *,
+    client_routing: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING,
+) -> dict[str, Any]:
     """Return the sing-box document for one user."""
     endpoints = [
         endpoint
@@ -36,7 +44,7 @@ def singbox_document(endpoints: list[ClientEndpoint], uuid: str, placeholders: t
     else:
         proxies = [singbox_outbound(endpoint, uuid) for endpoint in endpoints]
     names = [proxy["tag"] for proxy in proxies]
-    document = copy.deepcopy(singbox_template())
+    document = copy.deepcopy(singbox_template(client_routing=client_routing))
     for outbound in document["outbounds"]:
         if outbound["type"] == "selector":
             outbound["outbounds"] = [AUTOMATIC, *names]

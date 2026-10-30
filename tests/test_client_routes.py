@@ -17,7 +17,7 @@ def test_bittorrent_bypass_changes_only_xray_templates(monkeypatch: pytest.Monke
     # formats that must ignore the new protocol-only entry entirely.
     for name in ("xray_client_rules", "mihomo_client_rules", "singbox_client_rules"):
         renderer = getattr(delivery, name)
-        monkeypatch.setattr(delivery, name, lambda renderer=renderer: renderer(without_protocols))
+        monkeypatch.setattr(delivery, name, lambda routes, renderer=renderer: renderer(without_protocols))
     previous = {resource.logical_id: resource for resource in compile_panel_pass(intent).resources}
 
     xray_templates = 0

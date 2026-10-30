@@ -66,6 +66,7 @@ def serve_subscription(
         profile_title=settings.profile_title,
         public_url=settings.public_url,
         update_interval_hours=settings.update_interval_hours,
+        client_routing=settings.client_routing,
         now=datetime.fromtimestamp(clock(), UTC),
         placeholder_remarks=DEVICE_LIMIT_REMARKS if "x-hwid-limit" in hwid_flags else None,
         extra_headers=hwid_flags,

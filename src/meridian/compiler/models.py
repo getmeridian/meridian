@@ -17,7 +17,7 @@ from meridian.compiler.names import (
     RemnawaveUsername,
 )
 from meridian.core.client_limits import UserCreationSettings
-from meridian.core.defaults import SUBSCRIPTION_UPDATE_INTERVAL_HOURS
+from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import (
     IPAddressValue,
     OptionalCountryCodeValue,
@@ -30,6 +30,7 @@ from meridian.core.models import CoreModel
 from meridian.core.resources import ResourceKind as ResourceKind
 from meridian.core.topology import (
     DEFAULT_TLS_FINGERPRINT,
+    ClientRoutingPolicy,
     EgressOverrideMatch,
     EgressStrategy,
     ProtocolKind,
@@ -318,6 +319,9 @@ class SubscriptionSettingsPayload(CoreModel):
     kind: Literal["subscription_settings"] = "subscription_settings"
     profile_title: str
     update_interval_hours: SubscriptionUpdateIntervalHours = SUBSCRIPTION_UPDATE_INTERVAL_HOURS
+    client_routing: ClientRoutingPolicy = Field(
+        default=DEFAULT_CLIENT_ROUTING, exclude_if=lambda value: value == DEFAULT_CLIENT_ROUTING
+    )
     randomize_hosts: bool = False
     # Apps Remnawave knows read Xray JSON (Happ, v2rayNG, Streisand, ...) get it instead of
     # base64 links, and with it the automatic failover between entries.
@@ -507,6 +511,9 @@ class ServiceSettingsPayload(CoreModel):
     update_interval_hours: SubscriptionUpdateIntervalHours = Field(
         default=SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
         exclude_if=lambda value: value == SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
+    )
+    client_routing: ClientRoutingPolicy = Field(
+        default=DEFAULT_CLIENT_ROUTING, exclude_if=lambda value: value == DEFAULT_CLIENT_ROUTING
     )
 
 

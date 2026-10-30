@@ -27,7 +27,12 @@ from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE, B
 from meridian.control.command_models import CommandRequest, NodeCommandRecord, UserCutOffMutation
 from meridian.control.commands import COMMAND_TABLES, CommandLedger
 from meridian.control.cutoff import CutOffLedger
-from meridian.control.delivery_settings import save_update_interval_hours, update_interval_hours
+from meridian.control.delivery_settings import (
+    client_routing,
+    save_client_routing,
+    save_update_interval_hours,
+    update_interval_hours,
+)
 from meridian.control.devices import DEVICES_TABLE, DeviceLedger, HeaderReader
 from meridian.control.enrollment import NodeAuthority
 from meridian.control.errors import ServiceError
@@ -208,6 +213,7 @@ class ControlService:
             self._set_meta("profile_title", settings.profile_title)
             self._set_meta("public_url", settings.public_url)
             save_update_interval_hours(self._store, settings.update_interval_hours)
+            save_client_routing(self._store, settings.client_routing)
         return settings
 
     def settings(self) -> ServiceSettings:
@@ -215,6 +221,7 @@ class ControlService:
             profile_title=self._meta("profile_title") or "Meridian",
             public_url=self._meta("public_url") or "",
             update_interval_hours=update_interval_hours(self._store),
+            client_routing=client_routing(self._store),
         )
 
     def privacy(self) -> PrivacySettings:

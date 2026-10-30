@@ -85,6 +85,7 @@ COMMAND_SECTIONS: dict[str, str] = {
     "fleet history": "### meridian fleet",
     "fleet events": "### meridian fleet",
     "fleet usage": "### meridian fleet",
+    "fleet routing": "### meridian fleet",
     "context list": "### meridian context",
     "context use": "### meridian context",
     "context rename": "### meridian context",

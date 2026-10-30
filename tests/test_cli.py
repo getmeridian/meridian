@@ -170,6 +170,7 @@ class TestRenamedSpellings:
         (["server"], ["add", "list", "remove"]),
         (["fleet"], ["status", "inventory", "upgrade"]),
         (["fleet", "status"], ["--json"]),
+        (["fleet", "routing"], ["ru-split", "full", "--dry-run", "--yes", "--json"]),
         (["api"], ["commands", "schemas", "schema"]),
         (["doctor"], ["--ai"]),
         (["update"], []),

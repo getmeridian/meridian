@@ -1,6 +1,6 @@
 ---
-title: 分流（俄罗斯）
-description: 俄罗斯流量直连，其余流量走代理——既保护 VPS IP，又保证俄罗斯本土网站正常访问。
+title: 客户端路由
+description: 选择 ru-split 或 full，保留私有网络直连，并在应用前审核每次更改。
 ---
 
 ## 问题背景
@@ -24,19 +24,39 @@ Meridian 默认开启**服务器端地理封锁**：出口会丢弃发往俄罗�
 
 ## Meridian 中如何实现
 
-Meridian 在其下发的 **Xray JSON** 和 **Mihomo** 订阅中内置了分流规则，因此大多数应用无需手动配置。每份订阅都会将以下目标设为直连：
+默认客户端策略为 **`ru-split`**。Xray JSON、Mihomo 和 Stash 订阅会将以下目标设为直连：
 
 - 局域网与私有地址（`geosite:private`、`geoip:private`）
 - `.ru`、`.su` 和 `.рф` 域名，以及 `geosite:category-ru`
 - 俄罗斯 IP 段（`geoip:ru`）
 
-同时，订阅会拒绝发往其余目标的 QUIC（UDP 443）流量，使应用回退到 TCP，从而让代理按域名准确分流。
+sing-box 使用同一策略，但只采用私有 IP 和三个俄罗斯域名后缀的内联规则。它不会下载 geosite 或 geoip 列表，因此其他俄罗斯域名和 IP 段仍可能通过 VPN。
 
-仅导入纯链接列表（Base64）的应用不会收到路由规则。在这些应用中，请在路由设置里为 `geosite:category-ru` 和 `geoip:ru` 添加**直连（direct）**规则，或换用支持 Xray JSON 或 Mihomo 订阅的应用。Hiddify 用户也可以直接将地区设为**俄罗斯（Russia）**。
+两种策略都会在直连目标规则之后阻止 QUIC（UDP 443），使应用回退到 TCP。两种策略也都保留 **Xray JSON 中的 BitTorrent 直连规则**，以减少针对出口服务器的滥用投诉。该规则仅匹配已识别的对等连接握手；加密的对等连接和 UDP DHT/uTP 仍可能通过 VPN。Mihomo、Stash 和 sing-box 不携带 BitTorrent 匹配规则。
+
+### 选择策略
+
+| 策略 | 设备上的路由 |
+|------|--------------|
+| `ru-split`（默认） | 私有地址、局域网和匹配规则的俄罗斯目的地直连，其他流量通过 VPN |
+| `full` | 互联网流量通过 VPN，包括俄罗斯目的地；私有地址和局域网保持直连 |
+
+```bash
+meridian fleet routing
+meridian fleet routing full --dry-run
+meridian fleet routing full --yes
+meridian fleet routing ru-split --yes
+```
+
+不带参数的命令会显示当前策略并解释两种选项。更改会编辑拓扑、显示审核结果，并在确认后应用此次审核的内容。没有终端或使用 `--json` 时，须传入 `--yes`；`--dry-run --json` 会返回审核结果而不应用。应用会在下次刷新订阅时（默认每六小时，由 `delivery.update_interval_hours` 设置）或手动刷新后收到策略。设置向导继续使用 `ru-split`，不增加提问。
+
+`fleet export` 和 `fleet import` 会保留 `delivery.client_routing: full`。默认值 `ru-split` 会省略；从导出文件中删除此字段即可恢复默认策略。网页控制台在“设置”中只读显示策略，并提供更改策略的 CLI 命令。
+
+仅导入 Base64 链接列表的应用不会收到路由规则。请在这类应用中自行设置分流或全局路由，或使用包含配置的订阅。Hiddify 会接收 sing-box 文档并遵循其内联规则。
 
 ### 规则从哪里来
 
-控制服务根据你已审核的拓扑生成每一份 Xray JSON、Mihomo 和 sing-box 订阅：其中包含多个出口与中继之间的自动回退配置以及上述分流规则。没有需要手动编辑的模板。要改变流量走向，请在出口上使用 [`meridian route`](/zh/cli-reference/#meridian-route)，或使用[路由网关](#通过路由网关)的路由规则。
+控制服务根据同一份客户端路由规则列表和拓扑中的所选策略生成所有包含配置的订阅。用 [`meridian fleet routing`](/zh/cli-reference/#meridian-fleet) 更改设备路由。[`meridian route`](/zh/cli-reference/#meridian-route) 控制出口服务器的出站流量；[路由网关](#通过路由网关)则有自己的服务器规则。
 
 ## 两层机制如何配合
 
@@ -45,13 +65,15 @@ Meridian 在其下发的 **Xray JSON** 和 **Mihomo** 订阅中内置了分流�
 | **服务器端地理封锁** | 在出口丢弃发往俄罗斯的流量 | VPS IP 出现在俄罗斯服务的访问日志中 |
 | **设备端分流路由** | 从设备直接发送俄罗斯流量 | 俄罗斯本土网站打不开、代理承担不必要的流量 |
 
-正常情况下，俄罗斯流量根本不会发往服务器。如果某台设备没有分流规则（例如使用 Base64 导入或旧版应用），服务器端仍会拦截发往俄罗斯的请求，从而保护 VPS IP。
+在 `ru-split` 下，匹配客户端俄罗斯直连规则的目的地不会到达出口。如果设备没有路由规则（例如 Base64 导入或旧版应用），出口上已开启的地理封锁仍会拦截俄罗斯目的地。
 
-如果你的用户确实需要通过 VPN 访问俄罗斯网站，请在部署时加上 `--no-geo-block`。
+`full` 只更改客户端路由。要通过出口访问俄罗斯网站，出口也必须允许这些目的地：部署该出口时使用 `--no-geo-block`。更改客户端策略不会更改服务器端地理封锁。
 
 ## 通过路由网关
 
 路由网关（用 `meridian setup` 配置）是运行在出口之前一台服务器上的 Xray，它按规则逐条决定流量从哪里出去。每条规则会把匹配的流量发往某个出口、出口池、**直接从网关发出**，或者不发送（封锁）。网关位于俄罗斯时，直连规则会用网关自己的俄罗斯地址打开俄罗斯网站，即使应用没有收到任何分流规则也能访问：
+
+如果这部分流量需要经过网关规则，请选择 `full`。使用 `ru-split` 时，匹配规则的俄罗斯目的地已从设备直连。
 
 ```
 俄罗斯网站   → 设备 → 网关（俄罗斯境内） → 互联网
@@ -64,4 +86,4 @@ Meridian 在其下发的 **Xray JSON** 和 **Mihomo** 订阅中内置了分流�
 
 ## DNS 注意事项
 
-在 Xray JSON 订阅中，未命中直连规则的域名会通过代理解析，因此境外域名查询不会泄漏给本地 ISP。Mihomo 订阅仅对直接按 IP 发起的连接匹配俄罗斯 IP 段，不会在本地解析其他域名。如果你的应用带有独立的 DNS 设置，请为代理流量开启防 DNS 泄漏选项。
+在 Xray JSON 订阅中，未命中直连规则的域名会通过代理解析，因此境外域名查询不会泄漏给本地 ISP。使用 `ru-split` 时，Mihomo 仅对直接按 IP 发起的连接匹配俄罗斯 IP 段，不会在本地解析其他域名。如果你的应用带有独立的 DNS 设置，请为代理流量开启防 DNS 泄漏选项。

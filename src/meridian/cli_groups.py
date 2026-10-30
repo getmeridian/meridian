@@ -9,6 +9,7 @@ from typing import Annotated
 
 import typer
 
+from meridian.cli_fleet_routing import fleet_routing_cmd
 from meridian.cli_fleet_usage import fleet_usage_cmd
 from meridian.cli_node_commands import node_restart_cmd
 from meridian.cli_options import (
@@ -39,11 +40,14 @@ relay_app = typer.Typer(
     help="Add, list, or remove relays that forward traffic to an exit, or change their SNI", no_args_is_help=True
 )
 route_app = typer.Typer(help="Send chosen destinations through WARP, directly, or nowhere", no_args_is_help=True)
-fleet_app = typer.Typer(help="Fleet status, inventory, upgrades, and the fleet as a file", no_args_is_help=True)
+fleet_app = typer.Typer(
+    help="Fleet status, inventory, client routing, upgrades, and the fleet as a file", no_args_is_help=True
+)
 api_app = typer.Typer(help="Machine-readable contracts for scripts and UIs", no_args_is_help=True)
 dev_app = typer.Typer(help="Developer tools for testing and debugging", no_args_is_help=True)
 fleet_app.command("usage")(fleet_usage_cmd)
 node_app.command("restart", rich_help_panel="Operations")(node_restart_cmd)
+fleet_app.command("routing", rich_help_panel="Routing")(fleet_routing_cmd)
 
 
 @client_app.command("add")

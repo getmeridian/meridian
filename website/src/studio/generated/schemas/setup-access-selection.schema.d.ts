@@ -16,6 +16,10 @@ export type SquadName = string;
  */
 export type Users = [string, ...string[]];
 /**
+ * Client routing: ru-split bypasses Russian destinations; full tunnels them. Both bypass private/LAN ranges and retain Xray's best-effort BitTorrent bypass.
+ */
+export type ClientRouting = "ru-split" | "full";
+/**
  * @minItems 1
  */
 export type Formats = [
@@ -75,6 +79,7 @@ export interface DisplayNames {
  * Canonical Remnawave subscription presentation settings.
  */
 export interface DeliveryIntent {
+  client_routing?: ClientRouting;
   formats?: Formats;
   profile_title?: ProfileTitle;
   template_name?: TemplateName;

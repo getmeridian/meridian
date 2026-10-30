@@ -114,6 +114,16 @@
       "additionalProperties": false,
       "description": "Canonical Remnawave subscription presentation settings.",
       "properties": {
+        "client_routing": {
+          "default": "ru-split",
+          "description": "Client routing: ru-split bypasses Russian destinations; full tunnels them. Both bypass private/LAN ranges and retain Xray's best-effort BitTorrent bypass.",
+          "enum": [
+            "ru-split",
+            "full"
+          ],
+          "title": "Client Routing",
+          "type": "string"
+        },
         "formats": {
           "items": {
             "enum": [

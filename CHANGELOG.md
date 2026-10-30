@@ -45,6 +45,12 @@ that dials out to it.
 - API timestamps reject impossible dates and times before token or user settings can be stored.
 - Subscription primary and fingerprint groups keep the same endpoint order after duplicate names are disambiguated.
 - Xray subscriptions show availability notices when only fingerprint copies remain.
+- **Client routing policy** — `meridian fleet routing` reads or reviews `ru-split`
+  (default) and `full`, with a dry run and JSON output. Structured subscriptions
+  follow the choice; private/LAN ranges stay direct, and both retain Xray JSON's
+  best-effort BitTorrent direct rule to reduce abuse complaints against exits.
+  The default preserves existing plan and subscription bytes. Export/import
+  carries the policy, and the console shows it read-only in Settings.
 - **Subscription refresh interval** — delivery.update_interval_hours accepts 1–168
   hours (default 6), round-trips through fleet export/import, and reaches native
   apps in profile-update-interval.

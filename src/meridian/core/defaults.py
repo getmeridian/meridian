@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 # Default Reality camouflage target.  Duplicated from ``meridian.config``
 # so that the core contract layer stays free of CLI-specific state such as
 # paths, image tags, and environment-variable readers.
@@ -24,6 +26,9 @@ SUPPORT_PAGE: str = "pwa/support.html"
 
 # Hours between subscription refreshes (Happ and the Clash family read whole hours).
 SUBSCRIPTION_UPDATE_INTERVAL_HOURS: int = 6
+
+# Client routing stays compatible with subscriptions delivered before policy selection.
+DEFAULT_CLIENT_ROUTING: Literal["ru-split"] = "ru-split"
 
 # Device/server clock drift worth a warning. Nothing Meridian deploys checks the
 # clock to the second: Reality's `maxTimeDiff` is left unset (Xray then skips the

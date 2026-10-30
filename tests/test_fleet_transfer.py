@@ -194,6 +194,27 @@ def _applied(apply: MagicMock) -> SetupIntent:
 
 
 class TestExport:
+    @pytest.mark.parametrize("policy", ["ru-split", "full"])
+    @pytest.mark.parametrize("json_mode", [False, True])
+    def test_export_and_import_keep_the_client_routing_policy(
+        self, registry: ServerRegistry, tmp_path: Path, capsys: pytest.CaptureFixture[str], policy: str, json_mode: bool
+    ) -> None:
+        intent = _intent(delivery=DeliveryIntent(client_routing=policy))
+        with (
+            patch("meridian.commands.fleet_transfer.load_topology_cluster", return_value=_cluster(intent)),
+            patch("meridian.commands.fleet_transfer.is_json_mode", return_value=json_mode),
+        ):
+            run_export()
+        output = capsys.readouterr().out
+        document = json.loads(output)["data"]["document"] if json_mode else yaml.safe_load(output)
+        assert document["delivery"].get("client_routing", "ru-split") == policy
+        assert ("client_routing" in document["delivery"]) == (policy != "ru-split")
+
+        previous = _intent(delivery=DeliveryIntent(client_routing="full" if policy == "ru-split" else "ru-split"))
+        apply, _cluster_after = _import(tmp_path, yaml.safe_dump(document), _cluster(previous))
+
+        assert _applied(apply).delivery.client_routing == policy
+
     @pytest.mark.parametrize("json_mode", [False, True])
     def test_export_and_import_keep_the_subscription_refresh_interval(
         self, registry: ServerRegistry, tmp_path: Path, capsys: pytest.CaptureFixture[str], json_mode: bool

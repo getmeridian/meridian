@@ -24,25 +24,37 @@ from meridian.control.formats.entries import (
 )
 from meridian.control.formats.links import finalmask
 from meridian.control.models import ClientEndpoint
+from meridian.core.defaults import DEFAULT_CLIENT_ROUTING
+from meridian.core.topology import ClientRoutingPolicy
 
 PROXY_TAG = "MERIDIAN_PROXY"
 
 
 def xray_json_document(
-    endpoints: list[ClientEndpoint], uuid: str, placeholders: tuple[str, ...] = ()
+    endpoints: list[ClientEndpoint],
+    uuid: str,
+    placeholders: tuple[str, ...] = (),
+    *,
+    client_routing: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING,
 ) -> list[dict[str, Any]]:
     """Return the Xray JSON document: one config per automatic group (or per placeholder)."""
     endpoints = presentation_endpoints(endpoints)
     placeholders = availability_placeholders(primaries(endpoints), placeholders)
     if placeholders:
-        return [_config([], uuid, remark) for remark in placeholders]
-    configs = [_config(primaries(endpoints), uuid, AUTOMATIC)]
-    configs += [_config(members, uuid, remark) for remark, members in copy_groups(endpoints)]
+        return [_config([], uuid, remark, client_routing) for remark in placeholders]
+    configs = [_config(primaries(endpoints), uuid, AUTOMATIC, client_routing)]
+    configs += [_config(members, uuid, remark, client_routing) for remark, members in copy_groups(endpoints)]
     return configs
 
 
-def _config(endpoints: list[ClientEndpoint], uuid: str, remark: str) -> dict[str, Any]:
-    config = {key: value for key, value in copy.deepcopy(xray_json_template()).items() if key != "remnawave"}
+def _config(
+    endpoints: list[ClientEndpoint], uuid: str, remark: str, client_routing: ClientRoutingPolicy
+) -> dict[str, Any]:
+    config = {
+        key: value
+        for key, value in copy.deepcopy(xray_json_template(client_routing=client_routing)).items()
+        if key != "remnawave"
+    }
     proxies = [
         {"tag": PROXY_TAG if index == 1 else f"{PROXY_TAG}-{index}", **xray_outbound(endpoint, uuid)}
         for index, endpoint in enumerate(endpoints, start=1)

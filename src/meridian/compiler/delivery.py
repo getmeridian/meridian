@@ -7,6 +7,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from meridian.core.defaults import DEFAULT_CLIENT_ROUTING
+from meridian.core.topology import ClientRoutingPolicy
+
 _PROBE_URL = "https://www.apple.com/library/test/success.html"
 
 _REGEX_SPECIAL = frozenset("\\.^$|?*+()[]{}")
@@ -30,6 +33,7 @@ class ClientRoute:
     network: Literal["", "udp"] = ""
     port: str = ""
     protocols: tuple[str, ...] = ()
+    ru_split_only: bool = False
 
 
 # Russian destinations stay off the tunnel: domestic services refuse foreign
@@ -39,8 +43,10 @@ class ClientRoute:
 # This is best-effort: encrypted peers and UDP DHT/uTP may still use the tunnel.
 DEFAULT_CLIENT_ROUTES: tuple[ClientRoute, ...] = (
     ClientRoute("direct", domains=("geosite:private",), ips=("geoip:private",)),
-    ClientRoute("direct", domains=("domain:ru", "domain:su", "domain:xn--p1ai", "geosite:category-ru")),
-    ClientRoute("direct", ips=("geoip:ru",)),
+    ClientRoute(
+        "direct", domains=("domain:ru", "domain:su", "domain:xn--p1ai", "geosite:category-ru"), ru_split_only=True
+    ),
+    ClientRoute("direct", ips=("geoip:ru",), ru_split_only=True),
     ClientRoute("block", network="udp", port="443"),
     ClientRoute("direct", protocols=("bittorrent",)),
 )
@@ -52,6 +58,15 @@ ROUTE_ONLY_SNIFFING: dict[str, Any] = {"enabled": True, "destOverride": ["http",
 
 _XRAY_OUTBOUND: dict[ClientRouteAction, str] = {"direct": "DIRECT", "block": "BLOCK"}
 _MIHOMO_TARGET: dict[ClientRouteAction, str] = {"direct": "DIRECT", "block": "REJECT"}
+
+
+def client_routes(policy: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING) -> tuple[ClientRoute, ...]:
+    """Derive both reviewed policies from the one ordered client list.
+
+    Full routing removes only the Russian bypasses. Private/LAN bypasses,
+    QUIC blocking, and the best-effort BitTorrent bypass stay in both policies.
+    """
+    return tuple(route for route in DEFAULT_CLIENT_ROUTES if not route.ru_split_only or policy == "ru-split")
 
 
 def xray_client_rules(routes: tuple[ClientRoute, ...] = DEFAULT_CLIENT_ROUTES) -> list[dict[str, Any]]:
@@ -118,7 +133,9 @@ def _mihomo_ip(matcher: str) -> str:
     raise ValueError(f"Unsupported client IP matcher: {matcher}")
 
 
-def xray_json_template(edge_tag: str = "MERIDIAN_V4_XRAY_EDGE") -> dict[str, Any]:
+def xray_json_template(
+    edge_tag: str = "MERIDIAN_V4_XRAY_EDGE", *, client_routing: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING
+) -> dict[str, Any]:
     """Route through the hidden edge Hosts tagged *edge_tag* and block all-down."""
     return {
         "remnawave": {
@@ -138,7 +155,7 @@ def xray_json_template(edge_tag: str = "MERIDIAN_V4_XRAY_EDGE") -> dict[str, Any
         "routing": {
             "domainStrategy": "IPIfNonMatch",
             "rules": [
-                *xray_client_rules(),
+                *xray_client_rules(client_routes(client_routing)),
                 {
                     "type": "field",
                     "network": "tcp,udp",
@@ -196,13 +213,15 @@ def xray_json_template(edge_tag: str = "MERIDIAN_V4_XRAY_EDGE") -> dict[str, Any
     }
 
 
-def mihomo_template(exclude_from_failover: Sequence[str] = ()) -> str:
+def mihomo_template(
+    exclude_from_failover: Sequence[str] = (), *, client_routing: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING
+) -> str:
     """Pick entries by hand or let an ordered, health-checked fallback group choose.
 
     Remnawave appends every entry to both groups; *exclude_from_failover* names entries the
     fallback group must skip (fingerprint copies), matched exactly.
     """
-    rules = "".join(f"  - {rule}\n" for rule in mihomo_client_rules())
+    rules = "".join(f"  - {rule}\n" for rule in mihomo_client_rules(client_routes(client_routing)))
     exclude = ""
     if exclude_from_failover:
         pattern = "|".join(_regex_literal(name) for name in exclude_from_failover)
@@ -234,7 +253,7 @@ def _regex_literal(value: str) -> str:
     return "".join(f"\\{char}" if char in _REGEX_SPECIAL else char for char in value)
 
 
-def singbox_template() -> dict[str, Any]:
+def singbox_template(*, client_routing: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING) -> dict[str, Any]:
     """Pick the lowest-latency working Host automatically, with every Host also selectable.
 
     Remnawave fills each selector and urltest with the user's proxies; it skips XHTTP,
@@ -286,7 +305,7 @@ def singbox_template() -> dict[str, Any]:
             "rules": [
                 {"action": "sniff"},
                 {"protocol": "dns", "action": "hijack-dns"},
-                *singbox_client_rules(),
+                *singbox_client_rules(client_routes(client_routing)),
             ],
             "final": "Meridian",
             "auto_detect_interface": True,

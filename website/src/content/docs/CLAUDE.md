@@ -1,6 +1,7 @@
 # content/docs — Markdown documentation source
 
 ## Design decisions
+**Client routing policy** — split-routing.md documents reviewed `ru-split | full`, private/LAN and best-effort Xray BitTorrent bypasses, format limits, subscription refresh, read-only console settings, and separate exit geo-blocking in every locale.
 
 **People API access** — the API-token section in client-management documents the separate people capability, credential access, and transactional declared-user refusals in all four locales.
 
