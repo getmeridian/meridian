@@ -450,7 +450,7 @@
   "client.metadata_none": "ندارد",
   "client.note_invalid": "یادداشت باید متن ساده و حداکثر ۵۰۰ نویسه باشد. رفتن به خط جدید مجاز است.",
   "client.tag_invalid": "از ۱ تا ۱۶ حرف بزرگ A–Z، رقم یا زیرخط استفاده کنید؛ none برچسب را پاک می‌کند.",
-  "client.set_options_hint": "یکی از گزینه‌های --limit، --reset، --expires، --devices، --note یا --tag را وارد کنید.",
+  "client.set_options_hint": "یکی از گزینه‌های --limit، --reset، --expires، --devices، --note، --tag یا --language را وارد کنید.",
   "client.settings_updated": "تنظیمات {name} به‌روزرسانی شد.",
   "fleet_contact.text": "راهنما",
   "fleet_contact.link": "پیوند تماس",
@@ -533,5 +533,12 @@
   "notice.error_length": "از ۱ تا ۵۰۰ نویسهٔ متن ساده وارد کنید.",
   "notice.error_paragraph": "از یک بند بدون شکست خط یا نویسه‌های کنترلی استفاده کنید.",
   "notice.error_substitutions": "جای‌گذاری‌های مجاز: {fields}",
-  "notice.error_expansion": "تعداد جای‌گذاری‌ها را کم کنید تا پیام در ۱۰۲۴ نویسه جا شود."
+  "notice.error_expansion": "تعداد جای‌گذاری‌ها را کم کنید تا پیام در ۱۰۲۴ نویسه جا شود.",
+  "language.invalid": "یکی از en، ru، fa یا zh را انتخاب کنید.",
+  "language.invalid_person": "یکی از en، ru، fa، zh یا default برای زبان پیش‌فرض سرویس را انتخاب کنید.",
+  "language.default": "پیش‌فرض سرویس",
+  "language.saved": "زبان اشتراک ذخیره شد: {language}",
+  "language.current": "زبان اشتراک: {language}",
+  "client.label.language": "زبان اشتراک",
+  "events.kind.language.changed": "زبان اشتراک تغییر کرد"
 }

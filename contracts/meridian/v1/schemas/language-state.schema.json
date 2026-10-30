@@ -1,0 +1,23 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "changed": {
+      "default": false,
+      "title": "Changed",
+      "type": "boolean"
+    },
+    "language": {
+      "default": "en",
+      "enum": [
+        "en",
+        "ru",
+        "fa",
+        "zh"
+      ],
+      "title": "Language",
+      "type": "string"
+    }
+  },
+  "title": "LanguageState",
+  "type": "object"
+}

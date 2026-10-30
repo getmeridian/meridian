@@ -110,7 +110,7 @@ meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DA
 meridian client show NAME [--connections] [--json]
 meridian client usage NAME [--days N] [--json]
 meridian client list [--attention] [--tag TAG|none] [--json]
-meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]
@@ -342,6 +342,7 @@ meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--j
 meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
 meridian fleet notice clear [--yes] [--json]
+meridian fleet language [en|ru|fa|zh] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -386,6 +387,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 `GET /api/servers` требует права read и возвращает контракт `server-usage`: сведения о сервере, границы периода по UTC, учтённые байты, начало учёта, следующую оплату и охват измерения. `GET /api/attention` добавляет `servers[]`: `allowance_near` при 80%, `allowance_exceeded` при 100%, `payment_due` за 7 дней до оплаты и `payment_overdue` для прошедшей разовой даты. Пороги запроса `allowance_percent` и `allowance_exceeded_percent` принимают 1–100, первый не выше второго; `payment_days` принимает 1–30. Предупреждения об оплате и лимитах устанавливают `summary.needs_attention`; состояние серверов и коды выхода по-прежнему описывают работу сервисов.
 
 Сообщение хранится в управляющем сервисе. `fleet notice set` показывает предпросмотр перед подтверждением; `--until WHEN` задаёт срок, `--for NAME` подставляет данные аккаунта, а изменение в JSON требует `--yes`. `fleet notice show` читает сообщение; `fleet notice clear` подтверждает удаление. Подробнее: [Управление клиентами](/ru/client-management/).
+
+Короткие статусы подписок используют заданный язык сервиса: `en`, `ru`, `fa` или `zh`. `fleet language` читает настройку; `fleet language CODE` сохраняет её. `client set NAME --language CODE` задаёт язык человека, `--language default` возвращает общий. Коды статусов остаются английскими. Настройки сохраняются при проверенных применениях и в зашифрованных резервных копиях.
 
 ### meridian context
 

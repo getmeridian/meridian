@@ -48,7 +48,7 @@ def drop_token_expiry_schema(db: sqlite3.Connection) -> None:
 def drop_person_metadata_schema(db: sqlite3.Connection) -> None:
     """Older fixtures must not retain the operator metadata added in schema step 15."""
     columns = {column[1] for column in db.execute("PRAGMA table_info(users)")}
-    for column in ("note", "tag"):
+    for column in ("note", "tag", "language"):
         if column in columns:
             db.execute(f"ALTER TABLE users DROP COLUMN {column}")
 

@@ -945,6 +945,7 @@ export const commandCatalog = {
         "--devices",
         "--note",
         "--tag",
+        "--language",
         "--json",
         "--context"
       ],
@@ -1626,6 +1627,76 @@ export const commandCatalog = {
       "stability": "stable",
       "statuses": [
         "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "fleet",
+        "language",
+        "[LANGUAGE]"
+      ],
+      "command": "fleet.language",
+      "data_schema": "language-state",
+      "description": "Read or set the fleet's subscription status language",
+      "envelope_schema": "fleet-language-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "language read; language saved; language unchanged",
+        "1": "unexpected Meridian bug",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "language read",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "language saved",
+          "status": "changed"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "language unchanged",
+          "status": "no_changes"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "changed",
+        "no_changes",
         "failed"
       ]
     },

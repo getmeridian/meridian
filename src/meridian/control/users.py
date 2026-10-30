@@ -20,6 +20,7 @@ USER_FIELDS = (
     "device_limit",
     "note",
     "tag",
+    "language",
 )
 # Lifetime includes the ledger and imported use; the offset leaves the current period's growth.
 USER_SELECT = (

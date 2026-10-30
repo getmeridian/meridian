@@ -450,7 +450,7 @@
   "client.metadata_none": "无",
   "client.note_invalid": "备注须为纯文本，最多 500 个字符，支持换行。",
   "client.tag_invalid": "请使用 1–16 个大写字母 A–Z、数字或下划线；none 清除标签。",
-  "client.set_options_hint": "请指定 --limit、--reset、--expires、--devices、--note 或 --tag。",
+  "client.set_options_hint": "请指定 --limit、--reset、--expires、--devices、--note、--tag 或 --language。",
   "client.settings_updated": "已更新 {name} 的设置。",
   "fleet_contact.text": "说明",
   "fleet_contact.link": "联系链接",
@@ -533,5 +533,12 @@
   "notice.error_length": "请输入 1–500 个字符的纯文本。",
   "notice.error_paragraph": "请输入单段文本，不含换行或控制字符。",
   "notice.error_substitutions": "允许的替换字段：{fields}",
-  "notice.error_expansion": "请减少替换字段，使通知不超过 1,024 个字符。"
+  "notice.error_expansion": "请减少替换字段，使通知不超过 1,024 个字符。",
+  "language.invalid": "请选择 en、ru、fa 或 zh。",
+  "language.invalid_person": "请选择 en、ru、fa、zh，或用 default 采用服务默认语言。",
+  "language.default": "服务默认语言",
+  "language.saved": "订阅语言已保存：{language}",
+  "language.current": "订阅语言：{language}",
+  "client.label.language": "订阅语言",
+  "events.kind.language.changed": "订阅语言已更改"
 }

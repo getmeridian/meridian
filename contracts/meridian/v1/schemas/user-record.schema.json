@@ -55,6 +55,25 @@
       "description": "When the service first accepted traffic growth; unknown for historical use.",
       "title": "First Traffic At"
     },
+    "language": {
+      "anyOf": [
+        {
+          "enum": [
+            "en",
+            "ru",
+            "fa",
+            "zh"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Subscription status language; null uses the fleet default.",
+      "title": "Language"
+    },
     "last_traffic_node": {
       "anyOf": [
         {

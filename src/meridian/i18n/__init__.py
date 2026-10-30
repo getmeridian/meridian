@@ -12,12 +12,14 @@ import os
 import re
 from functools import cache
 from pathlib import Path
-from typing import Literal, cast, get_args
+from typing import cast
 
-Locale = Literal["en", "ru", "fa", "zh"]
-LOCALES: tuple[Locale, ...] = get_args(Locale)
-LOCALE_NAMES: dict[Locale, str] = {"en": "English", "ru": "Русский", "fa": "فارسی", "zh": "中文"}
-DEFAULT_LOCALE: Locale = "en"
+from meridian.core.languages import DEFAULT_LANGUAGE as DEFAULT_LOCALE
+from meridian.core.languages import LANGUAGE_NAMES
+from meridian.core.languages import LANGUAGES as LOCALES
+from meridian.core.languages import Language as Locale
+
+LOCALE_NAMES = LANGUAGE_NAMES
 
 _CATALOG_DIR = Path(__file__).parent / "locales"
 _current: Locale = DEFAULT_LOCALE

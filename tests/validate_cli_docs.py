@@ -83,6 +83,7 @@ COMMAND_SECTIONS: dict[str, str] = {
     "fleet notice show": "### meridian fleet",
     "fleet notice set": "### meridian fleet",
     "fleet notice clear": "### meridian fleet",
+    "fleet language": "### meridian fleet",
     "fleet upgrade": "### meridian fleet",
     "fleet export": "### meridian fleet",
     "fleet import": "### meridian fleet",

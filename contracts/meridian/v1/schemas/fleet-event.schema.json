@@ -178,11 +178,12 @@
               "credentials",
               "created_at",
               "traffic_reset_at",
-              "lifetime_traffic_bytes"
+              "lifetime_traffic_bytes",
+              "language"
             ],
             "type": "string"
           },
-          "maxItems": 9,
+          "maxItems": 10,
           "minItems": 1,
           "title": "Fields",
           "type": "array"
@@ -282,6 +283,7 @@
         "command.result",
         "privacy.changed",
         "notice.changed",
+        "language.changed",
         "token.created",
         "token.revoked"
       ],

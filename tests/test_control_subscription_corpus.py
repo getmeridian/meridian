@@ -18,7 +18,9 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import pytest
 import yaml
@@ -27,9 +29,11 @@ from meridian.control.formats.entries import SubscriptionUser, presentation_endp
 from meridian.control.formats.selector import SUFFIX_FORMATS, select_format
 from meridian.control.models import ClientEndpoint
 from meridian.control.subscriptions import SubscriptionResponse, render_subscription, unknown_subscription
+from meridian.core.languages import Language
 from tests.systemlab.golden_corpus import Capture, Response, decode_body, load_corpus, normalize_response
 
 CORPUS = load_corpus()
+STATUS_LANGUAGE = json.loads((Path(__file__).parent / "systemlab/golden/status-language.json").read_text())
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
 
 # -- service inputs equivalent to each captured fleet ---------------------------------------
@@ -280,14 +284,14 @@ def _individual_xray_profiles(text: str, endpoints: list[ClientEndpoint]) -> str
 # -- rendering and comparison ----------------------------------------------------------------
 
 
-def _render(capture: Capture) -> SubscriptionResponse:
+def _render(capture: Capture, language: Language = "en") -> SubscriptionResponse:
     """What the service answers this request, from the fleet's equivalent inputs."""
     request = capture.request
     if request["user"] == "unknown":
         return unknown_subscription()
     fleet = FLEETS[capture.topology]
     status = "disabled" if request["user"] == "disabled" else "active"
-    user = SubscriptionUser(username=fleet.username, uuid=UUID, short_id=SHORT_ID, status=status)
+    user = SubscriptionUser(username=fleet.username, uuid=UUID, short_id=SHORT_ID, status=status, language=language)
     document = SUFFIX_FORMATS[request["selector"]] if request["selector"] else None
     document = document or select_format(request["user_agent"], request["accept"])
     return render_subscription(
@@ -362,6 +366,42 @@ def test_service_answers_like_the_corpus(key: tuple[str, str]) -> None:
     deviation = DEVIATIONS.get(key[1])
     reason = f"deliberate deviation: {deviation.reason}" if deviation else "matches the corpus"
     assert _differences(_expected(capture), _normalized(capture, _render(capture))) == [], reason
+
+
+def localized_status_response(response: Response, language: Language) -> Response:
+    """A named presentation-only deviation from the frozen English captures."""
+    translations = dict(zip(STATUS_LANGUAGE["en"]["disabled"], STATUS_LANGUAGE[language]["disabled"], strict=True))
+
+    def translate(value: Any) -> Any:
+        if isinstance(value, str):
+            for original, translated in translations.items():
+                value = value.replace(quote(original, safe=""), quote(translated, safe=""))
+            return translations.get(value, value)
+        if isinstance(value, list):
+            return [translate(item) for item in value]
+        if isinstance(value, dict):
+            return {key: translate(item) for key, item in value.items()}
+        return value
+
+    body = (
+        translate(response.body)
+        if response.encoding == "base64"
+        else json.dumps(translate(_document(response.body)), ensure_ascii=False)
+    )
+    return Response(response.status, response.format, response.encoding, response.headers, body)
+
+
+DISABLED_KEYS = [key for key in KEYS_ALL if CORPUS[key].request["user"] == "disabled"]
+
+
+@pytest.mark.parametrize("language", ["ru", "fa", "zh"])
+@pytest.mark.parametrize("key", DISABLED_KEYS, ids=[f"{topology}/{request}" for topology, request in DISABLED_KEYS])
+def test_localized_status_remarks_preserve_the_native_corpus(language: Language, key: tuple[str, str]) -> None:
+    capture = CORPUS[key]
+    expected = localized_status_response(_expected(capture), language)
+    assert _differences(expected, _normalized(capture, _render(capture, language))) == [], (
+        "Only status remarks are translated; native structure and inert credentials stay frozen."
+    )
 
 
 @pytest.mark.parametrize("request_id", sorted(DEVIATIONS))

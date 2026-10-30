@@ -8,6 +8,7 @@
 - Person and CLI guides document individual credentials, explicit format URLs, their people/admin access, and the producing-output boundary in every locale.
 - Subscription guides explain Automatic-first Xray profiles and single-primary routing without mixing fingerprint alternatives.
 - The person-screen guide describes effective enable results and preserves parity across all four locales.
+- All four client, connecting, and CLI guides distinguish the explicit subscription-language default, nullable person overrides, stable English status codes, and the connection page's own picker.
 - Client, connecting, and CLI guides document operator notices, safe substitutions, expiry, rendered confirmation, encrypted snapshots, and content-free events in all four locales.
 - Client and connecting guides explain reviewed public owner contact, user-initiated support links, explicit clearing, and bounded inactive remarks in every locale.
 - Client guides document private notes/tags, explicit clearing, tag filters, people/admin scope, snapshots, and migration bounds in all four locales.

@@ -10,6 +10,7 @@ from typing import Annotated
 import typer
 
 from meridian.cli_fleet_contact import fleet_contact_cmd
+from meridian.cli_fleet_language import fleet_language_cmd
 from meridian.cli_fleet_notice import notice_app
 from meridian.cli_fleet_routing import fleet_routing_cmd
 from meridian.cli_fleet_usage import fleet_usage_cmd
@@ -53,6 +54,7 @@ node_app.command("restart", rich_help_panel="Operations")(node_restart_cmd)
 fleet_app.command("routing", rich_help_panel="Routing")(fleet_routing_cmd)
 fleet_app.command("contact", rich_help_panel="Connection pages")(fleet_contact_cmd)
 fleet_app.add_typer(notice_app, name="notice", rich_help_panel="Connection pages")
+fleet_app.command("language", rich_help_panel="Connection pages")(fleet_language_cmd)
 server_app.command("set", rich_help_panel="Allowances and payments")(server_set_cmd)
 
 
@@ -136,6 +138,9 @@ def client_set_cmd(
     tag: str | None = typer.Option(
         None, "--tag", metavar="TAG", help="1–16 uppercase letters, digits, underscores; none clears"
     ),
+    language: str | None = typer.Option(
+        None, "--language", metavar="LANGUAGE", help="Subscription status language: en, ru, fa, zh, or default"
+    ),
     _json: Json = False,
 ) -> None:
     """Change a client's traffic limit, reset period, or expiry
@@ -150,7 +155,7 @@ def client_set_cmd(
     """
     from meridian.commands.client_limits import run_set
 
-    run_set(name, limit=limit, reset=reset, expires=expires, devices=devices, note=note, tag=tag)
+    run_set(name, limit=limit, reset=reset, expires=expires, devices=devices, note=note, tag=tag, language=language)
 
 
 @client_app.command("devices", rich_help_panel="Device limits")

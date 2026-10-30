@@ -66,6 +66,7 @@ from meridian.core.client_limits import ClientExtendRequest
 from meridian.core.clients import ClientConnections
 from meridian.core.errors import MeridianError
 from meridian.core.fleet_events import FleetEventPage, FleetEventQuery
+from meridian.core.languages import LanguageSettings, LanguageState
 from meridian.core.notices import NoticeState, NoticeWrite
 from meridian.core.server_allowances import ServerUsageList
 
@@ -199,6 +200,12 @@ class ControlClient:
         return NoticeState.model_validate(
             self._request("PUT", "api/notice", request.model_dump(mode="json"), mutation_method=method).json()
         )
+
+    def language(self) -> LanguageState:
+        return LanguageState.model_validate(self._call("GET", "api/language"))
+
+    def set_language(self, settings: LanguageSettings) -> LanguageState:
+        return LanguageState.model_validate(self._call("PUT", "api/language", settings.to_data()))
 
     def set_privacy(self, settings: PrivacySettings) -> PrivacyUpdateResult:
         return PrivacyUpdateResult.model_validate(self._call("PUT", "api/privacy", settings.model_dump(mode="json")))

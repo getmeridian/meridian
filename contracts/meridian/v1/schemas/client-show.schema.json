@@ -167,6 +167,25 @@
           "title": "Id",
           "type": "string"
         },
+        "language": {
+          "anyOf": [
+            {
+              "enum": [
+                "en",
+                "ru",
+                "fa",
+                "zh"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Subscription status language; null uses the fleet default.",
+          "title": "Language"
+        },
         "last_seen": {
           "title": "Last Seen",
           "type": "string"

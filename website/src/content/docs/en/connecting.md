@@ -50,3 +50,7 @@ An app's support button may open the same contact link. If it opens a Meridian s
 ## Messages from the owner
 
 Your connection page may show a notice from the person who runs the service, such as a maintenance time. Some apps show the same notice after refreshing the subscription. Account values in it are filled in for you. An expired notice disappears; the page loads it from the same service and makes no outside requests.
+
+## Status messages in your app
+
+If access is disabled, has expired, or has reached its traffic allowance, the entries in your app explain the reason and ask you to contact the owner. The owner chooses the language for these messages and can set one for your account. Your connection page keeps its own language picker. These explanatory entries cannot connect; ask the owner to restore access.

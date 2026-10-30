@@ -5,6 +5,7 @@ make system-lab
 uv run pytest tests/systemlab/ -q
 ```
 ## Design decisions
+- `golden/status-language.json` is the reviewed four-language wording reference; localized corpus replay replaces only fixed disabled labels and keeps native documents, headers, and inert credentials unchanged.
 
 **Real services over mocks** — privileged systemd/SSH containers stand in for two exits, two relay hops, and a routing gateway; the controller deploys through the same CLI and SSH paths as a VPS.
 **This checkout, not a release** — the controller is an editable install with uv, so deploys upload this checkout's wheel (`control_artifacts`) and the agent `make system-lab-agent` built for the Docker daemon's architecture; the control server installs `ctld` and exits run `netagent`/`netcore` as systemd units, with no nested Docker.

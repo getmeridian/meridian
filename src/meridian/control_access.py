@@ -40,6 +40,7 @@ from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientLimitChange, TrafficReset
 from meridian.core.clients import ClientConnections
 from meridian.core.fleet import FleetTopology
+from meridian.core.languages import LanguageSettings, LanguageState
 from meridian.core.notices import NoticeState, NoticeWrite
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.traffic import NodeTrafficEvidence
@@ -96,6 +97,12 @@ class ServiceAccessPanel:
     def set_notice(self, request: NoticeWrite) -> NoticeState:
         return _translated(lambda: self._client.set_notice(request))
 
+    def language(self) -> LanguageState:
+        return _translated(self._client.language)
+
+    def set_language(self, settings: LanguageSettings) -> LanguageState:
+        return _translated(lambda: self._client.set_language(settings))
+
     def user_usage(self, username: str, *, days: int = 30) -> UserUsage:
         return _translated(lambda: self._client.user_usage(username, days=days))
 
@@ -143,6 +150,8 @@ class ServiceAccessPanel:
             fields["expire_at"] = change.expires_at  # None clears the expiry
         if change.sets_devices:
             fields["device_limit"] = change.device_limit
+        if change.sets_language:
+            fields["language"] = change.language
         for field in ("note", "tag"):
             if getattr(change, field) is not None:
                 fields[field] = getattr(change, field)
@@ -209,6 +218,7 @@ class ServiceAccessPanel:
             hwid_device_limit=record.device_limit,
             description=record.note,
             tag=record.tag,
+            language=record.language,
         )
 
 

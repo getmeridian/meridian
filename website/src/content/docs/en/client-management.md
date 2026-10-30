@@ -304,3 +304,15 @@ One service-owned notice appears as a banner on connection pages and in apps tha
 `--until` accepts a future UTC instant or a date (end of that day in UTC); omit it for no expiry. Expired notices stop being delivered. `--for NAME` renders real account values for the confirmation; without it the preview uses sample values. `show --for NAME` reads the saved notice and its preview. Saving and clearing require confirmation, and JSON changes require `--yes`. Console Settings offers the same editor and rendered confirmation.
 
 These are operator settings: reviewed applies preserve them. `GET /api/notice?for=NAME` needs read scope; `PUT /api/notice` needs admin or the owner session and accepts `{"notice":{"text":"Hello {name}","until":null},"for_user":"person","confirm":false}` to preview. Set `confirm` to `true` to save, or `notice` to `null` to clear. Previews do not change storage or register devices. Encrypted snapshots include the notice; `notice.changed` events record who changed it without its text. No push or messaging notification is sent.
+
+## Language for subscription status messages
+
+```bash
+meridian fleet language ru --json
+meridian client set person --language fa --json
+meridian client set person --language default --json
+```
+
+Native apps can explain disabled, expired, and traffic-limited subscriptions in English (`en`), Russian (`ru`), Persian (`fa`), or Chinese (`zh`). The service default is explicitly `en`; it does not guess from User-Agent, Accept, the CLI language, or browser preferences. `meridian fleet language` reads the default; passing a code saves it immediately. Settings has the same default-language control. `client set NAME --language CODE` gives one person an override; `--language default` clears it. An omitted option preserves it, and client list/show JSON exposes the nullable `language` field.
+
+These settings live in the service, survive encrypted snapshots, and are preserved by reviewed applies. `GET /api/language` needs read scope; `PUT /api/language` with `{"language":"ru"}` needs admin or the owner session. `PATCH /api/users/NAME` accepts `{"language":"fa"}` or `{"language":null}` under people/admin access. Status values remain `active`, `disabled`, `limited`, and `expired`; only the fixed client-list remarks are translated, and their connections remain inert. The connection page keeps its own language picker.

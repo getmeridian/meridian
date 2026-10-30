@@ -2,6 +2,7 @@
 
 ## Design decisions
 - `client show --connections` reads the same canonical list and explicit format URLs as the person screen; only its final output reveals credential paths.
+- `fleet language [CODE]` reads or directly saves the service default; `client set --language CODE|default` uses one partial PATCH with the existing limits and metadata, and neither action runs reviewed apply.
 - `fleet notice set|clear` requires confirmation (`--yes` for JSON) after a service-rendered preview; `--for NAME` uses the usual exact-name/display-name resolution, and these operator settings never edit or apply topology.
 - `fleet contact --text/--link` reviews and applies only the delivery contact edit, preserves omitted fields, supports explicit clearing, and requires --yes for JSON changes; exact JSON paths preserve public contact values in export/import reviews.
 - `client set --note TEXT --tag TAG` edits service-owned metadata with limits in one PATCH; `--note ""` and `--tag none` clear, while uppercase `NONE` remains a tag. Client reads include console people and `client list --tag` filters before status counts.

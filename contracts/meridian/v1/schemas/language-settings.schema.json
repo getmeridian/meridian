@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "description": "Operator-owned default for native subscription presentation; never guessed from requests.",
+  "properties": {
+    "language": {
+      "default": "en",
+      "enum": [
+        "en",
+        "ru",
+        "fa",
+        "zh"
+      ],
+      "title": "Language",
+      "type": "string"
+    }
+  },
+  "title": "LanguageSettings",
+  "type": "object"
+}

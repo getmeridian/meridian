@@ -35,7 +35,7 @@ def update_user(
         events.user_updated(user, merged)
         store.db.execute(
             "UPDATE users SET status = ?, expire_at = ?, traffic_limit_bytes = ?, traffic_limit_strategy = ?,"
-            " device_limit = ?, note = ?, tag = ? WHERE username = ?",
+            " device_limit = ?, note = ?, tag = ?, language = ? WHERE username = ?",
             (
                 merged.status,
                 merged.expire_at,
@@ -44,6 +44,7 @@ def update_user(
                 merged.device_limit,
                 merged.note,
                 merged.tag,
+                merged.language,
                 username,
             ),
         )

@@ -450,7 +450,7 @@
   "client.metadata_none": "None",
   "client.note_invalid": "Use a plain-text note of at most 500 characters; newlines are allowed.",
   "client.tag_invalid": "Use 1–16 uppercase letters A–Z, digits, or underscores; none clears the tag.",
-  "client.set_options_hint": "Pass --limit, --reset, --expires, --devices, --note, or --tag.",
+  "client.set_options_hint": "Pass --limit, --reset, --expires, --devices, --note, --tag, or --language.",
   "client.settings_updated": "Updated settings for {name}.",
   "fleet_contact.text": "Instructions",
   "fleet_contact.link": "Contact link",
@@ -533,5 +533,12 @@
   "notice.error_length": "Use 1–500 characters of plain text.",
   "notice.error_paragraph": "Use a single paragraph without line breaks or control characters.",
   "notice.error_substitutions": "Allowed substitutions: {fields}",
-  "notice.error_expansion": "Use fewer substitutions so the notice fits within 1,024 characters."
+  "notice.error_expansion": "Use fewer substitutions so the notice fits within 1,024 characters.",
+  "language.invalid": "Choose en, ru, fa, or zh.",
+  "language.invalid_person": "Choose en, ru, fa, zh, or default for the fleet language.",
+  "language.default": "Fleet default",
+  "language.saved": "Subscription language saved: {language}",
+  "language.current": "Subscription language: {language}",
+  "client.label.language": "Subscription language",
+  "events.kind.language.changed": "Subscription language changed"
 }

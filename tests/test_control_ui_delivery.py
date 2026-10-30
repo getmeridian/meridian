@@ -51,3 +51,11 @@ def test_page_notice_is_plain_text_and_does_not_request_or_store_anything(locale
 def test_page_notice_hides_expired_or_untrusted_values(notice: object) -> None:
     result = run_console("delivery-page-notice", data={"notice": notice})
     assert result["hidden"] is True and result["text"] == ""
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_settings_edits_the_fleet_subscription_language_in_its_own_card(locale: str) -> None:
+    result = run_console("delivery-language", locale, {"language": "en", "next": "fa"})
+    catalog = json.loads((UI_DIR / f"locales/{locale}.json").read_text())
+    assert result["initial"] == "en" and result["writes"] == [{"language": "fa"}]
+    assert catalog["language.title"] in result["text"]

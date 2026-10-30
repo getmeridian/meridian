@@ -304,3 +304,15 @@ meridian fleet notice clear --yes
 `--until` 接受未来的 UTC 时间或日期（该日期在 UTC 的最后一秒）；省略则永久有效。通知到期后不再发送。`--for NAME` 在确认预览中使用真实账户信息；省略则使用示例值。`show --for NAME` 读取保存的通知并预览。保存和清除都需要确认，JSON 模式下需要 `--yes`。控制台设置提供同样的编辑器和预览确认。
 
 这些设置由管理者维护，经过审核的应用操作会保留它们。`GET /api/notice?for=NAME` 需要 read 权限；`PUT /api/notice` 需要 admin 权限或管理者会话。发送 `{"notice":{"text":"你好，{name}","until":null},"for_user":"person","confirm":false}` 可预览；将 `confirm` 设为 `true` 可保存，将 `notice` 设为 `null` 可清除。预览不会写入存储或注册设备。加密快照包含通知；`notice.changed` 事件记录修改者，不记录正文。不会发送推送或即时消息通知。
+
+## 订阅状态消息的语言
+
+```bash
+meridian fleet language ru --json
+meridian client set person --language fa --json
+meridian client set person --language default --json
+```
+
+应用可用英语（`en`）、俄语（`ru`）、波斯语（`fa`）或中文（`zh`）解释停用、到期及流量用完的订阅。服务默认明确设为 `en`，不会根据 User-Agent、Accept、CLI 或浏览器语言猜测。`meridian fleet language` 读取默认值；传入语言代码则立即保存。控制台设置提供同样的选项。`client set NAME --language CODE` 为指定用户设置语言，`--language default` 恢复服务默认值。不提供该选项则保留现有设置；client list/show 的 JSON 输出包含可为 null 的 `language` 字段。
+
+这些设置保存在服务中，包含在加密快照内，并由经过审核的应用操作保留。`GET /api/language` 需要 read 权限；`PUT /api/language` 携带 `{"language":"ru"}` 需要 admin 权限或管理者会话。people/admin 权限可通过 `PATCH /api/users/NAME` 发送 `{"language":"fa"}` 或 `{"language":null}`。状态值仍为 `active`、`disabled`、`limited` 和 `expired`；只翻译应用列表中的固定提示，这些提示条目无法连接。连接页面保留自己的语言选择器。

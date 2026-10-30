@@ -450,7 +450,7 @@
   "client.metadata_none": "Нет",
   "client.note_invalid": "Введите обычный текст длиной до 500 символов. Переносы строк разрешены.",
   "client.tag_invalid": "Используйте 1–16 заглавных букв A–Z, цифр или подчёркиваний; none удаляет метку.",
-  "client.set_options_hint": "Укажите --limit, --reset, --expires, --devices, --note или --tag.",
+  "client.set_options_hint": "Укажите --limit, --reset, --expires, --devices, --note, --tag или --language.",
   "client.settings_updated": "Настройки {name} обновлены.",
   "fleet_contact.text": "Указания",
   "fleet_contact.link": "Ссылка для связи",
@@ -533,5 +533,12 @@
   "notice.error_length": "Введите от 1 до 500 символов обычного текста.",
   "notice.error_paragraph": "Нужен один абзац без переносов строк и управляющих символов.",
   "notice.error_substitutions": "Допустимые подстановки: {fields}",
-  "notice.error_expansion": "Используйте меньше подстановок, чтобы сообщение укладывалось в 1 024 символа."
+  "notice.error_expansion": "Используйте меньше подстановок, чтобы сообщение укладывалось в 1 024 символа.",
+  "language.invalid": "Выберите en, ru, fa или zh.",
+  "language.invalid_person": "Выберите en, ru, fa, zh или default для языка по умолчанию.",
+  "language.default": "Как в настройках сервиса",
+  "language.saved": "Язык подписок сохранён: {language}",
+  "language.current": "Язык подписок: {language}",
+  "client.label.language": "Язык подписки",
+  "events.kind.language.changed": "Язык подписок изменён"
 }

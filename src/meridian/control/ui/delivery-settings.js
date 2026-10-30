@@ -5,6 +5,29 @@
   var h = M.h;
   var FIELDS = ["name", "expires", "days_left", "used", "quota"];
 
+  M.languageSection = function () {
+    var select = h("select", { disabled: true, "data-language": "default" },
+      [["en", "English"], ["ru", "Русский"], ["fa", "فارسی"], ["zh", "中文"]].map(function (item) {
+        return h("option", { value: item[0], lang: item[0], text: item[1] });
+      }));
+    var error = h("p", { class: "form-error", role: "alert" });
+    var save = h("button", { type: "submit", class: "btn btn-primary btn-sm", disabled: true }, M.t("action.save"));
+    var form = h("form", { class: "stack" }, M.field(M.t("language.default"), select), error, save);
+    M.api("GET", "api/language").then(function (state) {
+      select.value = state.language;
+      select.disabled = save.disabled = false;
+    }, function (e) { error.textContent = M.errorText(e); });
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var language = select.value;
+      M.busy(form, function () { return M.api("PUT", "api/language", { language: language }); }).then(function () {
+        M.toast(M.t("language.saved"));
+      }, function () { /* shown by M.busy */ });
+    });
+    return h("section", { class: "card" }, h("h2", { text: M.t("language.title") }),
+      h("p", { class: "muted small", text: M.t("language.hint") }), form);
+  };
+
   function localTime(value) {
     if (!value) return "";
     var date = new Date(value);

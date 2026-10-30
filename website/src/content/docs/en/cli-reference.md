@@ -110,7 +110,7 @@ meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DA
 meridian client show NAME [--connections] [--json]
 meridian client usage NAME [--days N] [--json]
 meridian client list [--attention] [--tag TAG|none] [--json]
-meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]
@@ -342,6 +342,7 @@ meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--j
 meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
 meridian fleet notice clear [--yes] [--json]
+meridian fleet language [en|ru|fa|zh] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -386,6 +387,8 @@ The `active` column counts people with growth in the last report, with its colle
 `GET /api/servers` needs read scope and returns the `server-usage` contract: metadata, UTC period boundaries, counted bytes, tracking start, next payment, and measurement coverage. `GET /api/attention` adds `servers[]` with `allowance_near` at 80%, `allowance_exceeded` at 100%, `payment_due` within 7 days, and `payment_overdue` for past one-off dates. Its `allowance_percent` and `allowance_exceeded_percent` query thresholds are bounded to 1–100, with the first no higher than the second; `payment_days` is 1–30. Billing warnings set `summary.needs_attention`; fleet health and exit codes continue to describe runtime health.
 
 The service notice is operator-owned. `fleet notice set` shows a rendered preview before confirmation; `--until WHEN` sets its expiry, `--for NAME` uses real account values, and JSON changes require `--yes`. `fleet notice show` reads it; `fleet notice clear` confirms removal. See [Client management](/en/client-management/).
+
+Subscription status remarks use the explicit service default (`en`, `ru`, `fa`, or `zh`). `fleet language` reads it; `fleet language CODE` saves it. `client set NAME --language CODE` sets a person preference; `--language default` clears it. Status codes stay English. These service settings survive reviewed applies and encrypted backups.
 
 ### meridian context
 

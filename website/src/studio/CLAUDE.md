@@ -15,6 +15,7 @@
 **Guided cockpit UX** — one task per screen; the journey rail, contextual help, and native `<dialog>` command sheet replace always-visible JSON/CLI panels.
 
 ## What's done well
+- Generated client and user types retain nullable language overrides and the shared four-code enum from Python.
 - Generated notice types preserve Unicode text bounds and the explicit preview/save confirmation field from Python.
 - Generated delivery and contact models retain the optional public contact and canonical-link constraints from Python; Studio does not define another presentation contract.
 - Generated person contracts preserve private metadata bounds and scoped-read descriptions without embedding operator data in Studio assets.

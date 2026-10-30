@@ -1,6 +1,7 @@
 # Remnawave adapter
 
 ## Design decisions
+- `User.language` carries only Meridian's nullable subscription-language preference through the existing access projection; legacy panel reads leave it unset.
 - `User` also carries the control service's optional first-traffic time and last reporting node so CLI adapters keep the shared user shape; legacy panel users leave them unknown.
 
 - `__init__.py` is the compatibility facade consumed by Meridian; resource behavior stays in `client.py` and `control_plane.py`.

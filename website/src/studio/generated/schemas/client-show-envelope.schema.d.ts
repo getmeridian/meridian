@@ -32,6 +32,10 @@ export type ExpiresAt = string;
  */
 export type FirstTrafficAt = string | null;
 export type Id = string;
+/**
+ * Subscription status language; null uses the fleet default.
+ */
+export type Language = ("en" | "ru" | "fa" | "zh") | null;
 export type LastSeen = string;
 /**
  * The node whose latest accepted growth set the user's last traffic time.
@@ -171,6 +175,7 @@ export interface ClientDetail {
   expires_at: ExpiresAt;
   first_traffic_at?: FirstTrafficAt;
   id: Id;
+  language?: Language;
   last_seen: LastSeen;
   last_traffic_node?: LastTrafficNode;
   lifetime_traffic_bytes?: LifetimeTrafficBytes;

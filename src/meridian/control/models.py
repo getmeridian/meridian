@@ -32,6 +32,7 @@ from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES, LimitStrategy, 
 from meridian.core.connection_pages import ConnectionPageSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import ServerReferenceValue, validate_ip_address_value
+from meridian.core.languages import Language
 from meridian.core.models import CoreModel
 from meridian.core.person_metadata import PersonTag, PrivateNote
 from meridian.core.server_allowances import ServerAllowanceSpec
@@ -214,6 +215,9 @@ class UserRecord(UserTrafficEvidence):
     online_at: Timestamp | None = Field(default=None, description="When an agent last counted the user's traffic.")
     note: PrivateNote = Field(default="", repr=False, description="Private operator note; people/admin only.")
     tag: PersonTag = Field(default="", repr=False, description="Private operator tag; people/admin only.")
+    language: Language | None = Field(
+        default=None, description="Subscription status language; null uses the fleet default."
+    )
 
 
 class UserUpdate(CoreModel):
@@ -226,6 +230,7 @@ class UserUpdate(CoreModel):
     device_limit: int | None = Field(default=None, ge=1, le=100)
     note: PrivateNote = Field(default="", repr=False)
     tag: PersonTag = Field(default="", repr=False)
+    language: Language | None = None
 
 
 SUB_TOKEN_PATTERN = r"^[A-Za-z0-9_-]{16,64}$"

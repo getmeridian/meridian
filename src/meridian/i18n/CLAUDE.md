@@ -1,6 +1,7 @@
 # i18n — CLI message catalog
 
 ## Design decisions
+- Locale types and native language names come from core.languages; CLI detection never sets the operator's subscription language, whose fixed status catalog lives in control/formats/status_remarks.py.
 
 **Flat JSON per locale** — `locales/<code>.json` maps dotted keys to text with `{name}` placeholders; English is the source and the fallback for a missing key. Locales match the website: en, ru, fa, zh.
 **Explicit beats guessed** — `--lang` (`request_locale`) > `MERIDIAN_LANG` > `preferences.json` in the Meridian home (saved by the wizard's language step) > ask, preselected from `LC_ALL`/`LC_MESSAGES`/`LANG`.

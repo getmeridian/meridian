@@ -337,6 +337,16 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         outcomes=[_ok("notice saved", status="changed"), _ok("notice unchanged", status="no_changes"), *_FAILURES],
         stability="preview",
     ),
+    "fleet.language": CommandOutput(
+        data_schema="language-state",
+        outcomes=[
+            _ok("language read"),
+            _ok("language saved", status="changed"),
+            _ok("language unchanged", status="no_changes"),
+            *_FAILURES,
+        ],
+        stability="preview",
+    ),
     "fleet.notice.clear": CommandOutput(
         data_schema="notice-state",
         outcomes=[

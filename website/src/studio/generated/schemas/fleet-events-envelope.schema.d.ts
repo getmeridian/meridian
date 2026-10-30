@@ -27,7 +27,7 @@ export type Detail =
  * Changed field names, never values.
  *
  * @minItems 1
- * @maxItems 9
+ * @maxItems 10
  */
 export type Fields =
   | [
@@ -40,6 +40,7 @@ export type Fields =
       | "created_at"
       | "traffic_reset_at"
       | "lifetime_traffic_bytes"
+      | "language"
     ]
   | [
       (
@@ -52,6 +53,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -63,6 +65,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       )
     ]
   | [
@@ -76,6 +79,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -87,6 +91,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -98,6 +103,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       )
     ]
   | [
@@ -111,6 +117,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -122,6 +129,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -133,6 +141,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -144,6 +153,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       )
     ]
   | [
@@ -157,6 +167,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -168,6 +179,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -179,6 +191,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -190,6 +203,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -201,6 +215,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       )
     ]
   | [
@@ -214,6 +229,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -225,6 +241,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -236,6 +253,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -247,6 +265,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -258,6 +277,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -269,6 +289,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       )
     ]
   | [
@@ -282,6 +303,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -293,6 +315,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -304,6 +327,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -315,6 +339,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -326,6 +351,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -337,6 +363,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -348,6 +375,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       )
     ]
   | [
@@ -361,6 +389,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -372,6 +401,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -383,6 +413,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -394,6 +425,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -405,6 +437,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -416,6 +449,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -427,6 +461,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -438,6 +473,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       )
     ]
   | [
@@ -451,6 +487,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -462,6 +499,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -473,6 +511,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -484,6 +523,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -495,6 +535,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -506,6 +547,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -517,6 +559,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -528,6 +571,7 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
       ),
       (
         | "status"
@@ -539,6 +583,129 @@ export type Fields =
         | "created_at"
         | "traffic_reset_at"
         | "lifetime_traffic_bytes"
+        | "language"
+      )
+    ]
+  | [
+      (
+        | "status"
+        | "device_limit"
+        | "expire_at"
+        | "traffic_limit_bytes"
+        | "traffic_limit_strategy"
+        | "credentials"
+        | "created_at"
+        | "traffic_reset_at"
+        | "lifetime_traffic_bytes"
+        | "language"
+      ),
+      (
+        | "status"
+        | "device_limit"
+        | "expire_at"
+        | "traffic_limit_bytes"
+        | "traffic_limit_strategy"
+        | "credentials"
+        | "created_at"
+        | "traffic_reset_at"
+        | "lifetime_traffic_bytes"
+        | "language"
+      ),
+      (
+        | "status"
+        | "device_limit"
+        | "expire_at"
+        | "traffic_limit_bytes"
+        | "traffic_limit_strategy"
+        | "credentials"
+        | "created_at"
+        | "traffic_reset_at"
+        | "lifetime_traffic_bytes"
+        | "language"
+      ),
+      (
+        | "status"
+        | "device_limit"
+        | "expire_at"
+        | "traffic_limit_bytes"
+        | "traffic_limit_strategy"
+        | "credentials"
+        | "created_at"
+        | "traffic_reset_at"
+        | "lifetime_traffic_bytes"
+        | "language"
+      ),
+      (
+        | "status"
+        | "device_limit"
+        | "expire_at"
+        | "traffic_limit_bytes"
+        | "traffic_limit_strategy"
+        | "credentials"
+        | "created_at"
+        | "traffic_reset_at"
+        | "lifetime_traffic_bytes"
+        | "language"
+      ),
+      (
+        | "status"
+        | "device_limit"
+        | "expire_at"
+        | "traffic_limit_bytes"
+        | "traffic_limit_strategy"
+        | "credentials"
+        | "created_at"
+        | "traffic_reset_at"
+        | "lifetime_traffic_bytes"
+        | "language"
+      ),
+      (
+        | "status"
+        | "device_limit"
+        | "expire_at"
+        | "traffic_limit_bytes"
+        | "traffic_limit_strategy"
+        | "credentials"
+        | "created_at"
+        | "traffic_reset_at"
+        | "lifetime_traffic_bytes"
+        | "language"
+      ),
+      (
+        | "status"
+        | "device_limit"
+        | "expire_at"
+        | "traffic_limit_bytes"
+        | "traffic_limit_strategy"
+        | "credentials"
+        | "created_at"
+        | "traffic_reset_at"
+        | "lifetime_traffic_bytes"
+        | "language"
+      ),
+      (
+        | "status"
+        | "device_limit"
+        | "expire_at"
+        | "traffic_limit_bytes"
+        | "traffic_limit_strategy"
+        | "credentials"
+        | "created_at"
+        | "traffic_reset_at"
+        | "lifetime_traffic_bytes"
+        | "language"
+      ),
+      (
+        | "status"
+        | "device_limit"
+        | "expire_at"
+        | "traffic_limit_bytes"
+        | "traffic_limit_strategy"
+        | "credentials"
+        | "created_at"
+        | "traffic_reset_at"
+        | "lifetime_traffic_bytes"
+        | "language"
       )
     ];
 export type PreviousStatus = "active" | "disabled" | "limited" | "expired";
@@ -588,6 +755,7 @@ export type Kind2 =
   | "command.result"
   | "privacy.changed"
   | "notice.changed"
+  | "language.changed"
   | "token.created"
   | "token.revoked";
 /**

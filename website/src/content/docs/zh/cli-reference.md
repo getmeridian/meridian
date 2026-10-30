@@ -110,7 +110,7 @@ meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DA
 meridian client show NAME [--connections] [--json]
 meridian client usage NAME [--days N] [--json]
 meridian client list [--attention] [--tag TAG|none] [--json]
-meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]
@@ -342,6 +342,7 @@ meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--j
 meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
 meridian fleet notice clear [--yes] [--json]
+meridian fleet language [en|ru|fa|zh] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
@@ -386,6 +387,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 `GET /api/servers` 需要 read 权限，返回 `server-usage` 合同：服务器信息、UTC 周期边界、已计数字节、计量开始时间、下次付款以及计量范围。`GET /api/attention` 增加 `servers[]`：达到 80% 时为 `allowance_near`，达到 100% 时为 `allowance_exceeded`，付款日期在 7 天内时为 `payment_due`，已过期的单次日期为 `payment_overdue`。查询参数 `allowance_percent` 和 `allowance_exceeded_percent` 的范围是 1–100，前者不得高于后者；`payment_days` 的范围是 1–30。额度与付款提醒会设置 `summary.needs_attention`；部署健康状态和退出码继续表示服务运行状态。
 
 通知由管理者维护，保存在控制服务中。`fleet notice set` 先显示预览，再请求确认；`--until WHEN` 设置到期时间，`--for NAME` 使用真实账户信息，JSON 修改需要 `--yes`。`fleet notice show` 读取通知；`fleet notice clear` 确认清除。参见[客户端管理](/zh/client-management/)。
+
+订阅状态提示使用服务明确设置的默认语言：`en`、`ru`、`fa` 或 `zh`。`fleet language` 读取设置，`fleet language CODE` 保存设置。`client set NAME --language CODE` 设置用户偏好，`--language default` 清除偏好。状态代码保持英文。这些服务设置在经过审核的应用操作和加密备份中保留。
 
 ### meridian context
 

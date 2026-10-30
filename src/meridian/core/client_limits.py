@@ -19,6 +19,7 @@ from pydantic import Field, field_validator
 from meridian.core.agent_types import Timestamp
 from meridian.core.calendar import month_date, shift_month
 from meridian.core.errors import MeridianError
+from meridian.core.languages import Language, parse_person_language
 from meridian.core.models import CoreModel
 from meridian.core.person_metadata import PersonTag, PrivateNote, parse_note_option, parse_tag_option
 
@@ -115,6 +116,7 @@ class ClientLimitChange(CoreModel):
         default=None, repr=False, description="Omitted keeps the private note; empty clears."
     )
     tag: PersonTag | None = Field(default=None, repr=False, description="Omitted keeps the private tag; empty clears.")
+    language: Language | None = Field(default=None, description="Explicit null uses the fleet's subscription language.")
 
     @property
     def is_empty(self) -> bool:
@@ -127,6 +129,10 @@ class ClientLimitChange(CoreModel):
     @property
     def sets_devices(self) -> bool:
         return "device_limit" in self.model_fields_set
+
+    @property
+    def sets_language(self) -> bool:
+        return "language" in self.model_fields_set
 
     def for_creation(self) -> UserCreationSettings:
         """Use creation defaults for fields the operator did not specify."""
@@ -150,6 +156,7 @@ def build_limit_change(
     devices: str | None = None,
     note: str | None = None,
     tag: str | None = None,
+    language: str | None = None,
     now: datetime | None = None,
 ) -> ClientLimitChange:
     """Parse the `--limit`, `--reset`, and `--expires` values that were given into one change."""
@@ -166,6 +173,8 @@ def build_limit_change(
         fields["note"] = parse_note_option(note)
     if tag is not None:
         fields["tag"] = parse_tag_option(tag)
+    if language is not None:
+        fields["language"] = parse_person_language(language)
     return ClientLimitChange(**fields)  # type: ignore[arg-type]
 
 

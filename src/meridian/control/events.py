@@ -54,6 +54,7 @@ _USER_FIELDS: tuple[UserEventField, ...] = (
     "created_at",
     "traffic_reset_at",
     "lifetime_traffic_bytes",
+    "language",
 )
 
 

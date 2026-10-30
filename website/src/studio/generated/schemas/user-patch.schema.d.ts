@@ -7,6 +7,7 @@
 
 export type DeviceLimit = number | null;
 export type ExpireAt = string | null;
+export type Language = ("en" | "ru" | "fa" | "zh") | null;
 export type Note = string;
 export type Status = ("active" | "disabled") | null;
 export type Tag = string;
@@ -20,6 +21,7 @@ export type Username = string;
 export interface UserPatch {
   device_limit?: DeviceLimit;
   expire_at?: ExpireAt;
+  language?: Language;
   note?: Note;
   status?: Status;
   tag?: Tag;

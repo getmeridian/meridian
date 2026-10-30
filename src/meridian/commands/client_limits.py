@@ -29,6 +29,7 @@ from meridian.core.clients import (
     build_client_record,
     client_metadata_paths,
 )
+from meridian.core.languages import LANGUAGE_NAMES, LanguageError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.person_metadata import PersonMetadataError
@@ -52,10 +53,15 @@ def parse_limit_options(
     devices: str | None = None,
     note: str | None = None,
     tag: str | None = None,
+    language: str | None = None,
 ) -> ClientLimitChange:
     """The change `--limit`, `--reset`, and `--expires` ask for; a bad value exits 2 before any connection."""
     try:
-        return build_limit_change(limit=limit, reset=reset, expires=expires, devices=devices, note=note, tag=tag)
+        return build_limit_change(
+            limit=limit, reset=reset, expires=expires, devices=devices, note=note, tag=tag, language=language
+        )
+    except LanguageError:
+        fail(t("language.invalid_person"), hint_type="user")
     except PersonMetadataError as exc:
         fail(t(f"client.{exc.field}_invalid"), hint_type="user")
     except ClientLimitError as exc:
@@ -101,6 +107,9 @@ def print_client_usage(record: ClientRecord) -> None:
     rows.append((t("client.label.last_traffic_node"), escape(record.last_traffic_node or t("client.traffic_unknown"))))
     rows.append((t("client.label.tag"), escape(record.tag or t("client.metadata_none"))))
     rows.append((t("client.label.note"), escape(record.note or t("client.metadata_none"))))
+    rows.append(
+        (t("client.label.language"), LANGUAGE_NAMES[record.language] if record.language else t("language.default"))
+    )
     # One column for every label, shown or not, so values line up the same in every view.
     width = max(cell_len(label) for label in (last_seen, *(label for label, _value in rows))) + 1
     for label, value in rows:
@@ -118,11 +127,14 @@ def run_set(
     devices: str | None = None,
     note: str | None = None,
     tag: str | None = None,
+    language: str | None = None,
 ) -> None:
     """Change a client's traffic limit, reset period, or expiry."""
     operation = OperationContext()
     with error_context("client.set", timer=operation.timer):
-        change = parse_limit_options(limit=limit, reset=reset, expires=expires, devices=devices, note=note, tag=tag)
+        change = parse_limit_options(
+            limit=limit, reset=reset, expires=expires, devices=devices, note=note, tag=tag, language=language
+        )
         if change.is_empty:
             fail(
                 "Nothing to change",

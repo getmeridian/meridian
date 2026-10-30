@@ -19,6 +19,10 @@ export type ExpireAt = string | null;
  */
 export type FirstTrafficAt = string | null;
 /**
+ * Subscription status language; null uses the fleet default.
+ */
+export type Language = ("en" | "ru" | "fa" | "zh") | null;
+/**
  * The node whose latest accepted growth set the user's last traffic time.
  */
 export type LastTrafficNode = string | null;
@@ -69,6 +73,7 @@ export interface UserRecord {
   device_limit?: DeviceLimit;
   expire_at?: ExpireAt;
   first_traffic_at?: FirstTrafficAt;
+  language?: Language;
   last_traffic_node?: LastTrafficNode;
   lifetime_traffic_bytes?: LifetimeTrafficBytes;
   note?: Note;

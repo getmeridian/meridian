@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from meridian.control.models import NodeRuntime
+from meridian.core.languages import Language
 
 
 @dataclass
@@ -45,6 +46,7 @@ class User:
     telegram_id: str = ""
     # The control projection also uses this cap; migrate reports the panel's instead of importing it.
     hwid_device_limit: int | None = None
+    language: Language | None = None  # Meridian's operator preference; legacy panel users leave it unset.
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 

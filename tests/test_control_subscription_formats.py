@@ -23,13 +23,13 @@ import yaml
 from meridian.compiler.delivery import xray_json_template
 from meridian.control.formats.entries import (
     NO_CONNECTIONS_REMARKS,
-    STATUS_REMARKS,
     SubscriptionUser,
     UserStatus,
     presentation_endpoints,
     primaries,
 )
 from meridian.control.formats.selector import DocumentFormat, select_format
+from meridian.control.formats.status_remarks import STATUS_REMARKS
 from meridian.control.formats.xray_json import xray_json_document
 from meridian.control.models import ClientEndpoint
 from meridian.control.subscriptions import SubscriptionResponse, render_subscription
@@ -326,12 +326,12 @@ def test_empty_or_filtered_subscriptions_have_inert_placeholders(document: Docum
 @pytest.mark.parametrize("status", ["disabled", "limited", "expired"])
 def test_status_notices_take_priority_over_no_connections(status: UserStatus) -> None:
     lines = parse_base64_subscription(_render_endpoints([], "base64", status).body)
-    assert [unquote(urlsplit(line).fragment) for line in lines] == list(STATUS_REMARKS[status])
+    assert [unquote(urlsplit(line).fragment) for line in lines] == list(STATUS_REMARKS["en"][status])
 
 
 @pytest.mark.parametrize("status", ["active", "disabled"])
 def test_mihomo_copy_exclusions_never_remove_placeholders(status: UserStatus) -> None:
-    remarks = NO_CONNECTIONS_REMARKS if status == "active" else STATUS_REMARKS[status]
+    remarks = NO_CONNECTIONS_REMARKS if status == "active" else STATUS_REMARKS["en"][status]
     prototype = DOMAIN_FLEET.endpoints[0]
     endpoints = [
         prototype.model_copy(update={"remark": remark, "position": position, "fingerprint_copy": True})
@@ -374,7 +374,7 @@ def test_xray_offers_one_named_profile_per_primary_with_the_shared_routing(topol
 
 @pytest.mark.parametrize("status", ["disabled", "limited", "expired"])
 def test_a_suspended_user_sees_why_in_every_format(status: UserStatus) -> None:
-    remarks = list(STATUS_REMARKS[status])
+    remarks = list(STATUS_REMARKS["en"][status])
     lines = base64.b64decode(_render("single", "base64", status).body).decode().splitlines()
     assert [unquote(line.rsplit("#", 1)[1]) for line in lines] == remarks
     assert all("@0.0.0.0:1?" in line and UUID not in line for line in lines)

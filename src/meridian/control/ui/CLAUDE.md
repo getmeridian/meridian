@@ -4,6 +4,7 @@
 - Person/password drafts live only in memory; changed forms guard routes, history traversal, sign-out, and their own dialog dismissal with Leave/Stay, while visible person reads refresh status and usage passively every 30 seconds.
 - Person and add forms use native local date/time with the browser zone and exact UTC instant; core-computed +1/+3 calendar-month previews only fill a draft, and No expiry PATCHes null when saved.
 - The closed Individual connections disclosure uses canonical subscription order and local QR codes; explicit format URLs and entries share the subscription link's credential permissions.
+- Settings edits the fleet's subscription language in delivery-settings.js; the person-screen worker can read UserRecord.language and PATCH language=en/ru/fa/zh or null for the fleet default, while editing other fields preserves it.
 - `delivery-settings.js` owns Settings' service notice editor; preview and save use the same admin API, confirmation shows the rendered literal text, and the optional expiry is entered locally and saved in UTC.
 - Settings shows public owner instructions and the canonical link read-only with `meridian fleet contact`; it never writes the topology-owned presentation.
 - **Server billing stays reviewed** — Servers composes read-only allowance/payment evidence and attention from service settings, adds cards for non-agent servers, and prints `meridian server set` to edit the topology.

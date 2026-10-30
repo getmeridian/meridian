@@ -474,5 +474,9 @@
   "notice.length": "请输入 1–500 个字符的纯文本。",
   "notice.paragraph": "请输入单段文本，不含换行或控制字符。",
   "notice.allowed": "允许的替换字段：{fields}",
-  "notice.until_invalid": "请选择未来的到期时间，或留空。"
+  "notice.until_invalid": "请选择未来的到期时间，或留空。",
+  "language.title": "订阅状态语言",
+  "language.default": "默认语言",
+  "language.hint": "应用使用此语言显示停用、到期或流量用完的账户状态。每位用户可有自己的偏好；连接页面仍使用其语言选择器。",
+  "language.saved": "订阅语言已保存"
 }

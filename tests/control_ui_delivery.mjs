@@ -3,6 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export function deliveryReply(url, options, data, writes) {
+  if (url === 'api/language') {
+    if (options.method === 'GET') return { language: data.language || 'en', changed: false };
+    const body = JSON.parse(options.body);
+    writes.push(body);
+    return { ...body, changed: true };
+  }
   if (url !== 'api/notice') throw new Error('Unexpected delivery request: ' + url);
   const body = options.method === 'GET' ? { notice: data.notice || null, for_user: null, confirm: false }
     : JSON.parse(options.body);
@@ -25,6 +31,17 @@ export async function runDeliveryScenario({ w, M, ui, mode, locale, data, view, 
     return;
   }
   w.eval(fs.readFileSync(path.join(ui, 'delivery-settings.js'), 'utf8'));
+  if (mode === 'delivery-language') {
+    M.mount(view, M.languageSection());
+    await settle();
+    report.initial = view.querySelector('select').value;
+    view.querySelector('select').value = data.next || 'ru';
+    view.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+    for (let i = 0; i < 6; i++) await settle();
+    report.text = view.textContent;
+    report.writes = writes;
+    return;
+  }
   const confirmations = [];
   const confirm = M.confirm;
   M.confirm = async (title, text, label, danger) => {

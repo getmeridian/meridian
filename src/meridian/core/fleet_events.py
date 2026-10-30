@@ -37,6 +37,7 @@ FleetEventKind = Literal[
     "command.result",
     "privacy.changed",
     "notice.changed",
+    "language.changed",
     "token.created",
     "token.revoked",
 ]
@@ -51,6 +52,7 @@ UserEventField = Literal[
     "created_at",
     "traffic_reset_at",
     "lifetime_traffic_bytes",
+    "language",
 ]
 _NAME_PATTERN = r"^[^\x00-\x1f\x7f]+$"
 
@@ -60,7 +62,7 @@ class EmptyEventDetail(CoreModel):
 
 
 class UserFieldsDetail(CoreModel):
-    fields: list[UserEventField] = Field(min_length=1, max_length=9, description="Changed field names, never values.")
+    fields: list[UserEventField] = Field(min_length=1, max_length=10, description="Changed field names, never values.")
 
     @model_validator(mode="after")
     def unique_fields(self) -> UserFieldsDetail:
@@ -130,6 +132,7 @@ _DETAIL_TYPES: dict[FleetEventKind, type[CoreModel]] = {
     "command.result": CommandResultDetail,
     "privacy.changed": PrivacyEventDetail,
     "notice.changed": EmptyEventDetail,
+    "language.changed": EmptyEventDetail,
     "token.created": TokenEventDetail,
     "token.revoked": TokenEventDetail,
 }

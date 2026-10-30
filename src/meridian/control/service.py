@@ -32,6 +32,7 @@ from meridian.control.devices import DEVICES_TABLE, DeviceLedger, HeaderReader
 from meridian.control.enrollment import NodeAuthority
 from meridian.control.errors import ServiceError
 from meridian.control.events import EVENT_TABLES, EventLedger
+from meridian.control.languages import LanguageLedger
 from meridian.control.models import (
     ClientEndpoint,
     EnrollmentGrant,
@@ -79,7 +80,7 @@ from meridian.core.client_devices import DevicesRemoved
 from meridian.core.clients import ClientConnections
 from meridian.core.server_allowances import ServerUsageList
 
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 17
 MAX_WAIT_SECONDS = 55
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -112,7 +113,8 @@ CREATE TABLE IF NOT EXISTS users (
     traffic_carried_bytes INTEGER NOT NULL DEFAULT 0,
     device_limit INTEGER,
     note TEXT NOT NULL DEFAULT '',
-    tag TEXT NOT NULL DEFAULT ''
+    tag TEXT NOT NULL DEFAULT '',
+    language TEXT
 );
 CREATE TABLE IF NOT EXISTS endpoints (endpoint_id TEXT PRIMARY KEY, body TEXT NOT NULL);
 """
@@ -154,6 +156,8 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     ),
     # 15 -> 16: server allowance offsets over durable accepted node totals.
     (ALLOWANCE_PERIODS_TABLE,),
+    # 16 -> 17: optional operator-owned subscription language per person.
+    ("ALTER TABLE users ADD COLUMN language TEXT",),
 )
 # meta key prefix: the last revision a deleted node was signed at.
 _RETIRED_REVISION = "retired_revision:"
@@ -196,6 +200,7 @@ class ControlService:
         self.owner = OwnerAuth(self._store, clock=clock)
         self.devices = DeviceLedger(self._store, clock=clock)
         self.notices = NoticeLedger(self._store, self.events, read_user=self.get_user, clock=clock)
+        self.languages = LanguageLedger(self._store, self.events)
         self.pages = ConnectionPages(self._store, self)
         with self._transaction():
             # Documents signed by an earlier signing certificate are signed again.
@@ -672,6 +677,7 @@ class ControlService:
             read_settings=self.settings,
             read_privacy=self.privacy,
             read_notice=self.notices.render,
+            read_language=self.languages.read,
             clock=self._clock,
             render_page=self.pages.render,
             user_agent=user_agent,

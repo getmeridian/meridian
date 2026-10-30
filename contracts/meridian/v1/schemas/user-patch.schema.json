@@ -31,6 +31,24 @@
       "default": null,
       "title": "Expire At"
     },
+    "language": {
+      "anyOf": [
+        {
+          "enum": [
+            "en",
+            "ru",
+            "fa",
+            "zh"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Language"
+    },
     "note": {
       "default": "",
       "maxLength": 500,

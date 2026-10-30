@@ -474,5 +474,9 @@
   "notice.length": "Use 1–500 characters of plain text.",
   "notice.paragraph": "Use a single paragraph without line breaks or control characters.",
   "notice.allowed": "Allowed substitutions: {fields}",
-  "notice.until_invalid": "Choose a future expiry time, or leave it blank."
+  "notice.until_invalid": "Choose a future expiry time, or leave it blank.",
+  "language.title": "Subscription status language",
+  "language.default": "Default language",
+  "language.hint": "Apps use this language for disabled, expired, or limited accounts. A person can have their own preference; connection pages keep their language picker.",
+  "language.saved": "Subscription language saved"
 }

@@ -314,7 +314,7 @@ if (mode === 'owner-support') {
 }
 
 if (mode === 'owner-settings') {
-  M.privacySection = M.noticeSection = M.cliHint = () => M.h('section');
+  M.privacySection = M.noticeSection = M.languageSection = M.cliHint = () => M.h('section');
   M.i18n = { ...M.i18n, langs: [locale], names: { [locale]: locale }, lang: locale };
   M.state.auth = { passkeys: { reason: 'no_domain' } };
   w.eval(fs.readFileSync(path.join(ui, 'settings.js'), 'utf8'));

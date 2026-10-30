@@ -7,18 +7,12 @@ from datetime import datetime
 from typing import Literal
 
 from meridian.compiler.names import fingerprint_label
+from meridian.control.formats.status_remarks import STATUS_REMARKS
 from meridian.control.models import ENDPOINT_REMARK_MAX_LENGTH, ClientEndpoint, LimitStrategy
+from meridian.core.languages import DEFAULT_LANGUAGE, Language
 
 UserStatus = Literal["active", "disabled", "limited", "expired"]
 
-# A suspended user's subscription lists these entries in place of real ones, so the app
-# itself says why nothing connects (the wording Remnawave users already know).
-STATUS_REMARKS: dict[UserStatus, tuple[str, ...]] = {
-    "active": (),
-    "disabled": ("🚫 Subscription disabled", "Contact support"),
-    "limited": ("🚧 Subscription limited", "Contact support"),
-    "expired": ("⌛ Subscription expired", "Contact support"),
-}
 NO_CONNECTIONS_REMARKS = (
     "No connections available yet",
     "Подключения пока недоступны",
@@ -54,11 +48,12 @@ class SubscriptionUser:
     limit_bytes: int = 0
     lifetime_used_bytes: int = 0
     limit_strategy: LimitStrategy = "no_reset"
+    language: Language = DEFAULT_LANGUAGE
 
     @property
     def placeholders(self) -> tuple[str, ...]:
         """The entries a suspended user sees instead of real ones (none when active)."""
-        return STATUS_REMARKS[self.status]
+        return STATUS_REMARKS[self.language][self.status]
 
 
 def ordered(endpoints: list[ClientEndpoint]) -> list[ClientEndpoint]:

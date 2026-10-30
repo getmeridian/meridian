@@ -11,6 +11,7 @@ from meridian.control.command_models import NodeCommandOutcome
 from meridian.control.models import UserStatus, UserUsage
 from meridian.core.attention import PersonAttentionReason
 from meridian.core.client_limits import canonical_expiry, traffic_reset_from_strategy
+from meridian.core.languages import Language
 from meridian.core.models import CoreModel
 from meridian.core.person_metadata import PersonTag, PrivateNote
 from meridian.core.topology import ProtocolKind
@@ -82,6 +83,9 @@ class ClientRecord(UserTrafficEvidence):
     device_limit: int | None = Field(default=None, ge=1, le=100, description="None uses the fleet's default cap.")
     note: PrivateNote = Field(default="", repr=False, description="Private operator note; people/admin only.")
     tag: PersonTag = Field(default="", repr=False, description="Private operator tag; people/admin only.")
+    language: Language | None = Field(
+        default=None, description="Subscription status language; null uses the fleet default."
+    )
     declared: bool = Field(
         default=True,
         description="False for a person added in the control service's web console rather than the fleet's "
@@ -274,6 +278,7 @@ def build_client_record(
         device_limit=user.hwid_device_limit,
         note=getattr(user, "description", ""),
         tag=getattr(user, "tag", ""),
+        language=getattr(user, "language", None),
         declared=declared,
     )
 
