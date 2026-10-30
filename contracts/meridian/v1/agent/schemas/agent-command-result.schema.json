@@ -53,6 +53,23 @@
       "title": "Command Id",
       "type": "string"
     },
+    "effect": {
+      "anyOf": [
+        {
+          "enum": [
+            "inbound_reset",
+            "core_restart"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "For a successful reset_inbound: whether the inbound API reset or a fallback core restart ended its sessions. Null for other outcomes. Sent only by sessions negotiating command kinds.",
+      "title": "Effect"
+    },
     "error": {
       "anyOf": [
         {
@@ -93,7 +110,8 @@
     "command_id",
     "status",
     "error",
-    "finished_at"
+    "finished_at",
+    "effect"
   ],
   "title": "CommandResult",
   "type": "object"

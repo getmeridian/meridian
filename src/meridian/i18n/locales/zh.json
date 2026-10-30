@@ -404,6 +404,8 @@
   "events.kind.node.online": "节点在线",
   "events.kind.node.apply_failed": "配置应用失败",
   "events.kind.node.apply_recovered": "配置应用错误已解除",
+  "events.kind.command.issued": "已下发节点命令",
+  "events.kind.command.result": "节点命令已完成",
   "events.kind.privacy.changed": "隐私设置已更改",
   "events.kind.token.created": "已创建令牌",
   "events.kind.token.revoked": "已撤销令牌"

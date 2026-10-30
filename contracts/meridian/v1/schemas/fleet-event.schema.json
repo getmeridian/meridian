@@ -1,5 +1,88 @@
 {
   "$defs": {
+    "CommandIssuedDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "command_id": {
+          "description": "Idempotency key of a command: a lowercase UUID chosen by the service, never reused.",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Command Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "reconcile",
+            "report",
+            "reset_inbound",
+            "restart_unit",
+            "renew_credential"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "kind"
+      ],
+      "title": "CommandIssuedDetail",
+      "type": "object"
+    },
+    "CommandResultDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "command_id": {
+          "description": "Idempotency key of a command: a lowercase UUID chosen by the service, never reused.",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Command Id",
+          "type": "string"
+        },
+        "effect": {
+          "anyOf": [
+            {
+              "enum": [
+                "inbound_reset",
+                "core_restart"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effect"
+        },
+        "kind": {
+          "enum": [
+            "reconcile",
+            "report",
+            "reset_inbound",
+            "restart_unit",
+            "renew_credential"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "rejected",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "kind",
+        "status"
+      ],
+      "title": "CommandResultDetail",
+      "type": "object"
+    },
     "EmptyEventDetail": {
       "additionalProperties": false,
       "description": "A fact needs no additional stored data.",
@@ -162,6 +245,12 @@
         },
         {
           "$ref": "#/$defs/TokenEventDetail"
+        },
+        {
+          "$ref": "#/$defs/CommandIssuedDetail"
+        },
+        {
+          "$ref": "#/$defs/CommandResultDetail"
         }
       ],
       "title": "Detail"
@@ -189,6 +278,8 @@
         "node.online",
         "node.apply_failed",
         "node.apply_recovered",
+        "command.issued",
+        "command.result",
         "privacy.changed",
         "token.created",
         "token.revoked"

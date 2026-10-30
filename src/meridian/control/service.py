@@ -24,6 +24,8 @@ from typing import Any
 from meridian.control.attention import read_attention
 from meridian.control.background_health import BackgroundHealth
 from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE, BackupLedger
+from meridian.control.command_models import CommandRequest, NodeCommandRecord
+from meridian.control.commands import COMMAND_TABLES, CommandLedger
 from meridian.control.delivery_settings import save_update_interval_hours, update_interval_hours
 from meridian.control.devices import DEVICES_TABLE, DeviceLedger, HeaderReader
 from meridian.control.enrollment import NodeAuthority
@@ -64,13 +66,13 @@ from meridian.control.user_lifecycle import extend_user_expiry, insert_user
 from meridian.control.user_policy import enforced_status, period_began, whole_seconds
 from meridian.control.users import USER_SELECT, user_record
 from meridian.core.agent_desired import DesiredNodeState
-from meridian.core.agent_protocol import ObservedStateReport, PollRequest, StatsAck, StatsReport
+from meridian.core.agent_protocol import Capability, ObservedStateReport, PollRequest, StatsAck, StatsReport
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.client_devices import DevicesRemoved
 
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 MAX_WAIT_SECONDS = 55
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -106,6 +108,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS endpoints (endpoint_id TEXT PRIMARY KEY, body TEXT NOT NULL);
 """
 _SCHEMA += "\n".join(PRIVACY_TABLES) + "\n" + DEVICES_TABLE + ";\n"
+_SCHEMA += ";\n".join(COMMAND_TABLES) + ";\n"
 # Statements that bring a database from version N to N + 1 (index N - 1).
 _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (
@@ -132,6 +135,8 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     ("ALTER TABLE api_tokens ADD COLUMN expires_at TEXT",),
     # 12 -> 13: durable accounting, aggregate activity, and local lifecycle events.
     (*ACCOUNTING_MIGRATION, *EVENT_TABLES),
+    # 13 -> 14: signed node commands and the capabilities accepted by each session.
+    COMMAND_TABLES,
 )
 # meta key prefix: the last revision a deleted node was signed at.
 _RETIRED_REVISION = "retired_revision:"
@@ -166,6 +171,7 @@ class ControlService:
         self.fleet_id = fleet_id
         self.events.prune()
         self.authority = NodeAuthority(self._store, fleet_id, clock=clock)
+        self.commands = CommandLedger(self._store, self.authority, clock=clock, events=self.events)
         self.tokens = TokenRegistry(self._store, clock=clock, events=self.events)
         self.revisions = RevisionLedger(self._store, self.tokens, fleet_id, clock=clock)
         self.backups = BackupLedger(self._store, clock=clock)
@@ -303,6 +309,9 @@ class ControlService:
         rows = self._store.rows("SELECT node_id FROM nodes ORDER BY node_id")
         return [self.node_status(str(row["node_id"])) for row in rows]
 
+    def issue_command(self, node_id: str, request: CommandRequest) -> NodeCommandRecord:
+        return self.commands.issue(node_id, request)
+
     def poll(
         self,
         node_id: str,
@@ -310,6 +319,7 @@ class ControlService:
         *,
         max_wait: float = MAX_WAIT_SECONDS,
         recheck: Callable[[], object] | None = None,
+        capabilities: tuple[Capability, ...] = (),
     ) -> dict[str, Any]:
         """Wait up to `wait_seconds` (at most `max_wait`) for a document newer than `have`; return the response.
 
@@ -322,10 +332,12 @@ class ControlService:
             while True:
                 row = self._node(node_id)
                 document = row["document"] if row is not None else None
-                if row is not None and document and _differs(request.have, self.fleet_epoch, row):
+                commands = self.commands.pending(node_id, capabilities) if row is not None else []
+                newer = row is not None and document and _differs(request.have, self.fleet_epoch, row)
+                if newer or commands:
                     if recheck is not None:
                         recheck()
-                    desired: Any = json.loads(document)
+                    desired: Any = json.loads(document) if newer and document is not None else None
                     break
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -336,7 +348,7 @@ class ControlService:
             "type": "poll_result",
             "fleet_epoch": self.fleet_epoch,
             "desired": desired,
-            "commands": [],
+            "commands": commands,
             "poll_after_seconds": 0,
         }
 
@@ -357,6 +369,7 @@ class ControlService:
                     node_id,
                 ),
             )
+            self.commands.release_ready(node_id, applied)
         return {"type": "report_ack", "applied_revision": applied.revision if applied else None}
 
     # -- users and endpoints -----------------------------------------------------------
@@ -530,6 +543,7 @@ class ControlService:
     def enforce(self, now: str | None = None) -> list[str]:
         """Apply expiry, traffic limits, and periodic resets; return who changed status."""
         moment = now or utc_now()
+        self.commands.maintain()
         self.traffic.prune_history(moment)
         self.events.observe_nodes(self.list_nodes, moment)
         with self._transaction():

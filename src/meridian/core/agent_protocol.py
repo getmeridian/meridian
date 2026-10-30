@@ -15,7 +15,7 @@ for a client certificate and looks exactly like today's.
 
 from __future__ import annotations
 
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal, Union, get_args
 
 from pydantic import Field, RootModel, model_validator
 
@@ -50,6 +50,10 @@ from meridian.core.agent_types import (
 
 MAX_TRAFFIC_ENTRIES = 10_000
 
+CommandKind = Literal["reconcile", "report", "reset_inbound", "restart_unit", "renew_credential"]
+CommandResultStatus = Literal["succeeded", "failed", "rejected", "expired"]
+CommandEffect = Literal["inbound_reset", "core_restart"]
+
 Capability = Literal[
     "long_poll",
     "files",
@@ -64,7 +68,9 @@ Capability = Literal[
     "agent_upgrade",
     "traffic_stats",
     "blob_fetch",
+    CommandKind,
 ]
+COMMAND_CAPABILITIES: tuple[CommandKind, ...] = get_args(CommandKind)
 CapabilityName = Annotated[
     str,
     Field(
@@ -457,14 +463,21 @@ class CommandResult(AgentModel):
 
     type: Literal["command_result"] = "command_result"
     command_id: CommandId
-    status: Literal["succeeded", "failed", "rejected", "expired"]
+    status: CommandResultStatus
     error: ResourceError | None = Field(description="Set when `status` is `failed` or `rejected`.")
     finished_at: Timestamp
+    effect: CommandEffect | None = Field(
+        default=None,
+        description="For a successful reset_inbound: whether the inbound API reset or a fallback core restart "
+        "ended its sessions. Null for other outcomes. Sent only by sessions negotiating command kinds.",
+    )
 
     @model_validator(mode="after")
     def _error_matches_status(self) -> CommandResult:
         if (self.error is not None) != (self.status in {"failed", "rejected"}):
             raise ValueError("error is required for failed or rejected commands and forbidden otherwise")
+        if self.effect is not None and self.status != "succeeded":
+            raise ValueError("effect is only set for succeeded commands")
         return self
 
 

@@ -404,6 +404,8 @@
   "events.kind.node.online": "Node online",
   "events.kind.node.apply_failed": "Apply failed",
   "events.kind.node.apply_recovered": "Apply failure cleared",
+  "events.kind.command.issued": "Node command issued",
+  "events.kind.command.result": "Node command finished",
   "events.kind.privacy.changed": "Privacy changed",
   "events.kind.token.created": "Token created",
   "events.kind.token.revoked": "Token revoked"

@@ -50,6 +50,8 @@ BACKUP_STATE_TABLE = """CREATE TABLE IF NOT EXISTS backup_state (
 NOT_SNAPSHOTTED = (
     "secrets",
     "agent_sessions",
+    "agent_command_capabilities",
+    "commands",
     "enrollment_tokens",
     "hello_nonces",
     # The web owner signs in again after a restore: a seized server held its TOTP secret.

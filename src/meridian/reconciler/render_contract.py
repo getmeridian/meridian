@@ -10,6 +10,7 @@ _RENDERER_MANIFEST = {
     "agent-runtime": "staged-upgrade-v1",
     "agent-spec": "service-blob-v1",
     "control-subscriptions": "yaml12-quoting-v10",
+    "control-commands": "signed-command-ledger-v1",
     "pwa": "quiet-account-v23",
     "control-service": "people-fleet-fallback-v20",
     "control-api": "finite-user-expiry-v5",

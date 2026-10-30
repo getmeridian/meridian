@@ -50,7 +50,14 @@ class FakeNode:
             "arch": "amd64",
         }
 
-    def hello(self, issued_at: str, *, nonce: str = "", highest_fleet_epoch: int | None = None) -> dict[str, Any]:
+    def hello(
+        self,
+        issued_at: str,
+        *,
+        nonce: str = "",
+        highest_fleet_epoch: int | None = None,
+        capabilities: list[str] | None = None,
+    ) -> dict[str, Any]:
         body: dict[str, Any] = {
             "type": "hello",
             "protocols": ["meridian.agent/v1"],
@@ -58,7 +65,7 @@ class FakeNode:
             "node_id": self.node_id,
             "agent_version": "0.2.0",
             "arch": "amd64",
-            "capabilities": CAPABILITIES,
+            "capabilities": CAPABILITIES if capabilities is None else capabilities,
             "highest_fleet_epoch": highest_fleet_epoch,
             "applied": None,
             "proof": {

@@ -30,6 +30,7 @@ from pydantic import BaseModel, ValidationError
 from meridian import __version__
 from meridian.control import ui_routes
 from meridian.control.blobs import BlobStore, fleet_artifacts, served_hashes
+from meridian.control.command_models import NodeCommandRequest
 from meridian.control.enrollment import Session, token_sha256
 from meridian.control.errors import ServiceError, agent_error
 from meridian.control.formats.selector import SUFFIX_FORMATS
@@ -66,7 +67,14 @@ from meridian.control.tokens import ROOT, WEB_OWNER, Caller, unauthenticated
 from meridian.control.ui_routes import UI_ROUTES, UiContext, owner_session
 from meridian.control.ui_views import is_declared
 from meridian.core.agent_http import AGENT_HTTP_SURFACE
-from meridian.core.agent_protocol import EnrollRequest, ObservedStateReport, PollRequest, RenewRequest, StatsReport
+from meridian.core.agent_protocol import (
+    CommandResult,
+    EnrollRequest,
+    ObservedStateReport,
+    PollRequest,
+    RenewRequest,
+    StatsReport,
+)
 from meridian.core.client_devices import DEVICE_KEY_PATTERN
 from meridian.core.client_limits import ClientExtendRequest
 
@@ -360,6 +368,15 @@ class _Handler(BaseHTTPRequestHandler):
     def grant_enrollment(self, match: re.Match[str]) -> Any:
         return self._service.grant_enrollment(match[1])
 
+    def issue_command(self, match: re.Match[str]) -> Any:
+        return self._service.issue_command(match[1], self._model(NodeCommandRequest).root)
+
+    def get_command(self, match: re.Match[str]) -> Any:
+        return self._service.commands.get(match[1], match[2])
+
+    def command_targets(self, match: re.Match[str]) -> Any:
+        return self._service.commands.targets(match[1])
+
     def fleet_authority(self, _match: re.Match[str]) -> Any:
         return self._service.authority.fleet_authority()
 
@@ -566,6 +583,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._model(PollRequest),
             max_wait=remaining,
             recheck=lambda: service.authority.authenticate(token),
+            capabilities=session.capabilities,
         )
 
     def agent_report(self, _match: re.Match[str]) -> Any:
@@ -577,6 +595,13 @@ class _Handler(BaseHTTPRequestHandler):
     def agent_stats(self, _match: re.Match[str]) -> Any:
         service, session = self._session()
         return service.record_stats(session.node_id, self._model(StatsReport))
+
+    def agent_command_result(self, _match: re.Match[str]) -> Any:
+        service, session = self._session()
+        result = self._model(CommandResult)
+        token = self._bearer()
+        with service.conditions(lambda: service.authority.authenticate(token)):
+            return service.commands.accept_result(session.node_id, result)
 
     def agent_blob(self, match: re.Match[str]) -> Any:
         service, session = self._session()
@@ -623,6 +648,9 @@ ROUTES: list[Route] = [
     ("PUT", re.compile(rf"/api/nodes/{_NODE}"), WRITE, _Handler.put_node),
     ("DELETE", re.compile(rf"/api/nodes/{_NODE}"), WRITE, _Handler.delete_node),
     ("POST", re.compile(rf"/api/nodes/{_NODE}/enrollment"), "admin", _Handler.grant_enrollment),
+    ("POST", re.compile(rf"/api/nodes/{_NODE}/commands"), WRITE, _Handler.issue_command),
+    ("GET", re.compile(rf"/api/nodes/{_NODE}/commands/([0-9a-f-]{{36}})"), "read", _Handler.get_command),
+    ("GET", re.compile(rf"/api/nodes/{_NODE}/command-targets"), "read", _Handler.command_targets),
     ("GET", re.compile(r"/api/ca"), "read", _Handler.fleet_authority),
     ("GET", re.compile(r"/api/traffic"), "read", _Handler.traffic),
     ("GET", re.compile(r"/api/events"), "read", _Handler.events),
@@ -675,6 +703,7 @@ ROUTES: list[Route] = [
     ("POST", re.compile(r"/agent/v1/poll"), None, _Handler.agent_poll),
     ("POST", re.compile(r"/agent/v1/report"), None, _Handler.agent_report),
     ("POST", re.compile(r"/agent/v1/stats"), None, _Handler.agent_stats),
+    ("POST", re.compile(r"/agent/v1/command-results"), None, _Handler.agent_command_result),
     ("GET", re.compile(r"/agent/v1/blobs/([0-9a-f]{64})"), None, _Handler.agent_blob),
     ("GET", re.compile(rf"/sub/{_SUB_TOKEN}(?:/({_SUB_SUFFIX}))?"), None, _Handler.subscription),
 ]

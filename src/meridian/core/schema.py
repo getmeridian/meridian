@@ -6,6 +6,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, RootModel
 
+from meridian.control.command_models import NodeCommandRecord, NodeCommandRequest, NodeCommandTargets
 from meridian.control.models import (
     IssuedToken,
     PrivacySettings,
@@ -667,6 +668,9 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     **TOPOLOGY_SCHEMAS,
     "node-add-request": NodeAddRequest,
     "node-target-request": NodeTargetRequest,
+    "node-command-request": NodeCommandRequest,
+    "node-command-record": NodeCommandRecord,
+    "node-command-targets": NodeCommandTargets,
     "relay-deploy-request": RelayDeployRequest,
     "relay-target-request": RelayTargetRequest,
     "deploy-command-data": DeployCommandData,

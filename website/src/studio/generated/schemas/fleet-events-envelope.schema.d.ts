@@ -20,7 +20,9 @@ export type Detail =
   | UserStateDetail
   | NodeEventDetail
   | PrivacyEventDetail
-  | TokenEventDetail;
+  | TokenEventDetail
+  | CommandIssuedDetail
+  | CommandResultDetail;
 /**
  * Changed field names, never values.
  *
@@ -552,10 +554,22 @@ export type AuditId = number;
 export type Name = string;
 export type Scope = "read" | "propose" | "approve" | "people" | "admin";
 /**
+ * Idempotency key of a command: a lowercase UUID chosen by the service, never reused.
+ */
+export type CommandId = string;
+export type Kind = "reconcile" | "report" | "reset_inbound" | "restart_unit" | "renew_credential";
+/**
+ * Idempotency key of a command: a lowercase UUID chosen by the service, never reused.
+ */
+export type CommandId1 = string;
+export type Effect = ("inbound_reset" | "core_restart") | null;
+export type Kind1 = "reconcile" | "report" | "reset_inbound" | "restart_unit" | "renew_credential";
+export type Status = "succeeded" | "failed" | "rejected" | "expired";
+/**
  * Monotonic cursor, never reused after retention pruning.
  */
 export type Id = number;
-export type Kind =
+export type Kind2 =
   | "user.created"
   | "user.updated"
   | "user.enabled"
@@ -570,6 +584,8 @@ export type Kind =
   | "node.online"
   | "node.apply_failed"
   | "node.apply_recovered"
+  | "command.issued"
+  | "command.result"
   | "privacy.changed"
   | "token.created"
   | "token.revoked";
@@ -597,7 +613,7 @@ export type MeridianVersion = string;
 export type OperationId = string;
 export type Schema = "meridian.output/v1";
 export type StartedAt = string;
-export type Status = "ok";
+export type Status1 = "ok";
 export type Changed = boolean;
 export type Text = string;
 export type Category = "user" | "system" | "bug" | "cancelled";
@@ -618,7 +634,7 @@ export type MeridianVersion1 = string;
 export type OperationId1 = string;
 export type Schema1 = "meridian.output/v1";
 export type StartedAt1 = string;
-export type Status1 = "failed";
+export type Status2 = "failed";
 export type Warnings1 = MeridianError[];
 
 export interface _FleetEventsSuccessEnvelope {
@@ -631,7 +647,7 @@ export interface _FleetEventsSuccessEnvelope {
   operation_id: OperationId;
   schema: Schema;
   started_at: StartedAt;
-  status: Status;
+  status: Status1;
   summary: Summary;
   warnings: Warnings;
 }
@@ -650,7 +666,7 @@ export interface FleetEvent {
   actor: Actor;
   detail?: Detail;
   id: Id;
-  kind: Kind;
+  kind: Kind2;
   subject: Subject;
   time: Time;
 }
@@ -674,6 +690,16 @@ export interface PrivacyEventDetail {
 export interface TokenEventDetail {
   name: Name;
   scope: Scope;
+}
+export interface CommandIssuedDetail {
+  command_id: CommandId;
+  kind: Kind;
+}
+export interface CommandResultDetail {
+  command_id: CommandId1;
+  effect?: Effect;
+  kind: Kind1;
+  status: Status;
 }
 /**
  * Structured summary shown in JSON envelopes and UI dashboards.
@@ -715,7 +741,7 @@ export interface _FleetEventsTerminalEnvelope {
   operation_id: OperationId1;
   schema: Schema1;
   started_at: StartedAt1;
-  status: Status1;
+  status: Status2;
   summary: Summary;
   warnings: Warnings1;
 }

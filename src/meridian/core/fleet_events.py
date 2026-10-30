@@ -12,7 +12,8 @@ from typing import Literal, TypeAlias, get_args
 from pydantic import Field, model_validator
 
 from meridian.control.models import TokenScope, UserStatus
-from meridian.core.agent_types import MAX_SAFE_INTEGER, Timestamp
+from meridian.core.agent_protocol import CommandEffect, CommandKind, CommandResultStatus
+from meridian.core.agent_types import MAX_SAFE_INTEGER, CommandId, Timestamp
 from meridian.core.models import CoreModel
 
 MAX_EVENTS = 2000
@@ -32,6 +33,8 @@ FleetEventKind = Literal[
     "node.online",
     "node.apply_failed",
     "node.apply_recovered",
+    "command.issued",
+    "command.result",
     "privacy.changed",
     "token.created",
     "token.revoked",
@@ -82,13 +85,30 @@ class PrivacyEventDetail(CoreModel):
     )
 
 
+class CommandIssuedDetail(CoreModel):
+    command_id: CommandId
+    kind: CommandKind
+
+
+class CommandResultDetail(CommandIssuedDetail):
+    status: CommandResultStatus
+    effect: CommandEffect | None = None
+
+
 class TokenEventDetail(CoreModel):
     name: str = Field(min_length=1, max_length=64, pattern=_NAME_PATTERN)
     scope: TokenScope
 
 
 EventDetail: TypeAlias = (
-    EmptyEventDetail | UserFieldsDetail | UserStateDetail | NodeEventDetail | PrivacyEventDetail | TokenEventDetail
+    EmptyEventDetail
+    | UserFieldsDetail
+    | UserStateDetail
+    | NodeEventDetail
+    | PrivacyEventDetail
+    | TokenEventDetail
+    | CommandIssuedDetail
+    | CommandResultDetail
 )
 _DETAIL_TYPES: dict[FleetEventKind, type[CoreModel]] = {
     "user.created": EmptyEventDetail,
@@ -105,6 +125,8 @@ _DETAIL_TYPES: dict[FleetEventKind, type[CoreModel]] = {
     "node.online": NodeEventDetail,
     "node.apply_failed": NodeEventDetail,
     "node.apply_recovered": NodeEventDetail,
+    "command.issued": CommandIssuedDetail,
+    "command.result": CommandResultDetail,
     "privacy.changed": PrivacyEventDetail,
     "token.created": TokenEventDetail,
     "token.revoked": TokenEventDetail,

@@ -404,6 +404,8 @@
   "events.kind.node.online": "گره در دسترس است",
   "events.kind.node.apply_failed": "اعمال تنظیمات ناموفق بود",
   "events.kind.node.apply_recovered": "خطای اعمال تنظیمات برطرف شد",
+  "events.kind.command.issued": "فرمان سرور صادر شد",
+  "events.kind.command.result": "فرمان سرور پایان یافت",
   "events.kind.privacy.changed": "تنظیمات حریم خصوصی تغییر کرد",
   "events.kind.token.created": "توکن ایجاد شد",
   "events.kind.token.revoked": "توکن لغو شد"

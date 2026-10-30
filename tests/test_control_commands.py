@@ -1,0 +1,411 @@
+"""Signed commands: negotiation, durable delivery, revision gates, and safe results over loopback."""
+
+from __future__ import annotations
+
+import json
+import sqlite3
+import threading
+import time
+import urllib.error
+import urllib.request
+from collections.abc import Iterator
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from meridian.control.backups import strip_unsnapshotted
+from meridian.control.command_models import ReconcileCreate
+from meridian.control.enrollment import token_sha256
+from meridian.control.models import NodeSpec, TokenCreate
+from meridian.control.server import ControlServer
+from meridian.control.service import SCHEMA_VERSION, ControlService
+from meridian.control.tokens import ROOT
+from meridian.core.agent_protocol import StatsReport
+from meridian.core.agent_signing import COMMAND_CONTEXT, verify
+from tests.support.agent_node import FakeNode
+from tests.support.control_service import ADMIN_TOKEN, FLEET_ID
+
+COMMAND_KINDS = ["reconcile", "report", "reset_inbound", "restart_unit", "renew_credential"]
+TAG = "vless-reality"
+
+
+class Clock:
+    def __init__(self) -> None:
+        self.now = time.time()
+
+    def __call__(self) -> float:
+        return self.now
+
+    def stamp(self) -> str:
+        return datetime.fromtimestamp(self.now, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+@pytest.fixture
+def clock() -> Clock:
+    return Clock()
+
+
+@pytest.fixture
+def service(tmp_path: Path, clock: Clock) -> Iterator[ControlService]:
+    service = ControlService(tmp_path / "control.db", fleet_id=FLEET_ID, version="4.0.0", clock=clock)
+    yield service
+    service.close()
+
+
+@pytest.fixture
+def http(service: ControlService) -> Iterator[str]:
+    server = ControlServer(("127.0.0.1", 0), service, token_sha256(ADMIN_TOKEN))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{server.server_address[1]}"
+    server.shutdown()
+    server.server_close()
+
+
+def ask(url: str, method: str = "GET", body: Any = None, token: str = ADMIN_TOKEN) -> tuple[int, Any]:
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode() if body is not None else None,
+        method=method,
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return response.status, json.load(response)
+    except urllib.error.HTTPError as exc:
+        return exc.code, json.load(exc)
+
+
+def spec() -> NodeSpec:
+    return NodeSpec.model_validate(
+        {
+            "resources": [
+                {
+                    "id": "xray:config",
+                    "kind": "xray_config",
+                    "path": "/etc/netagent/core.json",
+                    "config": {"inbounds": [{"tag": TAG, "protocol": "vless", "settings": {"clients": []}}]},
+                    "api_address": "127.0.0.1:10085",
+                },
+                {
+                    "id": "unit:netcore",
+                    "kind": "systemd_unit",
+                    "name": "netcore.service",
+                    "depends_on": ["xray:config"],
+                    "content": "[Service]\nExecStart=/usr/local/lib/netagent/netcore run\n",
+                    "enabled": True,
+                    "state": "started",
+                    "restart_on": ["xray:config"],
+                },
+            ],
+            "managed_inbounds": [{"tag": TAG, "protocol": "vless"}],
+        }
+    )
+
+
+def session(http: str, clock: Clock, *, node_id: str = "main", capabilities: list[str] | None = None) -> str:
+    assert ask(f"{http}/api/nodes/{node_id}", "PUT", spec().model_dump(mode="json"))[0] == 200
+    status, grant = ask(f"{http}/api/nodes/{node_id}/enrollment", "POST", {})
+    assert status == 200
+    node = FakeNode(node_id)
+    status, enrolled = ask(f"{http}/agent/v1/enroll", "POST", node.enroll_request(grant["enrollment_token"]), "")
+    assert status == 200
+    node.certificate_pem = enrolled["certificate_pem"]
+    offered = ["long_poll", "systemd_units", "xray_config", *COMMAND_KINDS] if capabilities is None else capabilities
+    status, welcome = ask(f"{http}/agent/v1/hello", "POST", node.hello(clock.stamp(), capabilities=offered), "")
+    assert status == 200
+    assert set(welcome["capabilities"]) == set(offered)
+    return str(welcome["session_token"])
+
+
+def poll(http: str, token: str, *, have: Any = None, wait: int = 0) -> dict[str, Any]:
+    status, body = ask(f"{http}/agent/v1/poll", "POST", {"type": "poll", "have": have, "wait_seconds": wait}, token)
+    assert status == 200, body
+    return body
+
+
+def report(document: dict[str, Any]) -> dict[str, Any]:
+    reference = {key: document[key] for key in ("fleet_epoch", "revision", "sha256")}
+    return {
+        "type": "report",
+        "fleet_id": FLEET_ID,
+        "node_id": "main",
+        "applied": reference,
+        "target": reference,
+        "resources": [],
+        "health": {
+            "status": "healthy",
+            "checks": [],
+            "uptime_seconds": 1,
+            "load1_milli": 0,
+            "memory_available_bytes": 1,
+            "disk_free_bytes": 1,
+        },
+        "versions": {
+            "agent": "0.2.8",
+            "xray": None,
+            "realm": None,
+            "nginx": None,
+            "os_id": "debian",
+            "os_version": "13",
+            "kernel": "6.1.0",
+        },
+        "observed_at": "2026-10-30T12:00:00Z",
+    }
+
+
+def issue(http: str, body: dict[str, Any]) -> dict[str, Any]:
+    status, record = ask(f"{http}/api/nodes/main/commands", "POST", body)
+    assert status == 200, record
+    return record
+
+
+def test_commands_are_signed_oldest_first_and_redelivered_until_a_result_is_acked(
+    http: str, service: ControlService, clock: Clock
+) -> None:
+    token = session(http, clock)
+    first = issue(http, {"kind": "restart_unit", "resource_id": "unit:netcore"})
+    second = issue(http, {"kind": "report", "include_stats": True})
+    commands = poll(http, token)["commands"]
+    assert commands == [first["command"], second["command"]]
+    authority = service.authority
+    assert all(
+        verify(command, COMMAND_CONTEXT, authority.service_public_key(), authority.service_key_id)
+        for command in commands
+    )
+    assert poll(http, token)["commands"] == commands
+    result = {
+        "type": "command_result",
+        "command_id": first["command"]["command_id"],
+        "status": "succeeded",
+        "error": None,
+        "effect": None,
+        "finished_at": clock.stamp(),
+    }
+    expected = (200, {"type": "command_result_ack", "command_id": result["command_id"]})
+    assert ask(f"{http}/agent/v1/command-results", "POST", result, token) == expected
+    assert ask(f"{http}/agent/v1/command-results", "POST", result, token) == expected
+    assert poll(http, token)["commands"] == [second["command"]]
+    status, record = ask(f"{http}/api/nodes/main/commands/{result['command_id']}")
+    assert status == 200 and record["status"] == "succeeded" and record["result"] == result
+    events = [event for event in service.events.list().events if event.kind.startswith("command.")]
+    assert [(event.kind, event.actor, event.subject) for event in events] == [
+        ("command.issued", "root", "main"),
+        ("command.issued", "root", "main"),
+        ("command.result", "system", "main"),
+    ]
+    assert events[0].detail.to_data() == {"command_id": result["command_id"], "kind": "restart_unit"}
+    assert events[-1].detail.to_data() == {
+        "command_id": result["command_id"],
+        "kind": "restart_unit",
+        "status": "succeeded",
+        "effect": None,
+    }
+
+
+def test_a_new_command_wakes_a_waiting_poll(http: str, clock: Clock) -> None:
+    token = session(http, clock)
+    document = poll(http, token)["desired"]
+    have = {key: document[key] for key in ("fleet_epoch", "revision", "sha256")}
+    response: dict[str, Any] = {}
+    waiter = threading.Thread(target=lambda: response.update(poll(http, token, have=have, wait=30)))
+    waiter.start()
+    time.sleep(0.1)
+    issued = issue(http, {"kind": "reconcile"})
+    waiter.join(timeout=5)
+    assert not waiter.is_alive()
+    assert response["desired"] is None and response["commands"] == [issued["command"]]
+
+
+def test_only_the_kinds_this_session_accepted_are_delivered(http: str, clock: Clock) -> None:
+    capable = session(http, clock, capabilities=["long_poll", "report"])
+    restart = issue(http, {"kind": "restart_unit", "resource_id": "unit:netcore"})
+    wanted = issue(http, {"kind": "report", "include_stats": False})
+    assert poll(http, capable)["commands"] == [wanted["command"]]
+    assert ask(f"{http}/api/nodes/main/commands/{restart['command']['command_id']}")[1]["status"] == "pending"
+
+
+def test_a_revision_gate_waits_for_an_applied_report_and_wakes_the_poll(http: str, clock: Clock) -> None:
+    token = session(http, clock)
+    document = poll(http, token)["desired"]
+    wanted = {key: document[key] for key in ("fleet_epoch", "revision", "sha256")}
+    record = issue(http, {"kind": "reset_inbound", "inbound_tag": TAG, "wait_for": wanted})
+    assert record["status"] == "waiting"
+    assert poll(http, token, have=wanted)["commands"] == []
+    response: dict[str, Any] = {}
+    waiter = threading.Thread(target=lambda: response.update(poll(http, token, have=wanted, wait=30)))
+    waiter.start()
+    time.sleep(0.1)
+    assert ask(f"{http}/agent/v1/report", "POST", report(document), token)[0] == 200
+    waiter.join(timeout=5)
+    assert not waiter.is_alive()
+    assert response["commands"] == [record["command"]]
+
+
+def test_unknown_nodes_unmanaged_targets_and_other_nodes_results_are_refused(http: str, clock: Clock) -> None:
+    assert ask(f"{http}/api/nodes/missing/commands", "POST", {"kind": "reconcile"})[0] == 404
+    token = session(http, clock)
+    assert ask(f"{http}/api/nodes/main/commands", "POST", {"kind": "restart_unit", "resource_id": "netagent"})[0] == 400
+    assert ask(f"{http}/api/nodes/main/commands", "POST", {"kind": "reset_inbound", "inbound_tag": "missing"})[0] == 400
+    record = issue(http, {"kind": "reconcile"})
+    other = session(http, clock, node_id="other")
+    result = {
+        "type": "command_result",
+        "command_id": record["command"]["command_id"],
+        "status": "succeeded",
+        "error": None,
+        "effect": None,
+        "finished_at": clock.stamp(),
+    }
+    assert ask(f"{http}/agent/v1/command-results", "POST", result, other)[0] == 400
+    assert poll(http, token)["commands"] == [record["command"]]
+
+
+def test_command_writes_need_admin_and_reads_need_read(http: str, service: ControlService) -> None:
+    service.put_node_spec("main", spec())
+    read = service.tokens.issue(TokenCreate(name="reader", scope="read"), issuer=ROOT)
+    assert ask(f"{http}/api/nodes/main/commands", "POST", {"kind": "reconcile"}, read.token)[0] == 403
+    record = issue(http, {"kind": "reconcile"})
+    assert ask(f"{http}/api/nodes/main/commands/{record['command']['command_id']}", token=read.token)[0] == 200
+    people = service.tokens.issue(TokenCreate(name="accounts", scope="people"), issuer=ROOT)
+    assert ask(f"{http}/api/nodes/main/commands", "POST", {"kind": "reconcile"}, people.token)[0] == 403
+    assert ask(f"{http}/api/nodes/main/commands/{record['command']['command_id']}", token=people.token)[0] == 403
+    assert ask(f"{http}/api/nodes/main/command-targets", token=people.token)[0] == 403
+
+
+def test_unanswered_commands_expire_and_old_finished_rows_are_pruned(
+    http: str, service: ControlService, clock: Clock, tmp_path: Path
+) -> None:
+    token = session(http, clock)
+    expired = issue(http, {"kind": "reconcile", "expires_in_seconds": 60})
+    clock.now += 61
+    assert poll(http, token)["commands"] == []
+    path = f"{http}/api/nodes/main/commands/{expired['command']['command_id']}"
+    assert ask(path)[1]["status"] == "expired"
+    events = [event for event in service.events.list().events if event.kind.startswith("command.")]
+    assert [event.kind for event in events] == ["command.issued", "command.result"]
+    assert events[-1].detail.to_data()["status"] == "expired"
+    service.commands.maintain()
+    assert [event for event in service.events.list().events if event.kind.startswith("command.")] == events
+    clock.now += 7 * 86400 + 1
+    service.commands.maintain()
+    assert ask(path)[0] == 404
+    with sqlite3.connect(tmp_path / "control.db") as db:
+        assert db.execute("SELECT count(*) FROM commands").fetchone()[0] == 0
+
+
+def test_results_scrub_credentials_names_and_user_ids(http: str, service: ControlService, clock: Clock) -> None:
+    token = session(http, clock)
+    user = service.put_user("person-a")
+    record = issue(http, {"kind": "restart_unit", "resource_id": "unit:netcore"})
+    result = {
+        "type": "command_result",
+        "command_id": record["command"]["command_id"],
+        "status": "failed",
+        "error": {
+            "code": "service_failed",
+            "message": f"failed {user.username} {user.user_id} {user.uuid} {user.sub_token}",
+            "retryable": False,
+        },
+        "effect": None,
+        "finished_at": clock.stamp(),
+    }
+    assert ask(f"{http}/agent/v1/command-results", "POST", result, token)[0] == 200
+    stored = ask(f"{http}/api/nodes/main/commands/{result['command_id']}")[1]
+    text = json.dumps(stored["result"]["error"])
+    assert all(secret not in text for secret in (user.username, user.user_id, user.uuid, user.sub_token))
+    assert len(stored["result"]["error"]["message"]) <= 300
+    events = [event.to_data() for event in service.events.list().events if event.kind.startswith("command.")]
+    text = json.dumps(events)
+    assert all(secret not in text for secret in (user.username, user.user_id, user.uuid, user.sub_token))
+    assert "message" not in text and "resource_id" not in text
+
+
+def test_command_issue_records_the_request_actor(http: str, service: ControlService) -> None:
+    service.put_node_spec("main", spec())
+    admin = service.tokens.issue(TokenCreate(name="operator", scope="admin"), issuer=ROOT)
+    assert ask(f"{http}/api/nodes/main/commands", "POST", {"kind": "reconcile"}, admin.token)[0] == 200
+    event = service.events.list().events[-1]
+    assert (event.kind, event.actor, event.subject) == ("command.issued", "operator", "main")
+
+
+@pytest.mark.parametrize("action", ["issue", "result"])
+def test_event_insert_failure_rolls_back_the_command_mutation(
+    http: str, service: ControlService, clock: Clock, action: str
+) -> None:
+    token = session(http, clock)
+    issued = issue(http, {"kind": "reconcile"})
+    before = service.events.list()
+    service._store.create(
+        "CREATE TRIGGER refuse_command_event BEFORE INSERT ON events BEGIN SELECT RAISE(ABORT, 'event refused'); END;"
+    )
+    if action == "issue":
+        assert ask(f"{http}/api/nodes/main/commands", "POST", {"kind": "reconcile"})[0] == 500
+    else:
+        result = {
+            "type": "command_result",
+            "command_id": issued["command"]["command_id"],
+            "status": "succeeded",
+            "error": None,
+            "effect": None,
+            "finished_at": clock.stamp(),
+        }
+        assert ask(f"{http}/agent/v1/command-results", "POST", result, token)[0] == 500
+    assert poll(http, token)["commands"] == [issued["command"]]
+    assert service.events.list() == before
+
+
+def test_snapshots_do_not_replay_commands_or_restore_their_session_capabilities(
+    http: str, service: ControlService, clock: Clock
+) -> None:
+    session(http, clock)
+    issue(http, {"kind": "reconcile"})
+    with sqlite3.connect(":memory:") as copy:
+        service._store.db.backup(copy)
+        strip_unsnapshotted(copy)
+        assert copy.execute("SELECT count(*) FROM commands").fetchone()[0] == 0
+        assert copy.execute("SELECT count(*) FROM agent_command_capabilities").fetchone()[0] == 0
+
+
+def test_schema_fourteen_keeps_token_expiry_accounting_and_events_from_schema_thirteen(
+    tmp_path: Path, clock: Clock
+) -> None:
+    path = tmp_path / "schema-thirteen.db"
+    old = ControlService(path, fleet_id=FLEET_ID, version="4.0.0", clock=clock)
+    try:
+        user = old.put_user("person-a")
+        token = old.tokens.issue(TokenCreate(name="operator", scope="admin", expires_in_days=7), issuer=ROOT)
+        old.record_stats(
+            "main",
+            StatsReport(
+                counter_epoch="5b0c8a52-6c1d-4e8b-9a7f-2b5d4c3e1f00",
+                seq=1,
+                collected_at=clock.stamp(),
+                users=[{"user_id": user.user_id, "uplink_bytes": 10, "downlink_bytes": 20}],
+            ),
+            now=clock.stamp(),
+        )
+        accounting = old.traffic.node_accounting("main")
+        events = old.events.list()
+    finally:
+        old.close()
+    with sqlite3.connect(path) as db:
+        db.execute("DROP TABLE commands")
+        db.execute("DROP TABLE agent_command_capabilities")
+        db.execute("UPDATE meta SET value = '13' WHERE key = 'schema_version'")
+    migrated = ControlService(path, fleet_id=FLEET_ID, version="4.0.0", clock=clock)
+    try:
+        assert migrated.tokens.authenticate(token.token).scope == "admin"
+        assert migrated.tokens.list_tokens().tokens[0].expires_at == token.expires_at
+        assert migrated.traffic.node_accounting("main") == accounting
+        assert migrated.events.list() == events
+        restored_user = migrated.get_user("person-a")
+        assert restored_user is not None and restored_user.lifetime_traffic_bytes == 30
+        assert int(migrated._store.meta("schema_version")) == SCHEMA_VERSION
+        migrated.put_node_spec("main", spec())
+        issued = migrated.issue_command("main", ReconcileCreate())
+        assert issued.status == "pending"
+    finally:
+        migrated.close()

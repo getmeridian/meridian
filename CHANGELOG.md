@@ -6,6 +6,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+- Signed node commands are queued durably, delivered only to agents that accept their kinds, and expose per-node outcomes through the admin API.
+
 Changes since 4.0.0b8. Meridian now runs its own control service in place of
 Remnawave: no Docker, no third-party panel, and every server runs a small agent
 that dials out to it.

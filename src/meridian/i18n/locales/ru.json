@@ -404,6 +404,8 @@
   "events.kind.node.online": "Узел доступен",
   "events.kind.node.apply_failed": "Ошибка применения конфигурации",
   "events.kind.node.apply_recovered": "Ошибка применения устранена",
+  "events.kind.command.issued": "Команда серверу выдана",
+  "events.kind.command.result": "Команда сервера завершена",
   "events.kind.privacy.changed": "Настройки приватности изменены",
   "events.kind.token.created": "Токен создан",
   "events.kind.token.revoked": "Токен отозван"

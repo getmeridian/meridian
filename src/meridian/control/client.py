@@ -9,6 +9,7 @@ from urllib.parse import quote, urlencode
 
 import httpx
 
+from meridian.control.command_models import CommandRequest, NodeCommandRecord, NodeCommandTargets
 from meridian.control.models import (
     ApplyFenceRecord,
     ApplyFenceState,
@@ -134,6 +135,21 @@ class ControlClient:
 
     def health(self) -> ServiceHealth:
         return ServiceHealth.model_validate(self._call("GET", "api/health"))
+
+    def issue_command(self, node_id: str, request: CommandRequest) -> NodeCommandRecord:
+        return NodeCommandRecord.model_validate(
+            self._call("POST", f"api/nodes/{quote(node_id, safe='')}/commands", request.model_dump(mode="json"))
+        )
+
+    def command(self, node_id: str, command_id: str) -> NodeCommandRecord:
+        return NodeCommandRecord.model_validate(
+            self._call("GET", f"api/nodes/{quote(node_id, safe='')}/commands/{quote(command_id, safe='')}")
+        )
+
+    def command_targets(self, node_id: str) -> NodeCommandTargets:
+        return NodeCommandTargets.model_validate(
+            self._call("GET", f"api/nodes/{quote(node_id, safe='')}/command-targets")
+        )
 
     def ping(self) -> bool:
         try:

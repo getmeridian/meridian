@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import secrets
 import time
 from collections.abc import Callable
@@ -18,6 +19,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from meridian.control.commands import COMMAND_CAPABILITIES_TABLE
 from meridian.control.errors import agent_error
 from meridian.control.models import EnrollmentGrant, FleetAuthority
 from meridian.control.pki import (
@@ -34,6 +36,7 @@ from meridian.control.pki import (
 from meridian.control.store import Store
 from meridian.control.times import format_timestamp, parse_timestamp
 from meridian.core.agent_protocol import (
+    COMMAND_CAPABILITIES,
     Capability,
     EnrollRequest,
     EnrollResponse,
@@ -73,6 +76,7 @@ SERVICE_CAPABILITIES: tuple[Capability, ...] = (
     "binary_pins",
     "traffic_stats",
     "blob_fetch",
+    *COMMAND_CAPABILITIES,
 )
 POLL_SETTINGS = PollSettings(max_wait_seconds=55, report_interval_seconds=60, stats_interval_seconds=60)
 
@@ -98,6 +102,7 @@ CREATE TABLE IF NOT EXISTS agent_sessions (
 );
 CREATE TABLE IF NOT EXISTS hello_nonces (nonce TEXT PRIMARY KEY, expires_at INTEGER NOT NULL);
 """
+_SCHEMA += COMMAND_CAPABILITIES_TABLE + ";\n"
 
 
 @dataclass(frozen=True)
@@ -107,6 +112,7 @@ class Session:
     node_id: str
     certificate_sha256: str
     expires_at: float
+    capabilities: tuple[Capability, ...] = ()
 
 
 def token_sha256(token: str) -> str:
@@ -241,6 +247,8 @@ class NodeAuthority:
         token = secrets.token_urlsafe(32)
         stamp = int(now.timestamp())
         expires_at = stamp + SESSION_SECONDS
+        offered = set(request.capabilities)
+        accepted = [name for name in SERVICE_CAPABILITIES if name in offered]
         with self._store.transaction():
             row = self._store.row(
                 "SELECT node_id, renew_after, revoked_at FROM node_certificates WHERE sha256 = ?", (certificate.sha256,)
@@ -252,6 +260,10 @@ class NodeAuthority:
             db = self._store.db
             db.execute("DELETE FROM hello_nonces WHERE expires_at < ?", (stamp,))
             db.execute("DELETE FROM agent_sessions WHERE expires_at < ?", (stamp,))
+            db.execute(
+                "DELETE FROM agent_command_capabilities WHERE token_sha256 NOT IN"
+                " (SELECT token_sha256 FROM agent_sessions)"
+            )
             if db.execute("SELECT 1 FROM hello_nonces WHERE nonce = ?", (request.proof.nonce,)).fetchone():
                 raise agent_error("unauthenticated", "The proof's nonce was already used.")
             nonce_expiry = int(issued_at) + CLOCK_SKEW_SECONDS + NONCE_MARGIN_SECONDS
@@ -260,12 +272,14 @@ class NodeAuthority:
                 "INSERT INTO agent_sessions VALUES (?, ?, ?, ?)",
                 (token_sha256(token), request.node_id, certificate.sha256, expires_at),
             )
+            db.execute(
+                "INSERT INTO agent_command_capabilities VALUES (?, ?)", (token_sha256(token), json.dumps(accepted))
+            )
             renew_after = int(row["renew_after"])
-        offered = set(request.capabilities)
         return request, HelloResponse(
             protocol=AGENT_PROTOCOL,
             fleet_epoch=epoch,
-            capabilities=[name for name in SERVICE_CAPABILITIES if name in offered],
+            capabilities=accepted,
             session_token=token,
             session_expires_at=format_timestamp(expires_at),
             server_time=format_timestamp(stamp),
@@ -276,8 +290,9 @@ class NodeAuthority:
 
     def authenticate(self, token: str) -> Session:
         row = self._store.row(
-            "SELECT s.node_id, s.certificate_sha256, s.expires_at, c.revoked_at FROM agent_sessions s"
-            " LEFT JOIN node_certificates c ON c.sha256 = s.certificate_sha256 WHERE s.token_sha256 = ?",
+            "SELECT s.node_id, s.certificate_sha256, s.expires_at, c.revoked_at, a.capabilities FROM agent_sessions s"
+            " LEFT JOIN node_certificates c ON c.sha256 = s.certificate_sha256"
+            " LEFT JOIN agent_command_capabilities a ON a.token_sha256 = s.token_sha256 WHERE s.token_sha256 = ?",
             (token_sha256(token),),
         )
         if row is None:
@@ -290,6 +305,7 @@ class NodeAuthority:
             node_id=str(row["node_id"]),
             certificate_sha256=str(row["certificate_sha256"]),
             expires_at=float(row["expires_at"]),
+            capabilities=tuple(json.loads(row["capabilities"])) if row["capabilities"] else (),
         )
 
     def renew(self, session: Session, request: RenewRequest) -> RenewResponse:
@@ -333,6 +349,9 @@ class NodeAuthority:
             (int(self._clock()), node_id, keep),
         )
         db.execute("DELETE FROM agent_sessions WHERE node_id = ?", (node_id,))
+        db.execute(
+            "DELETE FROM agent_command_capabilities WHERE token_sha256 NOT IN (SELECT token_sha256 FROM agent_sessions)"
+        )
 
     def _now(self) -> datetime:
         return datetime.fromtimestamp(self._clock(), UTC)

@@ -24,6 +24,7 @@
 
 ## What's done well
 - Delivery refresh intervals use one integer contract (1–168 hours); the six-hour default is omitted from new intent and settings fields to preserve existing serialization.
+- Each command kind is its own hello capability; successful `reset_inbound` results disclose `inbound_reset` or `core_restart` through the nullable `effect` field, without carrying a user identifier.
 - No barrel re-exports in `__init__.py`; consumers import specific submodules.
 - Shared serializers keep JSON output stable and recurse through core models.
 - Fleet, client, node, and relay commands build typed, redacted results before any envelope or rendering.

@@ -29,6 +29,9 @@
 
 ## What's done well
 - Node status exposes durable `traffic_bytes` and its activity window from the same accounting row, so deployer adapters consume the public API rather than replay baselines.
+- Signed commands live in `commands.py` and schema step 14: oldest first, only session-negotiated kinds, durable first-result acknowledgements, 64 unanswered per node, expiry and seven-day finished retention; revision gates release only on applied reports.
+- Command session capabilities and command queues are transient snapshot state; restore never replays a signed command under the old epoch or signing certificate.
+- Command issue and terminal result facts share their mutation's transaction in the local event ledger; retries add no duplicate result, and details carry only command ID, kind, status, and reset effect, never targets, user identifiers, or raw errors.
 - A revision is signed only when the resources' hash (or the signing certificate) changes, so repeated applies never wake agents.
 - Agent errors use the protocol's `AgentErrorResponse` with the status `AGENT_HTTP_SURFACE` maps (`errors.agent_error`); admin errors a plain `{"error": {...}}`.
 - An API token's public ID (`mrd_<id>_<secret>`) finds its row, so the hash is compared once with `hmac.compare_digest`, against a dummy when no row matches.
@@ -58,6 +61,7 @@
 - Event details accept only typed field names, statuses, counts, audit IDs, and token names/scopes; never copy user records, credential values, raw report errors, addresses, or device metadata. A missing report cannot announce an apply recovery, and a repeated state or write adds no transition event.
 - Never derive displayed node totals from the last-arriving epoch or clear them with user/history/node deletion; duplicates and retired epochs leave activity alone, and a late older collection window adds bytes without replacing fresher activity.
 - Removing a person erases lifetime totals, per-user baselines, and daily history in the user's transaction; node report sequences and epochs stay, and the ledger itself drops unknown IDs before comparing counters so a late report cannot recreate them.
+- A cut-off must wait for the credential-removal revision to be reported applied; resetting an inbound against the previous composition can restore the revoked credentials.
 - nginx answers 502/503/504 for a stopped or hung service — `ControlClient` raises those as retryable unreachable errors; as plain refusals, a stopped ctld failed the fence at once with "refused: HTTP 502". A write the backup hook counts as maybe-committed (a lost reply, any 5xx) raises `ControlServiceUncertain`, which Meridian drivers turn into `UnknownResourceOutcome`.
 - `serve` is a daemon: the root callback skips the beta banner and the update check for it (it once printed the banner into journald and phoned out on every start).
 - Decode the path before routing — `ControlClient` percent-encodes IDs, so `:` in endpoint IDs arrives as `%3A` and every endpoint PUT 404'd; node routes match only topology IDs (`_NODE`), or a grant stored `main:exit` before its response refused it and broke the fleet view.

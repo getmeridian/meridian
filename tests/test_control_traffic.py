@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from meridian.control.errors import ServiceError
-from meridian.control.service import ControlService
+from meridian.control.service import SCHEMA_VERSION, ControlService
 from meridian.control.traffic import KEPT_EPOCHS, REMEMBERED_RETIRED_EPOCHS
 from meridian.core.agent_protocol import StatsReport
 from tests.support.agent_node import FLEET_ID
@@ -380,7 +380,7 @@ def test_schema_thirteen_backfills_retained_node_evidence_once_and_marks_the_acc
         assert service.get_user("alice").first_traffic_at is None
         assert service.get_user("alice").last_traffic_node is None
         assert service.get_user("alice").lifetime_traffic_bytes == (KEPT_EPOCHS + 2) * 10
-        assert service._store.meta("schema_version") == "13"
+        assert service._store.meta("schema_version") == str(SCHEMA_VERSION)
         service.close()
     service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
     try:

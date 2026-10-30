@@ -15,7 +15,9 @@ export type Detail =
   | UserStateDetail
   | NodeEventDetail
   | PrivacyEventDetail
-  | TokenEventDetail;
+  | TokenEventDetail
+  | CommandIssuedDetail
+  | CommandResultDetail;
 /**
  * Changed field names, never values.
  *
@@ -547,10 +549,22 @@ export type AuditId = number;
 export type Name = string;
 export type Scope = "read" | "propose" | "approve" | "people" | "admin";
 /**
+ * Idempotency key of a command: a lowercase UUID chosen by the service, never reused.
+ */
+export type CommandId = string;
+export type Kind = "reconcile" | "report" | "reset_inbound" | "restart_unit" | "renew_credential";
+/**
+ * Idempotency key of a command: a lowercase UUID chosen by the service, never reused.
+ */
+export type CommandId1 = string;
+export type Effect = ("inbound_reset" | "core_restart") | null;
+export type Kind1 = "reconcile" | "report" | "reset_inbound" | "restart_unit" | "renew_credential";
+export type Status = "succeeded" | "failed" | "rejected" | "expired";
+/**
  * Monotonic cursor, never reused after retention pruning.
  */
 export type Id = number;
-export type Kind =
+export type Kind2 =
   | "user.created"
   | "user.updated"
   | "user.enabled"
@@ -565,6 +579,8 @@ export type Kind =
   | "node.online"
   | "node.apply_failed"
   | "node.apply_recovered"
+  | "command.issued"
+  | "command.result"
   | "privacy.changed"
   | "token.created"
   | "token.revoked";
@@ -598,7 +614,7 @@ export interface FleetEvent {
   actor: Actor;
   detail?: Detail;
   id: Id;
-  kind: Kind;
+  kind: Kind2;
   subject: Subject;
   time: Time;
 }
@@ -622,4 +638,14 @@ export interface PrivacyEventDetail {
 export interface TokenEventDetail {
   name: Name;
   scope: Scope;
+}
+export interface CommandIssuedDetail {
+  command_id: CommandId;
+  kind: Kind;
+}
+export interface CommandResultDetail {
+  command_id: CommandId1;
+  effect?: Effect;
+  kind: Kind1;
+  status: Status;
 }
