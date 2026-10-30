@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, NoReturn
 
 from meridian import config
@@ -13,6 +13,7 @@ from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.topology import ExitIntent, SetupIntent
 
 if TYPE_CHECKING:
+    from meridian.control.command_models import NodeCommandRecord
     from meridian.core.reporters import Reporter
     from meridian.reconciler.resources import ResourceExecutionResult
     from meridian.servers import ServerRegistry
@@ -119,6 +120,7 @@ def reviewed_runtime(
     reporter: Reporter | None = None,
     *,
     fence_holder: str | None = None,
+    user_cut_off: Mapping[str, list[NodeCommandRecord]] | None = None,
 ) -> SetupRuntime:
     """A setup runtime bound to an already-loaded cluster that persists every checkpoint."""
     from meridian.setup.runtime import SetupRuntime
@@ -129,6 +131,7 @@ def reviewed_runtime(
         persist=persist_reviewed_apply,
         reporter=reporter,
         fence_holder=fence_holder,
+        user_cut_off=user_cut_off,
     )
 
 
@@ -142,6 +145,7 @@ def apply_reviewed_intent(
     expected_plan_hash: str | None = None,
     on_unsaved: Callable[[ReviewedApplyPersistenceError], NoReturn] | None = None,
     fence_holder: str | None = None,
+    user_cut_off: Mapping[str, list[NodeCommandRecord]] | None = None,
 ) -> ResourceExecutionResult:
     """Apply an edited intent with progress, failing with ``failure`` unless every resource converged.
 
@@ -150,9 +154,9 @@ def apply_reviewed_intent(
     """
     try:
         with apply_progress(registry=registry) as reporter:
-            result = reviewed_runtime(registry, cluster, reporter, fence_holder=fence_holder).apply_intent(
-                intent, expected_plan_hash=expected_plan_hash
-            )
+            result = reviewed_runtime(
+                registry, cluster, reporter, fence_holder=fence_holder, user_cut_off=user_cut_off
+            ).apply_intent(intent, expected_plan_hash=expected_plan_hash)
     except MeridianError as exc:
         if on_unsaved is not None and isinstance(exc, ReviewedApplyPersistenceError):
             on_unsaved(exc)

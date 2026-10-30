@@ -23,6 +23,7 @@
 
 ## Pitfalls
 
+- A control-user retirement with a saved cut-off deletes credentials and queues resets atomically; a retry keeps the flag, and 404 after a lost reply means the deletion already committed.
 - **First limits travel with the reviewed user** — `ControlUserPayload.creation_settings` uses atomic account creation; a lost reply resumes by observing existence, and every later apply preserves operator-owned settings instead of PATCHing them.
 
 - **An unseen but installed agent gets its backoff first** — after a control-service outage a healthy agent reads not-live until it retries (≤ 60 s); `AgentRuntimeDriver.apply` waits for it before re-enrolling, which once re-keyed every agent on the first apply after a ctld restart.

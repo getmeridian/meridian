@@ -272,6 +272,11 @@ class ControlClient:
     def delete_user(self, username: str) -> None:
         self._call("DELETE", f"api/users/{_segment(username)}")
 
+    def delete_user_with_cut_off(self, username: str) -> UserCutOffMutation:
+        return UserCutOffMutation.model_validate(
+            self._call("DELETE", f"api/users/{_segment(username)}", UserCutOffRequest(cut_off=True).to_data())
+        )
+
     def get_endpoint(self, endpoint_id: str) -> ClientEndpoint | None:
         try:
             return ClientEndpoint.model_validate(self._call("GET", f"api/endpoints/{_segment(endpoint_id)}"))

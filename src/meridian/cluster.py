@@ -167,6 +167,7 @@ class ManagedResourceBinding:
     active: bool = False
     adopted: bool = False
     server_ref: str = ""  # host owning server-side artifacts, needed to retire them
+    cut_off_on_retire: bool = False
     _extra: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -403,6 +404,10 @@ class ClusterConfig:
                 errors.append(f"{label}.desired_hash is not a SHA-256 hash")
 
         for key, binding in self.managed_bindings.items():
+            if not isinstance(binding.cut_off_on_retire, bool):
+                errors.append(f"managed_bindings[{key}].cut_off_on_retire must be a boolean")
+            elif binding.cut_off_on_retire and binding.resource_kind != "control_user":
+                errors.append(f"managed_bindings[{key}].cut_off_on_retire applies only to control users")
             if key != f"{binding.logical_id}@{binding.generation}":
                 errors.append(f"managed_bindings[{key}] key does not match its logical ID and generation")
             if binding.desired_hash and re.fullmatch(r"[0-9a-f]{64}", binding.desired_hash) is None:

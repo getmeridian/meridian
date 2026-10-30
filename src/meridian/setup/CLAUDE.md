@@ -24,6 +24,7 @@
 - `plan` and `apply` run the same compiler and runtime as setup.
 
 ## Pitfalls
+- Pass the command's cut-off result collector through the reviewed runtime into control-user retirement; copy neither its command list nor the saved cut-off request away during driver construction.
 - **Control bootstrap values come from the exit on the control server** — taking the first exit in plan order re-ran the bootstrap whenever an exit that sorts earlier was added, and fed another server's ports to the control nginx.
 - **A control-domain bootstrap renders no WSS location** — the service has no WSS listener, and an empty path rendered a second `location /` to port 0, failing `nginx -t`; compiled artifacts own WSS.
 - **A self-steal exit bootstraps with the default SNI** — the interim legacy 443 fallback dials the bootstrap SNI, and the operator's own name would point the server at itself.

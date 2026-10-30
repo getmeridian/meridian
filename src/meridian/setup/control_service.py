@@ -25,6 +25,7 @@ from meridian.compiler.models import (
     canonical_hash,
 )
 from meridian.control.client import ControlClient
+from meridian.control.command_models import NodeCommandRecord
 from meridian.control.models import ServiceConfig
 from meridian.control_artifacts import agent_binary, require_agent_build, service_package
 from meridian.core.cancellation import CancellationToken
@@ -99,6 +100,7 @@ def meridian_drivers(
     persist: PersistCluster,
     connections: Mapping[str, ServerConnection],
     addresses: Mapping[str, str],
+    user_cut_off: Mapping[str, list[NodeCommandRecord]] | None = None,
 ) -> ResourceDrivers:
     return build_meridian_drivers(
         MeridianDriverContext(
@@ -109,6 +111,7 @@ def meridian_drivers(
             connection_for=connections.__getitem__,
             server_addresses=addresses,
             agent_binary=agent_binary,
+            user_cut_off=user_cut_off if user_cut_off is not None else {},
         )
     )
 

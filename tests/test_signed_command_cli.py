@@ -14,6 +14,7 @@ from meridian.cli import app
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands.client import run_reissue, run_remove
 from meridian.console import set_json_mode
+from meridian.control.client import ControlServiceUncertain
 from meridian.control.command_models import (
     CommandUnitTarget,
     CutOffNode,
@@ -77,6 +78,11 @@ def test_client_remove_json_preserves_all_cut_off_results_after_the_reviewed_app
     ]
     scope = CutOffPlan(nodes=[CutOffNode(node_id="main", inbound_tags=["vless-reality"])])
     events = []
+
+    def applied(*args, **kwargs):
+        events.append("apply")
+        kwargs["user_cut_off"]["person-a"].extend(outcomes[0].commands)
+
     set_json_mode(True)
     try:
         with (
@@ -85,10 +91,10 @@ def test_client_remove_json_preserves_all_cut_off_results_after_the_reviewed_app
             patch("meridian.node_commands.cut_off_scope", return_value=scope),
             patch(
                 "meridian.commands.client_v4.apply_reviewed_intent",
-                side_effect=lambda *args, **kwargs: events.append("apply"),
+                side_effect=applied,
             ),
             patch(
-                "meridian.node_commands.cut_off_after_apply",
+                "meridian.node_commands.wait_commands",
                 side_effect=lambda *args: events.append("cut-off") or outcomes,
             ),
             patch("meridian.handoff.remove_connection_page", return_value=""),
@@ -217,3 +223,38 @@ def test_conflicting_restart_scopes_are_refused_before_any_service_call(tmp_home
         run_restart("main", core=True, all_units=True, yes=True)
     assert raised.value.exit_code == 2
     client.assert_not_called()
+
+
+def test_review_3_3_an_uncertain_second_restart_never_downgrades_an_earlier_failure(tmp_home, capsys) -> None:
+    from meridian.commands.node_restart import run_restart
+
+    client = MagicMock()
+    client.__enter__.return_value = client
+    client.command_targets.return_value = NodeCommandTargets(
+        node_id="main",
+        units=[
+            CommandUnitTarget(resource_id="unit:netcore", name="netcore.service", core=True),
+            CommandUnitTarget(resource_id="unit:forward", name="netfwd-test.service", core=False),
+        ],
+        inbounds=[],
+        capabilities=["restart_unit"],
+    )
+    first = command_record("main", "failed", unit="unit:netcore")
+    client.issue_command.side_effect = [first, ControlServiceUncertain("The write may have committed.", retryable=True)]
+    topology = SimpleNamespace(nodes=[SimpleNamespace(name="main", uuid="main", ip="198.51.100.10")])
+    set_json_mode(True)
+    try:
+        with (
+            patch("meridian.commands.node_restart.load_topology_cluster", return_value=cluster()),
+            patch("meridian.commands.node_restart.topology_from_local_cluster", return_value=topology),
+            patch("meridian.commands.node_restart.ControlClient", return_value=client),
+            pytest.raises(typer.Exit) as raised,
+        ):
+            run_restart("main", all_units=True, yes=True)
+        body = json.loads(capsys.readouterr().out)
+        assert raised.value.exit_code == 4 and body["exit_code"] == 4
+        assert body["data"]["nodes"][0]["status"] == "failed"
+        assert body["data"]["nodes"][0]["commands"][0]["status"] == "failed"
+        assert body["warnings"][0]["retryable"] is False
+    finally:
+        set_json_mode(False)

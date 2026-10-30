@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from meridian.node_commands import command_exit_code, wait_for_commands
+import pytest
+
+from meridian.control.client import ControlServiceUncertain
+from meridian.control.command_models import NodeCommandOutcome
+from meridian.node_commands import command_exit_code, command_warnings, wait_for_commands, with_command_issue_error
 from tests.support.node_commands import command_record
 
 
@@ -56,3 +60,14 @@ def test_one_failed_inbound_preserves_the_other_inbounds_success() -> None:
     result = wait_for_commands(MagicMock(), [succeeded, failed])[0]
     assert result.status == "failed" and len(result.commands) == 2
     assert result.commands[0].result.effect == "core_restart"
+
+
+@pytest.mark.parametrize("earlier", [None, "done", "core_restart", "timed_out", "failed"])
+def test_review_3_3_uncertain_issues_are_retryable_unless_a_node_already_failed(earlier: str | None) -> None:
+    previous = NodeCommandOutcome(node_id="main", status=earlier) if earlier is not None else None
+    error = ControlServiceUncertain("The issue may have committed.", retryable=True)
+    outcome = with_command_issue_error("main", previous, error)
+    assert outcome.status == ("failed" if earlier == "failed" else "timed_out")
+    warning = command_warnings([outcome])[0]
+    assert warning.retryable is (earlier != "failed")
+    assert command_exit_code([outcome]) == (4 if earlier == "failed" else 3)

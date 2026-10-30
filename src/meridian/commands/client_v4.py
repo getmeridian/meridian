@@ -196,9 +196,10 @@ def run_remove_v4(
     from meridian.commands.node_command_results import cut_off_disclosure, print_command_results
     from meridian.config import SERVER_PROFILES_FILE
     from meridian.console import confirm
+    from meridian.control.command_models import NodeCommandRecord
     from meridian.handoff import remove_connection_page
     from meridian.i18n import t
-    from meridian.node_commands import command_exit_code, command_warnings, cut_off_after_apply, cut_off_scope
+    from meridian.node_commands import command_exit_code, command_warnings, cut_off_scope, wait_commands
     from meridian.servers import ServerRegistry
     from meridian.setup.editor import remove_access_user_from_intent
 
@@ -217,15 +218,21 @@ def run_remove_v4(
 
     with access_panel(cluster) as panel:
         user = get_user_or_fail(panel, name, action="load")
+    commands: list[NodeCommandRecord] = []
+    if cut_off:
+        for binding in cluster.managed_bindings.values():
+            if binding.resource_kind == "control_user" and binding.remote_id == name:
+                binding.cut_off_on_retire = True
     apply_reviewed_intent(
         cluster,
         ServerRegistry(SERVER_PROFILES_FILE),
         updated,
         failure=f"Client '{name}' was not fully removed",
         hint="The client is out of the topology; rerun `meridian apply` to finish.",
+        user_cut_off={name: commands} if cut_off else None,
     )
 
-    cut_off_results = cut_off_after_apply(cluster, scope) if scope is not None else None
+    cut_off_results = wait_commands(cluster, commands) if scope is not None else None
     page_error = remove_connection_page(cluster, user.vless_uuid) if user and user.vless_uuid else ""
     if page_error:
         warn(f"Client '{name}' was removed, but their connection page could not be deleted: {page_error}")

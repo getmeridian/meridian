@@ -7,15 +7,13 @@ from collections import defaultdict
 from collections.abc import Callable, Sequence
 
 from meridian.cluster import ClusterConfig
-from meridian.control.client import ControlClient, ControlServiceError
+from meridian.control.client import ControlClient, ControlServiceError, ControlServiceUncertain
 from meridian.control.command_models import (
     CutOffPlan,
     NodeCommandOutcome,
     NodeCommandOutcomeStatus,
     NodeCommandRecord,
-    ResetInboundCreate,
 )
-from meridian.core.agent_types import NodeStateRef
 from meridian.core.models import ErrorModel
 from meridian.core.redaction import redact_diagnostic_text
 
@@ -93,34 +91,24 @@ def wait_commands(cluster: ClusterConfig, commands: Sequence[NodeCommandRecord])
         return wait_for_commands(client, commands)
 
 
-def cut_off_after_apply(cluster: ClusterConfig, plan: CutOffPlan) -> list[NodeCommandOutcome]:
-    """The topology apply owns deletion; queue resets afterwards against each node's resulting revision."""
-    commands: list[NodeCommandRecord] = []
-    failed: dict[str, list[str]] = {}
-    with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
-        for node in plan.nodes:
-            try:
-                status = client.node(node.node_id)
-                if status is None or status.revision is None or status.sha256 is None:
-                    raise ControlServiceError("The affected node has no current document.", category="system")
-                wanted = NodeStateRef(fleet_epoch=status.fleet_epoch, revision=status.revision, sha256=status.sha256)
-                for tag in node.inbound_tags:
-                    commands.append(
-                        client.issue_command(node.node_id, ResetInboundCreate(inbound_tag=tag, wait_for=wanted))
-                    )
-            except ControlServiceError as exc:
-                # A lost POST reply may already have queued a command; never blindly issue another ID.
-                failed[node.node_id] = [redact_diagnostic_text(str(exc), cluster.secret_values())[:300]]
-        outcomes = {outcome.node_id: outcome for outcome in wait_for_commands(client, commands)}
-    for node_id, errors in failed.items():
-        previous = outcomes.get(node_id)
-        outcomes[node_id] = NodeCommandOutcome(
-            node_id=node_id,
-            status="failed",
-            commands=previous.commands if previous else [],
-            errors=[*(previous.errors if previous else []), *errors],
-        )
-    return [outcomes[node_id] for node_id in sorted(outcomes)]
+def with_command_issue_error(
+    node_id: str,
+    previous: NodeCommandOutcome | None,
+    error: ControlServiceError,
+    *,
+    secrets: Sequence[str] = (),
+) -> NodeCommandOutcome:
+    """A maybe-committed issue is retryable uncertainty; an earlier failure remains failure."""
+    failed = previous is not None and previous.status == "failed"
+    status: NodeCommandOutcomeStatus = (
+        "failed" if failed or not isinstance(error, ControlServiceUncertain) else "timed_out"
+    )
+    return NodeCommandOutcome(
+        node_id=node_id,
+        status=status,
+        commands=previous.commands if previous else [],
+        errors=[*(previous.errors if previous else []), redact_diagnostic_text(str(error), secrets)[:300]],
+    )
 
 
 def command_exit_code(outcomes: Sequence[NodeCommandOutcome]) -> int:

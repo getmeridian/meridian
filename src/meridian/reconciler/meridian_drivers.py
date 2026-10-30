@@ -28,7 +28,13 @@ from meridian.compiler.models import (
     ResourcePlan,
     ServiceSettingsPayload,
 )
-from meridian.control.client import ControlClient, ControlServiceConflict, ControlServiceUncertain
+from meridian.control.client import (
+    ControlClient,
+    ControlServiceConflict,
+    ControlServiceNotFound,
+    ControlServiceUncertain,
+)
+from meridian.control.command_models import NodeCommandRecord
 from meridian.control.models import ClientEndpoint, NodeSpec, NodeStatus, ServiceSettings, UserCreate
 from meridian.control_artifacts import AgentBinary
 from meridian.core.agent_protocol import AgentBootstrap
@@ -92,6 +98,7 @@ class MeridianDriverContext:
     server_addresses: Mapping[str, str]
     agent_binary: Callable[[str], AgentBinary]
     sleep: Callable[[float], None] = time.sleep
+    user_cut_off: Mapping[str, list[NodeCommandRecord]] = field(default_factory=dict)
     _architectures: dict[str, str] = field(default_factory=dict, repr=False)
 
     def architecture(self, server_ref: str) -> str:
@@ -551,7 +558,16 @@ class ControlUserDriver:
     def retire(self, binding: ManagedResourceBinding) -> None:
         if binding.remote_id:
             with self.context.client() as client:
-                client.delete_user(binding.remote_id)
+                if binding.cut_off_on_retire or binding.remote_id in self.context.user_cut_off:
+                    try:
+                        result = client.delete_user_with_cut_off(binding.remote_id)
+                    except ControlServiceNotFound:
+                        # A lost reply may have committed the atomic deletion and its resets.
+                        return
+                    if binding.remote_id in self.context.user_cut_off:
+                        self.context.user_cut_off[binding.remote_id].extend(result.commands)
+                else:
+                    client.delete_user(binding.remote_id)
 
 
 class ServiceSettingsDriver:

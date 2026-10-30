@@ -17,6 +17,7 @@ from meridian.compiler import (
 )
 from meridian.compiler.models import ControlServicePayload, ResourcePlan
 from meridian.config import ACME_SERVER, XRAY_VERSION
+from meridian.control.command_models import NodeCommandRecord
 from meridian.core.cancellation import CancellationToken
 from meridian.core.errors import LocalStateError
 from meridian.core.output import OperationContext
@@ -111,6 +112,7 @@ class SetupRuntime:
         operation: OperationContext | None = None,
         fence_factory: FenceFactory | None = None,
         fence_holder: str | None = None,
+        user_cut_off: Mapping[str, list[NodeCommandRecord]] | None = None,
     ) -> None:
         self._registry = registry
         self._cluster_loader = cluster_loader
@@ -122,6 +124,7 @@ class SetupRuntime:
         self._fence_factory: FenceFactory = fence_factory or self._default_fence
         # A caller already holding the lease (`meridian migrate`) applies under the same holder.
         self._fence_holder = fence_holder
+        self._user_cut_off = user_cut_off if user_cut_off is not None else {}
         self._control_bootstrap = control_bootstrap or partial(
             bootstrap_reviewed_control_service,
             cancellation=cancellation,
@@ -298,7 +301,16 @@ class SetupRuntime:
         drivers: ResourceDrivers = {}
         drivers.update(build_server_drivers(servers))
         drivers["control_service"] = ControlServiceDriver(control_context)
-        drivers.update(meridian_drivers(plan, cluster, persist=persist, connections=connections, addresses=addresses))
+        drivers.update(
+            meridian_drivers(
+                plan,
+                cluster,
+                persist=persist,
+                connections=connections,
+                addresses=addresses,
+                user_cut_off=self._user_cut_off,
+            )
+        )
         assert_complete_driver_registry(drivers)
         return drivers
 

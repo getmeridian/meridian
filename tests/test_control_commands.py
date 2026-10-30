@@ -11,12 +11,19 @@ import urllib.request
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
+import typer
 
+from meridian.cluster import ClusterConfig, ManagedResourceBinding, PanelConfig
+from meridian.commands.client import run_remove
+from meridian.console import set_json_mode
 from meridian.control.backups import strip_unsnapshotted
-from meridian.control.command_models import ReconcileCreate
+from meridian.control.client import ControlClient, ControlServiceConflict
+from meridian.control.command_models import NodeCommandOutcome, ReconcileCreate
 from meridian.control.enrollment import token_sha256
 from meridian.control.models import NodeSpec, TokenCreate
 from meridian.control.server import ControlServer
@@ -24,9 +31,12 @@ from meridian.control.service import SCHEMA_VERSION, ControlService
 from meridian.control.tokens import ROOT
 from meridian.core.agent_protocol import StatsReport
 from meridian.core.agent_signing import COMMAND_CONTEXT, verify
+from meridian.reconciler.meridian_drivers import ControlUserDriver
+from meridian.remnawave import User
 from tests.support.agent_node import FakeNode
 from tests.support.control_service import ADMIN_TOKEN, FLEET_ID
 from tests.support.node_commands import command_node_spec as spec
+from tests.support.topology import single_exit_intent
 
 COMMAND_KINDS = ["reconcile", "report", "reset_inbound", "restart_unit", "renew_credential"]
 TAG = "vless-reality"
@@ -312,6 +322,166 @@ def test_review_2_1_late_execution_result_replaces_expiry_and_records_its_event(
     assert ask(f"{http}/agent/v1/command-results", "POST", different, token)[0] == 200
     assert ask(path)[1]["result"] == result
     assert [event for event in service.events.list().events if event.kind == "command.result"] == events
+
+
+def test_review_3_1_cli_removal_does_not_drop_resets_when_the_node_revision_changes(
+    http: str, service: ControlService, clock: Clock, tmp_home: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    user = service.put_user("person-a")
+    session(http, clock)
+    body = spec().model_dump(mode="json")
+    body["resources"][0]["config"]["inbounds"].append(
+        {"tag": "vless-xhttp", "protocol": "vless", "settings": {"clients": []}}
+    )
+    body["managed_inbounds"].append({"tag": "vless-xhttp", "protocol": "vless"})
+    service.put_node_spec("main", NodeSpec.model_validate(body))
+    binding = ManagedResourceBinding(
+        logical_id="user:person-a", resource_kind="control_user", generation=1, remote_id="person-a", active=True
+    )
+    saved = ClusterConfig(
+        panel=PanelConfig(url=http, api_token=ADMIN_TOKEN),
+        topology_intent=single_exit_intent(users=["person-a", "other-person"]),
+        managed_bindings={"user:person-a@1": binding},
+    )
+    panel = MagicMock()
+    panel.__enter__.return_value = panel
+    panel.get_user.return_value = User(
+        username=user.username, id=user.user_id, short_uuid=user.sub_token, vless_uuid=user.uuid, status="ACTIVE"
+    )
+    reads: list[str] = []
+    queued_during_retirement: list[int] = []
+
+    class RacingClient(ControlClient):
+        def node(self, node_id: str):
+            current = super().node(node_id)
+            reads.append(node_id)
+            service.put_user("person-b")
+            return current
+
+    def apply(*args, **kwargs):
+        context = SimpleNamespace(
+            client=lambda: ControlClient(http, ADMIN_TOKEN), user_cut_off=kwargs.get("user_cut_off", {})
+        )
+        ControlUserDriver(context).retire(binding)
+        queued_during_retirement.append(len(service._store.rows("SELECT command_id FROM commands")))
+
+    def waited(client, commands):
+        return [NodeCommandOutcome(node_id="main", status="done", commands=list(commands))] if commands else []
+
+    set_json_mode(True)
+    try:
+        exit_code = 0
+        with (
+            patch("meridian.commands.client.load_topology_cluster", return_value=saved),
+            patch("meridian.commands.client_v4.access_panel", return_value=panel),
+            patch("meridian.commands.client_v4.apply_reviewed_intent", side_effect=apply),
+            patch("meridian.node_commands.ControlClient", side_effect=lambda *args: RacingClient(*args)),
+            patch("meridian.node_commands.wait_for_commands", side_effect=waited),
+            patch("meridian.handoff.remove_connection_page", return_value=""),
+            patch("meridian.commands.client_v4.persist_reviewed_apply"),
+        ):
+            try:
+                run_remove("person-a", yes=True, cut_off=True)
+            except typer.Exit as exc:
+                exit_code = exc.exit_code
+        result = json.loads(capsys.readouterr().out)
+        assert exit_code == 0, json.dumps(result)
+        assert queued_during_retirement == [2], "both resets must already be committed when retirement returns"
+        assert reads == [], "atomic deletion must not read a revision then issue a separate reset"
+        commands = result["data"]["cut_off"][0]["commands"]
+        assert {record["command"]["inbound_tag"] for record in commands} == {TAG, "vless-xhttp"}
+        assert all(record["wait_for"] is not None for record in commands)
+    finally:
+        set_json_mode(False)
+
+
+def test_review_3_2_full_queue_keeps_the_user_and_a_resumable_cut_off_retirement(
+    http: str, service: ControlService, clock: Clock, tmp_path: Path
+) -> None:
+    user = service.put_user("person-a")
+    session(http, clock)
+    for _ in range(64):
+        service.issue_command("main", ReconcileCreate())
+    before = service.node_status("main")
+    events = service.events.list()
+    binding = ManagedResourceBinding(
+        logical_id="user:person-a", resource_kind="control_user", generation=1, remote_id="person-a", active=True
+    )
+    setattr(binding, "cut_off_on_retire", True)
+    saved = ClusterConfig(managed_bindings={"user:person-a@1": binding})
+    commands = []
+    driver = ControlUserDriver(
+        SimpleNamespace(client=lambda: ControlClient(http, ADMIN_TOKEN), user_cut_off={"person-a": commands})
+    )
+    error = None
+    try:
+        driver.retire(binding)
+    except ControlServiceConflict as exc:
+        error = exc
+    assert service.get_user("person-a") == user, "a full reset queue must roll back deletion"
+    assert isinstance(error, ControlServiceConflict)
+    assert service.node_status("main") == before and service.events.list() == events
+    path = tmp_path / "cluster.yml"
+    saved.save(path)
+    resumed = ClusterConfig.load(path).managed_bindings["user:person-a@1"]
+    assert resumed.cut_off_on_retire, "a retry of meridian apply must still request the cut-off"
+    clock.now += 301
+    service.commands.maintain()
+    driver.retire(resumed)
+    assert service.get_user("person-a") is None and len(commands) == 1
+    driver.retire(resumed)
+    assert len(commands) == 1, "an already committed deletion must not queue another reset"
+
+
+def test_reviewed_runtime_carries_atomic_cut_off_results_back_to_the_command(
+    http: str, service: ControlService, clock: Clock, tmp_home: Path
+) -> None:
+    from meridian.commands._helpers import apply_reviewed_intent
+    from meridian.compiler import compile_topology
+    from meridian.reconciler.control_service_driver import ControlServiceDriverContext
+    from meridian.reconciler.resources import ResourceExecutionResult
+    from meridian.servers import ServerRegistry
+
+    service.put_user("person-a")
+    session(http, clock)
+    intent = single_exit_intent(users=["other-person"])
+    saved = ClusterConfig(panel=PanelConfig(url=http, api_token=ADMIN_TOKEN), topology_intent=intent)
+    binding = ManagedResourceBinding(resource_kind="control_user", remote_id="person-a")
+    commands = []
+
+    def apply_runtime(runtime, intent, **kwargs):
+        plan = compile_topology(intent)
+        drivers = runtime._build_drivers(
+            plan,
+            saved,
+            {},
+            {},
+            persist=lambda _state: None,
+            control_context=ControlServiceDriverContext(ready=lambda _action: True, bootstrap=lambda _action: None),
+        )
+        drivers["control_user"].retire(binding)
+        return ResourceExecutionResult(plan_hash=plan.plan_hash, generation=1, results=[])
+
+    with patch("meridian.setup.runtime.SetupRuntime.apply_intent", new=apply_runtime):
+        apply_reviewed_intent(
+            saved,
+            ServerRegistry(tmp_home / "servers.json"),
+            intent,
+            failure="Removal failed",
+            hint="Retry the apply",
+            user_cut_off={"person-a": commands},
+        )
+    assert len(commands) == 1 and commands[0].wait_for is not None
+    assert service.get_user("person-a") is None
+
+
+@pytest.mark.parametrize("value", ["false", 1, []])
+def test_persisted_cut_off_request_requires_a_boolean(value: Any, tmp_path: Path) -> None:
+    binding = ManagedResourceBinding(logical_id="user:person-a", resource_kind="control_user", generation=1)
+    binding.cut_off_on_retire = value
+    saved = ClusterConfig(managed_bindings={"user:person-a@1": binding})
+    with pytest.raises(ValueError, match="cut_off_on_retire must be a boolean"):
+        saved.save(tmp_path / "cluster.yml")
 
 
 def test_results_scrub_credentials_names_and_user_ids(http: str, service: ControlService, clock: Clock) -> None:

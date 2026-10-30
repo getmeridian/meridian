@@ -9,14 +9,13 @@ from meridian.commands._helpers import load_topology_cluster
 from meridian.commands._validation import validate_command_input
 from meridian.commands.node_command_results import print_command_results
 from meridian.console import confirm, error_context, fail, is_json_mode, warn
-from meridian.control.client import ControlClient, ControlServiceError, ControlServiceUncertain
-from meridian.control.command_models import NodeCommandOutcome, NodeCommandRecord, RestartUnitCreate
+from meridian.control.client import ControlClient, ControlServiceError
+from meridian.control.command_models import NodeCommandRecord, RestartUnitCreate
 from meridian.core.models import Summary
 from meridian.core.node_commands import NodeRestartRequest, NodeRestartResult
 from meridian.core.output import OperationContext, command_envelope
-from meridian.core.redaction import redact_diagnostic_text
 from meridian.i18n import t
-from meridian.node_commands import command_exit_code, command_warnings, wait_for_commands
+from meridian.node_commands import command_exit_code, command_warnings, wait_for_commands, with_command_issue_error
 from meridian.renderers import emit_json
 
 
@@ -74,17 +73,7 @@ def run_restart(name: str, *, core: bool = False, all_units: bool = False, yes: 
             outcomes = wait_for_commands(client, commands)
         if issue_error is not None:
             previous = outcomes[0] if outcomes else None
-            outcomes = [
-                NodeCommandOutcome(
-                    node_id=node_id,
-                    status="timed_out" if isinstance(issue_error, ControlServiceUncertain) else "failed",
-                    commands=previous.commands if previous else [],
-                    errors=[
-                        *(previous.errors if previous else []),
-                        redact_diagnostic_text(str(issue_error), cluster.secret_values())[:300],
-                    ],
-                )
-            ]
+            outcomes = [with_command_issue_error(node_id, previous, issue_error, secrets=cluster.secret_values())]
         result = NodeRestartResult(scope=request.scope, nodes=outcomes)
         exit_code = command_exit_code(outcomes)
         if is_json_mode():

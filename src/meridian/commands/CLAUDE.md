@@ -26,6 +26,7 @@
 - **`fleet upgrade` never mutates beside the plan** — it reads images (`diagnostics/images.py`) and each relay's running Realm (never the saved pin, which a failed upgrade leaves ahead), applies the unchanged intent (new pins ride the render contract), then runs the fleet `check`.
 
 ## Pitfalls
+- CLI removal carries cut-off into reviewed user retirement's atomic DELETE; never queue resets after deletion, and never let a later uncertain issue downgrade an earlier failed node.
 - Trim console-name fallback validation after exact and ambiguous directory matches; mutation prechecks must accept the same padded names as client show.
 - SNI review advice reads the reviewed delivery refresh interval; fleets can override the six-hour default.
 - Client show prints period use, lifetime traffic, and the UTC period start separately; lifetime totals are available even while daily history is off.

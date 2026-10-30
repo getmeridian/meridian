@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+- CLI client removal queues its cut-off atomically with deletion and preserves the request across apply retries; an uncertain later restart keeps an earlier node failure.
 - Commands that start before their deadline keep their real late outcomes and events; agents retain results and executed IDs beyond expiry so failed delivery or clock rounding cannot repeat an action.
 - Node commands survive a session lost during reports or stats, keep the service clock, and retry credential renewal after reopening an expired session.
 - Signed node commands are queued durably, delivered only to agents that accept their kinds, and expose per-node outcomes through the admin API.

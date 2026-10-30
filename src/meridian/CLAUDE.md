@@ -23,6 +23,7 @@
 - **One owner per state** — the control service owns users, `cluster.yml` owns topology, and the control server's apply fence (`reconciler/fence.py`) stops a stale or foreign copy from applying.
 - **Read-only fleet projection** — `adapters/cluster.py` is the only source of node/relay rows; it never projects routing gateways as exits or source-restricted relay hops as public endpoints.
 ## Pitfalls
+- Persist a requested retirement cut-off in the typed control-user binding before applying the removal; transient runtime flags alone lose the request after a full queue or interrupted apply.
 - **A handed-over fence.json is never a fallback** — once the service keeps the fence, an unreachable service is retried and refused; falling back to the file would let a stale copy apply around it.
 - **Server ownership compares canonical addresses and fails closed** — `refuse_servers_claimed_elsewhere()` matches `canonical_endpoint_address()` forms (`2001:db8::1` and its long spelling once passed as two machines), a context it cannot read refuses instead of being skipped, and active bindings claim their servers until retirement or forgetting (an intent edit alone once freed a server whose cleanup was still to run).
 - **A live agent that could not apply is a failed node** — `ServiceFleetPanel` sets `Node.apply_failed` from the report's `failed`, and `fleet status` degrades (exit 4); reading only `is_live()` once called it connected and healthy.
