@@ -32,7 +32,7 @@ from meridian.control.privacy import history_cutoff, prune_history_rows, read_pr
 from meridian.control.store import Store
 from meridian.control.times import utc_now
 from meridian.core.agent_protocol import StatsAck, StatsReport
-from meridian.core.traffic import NodeTrafficEvidence
+from meridian.core.traffic import NodeTrafficAccounting, NodeTrafficEvidence
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS traffic_totals (
@@ -255,16 +255,20 @@ class TrafficLedger:
         rows = self._store.rows("SELECT node_id, uplink_bytes + downlink_bytes AS total FROM node_traffic_totals")
         return {str(row["node_id"]): int(row["total"] or 0) for row in rows}
 
-    def node_evidence(self, node_id: str) -> NodeTrafficEvidence:
+    def node_accounting(self, node_id: str) -> NodeTrafficAccounting:
         row = self._store.row("SELECT * FROM node_traffic_totals WHERE node_id = ?", (node_id,))
         if row is None:
-            return NodeTrafficEvidence()
-        return NodeTrafficEvidence(
+            return NodeTrafficAccounting()
+        return NodeTrafficAccounting(
+            traffic_bytes=int(row["uplink_bytes"]) + int(row["downlink_bytes"]),
             traffic_counting_since=row["counting_since"],
             active_users=row["active_users"],
             active_report_at=row["active_report_at"],
             active_report_received_at=row["active_report_received_at"],
         )
+
+    def node_evidence(self, node_id: str) -> NodeTrafficEvidence:
+        return self.node_accounting(node_id).traffic_evidence()
 
     def _record_activity(self, node_id: str, report: StatsReport, active: int, now: str) -> None:
         held = self.node_evidence(node_id).active_report_at

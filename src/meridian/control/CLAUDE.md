@@ -27,6 +27,7 @@
 - **Renderer takes plain values** — `SubscriptionUser` (UUID, short ID, status `active|disabled|limited|expired`, expiry, traffic and its reset strategy) and `ClientEndpoint`s; a suspended user gets Remnawave's status placeholder entries in every format. `ServiceSettings.public_url` feeds `support-url`/`profile-web-page-url`; `ClientEndpoint.fingerprint_copy` marks copies.
 
 ## What's done well
+- Node status exposes durable `traffic_bytes` and its activity window from the same accounting row, so deployer adapters consume the public API rather than replay baselines.
 - A revision is signed only when the resources' hash (or the signing certificate) changes, so repeated applies never wake agents.
 - Agent errors use the protocol's `AgentErrorResponse` with the status `AGENT_HTTP_SURFACE` maps (`errors.agent_error`); admin errors a plain `{"error": {...}}`.
 - An API token's public ID (`mrd_<id>_<secret>`) finds its row, so the hash is compared once with `hmac.compare_digest`, against a dummy when no row matches.

@@ -299,8 +299,7 @@ class ControlService:
             failed=failed,
             errors=errors,
             runtime=project_runtime(report),
-            traffic_bytes=self.traffic.node_totals().get(node_id, 0),
-            **self.traffic.node_evidence(node_id).model_dump(),
+            **self.traffic.node_accounting(node_id).model_dump(),
         )
 
     def list_nodes(self) -> list[NodeStatus]:

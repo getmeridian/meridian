@@ -321,6 +321,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 The `active` column counts people with growth in the last report, with its collection time shown below. A delayed older window cannot replace newer activity. Node byte totals survive counter epochs; `traffic_counting_since` marks complete durable accounting, with only retained evidence backfilled from before migration.
 
+`GET /api/nodes/NODE` includes durable `traffic_bytes`, the active report window, and the counting start; its contract is `meridian api schema service-node-status`.
+
 **`fleet inventory`** — your configured servers, roles, nodes, and relays, with live status when the control service is reachable. It never prints API tokens or secret paths. If live status is unavailable, the configured inventory is still shown, with warnings, and the command exits `3`. Use `plan --json` to decide whether apply has work to do.
 
 **`fleet history`** — every reviewed apply the control service recorded, newest first: its number, time, author (the machine's token name, `root` for the CLI's own token, `owner` for the console), status (`proposed`, `approved`, `applied`, or `failed`), and the start of its plan hash. `--json` returns `data.revisions[]`.

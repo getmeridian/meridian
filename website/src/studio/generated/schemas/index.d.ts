@@ -134,6 +134,7 @@ export * as ServerProfileSchema from "./server-profile.schema";
 export * as ServerRemoveRequestSchema from "./server-remove-request.schema";
 export * as ServerValidateRequestSchema from "./server-validate-request.schema";
 export * as ServerValidateResultSchema from "./server-validate-result.schema";
+export * as ServiceNodeStatusSchema from "./service-node-status.schema";
 export * as SetupAccessSelectionSchema from "./setup-access-selection.schema";
 export * as SetupDraftSchema from "./setup-draft.schema";
 export * as SetupExitPathsSchema from "./setup-exit-paths.schema";

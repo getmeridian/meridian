@@ -321,6 +321,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 `active` 列统计最近一次报告中流量有所增长的人数，报告采集时间显示在表格下方。迟到的旧报告不会覆盖较新的活跃数据。节点流量总计在计数器更换周期后仍会保留；`traffic_counting_since` 标记完整持久统计的起点，升级前仅补入仍保留的计数证据。
 
+`GET /api/nodes/NODE` 返回持久保存的 `traffic_bytes`、最近报告的活跃统计窗口以及完整计数起点；可通过 `meridian api schema service-node-status` 查看其数据契约。
+
 **`fleet inventory`** — 列出已配置的服务器、角色、节点和中继，并在控制服务可达时附带实时状态。绝不会输出 API 令牌或秘密路径。如果实时状态不可用，仍会显示已配置的清单并附带警告，命令以退出码 `3` 结束。要判断 `apply` 是否有待执行的变更，请使用 `plan --json`。
 
 **`fleet history`** — 控制服务记录的每一次经过审核的应用，最新的在前：编号、时间、作者（机器的令牌名称；CLI 自身的令牌为 `root`，控制台为 `owner`）、状态（`proposed`、`approved`、`applied` 或 `failed`）以及计划哈希的开头部分。`--json` 返回 `data.revisions[]`。

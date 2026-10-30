@@ -58,6 +58,7 @@ def test_traffic_evidence_reaches_client_show_and_fleet_status(
             person = api.get_user("alice")
             assert (person.first_traffic_at, person.last_traffic_node) == (NOW, "main")
             node = api.node("main")
+            assert node.traffic_bytes == 30
             assert (node.active_users, node.active_report_at, node.traffic_counting_since) == (1, NOW, NOW)
             assert node.runtime_available() and node.in_sync
             console = httpx.get(url + "/ui/api/fleet", headers={"Authorization": f"Bearer {ADMIN_TOKEN}"}).json()

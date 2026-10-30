@@ -18,6 +18,9 @@ from meridian.control.models import (
     TrafficDailySummary,
     UserUsage,
 )
+from meridian.control.models import (
+    NodeStatus as ServiceNodeStatus,
+)
 from meridian.core.apply import (
     ApplyCommandData,
     ApplyCounts,
@@ -654,6 +657,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "fleet-events": FleetEventPage,
     "fleet-event": FleetEvent,
     "fleet-event-query": FleetEventQuery,
+    "service-node-status": ServiceNodeStatus,
     "fleet-usage-envelope": FleetUsageOutputEnvelope,
     "fleet-import-envelope": FleetImportOutputEnvelope,
     "event": Event,

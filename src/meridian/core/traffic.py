@@ -39,3 +39,11 @@ class NodeTrafficEvidence(CoreModel):
             active_report_at=self.active_report_at,
             active_report_received_at=self.active_report_received_at,
         )
+
+
+class NodeTrafficAccounting(NodeTrafficEvidence):
+    traffic_bytes: int = Field(
+        default=0,
+        ge=0,
+        description="Durable accepted upload plus download bytes across counter epochs, including retained backfill.",
+    )

@@ -33,7 +33,7 @@ from meridian.core.defaults import SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import validate_ip_address_value
 from meridian.core.models import CoreModel
 from meridian.core.topology import ProtocolKind, SubscriptionUpdateIntervalHours
-from meridian.core.traffic import NodeTrafficEvidence, UserTrafficEvidence
+from meridian.core.traffic import NodeTrafficAccounting, UserTrafficEvidence
 
 
 class ManagedInbound(CoreModel):
@@ -82,7 +82,7 @@ class NodeRuntime(CoreModel):
         return self.health.status != "healthy" or any(check.status != "pass" for check in self.health.checks)
 
 
-class NodeStatus(NodeTrafficEvidence):
+class NodeStatus(NodeTrafficAccounting):
     """The service's view of one node."""
 
     node_id: NodeId
@@ -96,7 +96,6 @@ class NodeStatus(NodeTrafficEvidence):
     failed: list[str] = Field(default_factory=list, description="Resource IDs the last report marked failed.")
     errors: list[str] = Field(default_factory=list, description="Operator-facing messages of failed resources.")
     runtime: NodeRuntime | None = Field(default=None, description="The last report's health and version evidence.")
-    traffic_bytes: Count = Field(default=0, description="Total traffic counted by the service for this node.")
 
     def unseen_seconds(self, now: datetime | None = None) -> float | None:
         """Seconds since the agent last reached the service; None if it never did."""
