@@ -577,3 +577,25 @@ def test_client_engines_accept_availability_and_name_collision_cases(
         tmp_path,
         geodata_dir=Path(geodata) if geodata else None,
     )
+
+
+@pytest.mark.parametrize("short_id", ["12e34567", "01890000", "1234"], ids=["float", "leading-zero-int", "int"])
+@pytest.mark.parametrize("stash", [False, True], ids=["mihomo", "stash"])
+def test_a_numeric_looking_short_id_stays_a_quoted_string_for_yaml_12_readers(short_id: str, stash: bool) -> None:
+    from meridian.control.formats.mihomo import mihomo_document
+
+    endpoint = ClientEndpoint(
+        remark="Reality",
+        protocol="reality",
+        address=EXIT_B,
+        port=443,
+        position=0,
+        reality_sni=DOMAIN,
+        reality_public_key=KEYS["exit-b"][0],
+        reality_short_id=short_id,
+    )
+
+    text = mihomo_document([endpoint], UUID, stash=stash)
+
+    assert f"short-id: '{short_id}'" in text
+    assert yaml.safe_load(text)["proxies"][0]["reality-opts"]["short-id"] == short_id

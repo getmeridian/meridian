@@ -165,6 +165,8 @@ that dials out to it.
   yet” entries in English, Russian, Persian, and Chinese instead of empty documents.
 - Duplicate connection names and names matching automatic groups now receive
   readable, stable suffixes, keeping Mihomo proxy names and sing-box tags unique.
+- Mihomo, Clash, and Stash subscriptions quote a Reality short ID that looks like a
+  number (such as `12e34567`), which those apps read as a float and then refused the whole document.
 - Fleet status now reports pending convergence separately from runtime health instead of calling a fresh but unapplied configuration healthy.
 - An incomplete successful token response now uses the same recovery notice as a lost reply, so it cannot silently discard an issued secret.
 - `client show` now includes lifetime traffic and the current traffic period's start in human output and JSON, including when daily history is off.

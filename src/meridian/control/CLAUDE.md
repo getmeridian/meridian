@@ -77,4 +77,5 @@
 - `control/` never imports the deployer (CLI, SSH, panel, provision, reconciler); architecture-tested.
 - Never compress or send Referrer-Policy on `/sub/` — nginx gzips JSON/Base64 (YAML stays plain, as `gzip_types` has none) and adds its own Referrer-Policy; the panel's duplicate was a corpus defect.
 - A fingerprint copy without `fingerprint_copy` lands in the primary balancer and failover groups, mixing fingerprints toward one server (TSPU escalates); copies group per fingerprint too (`copy_groups()`: a Safari path's Chrome and Firefox copies once shared one balancer); sing-box omits copies entirely.
+- Mihomo and Stash read YAML 1.2, PyYAML writes 1.1: dump through `mihomo._Yaml12SafeDumper`, which quotes strings 1.2 resolves as numbers or booleans — a random short ID like `12e34567` once became a float and Mihomo refused the document (System Lab caught it by chance).
 - Stash spells fields its own way (`sni`, Hysteria2 `auth`) and has no `exclude-filter` or `GEOIP,private`; Remnawave's Stash and Clash answers had no failover at all.

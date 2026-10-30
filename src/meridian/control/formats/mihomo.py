@@ -13,6 +13,7 @@ field names: `sni` for the TLS name and `auth` for the Hysteria2 password.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import yaml
@@ -38,6 +39,28 @@ _STASH_PRIVATE_RULE = ("GEOIP,private,", "GEOIP,LAN,")
 # Stash's documented names for fields Mihomo spells otherwise.
 _STASH_FIELDS = {"servername": "sni", "password": "auth"}
 _NETWORKS = {"reality": "tcp", "xhttp": "xhttp", "wss": "ws"}
+# Plain scalars a YAML 1.2 reader (Mihomo, Stash) takes for numbers, booleans, or null that
+# PyYAML's 1.1 resolver leaves unquoted: a random short ID like 12e34567 or 01890000 became
+# a float or an int there, and Mihomo refused the whole document.
+_YAML12_NON_STRING = re.compile(
+    r"[-+]?(?:[0-9]+|0o[0-7]+|0x[0-9a-fA-F]+)"
+    r"|[-+]?(?:\.[0-9]+|[0-9]+(?:\.[0-9]*)?)(?:[eE][-+]?[0-9]+)?"
+    r"|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN)"
+    r"|true|True|TRUE|false|False|FALSE|null|Null|NULL|~|"
+)
+
+
+class _Yaml12SafeDumper(yaml.SafeDumper):
+    """Quote every string a YAML 1.2 reader would resolve to another type."""
+
+
+def _represent_str(dumper: yaml.SafeDumper, value: str) -> yaml.ScalarNode:
+    if _YAML12_NON_STRING.fullmatch(value):
+        return dumper.represent_scalar("tag:yaml.org,2002:str", value, style="'")
+    return dumper.represent_str(value)
+
+
+_Yaml12SafeDumper.add_representer(str, _represent_str)
 
 
 def mihomo_document(
@@ -67,7 +90,7 @@ def mihomo_document(
             group["proxies"] = names
     if stash:
         _to_stash(document, [] if placeholders else endpoints)
-    return yaml.safe_dump(document, sort_keys=False, allow_unicode=True, width=1_000_000)
+    return yaml.dump(document, Dumper=_Yaml12SafeDumper, sort_keys=False, allow_unicode=True, width=1_000_000)
 
 
 def _to_stash(document: dict[str, Any], listed: list[ClientEndpoint]) -> None:

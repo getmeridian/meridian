@@ -9,7 +9,7 @@ _RENDERER_MANIFEST = {
     "compiler": COMPILER_VERSION,
     "agent-runtime": "staged-upgrade-v1",
     "agent-spec": "service-blob-v1",
-    "control-subscriptions": "presentation-order-v9",
+    "control-subscriptions": "yaml12-quoting-v10",
     "pwa": "quiet-account-v23",
     "control-service": "people-fleet-fallback-v20",
     "control-api": "finite-user-expiry-v5",
