@@ -13,7 +13,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 | **Unit** | MockConnection steps, config parsing, cluster handling, pure system-lab contracts | `tests/` |
 | **Deploy** | Mock-based topology setup (runtime, editor, persistence, node container) | `tests/test_setup_*.py` |
 | **Command** | Mock-based command tests (node, fleet, client, recover) | `tests/test_*_commands.py` |
-| **System lab** | Real multi-node deploy via Docker: panel+node, relay, connection tests | `tests/systemlab/` |
+| **System lab** | Real multi-node deploy via Docker: control service, agents, relays, connection tests | `tests/systemlab/` |
 
 **Integration-level verification** — tests pin contracts (API returns X → we handle Y), not one test per function.
 **PWA behavior** — pytest runs plain JavaScript scenarios in Node against a small DOM/fetch/storage boundary, with no npm packages; browser layout is verified separately.
@@ -23,39 +23,35 @@ uv run pytest tests/ -k "test_name"    # by pattern
 **Shared doubles and builders live in `tests/support/`** — `mock_connection.py`, `CaptureReporter`, `CancellationFlag`, `fence_host.py` (an SSH fence.json double), `control_service.py` (`serve_control`: a real loopback control service), `console_dom.py` (`run_console`, `needs_console_dom`: console scenarios on the website's jsdom), and `topology.py` (`single_exit_intent`, `gateway_fleet_intent`, `resource_plan`, `firewall_resource`, `panel_mock`). Search there before writing a local intent, plan, or panel builder.
 
 ## What's done well
-
-- **Quirk-named tests** — e.g., `test_login_uses_form_urlencoded_not_json()`. The test name IS the documentation; docstrings only explain a non-obvious why.
+- **Quirk-named tests** — e.g., `test_fence_write_that_timed_out_after_landing_is_re_read_not_repeated()`. The test name IS the documentation; docstrings only explain a non-obvious why.
 - **Tables over near-duplicates** — cases that differ only in inputs and expected outcome are one `@pytest.mark.parametrize` table with `ids`; each distinct case keeps its own row.
-- **Idempotency dual-path** — provisioner tests verify both "needs change" and "already done" paths.
-- **RFC 5737 IPs** — always `198.51.100.x` for test data, never real IPs.
+- Idempotency dual-path: `tests/provision/CLAUDE.md`; RFC 5737 test data: the root Conventions.
 
 ## Pitfalls
-- CLI language scenarios use tmp_home and reset JSON mode after each invocation; a leaked JSON mode once made a later human notice confirmation require --yes.
-- Page-language scenarios verify HTML attributes, blocking head selection, saved/browser precedence, early load errors, support text before its main script, and person-select draft preservation; CLI JSON assertions read stdout apart from backup notices.
-- Device-card scenarios use the shared console DOM and form helpers, preserve real field validity, and verify the card's own count refresh after a mutation.
-- Every new admin handler needs a runnable ROUTE_SAMPLES entry so the token-scope matrix can collect and exercise its permissions.
-- Preview tests compare rule precedence and native filtering, verify read scope and zero writes across all device levels, mask encoded headers and URI remarks, and confirm reviewed apply restores an API-disabled endpoint.
-- Language tests pin unchanged English corpus bytes, translate only disabled labels in native corpus cases, assert inert placeholders in every format, and drop users.language before rewinding to a schema before step 17.
-- Notice coverage checks Unicode substitution before Base64, expiry at the exact instant, content-free actors, preview mutation hooks, encrypted restore, and the real console confirmation dialog in all four locales.
-- Owner contact tests cover reviewed-hash applies, export/import, delivery rollback, all placeholder parsers and remark bounds, locale/RTL rendering, active-link guards, and support HTML bypassing worker caches.
-- Fixtures rewinding before step 15 drop `users.note` and `users.tag`; metadata coverage checks empty lower-scope reads, snapshot restoration, content-free events, and edited-field-only console PATCHes.
-- Server allowance fixtures pin the settings clock beside accounting time, cover UTC boundary growth before timer resets, and verify payment/attention reads leave SQLite change counts untouched.
-- Console DOM scenarios make the document visible (`pretendToBeVisual` in jsdom); Servers and People defer their requests while hidden.
-- **Traffic period clocks** — pin both service and ledger UTC clocks and the injected registry clock; a fixture that set resets with wall time while asserting a fixed midnight failed as soon as the date changed. Match aligned labels by content, not an exact number of spaces.
-- **Local event facts** — exercise rollback on both sides of the event insert, concurrent request actors, no-op changes, the full node live window, missing-report recovery, cursor boundaries, count/age retention, and snapshot cursor preservation; details must reject credential and raw-error fields.
-- Migration tests assert the stored version equals `SCHEMA_VERSION`, never the version current when the test was added.
-- Connection-page tests use browser HTML at `/sub/<token>`, JSON at `/info`, and token-free assets; the Node boundary supplies the rendered script paths, and legacy worker activation must release cached pages without deleting other applications' caches.
 - **`tmp_home` must patch both** — env var AND `meridian.config` attributes; patch `meridian.config.NAME`, never a command module's copy (there are none).
+- **The cache is isolated for every test** — an autouse fixture points `config.CACHE_DIR` at `tmp_path`; the banner and update throttles once wrote into the developer's real home, and a banner shown once a day would make output assertions depend on test order.
+- **CLI scenarios reset JSON mode** — language scenarios use `tmp_home` and reset JSON mode after each invocation (a leaked JSON mode once made a later human notice confirmation require `--yes`); CLI JSON assertions read stdout apart from backup notices.
 - **MockConnection substring matching** — `when("grep", rc=1)` matches ANY command containing "grep". Use specific patterns.
 - **Don't restate registries** — a test that copies a constant, catalog, or schema list fails on every legitimate edit; assert behaviour or let the contract drift check do it.
-- **`make dead-code` flags production code only tests use** — keep system-lab-only helpers in `tests/systemlab/subscription_client.py`.
-- **System-lab collection** — pure `tests/systemlab/test_*.py` tests run under normal pytest; Docker runs only through `make system-lab`.
+- **Every new admin handler needs a runnable `ROUTE_SAMPLES` entry** so the token-scope matrix can collect and exercise its permissions.
+- **Pin every clock a scenario reads** — user edits enforce at `meridian.control.service.utc_now()` (reset tests dated 2026-10-29/30 failed on the real 2026-10-30); traffic periods need the service and ledger UTC clocks and the injected registry clock (a fixture that set resets with wall time while asserting a fixed midnight failed as soon as the date changed); server allowance fixtures pin the settings clock beside accounting time. Match aligned labels by content, not an exact number of spaces.
+- **Migration tests assert the stored version equals `SCHEMA_VERSION`**, never the version current when the test was added.
+- **Older-schema fixtures drop later columns as well as tables** before rewinding `schema_version` — retaining a new column makes its migration fail spuriously: drop `users.note` and `users.tag` before step 15 and `users.language` before step 17.
+- **Console DOM tests take `needs_console_dom`** — CI's 3.11/3.13/3.14 legs have no jsdom; five modules importing only `run_console` failed there with a bare exit 1. The 3.12 leg installs it and sets `MERIDIAN_TEST_CONSOLE`, so a lost install fails instead of skipping.
+- **Console DOM scenarios make the document visible** (`pretendToBeVisual` in jsdom) — Servers and People defer their requests while hidden; device-card scenarios use the shared console DOM and form helpers, preserve real field validity, and verify the card's own count refresh after a mutation.
+- **Help text goes through `unstyle()`** — CI's 3.14 leg renders `--help` in colour, splitting `--cut-off` into styled runs; assert on `tests.support.text.unstyle(reply.output)` (missed twice in one night).
 - **Wizard prompts read `/dev/tty`** — `CliRunner` input never reaches them; drive journeys with scripted IO or `pexpect` (`test_setup_wizard_tty.py`), matching prose across terminal line wraps.
 - **Stall retries keep their count, not their pauses** — an autouse fixture zeroes `stall_retry.STALL_DELAYS`, so a stubbed rc 124/255 observation runs five times; inject `StallRetry(delays=, sleep=)` to assert pauses.
-- **Privacy changes are transactional** — test downgrade/audit rollback, no-op writes, history-off gaps, UTC receipt days, owner step-up races, and enabled/off snapshot restoration.
+- **`make dead-code` flags production code only tests use** — keep system-lab-only helpers in `tests/systemlab/subscription_client.py`.
+- **System-lab collection** — pure `tests/systemlab/test_*.py` tests run under normal pytest; Docker runs only through `make system-lab`.
 - **V4 command JSON** — validate compiled-resource plan/apply variants through their advertised envelopes, including terminal errors.
-- **Pin the service clock beside hard-coded dates** — user edits enforce at `meridian.control.service.utc_now()`; reset tests dated 2026-10-29/30 failed on the real 2026-10-30.
-- **Older-schema snapshots** — drop later columns as well as tables before rewinding `schema_version`; retaining a new column makes its migration fail spuriously.
-- **Console DOM tests take `needs_console_dom`** — CI's 3.11/3.13/3.14 legs have no jsdom; five modules importing only `run_console` failed there with a bare exit 1. The 3.12 leg installs it and sets `MERIDIAN_TEST_CONSOLE`, so a lost install fails instead of skipping.
-- **Help text goes through `unstyle()`** — CI's 3.14 leg renders `--help` in colour, splitting `--cut-off` into styled runs; assert on `tests.support.text.unstyle(reply.output)` (missed twice in one night).
-- **The cache is isolated for every test** — an autouse fixture points `config.CACHE_DIR` at `tmp_path`; the banner and update throttles once wrote into the developer's real home, and a banner shown once a day would make output assertions depend on test order.
+- **Connection-page tests** use browser HTML at `/sub/<token>`, JSON at `/info`, and token-free assets; the Node boundary supplies the rendered script paths, and legacy worker activation must release cached pages without deleting other applications' caches.
+- **Page-language coverage** — verify HTML attributes, blocking head selection, saved/browser precedence, early load errors, support text before its main script, and person-select draft preservation.
+- **Language coverage** — pin unchanged English corpus bytes, translate only disabled labels in native corpus cases, and assert inert placeholders in every format.
+- **Preview coverage** — compare rule precedence and native filtering, verify read scope and zero writes across all device levels, mask encoded headers and URI remarks, and confirm reviewed apply restores an API-disabled endpoint.
+- **Notice coverage** — check Unicode substitution before Base64, expiry at the exact instant, content-free actors, preview mutation hooks, encrypted restore, and the real console confirmation dialog in all four locales.
+- **Owner contact coverage** — reviewed-hash applies, export/import, delivery rollback, all placeholder parsers and remark bounds, locale/RTL rendering, active-link guards, and support HTML bypassing worker caches.
+- **Person metadata coverage** — empty lower-scope reads, snapshot restoration, content-free events, and edited-field-only console PATCHes.
+- **Server allowance coverage** — UTC boundary growth before timer resets, and payment/attention reads that leave SQLite change counts untouched.
+- **Privacy changes are transactional** — test downgrade/audit rollback, no-op writes, history-off gaps, UTC receipt days, owner step-up races, and enabled/off snapshot restoration.
+- **Local event facts** — exercise rollback on both sides of the event insert, concurrent request actors, no-op changes, the full node live window, missing-report recovery, cursor boundaries, count/age retention, and snapshot cursor preservation; details must reject credential and raw-error fields.
