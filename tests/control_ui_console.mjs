@@ -59,6 +59,7 @@ w.fetch = (url, options) => {
     if (url === 'api/tokens' && options.method === 'POST') {
       writes.push(JSON.parse(options.body));
       if (mode === 'token-uncertain') return Promise.reject(new Error('reply lost'));
+      if (mode === 'token-missing-secret') return Promise.resolve(reply(null));
       return new Promise(resolve => { delayed.issue = resolve; });
     }
   }

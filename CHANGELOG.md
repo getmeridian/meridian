@@ -137,6 +137,7 @@ that dials out to it.
   yet” entries in English, Russian, Persian, and Chinese instead of empty documents.
 - Duplicate connection names and names matching automatic groups now receive
   readable, stable suffixes, keeping Mihomo proxy names and sing-box tags unique.
+- An incomplete successful token response now uses the same recovery notice as a lost reply, so it cannot silently discard an issued secret.
 - `client show` now includes lifetime traffic and the current traffic period's start in human output and JSON, including when daily history is off.
 - Phone dialogs now scroll their body with sticky actions and safe-area spacing; touch targets reach 44 px, sign-out has an accessible label, and nested identity checks use unique title IDs.
 - A failed console locale now keeps English, and unavailable language files show a local retry notice instead of untranslated startup labels.

@@ -280,7 +280,10 @@
         close.lock(true);
         M.busy(form, function () {
           return M.api("POST", "api/tokens", { name: name.value.trim(), scope: scope.value });
-        }).then(function (issued) { close.lock(false); close(issued); }, function (error) {
+        }).then(function (issued) {
+          close.lock(false);
+          close(issued && typeof issued.token === "string" && issued.token ? issued : { uncertain: true });
+        }, function (error) {
           issuing = false;
           close.lock(false);
           if (error && error.uncertain) close({ uncertain: true });

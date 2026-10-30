@@ -16,6 +16,7 @@
 - **Assets revalidate by ETag** (content hash, `no-cache`); anything holding a secret is `no-store`.
 
 ## Pitfalls
+- A successful token response without a secret is still uncertain; refresh the metadata list and explain recovery instead of closing an empty result.
 - Scroll focused fields clear of a sticky dialog footer after layout; native focus scrolling treated a covered input as visible on a phone.
 - Dialogs constrain their scrolling body to dvh and safe areas, keep form actions sticky, and use unique title IDs for nested identity checks; icon-only actions need an aria-label and coarse-pointer controls need 44 px targets.
 - Load locale catalogs independently so a selected-locale failure retains English; if both fail, keep startup waiting on a local retry notice whose bootstrap labels match the catalogs.

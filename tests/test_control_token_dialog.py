@@ -25,3 +25,10 @@ def test_an_uncertain_issue_reloads_metadata_and_explains_before_retry(locale: s
     assert result["listReads"] == 2 and result["writes"] == 1
     assert catalog["tokens.uncertain_text"] in result["dialog"]
     assert result["secret"] == ""
+
+
+def test_a_success_reply_without_the_secret_is_an_uncertain_issue() -> None:
+    result = run_console("token-missing-secret")
+    assert result["listReads"] == 2 and result["writes"] == 1
+    assert "may have been created" in result["dialog"]
+    assert result["secret"] == ""
