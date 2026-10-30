@@ -90,6 +90,8 @@ pub struct Agent<'a> {
     protocol_refused_until: Option<Instant>,
     traffic: TrafficStore,
     collection_health: CollectionHealth,
+    /// An Xray API has been installed since start; staleness counts from then.
+    collecting: bool,
     roots: Option<RootCerts>,
     exec: &'a dyn Exec,
     opts: Options,
@@ -158,6 +160,7 @@ impl<'a> Agent<'a> {
             protocol_refused_until: None,
             traffic,
             collection_health: CollectionHealth::new(exec.now()),
+            collecting: false,
             roots,
             exec,
             opts,
@@ -526,36 +529,42 @@ impl<'a> Agent<'a> {
         users
     }
 
+    /// Fold Xray's counters into the store and record collection health; `None` while no Xray
+    /// API is installed. Staleness counts from the first time one is: a node that waited minutes
+    /// for its first document must not report a failed collection it never attempted.
+    fn collect_stats(&mut self) -> Option<(String, String)> {
+        let api = self.xray_api();
+        let (xray, address) = api.as_ref()?;
+        if !self.collecting {
+            self.collecting = true;
+            self.collection_health = CollectionHealth::new(self.exec.now());
+        }
+        match stats::query(self.exec, xray, address) {
+            Ok(deltas) => {
+                self.collection_health.success(self.exec.now(), now_unix());
+                if !deltas.is_empty() {
+                    self.traffic.fold(&deltas);
+                    if let Err(err) = self.traffic.save(&self.opts.state_dir) {
+                        info!("{err}");
+                    }
+                }
+            }
+            // Stored totals still go out: the service counts only growth.
+            Err(_) => {
+                let now = self.exec.now();
+                if self.collection_health.failure(now) {
+                    warn!("stats: {}", self.collection_health.check(now).message);
+                }
+            }
+        }
+        api
+    }
+
     /// Fold Xray's counters into the store, then send the totals. `Ok(false)` when the session
     /// does not use `traffic_stats` or no Xray runs here yet. Folding comes first, service or
     /// not: Xray's own counters die with the core, so an outage must not leave them there.
     pub fn send_stats(&mut self) -> Result<bool, HttpError> {
-        let api = self.xray_api();
-        if api.is_none() {
-            // Staleness counts from the first chance to collect: a node that waited minutes
-            // for its first document must not report a failed collection it never attempted.
-            self.collection_health = CollectionHealth::new(self.exec.now());
-        }
-        if let Some((xray, api)) = &api {
-            match stats::query(self.exec, xray, api) {
-                Ok(deltas) => {
-                    self.collection_health.success(self.exec.now(), now_unix());
-                    if !deltas.is_empty() {
-                        self.traffic.fold(&deltas);
-                        if let Err(err) = self.traffic.save(&self.opts.state_dir) {
-                            info!("{err}");
-                        }
-                    }
-                }
-                // Stored totals still go out: the service counts only growth.
-                Err(_) => {
-                    let now = self.exec.now();
-                    if self.collection_health.failure(now) {
-                        warn!("stats: {}", self.collection_health.check(now).message);
-                    }
-                }
-            }
-        }
+        let api = self.collect_stats();
         self.connect()?;
         let uses = self
             .session
@@ -611,6 +620,9 @@ impl<'a> Agent<'a> {
                 PollOutcome::Recorded(after)
             }
             Accepted::Applied => {
+                // The report right after an apply carries collection health: collect first.
+                // A merely recorded revision changed nothing, so it resets no counters.
+                self.collect_stats();
                 self.report_logged();
                 PollOutcome::Applied(after)
             }

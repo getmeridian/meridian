@@ -84,6 +84,11 @@ fn stats_health_no_success_is_warn_then_fail_without_an_invented_timestamp() {
     let exec = FakeExec::default();
     let mut agent = Agent::new(node.options(), &exec).unwrap();
     agent.poll_once().unwrap();
+    drop(agent);
+    // A restarted agent whose collections keep failing has no success to show.
+    *exec.stats_down.lock().unwrap() = true;
+    let mut agent = Agent::new(node.options(), &exec).unwrap();
+    agent.send_stats().unwrap();
     assert_eq!(collection_check(&agent).status, "warn");
     assert!(
         collection_check(&agent)
@@ -95,15 +100,46 @@ fn stats_health_no_success_is_warn_then_fail_without_an_invented_timestamp() {
 }
 
 #[test]
-fn stats_health_counts_staleness_from_the_first_xray_not_the_agents_start() {
+fn the_report_after_a_first_apply_carries_a_collection_made_after_the_wait() {
     let pki = TestPki::new();
     let service = service(&pki);
     let node = Node::new(&service.url(), &pki);
     let exec = FakeExec::default();
     let mut agent = Agent::new(node.options(), &exec).unwrap();
     *exec.elapsed.lock().unwrap() += Duration::from_secs(600);
-    assert!(!agent.send_stats().unwrap(), "no xray yet");
     service.push(document(1, 1, &supported(), &pki));
     agent.poll_once().unwrap();
-    assert_eq!(collection_check(&agent).status, "warn");
+    let report = service.requests_to("report").last().unwrap().json();
+    let stats = report["health"]["checks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|check| check["name"] == "stats")
+        .cloned()
+        .unwrap();
+    assert_eq!(stats["status"], "pass", "{stats}");
+}
+
+#[test]
+fn stats_health_fails_and_keeps_its_last_collection_when_the_core_binary_vanishes() {
+    let pki = TestPki::new();
+    let service = service(&pki);
+    service.push(document(1, 1, &supported(), &pki));
+    let node = Node::new(&service.url(), &pki);
+    let exec = FakeExec::default();
+    let mut agent = Agent::new(node.options(), &exec).unwrap();
+    agent.poll_once().unwrap();
+    assert_eq!(collection_check(&agent).status, "pass");
+    std::fs::remove_file(node.root.path().join("usr/local/lib/netagent/netcore")).unwrap();
+    for _ in 0..4 {
+        *exec.elapsed.lock().unwrap() += Duration::from_secs(60);
+        let _ = agent.send_stats();
+    }
+    let check = collection_check(&agent);
+    assert_eq!(check.status, "fail");
+    assert!(
+        check.message.contains("last collected"),
+        "{}",
+        check.message
+    );
 }
