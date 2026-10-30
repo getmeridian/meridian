@@ -5,16 +5,13 @@ make system-lab
 uv run pytest tests/systemlab/ -q
 ```
 ## Design decisions
-- `golden/status-language.json` is the reviewed four-language wording reference; localized corpus replay replaces only fixed disabled labels and keeps native documents, headers, and inert credentials unchanged.
-
 **Real services over mocks** — privileged systemd/SSH containers stand in for two exits, two relay hops, and a routing gateway; the controller deploys through the same CLI and SSH paths as a VPS.
 **This checkout, not a release** — the controller is an editable install with uv, so deploys upload this checkout's wheel (`control_artifacts`) and the agent `make system-lab-agent` built for the Docker daemon's architecture; the control server installs `ctld` and exits run `netagent`/`netcore` as systemd units, with no nested Docker.
 **Deterministic topology** — a fixed `172.30.0.0/24` bridge keeps SSH host keys, deploy targets, the local Pebble CA, and relay routing repeatable.
 **Small fail-fast stages** — the controller runs bootstrap, single deploy, fleet deploy, subscription, golden, resilience, and removal scripts under `scripts/stages/`; Make always tears Compose down. Pure contract tests run in normal pytest.
-**Golden subscription corpus** — `golden/` is the frozen record of what Remnawave served each `golden_agents.py` User-Agent on these fleets (`CAPTURED_BACKEND`); `scripts/diff-golden.py` replays every recorded request against the live fleet and diffs it through `tests/test_control_subscription_corpus.py`'s expectations and named deviations, which also replay it against the renderer in unit tests.
+**Golden subscription corpus** — `golden/` is the frozen record of what Remnawave served each `golden_agents.py` User-Agent on these fleets (`CAPTURED_BACKEND`); `scripts/diff-golden.py` replays every recorded request against the live fleet and diffs it through `tests/test_control_subscription_corpus.py`'s expectations and named deviations, which also replay it against the renderer in unit tests. `golden/status-language.json` is the reviewed four-language wording reference: localized replay replaces only fixed disabled labels and keeps native documents, headers, and inert credentials unchanged.
 
 ## What's done well
-
 - Fresh deploy checks `ctld`, both exits' and the gateway's agents and cores, both Realm hops, `fleet status`, a no-op second apply, and that no unit, process, or `/opt` name reveals proxy software.
 - The delivered Xray config is executed directly; Base64, Mihomo, and sing-box documents are parsed and endpoint-checked, and the last two also pass `mihomo -t` and `sing-box check` at versions pinned (with per-arch checksums) in the controller image.
 - Resilience proves both one-exit-down directions and fail-closed all-down behavior through the `leastPing` pool, by stopping each exit's agent and core.
