@@ -22,6 +22,7 @@ from meridian.control.snapshot import decrypt_snapshot, generate_key_pair
 from meridian.control.times import format_timestamp
 from meridian.core.agent_protocol import ObservedStateReport, StatsReport
 from tests.support.control_service import ADMIN_TOKEN, FLEET_ID, serve_control
+from tests.support.text import unstyle
 from tests.test_control_service import _document, _report, _spec
 
 NOW = "2026-11-01T12:00:00Z"
@@ -379,7 +380,8 @@ def test_missing_report_never_announces_apply_recovery_and_state_survives_a_rest
 def test_events_command_help_exposes_cursor_limit_and_json() -> None:
     result = CliRunner().invoke(app, ["fleet", "events", "--help"])
     assert result.exit_code == 0
-    assert "--since" in result.output and "--limit" in result.output and "--json" in result.output
+    output = unstyle(result.output)
+    assert "--since" in output and "--limit" in output and "--json" in output
 
 
 def test_events_command_json_continues_the_cursor_and_invalid_flags_have_an_envelope(
