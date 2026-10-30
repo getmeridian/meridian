@@ -9,15 +9,24 @@
   function path(username, suffix) { return "api/users/" + encodeURIComponent(username) + (suffix || ""); }
 
   M.renderPerson = function (view, username) {
-    var screen = { view: view, username: username, generation: ++generation, stopped: false };
+    var screen = { view: view, username: username, generation: ++generation, stopped: false, version: 0 };
     view.meridianPersonGeneration = screen.generation;
-    M.mount(view, h("div", { class: "empty" }, h("span", { class: "spinner" })));
-    Promise.all([M.api("GET", path(username)), M.api("GET", "ui/api/people/" + encodeURIComponent(username) + "/share")])
-      .then(function (results) { if (current(screen)) draw(screen, results[0], results[1]); }, function (e) {
-        if (!current(screen)) return;
-        M.mount(view, [back(), h("div", { class: "notice notice-err", text: M.errorText(e) })]);
-      });
-    return function () { screen.stopped = true; };
+    screen.liveStatus = h("div", { class: "live-status" });
+    var loading = h("div", { class: "empty" }, h("span", { class: "spinner" }));
+    M.mount(view, [back(), screen.liveStatus, loading]);
+    var stop = M.liveView(view, {
+      status: screen.liveStatus, interval: 30000,
+      load: function (passive) {
+        var version = screen.version;
+        return Promise.all([M.api("GET", path(username), undefined, { passive: passive }),
+          M.api("GET", "ui/api/people/" + encodeURIComponent(username) + "/share", undefined, { passive: passive })])
+          .then(function (results) { return { version: version, results: results }; });
+      },
+      accept: function (data) { return current(screen) && data.version === screen.version; },
+      draw: function (data) { draw(screen, data.results[0], data.results[1]); },
+      empty: function () { loading.remove(); },
+    });
+    return function () { screen.stopped = true; stop(); M.discardDrafts(view); };
   };
 
   function back() {
@@ -28,15 +37,21 @@
     return !screen.stopped && screen.view.isConnected && screen.view.meridianPersonGeneration === screen.generation;
   }
 
-  function completed(screen, user, toastKey, label) {
+  function failed(label, error) {
+    if (error.code !== "cancelled") M.toast(M.t("person.action_error", { name: label, error: M.errorText(error) }), "error");
+  }
+
+  function completed(screen, user, toastKey, label, savedForm) {
     if (toastKey === "person.enabled_toast" && user.status === "expired") toastKey = "person.enabled_expired_toast";
     if (toastKey === "person.enabled_toast" && user.status === "limited") toastKey = "person.enabled_limited_toast";
     M.toast(M.t(toastKey, { name: label }));
     if (!current(screen)) return;
-    draw(screen, user, screen.share);
+    screen.version++;
+    draw(screen, user, screen.share, savedForm);
     if (toastKey === "person.reissued_toast") {
+      var version = screen.version;
       M.api("GET", "ui/api/people/" + encodeURIComponent(screen.username) + "/share").then(function (share) {
-        if (current(screen)) draw(screen, screen.user, share);
+        if (current(screen) && screen.version === version) draw(screen, screen.user, share);
       }, function (e) { if (current(screen)) M.toast(M.errorText(e), "error"); });
     }
   }
@@ -46,29 +61,58 @@
     var label = M.displayName(screen.username);
     return work().then(function (user) {
       completed(screen, user, toastKey, label);
-    }, function (e) { if (e.code !== "cancelled") M.toast(M.errorText(e), "error"); });
+    }, function (e) { failed(label, e); });
   }
 
-  function draw(screen, user, share) {
+  function heading(user) {
+    var name = user.username;
+    return [h("div", {}, h("h1", { text: M.displayName(name) }),
+      h("p", { class: "muted" }, M.displayName(name) !== name ? h("span", { class: "mono", text: name + " · " }) : null,
+        M.t("person.since", { when: M.date(user.created_at) }))), M.statusPill(user.status)];
+  }
+
+  function editable(form) { return !M.formDirty(form) && !form.meridianSaving; }
+
+  function draw(screen, user, share, savedForm) {
+    var previous = screen.user, oldShare = screen.share;
     screen.user = user;
     screen.share = share;
     var name = user.username;
-    M.mount(screen.view, [
-      back(),
-      h("div", { class: "page-head" },
-        h("div", {},
-          h("h1", { text: M.displayName(name) }),
-          h("p", { class: "muted" },
-            M.displayName(name) !== name ? h("span", { class: "mono", text: name + " · " }) : null,
-            M.t("person.since", { when: M.date(user.created_at) }))),
-        M.statusPill(user.status)),
-      shareCard(share, name),
-      h("div", { class: "cards" }, usageCard(user, screen), accessCard(user, screen)),
-      metadataCard(user, screen),
-      M.personHistory(name),
-      M.devicesCard(user),
-      dangerCard(user, share.declared, screen),
-    ]);
+    if (!previous) {
+      screen.head = h("div", { class: "page-head" });
+      screen.shareSlot = h("div"); screen.usageSlot = h("div", { class: "card-slot" });
+      screen.accessSlot = h("div", { class: "card-slot" }); screen.metadataSlot = h("div"); screen.dangerSlot = h("div");
+      M.mount(screen.view, [back(), screen.head, screen.liveStatus, screen.shareSlot,
+        h("div", { class: "cards" }, screen.usageSlot, screen.accessSlot), screen.metadataSlot,
+        M.personHistory(name), M.devicesCard(user, function (changed) {
+          if (!current(screen)) return;
+          screen.version++;
+          draw(screen, changed, screen.share);
+        }), screen.dangerSlot]);
+    }
+    M.mount(screen.head, heading(user));
+    M.mount(screen.usageSlot, usageCard(user, screen));
+    if (!oldShare || JSON.stringify(oldShare) !== JSON.stringify(share)) {
+      var disclosure = screen.shareSlot.querySelector("details");
+      var open = disclosure && disclosure.open;
+      M.mount(screen.shareSlot, shareCard(share, name));
+      if (open && screen.shareSlot.querySelector("details")) screen.shareSlot.querySelector("details").open = true;
+    }
+    var accessForm = screen.accessSlot.querySelector("form");
+    var changedAccess = !previous || previous.expire_at !== user.expire_at || previous.traffic_limit_bytes !== user.traffic_limit_bytes
+      || previous.traffic_limit_strategy !== user.traffic_limit_strategy;
+    if (!accessForm || editable(accessForm) && (changedAccess || accessForm === savedForm)) {
+      M.mount(screen.accessSlot, accessCard(user, screen));
+    } else {
+      screen.accessSlot.querySelector(".card-head").replaceWith(accessHead(user, screen));
+      screen.accessSlot.querySelector(".access-status").textContent = M.t("person.status_" + user.status);
+    }
+    var metadataForm = screen.metadataSlot.querySelector("form");
+    var changedMetadata = !previous || previous.note !== user.note || previous.tag !== user.tag;
+    if (!metadataForm || editable(metadataForm) && (changedMetadata || metadataForm === savedForm)) {
+      M.mount(screen.metadataSlot, metadataCard(user, screen));
+    }
+    M.mount(screen.dangerSlot, dangerCard(user, share.declared, screen));
   }
 
   function shareCard(share, username) {
@@ -120,7 +164,6 @@
 
   function accessCard(user, screen) {
     var name = user.username;
-    var disabled = user.status === "disabled";
     var expiry = M.expiryFields(user.expire_at, name);
     var limits = M.limitFields(user);
     var form = h("form", { class: "stack", novalidate: true },
@@ -129,30 +172,36 @@
       h("p", { class: "form-error", role: "alert" }),
       h("div", { class: "row-actions" },
         h("button", { class: "btn btn-primary btn-sm", type: "submit" }, M.t("action.save"))));
+    M.trackForm(form);
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var change = limits.value();
       Object.assign(change, expiry.change());
       if (!Object.keys(change).length) {
+        M.resetDraft(form);
         M.toast(M.t("person.nothing_changed"));
         return;
       }
       var label = M.displayName(name);
-      M.busy(form, function () { return M.api("PATCH", path(name), change); }).then(function (changed) {
-        completed(screen, changed, "person.saved_toast", label);
-      }, function () { /* shown in the form */ });
+      M.saveDraft(form, function () { return M.api("PATCH", path(name), change); }).then(function (changed) {
+        completed(screen, changed, "person.saved_toast", label, form);
+      }, function (e) { if (!current(screen)) failed(label, e); });
     });
     return h("section", { class: "card" },
-      h("div", { class: "card-head" },
+      accessHead(user, screen),
+      h("p", { class: "muted small access-status", text: M.t("person.status_" + user.status) }), form);
+  }
+
+  function accessHead(user, screen) {
+    var disabled = user.status === "disabled", name = user.username;
+    return h("div", { class: "card-head" },
         h("h2", { text: M.t("person.access") }),
         h("button", { class: "btn btn-sm " + (disabled ? "btn-primary" : "btn-ghost"), type: "button",
           onclick: function () {
             act(screen, function () {
               return M.api("PATCH", path(name), { status: disabled ? "active" : "disabled" });
             }, disabled ? "person.enabled_toast" : "person.disabled_toast");
-          } }, M.t(disabled ? "person.enable" : "person.disable"))),
-      h("p", { class: "muted small", text: M.t("person.status_" + user.status) }),
-      form);
+          } }, M.t(disabled ? "person.enable" : "person.disable")));
   }
 
   function metadataCard(user, screen) {
@@ -164,6 +213,7 @@
       M.field(M.t("person.note"), note, M.t("person.note_hint")),
       M.field(M.t("person.tag"), tag, M.t("person.tag_hint")), error,
       h("button", { class: "btn btn-primary btn-sm", type: "submit" }, M.t("action.save")));
+    M.trackForm(form);
     function validate() {
       var characters = Array.from(note.value);
       var invalidText = characters.some(function (character) {
@@ -187,11 +237,11 @@
       var change = {};
       if (note.value !== initialNote) change.note = note.value;
       if (tag.value !== initialTag) change.tag = tag.value;
-      if (!Object.keys(change).length) { M.toast(M.t("person.nothing_changed")); return; }
+      if (!Object.keys(change).length) { M.resetDraft(form); M.toast(M.t("person.nothing_changed")); return; }
       var label = M.displayName(user.username);
-      M.busy(form, function () { return M.api("PATCH", path(user.username), change); }).then(function (changed) {
-        completed(screen, changed, "person.saved_toast", label);
-      }, function () { /* shown in the form */ });
+      M.saveDraft(form, function () { return M.api("PATCH", path(user.username), change); }).then(function (changed) {
+        completed(screen, changed, "person.saved_toast", label, form);
+      }, function (e) { if (!current(screen)) failed(label, e); });
     });
     return h("section", { class: "card" }, h("h2", { text: M.t("person.metadata") }),
       h("p", { class: "muted small", text: M.t("person.metadata_private") }), form);
@@ -224,10 +274,11 @@
             M.api("DELETE", path(name), { cut_off: choice.cut_off }).then(function (changed) {
               M.toast(M.t("person.removed_toast", { name: label }));
               if (!current(screen)) return;
+              M.discardDrafts(screen.view);
               M.go("people");
               if (changed.commands) M.showCommandResults(changed.commands);
-            }, function (e) { M.toast(M.errorText(e), "error"); });
-          }, function (e) { M.toast(M.errorText(e), "error"); });
+            }, function (e) { failed(label, e); });
+          }, function (e) { failed(M.displayName(name), e); });
         } }, M.t("person.remove"))));
   }
 })();

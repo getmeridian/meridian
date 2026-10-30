@@ -52,9 +52,9 @@
       date.disabled = time.disabled = never.checked;
       var d = moment(), message = "", target = date;
       if (!never.checked) {
-        if (!date.value || !d) { message = M.t("person.expiry_invalid"); if (date.value) target = time; }
+        if (!date.value || !d) { message = M.t("person.expiry_invalid", { choice: M.t("people.no_expiry") }); if (date.value) target = time; }
         if (d && d.getUTCFullYear() >= NEVER_EXPIRES_YEAR) message = M.t("people.expiry_too_far");
-        else if (d && edited() && d.getTime() <= Date.now()) message = M.t("person.expiry_past");
+        else if (d && edited() && d.getTime() <= Date.now()) message = M.t("person.expiry_past", { choice: M.t("people.no_expiry") });
       }
       date.setCustomValidity(target === date ? message : "");
       time.setCustomValidity(target === time ? message : "");

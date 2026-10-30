@@ -8,6 +8,8 @@
   var root = null;
   var setupToken = "";
   var stopScreen = null;
+  var activeHash = null, position = 0, navigationTurn = 0, ignoreHash = null;
+  var restoring = null, allowedTraversal = false;
 
   var SCREENS = [
     { name: "people", render: function (view, route) { return route.arg ? M.renderPerson(view, route.arg) : M.renderPeople(view); } },
@@ -33,12 +35,22 @@
   };
 
   function signOut() {
-    M.rawApi("POST", "auth/logout", {}).finally(function () { M.onSignedOut(); });
+    M.tryLeave().then(function (leave) {
+      if (leave) M.rawApi("POST", "auth/logout", {}).finally(function () { M.onSignedOut(); });
+    });
   }
 
   /* Draw what the current state and hash call for. */
-  M.render = function () {
+  M.render = function (confirmed) {
+    if (confirmed !== true && M.state.auth && M.state.auth.signed_in && M.hasUnsavedEdits()) {
+      return M.tryLeave().then(function (leave) { if (leave) renderNow(); });
+    }
+    renderNow();
+  };
+
+  function renderNow() {
     if (stopScreen) { stopScreen(); stopScreen = null; }
+    M.discardDrafts(root);
     var auth = M.state.auth;
     document.title = (M.state.fleet && M.state.fleet.profile_title) || "Meridian";
     if (!auth) return;
@@ -47,7 +59,7 @@
     if (!auth.owner_exists) return M.renderNotice(root, "auth.no_owner_title", "auth.no_owner_text", "meridian panel");
     if (!auth.signed_in) return M.renderLogin(root, auth, afterSignIn);
     renderShell();
-  };
+  }
 
   function afterSignIn() {
     refreshAuth().then(refreshFleet).then(M.render, showFatal);
@@ -78,6 +90,7 @@
   }
 
   function renderShell() {
+    if (activeHash === null) remember(location.hash, 0);
     var route = M.route();
     var screen = SCREENS.filter(function (s) { return s.name === route.name; })[0] || SCREENS[0];
     var view = h("main", { id: "view", class: "view", tabindex: "-1" });
@@ -100,6 +113,75 @@
     stopScreen = typeof cleanup === "function" ? cleanup : null;
   }
 
+  function remember(hash, nextPosition) {
+    position = nextPosition;
+    activeHash = hash;
+    history.replaceState({ meridianPosition: position }, "", location.pathname + location.search + hash);
+  }
+
+  M.navigate = function (hash) {
+    var mine = ++navigationTurn;
+    return M.tryLeave().then(function (leave) {
+      if (!leave || mine !== navigationTurn) return;
+      if (activeHash === null) remember(location.hash, 0);
+      if (hash !== activeHash) {
+        history.pushState({ meridianPosition: position + 1 }, "", location.pathname + location.search + hash);
+        position++;
+        activeHash = hash;
+      }
+      renderNow();
+    });
+  };
+
+  function traversed(event) {
+    if (!M.state.auth || !M.state.auth.signed_in) return;
+    ignoreHash = location.hash;
+    if (restoring) {
+      var target = restoring;
+      restoring = null;
+      remember(activeHash, position);
+      M.tryLeave().then(function (leave) {
+        if (!leave || target.turn !== navigationTurn) return;
+        allowedTraversal = true;
+        history.go(target.position - position);
+      });
+      return;
+    }
+    var nextPosition = event.state && Number.isInteger(event.state.meridianPosition)
+      ? event.state.meridianPosition : position + 1;
+    if (!allowedTraversal && M.hasUnsavedEdits()) {
+      restoring = { hash: location.hash, position: nextPosition, turn: ++navigationTurn };
+      history.go(position - nextPosition);
+      return;
+    }
+    allowedTraversal = false;
+    remember(location.hash, nextPosition);
+    renderNow();
+  }
+
+  function hashChanged() {
+    if (!M.state.auth || !M.state.auth.signed_in) return;
+    if (ignoreHash === location.hash) { ignoreHash = null; return; }
+    ignoreHash = null;
+    if (location.hash === activeHash) return;
+    if (M.hasUnsavedEdits()) {
+      restoring = { hash: location.hash, position: position + 1, turn: ++navigationTurn };
+      history.back();
+    } else {
+      remember(location.hash, position + 1);
+      renderNow();
+    }
+  }
+
+  function routeClick(event) {
+    var link = event.target.closest && event.target.closest("a");
+    var hash = link && link.getAttribute("href");
+    if (!hash || hash.charAt(0) !== "#" || event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    if (!M.state.auth || !M.state.auth.signed_in) return;
+    event.preventDefault();
+    M.navigate(hash);
+  }
+
   function showFatal(error) {
     M.mount(root, h("main", { class: "auth" }, h("div", { class: "auth-card" },
       h("h1", { text: M.t("error.fatal_title") }),
@@ -112,9 +194,9 @@
     root = document.getElementById("app");
     root.classList.remove("boot");
     setupToken = M.takeSetupToken();
-    window.addEventListener("hashchange", function () {
-      if (M.state.auth && M.state.auth.signed_in) M.render();
-    });
+    window.addEventListener("hashchange", hashChanged);
+    window.addEventListener("popstate", traversed);
+    document.addEventListener("click", routeClick);
     M.i18n.load().then(refreshAuth).then(function (auth) {
       return auth.signed_in ? refreshFleet() : null;
     }).then(M.render, showFatal);

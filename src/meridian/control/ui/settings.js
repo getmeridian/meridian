@@ -62,7 +62,9 @@
       M.i18n.langs.map(function (code) {
         return h("button", { type: "button", role: "radio", lang: code, "aria-checked": String(M.i18n.lang === code),
           class: M.i18n.lang === code ? "active" : "", onclick: function () {
-            M.i18n.choose(code).then(function () { M.render(); });
+            M.tryLeave().then(function (leave) {
+              if (leave) M.i18n.choose(code).then(function () { M.render(true); });
+            });
           } }, M.i18n.names[code]);
       }));
     return h("section", { class: "card" },
@@ -72,13 +74,17 @@
   }
 
   function setTheme(value) {
+    M.tryLeave().then(function (leave) { if (leave) applyTheme(value); });
+  }
+
+  function applyTheme(value) {
     try {
       if (value === "auto") localStorage.removeItem("mrd.theme");
       else localStorage.setItem("mrd.theme", value);
     } catch (e) { /* storage disabled: this page only */ }
     if (value === "auto") document.documentElement.removeAttribute("data-theme");
     else document.documentElement.setAttribute("data-theme", value);
-    M.render();
+    M.render(true);
   }
 
   function passwordCard() {
@@ -91,13 +97,15 @@
       error,
       h("div", { class: "row-actions" },
         h("button", { class: "btn btn-primary btn-sm", type: "submit" }, M.t("settings.change_password"))));
+    M.trackForm(form);
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       if (password.value.length < 10) { error.textContent = M.t("error.weak_password"); return; }
       if (password.value !== again.value) { error.textContent = M.t("auth.mismatch"); return; }
-      M.busy(form, function () { return M.api("POST", "auth/password", { password: password.value }); })
+      M.saveDraft(form, function () { return M.api("POST", "auth/password", { password: password.value }); })
         .then(function () {
           password.value = again.value = "";
+          M.resetDraft(form);
           M.toast(M.t("settings.password_toast"));
         }, function () { /* shown in the form */ });
     });

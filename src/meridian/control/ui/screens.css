@@ -94,7 +94,7 @@
 .facts dd { min-width: 0; overflow-wrap: anywhere; }
 .share { display: flex; gap: 20px; align-items: flex-start; }
 .share-links { flex: 1; }
-.share-qr { flex: 0 0 220px; }
+.share-qr { flex: 0 0 auto; width: 220px; max-width: 100%; }
 .share-qr .qr { margin-inline: auto; }
 .qr-export-actions { justify-content: center; }
 .qr { display: block; border-radius: var(--r); background: #fff; border: 1px solid var(--b1); flex-shrink: 0; }
@@ -109,6 +109,8 @@
 .expiry-never { display: flex; align-items: center; gap: 8px; font-size: .875rem; }
 .expiry-never input { width: 18px; height: 18px; padding: 0; }
 .expiry-utc { overflow-wrap: anywhere; }
+.card-slot { min-width: 0; }
+.card-slot > .card { height: 100%; }
 .server-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .server-name h2 { font-size: 1rem; overflow-wrap: anywhere; }
 .cli-hint { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 16px; border-radius: var(--r2);

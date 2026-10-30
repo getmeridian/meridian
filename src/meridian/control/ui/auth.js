@@ -56,11 +56,12 @@
       error,
       h("button", { class: "btn btn-primary btn-block", type: "submit" },
         M.t(purpose === "reset" ? "auth.reset_submit" : "auth.setup_submit")));
+    M.trackForm(form);
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       if (password.value.length < 10) { error.textContent = M.t("error.weak_password"); return; }
       if (password.value !== again.value) { error.textContent = M.t("auth.mismatch"); return; }
-      M.busy(form, function () {
+      M.saveDraft(form, function () {
         return M.rawApi("POST", "auth/setup", { token: token, password: password.value });
       }).then(function () { done(purpose); }, function () { /* shown under the form */ });
     });
@@ -95,9 +96,10 @@
       code ? M.field(M.t("auth.code"), code, M.t("auth.code_hint")) : null,
       error,
       h("button", { class: "btn btn-primary btn-block", type: "submit" }, M.t("auth.sign_in")));
+    M.trackForm(form);
     form.addEventListener("submit", function (e) {
       e.preventDefault();
-      M.busy(form, function () {
+      M.saveDraft(form, function () {
         return M.rawApi("POST", "auth/login", { password: password.value, code: code ? code.value : "" });
       }).then(done, function () { password.select(); });
     });
@@ -129,9 +131,10 @@
           h("button", { class: "btn btn-ghost", type: "button", onclick: function () { close(false); } },
             M.t("action.cancel")),
           h("button", { class: "btn btn-primary", type: "submit" }, M.t("reauth.submit"))));
+      M.trackForm(form);
       form.addEventListener("submit", function (e) {
         e.preventDefault();
-        M.busy(form, function () {
+        M.saveDraft(form, function () {
           return M.rawApi("POST", "auth/confirm", { password: password.value, code: code ? code.value : "" });
         }).then(function () { close(true); }, function () { /* shown in the form */ });
       });

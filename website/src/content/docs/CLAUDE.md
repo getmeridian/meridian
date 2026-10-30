@@ -2,6 +2,7 @@
 
 ## Design decisions
 - API-token guides explain scoped issuance, authenticated OpenAPI discovery, credential/scope markers, and cut-off permissions in every locale; operation tables are checked against the committed admin contract by `scripts/validate_api_docs.py`.
+- Person guides explain Leave/Stay, memory-only drafts, preserved focus, visible 30-second refresh, and owner idle expiry in every locale.
 - Person guides explain browser-local expiry, exact UTC, calendar-month clamping, explicit null, and changed-field saves in four locales.
 - Person guides describe captioned PNG/SVG QR export, clipboard fallback, and local-only rendering in all four locales.
 - Person and CLI guides document individual credentials, explicit format URLs, their people/admin access, and the producing-output boundary in every locale.

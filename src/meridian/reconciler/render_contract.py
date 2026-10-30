@@ -14,7 +14,7 @@ _RENDERER_MANIFEST = {
     "pwa": "service-pages-v25",
     "control-service": "person-connections-v1",
     "control-api": "person-expiry-v1",
-    "control-ui": "person-view-v4",
+    "control-ui": "person-view-v5",
     "firewall": "ufw-comment-v2",
     "nginx": "service-pages-v12",
     "realm": "neutral-systemd-musl-v3",

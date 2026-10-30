@@ -11,7 +11,7 @@ const dom = new JSDOM('<!doctype html><body><main id="view"></main></body>', {
 });
 const w = dom.window;
 const requests = [];
-for (const script of ['core.js', 'settings.js']) w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
+for (const script of ['core.js', 'drafts.js', 'settings.js']) w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 const M = w.M;
 const catalog = JSON.parse(fs.readFileSync(path.join(ui, 'locales', locale + '.json')));
 M.t = (key, params = {}) => (catalog[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? ''));

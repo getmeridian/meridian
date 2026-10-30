@@ -192,7 +192,8 @@
         if (!validate()) throw new Error(error.textContent);
         var change = {};
         if (!user || edited()) {
-          change.traffic_limit_bytes = mode.value === "unlimited" ? 0 : quotaBytes(gb.value, unit.value).bytes;
+          var bytes = mode.value === "unlimited" ? 0 : quotaBytes(gb.value, unit.value).bytes;
+          if (!user || bytes !== user.traffic_limit_bytes) change.traffic_limit_bytes = bytes;
         }
         if (!user || strategy.value !== user.traffic_limit_strategy) change.traffic_limit_strategy = strategy.value;
         return change;
@@ -215,6 +216,7 @@
           h("button", { class: "btn btn-ghost", type: "button", onclick: function () { close(); } },
             M.t("action.cancel")),
           h("button", { class: "btn btn-primary", type: "submit" }, M.t("people.add_submit"))));
+      M.trackForm(form);
       form.addEventListener("submit", function (e) {
         e.preventDefault();
         var username = name.value.trim();
@@ -226,7 +228,7 @@
         var body = limits.value();
         body.username = username;
         body.expire_at = expiry.value();
-        M.busy(form, function () { return M.api("POST", "api/users", body); }).then(function () {
+        M.saveDraft(form, function () { return M.api("POST", "api/users", body); }).then(function () {
           close();
           M.toast(M.t("people.added_toast", { name: username }));
           M.go("people", username);

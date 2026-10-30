@@ -8,6 +8,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 - An apply after a Meridian upgrade, or after another renderer changed, no longer re-runs every server's package and hardening baseline; only a change to the baseline itself or to the server's connection does.
 - Scoped integrations can fetch OpenAPI 3.1 at `/api/openapi.json`. The same route catalog drives dispatch and authorization, marks responses that can carry credentials, and supplies checked API operation tables in all four locales.
+- Person and password forms ask Leave/Stay while edits exist, including browser back and dialog dismissal. Person status and usage refresh while visible without replacing drafts or focus; device actions update their originating card. Drafts stay in memory, and successful saves clear only the saved form.
+
 - Console expiry forms edit native date and time, show the browser zone and exact UTC instant, and preserve untouched timestamps. +1 month and +3 months preview a UTC calendar renewal after now or the current expiry; No expiry saves null.
 
 - Console QR images export as PNG or SVG with the person's name and fleet title. Supported browsers copy the PNG to the clipboard; a refused or unavailable clipboard falls back to a local download without changing the CSP.

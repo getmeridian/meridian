@@ -1,6 +1,7 @@
 # control/ui — The owner's web console (M5, #95)
 
 ## Design decisions
+- Person/password drafts live only in memory; changed forms guard routes, history traversal, sign-out, and their own dialog dismissal with Leave/Stay, while visible person reads refresh status and usage passively every 30 seconds.
 - Person and add forms use native local date/time with the browser zone and exact UTC instant; core-computed +1/+3 calendar-month previews only fill a draft, and No expiry PATCHes null when saved.
 - The closed Individual connections disclosure uses canonical subscription order and local QR codes; explicit format URLs and entries share the subscription link's credential permissions.
 - Settings shows public owner instructions and the canonical link read-only with `meridian fleet contact`; it never writes the topology-owned presentation.
@@ -27,6 +28,8 @@
 - **Assets revalidate by ETag** (content hash, `no-cache`); anything holding a secret is `no-store`.
 
 ## Pitfalls
+- Preserve edited input nodes, focus, and selection during person refresh; accept live reads only before a newer mutation result, and refresh device counts on their originating card.
+- Ignore disabled draft fields and keep the submitted baseline before locking a save; clear only successful saves or actually discarded forms, and a confirmed person deletion discards its obsolete drafts once.
 - Validate edited expiry instants as whole-second future UTC values before 2099; preserve untouched fractional timestamps and reject nonexistent local times in a DST gap.
 - Capture the person and screen generation before a mutation; apply its returned record only there, name the person in feedback, and report effective expired/limited access after enabling.
 - Person metadata uses text nodes for textarea contents, validates 500 Unicode characters and the uppercase tag, and PATCHes only changed fields; a textarea `value` attribute does not populate its value.

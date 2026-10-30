@@ -230,12 +230,19 @@
         "aria-labelledby": titleId });
       var settled = false;
       var dismissalLocked = false;
-      function close(value) {
+      function settle(value) {
         if (settled || dismissalLocked) return;
         settled = true;
         dialog.close();
+        if (M.discardDrafts) M.discardDrafts(dialog);
         dialog.remove();
         resolve(value);
+      }
+      function close(value) {
+        if (settled || dismissalLocked) return;
+        if ((value === undefined || value === false) && M.hasUnsavedEdits && M.hasUnsavedEdits(dialog)) {
+          M.tryLeave(dialog).then(function (leave) { if (leave) settle(value); });
+        } else settle(value);
       }
       var dismiss = M.h("button", { class: "btn-icon", type: "button", "aria-label": M.t("action.close"),
         onclick: function () { close(undefined); } }, M.icon("x"));
@@ -267,7 +274,7 @@
       dialog.appendChild(body);
       document.body.appendChild(dialog);
       dialog.showModal();
-      var first = dialog.querySelector("input, select, textarea");
+      var first = dialog.querySelector("[autofocus], input, select, textarea");
       if (first) first.focus();
     });
   };
@@ -354,6 +361,7 @@
       view.setAttribute("aria-busy", "true");
       latest(Promise.resolve().then(function () { return options.load(passive); })).then(function (data) {
         if (!active()) return;
+        if (options.accept && !options.accept(data)) { view.setAttribute("aria-busy", "false"); schedule(); return; }
         options.draw(data);
         updatedAt = Date.now();
         failures = 0;
@@ -408,6 +416,7 @@
   };
   M.go = function (name, arg) {
     var hash = "#/" + name + (arg ? "/" + encodeURIComponent(arg) : "");
+    if (M.navigate) return M.navigate(hash);
     if (location.hash === hash && M.render) M.render();
     else location.hash = hash;
   };

@@ -2,9 +2,24 @@
 
 import pytest
 
+from meridian.control.ui_views import qr_data_uri
 from tests.support.console_dom import needs_console_dom, run_console
 
 pytestmark = needs_console_dom
+
+
+def test_qr_export_accepts_the_canonical_server_svg() -> None:
+    result = run_console(
+        "person-qr",
+        data={
+            "action": "svg",
+            "share": {
+                "qr_svg": qr_data_uri("https://198.51.100.1/sub/test-only-link"),
+            },
+        },
+    )
+    assert result["downloadTypes"] == ["image/svg+xml"]
+    assert "segno" in result["svg"] and "Sample person" in result["svg"]
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
