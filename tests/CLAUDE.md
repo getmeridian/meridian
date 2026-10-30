@@ -47,3 +47,4 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - **Pin the service clock beside hard-coded dates** — user edits enforce at `meridian.control.service.utc_now()`; reset tests dated 2026-10-29/30 failed on the real 2026-10-30.
 - **Older-schema snapshots** — drop later columns as well as tables before rewinding `schema_version`; retaining a new column makes its migration fail spuriously.
 - **Console DOM tests take `needs_console_dom`** — CI's 3.11/3.13/3.14 legs have no jsdom; five modules importing only `run_console` failed there with a bare exit 1. The 3.12 leg installs it and sets `MERIDIAN_TEST_CONSOLE`, so a lost install fails instead of skipping.
+- **Help text goes through `unstyle()`** — CI's 3.14 leg renders `--help` in colour, splitting `--cut-off` into styled runs; assert on `tests.support.text.unstyle(reply.output)` (missed twice in one night).

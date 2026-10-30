@@ -24,6 +24,7 @@ from meridian.control.command_models import (
 )
 from meridian.remnawave import User
 from tests.support.node_commands import command_record
+from tests.support.text import unstyle
 from tests.support.topology import single_exit_intent
 
 
@@ -31,16 +32,18 @@ from tests.support.topology import single_exit_intent
 def test_client_help_discloses_the_opt_in_cut_off_scope(command: list[str]) -> None:
     reply = CliRunner().invoke(app, [*command, "--help"])
     assert reply.exit_code == 0
-    assert "--cut-off" in reply.output
-    assert "every" in reply.output.lower() and "session" in reply.output.lower()
-    assert "restart" in reply.output.lower()
+    output = unstyle(reply.output)
+    assert "--cut-off" in output
+    assert "every" in output.lower() and "session" in output.lower()
+    assert "restart" in output.lower()
 
 
 def test_node_restart_help_names_the_core_and_all_unit_scopes() -> None:
     reply = CliRunner().invoke(app, ["node", "restart", "--help"])
     assert reply.exit_code == 0
-    assert all(flag in reply.output for flag in ("--core", "--all", "--json", "--yes"))
-    assert "Xray" in reply.output and "managed" in reply.output
+    output = unstyle(reply.output)
+    assert all(flag in output for flag in ("--core", "--all", "--json", "--yes"))
+    assert "Xray" in output and "managed" in output
 
 
 def cluster() -> ClusterConfig:
