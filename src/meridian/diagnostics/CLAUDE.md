@@ -1,7 +1,6 @@
 # diagnostics — Reusable server health checks
 
 ## Design decisions
-
 **One result contract** — every reported check is a core `VerificationCheck`; SSH primitives return frozen `CheckResult`, lifted with `evidence.check_from_result()`.
 **No CLI rendering** — checks return data and never import console, Rich, or Typer; commands own output, so Engine and tests reuse the checks.
 **I/O follows perspective** — server health runs through a `core.execution.ServerConnection`; external checks use bounded sockets and argv-only subprocesses.
@@ -9,15 +8,10 @@
 **Log tails** — `logs.py` maps fleet roles to sources (`ctld`, `netagent`, and `netcore` units, Realm units from `server_render`, nginx's error log) and returns redacted `LogTail`s; a missing source or lost SSH is an error, never an empty log.
 **Control-service health** — `control_service.py` checks the `ctld`/`netagent`/`netcore` units and judges each agent from its `NodeStatus` (`is_live()`, failed resources, applied vs current revision); the agent repairs a stopped core itself within 5 minutes.
 **Setup helpers** — `preflight.py` collects pre-deploy checks; `camouflage.py` runs the pinned RealiTLScanner and picks same-subnet Reality targets (`commands/scan.py` adds only the spinner and prompt).
-
 ## What's done well
-
 - Disk, port, TLS, and firewall primitives are shared by every check scope and testable without CLI scaffolding.
-
 ## Pitfalls
-- Agent runtime and convergence findings require a fresh report; an old unhealthy report is skipped evidence even while the agent keeps polling.
-
-- **Execution failure is not negative evidence** — a command timeout, SSH drop, or missing inspection tool returns skipped, never failed.
+- **Execution failure is not negative evidence** — a command timeout, SSH drop, or missing inspection tool returns skipped, never failed; likewise agent runtime and convergence findings need a fresh report, and an old unhealthy report is skipped evidence even while the agent keeps polling.
 - **Protocol shape controls checks** — never require TCP/443 or HTTPS from a UDP-only Hysteria2 endpoint; full canonical traffic is the UDP authority.
 - **Probe Meridian's certificate as clients ask for it** — an IP goes with no SNI (on an exit an IP SNI reaches the Reality camouflage site, so `check` long judged Google's certificate), the managed route before the camouflage one, and expiry warns relative to lifetime (6-day IP certificates).
 - **Inspection is not validation** — unverified TLS may collect a certificate, but a pass needs separate trust, lifetime, and hostname validation.
