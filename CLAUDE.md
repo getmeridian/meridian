@@ -36,7 +36,8 @@ Every folder with distinct architectural concerns has a `CLAUDE.md`. AI assistan
 
 **Format (applies to every file, root excepted):**
 - Section order: **Design decisions → What's done well → Pitfalls → (optional) Links**
-- ≤ 40 lines and roughly 700 words (leaf files). Root is the spine; longer is acceptable but resist bloat.
+- ≤ 40 lines and roughly 700 words (leaf files); the largest modules may reach about 1,000. Root is the spine; longer is acceptable but resist bloat.
+- Cut incident stories, counts, and lists the code already states; never cut a pitfall's cause to fit.
 - Pitfalls are one-line, concrete, actionable.
 - No duplication across files. Root has the big picture; folders have the details. Cross-reference by path.
 - No line numbers or function signatures (they drift with code).
