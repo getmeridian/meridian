@@ -62,6 +62,7 @@ READS_ONLY = frozenset(
         "doctor",
         "fleet.export",
         "fleet.history",
+        "fleet.events",
         "fleet.inventory",
         "fleet.status",
         "fleet.usage",

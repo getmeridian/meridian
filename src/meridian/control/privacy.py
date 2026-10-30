@@ -11,6 +11,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from meridian.control.devices import DeviceLedger
+from meridian.control.events import EventLedger
 from meridian.control.models import (
     PrivacyChange,
     PrivacyDeletedRows,
@@ -20,6 +21,7 @@ from meridian.control.models import (
 )
 from meridian.control.store import Store
 from meridian.control.times import format_timestamp
+from meridian.core.fleet_events import PrivacyEventDetail
 
 PRIVACY_TABLE = "CREATE TABLE IF NOT EXISTS privacy (id INTEGER PRIMARY KEY CHECK (id = 1), settings TEXT NOT NULL);"
 PRIVACY_CHANGES_TABLE = (
@@ -53,21 +55,25 @@ def prune_history_rows(store: Store, days: int, now: str) -> PrivacyDeletedRows:
 
 
 class PrivacyLedger:
-    def __init__(self, store: Store, *, clock: Callable[[], float] = time.time) -> None:
+    def __init__(
+        self, store: Store, *, clock: Callable[[], float] = time.time, events: EventLedger | None = None
+    ) -> None:
         self._store = store
         self._clock = clock
         for table in PRIVACY_TABLES:
             store.create(table)
+        self._events = events if events is not None else EventLedger(store, clock=clock)
 
     def state(self) -> PrivacyState:
         with self._store.lock:
             rows = self._store.rows(
-                "SELECT changed_at, author, before, after FROM privacy_changes ORDER BY id DESC LIMIT 50"
+                "SELECT id, changed_at, author, before, after FROM privacy_changes ORDER BY id DESC LIMIT 50"
             )
             return PrivacyState(
                 settings=read_privacy(self._store),
                 changes=[
                     PrivacyChange(
+                        id=row["id"],
                         changed_at=row["changed_at"],
                         author=row["author"],
                         before=PrivacySettings.model_validate_json(row["before"]),
@@ -104,9 +110,13 @@ class PrivacyLedger:
                 "INSERT INTO privacy VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET settings = excluded.settings",
                 (settings.model_dump_json(),),
             )
-            self._store.db.execute(
+            audit = self._store.db.execute(
                 "INSERT INTO privacy_changes (changed_at, author, before, after) VALUES (?, ?, ?, ?)",
                 (now, author, before.model_dump_json(), settings.model_dump_json()),
+            )
+            assert audit.lastrowid is not None
+            self._events.append(
+                "privacy.changed", "privacy", actor=author, now=now, detail=PrivacyEventDetail(audit_id=audit.lastrowid)
             )
             return PrivacyUpdateResult(
                 **self.state().model_dump(),

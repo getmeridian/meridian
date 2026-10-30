@@ -299,6 +299,7 @@ Fleet-wide health and inventory from the live control service, its history of ap
 meridian fleet status [--json]
 meridian fleet inventory [--json]
 meridian fleet history [--json]
+meridian fleet events [--since ID] [--limit N] [--json]
 meridian fleet usage [--days N] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
@@ -307,6 +308,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--since ID` | 0 | `fleet events`: read events after this cursor |
+| `--limit N` | 100 | `fleet events`: return 1–2000 events |
 | `--days N` | 30 | UTC days for `client usage` or `fleet usage`, 1–730, capped at the saved retention |
 | `--json` | | Emit the result as a `meridian.output/v1` envelope (`status`, `inventory`, `history`, `export`, `import`) |
 | `--tested` | | `fleet upgrade`: skip GitHub; Realm stays on the tested version or what you already upgraded to |
@@ -321,6 +324,8 @@ The `active` column counts people with growth in the last report, with its colle
 **`fleet inventory`** — your configured servers, roles, nodes, and relays, with live status when the control service is reachable. It never prints API tokens or secret paths. If live status is unavailable, the configured inventory is still shown, with warnings, and the command exits `3`. Use `plan --json` to decide whether apply has work to do.
 
 **`fleet history`** — every reviewed apply the control service recorded, newest first: its number, time, author (the machine's token name, `root` for the CLI's own token, `owner` for the console), status (`proposed`, `approved`, `applied`, or `failed`), and the start of its plan hash. `--json` returns `data.revisions[]`.
+
+**`fleet events`** — local lifecycle changes and node outages/recovery, oldest first after `--since ID` (default `0`). `--limit N` returns 1–2000 events, default 100. JSON returns `data.events[]`, `next_cursor`, and `has_more`; continue with the returned cursor. Each entry has a UTC time, kind, actor (token name, `root`, `owner`, or `system`), subject, and small details such as changed field names, token scope, or a privacy audit row ID. Credentials, raw errors, client addresses, and device data are excluded. The service keeps at most 2,000 events or 180 days, whichever is smaller, and includes them in snapshots. `GET /api/events?after=ID&limit=N` needs `read` scope and also admits the signed-in owner.
 
 **`fleet upgrade`** — brings the fleet up to date in one reviewed apply. The control service and every node agent move to the build this Meridian ships, and each agent upgrades in place, keeping its node's identity; run `meridian update` first to get newer ones. Relays move to the newest Realm release without waiting for a Meridian update: GitHub's newest release in the tested major, recorded in `cluster.yml` with the sha256 GitHub publishes for each archive, which every relay checks before installing. It shows what each server runs as `current` or `upgrade`, then, after you confirm, applies the reviewed plan and runs `meridian check` on every server. A version that cannot be read stops the command with exit `3` before anything changes.
 

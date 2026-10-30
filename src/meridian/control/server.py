@@ -57,6 +57,7 @@ from meridian.control.models import (
     UserUpdate,
     scope_covers,
 )
+from meridian.control.operations_api import read_events
 from meridian.control.owner import OwnerSession
 from meridian.control.service import ControlService
 from meridian.control.subscriptions import unknown_subscription
@@ -176,8 +177,10 @@ class _Handler(BaseHTTPRequestHandler):
                             if handler in OWNER_STEP_UP:
                                 self._service.owner.require_recent(self.owner_session)
                     session = self.owner_session
-                    with self._service.owner.while_live(session) if session is not None else nullcontext():
-                        result = handler(self, match)
+                    actor = self._service.tokens.actor(self.caller).name if self.caller is not None else "system"
+                    with self._service.events.as_actor(actor):
+                        with self._service.owner.while_live(session) if session is not None else nullcontext():
+                            result = handler(self, match)
                     if result is not None:
                         self._json(200, result)
                     return
@@ -361,6 +364,9 @@ class _Handler(BaseHTTPRequestHandler):
     def traffic(self, _match: re.Match[str]) -> Any:
         return self._service.traffic.summary()
 
+    def events(self, _match: re.Match[str]) -> Any:
+        return read_events(self._service, self.path)
+
     def daily_traffic(self, _match: re.Match[str]) -> Any:
         return self._service.traffic.daily(days=self._history_days())
 
@@ -475,7 +481,7 @@ class _Handler(BaseHTTPRequestHandler):
         return self._service.tokens.list_tokens()
 
     def revoke_token(self, match: re.Match[str]) -> Any:
-        return self._service.tokens.revoke(match[1])
+        return self._service.tokens.revoke(match[1], caller=self._caller())
 
     def list_revisions(self, _match: re.Match[str]) -> Any:
         return self._service.revisions.list_revisions()
@@ -614,6 +620,7 @@ ROUTES: list[Route] = [
     ("POST", re.compile(rf"/api/nodes/{_NODE}/enrollment"), "admin", _Handler.grant_enrollment),
     ("GET", re.compile(r"/api/ca"), "read", _Handler.fleet_authority),
     ("GET", re.compile(r"/api/traffic"), "read", _Handler.traffic),
+    ("GET", re.compile(r"/api/events"), "read", _Handler.events),
     ("GET", re.compile(r"/api/traffic/daily"), "read", _Handler.daily_traffic),
     ("GET", re.compile(r"/api/users"), ("read", "people"), _Handler.list_users),
     ("POST", re.compile(r"/api/users"), "people", _Handler.create_user),
@@ -682,6 +689,7 @@ OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
         _Handler.put_privacy,
         _Handler.user_usage,
         _Handler.daily_traffic,
+        _Handler.events,
         _Handler.list_users,
         _Handler.get_user,
         _Handler.create_user,

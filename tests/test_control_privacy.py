@@ -91,6 +91,7 @@ def test_settings_apply_never_replaces_privacy_and_a_repeat_never_adds_an_audit_
     assert service.privacy() == settings
     assert first.changed and not again.changed and again.changes == first.changes
     assert first.changes[0].model_dump() == {
+        "id": 1,
         "changed_at": NOW,
         "author": "laptop",
         "before": PrivacySettings().model_dump(),

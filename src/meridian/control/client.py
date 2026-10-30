@@ -55,6 +55,7 @@ from meridian.control.models import (
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientExtendRequest
 from meridian.core.errors import MeridianError
+from meridian.core.fleet_events import FleetEventPage, FleetEventQuery
 
 _GATEWAY_FAILURES = frozenset({502, 503, 504})
 # Transport errors raised before any request bytes left this machine.
@@ -174,6 +175,10 @@ class ControlClient:
 
     def traffic(self) -> TrafficSummary:
         return TrafficSummary.model_validate(self._call("GET", "api/traffic"))
+
+    def events(self, *, after: int = 0, limit: int = 100) -> FleetEventPage:
+        query = FleetEventQuery(after=after, limit=limit)
+        return FleetEventPage.model_validate(self._call("GET", f"api/events?after={query.after}&limit={query.limit}"))
 
     def user_usage(self, username: str, *, days: int = 30) -> UserUsage:
         return UserUsage.model_validate(self._call("GET", f"api/users/{_segment(username)}/usage?days={days}"))

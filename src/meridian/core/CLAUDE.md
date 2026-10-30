@@ -2,6 +2,7 @@
 
 ## Design decisions
 - **Creation-only account settings** — `UserCreationSettings` is shared by service creation and `AccessIntent.creation_settings`; an empty mapping is omitted so existing user payloads and plans keep their hashes.
+- **Local lifecycle facts** — `fleet_events.py` is the durable event contract for integrations: monotonic ID, UTC time, kind, actor, subject, and a closed detail model per kind; command progress keeps its separate `events.py` contract.
 - **Traffic evidence** — `core/traffic.py` is the shared aggregate evidence contract: first accepted use and last reporting node per person, plus active people and collection/receipt times in each node's latest report; unknown historical evidence remains null.
 - **No CLI globals** - core never imports Typer, Rich, console, config, or command modules (tested); CLI and future UI clients are adapters. Core constants live in `core/defaults.py`.
 - **Envelope first** - JSON clients get one stable `meridian.output/v1` shape; command data lives under `data`.

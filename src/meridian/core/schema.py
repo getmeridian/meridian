@@ -60,6 +60,7 @@ from meridian.core.deploy import DeployPlan, DeployPorts, DeployRequest, DeployR
 from meridian.core.events import EVENT_TYPES
 from meridian.core.fleet import FleetInventory, FleetStatus, NodeListResult, RelayListResult
 from meridian.core.fleet_document import FleetExportResult, FleetImportResult, IntentChange
+from meridian.core.fleet_events import FleetEvent, FleetEventPage, FleetEventQuery
 from meridian.core.health import HealthCheckResult
 from meridian.core.models import (
     CoreModel,
@@ -387,6 +388,13 @@ _, _, FleetHistoryOutputEnvelope = _make_command_envelope(
     doc="Envelope schema for `meridian fleet history --json`.",
 )
 
+_, _, FleetEventsOutputEnvelope = _make_command_envelope(
+    "FleetEvents",
+    "fleet.events",
+    FleetEventPage,
+    doc="Envelope schema for `meridian fleet events --json`.",
+)
+
 _, _, FleetImportOutputEnvelope = _make_command_envelope(
     "FleetImport",
     "fleet.import",
@@ -642,6 +650,10 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "fleet-inventory-envelope": FleetInventoryOutputEnvelope,
     "fleet-export-envelope": FleetExportOutputEnvelope,
     "fleet-history-envelope": FleetHistoryOutputEnvelope,
+    "fleet-events-envelope": FleetEventsOutputEnvelope,
+    "fleet-events": FleetEventPage,
+    "fleet-event": FleetEvent,
+    "fleet-event-query": FleetEventQuery,
     "fleet-usage-envelope": FleetUsageOutputEnvelope,
     "fleet-import-envelope": FleetImportOutputEnvelope,
     "event": Event,

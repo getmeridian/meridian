@@ -175,6 +175,7 @@ class PrivacySettings(CoreModel):
 
 
 class PrivacyChange(CoreModel):
+    id: int | None = Field(default=None, ge=1, description="Local audit row referenced by privacy.changed events.")
     changed_at: Timestamp
     author: str
     before: PrivacySettings

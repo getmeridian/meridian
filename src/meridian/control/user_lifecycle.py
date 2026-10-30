@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import secrets
+import uuid as uuid_module
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from meridian.control.errors import ServiceError
-from meridian.control.models import UserRecord
+from meridian.control.models import UserCreate, UserRecord
 from meridian.control.store import Store
 from meridian.core.client_limits import ClientExtendRequest
 
@@ -19,6 +21,7 @@ def extend_user_expiry(
     now: Callable[[], str],
     read_user: Callable[[str], UserRecord],
     enforce: Callable[[str], object],
+    record_update: Callable[[UserRecord, UserRecord], None],
     compose: Callable[[], None],
 ) -> UserRecord:
     """Compute, enforce, and return the extension while holding the service's write transaction."""
@@ -34,6 +37,27 @@ def extend_user_expiry(
         except OverflowError as exc:
             raise ServiceError("invalid_request", "The extended expiry would be beyond year 9999.", 400) from exc
         store.db.execute("UPDATE users SET expire_at = ? WHERE username = ?", (expiry, username))
+        record_update(user, read_user(username))
         enforce(moment)
         compose()
         return read_user(username)
+
+
+def insert_user(store: Store, create: UserCreate, *, now: Callable[[], str]) -> None:
+    """Insert fresh credentials and first settings in the caller's transaction."""
+    store.db.execute(
+        "INSERT INTO users (username, user_id, uuid, sub_token, status, created_at, expire_at,"
+        " traffic_limit_bytes, traffic_limit_strategy, device_limit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            create.username,
+            f"u{secrets.token_hex(8)}",
+            str(uuid_module.uuid4()),
+            secrets.token_urlsafe(18),
+            create.status,
+            now(),
+            create.expire_at,
+            create.traffic_limit_bytes,
+            create.traffic_limit_strategy,
+            create.device_limit,
+        ),
+    )

@@ -282,6 +282,11 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         outcomes=[_ok("the recorded revisions were listed"), *_FAILURES],
         stability="preview",
     ),
+    "fleet.events": CommandOutput(
+        data_schema="fleet-events",
+        outcomes=[_ok("local lifecycle events were read"), *_FAILURES],
+        stability="stable",
+    ),
     "fleet.usage": CommandOutput(
         data_schema="traffic-daily",
         outcomes=[

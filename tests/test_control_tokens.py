@@ -114,6 +114,7 @@ ROUTE_SAMPLES = {
     "grant_enrollment": ("/api/nodes/main/enrollment", {}),
     "fleet_authority": ("/api/ca", None),
     "traffic": ("/api/traffic", None),
+    "events": ("/api/events", None),
     "daily_traffic": ("/api/traffic/daily", None),
     "list_users": ("/api/users", None),
     "create_user": ("/api/users", {"username": "bob", "traffic_limit_bytes": 1000}),
@@ -240,7 +241,8 @@ def test_a_token_may_revoke_itself(fleet: Fleet) -> None:
 
 
 def test_a_token_can_never_mint_a_scope_above_its_own(fleet: Fleet) -> None:
-    approver = Caller(token_id="0123456789ab", scope="approve")
+    issued = fleet.service.tokens.issue(TokenCreate(name="approver", scope="approve"), issuer=ROOT)
+    approver = fleet.service.tokens.authenticate(issued.token)
     with pytest.raises(ServiceError) as refused:
         fleet.service.tokens.issue(TokenCreate(name="escalate", scope="admin"), issuer=approver)
     assert (refused.value.status, refused.value.code) == (403, "insufficient_scope")

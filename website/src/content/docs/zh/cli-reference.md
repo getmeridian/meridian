@@ -299,6 +299,7 @@ meridian route remove EXIT ROUTE [--yes] [--json]
 meridian fleet status [--json]
 meridian fleet inventory [--json]
 meridian fleet history [--json]
+meridian fleet events [--since ID] [--limit N] [--json]
 meridian fleet usage [--days N] [--json]
 meridian fleet upgrade [--tested] [--yes]
 meridian fleet export [--json]
@@ -307,6 +308,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
+| `--since ID` | 0 | `fleet events`：读取此游标之后的事件 |
+| `--limit N` | 100 | `fleet events`：返回 1–2000 条事件 |
 | `--days N` | 30 | `client usage` 或 `fleet usage` 的 UTC 天数，1–730，受已保存保留时间限制 |
 | `--json` | | 将结果作为 `meridian.output/v1` 信封发出（`status`、`inventory`、`history`、`export`、`import`） |
 | `--tested` | | `fleet upgrade`：跳过 GitHub；Realm 保持在已测试的版本或你已升级到的版本 |
@@ -321,6 +324,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 **`fleet inventory`** — 列出已配置的服务器、角色、节点和中继，并在控制服务可达时附带实时状态。绝不会输出 API 令牌或秘密路径。如果实时状态不可用，仍会显示已配置的清单并附带警告，命令以退出码 `3` 结束。要判断 `apply` 是否有待执行的变更，请使用 `plan --json`。
 
 **`fleet history`** — 控制服务记录的每一次经过审核的应用，最新的在前：编号、时间、作者（机器的令牌名称；CLI 自身的令牌为 `root`，控制台为 `owner`）、状态（`proposed`、`approved`、`applied` 或 `failed`）以及计划哈希的开头部分。`--json` 返回 `data.revisions[]`。
+
+**`fleet events`** — 查看本地用户、令牌和隐私变更，以及节点离线和恢复事件。从 `--since ID` 之后按时间顺序显示（默认 `0`）。`--limit N` 返回 1–2000 条事件，默认 100 条。JSON 包含 `data.events[]`、`next_cursor` 和 `has_more`；继续读取时使用返回的游标。每条事件包含 UTC 时间、类型、执行者（令牌名称、`root`、`owner` 或 `system`）、对象，以及更改的字段名、令牌权限范围或隐私审计记录 ID 等简短详情。不会记录凭据、原始错误、客户端地址或设备数据。最多保留最近 180 天内的 2,000 条事件，并纳入快照。`GET /api/events?after=ID&limit=N` 需要 `read` 权限，也允许已登录的所有者访问。
 
 **`fleet upgrade`** — 通过一次已审核的应用让集群保持最新。控制服务和每个节点 agent 会升级到当前 Meridian 附带的构建，每个 agent 就地升级并保留其节点身份；要获取更新的构建，请先运行 `meridian update`。中继无需等待 Meridian 更新即可升级到最新的 Realm 版本：选用 GitHub 上已测试主版本内的最新版本，连同 GitHub 为每个压缩包发布的 sha256 一起记录到 `cluster.yml`，每个中继在安装前都会校验。它会显示每台服务器上运行的版本并标为 `current` 或 `upgrade`，确认后应用已审核的计划，并在每台服务器上运行 `meridian check`。如果某个版本无法读取，命令会在任何改动之前以退出码 `3` 结束。
 

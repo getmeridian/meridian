@@ -603,6 +603,18 @@ def fleet_history_cmd(
     run_history()
 
 
+@fleet_app.command("events", rich_help_panel="Activity")
+def fleet_events_cmd(
+    since: str = typer.Option("0", "--since", metavar="ID", help="Read events after this cursor"),
+    limit: str = typer.Option("100", "--limit", metavar="N", help="Events to return, 1–2000"),
+    _json: Json = False,
+) -> None:
+    """Read local lifecycle and node outage events, oldest first after the cursor"""
+    from meridian.commands.fleet_events import run_events
+
+    run_events(since=since, limit=limit)
+
+
 @fleet_app.command("upgrade")
 def fleet_upgrade_cmd(
     yes: Yes = False,

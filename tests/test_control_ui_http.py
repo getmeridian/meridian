@@ -157,6 +157,15 @@ def cheap_scrypt(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(passwords, "SCRYPT_PARAMS", (10, 8, 1))
 
 
+def test_owner_reads_events_and_mutations_record_the_owner(fleet: Fleet) -> None:
+    assert fleet.set_up().status == 200
+    assert fleet.ui("POST", "/api/users", {"username": "alice"}).status == 200
+    reply = fleet.ui("GET", "/api/events?limit=10")
+    assert reply.status == 200
+    assert reply.body["events"][0]["actor"] == "owner"
+    assert reply.body["events"][0]["kind"] == "user.created"
+
+
 @pytest.fixture
 def fleet(tmp_path: Path) -> Iterator[Fleet]:
     yield from _serve(tmp_path, PUBLIC_PATH)

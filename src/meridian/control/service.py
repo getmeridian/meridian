@@ -27,6 +27,7 @@ from meridian.control.delivery_settings import save_update_interval_hours, updat
 from meridian.control.devices import DEVICES_TABLE, DeviceLedger, HeaderReader, browser_request
 from meridian.control.enrollment import NodeAuthority
 from meridian.control.errors import ServiceError
+from meridian.control.events import EVENT_TABLES, EventLedger
 from meridian.control.formats.entries import SubscriptionUser
 from meridian.control.formats.selector import SUFFIX_FORMATS, select_format
 from meridian.control.models import (
@@ -63,7 +64,7 @@ from meridian.control.subscriptions import (
 from meridian.control.times import utc_now
 from meridian.control.tokens import API_TOKENS_TABLE_V4, TokenRegistry
 from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPOCH_BASELINES, TrafficLedger
-from meridian.control.user_lifecycle import extend_user_expiry
+from meridian.control.user_lifecycle import extend_user_expiry, insert_user
 from meridian.control.user_policy import enforced_status, period_began, whole_seconds
 from meridian.control.users import USER_SELECT, user_record
 from meridian.core.agent_desired import DesiredNodeState
@@ -132,8 +133,8 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (DEVICES_TABLE, "ALTER TABLE users ADD COLUMN device_limit INTEGER"),
     # 11 -> 12: optional expiry of scoped API tokens; existing tokens never expire.
     ("ALTER TABLE api_tokens ADD COLUMN expires_at TEXT",),
-    # 12 -> 13: durable accounting and aggregate activity evidence.
-    ACCOUNTING_MIGRATION,
+    # 12 -> 13: durable accounting, aggregate activity, and local lifecycle events.
+    (*ACCOUNTING_MIGRATION, *EVENT_TABLES),
 )
 # meta key prefix: the last revision a deleted node was signed at.
 _RETIRED_REVISION = "retired_revision:"
@@ -153,7 +154,8 @@ class ControlService:
         self._store.create(_SCHEMA)
         # Users read their traffic from the ledger's table, so it exists before any user query.
         self.traffic = TrafficLedger(self._store)
-        self.privacy_ledger = PrivacyLedger(self._store, clock=clock)
+        self.events = EventLedger(self._store, clock=clock)
+        self.privacy_ledger = PrivacyLedger(self._store, clock=clock, events=self.events)
         with self._transaction():
             stored = self._meta("fleet_id")
             if stored and stored != fleet_id:
@@ -165,8 +167,9 @@ class ControlService:
             if not self._meta("profile_title"):
                 self._set_meta("profile_title", "Meridian")
         self.fleet_id = fleet_id
+        self.events.prune()
         self.authority = NodeAuthority(self._store, fleet_id, clock=clock)
-        self.tokens = TokenRegistry(self._store, clock=clock)
+        self.tokens = TokenRegistry(self._store, clock=clock, events=self.events)
         self.revisions = RevisionLedger(self._store, self.tokens, fleet_id, clock=clock)
         self.backups = BackupLedger(self._store, clock=clock)
         self.owner = OwnerAuth(self._store, clock=clock)
@@ -247,6 +250,7 @@ class ControlService:
                 # An agent that keeps its state refuses an older revision, so a re-added node continues from here.
                 self._set_meta(_RETIRED_REVISION + node_id, str(row["revision"]))
             self._db.execute("DELETE FROM nodes WHERE node_id = ?", (node_id,))
+            self.events.forget_node(node_id)
             self.authority.forget_node(node_id)
 
     def grant_enrollment(self, node_id: str) -> EnrollmentGrant:
@@ -386,22 +390,8 @@ class ControlService:
             return self._require_user(create.username)
 
     def _insert_user(self, create: UserCreate) -> None:
-        self._db.execute(
-            "INSERT INTO users (username, user_id, uuid, sub_token, status, created_at, expire_at,"
-            " traffic_limit_bytes, traffic_limit_strategy, device_limit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                create.username,
-                f"u{secrets.token_hex(8)}",
-                str(uuid_module.uuid4()),
-                secrets.token_urlsafe(18),
-                create.status,
-                utc_now(),
-                create.expire_at,
-                create.traffic_limit_bytes,
-                create.traffic_limit_strategy,
-                create.device_limit,
-            ),
-        )
+        insert_user(self._store, create, now=utc_now)
+        self.events.append("user.created", create.username)
 
     def import_users(self, batch: UserImportBatch) -> UserImportResult:
         """Create users with the credentials, status, limits, and usage another control plane gave them.
@@ -456,6 +446,7 @@ class ControlService:
                         (*values, carried - item.used_traffic_bytes, item.username, f"u{secrets.token_hex(8)}"),
                     )
                     created.append(item.username)
+                    self.events.append("user.created", item.username)
                     continue
                 # What the ledger already counted stays counted, beside the newly carried use.
                 (old_carried,) = self._db.execute(
@@ -469,6 +460,7 @@ class ControlService:
                     (*values, counted + carried - item.used_traffic_bytes, item.username),
                 )
                 replaced.append(item.username)
+                self.events.user_updated(existing, self._require_user(item.username))
             self._enforce(now)
             self._compose_all()
         return UserImportResult(created=created, unchanged=unchanged, replaced=replaced)
@@ -485,6 +477,7 @@ class ControlService:
                     del changes[field]
             # Enforcement below turns an expired or limited user active again once the change lifts it.
             merged = UserRecord.model_validate({**user.model_dump(), **changes})
+            self.events.user_updated(user, merged)
             self._db.execute(
                 "UPDATE users SET status = ?, expire_at = ?, traffic_limit_bytes = ?, traffic_limit_strategy = ?,"
                 " device_limit = ? "
@@ -511,6 +504,7 @@ class ControlService:
                 "UPDATE users SET uuid = ?, sub_token = ? WHERE username = ?",
                 (str(uuid_module.uuid4()), secrets.token_urlsafe(18), username),
             )
+            self.events.append("user.reissued", username)
             self._compose_all()
             return self._require_user(username)
 
@@ -523,6 +517,7 @@ class ControlService:
             now=utc_now,
             read_user=self._require_user,
             enforce=self._enforce,
+            record_update=self.events.user_updated,
             compose=self._compose_all,
         )
 
@@ -530,6 +525,7 @@ class ControlService:
         """Start the user's traffic period now; a user limited by it becomes active again."""
         with self._transaction():
             self._reset_traffic(self._require_user(username), utc_now())
+            self.events.append("user.traffic_reset", username)
             self._enforce(utc_now())
             self._compose_all()
             return self._require_user(username)
@@ -538,6 +534,7 @@ class ControlService:
         """Apply expiry, traffic limits, and periodic resets; return who changed status."""
         moment = now or utc_now()
         self.traffic.prune_history(moment)
+        self.events.observe_nodes(self.list_nodes, moment)
         with self._transaction():
             changed = self._enforce(moment)
             if changed:
@@ -585,6 +582,7 @@ class ControlService:
             user = self.get_user(username)
             if user is not None:
                 self.traffic.forget_user(user.user_id)
+                self.events.append("user.removed", username)
             self._db.execute("DELETE FROM users WHERE username = ?", (username,))
             self._compose_all()
 
@@ -602,9 +600,11 @@ class ControlService:
                 user.traffic_reset_at is None or datetime.fromisoformat(user.traffic_reset_at) < start
             ):
                 self._reset_traffic(user, now)
+                self.events.append("user.traffic_reset", user.username, actor="system", now=now)
                 user = self._require_user(user.username)
             status = enforced_status(user, now)
             if status != user.status:
+                self.events.enforcement(user.username, user.status, status, now)
                 self._db.execute("UPDATE users SET status = ? WHERE username = ?", (status, user.username))
                 changed.append(user.username)
         return changed
@@ -744,6 +744,7 @@ class ControlService:
 
     def _ensure_node(self, node_id: str) -> None:
         self._db.execute("INSERT OR IGNORE INTO nodes (node_id) VALUES (?)", (node_id,))
+        self.events.watch_node(node_id)
 
     def _touch(self, node_id: str) -> None:
         self._db.execute("UPDATE nodes SET last_seen_at = ? WHERE node_id = ?", (utc_now(), node_id))

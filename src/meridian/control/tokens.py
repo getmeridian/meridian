@@ -24,6 +24,7 @@ from datetime import datetime
 
 from meridian.control.enrollment import token_sha256
 from meridian.control.errors import ServiceError
+from meridian.control.events import EventLedger
 from meridian.control.models import (
     IssuedToken,
     RevisionActor,
@@ -35,6 +36,7 @@ from meridian.control.models import (
 )
 from meridian.control.store import Store
 from meridian.control.times import format_timestamp, parse_timestamp
+from meridian.core.fleet_events import TokenEventDetail
 
 # `mrd_<id>_<secret>`: the public ID finds the row, so the secret's hash is compared once, in constant time.
 _TOKEN = re.compile(r"mrd_([0-9a-f]{12})_[0-9a-f]{64}")
@@ -80,10 +82,13 @@ def unauthenticated() -> ServiceError:
 
 
 class TokenRegistry:
-    def __init__(self, store: Store, *, clock: Callable[[], float] = time.time) -> None:
+    def __init__(
+        self, store: Store, *, clock: Callable[[], float] = time.time, events: EventLedger | None = None
+    ) -> None:
         self._store = store
         self._clock = clock
         store.create(API_TOKENS_TABLE)
+        self._events = events if events is not None else EventLedger(store, clock=clock)
 
     def actor(self, caller: Caller) -> RevisionActor:
         """The durable author of a change: the token's name, the web owner, or root."""
@@ -130,6 +135,7 @@ class TokenRegistry:
             if still_allowed is not None:
                 still_allowed()
             now = self._clock()
+            created_at = format_timestamp(now)
             expires_at = request.expires_at
             if request.expires_in_days is not None:
                 expires_at = format_timestamp(now + request.expires_in_days * 86400)
@@ -138,7 +144,14 @@ class TokenRegistry:
             self._store.db.execute(
                 "INSERT INTO api_tokens (token_id, name, scope, token_sha256, created_at, expires_at)"
                 " VALUES (?, ?, ?, ?, ?, ?)",
-                (token_id, request.name, request.scope, token_sha256(token), format_timestamp(now), expires_at),
+                (token_id, request.name, request.scope, token_sha256(token), created_at, expires_at),
+            )
+            self._events.append(
+                "token.created",
+                request.name,
+                actor=self.actor(issuer).name,
+                now=created_at,
+                detail=TokenEventDetail(name=request.name, scope=request.scope),
             )
         return IssuedToken(**self.get(token_id).model_dump(), token=token)
 
@@ -152,13 +165,23 @@ class TokenRegistry:
         rows = self._store.rows(f"SELECT {_COLUMNS} FROM api_tokens ORDER BY created_at, token_id")
         return TokenList(tokens=[_record(row) for row in rows])
 
-    def revoke(self, token_id: str) -> TokenRecord:
+    def revoke(self, token_id: str, *, caller: Caller = ROOT) -> TokenRecord:
         """Revoke a token from its next request on; revoking it again keeps the first time."""
         with self._store.transaction():
-            self.get(token_id)
+            record = self.get(token_id)
+            if record.revoked_at is not None:
+                return record
+            now = format_timestamp(self._clock())
             self._store.db.execute(
                 "UPDATE api_tokens SET revoked_at = ? WHERE token_id = ? AND revoked_at IS NULL",
-                (format_timestamp(self._clock()), token_id),
+                (now, token_id),
+            )
+            self._events.append(
+                "token.revoked",
+                record.name,
+                actor=self.actor(caller).name,
+                now=now,
+                detail=TokenEventDetail(name=record.name, scope=record.scope),
             )
         return self.get(token_id)
 

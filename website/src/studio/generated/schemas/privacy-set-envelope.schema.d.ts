@@ -21,6 +21,10 @@ export type Author = string;
  */
 export type ChangedAt = string;
 /**
+ * Local audit row referenced by privacy.changed events.
+ */
+export type Id = number | null;
+/**
  * Newest first, at most 50 changes.
  *
  * @maxItems 50
@@ -93,6 +97,7 @@ export interface PrivacyChange {
   author: Author;
   before: PrivacySettings;
   changed_at: ChangedAt;
+  id?: Id;
 }
 /**
  * Operator-owned privacy choices; reviewed applies never replace them.
