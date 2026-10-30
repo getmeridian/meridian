@@ -22,6 +22,12 @@ pub struct ServiceState {
     pub pki: TestPki,
     /// Polls answer these documents in turn, then `desired: null`.
     pub documents: VecDeque<Value>,
+    /// Deliberately raw commands, including hostile ones; kept until a result is acknowledged.
+    pub commands: Vec<Value>,
+    pub results: HashMap<String, Value>,
+    pub result_refusals: usize,
+    pub clock_offset: i64,
+    pub reject_results: bool,
     pub token_valid: bool,
     pub sessions: HashSet<String>,
     pub revoked: bool,
@@ -126,10 +132,11 @@ impl ServiceState {
             self.nonces.len()
         );
         self.sessions.insert(token.clone());
-        let now = now_unix();
+        let now = now_unix().saturating_add_signed(self.clock_offset);
         ok(json!({
             "type": "welcome", "protocol": "meridian.agent/v1", "fleet_epoch": 1,
-            "capabilities": self.capabilities, "session_token": token,
+            "capabilities": self.capabilities.iter().filter(|cap| body["capabilities"].as_array().unwrap()
+                .iter().any(|offered| offered.as_str() == Some(**cap))).collect::<Vec<_>>(), "session_token": token,
             "session_expires_at": format_unix(now + 3600), "server_time": format_unix(now),
             "poll": {"max_wait_seconds": 55, "report_interval_seconds": 60, "stats_interval_seconds": 60},
             "renew_after": format_unix((now as i64 + self.renew_in) as u64),
@@ -174,8 +181,22 @@ impl ServiceState {
                 let desired = self.documents.pop_front().unwrap_or(Value::Null);
                 ok(json!({
                     "type": "poll_result", "fleet_epoch": 1, "desired": desired,
-                    "commands": [], "poll_after_seconds": 0,
+                    "commands": self.commands, "poll_after_seconds": 0,
                 }))
+            }
+            "/command-results" => {
+                if self.reject_results {
+                    return error(400, "invalid_request");
+                }
+                let body = body();
+                let id = body["command_id"].as_str().unwrap().to_string();
+                self.results.entry(id.clone()).or_insert(body);
+                self.commands.retain(|command| command["command_id"] != id);
+                if self.result_refusals > 0 {
+                    self.result_refusals -= 1;
+                    return error(503, "temporarily_unavailable");
+                }
+                ok(json!({"type": "command_result_ack", "command_id": id}))
             }
             "/report" => ok(json!({"type": "report_ack", "applied_revision": null})),
             "/stats" => {
@@ -201,6 +222,11 @@ impl FakeService {
         let state = Arc::new(Mutex::new(ServiceState {
             pki: pki.clone(),
             documents: VecDeque::new(),
+            commands: Vec::new(),
+            results: HashMap::new(),
+            result_refusals: 0,
+            clock_offset: 0,
+            reject_results: false,
             token_valid: true,
             sessions: HashSet::new(),
             revoked: false,

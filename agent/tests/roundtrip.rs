@@ -1,5 +1,7 @@
 //! enroll → hello → poll → verify → apply → report → stats against an in-process fake service.
 
+#[path = "roundtrip/commands.rs"]
+mod commands;
 mod common;
 #[path = "roundtrip/stats_health.rs"]
 mod stats_health;
@@ -149,7 +151,10 @@ fn enroll_hello_poll_apply_report_round_trip() {
     let hello = &service.requests_to("hello")[0];
     assert!(hello.authorization.is_none());
     let hello = hello.json();
-    assert_eq!(hello["capabilities"].as_array().unwrap().len(), 9);
+    assert_eq!(
+        hello["capabilities"],
+        json!(meridian_agent::session::CAPABILITIES)
+    );
     assert_eq!(hello["highest_fleet_epoch"], Value::Null);
     let poll = &service.requests_to("poll")[0];
     assert!(

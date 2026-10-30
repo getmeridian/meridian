@@ -26,8 +26,12 @@ struct PythonService {
 impl PythonService {
     fn start(workdir: &Path) -> Option<PythonService> {
         let repo = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let spawned = Command::new("uv")
-            .args(["run", "--quiet", "python"])
+        let python = std::env::var_os("MERIDIAN_TEST_PYTHON");
+        let mut command = Command::new(python.as_deref().unwrap_or(std::ffi::OsStr::new("uv")));
+        if python.is_none() {
+            command.args(["run", "--quiet", "python"]);
+        }
+        let spawned = command
             .arg(repo.join("agent/tests/fixtures/control_server.py"))
             .arg(workdir)
             .current_dir(repo)

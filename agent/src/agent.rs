@@ -10,6 +10,7 @@ use ureq::tls::RootCerts;
 
 use crate::apply::Engine;
 use crate::bootstrap::Bootstrap;
+use crate::commands::CommandState;
 use crate::fetch::{Client, HttpError, load_roots};
 use crate::identity::Identity;
 use crate::model::{
@@ -23,6 +24,8 @@ use crate::system::Exec;
 use crate::timeutil::{now_rfc3339, now_unix};
 use crate::verify::{Admission, Trust, admit, verify_desired};
 use crate::{debug, info, report, warn};
+
+mod commands;
 
 /// Report and stats cadence before the first hello names the service's.
 pub const REPORT_INTERVAL: Duration = Duration::from_secs(60);
@@ -97,7 +100,7 @@ pub struct Agent<'a> {
     opts: Options,
     resources: Vec<Resource>,
     observations: Vec<ResourceObservation>,
-    commands_logged: bool,
+    command_state: CommandState,
 }
 
 fn typed<T: DeserializeOwned>(body: Value, expected: &str) -> Result<T, HttpError> {
@@ -147,6 +150,7 @@ impl<'a> Agent<'a> {
             now_unix(),
         )?;
         let traffic = TrafficStore::load(&opts.state_dir)?;
+        let command_state = CommandState::load(&opts.state_dir)?;
         let roots = opts.tls_ca_file.as_deref().map(load_roots).transpose()?;
         let client = Client::new(&bootstrap.service_url, opts.allow_http, roots.clone());
         let mut agent = Agent {
@@ -166,7 +170,7 @@ impl<'a> Agent<'a> {
             opts,
             resources: Vec::new(),
             observations: Vec::new(),
-            commands_logged: false,
+            command_state,
         };
         if let Some(identity) = identity {
             agent.adopt(identity);
@@ -379,21 +383,8 @@ impl<'a> Agent<'a> {
 
     /// Certify a fresh key; a failure only postpones the next try (the certificate is still good).
     fn renew_certificate(&mut self, now: u64) {
-        let Some(identity) = self.identity.as_ref() else {
-            return;
-        };
-        match session::renew(&self.client, &self.bootstrap, identity) {
-            Ok(renewed) => match renewed.save(&self.opts.state_dir) {
-                Ok(()) => {
-                    info!("renewed the node certificate");
-                    self.identity = Some(renewed);
-                    // The open session stays bound to the old certificate until it expires.
-                    if let Some(session) = &mut self.session {
-                        session.renew_after = session.expires_at;
-                    }
-                }
-                Err(err) => info!("{err}"),
-            },
+        match self.renew_now() {
+            Ok(()) => info!("renewed the node certificate"),
             Err(err) => {
                 info!("certificate renewal failed: {err}");
                 if let Some(session) = &mut self.session {
@@ -437,6 +428,9 @@ impl<'a> Agent<'a> {
         let Some(target) = self.state.held_ref() else {
             return Ok(());
         };
+        if target.fleet_epoch < self.state.highest_epoch.unwrap_or(1) {
+            return Err("The held document is from an older fleet epoch.".into());
+        }
         let engine = Engine {
             root: self.opts.root.clone(),
             cache_dir: self.opts.state_dir.join("cache"),
@@ -591,6 +585,7 @@ impl<'a> Agent<'a> {
 
     /// One long-poll; a new document is verified, held, applied, and reported.
     pub fn poll_once(&mut self) -> Result<PollOutcome, HttpError> {
+        self.retry_command_results()?;
         let have = self.state.held_ref();
         let wanted = self.opts.wait_seconds;
         let body = self.with_session(|client, session| {
@@ -601,18 +596,12 @@ impl<'a> Agent<'a> {
             })
         })?;
         let response: PollResponse = typed(body, "poll_result")?;
-        if !response.commands.is_empty() && !self.commands_logged {
-            debug!(
-                "ignoring {} command(s): this agent runs none",
-                response.commands.len()
-            );
-            self.commands_logged = true;
-        }
         let after = Duration::from_secs(response.poll_after_seconds.min(3600));
-        let Some(desired) = response.desired else {
-            return Ok(PollOutcome::Idle(after));
-        };
-        Ok(match self.accept(desired) {
+        let outcome = match response
+            .desired
+            .map(|desired| self.accept(desired))
+            .unwrap_or(Accepted::Nothing)
+        {
             Accepted::Refused => PollOutcome::Refused,
             Accepted::Nothing => PollOutcome::Idle(after),
             Accepted::Recorded => {
@@ -626,7 +615,9 @@ impl<'a> Agent<'a> {
                 self.report_logged();
                 PollOutcome::Applied(after)
             }
-        })
+        };
+        self.process_commands(&response.commands, response.fleet_epoch)?;
+        Ok(outcome)
     }
 
     fn report_logged(&mut self) {

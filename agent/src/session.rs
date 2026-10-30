@@ -33,6 +33,11 @@ pub const CAPABILITIES: &[&str] = &[
     "binary_pins",
     "traffic_stats",
     "blob_fetch",
+    "reconcile",
+    "report",
+    "reset_inbound",
+    "restart_unit",
+    "renew_credential",
 ];
 /// Say hello again this long before the session expires.
 const SESSION_MARGIN_SECONDS: u64 = 30;
@@ -56,6 +61,7 @@ pub struct Session {
     pub stats_interval: Duration,
     pub capabilities: Vec<String>,
     pub fleet_epoch: u64,
+    pub server_offset: i64,
 }
 
 impl Session {
@@ -65,6 +71,10 @@ impl Session {
 
     pub fn uses(&self, capability: &str) -> bool {
         self.capabilities.iter().any(|c| c == capability)
+    }
+
+    pub fn server_now(&self, now: u64) -> u64 {
+        now.saturating_add_signed(self.server_offset)
     }
 }
 
@@ -185,6 +195,15 @@ pub fn hello(
     .map_err(protocol_error)?;
     let at = |text: &str| parse_rfc3339(text).ok_or_else(|| protocol_error("bad timestamp"));
     let server_time = at(&response.server_time)?;
+    if response
+        .capabilities
+        .iter()
+        .any(|capability| !CAPABILITIES.contains(&capability.as_str()))
+    {
+        return Err(protocol_error(
+            "the service accepted a capability this agent did not offer",
+        ));
+    }
     let on_our_clock = |stamp: u64| now.saturating_add(stamp.saturating_sub(server_time));
     let session = Session {
         expires_at: on_our_clock(at(&response.session_expires_at)?),
@@ -194,6 +213,7 @@ pub fn hello(
         stats_interval: Duration::from_secs(response.poll.stats_interval_seconds.clamp(10, 3600)),
         capabilities: response.capabilities,
         fleet_epoch: response.fleet_epoch,
+        server_offset: server_time as i64 - now as i64,
     };
     client.set_session(Some(response.session_token));
     Ok((session, service))

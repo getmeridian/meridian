@@ -368,7 +368,7 @@ fn check_mode(mode: &str) -> Result<(), String> {
 }
 
 /// `InboundTag` in `meridian.core.agent_types`: it names a cache file and an `xray api` argument.
-fn check_tag(tag: &str) -> Result<(), String> {
+pub(crate) fn check_tag(tag: &str) -> Result<(), String> {
     let mut bytes = tag.bytes();
     let first = bytes.next().is_some_and(|b| b.is_ascii_alphanumeric());
     if first && tag.len() <= 64 && bytes.all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b)) {
@@ -391,7 +391,7 @@ fn check_user_id(user_id: &str) -> Result<(), String> {
 }
 
 /// The Xray API speaks plaintext gRPC, so it may only listen on loopback.
-fn check_loopback(address: &str) -> Result<(), String> {
+pub(crate) fn check_loopback(address: &str) -> Result<(), String> {
     let port = address
         .strip_prefix("127.0.0.1:")
         .and_then(|p| p.parse::<u16>().ok());

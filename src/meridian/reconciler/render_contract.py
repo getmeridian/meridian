@@ -7,7 +7,7 @@ from meridian.compiler.models import COMPILER_VERSION, canonical_hash
 _RENDERER_MANIFEST = {
     "schema": "meridian.renderer-contract/v1",
     "compiler": COMPILER_VERSION,
-    "agent-runtime": "staged-upgrade-v1",
+    "agent-runtime": "signed-commands-v3",
     "agent-spec": "service-blob-v1",
     "control-subscriptions": "yaml12-quoting-v10",
     "control-commands": "signed-command-ledger-v1",

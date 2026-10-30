@@ -61,7 +61,7 @@ fn vless_clients(spec: &XrayUsersSpec) -> BTreeMap<&str, (&str, &str)> {
         .collect()
 }
 
-fn composed_inbound(composed: &Value, tag: &str) -> Result<Value, String> {
+pub(crate) fn composed_inbound(composed: &Value, tag: &str) -> Result<Value, String> {
     composed
         .get("inbounds")
         .and_then(Value::as_array)
@@ -427,7 +427,7 @@ impl Engine<'_> {
 
     /// Remove one inbound and add it back with all its users (`rmi` + `adi` exit 1 on failure).
     /// A failed `adi` leaves the inbound missing; the caller's restart brings it back from the file.
-    fn rebuild_inbound(
+    pub(crate) fn rebuild_inbound(
         &self,
         binary: &str,
         server: &str,

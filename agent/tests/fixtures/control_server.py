@@ -22,6 +22,9 @@ import sys
 import threading
 from pathlib import Path
 
+# A supplied interpreter may be an editable install of another worktree.
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
+
 from meridian.control.blobs import BlobStore
 from meridian.control.enrollment import token_sha256
 from meridian.control.models import NodeSpec, users_resource_id

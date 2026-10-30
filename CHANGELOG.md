@@ -7,6 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## Unreleased
 
 - Signed node commands are queued durably, delivered only to agents that accept their kinds, and expose per-node outcomes through the admin API.
+- Node agents execute signed restarts, inbound resets, reconciliation, reports, and credential renewal, with readiness checks and durable results that prevent a redelivery from repeating an action.
 
 Changes since 4.0.0b8. Meridian now runs its own control service in place of
 Remnawave: no Docker, no third-party panel, and every server runs a small agent

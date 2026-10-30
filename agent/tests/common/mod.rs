@@ -99,6 +99,8 @@ pub struct FakeExec {
     pub rebuilt: Mutex<Vec<Value>>,
     /// Users the fake running Xray holds, by email, after API calls.
     pub live_users: Mutex<BTreeSet<String>>,
+    /// Open VLESS sessions outlive rmu; rmi closes just its inbound, a core restart closes all.
+    pub live_sessions: Mutex<HashMap<String, BTreeSet<String>>>,
     /// `xray api statsquery` output (protobuf JSON).
     pub stats_output: Mutex<String>,
     pub stats_down: Mutex<bool>,
@@ -195,6 +197,9 @@ impl Exec for FakeExec {
                         fail("", "Job for unit failed: timed out\n")
                     }
                     "start" | "restart" => {
+                        if name == "netcore.service" {
+                            self.live_sessions.lock().unwrap().clear();
+                        }
                         let poisoned =
                             self.crash_when
                                 .lock()
@@ -331,6 +336,7 @@ impl FakeExec {
             }
             "rmi" => {
                 let tag = args[3];
+                self.live_sessions.lock().unwrap().remove(tag);
                 ok(&format!(
                     "removing inbounds: [{tag}]\nremoving: {tag}\n{{}}\n"
                 ))

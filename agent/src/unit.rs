@@ -55,7 +55,7 @@ impl Engine<'_> {
         truncate(&joined, 300)
     }
 
-    fn start_and_check(
+    pub(crate) fn start_and_check(
         &self,
         spec: &UnitSpec,
         resources: &[Resource],

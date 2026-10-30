@@ -36,12 +36,16 @@ pub struct Verified {
 
 /// Exactly what the service signs: context line, newline, canonical JSON without `signature`.
 pub fn signed_bytes(document: &Value) -> Result<Vec<u8>, String> {
+    signed_bytes_in_context(document, DESIRED_STATE_CONTEXT)
+}
+
+pub(crate) fn signed_bytes_in_context(document: &Value, context: &[u8]) -> Result<Vec<u8>, String> {
     let mut unsigned = document
         .as_object()
         .ok_or("desired state is not a JSON object")?
         .clone();
     unsigned.remove("signature");
-    let mut out = DESIRED_STATE_CONTEXT.to_vec();
+    let mut out = context.to_vec();
     out.push(b'\n');
     out.extend(jcs::canonical(&Value::Object(unsigned))?);
     Ok(out)
@@ -52,6 +56,15 @@ pub fn verify_signature(
     document: &Value,
     public_key: &[u8; 32],
     key_id: &str,
+) -> Result<(), String> {
+    verify_signature_in_context(document, public_key, key_id, DESIRED_STATE_CONTEXT)
+}
+
+pub(crate) fn verify_signature_in_context(
+    document: &Value,
+    public_key: &[u8; 32],
+    key_id: &str,
+    context: &[u8],
 ) -> Result<(), String> {
     let member = document
         .get("signature")
@@ -71,7 +84,7 @@ pub fn verify_signature(
         Signature::from_slice(&raw).map_err(|_| "signature is not 64 bytes".to_string())?;
     let key = VerifyingKey::from_bytes(public_key)
         .map_err(|_| "service public key is invalid".to_string())?;
-    key.verify_strict(&signed_bytes(document)?, &signature)
+    key.verify_strict(&signed_bytes_in_context(document, context)?, &signature)
         .map_err(|_| "signature does not verify".to_string())
 }
 

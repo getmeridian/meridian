@@ -10,6 +10,7 @@ use std::path::Path;
 use serde_json::{Value, json};
 
 use crate::bootstrap::Bootstrap;
+use crate::commands::CommandState;
 use crate::identity::Identity;
 use crate::state::State;
 use crate::stats::TrafficStore;
@@ -20,6 +21,7 @@ use crate::verify::verify_desired;
 pub fn self_check(bootstrap: &Path, state_dir: &Path, allow_http: bool) -> Result<Value, String> {
     let bootstrap = Bootstrap::load(bootstrap, allow_http)?;
     let state = State::load(state_dir)?;
+    CommandState::load(state_dir)?;
     TrafficStore::load(state_dir)?;
     let identity = Identity::load(
         state_dir,

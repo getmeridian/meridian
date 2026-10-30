@@ -14,10 +14,17 @@
 **Self-upgrade is designed, not built** — the contract's `agent_upgrade` resource (sources with `service` blobs, sha256, `health_timeout_seconds`) would let the service roll agents out; rollback must live outside the new binary: before swapping, the old build starts a transient `systemd-run --on-active=<timeout>` unit that restores `netagent.prev`, which the new build cancels after its first hello. Until then `agent_upgrade` stays unoffered and upgrades go over SSH (`reconciler/agent_upgrade.py`).
 **Static musl builds** — `make agent` builds in the digest-pinned `rust:alpine` image for the host's architecture and cross-compiles the other with zig cc + rust-lld; `agent/dist/` holds binaries with `.sha256` and `.version` files, which every wheel carries as `meridian/agent_dist/` (`control_artifacts` checks the digest).
 ## What's done well
+- **Signed commands execute through negotiated kinds** — `commands.rs` verifies received JSON with the pinned fleet service key, epoch, and service-adjusted expiry before `agent/commands.rs` runs anything; `command_host.rs` restarts only held, installed units through readiness and resets only composed, managed inbounds, disclosing API reset or fallback core restart.
+- **Durable command results** — `commands.json` (0600, at most 1024 results until expiry) is separate from rollback-compatible `state.json`; save an interrupted outcome before execution and the final result before sending it, then replay results rather than actions on redelivery.
 - **Secrets stay out of logs and reports** — no token, key, service URL (`Client::scrub`), user UUID, or sensitive content is logged; messages are trimmed to 300 chars.
-- **Both sides of the wire are tested** — `tests/roundtrip.rs` drives a fake service with a Rust test CA; `tests/service.rs` runs the real Python `ControlServer` (`fixtures/control_server.py`, skipped without `uv`), installing its pin from the service's blob store.
+- **Both sides of the wire are tested** — `tests/roundtrip.rs` drives a fake service with a Rust test CA; `tests/service.rs` runs the real Python `ControlServer` (`fixtures/control_server.py`, using `MERIDIAN_TEST_PYTHON` or `uv`), installing its pin from the service's blob store.
 - **Atomic writes everywhere** — private temp sibling, fsync, mode/owner, rename, directory fsync (`fsutil::write_atomic`).
 ## Pitfalls
+- Python round-trip fixtures load their own checkout's `src` before imports; a shared interpreter can otherwise test another worktree's editable install.
+- Command timestamps must have real calendar dates and at most nine fraction digits; the general time parser alone normalizes impossible dates.
+- Serde unit enum variants ignore extra command fields even with `deny_unknown_fields`; use empty struct variants for `reconcile` and `renew_credential` so signed extras are rejected.
+- An obsolete command result after restore must not block polling for new desired state; keep it remembered until expiry and let the new service's `invalid_request`/404 pass.
+- A signed command that advances the epoch floor makes an older held document ineligible for reconciliation; save that floor before host actions.
 - **ureq's body limit errors at exactly the limit** — downloads pass `size + 1` and `HashingWriter` enforces the exact size.
 - **Never send the session token to a `sources` URL** — only `service` goes to `blobs/{sha256}` with the bearer.
 - **Re-check in Rust whatever reaches a path, an argument, or a socket** — inbound tags, user IDs, the loopback API address, and the reserved `bootstrap.json` are validated again though Python checked them; serde reads an absent `Option` as `null`, so omissions still pass.
