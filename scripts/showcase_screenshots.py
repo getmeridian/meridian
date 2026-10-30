@@ -48,8 +48,13 @@ def settle(page: Page, text: str, *, scroll_to: str | None = None) -> None:
     # The banner belongs to the live demo, not to product screenshots.
     page.add_style_tag(content="#demo-banner { display: none !important; }")
     if scroll_to:
-        # Start just above the element's own edge, so no neighbour shows cut in half.
-        page.locator(scroll_to).first.evaluate("e => window.scrollTo(0, e.getBoundingClientRect().top + scrollY - 12)")
+        # Start just above the element's own edge (below a sticky header), so no neighbour shows cut in half.
+        page.locator(scroll_to).first.evaluate(
+            "e => { const h = document.querySelector('header');"
+            " const pinned = h && ['sticky', 'fixed'].includes(getComputedStyle(h).position);"
+            " const top = pinned ? h.getBoundingClientRect().bottom : 0;"
+            " window.scrollTo(0, e.getBoundingClientRect().top + scrollY - top - 12); }"
+        )
     page.wait_for_timeout(400)  # Fonts and the usage bars finish drawing.
 
 
@@ -64,7 +69,7 @@ def console_shots(page: Page, base: str) -> None:
     settle(page, "Example Hosting")
     save(page, "console-servers")
     page.goto(base + "console/?theme=light#/settings")
-    settle(page, "Notice for everyone")
+    settle(page, "Notice for everyone", scroll_to="role=heading[name='Privacy']")
     save(page, "console-settings")
 
 

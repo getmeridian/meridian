@@ -174,9 +174,9 @@ export const en = {
   'showcase.console.text': 'Add people, share links and QR codes, set limits and expiry dates, and keep an eye on your servers, from any browser.',
   'showcase.console.try': 'Try the owner console',
   'showcase.console.alt': 'The owner console\'s People list: each person\'s expiry, last time online, status, and traffic against their limit',
-  'showcase.person': 'One person: link, QR code, traffic, access, and devices.',
-  'showcase.servers': 'Servers: health, versions, monthly allowance, and the next payment.',
-  'showcase.settings': 'Settings: a notice for everyone, language, privacy, and sign-in security.',
+  'showcase.person': 'One person: their link, QR code, and connection page.',
+  'showcase.servers': 'Servers: health, versions, and the monthly allowance.',
+  'showcase.settings': 'Privacy: both features start off, and each choice says what it stores.',
 
   // Connect
   'connect.label': 'Connect',

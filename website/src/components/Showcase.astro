@@ -23,7 +23,7 @@ const more = [
 
 <div class="showcase">
   <figure class="showcase__card card">
-    <a href={page} class="showcase__shot showcase__shot--phone">
+    <a href={page} class="showcase__shot showcase__shot--phone" tabindex="-1" aria-hidden="true">
       <img src={img('connection-page-phone')} alt={t('showcase.page.alt')} width="780" height="1328" loading="lazy" decoding="async" />
     </a>
     <figcaption class="showcase__text">
@@ -33,7 +33,7 @@ const more = [
     </figcaption>
   </figure>
   <figure class="showcase__card card">
-    <a href={console} class="showcase__shot">
+    <a href={console} class="showcase__shot" tabindex="-1" aria-hidden="true">
       <img class="showcase__light" src={img('console-people')} alt={t('showcase.console.alt')} width="1600" height="1075" loading="lazy" decoding="async" />
       <img class="showcase__dark" src={img('console-people-dark')} alt={t('showcase.console.alt')} width="1600" height="1075" loading="lazy" decoding="async" />
     </a>
@@ -47,10 +47,10 @@ const more = [
 <ul class="showcase__more">
   {more.map((shot) => (
     <li>
-      <a href={console + shot.route} class="showcase__shot">
-        <img src={img(shot.name)} alt={shot.caption} width="1600" height="1075" loading="lazy" decoding="async" />
+      <a href={console + shot.route} class="showcase__link">
+        <span class="showcase__shot"><img src={img(shot.name)} alt="" width="1600" height="1075" loading="lazy" decoding="async" /></span>
+        <p>{shot.caption}</p>
       </a>
-      <p>{shot.caption}</p>
     </li>
   ))}
 </ul>
@@ -115,6 +115,11 @@ const more = [
     margin: 32px 0 0;
     padding: 0;
     list-style: none;
+  }
+  .showcase__link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
   }
   .showcase__more p {
     margin: 10px 0 0;

@@ -169,9 +169,9 @@ export const zh: LandingStrings = {
   'showcase.console.text': '在任何浏览器中添加用户、分享链接和二维码、设置流量限额和到期时间，并随时查看服务器状态。',
   'showcase.console.try': '试用管理控制台',
   'showcase.console.alt': '管理控制台的用户列表：每个人的到期时间、最近在线时间、状态，以及相对于限额的流量',
-  'showcase.person': '单个用户：链接、二维码、流量、访问权限和设备。',
-  'showcase.servers': '服务器：健康状况、版本、每月流量额度和下次付款。',
-  'showcase.settings': '设置：面向所有人的通知、语言、隐私和登录安全。',
+  'showcase.person': '单个用户：链接、二维码和连接页面。',
+  'showcase.servers': '服务器：健康状况、版本和每月流量额度。',
+  'showcase.settings': '隐私：两项功能默认关闭，每个选项都会说明它存储什么。',
 
   // Connect
   'connect.label': '连接',

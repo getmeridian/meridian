@@ -35,7 +35,7 @@ Each person gets a connection page; you get a web console for the people and ser
   </tr>
   <tr>
     <td valign="top"><a href="https://getmeridian.org/demo/"><img src="https://raw.githubusercontent.com/getmeridian/meridian/main/website/public/img/showcase/connection-page-account.webp" alt="The account panel on a connection page: status, traffic this period, and days left"></a></td>
-    <td valign="top"><a href="https://getmeridian.org/demo/console/#/servers"><img src="https://raw.githubusercontent.com/getmeridian/meridian/main/website/public/img/showcase/console-servers.webp" alt="The owner console's Servers screen: health, versions, monthly allowance, and the next payment for each exit"></a></td>
+    <td valign="top"><a href="https://getmeridian.org/demo/console/#/servers"><img src="https://raw.githubusercontent.com/getmeridian/meridian/main/website/public/img/showcase/console-servers.webp" alt="The owner console's Servers screen: each exit's health, versions, and monthly traffic allowance"></a></td>
   </tr>
 </table>
 
