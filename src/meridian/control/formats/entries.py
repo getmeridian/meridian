@@ -91,6 +91,20 @@ def availability_placeholders(endpoints: list[ClientEndpoint], placeholders: tup
     return placeholders or (() if endpoints else NO_CONNECTIONS_REMARKS)
 
 
+def trailing_notices(
+    endpoints: list[ClientEndpoint], placeholders: tuple[str, ...], notices: tuple[str, ...]
+) -> tuple[str, ...]:
+    """Inert entries placed after the real ones; none while placeholders replace them.
+
+    A notice whose name an endpoint, a generated group, or a reserved label already uses is
+    dropped: a duplicate name would corrupt the document.
+    """
+    if placeholders:
+        return ()
+    taken = RESERVED_NAMES | {endpoint.remark for endpoint in endpoints} | {r for r, _ in copy_groups(endpoints)}
+    return tuple(notice for notice in notices if notice not in taken)
+
+
 def primaries(endpoints: list[ClientEndpoint]) -> list[ClientEndpoint]:
     """Primary entries, preserving the caller's presentation order."""
     return [endpoint for endpoint in endpoints if not endpoint.fingerprint_copy]

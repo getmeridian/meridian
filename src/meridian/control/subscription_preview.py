@@ -11,6 +11,7 @@ from meridian.control.errors import ServiceError
 from meridian.control.formats.capabilities import endpoint_omission, requires_primary, supported_endpoints
 from meridian.control.formats.entries import SubscriptionUser, ordered, presentation_endpoints, primaries
 from meridian.control.formats.selector import explain_format
+from meridian.control.formats.stale_clients import stale_client
 from meridian.control.models import ClientEndpoint, PrivacySettings, ServiceSettings, UserRecord
 from meridian.control.store import Store
 from meridian.control.subscription_serving import subscription_user
@@ -88,6 +89,8 @@ def preview_subscription(
             included.append(metadata)
         else:
             omitted.append(OmittedEntry(**metadata.to_data(), reason=reason[0], restriction=reason[1]))
+    # The same rule as live delivery: only an app document with real entries carries the nudge.
+    stale = stale_client(request.user_agent) if decision.format != "browser" and placeholder is None else None
     response_kind: ResponseKind = (
         "subscription" if decision.format != "browser" else "account_info" if request.suffix else "page"
     )
@@ -112,6 +115,7 @@ def preview_subscription(
         included=included,
         omitted=omitted,
         placeholder=placeholder,
+        stale_client=stale,
         response_headers=safe_headers,
     )
 

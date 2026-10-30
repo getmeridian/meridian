@@ -18,6 +18,7 @@ UserAgentFamily = Literal["mihomo", "stash", "singbox", "clash", "xray-json"]
 OmissionReason = Literal["unsupported_format", "disabled_endpoint", "status_placeholder", "availability_placeholder"]
 EndpointRestriction = Literal["protocol", "fingerprint_copy"]
 ResponseKind = Literal["subscription", "page", "account_info"]
+StaleClient = Literal["outdated", "abandoned"]
 
 
 def validate_preview_header(value: str) -> str:
@@ -86,6 +87,10 @@ class SubscriptionPreview(FormatSelection):
     included: list[PreviewEntry] = Field(max_length=10_000)
     omitted: list[OmittedEntry] = Field(max_length=10_000)
     placeholder: Literal["disabled", "limited", "expired", "no_connections"] | None
+    stale_client: StaleClient | None = Field(
+        default=None,
+        description="Why one inert update or switch entry follows the connections; the User-Agent is never stored.",
+    )
     response_headers: dict[str, str] = Field(
         description="Service response headers; URIs and encoded text are redacted."
     )

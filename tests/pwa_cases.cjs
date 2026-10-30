@@ -443,6 +443,28 @@ const cases = {
     browser.context.page.switchLang('ru');
     assert.equal(browser.document.querySelectorAll('.conn').length, 9, 'language changes keep the expanded list');
   },
+  test_app_help_stays_collapsed_and_reads_plainly_in_every_language: async function(data) {
+    const browser = createBrowser(data.config, data.catalog, { info: data.info }); await browser.start();
+    const keys = ['ping.red', 'sub.refresh', 'sub.launch'];
+    const help = key => browser.document.querySelectorAll('li').find(item => item.getAttribute('data-t') === key);
+    const panel = help('ping.red').closest('details');
+    assert.ok(panel && !panel.hasAttribute('open'), 'help stays closed so import buttons keep their place');
+    assert.ok(panel.parentNode.getAttribute('class').includes('panels'), 'help sits with the other secondary panels');
+    assert.match(help('ping.red').textContent, /does not mean the connection is broken/);
+    assert.match(help('sub.refresh').textContent, /regularly/);
+    assert.match(help('sub.launch').textContent, /update subscription on launch/);
+    const english = keys.map(key => help(key).textContent);
+    const requests = browser.requests.length;
+    for (const [lang, pattern] of [['ru', /[а-я]/i], ['fa', /[\u0600-\u06ff]/], ['zh', /[\u4e00-\u9fff]/]]) {
+      browser.context.page.switchLang(lang);
+      keys.forEach((key, index) => {
+        const shown = help(key).textContent;
+        assert.match(shown, pattern, lang + ' ' + key);
+        assert.notEqual(shown, english[index], lang + ' ' + key + ' must be translated');
+      });
+    }
+    assert.equal(browser.requests.length, requests, 'help text never fetches anything');
+  },
   test_suspended_account_also_dims_individual_imports: async function(data) {
     data.info.user.userStatus = 'DISABLED'; data.info.user.isActive = false;
     data.config.protocols = [{ key: 'reality', label: 'Connection', url: 'vless://550e8400-e29b-41d4-a716-446655440000@198.51.100.1:443', qr_b64: '', recommended: true }];

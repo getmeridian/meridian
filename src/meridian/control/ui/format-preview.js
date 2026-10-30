@@ -61,6 +61,7 @@
       h("p", { class: "row-title", text: kind }), h("p", { class: "muted small", text: rule }),
       h("p", {}, M.t("preview.protocols") + ": ", h("bdi", { text: (data.protocols || []).join(", ") || M.t("preview.none") })),
       data.placeholder ? h("p", { class: "muted small", text: M.t("preview.placeholder_" + data.placeholder) }) : null,
+      data.stale_client ? h("p", { class: "muted small", text: M.t("preview.stale_client_" + data.stale_client) }) : null,
       h("div", { class: "list list-plain" }, rows),
       h("details", {}, h("summary", { text: M.t("preview.headers") }), headers),
     ]);

@@ -4980,6 +4980,23 @@
           "selection": {
             "$ref": "#/components/schemas/FormatRule"
           },
+          "stale_client": {
+            "anyOf": [
+              {
+                "enum": [
+                  "outdated",
+                  "abandoned"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why one inert update or switch entry follows the connections; the User-Agent is never stored.",
+            "title": "Stale Client"
+          },
           "status": {
             "enum": [
               "active",

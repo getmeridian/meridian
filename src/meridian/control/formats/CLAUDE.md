@@ -6,6 +6,7 @@
 - **Renderer takes plain values** — `SubscriptionUser` (UUID, short ID, status `active|disabled|limited|expired`, expiry, traffic and its reset strategy) and `ClientEndpoint`s, where `ClientEndpoint.fingerprint_copy` marks copies; a suspended user gets Remnawave's status placeholder entries in every format. `ServiceSettings.public_url` feeds `support-url`/`profile-web-page-url`, and Hysteria2 auth is the VLESS UUID, as Remnawave delivered it.
 - **Translated status labels** — `status_remarks.py` translates only the fixed labels; status codes and inert credentials stay stable in every language.
 - **Suffixes come from one table** — derive subscription suffix routing from `formats.selector.SUFFIX_FORMATS`; aliases override Accept and User-Agent, and Stash retains its own dialect.
+- **Stale-client nudge** — `stale_clients.py` maps a User-Agent to one inert entry (`outdated` v2rayNG below 1.9.17, `abandoned` NekoRay), each rule with its documented reason; it is read per request, stored nowhere, last in every format, and the preview reports it as `stale_client`.
 
 ## Pitfalls
 - **Every structured renderer gets the routing policy** — pass the topology's `client_routing` to each one, including Xray fingerprint groups and Stash.
@@ -16,3 +17,4 @@
 - **Mihomo and Stash read YAML 1.2, PyYAML writes 1.1** — dump through `mihomo._Yaml12SafeDumper`, which quotes strings 1.2 resolves as numbers or booleans; a random short ID like `12e34567` once became a float and Mihomo refused the document (System Lab caught it by chance).
 - **Hysteria2 has two spellings** — `hysteria2` in Meridian keys and URLs, but protocol/network `hysteria` plus version `2` in Xray configs, as in Remnawave profiles.
 - **Stash spells fields its own way** (`sni`, Hysteria2 `auth`) and has no `exclude-filter` or `GEOIP,private`; Remnawave's Stash and Clash answers had no failover at all.
+- **The nudge never replaces or reorders real entries** — it joins only the "Meridian" selector or sing-box selector, never the fallback or urltest group; status, availability, and device-limit placeholders drop it, and an app without a documented threshold stays out of the table (Happ's GitHub builds share its store User-Agent).

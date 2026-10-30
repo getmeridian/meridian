@@ -22,6 +22,7 @@ from meridian.control.formats.entries import (
     presentation_endpoints,
     primaries,
     tls_fingerprint,
+    trailing_notices,
 )
 from meridian.control.formats.links import finalmask
 from meridian.control.models import ClientEndpoint
@@ -37,8 +38,12 @@ def xray_json_document(
     placeholders: tuple[str, ...] = (),
     *,
     client_routing: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING,
+    notices: tuple[str, ...] = (),
 ) -> list[dict[str, Any]]:
-    """Automatic first, individual primary profiles, then isolated copy groups (or placeholders)."""
+    """Automatic first, individual primary profiles, then isolated copy groups (or placeholders).
+
+    *notices* become proxy-less configs after the last real one, unless placeholders replace them.
+    """
     endpoints = presentation_endpoints(endpoints)
     placeholders = availability_placeholders(primaries(endpoints), placeholders)
     if placeholders:
@@ -47,6 +52,8 @@ def xray_json_document(
     configs = [_config(primary, uuid, AUTOMATIC, client_routing)]
     configs += [_config([endpoint], uuid, endpoint.remark, client_routing) for endpoint in primary]
     configs += [_config(members, uuid, remark, client_routing) for remark, members in copy_groups(endpoints)]
+    inert = trailing_notices(endpoints, placeholders, notices)
+    configs += [_config([], uuid, remark, client_routing) for remark in inert]
     return configs
 
 

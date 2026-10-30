@@ -41,7 +41,9 @@ Your app lists several entries, named by country and method, such as "🇩🇪 D
 
 ## When it stops working
 
-1. **Refresh the subscription.** Your app updates it on its own; to update it now, open the subscription (or profile) list in the app and tap **Update**. This picks up new servers and routes.
+A red or “n/a” ping in your app does not mean the connection is broken: apps test with their own probe, which can fail while the tunnel works. Connect and open a website first. If it really does not load, try these in order. The same tips are on your connection page under **Not connecting?**.
+
+1. **Refresh the subscription.** Your app updates it on its own; to update it now, open the subscription (or profile) list in the app and tap **Update**. This picks up new servers and routes. If your app has a setting like “update subscription on launch”, turn it on.
 2. **Try another entry.** Pick one with a different method, or one "via relay".
 3. **Check your device's clock.** A clock that is off by more than a minute can make connections fail; turn on automatic date and time.
 4. **Run the connection check.** Turn your VPN app off so the check sees your real network. Open your connection page, expand **Not connecting?** and **Check my connection**, and tap **Run check**. Then tap **Copy report** and send it to the person who gave you the link; the report contains no links or keys.
@@ -60,6 +62,10 @@ Your connection page may show a notice from the person who runs the service, suc
 ## Status messages in your app
 
 If access is disabled, has expired, or has reached its traffic allowance, the entries in your app explain the reason and ask you to contact the owner. The messages follow your account language or the owner's default; automatic language keeps them in English. Your page's language buttons save a preference in this browser. These explanatory entries cannot connect; ask the owner to restore access.
+
+## An update message in your app
+
+If your app is too old to use everything the service offers, or is no longer maintained, it can list one extra entry at the end that asks you to update it, or to switch from NekoRay to Throne. This is decided from the app's name and version alone, at the moment it fetches the subscription; nothing is saved. The entry cannot connect, and your real entries stay as they were. Install the newer app from the apps list on your connection page, then refresh the subscription.
 
 ## When an app shows a different list
 
