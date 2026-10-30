@@ -22,6 +22,7 @@ uv run pytest tests/systemlab/ -q
 - Exit DNS privacy is proven on the wire: `dns_capture.py` sniffs exit A, loopback included, during a proxied fetch and requires no plain question for the observer names; a host-resolver lookup of a control name proves the capture sees DNS.
 
 ## Pitfalls
+- **Stage scripts import Meridian outside pytest** — a moved or renamed helper (`subscription_protocol_urls` left `handoff`) breaks only the Docker run, and only once lint and tests pass; grep `tests/systemlab/scripts` whenever a public helper moves.
 - **Debug one stage, not the lab** — `SYSTEMLAB_KEEP=1 SYSTEMLAB_STAGES="10-deploy.sh 40-removal.sh"` keeps the fleet up; rerun a stage with `docker compose exec controller bash /workspace/tests/systemlab/scripts/stages/40-removal.sh` (copy edited scripts in with `docker compose cp`).
 - **Agents verify the service against WebPKI roots** — images trust only the fixture CA (Pebble's own HTTPS), so 00-bootstrap adds Pebble's runtime issuance root to every node's and the controller's bundle and a `netagent.service.d` drop-in sets `NETAGENT_TLS_CA_FILE` to it before any deploy; without it no agent enrolls.
 - **A regular install deploys the released package** — keep the controller's install editable (and `uv` in the image), or the control server gets `meridian-vpn==VERSION` from PyPI, not the code under test; copy the Hatch build hook before installing.

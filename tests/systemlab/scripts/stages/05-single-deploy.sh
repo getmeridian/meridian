@@ -19,7 +19,8 @@ python3 <<'PYEOF'
 import httpx
 
 from meridian.cluster import ClusterConfig
-from meridian.handoff import page_url, subscription_protocol_urls
+from meridian.handoff import page_url
+from meridian.subscription_links import subscription_protocol_urls
 from meridian.control_access import access_panel
 
 cluster = ClusterConfig.load()
@@ -39,7 +40,7 @@ assert [link.key for link in links] == ["reality", "reality", "xhttp", "xhttp", 
     link.url for link in links
 ]
 
-page = httpx.get(page_url(cluster, user) + "config.json", timeout=20)
+page = httpx.get(page_url(cluster, user) + "/config.json", timeout=20)
 assert page.status_code == 200, (page.status_code, page.text[:200])
 assert [entry["url"] for entry in page.json()["protocols"]] == [link.url for link in links]
 PYEOF
