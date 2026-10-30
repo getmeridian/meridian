@@ -7,9 +7,9 @@ import uuid as uuid_module
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
-from meridian.control.errors import ServiceError
 from meridian.control.models import UserCreate, UserRecord
 from meridian.control.store import Store
+from meridian.control.user_expiry import require_finite_user_expiry
 from meridian.core.client_limits import ClientExtendRequest
 
 
@@ -32,10 +32,9 @@ def extend_user_expiry(
         start = datetime.fromisoformat(moment)
         if user.expire_at is not None:
             start = max(start, datetime.fromisoformat(user.expire_at))
-        try:
-            expiry = (start + timedelta(days=request.days)).astimezone(UTC).isoformat().replace("+00:00", "Z")
-        except OverflowError as exc:
-            raise ServiceError("invalid_request", "The extended expiry would be beyond year 9999.", 400) from exc
+        require_finite_user_expiry(start.astimezone(UTC).isoformat().replace("+00:00", "Z"))
+        expiry = (start + timedelta(days=request.days)).astimezone(UTC).isoformat().replace("+00:00", "Z")
+        require_finite_user_expiry(expiry)
         store.db.execute("UPDATE users SET expire_at = ? WHERE username = ?", (expiry, username))
         record_update(user, read_user(username))
         enforce(moment)
@@ -45,6 +44,7 @@ def extend_user_expiry(
 
 def insert_user(store: Store, create: UserCreate, *, now: Callable[[], str]) -> None:
     """Insert fresh credentials and first settings in the caller's transaction."""
+    require_finite_user_expiry(create.expire_at)
     store.db.execute(
         "INSERT INTO users (username, user_id, uuid, sub_token, status, created_at, expire_at,"
         " traffic_limit_bytes, traffic_limit_strategy, device_limit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",

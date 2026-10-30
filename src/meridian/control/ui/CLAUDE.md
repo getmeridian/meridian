@@ -18,6 +18,7 @@
 - **Assets revalidate by ETag** (content hash, `no-cache`); anything holding a secret is `no-store`.
 
 ## Pitfalls
+- Both person expiry forms validate the converted UTC end of day before submitting; a local date before 2099 can cross into the legacy no-expiry range.
 - A successful token response without a secret is still uncertain; refresh the metadata list and explain recovery instead of closing an empty result.
 - Scroll focused fields clear of a sticky dialog footer after layout; native focus scrolling treated a covered input as visible on a phone.
 - Dialogs constrain their scrolling body to dvh and safe areas, keep form actions sticky, and use unique title IDs for nested identity checks; icon-only actions need an aria-label and coarse-pointer controls need 44 px targets.

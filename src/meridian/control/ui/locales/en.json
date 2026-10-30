@@ -90,6 +90,7 @@
   "people.name_invalid": "Use 1–64 Latin letters, digits, dots, dashes, or underscores.",
   "people.expiry": "Access until",
   "people.expiry_hint": "Leave empty for no end date.",
+  "people.expiry_too_far": "Choose a date before 2099, or leave this empty for no end date.",
   "people.limit_gb": "Traffic limit",
   "people.limit_hint": "1 GiB = 1,024 MiB. 1 TiB = 1,024 GiB.",
   "people.reset": "Limit resets",

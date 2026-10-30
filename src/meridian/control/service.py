@@ -65,6 +65,7 @@ from meridian.control.subscriptions import (
 from meridian.control.times import utc_now
 from meridian.control.tokens import API_TOKENS_TABLE_V4, TokenRegistry
 from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPOCH_BASELINES, TrafficLedger
+from meridian.control.user_expiry import require_finite_user_expiry
 from meridian.control.user_lifecycle import extend_user_expiry, insert_user
 from meridian.control.user_policy import enforced_status, period_began, whole_seconds
 from meridian.control.users import USER_SELECT, user_record
@@ -433,7 +434,7 @@ class ControlService:
                     sub_token,
                     item.status,
                     whole_seconds(item.created_at) or now,
-                    whole_seconds(item.expire_at),
+                    whole_seconds(require_finite_user_expiry(item.expire_at)),
                     item.traffic_limit_bytes,
                     item.traffic_limit_strategy,
                     period_began(item, now),
@@ -471,6 +472,7 @@ class ControlService:
         with self._transaction():
             user = self._require_user(username)
             changes = update.model_dump(include=update.model_fields_set)
+            require_finite_user_expiry(changes.get("expire_at"))
             if "status" in changes and changes["status"] is None:
                 del changes["status"]
             for field in ("traffic_limit_bytes", "traffic_limit_strategy"):

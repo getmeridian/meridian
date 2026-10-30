@@ -26,6 +26,7 @@ that dials out to it.
   IP limits).
 
 ### Control service
+- User creation, imports, edits, and extensions refuse expiries from 2099 onward; both console expiry forms explain how to remove the end date instead.
 - API timestamps reject impossible dates and times before token or user settings can be stored.
 - Subscription primary and fingerprint groups keep the same endpoint order after duplicate names are disambiguated.
 - Xray subscriptions show availability notices when only fingerprint copies remain.

@@ -94,7 +94,7 @@
   function accessCard(user) {
     var name = user.username;
     var disabled = user.status === "disabled";
-    var expiry = h("input", { type: "date", value: M.dateValue(user.expire_at) });
+    var expiry = M.expiryField(user.expire_at);
     var limits = M.limitFields(user);
     var form = h("form", { class: "stack", novalidate: true },
       M.field(M.t("people.expiry"), expiry, M.expiryText(user)),

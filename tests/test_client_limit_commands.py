@@ -147,9 +147,10 @@ def test_client_show_prints_usage_against_the_limit_and_the_expiry(
         ({}, "Nothing to change"),
         ({"limit": "lots"}, "is not a size"),
         ({"expires": "2020-01-01"}, "in the past"),
+        ({"expires": "2099-01-01"}, "too far ahead"),
         ({"reset": "hourly"}, "is not one of"),
     ],
-    ids=["nothing", "bad-limit", "past-expiry", "bad-period"],
+    ids=["nothing", "bad-limit", "past-expiry", "sentinel-expiry", "bad-period"],
 )
 def test_client_set_refuses_bad_input_before_any_connection(
     options: dict[str, str], message: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
@@ -280,6 +281,21 @@ def test_extend_bad_days_fail_before_opening_service_access(
         assert refused.value.exit_code == 2
         assert _envelope(capsys, "client-extend-envelope")["status"] == "failed"
         access.assert_not_called()
+
+
+def test_extend_cli_refuses_an_expiry_it_would_display_as_never(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from meridian.commands.client_limits import run_extend
+
+    with _fleet(tmp_path, json_mode=True) as fleet:
+        original = fleet.client.update_user("alice", UserUpdate(expire_at="2098-12-31T00:00:00Z"))
+        with pytest.raises(typer.Exit):
+            run_extend("alice", days="1")
+        payload = _envelope(capsys, "client-extend-envelope")
+        assert payload["status"] == "failed"
+        assert "Remove the expiry" in payload["errors"][0]["message"]
+        assert fleet.client.get_user("alice") == original
 
 
 def test_client_add_creates_with_limits_during_the_reviewed_apply(

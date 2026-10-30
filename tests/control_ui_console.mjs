@@ -42,6 +42,17 @@ function reply(body, status = 200) {
 }
 w.fetch = (url, options) => {
   events.push({ method: options.method, url, headers: options.headers, at: fakeNow });
+  if (mode.startsWith('expiry-')) {
+    const user = { username: 'sample', status: 'active', created_at: '2026-10-29T00:00:00Z',
+      expire_at: '2031-12-31T00:00:00Z', traffic_limit_bytes: 0, traffic_limit_strategy: 'month' };
+    if (options.method !== 'GET') {
+      writes.push(JSON.parse(options.body));
+      return Promise.resolve(reply(user));
+    }
+    if (url === 'api/users') return Promise.resolve(reply({ users: [] }));
+    if (url === 'api/users/sample') return Promise.resolve(reply(user));
+    if (url === 'ui/api/people/sample/share') return Promise.resolve(reply({ declared: false }));
+  }
   if (mode === 'phone-app') {
     if (url === 'auth/state') return Promise.resolve(reply({ configured: true, owner_exists: true, signed_in: true }));
     if (url === 'api/users') return Promise.resolve(reply({ users: [] }));
@@ -143,6 +154,31 @@ if (mode === 'quota') {
   report.invalid = fields.gb.getAttribute('aria-invalid') === 'true';
   report.disabled = fields.gb.disabled;
   report.units = fields.unit ? [...fields.unit.options].map(option => option.value) : [];
+}
+
+if (mode.startsWith('expiry-')) {
+  M.personHistory = M.devicesCard = () => null;
+  M.go = () => {};
+  let cleanup;
+  if (mode === 'expiry-add') {
+    cleanup = M.renderPeople(view);
+    await settle();
+    view.querySelector('.btn-primary').click();
+    w.document.querySelector('dialog input[type="text"]').value = 'sample';
+  } else {
+    w.eval(fs.readFileSync(path.join(ui, 'person.js'), 'utf8'));
+    M.renderPerson(view, 'sample');
+  }
+  await settle();
+  const expiry = w.document.querySelector('input[type="date"]');
+  expiry.value = data.date;
+  expiry.dispatchEvent(new w.Event('input'));
+  expiry.form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  report.writes = writes;
+  report.error = expiry.validationMessage;
+  report.invalid = expiry.getAttribute('aria-invalid') === 'true';
+  if (typeof cleanup === 'function') cleanup();
 }
 
 if (mode.startsWith('live-')) {

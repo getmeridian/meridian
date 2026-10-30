@@ -527,6 +527,33 @@ def test_user_api_refuses_impossible_expiry_even_while_disabled(fleet: Fleet, me
     assert fleet.service.list_users() == before
 
 
+@pytest.mark.parametrize("expiry", ["2099-01-01T00:00:00Z", "9999-12-31T23:59:59Z"])
+@pytest.mark.parametrize("write", ["create", "update", "import-create", "import-replace"])
+def test_user_expiry_writes_refuse_the_legacy_never_range(fleet: Fleet, expiry: str, write: str) -> None:
+    existing = fleet.service.put_user("sample")
+    before = fleet.service.list_users()
+    body: dict[str, Any] = {"status": "disabled", "expire_at": expiry}
+    method, path = "POST", "/api/users"
+    if write == "create":
+        body["username"] = "new"
+    elif write == "update":
+        method, path = "PATCH", "/api/users/sample"
+    else:
+        replace = write == "import-replace"
+        body.update(
+            username="sample" if replace else "new",
+            uuid=existing.uuid if replace else "00000000-0000-4000-8000-000000000123",
+            sub_token=existing.sub_token if replace else "test-subscription-new",
+        )
+        body = {"users": [body], "replace": replace}
+        path = "/api/import/users"
+    status, answer = _request(fleet.url + path, method, body, ADMIN_TOKEN)
+    assert status == 400, answer
+    assert answer["error"]["code"] == "invalid_request"
+    assert "before 2099" in answer["error"]["message"] and "Remove the expiry" in answer["error"]["message"]
+    assert fleet.service.list_users() == before
+
+
 def test_step_twelve_preserves_existing_tokens_without_expiry_and_migrates_once(tmp_path: Path) -> None:
     path = tmp_path / "control.db"
     service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")

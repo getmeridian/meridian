@@ -18,7 +18,7 @@ from meridian.core.agent_protocol import StatsReport, UserTraffic
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
 TAG = "meridian-main-reality"
 PAST = "2026-01-01T00:00:00Z"
-FUTURE = "2999-01-01T00:00:00Z"
+FUTURE = "2098-01-01T00:00:00Z"
 NOW = "2026-10-29T12:00:00Z"
 
 
@@ -134,10 +134,24 @@ def test_extend_preserves_a_fractional_future_expiry(service: ControlService) ->
     assert datetime.fromisoformat(extended.expire_at) == datetime.fromisoformat("2026-12-08T00:00:00.5Z")
 
 
-def test_extension_overflow_rolls_back_with_a_specific_refusal(service: ControlService) -> None:
+@pytest.mark.parametrize("status", ["active", "disabled"])
+def test_extension_refuses_the_legacy_never_range_without_changing_the_user(
+    service: ControlService, status: str
+) -> None:
+    service.put_user("sample")
+    original = service.update_user("sample", UserUpdate(status=status, expire_at="2098-12-31T00:00:00Z"))
+    with pytest.raises(ServiceError, match="before 2099.*Remove the expiry") as refused:
+        service.extend_user("sample", days=1)
+    assert refused.value.status == 400 and service.get_user("sample") == original
+
+
+def test_extension_overflow_rolls_back_with_a_specific_refusal(service: ControlService, tmp_path: Path) -> None:
     service.put_user("alice")
-    original = service.update_user("alice", UserUpdate(expire_at="9999-12-31T00:00:00Z"))
-    with pytest.raises(ServiceError, match="year 9999") as refused:
+    # A previously stored sentinel must be refused before date arithmetic can overflow.
+    with sqlite3.connect(tmp_path / "control.db") as db:
+        db.execute("UPDATE users SET expire_at = '9999-12-31T00:00:00Z' WHERE username = 'alice'")
+    original = service.get_user("alice")
+    with pytest.raises(ServiceError, match="before 2099.*Remove the expiry") as refused:
         service.extend_user("alice", days=1)
     assert refused.value.status == 400 and service.get_user("alice") == original
 
@@ -167,10 +181,10 @@ def test_reissue_replaces_link_credentials_only(service: ControlService) -> None
 def test_enforcement_expires_active_users_once_their_time_passes(service: ControlService) -> None:
     _with_node(service)
     service.put_user("alice")
-    service.update_user("alice", UserUpdate(expire_at="2999-06-01T00:00:00Z"))
+    service.update_user("alice", UserUpdate(expire_at="2098-06-01T00:00:00Z"))
 
-    assert service.enforce("2999-05-31T23:59:59.5Z") == []
-    assert service.enforce("2999-06-01T00:00:00Z") == ["alice"]
+    assert service.enforce("2098-05-31T23:59:59.5Z") == []
+    assert service.enforce("2098-06-01T00:00:00Z") == ["alice"]
     assert service.get_user("alice").status == "expired"  # type: ignore[union-attr]
     assert _delivered(service) == []
 
