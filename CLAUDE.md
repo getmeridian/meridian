@@ -49,7 +49,8 @@ CLAUDE.md                               — this file (vision, manifest, convent
 contracts/CLAUDE.md                     — generated meridian-core contract artifacts
 scripts/CLAUDE.md                       — repository automation and contract export
 .github/workflows/CLAUDE.md             — two-stage pipeline, VERSION-driven releases
-agent/CLAUDE.md                         — Rust node agent (netagent): identity, apply, traffic, musl builds
+agent/CLAUDE.md                         — Rust node agent (netagent): contract, musl builds, upgrades, tests
+└── src/CLAUDE.md                       — agent runtime: identity, sessions, apply, Xray users, traffic, commands
 
 src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── core/CLAUDE.md                      — transport-neutral API contracts
