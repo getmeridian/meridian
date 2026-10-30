@@ -41,6 +41,7 @@ validate: ## Check CLI docs, app list sync, and generated contracts
 	uv run python tests/validate_cli_docs.py
 	uv run python tests/validate_apps_sync.py
 	uv run python scripts/export_contracts.py --check
+	uv run python scripts/validate_api_docs.py
 
 dead-code: ## Report dead / test-only code and unused params (warnings, never fails)
 	@echo "  —— Dead-code report (warnings only) ——"

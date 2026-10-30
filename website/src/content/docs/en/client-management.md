@@ -213,7 +213,13 @@ Scripts and community bots, such as a Telegram bot that tells people how much tr
 2. Name it after the bot and pick **Read**. The console shows the token once; store it with the bot's secrets.
 3. Point the bot at the console address and send the token as `Authorization: Bearer <token>`. API paths go below that address, for example `https://198.51.100.10/<secret-path>/api/users/alice`. The address contains the secret path, so keep it as private as the token.
 
-A read token sees:
+#### OpenAPI contract
+
+Fetch **`GET /api/openapi.json`** below the console address with the same `Authorization: Bearer <token>` header. Any valid API token can read the document, including `people`; expired or revoked tokens receive `401`. It is an English **OpenAPI 3.1** contract with the installed service's version, request and response schemas, errors, and required scopes. A checked-in copy lives at `contracts/meridian/v1/admin/openapi.json`; when using that copy, set your client's base URL to the console address, including the secret path.
+
+`x-meridian-scopes` lists alternative required scopes. `x-meridian-credentials: true` on an operation and its successful response means that response can carry credentials: keep it private and do not log it. User reads carry connection credentials only for `people` or `admin`; read tokens receive empty UUIDs and subscription tokens. Endpoint responses may carry a transport password, and encrypted snapshots contain credentials too. Agent enrollment, agent protocol, subscriptions, pages, and console sessions have separate surfaces and are excluded.
+
+The operation tables below are checked against the contract. A read token sees:
 
 | Endpoint | Returns |
 |---|---|
@@ -221,6 +227,9 @@ A read token sees:
 | `GET /api/users` | Every person |
 | `GET /api/traffic` | Traffic totals per person |
 | `GET /api/health` | The service's version |
+| `GET /api/openapi.json` | The admin API contract |
+| `GET /api/events` | A bounded page of local lifecycle events |
+| `GET /api/attention` | Derived account, node, and server warnings |
 
 Read tokens never see anyone's keys or subscription ID. Choose **People** for a bot that manages accounts and shares connection credentials. Creating it requires the same password confirmation as any other console token.
 
@@ -232,7 +241,7 @@ Read tokens never see anyone's keys or subscription ID. Choose **People** for a 
 | `people` | Read and manage people, including their UUIDs and subscription tokens |
 | `admin` | Both sets of permissions, including topology writes, enrollment, tokens, and backups; issued through the deployer's API access |
 
-`people` is separate from the read → propose → approve chain. It can access only `/api/users`: it cannot read or change nodes, endpoints, the apply fence, revisions, backups, enrollment, API tokens, privacy, or settings. Admin includes people access.
+`people` is separate from the read → propose → approve chain. It can access `/api/users` and read `/api/openapi.json`: it cannot read or change nodes, endpoints, the apply fence, revisions, backups, enrollment, API tokens, privacy, or settings. Admin includes people access.
 
 | People endpoint | Action |
 |---|---|
@@ -243,9 +252,12 @@ Read tokens never see anyone's keys or subscription ID. Choose **People** for a 
 | `POST /api/users/{username}/reissue` | Replace connection credentials and clear device registrations |
 | `DELETE /api/users/{username}` | Remove a person |
 | `GET /api/users/{username}/devices` | Read registrations allowed by the owner's privacy level |
-| `DELETE /api/users/{username}/devices[/{device_key}]` | Clear all registrations, or remove one |
+| `DELETE /api/users/{username}/devices` | Clear all registrations |
+| `DELETE /api/users/{username}/devices/{device_key}` | Remove one registration |
 
 A people token cannot remove or reissue a person declared in the fleet file: the API returns `409 declared_user` with the CLI command to run. This also applies while an approved or failed apply still declares the person. An unapproved proposal does not declare anyone. Status, limits, expiry, and device caps remain editable.
+
+Reissue and deletion accept an optional `{"cut_off": true}` body to end existing sessions after the credential change is applied. This also requires `admin`, as declared by `x-meridian-conditional-scopes`, and can briefly disconnect other people on the affected inbounds. Without that choice, the response keeps its usual account or deletion shape; with it, the response includes the queued commands.
 
 Choose **7, 30, or 90 days**, or **Never expires**; new console tokens default to 90 days. The list shows the expiry and marks expired tokens. Expiry and revocation both refuse the next request with the same `401 unauthenticated` response. Existing tokens keep no expiry. Treat a people token as a password, because it grants access to people's connection credentials.
 

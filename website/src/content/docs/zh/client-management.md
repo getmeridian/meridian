@@ -213,7 +213,13 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 2. 以机器人的名字命名令牌，并选择 **Read**。控制台只显示一次令牌；请将其与机器人的密钥一起保存。
 3. 将机器人指向控制台地址，并以 `Authorization: Bearer <token>` 发送令牌。API 路径位于该地址之下，例如 `https://198.51.100.10/<secret-path>/api/users/alice`。该地址包含秘密路径，因此要像令牌一样严格保密。
 
-只读令牌可以看到：
+#### OpenAPI 契约
+
+在控制台地址下请求 **`GET /api/openapi.json`**，并发送相同的 `Authorization: Bearer <token>` 请求头。所有有效的 API 令牌都能读取该文档，包括 `people`；已过期或撤销的令牌会收到 `401`。这是英文的 **OpenAPI 3.1** 契约，包含已安装服务的版本、请求与响应模式、错误和所需权限。仓库中的副本位于 `contracts/meridian/v1/admin/openapi.json`；使用该副本时，请将客户端的基础 URL 设置为控制台地址，包含秘密路径。
+
+`x-meridian-scopes` 列出可选的所需权限。操作及其成功响应上的 `x-meridian-credentials: true` 表示响应可能包含凭据：请妥善保密，不要写入日志。用户连接凭据仅对 `people` 或 `admin` 返回；只读令牌收到的 UUID 和订阅令牌为空。连接端点响应可能包含传输混淆密码，加密快照也包含凭据。agent 注册与协议、订阅、连接页面和控制台会话使用独立接口，不包含在此文档中。
+
+下方操作表会与契约核对。只读令牌可以看到：
 
 | 端点 | 返回 |
 |---|---|
@@ -221,6 +227,9 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 | `GET /api/users` | 所有用户 |
 | `GET /api/traffic` | 每个用户的流量总计 |
 | `GET /api/health` | 服务的版本 |
+| `GET /api/openapi.json` | 管理 API 契约 |
+| `GET /api/events` | 有数量上限的本地事件分页 |
+| `GET /api/attention` | 根据当前状态计算的账户、节点和服务器警告 |
 
 只读令牌看不到用户的密钥或订阅 ID。如果机器人需要管理账户并分发连接凭据，请选择**用户**权限。创建这种令牌与创建其他控制台令牌一样，需要再次确认密码。
 
@@ -232,7 +241,7 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 | `people` | 查看和管理用户，包括 UUID 和订阅令牌 |
 | `admin` | 包含两组权限，还可修改拓扑、注册 agent、管理令牌和备份；通过部署者的 API 管理权限签发 |
 
-`people` 独立于 read → propose → approve 权限链。它只能访问 `/api/users`，无法访问节点、连接端点、应用锁、修订、备份、agent 注册、API 令牌、隐私或设置。Admin 包含 people 权限。
+`people` 独立于 read → propose → approve 权限链。它可以访问 `/api/users` 并读取 `/api/openapi.json`，无法访问节点、连接端点、应用锁、修订、备份、agent 注册、API 令牌、隐私或设置。Admin 包含 people 权限。
 
 | 用户 API 端点 | 操作 |
 |---|---|
@@ -243,9 +252,12 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 | `POST /api/users/{username}/reissue` | 更换连接凭据并清除设备注册 |
 | `DELETE /api/users/{username}` | 删除用户 |
 | `GET /api/users/{username}/devices` | 按所有者选择的隐私级别读取设备注册 |
-| `DELETE /api/users/{username}/devices[/{device_key}]` | 清除全部注册，或删除一项 |
+| `DELETE /api/users/{username}/devices` | 清除全部注册 |
+| `DELETE /api/users/{username}/devices/{device_key}` | 删除一项注册 |
 
 People 令牌无法删除服务器配置文件中声明的用户，也无法为他们重新签发连接凭据。API 会返回 `409 declared_user` 和需要运行的 CLI 命令。已经批准或失败的应用仍声明该用户时，这项限制同样有效；未经批准的提案不会声明任何用户。状态、限额、到期时间和设备上限仍可修改。
+
+重新签发和删除操作接受可选的 `{"cut_off": true}` 请求体，在凭据变更应用后结束现有会话。根据 `x-meridian-conditional-scopes`，这一选择还需要 `admin` 权限，并可能让相关入站上的其他用户短暂断线。不选择时，响应仍为用户账户或删除确认；选择后，响应包含已排入队列的命令。
 
 可以选择 **7、30 或 90 天**，或**永不过期**；控制台新令牌默认有效期为 90 天。列表会显示到期时间并标记已过期令牌。到期和撤销都会在下一次请求时返回相同的 `401 unauthenticated` 响应。现有令牌仍保持无到期时间。请像保护密码一样保护 people 令牌，因为它可以读取用户的连接凭据。
 

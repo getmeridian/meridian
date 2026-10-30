@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## Unreleased
 
 - An apply after a Meridian upgrade, or after another renderer changed, no longer re-runs every server's package and hardening baseline; only a change to the baseline itself or to the server's connection does.
+- Scoped integrations can fetch OpenAPI 3.1 at `/api/openapi.json`. The same route catalog drives dispatch and authorization, marks responses that can carry credentials, and supplies checked API operation tables in all four locales.
+
 - Reviewed owner contact appears on connection and support pages in all four locales, uses a user-initiated HTTPS, Telegram, or email link, and supplies apps' support button. Short instructions can accompany inactive subscription remarks; longer ones stay on the pages.
 
 - People have private notes and one tag, editable through the people/admin API, `client set`, and the console. CLI reads show them and filter by tag; encrypted snapshots preserve them, and migration carries descriptions and valid tags with truncation notices.

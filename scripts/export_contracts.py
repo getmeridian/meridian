@@ -11,6 +11,7 @@ from typing import Any
 from unittest.mock import patch
 
 from meridian.cli_catalog import command_catalog
+from meridian.control.openapi import openapi_document
 from meridian.core.agent_http import AGENT_HTTP_SURFACE
 from meridian.core.deploy import DeployRequest, DeployResult
 from meridian.core.models import ErrorModel, Event, OutputEnvelope, OutputStatus, Summary
@@ -221,6 +222,7 @@ def build_contract_files() -> dict[Path, str]:
 
     files[Path("commands.json")] = _plain_json({"schema": "meridian.command-catalog/v1", "commands": command_catalog()})
     files[Path("events.json")] = _plain_json(event_type_catalog())
+    files[Path("admin") / "openapi.json"] = _plain_json(openapi_document().to_data())
     # The service-to-agent protocol is internal (consumed by the Rust agent), so it stays out of `schemas/`.
     for name in sorted(AGENT_SCHEMAS):
         files[Path("agent") / "schemas" / f"{name}.schema.json"] = _plain_json(agent_schema(name))

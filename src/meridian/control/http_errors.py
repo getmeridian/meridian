@@ -6,6 +6,24 @@ from http import HTTPStatus
 
 from pydantic import ValidationError
 
+from meridian.control.errors import ServiceError
+from meridian.core.models import CoreModel
+
+
+class ApiErrorDetail(CoreModel):
+    code: str
+    message: str
+
+
+class ApiErrorResponse(CoreModel):
+    """The existing admin refusal envelope; ServiceError remains the exception type."""
+
+    error: ApiErrorDetail
+
+
+def api_error_response(exc: ServiceError) -> ApiErrorResponse:
+    return ApiErrorResponse(error=ApiErrorDetail(code=exc.code, message=str(exc)))
+
 
 def error_page(code: int) -> bytes:
     """The same generic page nginx returns for malformed requests and unknown methods."""

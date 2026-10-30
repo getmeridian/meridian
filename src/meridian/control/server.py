@@ -28,11 +28,12 @@ from pydantic import BaseModel, ValidationError
 
 from meridian import __version__
 from meridian.control import ui_routes
+from meridian.control.api_models import DeletedResource, DeployerStateReceipt, UserList
 from meridian.control.blobs import BlobStore, fleet_artifacts, served_hashes
 from meridian.control.command_models import NodeCommandRequest, UserCutOffRequest
 from meridian.control.enrollment import Session, token_sha256
 from meridian.control.errors import ServiceError, agent_error
-from meridian.control.http_errors import error_page, validation_message
+from meridian.control.http_errors import api_error_response, error_page, validation_message
 from meridian.control.login_limits import LockedOut
 from meridian.control.models import (
     ApplyFenceSwap,
@@ -55,9 +56,12 @@ from meridian.control.models import (
     UserUpdate,
     scope_covers,
 )
+from meridian.control.openapi import openapi_document
 from meridian.control.operations_api import read_attention, read_events, read_history_days
 from meridian.control.owner import OwnerSession
-from meridian.control.route_table import WRITE, Route, control_routes
+from meridian.control.route_catalog import api_route_for
+from meridian.control.route_table import Route, control_routes
+from meridian.control.route_types import ApiRoute
 from meridian.control.service import ControlService
 from meridian.control.subscriptions import unknown_subscription
 from meridian.control.times import utc_now
@@ -113,6 +117,7 @@ class _Handler(BaseHTTPRequestHandler):
     timeout = 60
     caller: Caller | None = None
     owner_session: OwnerSession | None = None
+    api_route: ApiRoute | None = None
 
     def do_GET(self) -> None:
         self._dispatch("GET")
@@ -149,10 +154,12 @@ class _Handler(BaseHTTPRequestHandler):
         agent = path.startswith("/agent/")
         self.caller = None
         self.owner_session = None
+        self.api_route = None
         try:
             for route_method, pattern, scope, handler in ALL_ROUTES:
                 match = pattern.fullmatch(path)
                 if match and route_method == method:
+                    self.api_route = api_route_for(method, handler.__name__)
                     if scope is not None:
                         self.caller = self._authorize(scope)
                         if self.owner_session is not None:
@@ -246,6 +253,8 @@ class _Handler(BaseHTTPRequestHandler):
         return self.rfile.read(length) if length else b""
 
     def _model(self, model: type[ModelT]) -> ModelT:
+        if self.api_route is not None and self.api_route.request_model is not model:
+            raise RuntimeError("The request model differs from the route catalog.")
         return model.model_validate_json(self._body())
 
     def _raw(self) -> tuple[bytes, Any]:
@@ -290,7 +299,7 @@ class _Handler(BaseHTTPRequestHandler):
                 },
             }
         else:
-            body = {"error": {"code": exc.code, "message": str(exc)}}
+            body = api_error_response(exc).to_data()
         data = json.dumps(body, ensure_ascii=False).encode("utf-8")
         # The contract mirrors `retry_after_seconds` in the HTTP header; a locked-out sign-in says when to retry.
         if agent and retry_after is not None:
@@ -302,6 +311,9 @@ class _Handler(BaseHTTPRequestHandler):
         self._send(exc.status, "application/json", data, headers)
 
     # -- admin API -------------------------------------------------------------------------
+
+    def openapi(self, _match: re.Match[str]) -> Any:
+        return openapi_document(self._service.health().version).to_data()
 
     def health(self, _match: re.Match[str]) -> Any:
         return self._service.health()
@@ -338,7 +350,7 @@ class _Handler(BaseHTTPRequestHandler):
         self._service.delete_node(match[1])
         if self.server.blobs is not None:
             self.server.blobs.want(fleet_artifacts(self._service.node_specs))
-        return {"deleted": match[1]}
+        return DeletedResource(deleted=match[1])
 
     def grant_enrollment(self, match: re.Match[str]) -> Any:
         return self._service.grant_enrollment(match[1])
@@ -380,7 +392,7 @@ class _Handler(BaseHTTPRequestHandler):
         return read_history_days(self.path)
 
     def list_users(self, _match: re.Match[str]) -> Any:
-        return {"users": [self._visible(user).model_dump(mode="json") for user in self._service.list_users()]}
+        return UserList(users=[self._visible(user) for user in self._service.list_users()])
 
     def get_user(self, match: re.Match[str]) -> Any:
         user = self._service.get_user(match[1])
@@ -403,10 +415,11 @@ class _Handler(BaseHTTPRequestHandler):
     def import_users(self, _match: re.Match[str]) -> Any:
         return self._service.import_users(self._model(UserImportBatch))
 
+    def patch_user(self, _match: re.Match[str]) -> Any:
+        patch = self._model(UserPatch)
+        return self._service.update_user(patch.username, patch.change)
+
     def update_user(self, match: re.Match[str]) -> Any:
-        if match[1] is None:
-            patch = self._model(UserPatch)
-            return self._service.update_user(patch.username, patch.change)
         return self._service.update_user(match[1], self._model(UserUpdate))
 
     def reissue_user(self, match: re.Match[str]) -> Any:
@@ -421,10 +434,13 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _cut_off_requested(self) -> bool:
         body = self._body()
-        cut_off = UserCutOffRequest.model_validate_json(body).cut_off if body else False
-        if cut_off:
-            self._authorize(WRITE)
-        return cut_off
+        request = UserCutOffRequest.model_validate_json(body) if body else UserCutOffRequest()
+        if self.api_route is None or self.api_route.request_model is not UserCutOffRequest:
+            raise RuntimeError("The cut-off request has no route declaration.")
+        for condition in self.api_route.body_scopes:
+            if getattr(request, condition.field) == condition.equals:
+                self._authorize(condition.scope)
+        return request.cut_off
 
     def reset_user_traffic(self, match: re.Match[str]) -> Any:
         return self._service.reset_user_traffic(match[1])
@@ -448,7 +464,7 @@ class _Handler(BaseHTTPRequestHandler):
             if cut_off:
                 return self._service.cut_off_user(match[1])
             self._service.delete_user(match[1])
-        return {"deleted": match[1]}
+        return DeletedResource(deleted=match[1])
 
     def _refuse_declared(self, username: str, command: str) -> AbstractContextManager[None]:
         return refuse_declared(self._service, username, command, self.caller, self.owner_session)
@@ -464,7 +480,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def delete_endpoint(self, match: re.Match[str]) -> Any:
         self._service.delete_endpoint(match[1])
-        return {"deleted": match[1]}
+        return DeletedResource(deleted=match[1])
 
     def create_token(self, _match: re.Match[str]) -> Any:
         if self.caller is None:
@@ -532,7 +548,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def deposit_deployer_state(self, _match: re.Match[str]) -> Any:
         state = self._service.backups.deposit(self._model(DeployerStateDeposit))
-        return {"generation": state.generation, "deposited_at": state.deposited_at}
+        return DeployerStateReceipt(generation=state.generation, deposited_at=state.deposited_at)
 
     def snapshot(self, _match: re.Match[str]) -> None:
         self._send(200, "application/octet-stream", self._service.snapshot())

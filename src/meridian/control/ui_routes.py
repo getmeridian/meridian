@@ -368,6 +368,4 @@ UI_ROUTES: list[tuple[str, re.Pattern[str], TokenScope | None, UiHandler]] = [
     ("GET", re.compile(r"/ui/api/fleet"), "read", fleet),
     # Share links carry the subscription token, which connects as the person: admin, like `_visible`.
     ("GET", re.compile(rf"/ui/api/people/{_USERNAME}/share"), "admin", share),
-    ("GET", re.compile(r"/api/owner"), "admin", owner_status),
-    ("POST", re.compile(r"/api/owner/setup-link"), "admin", issue_setup_link),
 ]

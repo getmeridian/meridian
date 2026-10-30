@@ -1,6 +1,7 @@
 # control — Meridian's own control service (`meridian serve`)
 
 ## Design decisions
+- **Admin HTTP contract** — `route_catalog.py` declares every `/api` method, named path, scopes, body/query and response models, errors, credential marker, and publication decision; `route_types.py` compiles the same parameter schemas for dispatch, and `openapi.py` uses Pydantic validation/serialization schemas for OpenAPI 3.1.
 - **HTTP route bindings** — `route_table.py` owns ordered route matching and scope bindings; the HTTP front binds its handler without importing the server back into routing.
 - Owner contact persists in the page-settings meta row inside the delivery transaction; native `support-url` prefers its link, page URLs remain personal, and short text joins status remarks only when every format's 100-character names remain bounded.
 - Step 15 adds private `users.note` and `users.tag`; PATCH accepts the existing name path or a `username` body at `/api/users`, only people/admin reads retain metadata, applies preserve it, and snapshots carry it with user rows.
@@ -37,6 +38,7 @@
 - **Renderer takes plain values** — `SubscriptionUser` (UUID, short ID, status `active|disabled|limited|expired`, expiry, traffic and its reset strategy) and `ClientEndpoint`s; a suspended user gets Remnawave's status placeholder entries in every format. `ServiceSettings.public_url` feeds `support-url`/`profile-web-page-url`; `ClientEndpoint.fingerprint_copy` marks copies.
 
 ## What's done well
+- The discovery route accepts read or people, covering every valid API token; optional user cut-offs read their extra admin requirement from the catalog, and handler body models must match the declared request model.
 - Node status exposes durable `traffic_bytes` and its activity window from the same accounting row, so deployer adapters consume the public API rather than replay baselines.
 - The console's direct command permission is only `restart_unit` for a held managed resource; cut-off resets are queued through the guarded person mutation, and all other command kinds remain API-token operations.
 - `cutoff.py` captures affected inbounds before a credential change and queues revision-gated resets in that change's transaction; a full queue rolls back the credentials and documents together, and a closed console tab cannot strand the cut-off.
@@ -50,6 +52,7 @@
 - A proposal whose intent has a secret-shaped key or value (`secret_paths()`, keys per `core.redaction`) is refused, never stored; so is one whose `access` block is malformed (the console reads `access.users` on every person screen, and a `null` there broke them all).
 
 ## Pitfalls
+- Keep enrollment/CA bootstrap and console-owner APIs internal with a reason; every agent, subscription, page, and console route also needs an explicit internal classification, while credential markers include conditionally visible people records, endpoint passwords, and encrypted snapshots.
 - Support HTML embeds escaped public contact data from current settings, is always no-store, and stays outside service-worker caches; it never fetches person data or puts a bearer token into a background request.
 - Keep notes and tags out of event field catalogs and subscription projections; metadata-only edits must produce no lifecycle fact or new node document.
 - Advance server allowance offsets inside the accounting transaction before accepted growth; label changes and allowance amounts preserve use, while enabling or changing the reset day starts tracking at apply with earlier period use unknown.

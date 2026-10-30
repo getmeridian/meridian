@@ -1,6 +1,7 @@
 # scripts — Repository automation
 
 ## Design decisions
+- Admin OpenAPI joins `export_contracts.py` and its drift check; `validate_api_docs.py` checks all four localized API operation tables against the committed document, and `make validate` runs both gates.
 
 **Contract export** — `export_contracts.py` writes `contracts/meridian/`; its rules live in `contracts/CLAUDE.md`.
 

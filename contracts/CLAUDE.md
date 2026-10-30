@@ -1,6 +1,7 @@
 # contracts — Generated meridian-core artifacts
 
 ## Design decisions
+- `admin/openapi.json` is the English OpenAPI 3.1 contract generated from the control route catalog and Pydantic models; it uses the package version on export and the installed service version at runtime, with explicit credential and scope extensions.
 - Owner contact request/result schemas and inherited presentation fields export their text bounds and allowed URI schemes; default empty contact stays omitted from intent and settings payloads.
 - Administrative person schemas describe private notes and tags with their bounds; generated schemas contain no private values, and lower-scope API records keep these fields as empty strings.
 - **Server billing contracts** — server list/set envelopes, metadata, service settings, and nullable period usage are exported from `core/schema_servers.py`; fleet and attention contracts compose the same server evidence.
@@ -22,3 +23,4 @@
 
 - Do not make generated TypeScript or Studio forms the source of truth.
 - Keep fixture clocks, operation IDs, and durations fixed so diffs are meaningful.
+- Never write Python-version-dependent text into a contract: `HTTPStatus.phrase` changed in 3.13 (413 "Request Entity Too Large" → "Content Too Large"), so the OpenAPI generator pins RFC 9110 phrases.

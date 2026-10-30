@@ -103,6 +103,7 @@ def _mint(fleet: Fleet, scope: str, name: str = "device") -> dict[str, Any]:
 BACKUP_KEY = generate_key_pair().public
 # Samples carry no permissions: every requirement comes directly from server.ROUTES.
 ROUTE_SAMPLES = {
+    "openapi": ("/api/openapi.json", None),
     "health": ("/api/health", None),
     "get_settings": ("/api/settings", None),
     "put_settings": ("/api/settings", {"profile_title": "Fleet"}),
@@ -128,6 +129,7 @@ ROUTE_SAMPLES = {
     "user_usage": ("/api/users/alice/usage", None),
     "put_user": ("/api/users/bob", {}),
     "update_user": ("/api/users/alice", {"status": "disabled"}),
+    "patch_user": ("/api/users", {"username": "alice", "status": "disabled"}),
     "reissue_user": ("/api/users/alice/reissue", {}),
     "cut_off_scope": ("/api/users/alice/cut-off", None),
     "reset_user_traffic": ("/api/users/alice/reset-traffic", {}),
@@ -159,6 +161,8 @@ ROUTE_SAMPLES = {
         {"cluster_yml": "version: 3\n", "servers_json": "[]", "generation": 0},
     ),
     "snapshot": ("/api/backup/snapshot", None),
+    "owner_status": ("/api/owner", None),
+    "issue_setup_link": ("/api/owner/setup-link", {}),
 }
 SCOPE_MATRIX = [
     (method, *ROUTE_SAMPLES[handler.__name__], needed)
@@ -182,7 +186,10 @@ def test_scope_matrix(fleet: Fleet, method: str, path: str, body: Any, needed: A
 
     requirements = (needed,) if isinstance(needed, str) else needed
     if held == "root" or any(scope_covers(held, scope) for scope in requirements):
-        assert status not in (401, 403), answer
+        if path == "/api/owner/setup-link" and held != "root":
+            assert status == 403 and answer["error"]["code"] == "insufficient_scope"
+        else:
+            assert status not in (401, 403), answer
     else:
         assert status == 403 and answer["error"]["code"] == "insufficient_scope"
 
@@ -205,7 +212,9 @@ def test_people_access_is_declared_only_on_user_routes() -> None:
         if needed is None:
             continue
         requirements = (needed,) if isinstance(needed, str) else needed
-        manages_people = pattern.pattern.startswith("/api/users") and handler.__name__ != "cut_off_scope"
+        manages_people = (
+            pattern.pattern.startswith("/api/users") and handler.__name__ != "cut_off_scope"
+        ) or handler.__name__ == "openapi"
         assert any(scope_covers("people", scope) for scope in requirements) == manages_people
         assert all(scope_covers("admin", scope) for scope in requirements)
 
@@ -365,7 +374,7 @@ def test_people_reads_credentials_and_edits_people_without_fleet_access(fleet: F
     )
     assert status == 200 and (updated["status"], updated["traffic_limit_bytes"]) == ("disabled", 1000)
     for method, path, body, _needed in SCOPE_MATRIX:
-        if path.startswith("/api/users"):
+        if path.startswith("/api/users") or path == "/api/openapi.json":
             continue
         status, answer = _request(fleet.url + path.format(victim="0123456789ab"), method, body, token)
         assert (status, answer["error"]["code"]) == (403, "insufficient_scope"), path

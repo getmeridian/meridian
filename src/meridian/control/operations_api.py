@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from urllib.parse import parse_qs, urlsplit
 
+from meridian.control.api_models import FleetEventsQuery, HistoryQuery
 from meridian.control.errors import ServiceError
 from meridian.control.service import ControlService
 from meridian.core.agent_types import MAX_SAFE_INTEGER
@@ -34,20 +35,25 @@ def query_options(path: str, defaults: dict[str, str]) -> dict[str, str]:
 
 def read_history_days(path: str) -> int:
     """The history endpoints' single day count, preserving their existing defaults and bounds."""
-    values = parse_qs(urlsplit(path).query, keep_blank_values=True).get("days", ["30"])
-    if len(values) != 1 or not re.fullmatch(r"[0-9]{1,3}", values[0]) or not 1 <= int(values[0]) <= 730:
-        raise ServiceError("invalid_request", "days must be one integer between 1 and 730.", 400)
-    return int(values[0])
+    values = parse_qs(urlsplit(path).query, keep_blank_values=True).get("days", [str(HistoryQuery().days)])
+    try:
+        if len(values) != 1 or not re.fullmatch(r"[0-9]{1,3}", values[0]):
+            raise ValueError("Invalid day count.")
+        return HistoryQuery(days=int(values[0])).days
+    except ValueError as exc:
+        raise ServiceError("invalid_request", "days must be one integer between 1 and 730.", 400) from exc
 
 
 def read_events(service: ControlService, path: str) -> FleetEventPage:
-    options = query_options(path, {"after": "0", "limit": "100"})
+    options = query_options(path, {name: str(value) for name, value in FleetEventsQuery().model_dump().items()})
     try:
-        after = bounded_integer(options["after"], "after", 0, MAX_SAFE_INTEGER)
-        limit = bounded_integer(options["limit"], "limit", 1, MAX_EVENTS)
+        query = FleetEventsQuery(
+            after=bounded_integer(options["after"], "after", 0, MAX_SAFE_INTEGER),
+            limit=bounded_integer(options["limit"], "limit", 1, MAX_EVENTS),
+        )
     except ValueError as exc:
         raise ServiceError("invalid_request", str(exc), 400) from exc
-    return service.events.list(after=after, limit=limit)
+    return service.events.list(after=query.after, limit=query.limit)
 
 
 def read_attention(service: ControlService, path: str) -> AttentionList:
