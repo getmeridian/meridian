@@ -369,7 +369,10 @@ class _Handler(BaseHTTPRequestHandler):
         return self._service.grant_enrollment(match[1])
 
     def issue_command(self, match: re.Match[str]) -> Any:
-        return self._service.issue_command(match[1], self._model(NodeCommandRequest).root)
+        request = self._model(NodeCommandRequest).root
+        if self.owner_session is not None and request.kind != "restart_unit":
+            raise ServiceError("insufficient_scope", "The console issues only managed-unit restarts directly.", 403)
+        return self._service.issue_command(match[1], request)
 
     def get_command(self, match: re.Match[str]) -> Any:
         return self._service.commands.get(match[1], match[2])
@@ -738,6 +741,8 @@ OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
         _Handler.delete_user,
         _Handler.cut_off_scope,
         _Handler.get_command,
+        _Handler.command_targets,
+        _Handler.issue_command,
         _Handler.list_tokens,
         _Handler.create_token,
         _Handler.revoke_token,

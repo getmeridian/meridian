@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,7 +14,13 @@ from meridian.cli import app
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands.client import run_reissue, run_remove
 from meridian.console import set_json_mode
-from meridian.control.command_models import CutOffNode, CutOffPlan, NodeCommandOutcome
+from meridian.control.command_models import (
+    CommandUnitTarget,
+    CutOffNode,
+    CutOffPlan,
+    NodeCommandOutcome,
+    NodeCommandTargets,
+)
 from meridian.handoff import HandoffLinks
 from meridian.remnawave import User
 from tests.support.node_commands import command_record
@@ -27,6 +34,13 @@ def test_client_help_discloses_the_opt_in_cut_off_scope(command: list[str]) -> N
     assert "--cut-off" in reply.output
     assert "every" in reply.output.lower() and "session" in reply.output.lower()
     assert "restart" in reply.output.lower()
+
+
+def test_node_restart_help_names_the_core_and_all_unit_scopes() -> None:
+    reply = CliRunner().invoke(app, ["node", "restart", "--help"])
+    assert reply.exit_code == 0
+    assert all(flag in reply.output for flag in ("--core", "--all", "--json", "--yes"))
+    assert "Xray" in reply.output and "managed" in reply.output
 
 
 def cluster() -> ClusterConfig:
@@ -137,3 +151,69 @@ def test_declining_the_cut_off_confirmation_changes_no_credentials_or_pages(tmp_
     assert "main" in confirm.call_args.args[0] and "every open session" in confirm.call_args.args[0]
     panel.assert_not_called()
     page.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("all_units", "status", "exit_code"),
+    [(False, "succeeded", 0), (True, "succeeded", 0), (False, "failed", 4), (False, "expired", 3)],
+)
+def test_node_restart_selects_the_requested_units_and_emits_typed_results(
+    tmp_home, capsys, all_units, status, exit_code
+) -> None:
+    from meridian.commands.node_restart import run_restart
+
+    topology = SimpleNamespace(nodes=[SimpleNamespace(name="main", uuid="main", ip="198.51.100.10")])
+    targets = NodeCommandTargets(
+        node_id="main",
+        units=[
+            CommandUnitTarget(resource_id="unit:netcore", name="netcore.service", core=True),
+            CommandUnitTarget(resource_id="unit:forward", name="netfwd-test.service", core=False),
+        ],
+        inbounds=[],
+        capabilities=["restart_unit"],
+    )
+    client = MagicMock()
+    client.__enter__.return_value = client
+    client.command_targets.return_value = targets
+    issued = {}
+
+    def issue(node_id, request):
+        index = len(issued) + 1
+        record = command_record(node_id, index=index, unit=request.resource_id)
+        issued[record.command.command_id] = command_record(node_id, status, index=index, unit=request.resource_id)
+        return record
+
+    client.issue_command.side_effect = issue
+    client.command.side_effect = lambda node_id, command_id: issued[command_id]
+    set_json_mode(True)
+    try:
+        with (
+            patch("meridian.commands.node_restart.load_topology_cluster", return_value=cluster()),
+            patch("meridian.commands.node_restart.topology_from_local_cluster", return_value=topology),
+            patch("meridian.commands.node_restart.ControlClient", return_value=client),
+        ):
+            if exit_code:
+                with pytest.raises(typer.Exit) as raised:
+                    run_restart("main", all_units=all_units, yes=True)
+                assert raised.value.exit_code == exit_code
+            else:
+                run_restart("main", all_units=all_units, yes=True)
+        body = json.loads(capsys.readouterr().out)
+        assert body["exit_code"] == exit_code
+        assert body["data"]["scope"] == ("all" if all_units else "core")
+        result = body["data"]["nodes"][0]
+        assert result["status"] == {"succeeded": "done", "failed": "failed", "expired": "timed_out"}[status]
+        assert {record["command"]["resource_id"] for record in result["commands"]} == (
+            {"unit:netcore", "unit:forward"} if all_units else {"unit:netcore"}
+        )
+    finally:
+        set_json_mode(False)
+
+
+def test_conflicting_restart_scopes_are_refused_before_any_service_call(tmp_home) -> None:
+    from meridian.commands.node_restart import run_restart
+
+    with patch("meridian.commands.node_restart.ControlClient") as client, pytest.raises(typer.Exit) as raised:
+        run_restart("main", core=True, all_units=True, yes=True)
+    assert raised.value.exit_code == 2
+    client.assert_not_called()

@@ -1,0 +1,36 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "ip_or_name": {
+      "minLength": 1,
+      "pattern": "^\\S+$",
+      "title": "Ip Or Name",
+      "type": "string"
+    },
+    "scope": {
+      "default": "core",
+      "enum": [
+        "core",
+        "all"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "user": {
+      "default": "",
+      "pattern": "^$|^[a-zA-Z0-9._-]+$",
+      "title": "User",
+      "type": "string"
+    },
+    "yes": {
+      "default": false,
+      "title": "Yes",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ip_or_name"
+  ],
+  "title": "NodeRestartRequest",
+  "type": "object"
+}

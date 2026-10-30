@@ -7,7 +7,7 @@ const require = createRequire(new URL('../website/package.json', import.meta.url
 const { JSDOM } = require('jsdom');
 const [ui, mode, locale = 'en'] = process.argv.slice(2);
 const dom = new JSDOM('<!doctype html><body><div id="view"></div></body>', {
-  url: 'https://198.51.100.1/console/', runScripts: 'outside-only',
+  url: 'https://198.51.100.1/console/', runScripts: 'outside-only', pretendToBeVisual: true,
 });
 const w = dom.window;
 const catalog = JSON.parse(fs.readFileSync(path.join(ui, 'locales', locale + '.json')));
@@ -24,6 +24,18 @@ function reply(body) {
 w.fetch = (url, options) => {
   if (!/^(api|ui\/api)\//.test(url)) throw new Error('outside request: ' + url);
   requests.push(options.method + ':' + url);
+  if (url === 'ui/api/fleet') return Promise.resolve(reply({ servers: [{ node_id: 'main', role: 'exit', live: true,
+    revision: 2, applied_revision: 1, in_sync: false, traffic_bytes: 0, errors: [], agent_version: '0.2.8',
+    runtime_available: true, runtime: { versions: { xray: '26.7.28' }, health: {
+      status: 'degraded', uptime_seconds: 60, load1_milli: 100, memory_available_bytes: 1048576,
+      disk_free_bytes: 2097152, checks: [{ name: 'stats', status: 'warn', message: 'collection stalled' },
+        { name: 'xray.uptime', status: 'pass', message: 'up 30 s' }],
+    } } }] }));
+  if (url === 'api/nodes/main/command-targets') return Promise.resolve(reply({ units: [{ resource_id: 'unit:netcore', name: 'netcore.service', core: true }] }));
+  if (url === 'api/nodes/main/commands' && options.method === 'POST') {
+    writes.push({ body: JSON.parse(options.body), csrf: options.headers['X-Meridian-Request'] });
+    return Promise.resolve(reply({ ...record, status: 'pending', command: { command_id: id, kind: 'restart_unit', resource_id: 'unit:netcore' } }));
+  }
   if (url === 'api/users/person-a' && options.method === 'GET') return Promise.resolve(reply(user));
   if (url === 'ui/api/people/person-a/share') return Promise.resolve(reply({ subscription_url: '', declared: mode === 'declared' }));
   if (url === 'api/users/person-a/cut-off') return Promise.resolve(reply({ nodes: [{ node_id: 'main', inbound_tags: ['vless-reality'] }] }));
@@ -39,7 +51,7 @@ w.fetch = (url, options) => {
   }
   throw new Error('unexpected request: ' + url);
 };
-for (const script of ['core.js', 'commands.js', 'people.js', 'person.js']) {
+for (const script of ['core.js', 'commands.js', 'people.js', 'person.js', 'fleet.js']) {
   w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 }
 const M = w.M;
@@ -48,27 +60,33 @@ M.t = (key, params = {}) => (catalog[key] || key).replace(/\{(\w+)\}/g, (_, name
 M.toast = () => {};
 M.go = () => {};
 M.personHistory = M.devicesCard = () => M.h('div');
+M.fleetHistory = () => M.h('div');
 w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
 w.HTMLDialogElement.prototype.close = function () { this.open = false; };
 const settle = async () => { for (let i = 0; i < 4; i++) await new Promise(setImmediate); };
 const view = w.document.getElementById('view');
-M.renderPerson(view, 'person-a');
+const restarting = mode.startsWith('restart');
+if (restarting) M.renderServers(view); else M.renderPerson(view, 'person-a');
 await settle();
 const report = { requests, writes };
-const remove = view.querySelector('.card-danger button.btn-danger');
+report.serverText = view.querySelector('.server')?.textContent || '';
+const remove = view.querySelector(restarting ? '.server .row-actions button' : '.card-danger button.btn-danger');
 if (mode === 'declared') {
   report.hasRemove = !!remove;
 } else {
   remove.click();
+  if (restarting) remove.click();
   await settle();
   report.writesBeforeConfirm = writes.length;
   const dialog = w.document.querySelector('dialog');
   report.disclosure = dialog.textContent;
-  const opt = dialog.querySelector('input[name="cut-off"]');
-  report.defaultOn = opt.checked;
-  opt.checked = mode !== 'default' && mode !== 'cancel';
+  if (!restarting) {
+    const opt = dialog.querySelector('input[name="cut-off"]');
+    report.defaultOn = opt.checked;
+    opt.checked = mode !== 'default' && mode !== 'cancel';
+  }
   const buttons = dialog.querySelector('.actions').children;
-  buttons[mode === 'cancel' ? 0 : 1].click();
+  buttons[mode === 'cancel' || mode === 'restart-cancel' ? 0 : 1].click();
   await settle();
   report.resultText = w.document.querySelector('dialog')?.textContent || '';
   report.images = w.document.querySelectorAll('img').length;

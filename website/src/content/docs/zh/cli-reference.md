@@ -210,6 +210,7 @@ meridian server remove NAME_OR_IP [--yes]
 ```
 meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
+meridian node restart NAME [--core|--all] [--yes] [--json]
 meridian node remove NAME_OR_IP [--yes] [--force] [--forget-unreachable]
 meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes] [--forget-unreachable]
 meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
@@ -228,17 +229,20 @@ meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 | `--yes` | | 跳过确认提示 |
 | `--forget-unreachable` | | `node remove`, `node replace`: 被移除的服务器无法通过 SSH 连接（被封锁或已删除）时，忘记其上部署的内容，而不是让清理失败；在你删除它之前，它会继续为原有用户提供服务 |
 | `--force` | | `node remove`：同时删除指向此出口的中继链 |
-| `--json` | | 将 `node list` 作为 `meridian.output/v1` 信封发出 |
+| `--json` | | 将 `node list` / `node restart` 作为 `meridian.output/v1` 信封发出 |
 
 **`node add`** — 通过 SSH 连接，将服务器作为出口加入拓扑，并应用已审核的计划（系统加固、节点 agent 和 Xray、向控制服务注册）。现有客户端会在下次订阅刷新时收到新出口。
 
 **`node list`** — 列出节点及其 agent 的实时状态、版本和流量。如果控制服务无法访问，已配置的节点会显示为 `unknown`，命令以退出码 `3` 结束。
+
+**`node restart`** — 向节点代理发送签名命令，并等待服务就绪。默认或 `--core` 重启 Xray（`netcore`）；`--all` 逐一重启当前节点文档管理的所有运行中服务。每个服务重启时，其现有连接都会中断。`--core` 和 `--all` 互斥；`--json` 需要 `--yes`。JSON 在 `data.nodes[]` 中保留各条命令及节点的 `done`、`failed` 或 `timed_out` 结果。失败退出码为 `4`，等待五分钟后超时的退出码为 `3`。控制台的服务器视图提供 **重启 Xray** 按钮，并展示相同的重连提示和执行结果。
 
 **`node remove`** — 从拓扑中移除一个出口或路由网关。它会列出将被删除的所有资源（节点记录和文档、其 agent 和 Xray、防火墙规则、客户端接入点），请求确认后原样执行该审查计划；服务器本身仍保留在已保存的服务器列表中。控制服务器不能通过此命令移除（请使用 `meridian teardown`）；仍有中继指向该出口时也会拒绝（请先移除中继或传入 `--force`）；有路由网关经由该出口接入集群，或移除后会破坏拓扑（例如导致出口池为空或失去默认出口）时同样会拒绝。绑定到被移除网关的路由规则会一并删除。
 
 **`node replace`** — 将一个出口移到另一个服务器。`EXIT` 是出口 ID 或其服务器的保存名称或 IP；新服务器使用与 `node add` 相同的目标语法（保存的名称或 `local` 也可用）并像 `server add` 一样被保存。出口保留其 ID、Reality 密钥、协议路径、SNI、WARP 和地理设置以及指向它的每个中继，所以中继用户保持工作，直接用户在下一次订阅刷新时获得新地址。审查列出将部署在新服务器上的内容以及在旧服务器上清理的每个资源（agent 和 Xray、nginx 文件、防火墙规则和证书）；保存的服务器保留。对于控制服务器拒绝（移动它会改变每个订阅 URL；丢失时请使用 `meridian restore`），以及对于已经有角色的新服务器拒绝。
 
 **`node sni`** — 为出口的 Reality 路径设置新的伪装 SNI。`EXIT` 是出口 ID 或其服务器的保存名称或 IP。它拒绝 `apple.com`、`icloud.com` 名称和 `www.microsoft.com`，通过 SSH 检查出口能否以 TLS 1.3 和 HTTP/2 访问新站点，显示审查（跟随出口 SNI 的中继、保留自己 SNI 的中继、基于该路径的路由网关以及将清理的内容），确认后应用。旧名称会被替换而不是并存：应用在下次订阅刷新（每 6 小时）或手动刷新时切换，在此之前无法通过 Reality 连接。XHTTP、WSS 和 Hysteria2 不变。当 `meridian test --probe` 报告伪装 SNI 被封锁时使用。使用 `--self-steal` 时，`NEW_SNI` 是你拥有的域名：它不做可达性检查，而是检查该域名是否解析到出口（无法解析时停止，指向别处时警告），出口会为它申请 Let's Encrypt 证书并自己回应探测。
+
 
 ### meridian relay
 

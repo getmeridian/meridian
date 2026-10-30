@@ -54,3 +54,21 @@ def test_console_results_label_failures_and_timeouts_and_render_errors_as_text(m
     catalog = json.loads((UI_DIR / "locales/en.json").read_text())
     assert catalog["commands." + mode] in result["resultText"]
     assert result["images"] == 0 and result["pwned"] is False
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_console_restart_discloses_reconnects_and_sends_one_managed_unit_command(locale: str) -> None:
+    result = run_ui("restart", locale)
+    catalog = json.loads((UI_DIR / f"locales/{locale}.json").read_text())
+    assert result["writesBeforeConfirm"] == 0
+    assert catalog["servers.health_degraded"] in result["serverText"]
+    assert catalog["servers.applying"] in result["serverText"]
+    assert catalog["servers.stats_stalled"] in result["serverText"]
+    assert catalog["servers.memory"] in result["serverText"] and "26.7.28" in result["serverText"]
+    assert catalog["commands.restart_text"] in result["disclosure"]
+    assert result["writes"] == [{"body": {"kind": "restart_unit", "resource_id": "unit:netcore"}, "csrf": "1"}]
+    assert catalog["commands.done"] in result["resultText"]
+
+
+def test_console_restart_cancel_issues_no_command() -> None:
+    assert run_ui("restart-cancel")["writes"] == []

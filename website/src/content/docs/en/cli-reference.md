@@ -210,6 +210,7 @@ Manage exit servers. The first server is deployed with `meridian deploy` (or `me
 ```
 meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
+meridian node restart NAME [--core|--all] [--yes] [--json]
 meridian node remove NAME_OR_IP [--yes] [--force] [--forget-unreachable]
 meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes] [--forget-unreachable]
 meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
@@ -228,17 +229,20 @@ meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 | `--yes` | | Skip confirmation prompts |
 | `--forget-unreachable` | | `node remove`, `node replace`: Forget what was deployed on a removed server that doesn't answer over SSH (blocked or deleted) instead of failing its cleanup; it keeps serving its old users until you delete it |
 | `--force` | | `node remove`: also remove the relay chains that route to this exit |
-| `--json` | | Emit `node list` as a `meridian.output/v1` envelope |
+| `--json` | | Emit `node list` / `node restart` as a `meridian.output/v1` envelope |
 
 **`node add`** — connects over SSH, adds the server as an exit in your topology, and applies the reviewed plan (hardening, the node agent and Xray, enrollment with the control service). Existing clients receive the new exit on their next subscription refresh.
 
 **`node list`** — lists nodes with their agent's live status, version, and traffic. If the control service is unreachable, configured nodes are shown as `unknown` and the command exits `3`.
+
+**`node restart`** — sends a signed command to the node agent and waits for readiness. Default and `--core` restart Xray (`netcore`); `--all` restarts every running unit managed by the held node document, one at a time. Active connections drop while their unit restarts. `--core` and `--all` are exclusive; `--json` requires `--yes`. JSON preserves each command and the per-node outcome in `data.nodes[]`: `done`, `failed`, or `timed_out`. Failed restarts exit `4`; a five-minute timeout exits `3`. The Servers view in the console has a **Restart Xray** button with the same reconnect disclosure and results.
 
 **`node remove`** — removes an exit or routing gateway from your topology. It lists every resource that will be deleted (the node's record and document, its agent and Xray, firewall rules, client endpoints), asks for confirmation, and applies exactly that review; the server stays in your saved servers. It refuses for the control server (use `meridian teardown`), while relays still route to the exit (remove them first or pass `--force`), while a routing gateway enters the fleet through it, and when the result would break the topology (for example an empty egress pool or the default egress). Routing rules scoped to a removed gateway are dropped with it.
 
 **`node replace`** — moves one exit to another server. `EXIT` is the exit ID or its server's saved name or IP; the new server uses the same target syntax as `node add` (a saved name or `local` works too) and is saved like `server add`. The exit keeps its ID, Reality keys, protocol paths, SNI, WARP and geo settings, and every relay that points at it, so relay users keep working and direct users get the new address on their next subscription refresh. The review lists what will be deployed on the new server and every resource cleaned up on the old one (the agent and Xray, nginx files, firewall rules, and certificates); the saved server stays. It refuses for the control server (moving it would change every subscription URL; use `meridian restore` when it is lost) and for a new server that already has a role.
 
 **`node sni`** — gives an exit's Reality path a new camouflage SNI. `EXIT` is the exit ID or its server's saved name or IP. It refuses `apple.com` and `icloud.com` names and `www.microsoft.com`, checks over SSH that the exit reaches the new site with TLS 1.3 and HTTP/2, shows the review (relays that follow the exit's SNI, relays that keep their own, routing gateways built on the path, and what gets cleaned up), confirms, and applies it. The old name is replaced, not kept alongside: apps switch at their next subscription refresh (every 6 hours) or a manual refresh, and until then they cannot connect over Reality. XHTTP, WSS, and Hysteria2 don't change. Use it when `meridian test --probe` reports the camouflage SNI blocked. With `--self-steal`, `NEW_SNI` is a domain you own: instead of the reachability check, it checks that the name resolves to the exit (stopping when it doesn't resolve, warning when it points elsewhere), and the exit gets a Let's Encrypt certificate for it and answers probes itself.
+
 
 ### meridian relay
 

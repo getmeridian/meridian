@@ -1,4 +1,4 @@
-/* Meridian console: Servers and Revisions (view-only) and API tokens.
+/* Meridian console: server runtime, revisions, and API tokens.
  * Topology changes stay in the CLI on the deployer's computer: SSH keys never live on
  * the control server, so this console shows servers and history but cannot change them. */
 (function () {
@@ -98,7 +98,9 @@
         h("ul", {}, (server.errors && server.errors.length ? server.errors : server.failed).map(function (line) {
           return h("li", { class: "mono small", text: line });
         })))
-        : null);
+        : null,
+      h("div", { class: "row-actions" }, h("button", { class: "btn btn-ghost btn-sm", type: "button",
+        onclick: function () { M.restartNode(server.node_id); } }, M.t("commands.restart"))));
   }
 
   // -- revisions --------------------------------------------------------------------------------

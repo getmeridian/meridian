@@ -6,20 +6,24 @@ import base64
 
 from meridian.control.command_models import NodeCommandRecord
 from meridian.control.models import NodeSpec
-from meridian.core.agent_protocol import CommandResult, ResetInboundCommand, ResourceError
+from meridian.core.agent_protocol import CommandResult, ResetInboundCommand, ResourceError, RestartUnitCommand
 from meridian.core.agent_types import ServiceSignature
 
 
 def command_record(
-    node_id: str, status: str = "pending", *, index: int = 1, fallback: bool = False
+    node_id: str, status: str = "pending", *, index: int = 1, fallback: bool = False, unit: str | None = None
 ) -> NodeCommandRecord:
-    command = ResetInboundCommand(
-        command_id=f"00000000-0000-4000-8000-{index:012d}",
-        fleet_epoch=1,
-        issued_at="2026-10-30T12:00:00Z",
-        expires_at="2026-10-30T12:05:00Z",
-        inbound_tag="vless-reality",
-        signature=ServiceSignature(key_id="a" * 64, signature=base64.b64encode(bytes(64)).decode()),
+    common = {
+        "command_id": f"00000000-0000-4000-8000-{index:012d}",
+        "fleet_epoch": 1,
+        "issued_at": "2026-10-30T12:00:00Z",
+        "expires_at": "2026-10-30T12:05:00Z",
+        "signature": ServiceSignature(key_id="a" * 64, signature=base64.b64encode(bytes(64)).decode()),
+    }
+    command = (
+        RestartUnitCommand(**common, resource_id=unit)
+        if unit
+        else ResetInboundCommand(**common, inbound_tag="vless-reality")
     )
     result = None
     if status in {"succeeded", "failed", "rejected"}:
@@ -30,7 +34,7 @@ def command_record(
             if status != "succeeded"
             else None,
             finished_at="2026-10-30T12:00:01Z",
-            effect=("core_restart" if fallback else "inbound_reset") if status == "succeeded" else None,
+            effect=("core_restart" if fallback else "inbound_reset") if status == "succeeded" and not unit else None,
         )
     return NodeCommandRecord(node_id=node_id, command=command, status=status, wait_for=None, result=result)
 

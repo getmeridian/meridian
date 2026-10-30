@@ -10,7 +10,7 @@ _RENDERER_MANIFEST = {
     "agent-runtime": "signed-commands-v4",
     "agent-spec": "service-blob-v1",
     "control-subscriptions": "yaml12-quoting-v10",
-    "control-commands": "revision-gated-cut-off-v2",
+    "control-commands": "node-restart-console-v3",
     "pwa": "quiet-account-v23",
     "control-service": "people-fleet-fallback-v20",
     "control-api": "finite-user-expiry-v5",

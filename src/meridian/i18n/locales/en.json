@@ -415,5 +415,11 @@
   "node_commands.done": "done",
   "node_commands.core_restart": "done with a core restart",
   "node_commands.failed": "failed",
-  "node_commands.timed_out": "timed out"
+  "node_commands.timed_out": "timed out",
+  "node_commands.restart_exclusive": "Choose either --core or --all.",
+  "node_commands.restart_confirmation": "Restarting a node requires explicit confirmation in JSON mode.",
+  "node_commands.restart_unknown": "Node '{name}' is not one of this fleet's agent nodes.",
+  "node_commands.restart_no_units": "This node has no running managed units in the requested scope.",
+  "node_commands.restart_core_confirm": "Restart Xray on {node}? Everyone using it reconnects for a moment.",
+  "node_commands.restart_all_confirm": "Restart these managed units on {node}: {units}? Their active connections drop while each unit restarts."
 }

@@ -415,5 +415,11 @@
   "node_commands.done": "انجام شد",
   "node_commands.core_restart": "با راه‌اندازی مجدد Xray انجام شد",
   "node_commands.failed": "ناموفق",
-  "node_commands.timed_out": "زمان انتظار پایان یافت"
+  "node_commands.timed_out": "زمان انتظار پایان یافت",
+  "node_commands.restart_exclusive": "فقط یکی از --core یا --all را انتخاب کنید.",
+  "node_commands.restart_confirmation": "راه‌اندازی مجدد سرور در حالت JSON به تأیید صریح نیاز دارد.",
+  "node_commands.restart_unknown": "سرور «{name}» از سرورهای دارای عاملِ این مجموعه نیست.",
+  "node_commands.restart_no_units": "این سرور در محدودهٔ انتخاب‌شده سرویسِ مدیریت‌شدهٔ فعالی ندارد.",
+  "node_commands.restart_core_confirm": "Xray در سرور {node} راه‌اندازی مجدد شود؟ همهٔ کاربران آن برای لحظه‌ای دوباره وصل می‌شوند.",
+  "node_commands.restart_all_confirm": "سرویس‌های مدیریت‌شدهٔ {units} در سرور {node} راه‌اندازی مجدد شوند؟ هنگام راه‌اندازی مجدد هر سرویس، اتصال‌های فعال آن قطع می‌شوند."
 }

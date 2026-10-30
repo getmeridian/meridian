@@ -382,5 +382,9 @@
   "commands.core_restart": "通过重启 Xray 完成",
   "commands.failed": "失败",
   "commands.timed_out": "等待超时",
-  "error.command_queue_full": "此节点有 64 条命令尚未响应。请等待它们完成后重试。"
+  "error.command_queue_full": "此节点有 64 条命令尚未响应。请等待它们完成后重试。",
+  "commands.restart": "重启 Xray",
+  "commands.restart_title": "重启节点 {node} 上的 Xray",
+  "commands.restart_text": "此节点上的所有 Xray 会话都会终止。使用它的所有人都会短暂重连。",
+  "commands.no_core": "此节点没有正在运行的受管 Xray 服务。请先应用节点配置。"
 }

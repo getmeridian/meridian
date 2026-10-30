@@ -73,6 +73,7 @@ COMMAND_SECTIONS: dict[str, str] = {
     "route remove": "### meridian route",
     "node add": "### meridian node",
     "node list": "### meridian node",
+    "node restart": "### meridian node",
     "node remove": "### meridian node",
     "node replace": "### meridian node",
     "node sni": "### meridian node",

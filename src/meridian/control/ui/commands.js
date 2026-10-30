@@ -76,4 +76,21 @@
       });
     });
   };
+
+  var restarting = Object.create(null);
+  M.restartNode = function (node) {
+    if (restarting[node]) return;
+    restarting[node] = true;
+    return M.api("GET", "api/nodes/" + encodeURIComponent(node) + "/command-targets").then(function (targets) {
+      var core = targets.units.find(function (unit) { return unit.core; });
+      if (!core) throw new M.ApiError(409, "node_no_core", M.t("commands.no_core"));
+      return M.confirm(M.t("commands.restart_title", { node: node }), M.t("commands.restart_text"), M.t("commands.restart"), true).then(function (ok) {
+        if (!ok) return;
+        return M.api("POST", "api/nodes/" + encodeURIComponent(node) + "/commands", { kind: "restart_unit", resource_id: core.resource_id }).then(function (record) {
+          M.showCommandResults([record]);
+        });
+      });
+    }).catch(function (error) { M.toast(M.errorText(error), "error"); })
+      .finally(function () { delete restarting[node]; });
+  };
 })();

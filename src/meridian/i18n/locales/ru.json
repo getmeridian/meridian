@@ -415,5 +415,11 @@
   "node_commands.done": "выполнено",
   "node_commands.core_restart": "выполнено с перезапуском Xray",
   "node_commands.failed": "не выполнено",
-  "node_commands.timed_out": "время ожидания истекло"
+  "node_commands.timed_out": "время ожидания истекло",
+  "node_commands.restart_exclusive": "Выберите --core или --all.",
+  "node_commands.restart_confirmation": "Для перезапуска сервера в режиме JSON нужно явное подтверждение.",
+  "node_commands.restart_unknown": "Сервер «{name}» не относится к вашим серверам с агентом.",
+  "node_commands.restart_no_units": "В выбранной области у этого сервера нет работающих управляемых служб.",
+  "node_commands.restart_core_confirm": "Перезапустить Xray на сервере {node}? Все его пользователи ненадолго переподключатся.",
+  "node_commands.restart_all_confirm": "Перезапустить управляемые службы на сервере {node}: {units}? Их активные соединения прервутся на время перезапуска каждой службы."
 }

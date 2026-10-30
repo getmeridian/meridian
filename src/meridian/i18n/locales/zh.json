@@ -415,5 +415,11 @@
   "node_commands.done": "已完成",
   "node_commands.core_restart": "通过重启 Xray 完成",
   "node_commands.failed": "失败",
-  "node_commands.timed_out": "等待超时"
+  "node_commands.timed_out": "等待超时",
+  "node_commands.restart_exclusive": "请选择 --core 或 --all，不能同时使用。",
+  "node_commands.restart_confirmation": "JSON 模式下重启节点需要明确确认。",
+  "node_commands.restart_unknown": "节点“{name}”不属于此集群的代理节点。",
+  "node_commands.restart_no_units": "此节点在所选范围内没有正在运行的受管服务。",
+  "node_commands.restart_core_confirm": "重启节点 {node} 上的 Xray？使用它的所有人都会短暂重连。",
+  "node_commands.restart_all_confirm": "重启节点 {node} 上的受管服务 {units}？每个服务重启时，其现有连接都会中断。"
 }

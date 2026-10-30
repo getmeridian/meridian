@@ -10,6 +10,7 @@ from typing import Annotated
 import typer
 
 from meridian.cli_fleet_usage import fleet_usage_cmd
+from meridian.cli_node_commands import node_restart_cmd
 from meridian.cli_options import (
     CutOff,
     DeviceLimit,
@@ -31,7 +32,9 @@ client_app = typer.Typer(
     help="Manage who can connect: add, show, list, limit, reissue, enable, disable, remove", no_args_is_help=True
 )
 server_app = typer.Typer(help="Save and name servers you reach over SSH", no_args_is_help=True)
-node_app = typer.Typer(help="Add, list, replace, or remove exit servers, or change their SNI", no_args_is_help=True)
+node_app = typer.Typer(
+    help="Add, list, restart, replace, or remove exit servers, or change their SNI", no_args_is_help=True
+)
 relay_app = typer.Typer(
     help="Add, list, or remove relays that forward traffic to an exit, or change their SNI", no_args_is_help=True
 )
@@ -43,6 +46,7 @@ context_app = typer.Typer(
 api_app = typer.Typer(help="Machine-readable contracts for scripts and UIs", no_args_is_help=True)
 dev_app = typer.Typer(help="Developer tools for testing and debugging", no_args_is_help=True)
 fleet_app.command("usage")(fleet_usage_cmd)
+node_app.command("restart", rich_help_panel="Operations")(node_restart_cmd)
 
 
 @client_app.command("add")

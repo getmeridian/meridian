@@ -229,6 +229,17 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         stability="stable",
     ),
     "node.replace": None,
+    "node.restart": CommandOutput(
+        data_schema="node-restart",
+        outcomes=[
+            _ok("the requested node units restarted and became ready"),
+            _ok("one or more restart results timed out", exit_code=3),
+            _ok("one or more node units failed to restart", exit_code=4),
+            _user("unknown node, conflicting scope flags, or confirmation missing"),
+            *_PANEL_FAILURES,
+        ],
+        stability="stable",
+    ),
     "node.sni": None,
     "node.remove": None,
     "relay.add": None,

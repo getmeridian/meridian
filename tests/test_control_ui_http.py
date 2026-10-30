@@ -619,6 +619,7 @@ def test_declared_people_are_the_clis_to_remove_or_relink(fleet: Fleet) -> None:
     assert fleet.ui("POST", "/api/users/bob/reissue", {}).status == 200  # the console's own people stay its own
     assert fleet.ui("DELETE", "/api/users/bob").status == 200
     assert fleet.call("POST", "/api/users/alice/reissue", {}, bearer=ADMIN_TOKEN).status == 200  # the CLI may
+    assert fleet.call("DELETE", "/api/users/alice", bearer=ADMIN_TOKEN).status == 200
 
 
 def test_the_owner_can_remove_its_person_with_a_cut_off_and_read_the_result(fleet: Fleet) -> None:
@@ -632,7 +633,20 @@ def test_the_owner_can_remove_its_person_with_a_cut_off_and_read_the_result(flee
     record = removed.body["commands"][0]
     read = fleet.ui("GET", f"/api/nodes/main/commands/{record['command']['command_id']}")
     assert read.status == 200 and read.body["status"] == "waiting"
-    assert fleet.call("DELETE", "/api/users/alice", bearer=ADMIN_TOKEN).status == 200
+
+
+def test_the_owner_can_restart_a_managed_unit_but_cannot_issue_other_command_kinds(fleet: Fleet) -> None:
+    fleet.set_up()
+    fleet.service.put_node_spec("main", command_node_spec())
+    assert fleet.ui("GET", "/api/nodes/main/command-targets").status == 200
+    restart = fleet.ui("POST", "/api/nodes/main/commands", {"kind": "restart_unit", "resource_id": "unit:netcore"})
+    assert restart.status == 200
+    for command in [
+        {"kind": "reconcile"},
+        {"kind": "renew_credential"},
+        {"kind": "reset_inbound", "inbound_tag": "vless-reality"},
+    ]:
+        assert fleet.ui("POST", "/api/nodes/main/commands", command).status == 403
 
 
 @pytest.mark.parametrize(("username", "status"), [(".", 404), ("..", 404), (".hidden", 200), ("...", 200)])

@@ -29,6 +29,7 @@
 
 ## What's done well
 - Node status exposes durable `traffic_bytes` and its activity window from the same accounting row, so deployer adapters consume the public API rather than replay baselines.
+- The console's direct command permission is only `restart_unit` for a held managed resource; cut-off resets are queued through the guarded person mutation, and all other command kinds remain API-token operations.
 - `cutoff.py` captures affected inbounds before a credential change and queues revision-gated resets in that change's transaction; a full queue rolls back the credentials and documents together, and a closed console tab cannot strand the cut-off.
 - Signed commands live in `commands.py` and schema step 14: oldest first, only session-negotiated kinds, durable first-result acknowledgements, 64 unanswered per node, expiry and seven-day finished retention; revision gates release only on applied reports.
 - Command session capabilities and command queues are transient snapshot state; restore never replays a signed command under the old epoch or signing certificate.

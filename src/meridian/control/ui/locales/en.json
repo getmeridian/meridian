@@ -382,5 +382,9 @@
   "commands.core_restart": "Done with a core restart",
   "commands.failed": "Failed",
   "commands.timed_out": "Timed out",
-  "error.command_queue_full": "This node has 64 unanswered commands. Wait for them to finish and retry."
+  "error.command_queue_full": "This node has 64 unanswered commands. Wait for them to finish and retry.",
+  "commands.restart": "Restart Xray",
+  "commands.restart_title": "Restart Xray on {node}",
+  "commands.restart_text": "Every open Xray session on this node ends. Everyone using it reconnects for a moment.",
+  "commands.no_core": "This node has no running managed Xray unit. Apply its node configuration first."
 }

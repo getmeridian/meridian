@@ -84,6 +84,7 @@ from meridian.core.models import (
     OutputStatus,
     Summary,
 )
+from meridian.core.node_commands import NodeRestartRequest, NodeRestartResult
 from meridian.core.operations import (
     DeployOperationResult,
     OperationCancel,
@@ -498,6 +499,13 @@ _, _, NodeListOutputEnvelope = _make_command_envelope(
     doc="Envelope schema for `meridian --json node list`.",
 )
 
+_, _, NodeRestartOutputEnvelope = _make_command_envelope(
+    "NodeRestart",
+    "node.restart",
+    NodeRestartResult,
+    doc="Envelope schema for `meridian node restart --json`.",
+)
+
 _, _, RelayListOutputEnvelope = _make_command_envelope(
     "RelayList",
     "relay.list",
@@ -603,6 +611,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "client-extend-envelope": ClientExtendOutputEnvelope,
     "client-extend-request": ClientExtendRequest,
     "node-list-envelope": NodeListOutputEnvelope,
+    "node-restart-envelope": NodeRestartOutputEnvelope,
     "relay-list-envelope": RelayListOutputEnvelope,
     "route-add-envelope": RouteAddOutputEnvelope,
     "route-list-envelope": RouteListOutputEnvelope,
@@ -679,6 +688,8 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "node-command-request": NodeCommandRequest,
     "node-command-record": NodeCommandRecord,
     "node-command-targets": NodeCommandTargets,
+    "node-restart-request": NodeRestartRequest,
+    "node-restart": NodeRestartResult,
     "node-command-outcome": NodeCommandOutcome,
     "cut-off-plan": CutOffPlan,
     "user-cut-off-request": UserCutOffRequest,
