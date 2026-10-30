@@ -16,17 +16,16 @@
 
 **Core imports plus the CLI tree** — contract export imports `meridian.core` services and schemas, and `meridian.cli_catalog` walks the in-process Typer app for `commands.json`; it never spawns `meridian`, imports command modules, or hits prompts and process exits.
 
-**Agent protocol apart** — `agent/` holds the internal `meridian.agent/v1` service-to-agent contract (`agent/schemas/`, `agent/http.json`) for the Rust node agent; it stays out of `schemas/`, so Studio's generator and `meridian api schemas` never see it.
+**Agent protocol apart** — `agent/` holds the internal `meridian.agent/v1` service-to-agent contract (`agent/schemas/`, `agent/http.json`) for the Rust node agent; it stays out of `schemas/`, so `meridian api schemas` never sees it.
 
 **Redacted fixtures** — golden fixtures are safe passive artifacts. Operator-visible handoff details remain available through explicit UI/CLI result views.
 
 ## What's done well
 
-- Contracts include schemas, command catalog, workflow catalog, event types, and deploy fixtures in one deterministic tree.
-- `--check` gives CI a cheap drift gate before Studio or Engine clients depend on stale shapes.
+- Contracts include schemas, command catalog, event types, and the admin OpenAPI document in one deterministic tree.
+- `--check` gives CI a cheap drift gate before API clients depend on stale shapes.
 
 ## Pitfalls
 
-- Do not make generated TypeScript or Studio forms the source of truth.
 - Keep fixture clocks, operation IDs, and durations fixed so diffs are meaningful.
 - Never write Python-version-dependent text into a contract: `HTTPStatus.phrase` changed in 3.13 (413 "Request Entity Too Large" → "Content Too Large"), so the OpenAPI generator pins RFC 9110 phrases.

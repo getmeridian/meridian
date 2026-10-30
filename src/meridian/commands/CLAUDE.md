@@ -7,11 +7,11 @@
 **Client names resolve like `client show`** — an exact service username wins over a case-folded or display-name match, and a name folding onto two people is refused. Service-owned edits and reads cover console-added people; topology-owned removal and reissue act only on `topology_intent.access.users`.
 **One target vocabulary** — `cli_options.py` owns the shared `SERVER` types; `resolve.parse_target()` reads `[user@]host[:port]`, saved names, and `local` like ssh, and `resolve.py` adds the prompts.
 **One JSON switch, one context switch** — every `--json` is `cli_options.Json` and bodies only read `is_json_mode()`; the root callback resolves argv, `--context`, and help requests through Click (`cli_catalog`), never by re-parsing argv. A superseded context runs only `context.READS_ONLY` commands.
-**Machine deploy mode** — `deploy --json`, `--events=jsonl`, `--request FILE`, and `--dry-run` serve automation: no prompts or Rich, the final envelope on stdout, JSONL on stderr; hidden `--cancel-file` stops at the next safe point (exit 5).
+**Machine deploy mode** — `deploy --json`, `--events=jsonl`, `--request FILE`, and `--dry-run` serve agents and automation: no prompts or Rich, the final envelope on stdout, JSONL on stderr; hidden `--cancel-file` stops at the next safe point (exit 5).
 **Health surface** — `check` dispatches by role, `test` runs a client's delivered Xray config end to end, `doctor` bundles a report, `logs` tails the server's units; all render through `check_render.py`: negative evidence exits 4, unavailable evidence 3, a full pass 0.
 **Presentation-only wizard** — `setup_v4.py` and `setup_wizard.py` collect resumable choices (text from `meridian.i18n`, prompts from `wizard_prompts.py`, lists from `wizard_terminal.py`); compile, apply, and verify stay in `meridian.setup`.
 **Agent guide** — `meridian help agents` prints `data/agents.md`; `test_help_command.py` fails if it names a missing command.
-**Retired spellings** — `cli.RENAMED`/`RENAMED_OPTIONS` refuse old commands and flags with exit 2 and the new spelling.
+**Retired spellings** — `cli.RENAMED`/`RENAMED_OPTIONS` refuse old commands and flags with exit 2 and the new spelling; `cli.RETIRED` refuses a command removed without a successor (`studio`) and points to where the work moved.
 
 ## What's done well
 - `fleet upgrade` reads each relay's running Realm (a failed upgrade leaves the saved pin ahead), applies the unchanged intent, then runs `check`.

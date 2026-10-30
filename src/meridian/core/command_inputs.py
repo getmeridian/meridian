@@ -1,4 +1,4 @@
-"""Validated command/input request models shared by CLI and Engine adapters."""
+"""Validated command/input request models shared by CLI adapters."""
 
 from __future__ import annotations
 

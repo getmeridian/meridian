@@ -68,7 +68,6 @@ def test_a_source_build_without_agent_builds_still_works(tmp_path: Path) -> None
 def _wheel(tmp_path: Path, builds: dict[str, bytes], *, digest: str | None = None) -> Path:
     wheel = tmp_path / "meridian.whl"
     with ZipFile(wheel, "w") as archive:
-        archive.writestr("meridian/studio_assets/studio/index.html", "<!doctype html>")
         archive.writestr("meridian/data/agents.md", "# Meridian for AI agents")
         archive.writestr("meridian/data/ai-reference.md", "# Reference")
         for name, data in builds.items():
@@ -82,11 +81,11 @@ def _wheel(tmp_path: Path, builds: dict[str, bytes], *, digest: str | None = Non
 def test_a_release_wheel_needs_both_agent_builds(tmp_path: Path) -> None:
     wheel = _wheel(tmp_path, {"netagent-x86_64-unknown-linux-musl": BUILD})
 
-    verify_wheel_assets(wheel)  # CI's website wheel carries no agent
+    verify_wheel_assets(wheel)  # a plain source build carries no agent
     with pytest.raises(ValueError, match="missing the node agent: .*aarch64"):
         verify_wheel_assets(wheel, release=True)
     with pytest.raises(ValueError, match="missing the node agent"):
-        verify_wheel_assets(wheel, studio=False, agent=True)
+        verify_wheel_assets(wheel, agent_only=True)
 
 
 def test_a_packaged_agent_build_that_misses_its_digest_fails_the_check(tmp_path: Path) -> None:

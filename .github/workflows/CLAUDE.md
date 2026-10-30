@@ -26,8 +26,6 @@
 - **System lab waits for lint and tests** — no Docker minutes spent on obvious failures.
 - **Client routing runs on real Xray** — Python 3.12 downloads the checksum-verified pinned runtime before pytest; bootstrap failure fails CI instead of silently skipping the loopback handshake tests. The same leg installs the website's jsdom for the console DOM scenarios (`MERIDIAN_TEST_CONSOLE`).
 - **Demo validation** — the website job runs `scripts/build_showcase.py` into `dist/demo` and checks the connection page's assets, its disabled SW, rendered pages, and the console demo's files; the release job builds the same output.
-- **Contract drift checks** — the website build also runs `pnpm run contracts:check`.
-- **Package asset check** — website CI builds a wheel after Astro and verifies the Studio page is bundled and the rest of the website is not.
 
 ## Pitfalls
 

@@ -131,11 +131,6 @@ ai-docs: ## Bundle the docs `doctor --ai` pastes into its prompt (needs Node)
 		echo "  - Node.js not found; skipping the AI reference (doctor --ai works without it)"; \
 	fi
 
-studio-assets: ## Build website assets bundled into `meridian studio`
-	cd website && pnpm run contracts:check && pnpm run build
-	cp VERSION website/dist/version
-	find website/dist -name .DS_Store -delete
-
 # Pinned toolchain image (multi-arch index digest), run on the host's own architecture;
 # agent/scripts/build-musl.sh cross-compiles the other target without emulation.
 AGENT_IMAGE := rust:1.99.1-alpine3.22@sha256:731f64e16c12af70970d9a3655eecb1eecab4898352f09688a8e5ca2ab8b77c5
@@ -148,7 +143,7 @@ agent: ## Build static netagent binaries (musl, in Docker) into agent/dist/
 		-e CARGO_TARGET_DIR=/target -w /src $(AGENT_IMAGE) sh /src/scripts/build-musl.sh $(AGENT_TARGETS)
 	@ls -l $(foreach t,$(AGENT_TARGETS),agent/dist/netagent-$(t))
 
-build: ai-docs studio-assets ## Build wheel and sdist
+build: ai-docs ## Build wheel and sdist
 	uv build
 	uv run python scripts/verify_package_assets.py dist/*.whl
 

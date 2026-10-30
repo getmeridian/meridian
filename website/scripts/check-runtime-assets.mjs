@@ -12,7 +12,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-// A literal absolute URL; loopback (Studio's local Engine) is not another origin on the network.
+// A literal absolute URL; loopback is not another origin on the network.
 const ABSOLUTE = String.raw`(["'\x60])(?:https?:|wss?:)?\/\/(?!(?:localhost|127\.0\.0\.1|\[::1\])[:/"'\x60])`;
 
 const MARKUP_CHECKS = [

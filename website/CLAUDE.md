@@ -1,4 +1,4 @@
-# website — Astro site (getmeridian.org): landing, Starlight docs, blog, Studio
+# website — Astro site (getmeridian.org): landing, Starlight docs, blog
 
 ```bash
 cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
@@ -29,13 +29,12 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 - **App links**: `src/data/apps.json` is SOT. CI validates against template + Python constants.
 - **AI docs**: `scripts/ai-docs.mjs` is the only bundler — `/llms-full.txt` and `/ai/reference.md` at build time, and `make ai-docs` / the PyPI job write the same reference into the package as `ai-reference.md` for `doctor --ai`. The agent guide is the CLI's `src/meridian/data/agents.md`.
 - **install.sh**: deployed to `getmeridian.org/install.sh` by CI release workflow.
-- **Studio contracts**: `pnpm run contracts:generate` builds `src/studio/generated/` from checked-in `contracts/meridian/v1`.
 
 ## Pitfalls
 
 - **Theme and language cross the docs boundary** — landing uses `meridian-theme`/`meridian-lang`, Starlight `starlight-theme`; ThemeToggle writes both (on click only) and a Starlight head script copies the theme, or switching sections flips it. Only a language link writes `meridian-lang`; reading a docs page is not a choice.
 - **Astro builds every `.md` under `src/pages`** — the `drop-contributor-notes` integration deletes the `/CLAUDE/` pages that folder notes produce.
-- **Links are validated** — `starlight-links-validator` fails the build on a broken docs link or anchor; translated headings have translated anchors. Custom pages (blog, demo, studio) are excluded because Starlight can't see them.
+- **Links are validated** — `starlight-links-validator` fails the build on a broken docs link or anchor; translated headings have translated anchors. Custom pages (blog, demo) are excluded because Starlight can't see them.
 - **Remark plugins need the unified processor** — Astro 7 defaults to Sätteri; pass plugins to `unified()` from `@astrojs/markdown-remark` (Starlight needs it too).
 - **Starlight owns Astro i18n** — never add a top-level `i18n` block; Starlight derives it from `locales`.
 - **Prefetch on hover only** — `defaultStrategy: 'viewport'` with `prefetchAll` downloaded every visible sidebar page (~20) on each visit.

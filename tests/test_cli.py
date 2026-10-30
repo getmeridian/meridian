@@ -46,7 +46,6 @@ class TestCLIBasics:
         output = _strip_ansi(result.output)
         assert "setup" in output
         assert "deploy" in output
-        assert "studio" in output
         assert "client" in output
         assert "server" in output
 
@@ -138,6 +137,12 @@ class TestRenamedSpellings:
             assert result.exit_code == 2, old
             assert f"meridian {old}` is now `meridian {new}`" in _strip_ansi(result.output)
 
+    def test_removed_studio_command_points_at_the_owners_console(self) -> None:
+        result = runner.invoke(app, ["studio", "--port", "9876", "--no-open"])
+
+        assert result.exit_code == 2
+        assert "meridian panel" in _strip_ansi(result.output)
+
     def test_old_spellings_are_not_commands_any_more(self) -> None:
         group = typer.main.get_command(app)
         for old in cli.RENAMED:
@@ -170,7 +175,6 @@ class TestRenamedSpellings:
     [
         (["setup"], ["--intent", "--restart"]),
         (["deploy"], ["--domain", "--sni", "--json", "--events", "--request", "--dry-run"]),
-        (["studio"], ["--port", "--assets-dir", "--no-open"]),
         (["client"], ["add", "list", "remove"]),
         (["server"], ["add", "list", "remove"]),
         (["fleet"], ["status", "inventory", "upgrade"]),
@@ -190,7 +194,7 @@ def test_subcommand_help(argv: list[str], expected: list[str]) -> None:
         assert needle in output
 
 
-@pytest.mark.parametrize("argv", [["studio", "--port", "65536"], ["apply", "--parallel", "0"]], ids=" ".join)
+@pytest.mark.parametrize("argv", [["apply", "--parallel", "0"]], ids=" ".join)
 def test_out_of_range_option_values_are_user_errors(argv: list[str]) -> None:
     assert runner.invoke(app, argv).exit_code == 2
 
@@ -257,19 +261,6 @@ class TestCommandDispatch:
 
         assert result.exit_code == 2
         assert "No server IP given" in _strip_ansi(result.output)
-
-    def test_studio_command_delegates_to_runner(self, monkeypatch) -> None:
-        called: dict[str, object] = {}
-
-        def fake_run(*, port: int, assets_dir: str, no_open: bool) -> None:
-            called.update({"port": port, "assets_dir": assets_dir, "no_open": no_open})
-
-        monkeypatch.setattr("meridian.commands.studio.run", fake_run)
-
-        result = runner.invoke(app, ["studio", "--port", "9876", "--assets-dir", "website/dist", "--no-open"])
-
-        assert result.exit_code == 0
-        assert called == {"port": 9876, "assets_dir": "website/dist", "no_open": True}
 
     def test_deploy_accepts_command_json_and_events(self, monkeypatch) -> None:
         called: dict[str, object] = {}

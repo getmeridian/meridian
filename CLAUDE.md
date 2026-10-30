@@ -23,7 +23,7 @@ Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
 - **Contexts:** one machine keeps several fleets (`meridian context`); the home is the `default` one, others live in `contexts/NAME/`, and the SSH key is shared.
 - **Plan and apply:** every fleet is a reviewed `topology_intent` in `cluster.yml`; `meridian plan` / `apply` compile it and reconcile resource drivers.
 - **Control service (#95):** `meridian serve` (`ctld`) keeps users, traffic, revisions, and operator-owned privacy in SQLite (device limits and daily history default off), serves subscriptions and the owner's web console, and signs documents that each server's Rust agent (`netagent`) pulls over HTTPS; every change pulls an encrypted snapshot to the deployer (`meridian backup`, `restore`). `meridian migrate` moves a Remnawave fleet from an earlier beta onto it in place, keeping every link.
-- **Website and Studio:** Astro, with docs on Starlight (every page also served as Markdown for agents). Static Studio consumes generated contracts; executable Studio runs through a localhost-only Engine (`meridian studio`) for server onboarding, deploy dry-runs, and deploys.
+- **Website:** Astro, with docs on Starlight (every page also served as Markdown for agents).
 - **Connection pages:** `ctld` serves every person's subscription URL as browser HTML or app configs, including console invitees; branding and exit countries travel through its settings, and shared PWA assets come from the installed package.
 - **Page language:** the service owns an automatic browser default or an explicit en/ru/fa/zh default, with nullable person overrides; a person's saved page choice wins, and automatic native status remarks stay English.
 - **Real-VM harness:** optional, local-only, in `tests/realvm/`.
@@ -61,7 +61,6 @@ src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── provision/CLAUDE.md                 — step pipeline + idempotency
 ├── remnawave/CLAUDE.md                 — migrate's read-only panel reader and shared user/node shapes
 ├── diagnostics/CLAUDE.md               — reusable health, blocking, and probe checks
-├── engine/CLAUDE.md                    — local Engine use-case boundary
 ├── control/CLAUDE.md                   — `meridian serve`: signed node documents, users, subscriptions
 │   ├── formats/CLAUDE.md               — subscription documents: golden corpus, Xray JSON, Mihomo, Stash, sing-box
 │   └── ui/CLAUDE.md                    — owner's web console: vanilla JS, strict CSP, owner sign-in
@@ -83,7 +82,6 @@ website/CLAUDE.md                       — Astro + Starlight docs, agent endpoi
 ├── src/layouts/CLAUDE.md               — Base/BlogPost shells, early theme + locale
 ├── src/pages/CLAUDE.md                 — docs entry, Markdown twins, machine-readable endpoints
 ├── src/pages/blog/CLAUDE.md            — blog index, post route
-├── src/studio/CLAUDE.md                — generated Studio contracts and adapters
 └── src/styles/CLAUDE.md                — token system, warm light-first palette
 
 video/CLAUDE.md                         — Remotion setup walkthrough from recorded, sanitized footage
@@ -117,7 +115,7 @@ Rules enforced by `tests/test_architecture.py` — violations fail CI.
 
 - **800-line budget** — files above 800 lines require an entry in `FILE_SIZE_ALLOWLIST` in `test_architecture.py` with a justification. When a change pushes a file past the budget, split first.
 - **No private cross-module imports** — if `_foo()` is imported outside its own file, it's public. Drop the underscore and move it to the right module, or add it to the allowlist with a justification.
-- **Layer boundaries** — `core/` never imports commands, console, config, Typer, or Rich. `engine/` never imports commands, console, provision, remnawave, or ssh. `compiler/` never does I/O or randomness. `adapters/` never imports engine.
+- **Layer boundaries** — `core/` never imports commands, console, config, Typer, or Rich. `compiler/` never does I/O or randomness.
 - **One concept, one place** — before adding a new type, helper, or constant, search for an existing one. Duplicate port computations, result types, error hierarchies, and field sets were the top source of drift.
 - **Typed contracts at boundaries** — new result types must reference or compose existing core types. Don't reinvent `returncode, stdout, stderr`; use `CommandResult`. Don't hand-build dicts that match a Pydantic model; construct the model.
 

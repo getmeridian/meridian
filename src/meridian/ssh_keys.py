@@ -2,8 +2,8 @@
 
 Host-key lookups plus Meridian's dedicated client key: create it once,
 install its public half in ``authorized_keys``, and check that it logs in.
-No Rich, no console, no transport — safe for the CLI (``meridian.ssh``,
-``meridian.resolve``) and the Engine (``meridian.engine``) alike.
+No Rich, no console, no transport — safe for ``meridian.ssh`` and
+``meridian.resolve`` alike.
 """
 
 from __future__ import annotations

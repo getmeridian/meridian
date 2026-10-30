@@ -26,7 +26,6 @@ CLI_REFERENCES = {
 # explicit makes section moves deliberate; discovery below makes new or removed
 # commands fail validation instead of silently falling outside the audit.
 COMMAND_SECTIONS: dict[str, str] = {
-    "studio": "### meridian studio",
     "plan": "### meridian plan",
     "apply": "### meridian apply",
     "setup": "### meridian setup",

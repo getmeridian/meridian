@@ -14,11 +14,13 @@ from typer.testing import CliRunner
 
 import meridian.cli as cli
 from meridian.cli import app
+from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands.deploy import _print_success
 from meridian.console import set_json_mode, set_quiet_mode
 from meridian.core.deploy import DeployRequest
 from meridian.handoff import HandoffLinks
-from meridian.servers import ServerRegistry
+from meridian.servers import ServerEntry, ServerRegistry
+from meridian.setup.single_server import single_server_intent
 from tests.support.text import unstyle
 
 runner = CliRunner()
@@ -44,6 +46,78 @@ def test_dry_run_compiles_a_single_server_topology_without_touching_state(tmp_ho
     assert data["xhttp_path"] and data["ws_path"]
     assert not (tmp_home / "cluster.yml").exists()
     assert not (tmp_home / "servers.json").exists()
+
+
+def _save_deployed_fleet(tmp_home: Path) -> tuple[ClusterConfig, ServerEntry]:
+    registry = ServerRegistry(tmp_home / "servers.json")
+    registry.add(ServerEntry(host="198.51.100.10", user="root", name="main"))
+    entry = registry.find("198.51.100.10")
+    assert entry is not None
+    cluster = ClusterConfig(
+        panel=PanelConfig(
+            url="https://198.51.100.10/panel",
+            api_token="test-token",
+            server_ip=entry.host,
+            secret_path="existing-secret-path",
+            sub_path="existing-info-page",
+        ),
+        topology_intent=single_server_intent(None, server_ref=entry.id, domain="proxy.example.com"),
+    )
+    cluster.save()
+    return cluster, entry
+
+
+def test_dry_run_of_a_redeploy_reuses_saved_panel_and_transport_paths(tmp_home: Path, monkeypatch) -> None:
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    cluster, _ = _save_deployed_fleet(tmp_home)
+    assert cluster.topology_intent is not None
+    saved_paths = {path.protocol: path.path for path in cluster.topology_intent.exits[0].paths}
+
+    result = _invoke(["deploy", "198.51.100.10", "--domain", "proxy.example.com", "--dry-run", "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.stdout)["data"]
+    assert data["mode"] == "redeploy"
+    assert data["info_page_path"] == "existing-info-page"
+    assert data["xhttp_path"] == saved_paths["xhttp"]
+    assert data["ws_path"] == saved_paths["wss"]
+
+
+def test_dry_run_refuses_a_server_that_is_not_an_exit_of_the_saved_fleet(tmp_home: Path, monkeypatch) -> None:
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    _save_deployed_fleet(tmp_home)
+
+    result = _invoke(["deploy", "198.51.100.20", "--dry-run", "--json"])
+
+    assert result.exit_code == 2, result.output
+    assert "meridian node add" in json.loads(result.stdout)["errors"][0]["hint"]
+
+
+def test_dry_run_refuses_a_cluster_without_topology_with_rebuild_guidance(tmp_home: Path, monkeypatch) -> None:
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    ClusterConfig(panel=PanelConfig(url="https://198.51.100.10/panel", api_token="test-token")).save()
+
+    result = _invoke(["deploy", "198.51.100.10", "--dry-run", "--json"])
+
+    assert result.exit_code == 2, result.output
+    error = json.loads(result.stdout)["errors"][0]
+    assert "development build" in error["message"]
+    assert "cluster.yml" in error["hint"]
+
+
+def test_cancel_file_stops_a_machine_deploy_before_it_connects(tmp_home: Path, monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    marker = tmp_path / "cancel"
+    marker.touch()
+
+    with patch("meridian.commands.deploy.resolve_server") as resolve_server:
+        result = _invoke(["deploy", "198.51.100.10", "--yes", "--json", "--cancel-file", str(marker)])
+
+    assert result.exit_code == 5, result.output
+    envelope = json.loads(result.stdout)
+    assert envelope["status"] == "cancelled"
+    assert envelope["data"]["phase"] == "preflight"
+    resolve_server.assert_not_called()
 
 
 def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypatch) -> None:

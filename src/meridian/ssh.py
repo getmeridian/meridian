@@ -2,7 +2,7 @@
 
 This module is a pure transport layer with no Rich/console dependency.
 All user-facing output goes through an optional ``SSHUI`` callback
-protocol so that CLI callers get Rich output while Engine/headless
+protocol so that CLI callers get Rich output while headless
 callers stay dependency-free.
 """
 

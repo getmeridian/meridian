@@ -94,25 +94,6 @@ def test_connection_test_schema_exposes_scope_and_client() -> None:
     assert properties["client"] == {"default": "", "title": "Client", "type": "string"}
 
 
-def test_server_onboarding_schemas_expose_cross_field_constraints() -> None:
-    validate_request = schema_for("server-validate-request")
-    bootstrap_request = schema_for("server-bootstrap-key-request")
-
-    assert validate_request["oneOf"] == [
-        {
-            "required": ["server_ref"],
-            "properties": {"server_ref": {"minLength": 1}, "draft": {"type": "null"}},
-        },
-        {"required": ["draft"], "properties": {"server_ref": {"const": ""}}},
-    ]
-    assert bootstrap_request["allOf"] == [
-        {
-            "if": {"properties": {"key_policy": {"const": "use_existing"}}, "required": ["key_policy"]},
-            "then": {"required": ["public_key"], "properties": {"public_key": {"minLength": 1}}},
-        }
-    ]
-
-
 def test_command_envelope_schema_binds_command_to_typed_data() -> None:
     schema = schema_for("fleet-status-envelope")
 
@@ -149,27 +130,6 @@ def test_schema_catalog_entries_are_typed() -> None:
     assert entry.commands == ["plan"]
     assert entry.json_schema is not None
     assert next(item for item in catalog if item["name"] == "plan-envelope")["schema"] == entry.json_schema
-
-
-def test_operation_schemas_are_exported_for_studio_engine_contracts() -> None:
-    snapshot = schema_for("operation-snapshot")["properties"]
-    events = schema_for("operation-events")["properties"]
-    result = schema_for("operation-result")["properties"]
-
-    assert snapshot["state"]["enum"] == [
-        "queued",
-        "running",
-        "succeeded",
-        "failed",
-        "cancel_requested",
-        "cancelled",
-        "completed_after_cancel",
-    ]
-    assert snapshot["latest_event"]["anyOf"][0]["$ref"].endswith("/Event")
-    assert events["schema"]["const"] == "meridian.operation-events/v1"
-    assert events["events"]["items"]["$ref"].endswith("/Event")
-    assert result["error"]["anyOf"][0]["$ref"].endswith("/OperationError")
-    assert schema_for("deploy-operation-result")["properties"]["result"]["$ref"].endswith("/DeployResult")
 
 
 def test_command_catalog_distinguishes_process_interrupts_from_json_outcomes() -> None:

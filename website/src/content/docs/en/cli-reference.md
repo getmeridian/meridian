@@ -623,24 +623,6 @@ Update the CLI to the latest release of its major version on PyPI. A newer major
 meridian update [--major]
 ```
 
-### meridian studio
-
-Open Meridian Studio, an experimental browser UI, with its local Engine API. The server binds only to `127.0.0.1`.
-
-```
-meridian studio [--port PORT] [--assets-dir DIRECTORY] [--no-open]
-```
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--port PORT` | 7391 | Localhost port from 0 to 65535; `0` picks any free port |
-| `--assets-dir DIRECTORY` | bundled assets | Use a built Studio asset directory instead of the packaged copy |
-| `--no-open` | | Print the local URL without opening a browser |
-
-Studio prints and opens an address like `http://127.0.0.1:7391/studio/#k=…`. The part after `#k=` is a key that changes on every launch; only a browser tab opened from that address can use the Engine, so other programs and other users on the same computer cannot. Keep it private. After restarting Studio, open the new address it prints.
-
-Without `--port`, Studio uses port 7391, or the next free port up to 7400, so the draft your browser saves for Studio is still there next time. An explicit `--port` that is taken fails clearly, as do missing assets. An explicit asset directory must contain `studio/index.html`.
-
 ### meridian serve
 
 Run the control service. Meridian installs it on the control server as the `ctld` systemd unit, which runs this command; you don't run it yourself.

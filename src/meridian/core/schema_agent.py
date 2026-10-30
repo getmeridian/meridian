@@ -2,7 +2,7 @@
 
 Kept apart from the public catalog in `core.schema`: the protocol is internal to
 the control service and the Rust node agent, so it is exported to
-`contracts/meridian/v1/agent/` and never listed by `meridian api schemas` or Studio.
+`contracts/meridian/v1/agent/` and never listed by `meridian api schemas`.
 """
 
 from __future__ import annotations
