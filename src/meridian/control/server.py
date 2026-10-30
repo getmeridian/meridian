@@ -28,7 +28,7 @@ from urllib.parse import unquote
 from pydantic import BaseModel, ValidationError
 
 from meridian import __version__
-from meridian.control import ui_routes
+from meridian.control import subscription_routes, ui_routes
 from meridian.control.blobs import BlobStore, fleet_artifacts, served_hashes
 from meridian.control.command_models import NodeCommandRequest, UserCutOffRequest
 from meridian.control.enrollment import Session, token_sha256
@@ -626,18 +626,6 @@ class _Handler(BaseHTTPRequestHandler):
             shutil.copyfileobj(handle, self.wfile, 1 << 16)
         return None
 
-    # -- subscriptions -----------------------------------------------------------------------
-
-    def subscription(self, match: re.Match[str]) -> None:
-        response = self.server.service.subscription(
-            match[1],
-            match[2] or "",
-            user_agent=self.headers.get("User-Agent"),
-            accept=self.headers.get("Accept"),
-            device_headers=self.headers,
-        )
-        self._send(response.status, response.content_type, response.body.encode("utf-8"), response.headers)
-
 
 ROUTES: list[Route] = [
     ("GET", re.compile(r"/api/health"), "read", _Handler.health),
@@ -707,7 +695,7 @@ ROUTES: list[Route] = [
     ("POST", re.compile(r"/agent/v1/stats"), None, _Handler.agent_stats),
     ("POST", re.compile(r"/agent/v1/command-results"), None, _Handler.agent_command_result),
     ("GET", re.compile(r"/agent/v1/blobs/([0-9a-f]{64})"), None, _Handler.agent_blob),
-    ("GET", re.compile(rf"/sub/{_SUB_TOKEN}(?:/({_SUB_SUFFIX}))?"), None, _Handler.subscription),
+    ("GET", re.compile(rf"/sub/{_SUB_TOKEN}(?:/({_SUB_SUFFIX}))?"), None, subscription_routes.subscription),
 ]
 
 

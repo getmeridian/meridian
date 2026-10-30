@@ -1,6 +1,7 @@
 # control — Meridian's own control service (`meridian serve`)
 
 ## Design decisions
+- **Subscription HTTP** — `subscription_routes.py` writes the response through the shared public request interface; the server keeps routing and authentication.
 - **Service settings** — `service_settings.py` reads and persists delivery settings; the public service methods delegate, and every setting is saved in one store transaction.
 - **Token expiry is registry time** — schema step 12 adds nullable `api_tokens.expires_at`; old tokens remain indefinite. Issuance accepts a future UTC expiry or 1–3650 days, computed inside the insert transaction, and authentication refuses at the deadline with the same 401 as revocation, without touching last use. Historical step 4 keeps its original table definition so an older database adds expiry only once.
 - **Duration extensions** — `user_lifecycle.py` owns fresh account inserts and computes max(now, expiry) plus whole days inside the service's write transaction, then records the expiry change, enforces, and composes before returning; disabled status and traffic cutoffs remain the operator's.
