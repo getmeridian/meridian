@@ -20,7 +20,7 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 
 **Self-hosted everything** — the root rule, enforced: `scripts/check-runtime-assets.mjs` fails the build on any external request in HTML, CSS, or JavaScript (literal absolute-URL loads), and both workflows rerun it after the demos join `dist`.
 
-**Demos are recorded, not hand-written** — `scripts/build_showcase.py` seeds a real control service with an invented fleet (`scripts/showcase_seed.py`), records the console's responses, validates each against today's models, and writes `/demo/` (one person's connection page) and `/demo/console/` (the unchanged console plus `website/demo/demo.js`, which answers its API in memory). Neither the shim nor the data ships in the package.
+**Demos are recorded, not hand-written** — `scripts/build_showcase.py` seeds a real control service with an invented fleet (`scripts/showcase_seed.py`), records the console's responses, validates each against today's models, and writes `/demo/` (one person's connection page) and `/demo/console/` (the unchanged console plus `website/demo/demo.js`, which answers its API in memory). Neither the shim nor the data ships in the package; the landing's `Showcase` screenshots come from `scripts/showcase_screenshots.py` (local, never CI).
 
 **pnpm with guardrails** — `pnpm-workspace.yaml` blocks exotic transitive sources, enforces a one-week release age, and refuses trust downgrades; allows build scripts only for explicitly trusted packages.
 
@@ -44,4 +44,5 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 - **The landing video is a file, not an embed** — `public/video/` comes from `video/scripts/export.mjs`; keep `preload="none"` so only the poster loads, and never embed a player from another origin.
 - **The demo shim mirrors service shapes exactly** — `/info` byte counts are decimal strings and statuses upper case; numbers there made the page reject its own account panel.
 - **Month-anchored demo dates move by whole months** — the shim shifts recorded timestamps by the time since generation, but `period_*`, `counting_since`, and `traffic_reset_at` keep their day of the month.
+- **Screenshots pin UTC and `en-US`** — the browser's own zone once showed in the person screen ("Your browser time zone") and moved the period start by an hour.
 - **Sharp is direct** — Astro image optimization must keep `sharp` as an explicit dependency.
