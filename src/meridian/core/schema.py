@@ -108,15 +108,8 @@ from meridian.core.routes import RouteListResult, RouteMutationResult
 from meridian.core.schema_delivery import delivery_schemas
 from meridian.core.schema_envelopes import make_command_envelope
 from meridian.core.schema_people import PEOPLE_SCHEMAS
+from meridian.core.schema_servers import SERVER_SCHEMAS
 from meridian.core.schema_topology import TOPOLOGY_SCHEMAS
-from meridian.core.servers import (
-    ServerBootstrapKeyRequest,
-    ServerBootstrapKeyResult,
-    ServerConnectionDraft,
-    ServerProfile,
-    ServerValidateRequest,
-    ServerValidateResult,
-)
 from meridian.core.verification import (
     FleetTestResult,
     ProbeResult,
@@ -674,13 +667,8 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "client-devices": ClientDevicesResult,
     "client-name-request": ClientNameRequest,
     "server-add-request": ServerAddRequest,
-    "server-bootstrap-key-request": ServerBootstrapKeyRequest,
-    "server-bootstrap-key-result": ServerBootstrapKeyResult,
-    "server-connection-draft": ServerConnectionDraft,
-    "server-profile": ServerProfile,
     "server-remove-request": ServerRemoveRequest,
-    "server-validate-request": ServerValidateRequest,
-    "server-validate-result": ServerValidateResult,
+    **SERVER_SCHEMAS,
     **TOPOLOGY_SCHEMAS,
     "node-add-request": NodeAddRequest,
     "node-target-request": NodeTargetRequest,
