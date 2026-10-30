@@ -83,6 +83,10 @@ class DeviceLedger:
             "SELECT device_key, first_seen_at, last_seen_at FROM devices WHERE user_id = ? AND device_key = ?",
             (user.user_id, key),
         )
+        # In full mode only a pending private fingerprint lacks a first-seen time; an app sending
+        # that key as its own ID is not that device and must never take over its slot.
+        if row is not None and privacy.device_limits == "full" and row["first_seen_at"] is None:
+            return result
         # A raise from private to full learns the raw ID on its next fetch, without consuming another slot.
         if row is None and privacy.device_limits == "full" and self._store.secret(DEVICE_HMAC_SECRET) is not None:
             row = self._store.row(
@@ -170,7 +174,10 @@ class DeviceLedger:
             self._store.db.execute("DELETE FROM devices")
             for row in rows:
                 key = self._fingerprint(row["device_key"]) if row["first_seen_at"] is not None else row["device_key"]
-                self._store.db.execute("INSERT INTO devices (user_id, device_key) VALUES (?, ?)", (row["user_id"], key))
+                # Two rows that fingerprint alike are one device; a key collision must never block lowering privacy.
+                self._store.db.execute(
+                    "INSERT OR IGNORE INTO devices (user_id, device_key) VALUES (?, ?)", (row["user_id"], key)
+                )
         return 0
 
     def _fingerprint(self, hwid: str) -> str:

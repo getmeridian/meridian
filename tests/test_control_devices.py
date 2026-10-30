@@ -343,3 +343,19 @@ def test_raising_private_to_full_recognizes_the_existing_slot_before_learning_de
     view = service.user_devices("alice")
     assert view.count == 1 and view.devices[0].device_key == HWID != fingerprint
     assert view.devices[0].to_data()["first_seen_at"] is not None
+
+
+def test_an_app_sending_a_pending_fingerprint_as_its_id_never_takes_that_slot(
+    service: ControlService,
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "control.db"
+    write_privacy(path, PrivacySettings(device_limits="private", default_device_limit=2))
+    fetch(service)
+    fingerprint = service.user_devices("alice").devices[0].device_key
+    write_privacy(path, PrivacySettings(device_limits="full", default_device_limit=2))
+    assert "x-hwid-limit" not in fetch(service, fingerprint).headers
+    assert [row[1:] for row in device_rows(tmp_path)] == [(fingerprint, None, None, None, None, None, None)]
+    fetch(service)
+    view = service.user_devices("alice")
+    assert [device.device_key for device in view.devices] == [HWID]
