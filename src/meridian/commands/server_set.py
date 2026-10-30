@@ -69,6 +69,14 @@ def _server_ref(intent: SetupIntent, registry: ServerRegistry, query: str) -> st
     refs = intent.declared_server_refs()
     if query in refs:
         return query
+    # `fleet status` names servers by their role (`main`, `exit-2`), so a role ID finds its server too.
+    roles = {exit_.id: exit_.server_ref for exit_ in intent.exits}
+    roles |= {gateway.id: gateway.server_ref for gateway in intent.routing_gateways}
+    roles |= {
+        relay.id: relay.hop_server_refs[0] for relay in intent.transparent_relays if len(relay.hop_server_refs) == 1
+    }
+    if query in roles:
+        return roles[query]
     entry = registry.find(query)
     if entry is not None:
         for ref in refs:

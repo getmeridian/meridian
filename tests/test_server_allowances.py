@@ -389,3 +389,24 @@ def test_reviewed_metadata_does_not_write_when_previewed_or_declined(tmp_home: P
     if dry_run:
         schema_model("server-set-envelope").model_validate_json(result.stdout)
         assert json.loads(result.stdout)["data"]["review"]["review_hash"] == review.review_hash
+
+
+def test_server_set_finds_a_server_by_the_role_name_fleet_status_shows() -> None:
+    from meridian.commands.server_set import _server_ref
+    from meridian.core.topology import TransparentRelayIntent
+
+    current = single_exit_intent()
+    data = current.model_dump(mode="json")
+    data["transparent_relays"] = [
+        TransparentRelayIntent(
+            id="entry",
+            hop_server_refs=["srv-relay"],
+            exit_ref=current.exits[0].id,
+            protocol_path_ref=current.exits[0].paths[0].id,
+        ).model_dump(mode="json")
+    ]
+    intent = SetupIntent.model_validate(data)
+    registry = SimpleNamespace(find=lambda _query: None)
+
+    assert _server_ref(intent, registry, current.exits[0].id) == current.exits[0].server_ref
+    assert _server_ref(intent, registry, "entry") == "srv-relay"
