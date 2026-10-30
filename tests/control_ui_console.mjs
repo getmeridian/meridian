@@ -41,6 +41,14 @@ function reply(body, status = 200) {
 }
 w.fetch = (url, options) => {
   events.push({ method: options.method, url, headers: options.headers, at: fakeNow });
+  if (mode.startsWith('token-')) {
+    if (url === 'api/tokens' && options.method === 'GET') return Promise.resolve(reply({ tokens: [] }));
+    if (url === 'api/tokens' && options.method === 'POST') {
+      writes.push(JSON.parse(options.body));
+      if (mode === 'token-uncertain') return Promise.reject(new Error('reply lost'));
+      return new Promise(resolve => { delayed.issue = resolve; });
+    }
+  }
   if (mode.startsWith('deadline-')) {
     delayed.signal = options.signal;
     return mode === 'deadline-fetch' ? new Promise(() => {}) : Promise.resolve({
@@ -195,6 +203,35 @@ if (mode.startsWith('deadline-')) {
   report.code = error?.code || null;
   report.uncertain = !!error?.uncertain;
   report.aborted = !!delayed.signal?.aborted;
+}
+
+if (mode.startsWith('token-')) {
+  M.renderTokens(view);
+  await settle();
+  view.querySelector('.btn-primary').click();
+  const form = w.document.querySelector('dialog form');
+  form.querySelector('input').value = 'sample';
+  form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  if (mode === 'token-pending') {
+    const dialog = w.document.querySelector('dialog');
+    report.closeDisabled = dialog.querySelector('.dialog-head button').disabled;
+    dialog.dispatchEvent(new w.Event('cancel', { cancelable: true }));
+    dialog.querySelector('.dialog-head button').click();
+    form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+    await settle();
+    report.openDuringWrite = dialog.isConnected && dialog.open;
+    report.issuedSecret = 'mrd_0123456789ab_test-only-secret-not-a-credential';
+    delayed.issue(reply({ id: '0123456789ab', name: 'sample', scope: 'read', token: report.issuedSecret }));
+    await settle();
+    report.resultHasForm = !!w.document.querySelector('dialog form');
+    report.stored = [...Object.keys(w.localStorage), ...Object.keys(w.sessionStorage)];
+    report.secretInUrl = w.location.href.includes(report.issuedSecret);
+  }
+  report.secret = w.document.querySelector('.secret-token')?.textContent || '';
+  report.dialog = w.document.querySelector('dialog')?.textContent || '';
+  report.listReads = events.filter(event => event.url === 'api/tokens' && event.method === 'GET').length;
+  report.writes = writes.length;
 }
 
 process.stdout.write(JSON.stringify(report));

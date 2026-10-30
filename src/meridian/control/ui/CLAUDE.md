@@ -16,6 +16,7 @@
 - **Assets revalidate by ETag** (content hash, `no-cache`); anything holding a secret is `no-store`.
 
 ## Pitfalls
+- Lock token dialog dismissal throughout issuance and reject duplicate submits; the secret lives only in its result step, and an uncertain response refreshes metadata and explains that the secret cannot be recovered.
 - People and Servers poll only while visible (30 s / 10 s), stop on navigation, keep stale data with retry and bounded backoff, and accept replies through M.latestOnly; passive GETs carry X-Meridian-Passive and every request has a body-inclusive deadline.
 - Quotas use GiB/TiB with an explicit Unlimited choice; validate at the field before any form submits, round decimal bytes like the CLI, and refuse new values above JavaScript's exact integer range.
 - Server cards keep reachability, runtime health, and convergence separate; resource metrics and health checks come only from fresh report evidence.

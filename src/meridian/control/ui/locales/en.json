@@ -359,5 +359,7 @@
   "live.never": "Not updated yet",
   "live.updated": "Updated {seconds} s ago",
   "live.stale": "Out of date",
-  "error.timeout": "The request timed out. Try again."
+  "error.timeout": "The request timed out. Try again.",
+  "tokens.uncertain_title": "Token creation wasn't confirmed",
+  "tokens.uncertain_text": "A token may have been created, but no secret was received. Its secret cannot be recovered. Check the token list and revoke it before creating another."
 }

@@ -227,18 +227,25 @@
       var dialog = M.h("dialog", { class: "dialog" + (options && options.wide ? " dialog-wide" : ""),
         "aria-labelledby": "dialog-title" });
       var settled = false;
+      var dismissalLocked = false;
       function close(value) {
-        if (settled) return;
+        if (settled || dismissalLocked) return;
         settled = true;
         dialog.close();
         dialog.remove();
         resolve(value);
       }
+      var dismiss = M.h("button", { class: "btn-icon", type: "button", "aria-label": M.t("action.close"),
+        onclick: function () { close(undefined); } }, M.icon("x"));
+      close.lock = function (locked) {
+        dismissalLocked = !!locked;
+        dismiss.disabled = dismissalLocked;
+        dialog.setAttribute("aria-busy", dismissalLocked ? "true" : "false");
+      };
       dialog.addEventListener("cancel", function (e) { e.preventDefault(); close(undefined); });
       dialog.appendChild(M.h("div", { class: "dialog-head" },
         M.h("h2", { id: "dialog-title", text: title }),
-        M.h("button", { class: "btn-icon", type: "button", "aria-label": M.t("action.close"),
-          onclick: function () { close(undefined); } }, M.icon("x"))));
+        dismiss));
       dialog.appendChild(M.h("div", { class: "dialog-body" }, build(close)));
       document.body.appendChild(dialog);
       dialog.showModal();

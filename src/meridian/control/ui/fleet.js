@@ -260,6 +260,7 @@
 
   function createToken(view) {
     M.dialog(M.t("tokens.create_title"), function (close) {
+      var issuing = false;
       var name = h("input", { type: "text", required: true, maxlength: "64", autocomplete: "off" });
       var scope = h("select", {}, ["read", "propose", "approve"].map(function (s) {
         return h("option", { value: s, text: M.t("scope." + s) + " — " + M.t("scope." + s + "_hint") });
@@ -273,15 +274,29 @@
           h("button", { class: "btn btn-primary", type: "submit" }, M.t("tokens.create"))));
       form.addEventListener("submit", function (e) {
         e.preventDefault();
+        if (issuing) return;
         if (!name.value.trim()) { form.querySelector(".form-error").textContent = M.t("tokens.name_required"); return; }
+        issuing = true;
+        close.lock(true);
         M.busy(form, function () {
           return M.api("POST", "api/tokens", { name: name.value.trim(), scope: scope.value });
-        }).then(function (issued) { close(issued); }, function () { /* shown in the form */ });
+        }).then(function (issued) { close.lock(false); close(issued); }, function (error) {
+          issuing = false;
+          close.lock(false);
+          if (error && error.uncertain) close({ uncertain: true });
+        });
       });
       return form;
     }).then(function (issued) {
       if (!issued) return;
       M.renderTokens(view);
+      if (issued.uncertain) {
+        return M.dialog(M.t("tokens.uncertain_title"), function (close) {
+          return [h("p", { class: "notice notice-warn", text: M.t("tokens.uncertain_text") }),
+            h("div", { class: "actions" }, h("button", { class: "btn btn-primary", type: "button",
+              onclick: function () { close(); } }, M.t("action.done")))];
+        });
+      }
       M.dialog(M.t("tokens.secret_title"), function (close) {
         return [
           h("p", { class: "notice notice-warn", text: M.t("tokens.secret_once") }),
