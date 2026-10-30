@@ -168,3 +168,5 @@
 .live-status { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .8rem; margin-block: 1rem; }
 .live-trouble:empty { display: none; }
 .live-retry[hidden] { display: none; }
+/* Dynamic browser chrome and notches leave the sign-in controls in the usable viewport. */
+.auth { min-height: 100dvh; padding-block: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-bottom)); }

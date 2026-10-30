@@ -222,10 +222,12 @@
   };
 
   /* A modal <dialog>; `build(close)` returns its body. Resolves with what close() was given. */
+  var dialogSequence = 0;
   M.dialog = function (title, build, options) {
     return new Promise(function (resolve) {
+      var titleId = "dialog-title-" + (++dialogSequence);
       var dialog = M.h("dialog", { class: "dialog" + (options && options.wide ? " dialog-wide" : ""),
-        "aria-labelledby": "dialog-title" });
+        "aria-labelledby": titleId });
       var settled = false;
       var dismissalLocked = false;
       function close(value) {
@@ -244,9 +246,25 @@
       };
       dialog.addEventListener("cancel", function (e) { e.preventDefault(); close(undefined); });
       dialog.appendChild(M.h("div", { class: "dialog-head" },
-        M.h("h2", { id: "dialog-title", text: title }),
+        M.h("h2", { id: titleId, text: title }),
         dismiss));
-      dialog.appendChild(M.h("div", { class: "dialog-body" }, build(close)));
+      var body = M.h("div", { class: "dialog-body" }, build(close));
+      var actions = body.querySelectorAll(".actions, .row-actions");
+      if (actions.length) {
+        var footer = actions[actions.length - 1];
+        footer.classList.add("dialog-footer");
+        body.addEventListener("focusin", function (event) {
+          var target = event.target;
+          if (footer.contains(target)) return;
+          requestAnimationFrame(function () {
+            if (!dialog.isConnected) return;
+            var edge = footer.getBoundingClientRect();
+            var bottom = target.getBoundingClientRect().bottom;
+            if (edge.height && bottom + 8 > edge.top) body.scrollTop += bottom + 8 - edge.top;
+          });
+        });
+      }
+      dialog.appendChild(body);
       document.body.appendChild(dialog);
       dialog.showModal();
       var first = dialog.querySelector("input, select, textarea");

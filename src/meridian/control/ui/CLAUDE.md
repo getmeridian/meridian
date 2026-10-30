@@ -16,6 +16,8 @@
 - **Assets revalidate by ETag** (content hash, `no-cache`); anything holding a secret is `no-store`.
 
 ## Pitfalls
+- Scroll focused fields clear of a sticky dialog footer after layout; native focus scrolling treated a covered input as visible on a phone.
+- Dialogs constrain their scrolling body to dvh and safe areas, keep form actions sticky, and use unique title IDs for nested identity checks; icon-only actions need an aria-label and coarse-pointer controls need 44 px targets.
 - Load locale catalogs independently so a selected-locale failure retains English; if both fail, keep startup waiting on a local retry notice whose bootstrap labels match the catalogs.
 - Lock token dialog dismissal throughout issuance and reject duplicate submits; the secret lives only in its result step, and an uncertain response refreshes metadata and explains that the secret cannot be recovered.
 - People and Servers poll only while visible (30 s / 10 s), stop on navigation, keep stale data with retry and bounded backoff, and accept replies through M.latestOnly; passive GETs carry X-Meridian-Passive and every request has a body-inclusive deadline.

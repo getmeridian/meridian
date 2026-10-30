@@ -42,6 +42,11 @@ function reply(body, status = 200) {
 }
 w.fetch = (url, options) => {
   events.push({ method: options.method, url, headers: options.headers, at: fakeNow });
+  if (mode === 'phone-app') {
+    if (url === 'auth/state') return Promise.resolve(reply({ configured: true, owner_exists: true, signed_in: true }));
+    if (url === 'api/users') return Promise.resolve(reply({ users: [] }));
+    if (url === 'ui/api/fleet') return Promise.resolve(reply({ servers: [], display_names: {}, declared_users: [] }));
+  }
   if (mode.startsWith('locale-')) {
     const code = url.split('/').at(-1).split('.')[0];
     if (mode === 'locale-fallback' && code === 'en') return new Promise(resolve => { delayed.english = resolve; });
@@ -262,6 +267,65 @@ if (mode.startsWith('locale-')) {
   report.label = M.t('nav.people');
   report.lang = M.i18n.lang;
   report.dir = w.document.documentElement.dir;
+}
+
+if (mode.startsWith('phone-')) {
+  const style = w.document.createElement('style');
+  // jsdom has no pointer devices; apply the coarse-pointer branch for this style-contract check.
+  style.textContent = ['styles.css', 'screens.css'].map(file => fs.readFileSync(path.join(ui, file), 'utf8'))
+    .join('\n').replace(/@media\s*\(pointer:\s*coarse\)/g, '@media all');
+  w.document.head.appendChild(style);
+  if (mode === 'phone-app') {
+    const app = M.h('div', { id: 'app', class: 'boot' });
+    w.document.body.appendChild(app);
+    M.i18n.load = () => Promise.resolve();
+    M.takeSetupToken = () => '';
+    w.eval(fs.readFileSync(path.join(ui, 'app.js'), 'utf8'));
+    await settle();
+    report.signOutName = app.querySelector('.top button')?.getAttribute('aria-label') || '';
+  } else if (mode === 'phone-touch') {
+    const targets = ['btn btn-sm', 'btn-icon', 'cmd-copy', 'tab'].map(className => M.h('button', { class: className }));
+    M.mount(view, targets);
+    report.targets = targets.map(element => {
+      const css = w.getComputedStyle(element);
+      return { height: Math.max(parseFloat(css.height) || 0, parseFloat(css.minHeight) || 0),
+        width: Math.max(parseFloat(css.width) || 0, parseFloat(css.minWidth) || 0) };
+    });
+  } else {
+    let form;
+    M.dialog('Parent title', () => {
+      form = M.h('form', { class: 'stack', novalidate: true },
+        Array.from({ length: 20 }, (_, index) => M.field('Field ' + index, M.h('input', { type: 'text' }))),
+        M.h('div', { class: 'actions' }, M.h('button', { class: 'btn btn-primary', type: 'submit', text: 'Save' })));
+      form.addEventListener('submit', event => {
+        event.preventDefault(); report.submitted = true;
+        M.busy(form, () => new Promise(() => {}));
+      });
+      return form;
+    });
+    if (mode === 'phone-identity') {
+      w.eval(fs.readFileSync(path.join(ui, 'auth.js'), 'utf8'));
+      M.confirmIdentity().catch(() => {});
+      const dialogs = [...w.document.querySelectorAll('dialog')];
+      report.titles = dialogs.map(dialog => dialog.getAttribute('aria-labelledby'));
+      report.labelsMatch = dialogs.every(dialog => dialog.querySelector('h2').id === dialog.getAttribute('aria-labelledby'));
+    } else {
+      const dialog = w.document.querySelector('dialog');
+      report.bodyOverflow = w.getComputedStyle(dialog.querySelector('.dialog-body')).overflowY;
+      report.maxHeight = w.getComputedStyle(dialog).maxBlockSize;
+      const actions = dialog.querySelector('.actions');
+      report.footerPosition = w.getComputedStyle(actions).position;
+      const focused = form.querySelectorAll('input')[5];
+      focused.getBoundingClientRect = () => ({ bottom: 600, height: 44 });
+      actions.getBoundingClientRect = () => ({ top: 500, height: 60 });
+      focused.dispatchEvent(new w.FocusEvent('focusin', { bubbles: true }));
+      await new Promise(resolve => w.requestAnimationFrame(resolve));
+      report.focusedScrolled = dialog.querySelector('.dialog-body').scrollTop > 0;
+      actions.querySelector('button').click();
+      await settle();
+      report.buttonsDisabled = actions.querySelector('button').disabled;
+    }
+  }
 }
 
 process.stdout.write(JSON.stringify(report));

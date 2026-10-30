@@ -176,9 +176,14 @@ input::placeholder { color: var(--t3); }
 .dialog { margin: auto; width: min(460px, calc(100vw - 24px)); max-height: calc(100vh - 32px); border: 1px solid var(--b1);
   border-radius: var(--r3); background: var(--s1); color: var(--t1); box-shadow: var(--shadow-lg); padding: 0; }
 .dialog-wide { width: min(560px, calc(100vw - 24px)); }
+.dialog { max-block-size: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow: hidden; }
+.dialog[open] { display: flex; flex-direction: column; }
 .dialog::backdrop { background: rgba(20, 22, 30, .45); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
-.dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px 4px; }
-.dialog-body { padding: 8px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+.dialog-head { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px 4px; }
+.dialog-head h2 { overflow-wrap: anywhere; }
+.dialog-body { padding: 8px 20px 20px; display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; gap: 12px; overflow-y: auto; overscroll-behavior: contain; }
+.dialog-body > * { flex-shrink: 0; }
+.dialog-footer { position: sticky; bottom: 0; z-index: 1; flex-shrink: 0; margin-top: 0; padding-block: 12px calc(6px + env(safe-area-inset-bottom)); background: var(--s1); border-top: 1px solid var(--b1); }
 #toast { position: fixed; inset-inline: 0; bottom: max(20px, env(safe-area-inset-bottom)); display: flex;
   justify-content: center; pointer-events: none; z-index: 300; opacity: 0; transform: translateY(8px);
   transition: opacity .18s, transform .18s; }
@@ -188,3 +193,9 @@ input::placeholder { color: var(--t3); }
 .toast-ok { background: var(--t1); color: var(--bg); }
 .toast-error { background: var(--err); color: var(--on-err); }
 .i18n-notice { position: fixed; z-index: 200; inset-inline: 1rem; bottom: calc(1rem + env(safe-area-inset-bottom)); display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1rem; width: fit-content; max-width: calc(100% - 2rem); margin-inline: auto; font-size: .875rem; }
+@media (pointer: coarse) {
+  button, .btn, .btn-sm, .btn-icon, .cmd-copy, [role="button"], .tab, .back, .top-brand, summary { min-height: 44px; min-width: 44px; }
+  .btn-icon, .cmd-copy { width: 44px; height: 44px; }
+  summary { display: flex; align-items: center; }
+  label:has(input[type="radio"]), label:has(input[type="checkbox"]) { min-height: 44px; }
+}
