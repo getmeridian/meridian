@@ -11,7 +11,7 @@ _RENDERER_MANIFEST = {
     "agent-spec": "service-blob-v1",
     "control-subscriptions": "page-language-v1",
     "control-commands": "node-restart-console-v3",
-    "pwa": "russian-copy-v1",
+    "pwa": "page-keys-v1",
     "control-service": "page-language-v1",
     "control-api": "page-language-v1",
     "control-ui": "failed-badge-v1",
