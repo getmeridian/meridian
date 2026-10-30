@@ -48,7 +48,7 @@ from meridian.core.cancellation import CancellationToken, OperationCancelledErro
 from meridian.core.defaults import DEFAULT_SNI, REALITY_SNI_CANDIDATES
 from meridian.core.deploy import DeployPlan, DeployRequest, DeployResult, build_deploy_workflow
 from meridian.core.deploy_validation import DeployValidationError, normalize_deploy_request
-from meridian.core.errors import EngineError, MeridianError, RemnawaveFleetError
+from meridian.core.errors import MeridianError, RemnawaveFleetError
 from meridian.core.events import COMMAND_CANCELLED, COMMAND_COMPLETED, COMMAND_STARTED
 from meridian.core.inputs import is_ip
 from meridian.core.models import OutputStatus, Summary
@@ -58,11 +58,10 @@ from meridian.core.reporters import NoopReporter, Reporter, emit_event
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
 from meridian.core.validation import wrap_validation_error
-from meridian.engine.deploy import resolve_deploy_target
 from meridian.handoff import HandoffLinks
 from meridian.registry_country import registry_country
 from meridian.renderers import emit_json
-from meridian.resolve import connection_for_entry, merge_target, parse_target
+from meridian.resolve import connection_for_entry, merge_target, parse_target, resolve_deploy_target
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.single_server import (
     DEFAULT_CLIENT,
@@ -219,7 +218,7 @@ def _execute(
     registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     try:
         target = resolve_deploy_target(request, registry)
-    except EngineError as exc:
+    except MeridianError as exc:
         fail(exc)
     resolved = ensure_server_connection(
         resolve_server(registry, explicit_ip=target.server_ip, user=target.ssh_user, port=target.ssh_port),
@@ -472,7 +471,7 @@ def _dry_run(request: DeployRequest) -> DeployPlan:
     registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     try:
         target = resolve_deploy_target(request, registry)
-    except EngineError as exc:
+    except MeridianError as exc:
         fail(exc)
     cluster = ClusterConfig.load()
     _refuse_pre_topology_cluster(cluster)
