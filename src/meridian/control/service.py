@@ -35,7 +35,6 @@ from meridian.control.events import EVENT_TABLES, EventLedger
 from meridian.control.models import (
     ClientEndpoint,
     EnrollmentGrant,
-    ManagedInbound,
     NodeSpec,
     NodeStatus,
     PrivacySettings,
@@ -49,8 +48,8 @@ from meridian.control.models import (
     UserImportResult,
     UserRecord,
     UserUpdate,
-    users_resource_id,
 )
+from meridian.control.node_documents import with_users
 from meridian.control.node_health import project_runtime
 from meridian.control.owner import UI_TABLES, OwnerAuth
 from meridian.control.periods import period_start
@@ -695,7 +694,7 @@ class ControlService:
         if row is None or not row["spec"]:
             return
         spec = NodeSpec.model_validate_json(row["spec"])
-        resources = _with_users(spec, self.list_users())
+        resources = with_users(spec, self.list_users())
         resources_sha = canonical_sha256(resources)
         held = json.loads(row["document"]) if row["document"] else None
         signed = (held["signature"]["key_id"], held["fleet_epoch"]) if held else None
@@ -758,36 +757,3 @@ def _differs(have: NodeStateRef | None, fleet_epoch: int, row: sqlite3.Row) -> b
     if have is None:
         return True
     return (have.fleet_epoch, have.revision, have.sha256) != (fleet_epoch, row["revision"], row["doc_sha256"])
-
-
-def _with_users(spec: NodeSpec, users: list[UserRecord]) -> list[dict[str, Any]]:
-    """Insert one users resource per managed inbound right after the Xray config."""
-    resources = [resource.model_dump(mode="json") for resource in spec.resources]
-    configs = [index for index, resource in enumerate(resources) if resource["kind"] == "xray_config"]
-    if not spec.managed_inbounds:
-        return resources
-    if len(configs) != 1:
-        raise ServiceError("invalid_request", "Managed inbounds need exactly one xray_config resource.", 400)
-    config_id = resources[configs[0]]["id"]
-    active = [user for user in users if user.status == "active"]
-    inserted = [_users_resource(inbound, active, config_id) for inbound in spec.managed_inbounds]
-    return [*resources[: configs[0] + 1], *inserted, *resources[configs[0] + 1 :]]
-
-
-def _users_resource(inbound: ManagedInbound, users: list[UserRecord], config_id: str) -> dict[str, Any]:
-    if inbound.protocol == "hysteria2":
-        return {
-            "id": users_resource_id(inbound.tag),
-            "depends_on": [config_id],
-            "kind": "hysteria2_users",
-            "inbound_tag": inbound.tag,
-            "users": [{"user_id": user.user_id, "auth": user.uuid} for user in users],
-        }
-    return {
-        "id": users_resource_id(inbound.tag),
-        "depends_on": [config_id],
-        "kind": "xray_users",
-        "inbound_tag": inbound.tag,
-        # An imported UUID keeps its case for Hysteria2; the document wants VLESS UUIDs lowercase.
-        "users": [{"user_id": user.user_id, "uuid": user.uuid.lower(), "flow": inbound.flow} for user in users],
-    }
