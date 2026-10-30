@@ -316,12 +316,13 @@ jobs:
           uv run meridian dev preview --output website/dist/demo
           # Verify expected files exist
           test -f website/dist/demo/index.html
-          test -f website/dist/demo/pwa/app.js
-          test -f website/dist/demo/pwa/styles.css
-          test -f website/dist/demo/pwa/icon.svg
-          test -f website/dist/demo/pwa/sw.js
+          assets=$(echo website/dist/demo/sub/~pwa/pwa-*)
+          test -f "$assets/app.js"
+          test -f "$assets/styles.css"
+          test -f "$assets/icon.svg"
+          test -f website/dist/demo/sub/~pwa/sw.js
           # Verify SW is no-op (disabled for static hosting)
-          grep -q "SW disabled" website/dist/demo/pwa/sw.js
+          grep -q "SW disabled" website/dist/demo/sub/~pwa/sw.js
           # Verify client index.html is non-empty (jinja2 rendered correctly)
           find website/dist/demo -mindepth 2 -name 'index.html' -size +0c | grep -q .
 
