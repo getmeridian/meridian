@@ -501,6 +501,32 @@ def test_token_create_requires_one_future_expiry_choice(fleet: Fleet) -> None:
     assert fleet.service.tokens.list_tokens().tokens == []
 
 
+def test_token_api_refuses_an_impossible_calendar_expiry(fleet: Fleet) -> None:
+    before = fleet.service.tokens.list_tokens()
+    status, answer = _request(
+        fleet.url + "/api/tokens",
+        "POST",
+        {"name": "temporary", "scope": "read", "expires_at": "2026-02-31T00:00:00Z"},
+        ADMIN_TOKEN,
+    )
+    assert (status, answer["error"]["code"]) == (400, "invalid_request")
+    assert fleet.service.tokens.list_tokens() == before
+
+
+@pytest.mark.parametrize("method", ["POST", "PATCH"])
+def test_user_api_refuses_impossible_expiry_even_while_disabled(fleet: Fleet, method: str) -> None:
+    fleet.service.put_user("alice")
+    before = fleet.service.list_users()
+    body = {"status": "disabled", "expire_at": "2026-02-31T00:00:00Z"}
+    path = "/api/users/alice"
+    if method == "POST":
+        body["username"] = "bob"
+        path = "/api/users"
+    status, answer = _request(fleet.url + path, method, body, ADMIN_TOKEN)
+    assert (status, answer["error"]["code"]) == (400, "invalid_request")
+    assert fleet.service.list_users() == before
+
+
 def test_step_twelve_preserves_existing_tokens_without_expiry_and_migrates_once(tmp_path: Path) -> None:
     path = tmp_path / "control.db"
     service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")

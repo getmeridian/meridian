@@ -12,7 +12,7 @@ _RENDERER_MANIFEST = {
     "control-subscriptions": "presentation-order-v9",
     "pwa": "quiet-account-v23",
     "control-service": "attention-v17",
-    "control-api": "people-expiry-v3",
+    "control-api": "calendar-timestamps-v4",
     "firewall": "ufw-comment-v2",
     "nginx": "connection-noindex-v11",
     "realm": "neutral-systemd-musl-v3",

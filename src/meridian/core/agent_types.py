@@ -31,9 +31,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import ConfigDict, Field
+from pydantic import AfterValidator, ConfigDict, Field
 
 from meridian.core.inputs import TopologyIdValue
 from meridian.core.models import CoreModel
@@ -45,6 +46,21 @@ MAX_SAFE_INTEGER = 2**53 - 1
 _UUID_PATTERN = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 _BASE64URL_TOKEN_PATTERN = r"^[A-Za-z0-9_-]+$"
 _BASE64_PATTERN = r"^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+
+
+def _calendar_timestamp(value: str) -> str:
+    try:
+        datetime(
+            int(value[:4]),
+            int(value[5:7]),
+            int(value[8:10]),
+            int(value[11:13]),
+            int(value[14:16]),
+            int(value[17:19]),
+        )
+    except ValueError as exc:
+        raise ValueError("Enter a valid calendar date and time in UTC.") from exc
+    return value
 
 
 class AgentModel(CoreModel):
@@ -101,6 +117,7 @@ Timestamp = Annotated[
         max_length=40,
         description="RFC 3339 timestamp in UTC, ending in Z.",
     ),
+    AfterValidator(_calendar_timestamp),
 ]
 CommandId = Annotated[
     str,
