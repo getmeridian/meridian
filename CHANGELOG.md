@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+- The website and README show the product: screenshots of the connection page and the owner console, and a clickable owner console demo at `/demo/console/` beside the connection page demo. Both run in the browser on one invented fleet, recorded from a real control service and checked against current API models.
 - The version and beta banner prints once a day (and after an upgrade), not before every command.
 - Russian text rewritten across the CLI, web console, connection and support pages, website, and docs, with one glossary throughout.
 - `client set --tag`, `client list --tag`, and the console save tags in uppercase instead of refusing lowercase (`family` becomes `FAMILY`); a refused tag no longer drops the note sent with it.

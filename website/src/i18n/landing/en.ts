@@ -162,6 +162,22 @@ export const en = {
   'tech.fp.body':
     '<p>Every TLS client sends a unique "Client Hello" fingerprint. Censors flag connections where the fingerprint doesn\'t match the claimed application.</p><p>Client apps use <strong>uTLS</strong> to send the same Client Hello as Chrome. Meridian also publishes a Firefox copy of each Reality and XHTTP entry, so if censors flag one fingerprint, the other keeps working.</p>',
 
+  // Showcase
+  'showcase.label': 'See it',
+  'showcase.title': 'What you and your people get',
+  'showcase.desc': 'Both demos run in your browser on invented data. Click around: nothing is real, and nothing is sent anywhere.',
+  'showcase.page.title': 'Connection page',
+  'showcase.page.text': 'Each person opens their own page: they pick an app, add the connection with one tap, and see their traffic and days left.',
+  'showcase.page.try': 'Try the connection page',
+  'showcase.page.alt': 'A person\'s connection page on a phone: choose an app, add the connection with one tap, then connect',
+  'showcase.console.title': 'Owner console',
+  'showcase.console.text': 'Add people, share links and QR codes, set limits and expiry dates, and keep an eye on your servers, from any browser.',
+  'showcase.console.try': 'Try the owner console',
+  'showcase.console.alt': 'The owner console\'s People list: each person\'s expiry, last time online, status, and traffic against their limit',
+  'showcase.person': 'One person: link, QR code, traffic, access, and devices.',
+  'showcase.servers': 'Servers: health, versions, monthly allowance, and the next payment.',
+  'showcase.settings': 'Settings: a notice for everyone, language, privacy, and sign-in security.',
+
   // Connect
   'connect.label': 'Connect',
   'connect.title': 'Scan and go',

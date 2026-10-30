@@ -157,6 +157,22 @@ export const zh: LandingStrings = {
   'tech.fp.body':
     '<p>每个 TLS 客户端都会发送独特的“Client Hello”指纹。如果指纹与其声称的应用不符，审查者就会将该连接标记出来。</p><p>客户端应用使用 <strong>uTLS</strong>，发送与 Chrome 相同的 Client Hello。Meridian 还会为每个 Reality 和 XHTTP 条目发布一份 Firefox 指纹的副本，因此一种指纹被标记时，另一种仍可使用。</p>',
 
+  // Showcase
+  'showcase.label': '看看效果',
+  'showcase.title': '你和你的用户会得到什么',
+  'showcase.desc': '两个演示都在你的浏览器中运行，使用虚构数据。随意点击：一切都不是真的，也不会发送到任何地方。',
+  'showcase.page.title': '连接页面',
+  'showcase.page.text': '每个人打开自己的页面：选择应用，一键添加连接，并查看自己的流量和剩余天数。',
+  'showcase.page.try': '试用连接页面',
+  'showcase.page.alt': '手机上的个人连接页面：选择应用，一键添加连接，然后连接',
+  'showcase.console.title': '管理控制台',
+  'showcase.console.text': '在任何浏览器中添加用户、分享链接和二维码、设置流量限额和到期时间，并随时查看服务器状态。',
+  'showcase.console.try': '试用管理控制台',
+  'showcase.console.alt': '管理控制台的用户列表：每个人的到期时间、最近在线时间、状态，以及相对于限额的流量',
+  'showcase.person': '单个用户：链接、二维码、流量、访问权限和设备。',
+  'showcase.servers': '服务器：健康状况、版本、每月流量额度和下次付款。',
+  'showcase.settings': '设置：面向所有人的通知、语言、隐私和登录安全。',
+
   // Connect
   'connect.label': '连接',
   'connect.title': '扫码即连',

@@ -24,6 +24,23 @@ A proxy that works can still give itself away: an open admin port, a self-signed
   <br><sub><a href="https://getmeridian.org/#video">Watch a full <code>meridian setup</code></a>, start to finish (3½ min) · <a href="https://getmeridian.org/video/meridian-setup.mp4">download the MP4</a> · <a href="https://getmeridian.org/ru/#video">по-русски</a></sub>
 </p>
 
+## See it
+
+Each person gets a connection page; you get a web console for the people and servers. Both demos below run in your browser on invented data: click around, nothing is real and nothing is sent anywhere.
+
+<table>
+  <tr>
+    <td width="30%" valign="top"><a href="https://getmeridian.org/demo/"><img src="https://raw.githubusercontent.com/getmeridian/meridian/main/website/public/img/showcase/connection-page-phone.webp" alt="A person's connection page on a phone: pick a platform and app, add the connection with one tap, then connect"></a></td>
+    <td width="70%" valign="top"><a href="https://getmeridian.org/demo/console/"><img src="https://raw.githubusercontent.com/getmeridian/meridian/main/website/public/img/showcase/console-people.webp" alt="The owner console's People list: each person's expiry, last time online, status, and traffic against their limit"></a></td>
+  </tr>
+  <tr>
+    <td valign="top"><a href="https://getmeridian.org/demo/"><img src="https://raw.githubusercontent.com/getmeridian/meridian/main/website/public/img/showcase/connection-page-account.webp" alt="The account panel on a connection page: status, traffic this period, and days left"></a></td>
+    <td valign="top"><a href="https://getmeridian.org/demo/console/#/servers"><img src="https://raw.githubusercontent.com/getmeridian/meridian/main/website/public/img/showcase/console-servers.webp" alt="The owner console's Servers screen: health, versions, monthly allowance, and the next payment for each exit"></a></td>
+  </tr>
+</table>
+
+<p align="center"><b><a href="https://getmeridian.org/demo/">Try the connection page</a></b> · <b><a href="https://getmeridian.org/demo/console/">Try the owner console</a></b></p>
+
 ## Install
 
 macOS or Linux (on Windows, use WSL):
@@ -129,7 +146,7 @@ prints a guide for Claude Code, Codex, Cursor, and other agents: how Meridian wo
 
 ## More
 
-- **Docs:** [getmeridian.org](https://getmeridian.org) · [connection page demo](https://getmeridian.org/demo) · [architecture](https://getmeridian.org/en/architecture/)
+- **Docs:** [getmeridian.org](https://getmeridian.org) · [connection page demo](https://getmeridian.org/demo/) · [owner console demo](https://getmeridian.org/demo/console/) · [architecture](https://getmeridian.org/en/architecture/)
 - **Upgrading from 3.x:** Meridian 4 replaces 3x-ui with its own control service and is not an in-place upgrade; every user gets a new link. [How to move](https://getmeridian.org/en/installation/#upgrading-from-3x). A fleet on an earlier Meridian 4 release that runs Remnawave moves in place with `meridian migrate`, keeping every link.
 - **Security:** [SECURITY.md](SECURITY.md) covers the threat model, including what Meridian does not protect against.
 - **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) · [issues](https://github.com/getmeridian/meridian/issues) (attach `meridian doctor` output)
