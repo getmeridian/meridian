@@ -16,8 +16,6 @@ Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
 - **Aesthetics are trust** — every surface is UI. CLI output, pages, error messages. In censored regions, polished = safe.
 
 ## Architecture (summary)
-- **Page language** — the service owns an automatic browser default or an explicit en/ru/fa/zh default, with nullable person overrides; a person's saved page choice wins, and automatic native status remarks stay English.
-
 - **CLI:** a Python package on PyPI (`meridian-vpn`) over a growing meridian-core contract layer.
 - **Server stack:** nginx (stream SNI routing, HTTP TLS, reverse proxy), acme.sh, Xray (VLESS+Reality, XHTTP, Hysteria2 over UDP), Meridian's control service, and its node agent, all pinned; no Docker.
 - **Domain mode:** XHTTP moves onto the domain and WSS is added, both able to ride Cloudflare's CDN.
@@ -27,6 +25,7 @@ Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
 - **Control service (#95):** `meridian serve` (`ctld`) keeps users, traffic, revisions, and operator-owned privacy in SQLite (device limits and daily history default off), serves subscriptions and the owner's web console, and signs documents that each server's Rust agent (`netagent`) pulls over HTTPS; every change pulls an encrypted snapshot to the deployer (`meridian backup`, `restore`). `meridian migrate` moves a Remnawave fleet from an earlier beta onto it in place, keeping every link.
 - **Website and Studio:** Astro, with docs on Starlight (every page also served as Markdown for agents). Static Studio consumes generated contracts; executable Studio runs through a localhost-only Engine (`meridian studio`) for server onboarding, deploy dry-runs, and deploys.
 - **Connection pages:** `ctld` serves every person's subscription URL as browser HTML or app configs, including console invitees; branding and exit countries travel through its settings, and shared PWA assets come from the installed package.
+- **Page language:** the service owns an automatic browser default or an explicit en/ru/fa/zh default, with nullable person overrides; a person's saved page choice wins, and automatic native status remarks stay English.
 - **Real-VM harness:** optional, local-only, in `tests/realvm/`.
 
 Full detail: [website/src/content/docs/en/architecture.md](website/src/content/docs/en/architecture.md).
@@ -102,10 +101,8 @@ Updating is part of the change, not a separate task. In the SAME commit:
 When in doubt: shorter is better. A 30-line CLAUDE.md that's current beats a 100-line one that's half-stale.
 
 ## Conventions
-- Public owner contact belongs to reviewed delivery intent; page and app links are chosen by the operator and open only on user action.
-
-- Private person notes and tags are operator-owned service data; scoped reads blank them below people/admin, and delivery, events, and logs never carry their contents.
-
+- **Owner contact**: public, owned by reviewed delivery intent; page and app links are chosen by the operator and open only on user action
+- **Private notes and tags**: operator-owned service data; scoped reads blank them below people/admin, and delivery, events, and logs never carry their contents
 - **Shell injection**: `shlex.quote()` on ALL `conn.run()` interpolated values
 - **Demo data**: RFC 5737 IPs (`198.51.100.x`), never real server IPs
 - **Privacy**: never reference real people's names, server IPs, or domains in commits, code, or docs unless asked
