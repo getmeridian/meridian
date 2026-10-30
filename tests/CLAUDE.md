@@ -30,7 +30,6 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - **RFC 5737 IPs** — always `198.51.100.x` for test data, never real IPs.
 
 ## Pitfalls
-- Pin service UTC timestamps before creating users in reset tests; a real reset newer than the simulated period makes midnight assertions depend on today's date.
 - **`tmp_home` must patch both** — env var AND `meridian.config` attributes; patch `meridian.config.NAME`, never a command module's copy (there are none).
 - **MockConnection substring matching** — `when("grep", rc=1)` matches ANY command containing "grep". Use specific patterns.
 - **Don't restate registries** — a test that copies a constant, catalog, or schema list fails on every legitimate edit; assert behaviour or let the contract drift check do it.
