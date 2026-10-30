@@ -15,12 +15,12 @@ AFTER INSTALL, IS IT HEALTHY? → meridian check
   Tests every server in the fleet by role, over SSH.
 
 AFTER INSTALL, CAN'T CONNECT → meridian test IP
-  "Is the proxy reachable from where I am right now?"
-  Tests: configured listeners, TLS/SNI, the delivered subscription, and real proxy traffic.
+  "Is the VPN reachable from where I am right now?"
+  Tests: configured listeners, TLS/SNI, the delivered subscription, and real VPN traffic.
   No SSH needed — runs from the client device.
 
 AFTER INSTALL, CHECK EXPOSURE → meridian test IP --probe
-  "Does this deployment reveal a proxy or management surface?"
+  "Does this deployment reveal a VPN or management surface?"
   Tests: public ports, TLS/HTTP behavior, paths, SNI, DNS and topology policy.
   No SSH needed — runs from the client device.
 
@@ -38,7 +38,7 @@ Add `--ai` to check or doctor for an AI-ready diagnostic prompt.
 **Causes:**
 1. Cloud provider firewall / security group blocks port 443 inbound
 2. ISP or network blocks the server IP entirely
-3. Server is down or proxy is not running
+3. Server is down or VPN services are not running
 4. UFW on the server doesn't allow port 443
 
 **Fixes:**
@@ -111,7 +111,7 @@ Test SSH manually: `ssh root@SERVER_IP`. Ensure you have key-based access. Use `
 
 Check its logs: `meridian logs IP -c node -n 50` shows the agent (`netagent`) and Xray (`netcore`). Common causes are a port collision on the host (Xray binds the ports from your topology directly, so they must be free), or an exit that can't reach the control server on TCP 443 (the agent dials out to it; check the provider's outbound firewall).
 
-**Fix:** run `meridian check IP` and follow its remediation, then `meridian apply`: it re-enrolls an agent that lost its identity and upgrades one that runs an old build. `meridian fleet status` shows whether each agent is online and has applied the current configuration; the console's **Servers** screen shows the same.
+**Fix:** run `meridian check IP` and follow its remediation, then `meridian apply`: it re-enrolls an agent that lost its identity and upgrades one that runs an old build. `meridian fleet status` shows whether each agent is online and has applied the current configuration; the web panel's **Servers** screen shows the same.
 
 ### Disk space insufficient
 
@@ -123,7 +123,7 @@ The certificate for your domain can only be issued once the domain's A record po
 
 ## Was working, now stopped
 
-**Most common cause:** Server IP got blocked. Run `meridian test IP`; its findings distinguish network reachability from TLS, subscription, and proxy execution failures. A TCP failure can also mean a cloud firewall or an offline server.
+**Most common cause:** Server IP got blocked. Run `meridian test IP`; its findings distinguish network reachability from TLS, subscription, and tunnel failures. A TCP failure can also mean a cloud firewall or an offline server.
 
 See the [IP Blocked Recovery guide](/en/recovery/) for recovery options (replacement exit, relay, CDN fallback).
 
@@ -181,7 +181,7 @@ See the [Relay guide — Troubleshooting](/en/relay/#troubleshooting) section fo
 | Server | OS version, uptime (recent reboot?), disk/memory usage |
 | Services | Are `ctld` (control service), `netagent` (agent), and `netcore` (Xray) active? |
 | Exit node Logs | Agent and Xray startup errors, "failed to start" entries, certificate issues |
-| Listening Ports | Port 443 should show nginx. If missing, proxy isn't running |
+| Listening Ports | Port 443 should show nginx. If missing, nginx isn't running |
 | Firewall (UFW) | Port 443/tcp should be ALLOW. If not listed, it's blocked |
 | Camouflage Target | Should show CONNECTED with a certificate chain |
 | Domain DNS | Should resolve to server IP |
@@ -197,7 +197,7 @@ See the [Relay guide — Troubleshooting](/en/relay/#troubleshooting) section fo
 | Automatic fallback | The delivered policy carried real traffic | Balancer, routing, credential, or endpoint failure |
 | Protocol checks | Each target outbound carried real traffic | Protocol-specific listener, firewall, or delivered config failure |
 
-The full test rotates independent public IP observers and checks the same observers directly. If neither the proxy nor control path can obtain an IP, the result is inconclusive rather than a false protocol failure. Set `MERIDIAN_CONNECT_TEST_URL` only when you operate a known observer endpoint.
+The full test rotates independent public IP observers and checks the same observers directly. If neither the VPN tunnel nor the direct path can obtain an IP, the result is inconclusive rather than a false protocol failure. Set `MERIDIAN_CONNECT_TEST_URL` only when you operate a known observer endpoint.
 
 The first full test may spend up to 120 seconds downloading and verifying the pinned Xray release from GitHub. After bootstrap, `--timeout` (default `5`, range `1`-`30`) applies to individual network operations. Exit `0` passed, `4` completed with negative findings, and `3` was inconclusive because required evidence was skipped. Basic mode cannot verify UDP-only Hysteria2 traffic.
 

@@ -5,11 +5,11 @@ description: 系统架构、流量流向和服务拓扑。
 
 ## 技术栈
 
-- **VLESS+Reality**（Xray-core）— 主要协议。它伪装成真实的 TLS 网站：任何探测服务器的人都会看到该网站的真实证书（最好是与你的服务器托管在同一网络的网站）。只有拥有正确密钥的客户端才能到达代理。
+- **VLESS+Reality**（Xray-core）— 主要协议。它伪装成真实的 TLS 网站：任何探测服务器的人都会看到该网站的真实证书（最好是与你的服务器托管在同一网络的网站）。只有拥有正确密钥的客户端才能进入 VPN 隧道。
 - **XHTTP**（Xray-core）— 你域名上的 TLS 路径；没有域名时，则使用服务器 IP 和 Let's Encrypt IP 证书。
 - **WSS**（Xray-core）— 域名模式下添加的、你自己域名上的 TLS 路径。通过 Cloudflare 代理域名后，它和 XHTTP 都经过 CDN，即使 IP 被封锁也仍然可用。
 - **Hysteria2**（Xray-core）— 用于丢包网络的 UDP/443 最后手段，用 salamander 混淆包装，看起来不像 QUIC。默认开启（`--no-hysteria2` 可关闭）。
-- **控制服务** — Meridian 自己的服务（`meridian serve`），运行在控制服务器上。它把用户、流量、修订和备份保存在一个 SQLite 文件中，提供所有格式的订阅，并承载所有者的网页控制台。它以 systemd 单元运行，不需要 Docker，也不需要数据库服务器。
+- **控制服务与网页面板** — Meridian 自己的服务（`meridian serve`，以 `ctld` 运行），运行在控制服务器上。它把用户、流量、修订、隐私设置和备份保存在一个 SQLite 文件中，提供所有格式的订阅和连接页面，并承载内置网页面板（管理控制台）。它以 systemd 单元运行，不需要 Docker，也不需要数据库服务器。
 - **节点 agent** — 每个出口和路由网关上的一个小型静态 Rust 程序。它主动通过 443 端口的 HTTPS 连接控制服务，校验收到的签名文档，并以独立服务运行 Xray。节点不开放任何管理端口。
 - **nginx** — 拥有公开 TCP/443。其 stream 模块按 SNI 路由连接而不终止 TLS；其 http 模块为控制服务、连接页面、订阅和域名路径终止 TLS。证书来自通过 [acme.sh](https://github.com/acmesh-official/acme.sh) 的 Let's Encrypt。
 - **Realm** — 中继服务器上的 TCP 转发器。
@@ -34,9 +34,9 @@ flowchart TD
 
 nginx stream **不**终止 TLS。它从 Client Hello 中读取 SNI 并转发原始 TCP 流。控制服务、连接页面和订阅使用服务器 IP 的 Let's Encrypt 证书提供（短期有效，自动续期）。
 
-共享链接只有一个地址：`/<page-path>/sub/<token>`。浏览器获得连接页面，应用获得适合自己的配置。控制台、API 和 agent 接入点位于共享链接永远不会暴露的独立秘密路径上。
+共享链接只有一个地址：`/<page-path>/sub/<token>`。浏览器获得连接页面，应用获得适合自己的配置。网页面板、API 和 agent 接入点位于共享链接永远不会暴露的独立秘密路径上。
 
-控制服务根据当前用户、连接端点、品牌设置和出口国家生成页面、`config.json` 和清单。每个人都有页面，包括在控制台中添加的用户。个人响应使用 `Cache-Control: no-store` 并禁止索引；安装包中的共享资源位于 `/<page-path>/sub/~pwa/` 下，以内容版本标识。nginx 提供 Referrer-Policy 和压缩，控制服务提供页面的 CSP 及其他浏览器保护头。旧的 `/<page-path>/<uuid>/` 链接会重定向到当前订阅 URL。应用升级会删除旧页面文件，并让旧 service worker 释放缓存的页面。
+控制服务根据当前用户、连接端点、品牌设置和出口国家生成页面、`config.json` 和清单。每个人都有页面，包括在网页面板中添加的用户。个人响应使用 `Cache-Control: no-store` 并禁止索引；安装包中的共享资源位于 `/<page-path>/sub/~pwa/` 下，以内容版本标识。nginx 提供 Referrer-Policy 和压缩，控制服务提供页面的 CSP 及其他浏览器保护头。旧的 `/<page-path>/<uuid>/` 链接会重定向到当前订阅 URL。应用升级会删除旧页面文件，并让旧 service worker 释放缓存的页面。
 
 ### 域名模式
 
@@ -53,7 +53,7 @@ flowchart TD
     Internet -.->|"UDP 443 (salamander)"| XrayHy2["Xray Hysteria2"]
 ```
 
-域名只承载代理路径；控制服务和页面留在 IP 证书上。
+域名只承载 VPN 路径；控制服务、网页面板和页面留在 IP 证书上。
 
 ### 中继
 
@@ -104,7 +104,7 @@ Meridian 会将拓扑编译为资源列表：防火墙规则、nginx 路由、�
 
 拓扑中的任何内容都可以添加和移除：用户、协议路径、出口、中继和路由网关。在新计划收敛后，`apply` 会清理已移出拓扑的资源（用户、客户端接入点、节点 agent 及其 Xray、nginx 配置文件、Realm 服务、证书、防火墙规则）。控制服务器是例外：它的地址包含在每个订阅 URL 中，因此只能通过 `meridian teardown` 卸载，或通过 `meridian restore` 迁移。
 
-客户端的状态、限额和到期时间归你管理，可以在 CLI 或控制台中修改；应用永远不会改动它们。
+客户端的状态、限额和到期时间归你管理，可以在 CLI 或网页面板中修改；应用永远不会改动它们。
 
 ## 端口分配
 
@@ -115,7 +115,7 @@ Meridian 会将拓扑编译为资源列表：防火墙规则、nginx 路由、�
 | 80/TCP | nginx（ACME 验证） | 公开 |
 | 8443 | nginx http（控制服务、连接页面、订阅） | 内部 |
 | 8444 | nginx http，PROXY 协议监听端口 | 内部 |
-| 3000 | 控制服务（控制台、API、agent、订阅） | localhost |
+| 3000 | 控制服务（网页面板、API、agent、订阅） | localhost |
 | 10000+ | Xray Reality（每个出口） | host network，由防火墙拦截外部访问 |
 | 20000+ | Xray WSS（域名模式，每个出口） | host network，由防火墙拦截外部访问 |
 | 30000+ | Xray XHTTP（每个出口） | host network，由防火墙拦截外部访问 |
@@ -124,7 +124,7 @@ Meridian 会将拓扑编译为资源列表：防火墙规则、nginx 路由、�
 
 ## 服务
 
-单元和目录名称都是中性的，因此在主机上查看 `systemctl` 或 `/opt` 时看不到任何指向代理软件的名称。`meridian check` 和 `meridian doctor` 会显示每个名称背后的角色。服务器不需要 Docker。
+单元和目录名称都是中性的，因此在主机上查看 `systemctl` 或 `/opt` 时看不到任何指向 VPN 或代理软件的名称。`meridian check` 和 `meridian doctor` 会显示每个名称背后的角色。服务器不需要 Docker。
 
 **在控制服务器上：**
 - `ctld` — 控制服务，即从 `/opt/ctld` 中固定版本的安装运行的 `meridian serve`，监听 `127.0.0.1:3000`，位于 nginx 之后

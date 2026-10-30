@@ -54,7 +54,7 @@ Updating the CLI changes nothing on your servers. If a server works, there is no
 
 ## Upgrading from 3.x
 
-Meridian 4 is **not an in-place upgrade**. It replaces the 3x-ui panel with its own control service, and links from a 3.x server cannot carry over: every user needs a new link.
+Meridian 4 is **not an in-place upgrade**. It replaces the 3x-ui panel with its own control service and web panel, and links from a 3.x server cannot carry over: every user needs a new link.
 
 Your 3.x servers keep working. You have two choices:
 

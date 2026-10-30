@@ -5,11 +5,11 @@ description: System architecture, traffic flow, and service topology.
 
 ## Technology stack
 
-- **VLESS+Reality** (Xray-core) — the primary protocol. It impersonates a real TLS website: anyone probing the server sees that site's genuine certificate (preferably a site hosted next to your server). Only clients with the right key reach the proxy.
+- **VLESS+Reality** (Xray-core) — the primary protocol. It impersonates a real TLS website: anyone probing the server sees that site's genuine certificate (preferably a site hosted next to your server). Only clients with the right key enter the VPN tunnel.
 - **XHTTP** (Xray-core) — a TLS path on your domain, or on the server's IP with a Let's Encrypt IP certificate when there is no domain.
 - **WSS** (Xray-core) — a TLS path on your own domain, added in domain mode. With Cloudflare proxying the domain, it and XHTTP travel through the CDN and survive an IP block.
 - **Hysteria2** (Xray-core) — the UDP/443 last resort for lossy networks, wrapped in salamander obfuscation so it doesn't look like QUIC. On by default (`--no-hysteria2` turns it off).
-- **Control service** — Meridian's own service (`meridian serve`) on the control server. It keeps users, traffic, revisions, and backups in one SQLite file, serves every subscription format, and hosts the owner's web console. It runs as a systemd unit, with no Docker and no database server.
+- **Control service and web panel** — Meridian's own service (`meridian serve`, running as `ctld`) on the control server. It keeps users, traffic, revisions, privacy settings, and backups in one SQLite file, serves every subscription format and connection page, and hosts the built-in web panel (owner console). It runs as a systemd unit, with no Docker and no database server.
 - **Node agent** — a small static Rust binary on every exit and routing gateway. It dials the control service over HTTPS on 443, verifies the signed document it receives, and runs Xray as a separate service. Nodes open no management port.
 - **nginx** — owns public TCP/443. Its stream module routes connections by SNI without terminating TLS; its http module terminates TLS for the control service, connection pages, subscriptions, and domain paths. Certificates come from Let's Encrypt via [acme.sh](https://github.com/acmesh-official/acme.sh).
 - **Realm** — the TCP forwarder on relay servers.
@@ -34,9 +34,9 @@ The public boxes in this diagram describe URL routes handled by `ctld`: the page
 
 nginx stream **does not** terminate TLS. It reads the SNI from the Client Hello and forwards the raw TCP stream. The control service, connection pages, and subscriptions are served with a Let's Encrypt certificate for the server's IP (short-lived, renewed automatically).
 
-Shared links use one address: `/<page-path>/sub/<token>`. Browsers receive the connection page; apps receive their configurations. The control service's console, API, and agent endpoint sit on a separate secret path that shared links never reveal.
+Shared links use one address: `/<page-path>/sub/<token>`. Browsers receive the connection page; apps receive their configurations. The control service's web panel, API, and agent endpoint sit on a separate secret path that shared links never reveal.
 
-The service renders each page, its `config.json`, and its manifest from current users, endpoints, branding, and exit countries. Every person has a page, including those added in the console. Person responses use `Cache-Control: no-store` and noindex; shared package assets use a content version under `/<page-path>/sub/~pwa/`. nginx supplies Referrer-Policy and compression, and the service supplies the page's CSP and other browser protections. Legacy `/<page-path>/<uuid>/` links redirect to the current subscription URL. Applying the upgrade retires the old page files and service workers.
+The service renders each page, its `config.json`, and its manifest from current users, endpoints, branding, and exit countries. Every person has a page, including those added in the web panel. Person responses use `Cache-Control: no-store` and noindex; shared package assets use a content version under `/<page-path>/sub/~pwa/`. nginx supplies Referrer-Policy and compression, and the service supplies the page's CSP and other browser protections. Legacy `/<page-path>/<uuid>/` links redirect to the current subscription URL. Applying the upgrade retires the old page files and service workers.
 
 ### Domain mode
 
@@ -53,7 +53,7 @@ flowchart TD
     Internet -.->|"UDP 443 (salamander)"| XrayHy2["Xray Hysteria2"]
 ```
 
-The domain carries only the proxy paths; the control service and pages stay on the IP certificate.
+The domain carries only the VPN paths; the control service, web panel, and pages stay on the IP certificate.
 
 ### Relays
 
@@ -104,7 +104,7 @@ Meridian turns the topology into a list of resources: firewall rules, nginx rout
 
 Anything in the topology can be added and removed: users, protocol paths, exits, relays, and routing gateways. After the new plan converges, apply deletes what left it (users, client endpoints, node agents and their Xray, nginx files, Realm services, certificates, firewall rules). The control server is the exception: its address is part of every subscription URL, so it leaves only with `meridian teardown`, or moves with `meridian restore`.
 
-Clients' status, limits, and expiry belong to you, from the CLI or the console; applies never change them.
+Clients' status, limits, and expiry belong to you, from the CLI or the web panel; applies never change them.
 
 ## Port assignments
 
@@ -115,7 +115,7 @@ Clients' status, limits, and expiry belong to you, from the CLI or the console; 
 | 80/TCP | nginx (ACME challenges) | Public |
 | 8443 | nginx http (control service, pages, subscriptions) | Internal |
 | 8444 | nginx http, PROXY-protocol listener | Internal |
-| 3000 | Control service (console, API, agents, subscriptions, pages) | localhost |
+| 3000 | Control service (web panel, API, agents, subscriptions, pages) | localhost |
 | 10000+ | Xray Reality (per-exit) | host network, firewalled |
 | 20000+ | Xray WSS (domain mode, per-exit) | host network, firewalled |
 | 30000+ | Xray XHTTP (per-exit) | host network, firewalled |
@@ -124,7 +124,7 @@ Backend Xray ports are reached through nginx; UFW blocks them from the internet.
 
 ## Services
 
-Unit and directory names are neutral, so a host reading `systemctl` or `/opt` sees nothing that names proxy software. `meridian check` and `meridian doctor` show the role behind each name. Servers need no Docker.
+Unit and directory names are neutral, so a host reading `systemctl` or `/opt` sees nothing that names VPN or proxy software. `meridian check` and `meridian doctor` show the role behind each name. Servers need no Docker.
 
 **On the control server:**
 - `ctld` — the control service, `meridian serve` from a pinned install in `/opt/ctld`, on `127.0.0.1:3000` behind nginx

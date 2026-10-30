@@ -3,7 +3,7 @@ title: 在路由器上使用 Meridian
 description: 通过 OpenWrt 上的 podkop 或 Keenetic 上的 XKeen 将家庭路由器连接到 Meridian 服务器，这样每台设备都能覆盖，无需安装应用。
 ---
 
-运行代理客户端的路由器可以覆盖家中的每台设备，包括无法运行应用的电视和游戏机。本指南展示两种常见的设置：**podkop** 在 OpenWrt 上和 **XKeen** 在 Keenetic 上。两者都是社区项目，所以开始前请查阅他们的页面了解最新步骤。
+连接到 Meridian VPN 服务器的路由器可以覆盖家中的每台设备，包括无法运行应用的电视和游戏机。本指南展示两种常见的设置：**podkop** 在 OpenWrt 上和 **XKeen** 在 Keenetic 上。两者都是社区项目，所以开始前请查阅他们的页面了解最新步骤。
 
 ## 获取链接
 
@@ -31,7 +31,7 @@ meridian client show home-router
 
 ## OpenWrt with podkop
 
-[podkop](https://podkop.net/) 只把你选择的域名和列表通过代理转发，其余流量全部直连。这很适合俄罗斯用户：境内网站无需额外规则就能走普通宽带直连。
+[podkop](https://podkop.net/) 只把你选择的域名和列表通过隧道转发，其余流量全部直连。这很适合俄罗斯用户：境内网站无需额外规则就能走普通宽带直连。
 
 **要求**（来自 [podkop 文档](https://podkop.net/docs/install)）：OpenWrt 24.10（25.12 通过 apk 也可用），以及约 20 MB 的可用闪存。如果 sing-box 尚未安装，podkop 需要 `/overlay` 中有 40 MB 可用空间。当空间不足时，podkop 常见问题建议 `sing-box-tiny`。
 
@@ -97,7 +97,7 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/jameszeroX/XKeen/main/insta
 
 链接包含每个值：`@` 之前的部分是 UUID，然后是地址和端口。在查询中，`pbk` 是 `publicKey`，`sid` 是 `shortId`，`sni` 是 `serverName`，`fp` 是 `fingerprint`。当链接包含时，保持 `flow` 为 `xtls-rprx-vision`。
 
-在 `05_routing.json` 中设置路由。XKeen 指南描述了两种方式：仅发送选定的域名和 IP 列表通过代理，或发送 `.ru`、`.su` 和 `.рф` 直接，其他所有内容通过。然后检查并开始：
+在 `05_routing.json` 中设置路由。XKeen 指南描述了两种方式：仅将选定的域名和 IP 列表通过隧道发送，或让 `.ru`、`.su` 和 `.рф` 直连而其余流量通过隧道。然后检查并启动：
 
 ```
 xkeen -xtest

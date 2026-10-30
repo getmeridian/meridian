@@ -38,7 +38,7 @@ Daily history keeps **90 days** by default. You can choose **7–730 days**, inc
 
 Traffic belongs to the UTC day when new counter growth reaches the service. A delayed report belongs to the day it arrives. Retries count only once. Use from before history was enabled is not reconstructed; empty days mean no recorded traffic. Resetting a person's traffic allowance keeps their daily history.
 
-The console shows a person's chart and a server chart with a server picker. The CLI shows compact tables:
+The web panel shows a person's chart and a server chart with a server picker. The CLI shows compact tables:
 
 ```bash
 meridian client usage alice --days 30
@@ -62,9 +62,9 @@ meridian privacy set --devices off --history off --yes --json
 
 Only options you pass change. Raising a level prints its disclosure before confirmation; `--yes` skips the question. JSON changes require `--yes`. Repeating the same settings changes nothing.
 
-In the web console, open **Settings → Privacy**. Each option shows its disclosure. Review the confirmation before saving; the owner needs a recent password check and their sign-in code if enabled. API reads need `read`; writes need `admin`.
+In the web panel, open **Settings → Privacy**. Each option shows its disclosure. Review the confirmation before saving; the owner needs a recent password check and their sign-in code if enabled. API reads need `read`; writes need `admin`.
 
-Every setting change records who made it (the token's name, `owner`, or `root`), when, and the complete before and after values. The console and CLI show the newest 50 changes.
+Every setting change records who made it (the token's name, `owner`, or `root`), when, and the complete before and after values. The web panel and CLI show the newest 50 changes.
 
 ## Lowering a level
 

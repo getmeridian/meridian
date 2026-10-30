@@ -6,7 +6,7 @@ export const GET: APIRoute = async () => {
   const lines = [
     '# Meridian',
     '',
-    '> Deploy censorship-resistant proxy servers with one command. Meridian sets up VLESS+Reality, XHTTP, and Hysteria2 behind a hardened firewall, verifies real traffic, and returns a connection page to share.',
+    '> Deploy a hardened self-hosted VPN server with one command. Meridian sets up VLESS+Reality, XHTTP, and Hysteria2 behind a hardened firewall, verifies real traffic, and gives you a built-in web panel and a connection page for each person.',
     '',
     'Driving the CLI as an agent? Start with the agent guide, also printed by `meridian help agents`.',
     '',

@@ -3,7 +3,7 @@ title: Security
 description: What Meridian contacts, what it sends, how downloads are verified, and how to report vulnerabilities.
 ---
 
-Meridian has **no telemetry, analytics, or ads**. It does not upload diagnostic reports. The connection page, support page, owner console, and website serve their own scripts, styles, fonts, icons, and QR rendering; they load **no third-party assets**. Opening an app store, support contact, or other external link is your choice.
+Meridian has **no telemetry, analytics, or ads**. It does not upload diagnostic reports. The connection page, support page, web panel, and website serve their own scripts, styles, fonts, icons, and QR rendering; they load **no third-party assets**. Opening an app store, support contact, or other external link is your choice.
 
 Installation, certificate renewal, DNS, and connectivity checks do need network access. The requests below describe those boundaries so you can decide which services to use.
 
@@ -40,7 +40,7 @@ Every recipient can see the connecting machine's IP address and normal protocol 
 | Request | When and what it sends | Your choice |
 |---------|------------------------|-------------|
 | **Reachability, camouflage, and blocking checks → the tested addresses and sites** | `check`, `test`, `--probe`, SNI selection, and deployment verification make TCP/TLS/HTTP requests from your machine or servers. They send the selected SNI, HTTP path, or probe bytes. Forward/reverse hostname checks use the machine's DNS resolver. | Run optional diagnostics when needed. Deployment requires its verification; specifying an SNI avoids automatic neighbor discovery, but still checks that site. |
-| **Connection tests → IP echo services** | Sends HTTPS requests through the tested proxy to `api.ipify.org`, `ipv4.icanhazip.com`, or `v4.ident.me`; IPv6 uses `api6.ipify.org`, `ipv6.icanhazip.com`, or `v6.ident.me`. The observer sees the exit IP. Failed tests may repeat the request directly, exposing the managing machine's IP to the observer. | Set `MERIDIAN_CONNECT_TEST_URL` to an endpoint you control that returns an IP address. Deployment also uses these traffic tests. |
+| **Connection tests → IP echo services** | Sends HTTPS requests through the tested VPN tunnel to `api.ipify.org`, `ipv4.icanhazip.com`, or `v4.ident.me`; IPv6 uses `api6.ipify.org`, `ipv6.icanhazip.com`, or `v6.ident.me`. The observer sees the exit IP. Failed tests may repeat the request directly, exposing the managing machine's IP to the observer. | Set `MERIDIAN_CONNECT_TEST_URL` to an endpoint you control that returns an IP address. Deployment also uses these traffic tests. |
 | **Camouflage discovery → GitHub and neighboring TLS sites** | `scan` and automatic SNI suggestions download pinned RealiTLScanner from XTLS/RealiTLScanner, then probe neighboring addresses and validate certificate names with DNS and TLS. The sites see the server's probes. | Choose `--sni` explicitly to avoid automatic discovery; do not run `scan` if you do not want the scan. |
 | **System packages and security updates → APT repositories** | Installation downloads packages from the OS's configured repositories. The baseline enables daily package-list refresh and unattended security updates. It installs nginx from `nginx.org` if the distribution package is insufficient. Requests identify distribution, architecture, and packages. | The server administrator controls APT sources and schedules; applying the baseline restores its update settings. `--no-harden` does not turn off package updates. |
 | **Control service installation → GitHub and PyPI** | Downloads the pinned uv archive from astral-sh/uv, managed Python through uv, and the exact `meridian-vpn` release plus dependencies from PyPI or configured indexes. An editable checkout builds a wheel on the managing machine, which can fetch build dependencies from its package index, then uploads the wheel over SSH instead. | An already current installation or populated caches avoid downloads. Normal installation needs the package sources. |
@@ -58,7 +58,7 @@ Every recipient can see the connecting machine's IP address and normal protocol 
 
 The **agent itself is not downloaded from GitHub by the node**. Meridian's wheel contains static musl builds for x86_64 and aarch64, with digest and build-version files. The managing machine verifies the bundled build and uploads it over SSH for installation or upgrade.
 
-### Proxy traffic and VPN apps
+### VPN traffic and client apps
 
 | Request | When and what it sends | Your choice |
 |---------|------------------------|-------------|
@@ -69,11 +69,11 @@ The **agent itself is not downloaded from GitHub by the node**. Meridian's wheel
 | **Realm relay → the next hop or exit** | Forwards the client's encrypted TCP stream to the destinations in its reviewed configuration. Runs no agent, VPN core, or separate telemetry client. | You choose the relay chain and exit. |
 | **VPN app → subscription service, DNS, and health-test site** | Your chosen app refreshes your subscription and may make its own DNS and connectivity requests. Meridian's Xray JSON profiles configure plain DNS at `1.1.1.1` / `8.8.8.8` and Apple test-page probes every minute; Mihomo fallback checks use that page every 5 minutes when active; sing-box configures Cloudflare DNS over TLS and UDP, with that page every 3 minutes. Probe sites see the path's egress IP, with no subscription credentials. | App behavior is separate from the browser page. Manage DNS and health checks in your app or its configuration. |
 
-### Connection pages, console, and website
+### Connection pages, web panel, and website
 
 - **Connection and support pages:** only their own service origin, for page/configuration, account status, subscriptions, shared assets, and optional clock/transfer checks. The service receives the person's secret URL and normal browser headers. QR generation and image export happen locally. No third-party requests.
-- **Owner console:** only its own service origin, for local assets, sign-in, session refresh, API reads/writes, and visible-screen refreshes. Passwords, authenticator codes, session cookies, and edits go to your service. No third-party requests.
-- **Website:** only its own origin, including fonts, search files, Markdown copies, and demo assets. The console demo answers its API in the browser. No analytics, external fonts, embeds, or third-party requests.
+- **Web panel:** only its own service origin, for local assets, sign-in, session refresh, API reads/writes, and visible-screen refreshes. Passwords, authenticator codes, session cookies, and edits go to your service. No third-party requests.
+- **Website:** only its own origin, including fonts, search files, Markdown copies, and demo assets. The web panel demo answers its API in the browser. No analytics, external fonts, embeds, or third-party requests.
 
 External app, documentation, and support links open only when you follow them. They do not make the page fetch those sites in the background.
 
@@ -89,19 +89,19 @@ The control service pins the Meridian package version. Python dependencies use t
 
 - **Credentials**: stored with `0600` permissions in `~/.config/meridian/cluster.yml`, secrets never passed through shell commands without `shlex.quote()`, redacted from `meridian doctor` output. Directory permissions are `0700` (owner-only). Any application running as your user can read these files — this is inherent to all CLI tools that store credentials locally (SSH keys, cloud CLI tokens, etc.). If your local machine is compromised at the user level, credential encryption would not help: malware can keylog the passphrase or intercept SSH sessions. Protect your local machine.
 - **Control service access**: the control service is reverse-proxied by nginx at a secret HTTPS path — no SSH tunnel required. Connection pages and subscription links use a separate path and never reveal it. The CLI holds its admin token in `~/.config/meridian/cluster.yml`; scripts get their own revocable, scoped tokens
-- **Web console**: one owner, with a password and an optional authenticator code; sessions expire after 30 minutes idle and 12 hours at most, and token creation or privacy changes need a recent password confirmation. The console manages people and privacy, never servers, and holds no SSH keys. It loads nothing from other sites and runs under a strict Content Security Policy
+- **Web panel**: one owner, with a password and an optional authenticator code; sessions expire after 30 minutes idle and 12 hours at most, and token creation or privacy changes need a recent password confirmation. The web panel manages people, notices, language, and privacy, never server topology, and holds no SSH keys. It loads nothing from other sites and runs under a strict Content Security Policy
 - **Nodes**: agents connect out to the control service over HTTPS, so nodes open no management port. Each joins with a single-use enrollment token and then holds a certificate from the fleet's own authority. Every document a node runs is signed by the control service and verified by the agent, which refuses anything older than what it already applied
 - **Privacy**: device limits and usage history default to off: the control service keeps lifetime traffic totals and last seen. You can opt in to keyed device fingerprints, full device details, or daily traffic with bounded retention. No level stores client IP addresses, connection logs, or request paths. See [Privacy](/en/privacy/) for what a seized server reveals
-- **Backups**: snapshots are encrypted with [age](https://age-encryption.org/) to each managing machine's key and to a recovery key whose private half only you hold. They carry no signing keys, sessions, or console password: a restore makes new ones, so a seized control server can't sign anything a restored fleet accepts
+- **Backups**: snapshots are encrypted with [age](https://age-encryption.org/) to each managing machine's key and to a recovery key whose private half only you hold. They carry no signing keys, sessions, or web panel password: a restore makes new ones, so a seized control server can't sign anything a restored fleet accepts
 - **SSH**: password authentication disabled and fail2ban enabled by default (`--no-harden` skips both, plus the firewall, for servers shared with other services)
-- **Firewall**: UFW denies inbound traffic except the server's SSH ports and the ports its role needs — TCP/443 for proxy traffic, TCP/80 where certificates are issued, UDP/443 only when Hysteria2 is enabled, and the listen port on relays
+- **Firewall**: UFW denies inbound traffic except the server's SSH ports and the ports its role needs — TCP/443 for VPN traffic, TCP/80 where certificates are issued, UDP/443 only when Hysteria2 is enabled, and the listen port on relays
 - **Exit DNS**: user destination lookups use parallel DNS over HTTPS to Cloudflare, Quad9, and Google by IP address. Those operators see the names; the hosting provider does not receive them as plain DNS. If none answers, exit lookups fail without a plain-DNS fallback. Setup checks, camouflage hostname resolution, gateway DNS, and client-app DNS have the separate behavior described above
 - **Pinned software**: verified binary downloads, signed desired state, and bundled static musl agents protect installation as described above; the control service runs the exact Meridian package release
 - **TLS**: [acme.sh](https://github.com/acmesh-official/acme.sh) handles certificates via Let's Encrypt, served by nginx
 
 ## Scope
 
-Meridian configures proxy servers — it does **not** implement cryptographic protocols. The underlying security depends on:
+Meridian configures VPN servers — it does **not** implement cryptographic protocols. The underlying security depends on:
 
 - [Xray-core](https://github.com/XTLS/Xray-core) — VLESS+Reality, XHTTP, WSS, and Hysteria2 protocols
 - [age](https://age-encryption.org/) (through pyrage) — snapshot encryption

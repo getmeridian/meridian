@@ -14,7 +14,7 @@ Without a domain, the exit already offers Reality, plus XHTTP and Hysteria2 on t
 - **XHTTP** moves to your domain, and **WSS** is added there, with a Let's Encrypt certificate that Meridian issues and renews (acme.sh)
 - Once the domain is proxied through Cloudflare, both paths travel through Cloudflare's CDN — so they keep working even if your server's IP gets blocked
 
-The control service and the connection pages stay on the server's IP certificate; the domain carries only the proxy paths.
+The control service, the web panel, and the connection pages stay on the server's IP certificate; the domain carries only the VPN paths.
 
 Hysteria2 on UDP/443 switches to the domain's certificate too (see [Hysteria2 and Cloudflare](#hysteria2-and-cloudflare)); `--no-hysteria2` turns it off.
 
