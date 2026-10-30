@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+- Hosting, relay, and security guides in all four languages now cover October 2026 hosting reports, TLS transfer blocking, mobile whitelist limits, broken relay-to-exit routes, and an audited account of outbound requests and download verification.
 - The website and README show the product: screenshots of the connection page and the owner console, and a clickable owner console demo at `/demo/console/` beside the connection page demo. Both run in the browser on one invented fleet, recorded from a real control service and checked against current API models.
 - The version and beta banner prints once a day (and after an upgrade), not before every command.
 - Russian text rewritten across the CLI, web console, connection and support pages, website, and docs, with one glossary throughout.
