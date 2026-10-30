@@ -19,7 +19,6 @@ import threading
 import time
 from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
-from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, TypeVar
@@ -34,6 +33,7 @@ from meridian.control.command_models import NodeCommandRequest, UserCutOffReques
 from meridian.control.enrollment import Session, token_sha256
 from meridian.control.errors import ServiceError, agent_error
 from meridian.control.formats.selector import SUFFIX_FORMATS
+from meridian.control.http_errors import error_page, validation_message
 from meridian.control.login_limits import LockedOut
 from meridian.control.models import (
     SUB_TOKEN_PATTERN,
@@ -156,14 +156,8 @@ class _Handler(BaseHTTPRequestHandler):
 
     def send_error(self, code: int, message: str | None = None, explain: str | None = None) -> None:
         """Answer malformed requests and unknown methods as nginx would, never with http.server's page."""
-        try:
-            title = f"{code} {HTTPStatus(code).phrase}"
-        except ValueError:
-            title = str(code)
-        page = f"<html>\r\n<head><title>{title}</title></head>\r\n<body>\r\n<center><h1>{title}</h1></center>\r\n"
-        page += "<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n"
         self.close_connection = True
-        self._send(code, "text/html", page.encode("ascii"), {"Connection": "close"})
+        self._send(code, "text/html", error_page(code), {"Connection": "close"})
 
     def log_message(self, format: str, *args: Any) -> None:
         """Keep no request log: paths carry subscription tokens and the secret path."""
@@ -203,7 +197,7 @@ class _Handler(BaseHTTPRequestHandler):
         except ServiceError as exc:
             self._error(exc, agent=agent)
         except ValidationError as exc:
-            self._error(ServiceError("invalid_request", _validation_message(exc), 400), agent=agent)
+            self._error(ServiceError("invalid_request", validation_message(exc), 400), agent=agent)
         except Exception:  # noqa: BLE001 - one request must never stop the service
             self._error(ServiceError("internal", "Internal error.", 500), agent=agent)
 
@@ -761,14 +755,6 @@ def _owner_may(handler: Callable[..., Any]) -> None:
         raise ServiceError(
             "insufficient_scope", "Only the meridian CLI or an API token does this; the console never needs it.", 403
         )
-
-
-def _validation_message(exc: ValidationError) -> str:
-    errors = exc.errors()
-    if not errors:
-        return "Invalid request."
-    location = ".".join(str(part) for part in errors[0]["loc"])
-    return f"Invalid request: {location} {errors[0]['msg']}".strip()[:500]
 
 
 def serve(config_path: Path) -> None:

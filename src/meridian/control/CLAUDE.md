@@ -3,6 +3,7 @@
 ## Design decisions
 - Owner contact persists in the page-settings meta row inside the delivery transaction; native `support-url` prefers its link, page URLs remain personal, and short text joins status remarks only when every format's 100-character names remain bounded.
 - Step 15 adds private `users.note` and `users.tag`; PATCH accepts the existing name path or a `username` body at `/api/users`, only people/admin reads retain metadata, applies preserve it, and snapshots carry it with user rows.
+- **HTTP error rendering** — `http_errors.py` owns generic nginx error pages and bounded field validation messages; the HTTP front delegates their rendering.
 - **Subscription HTTP** — `subscription_routes.py` writes the response through the shared public request interface; the server keeps routing and authentication.
 - **Service settings** — `service_settings.py` reads and persists delivery settings; the public service methods delegate, and every setting is saved in one store transaction.
 - **Token expiry is registry time** — schema step 12 adds nullable `api_tokens.expires_at`; old tokens remain indefinite. Issuance accepts a future UTC expiry or 1–3650 days, computed inside the insert transaction, and authentication refuses at the deadline with the same 401 as revocation, without touching last use. Historical step 4 keeps its original table definition so an older database adds expiry only once.
