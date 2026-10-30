@@ -11,7 +11,7 @@ from meridian.control.models import DeviceKeyCreate, PrivacyChange, PrivacySetti
 from meridian.control.restore import stage_restored_database
 from meridian.control.service import SCHEMA_VERSION, ControlService
 from meridian.control.snapshot import decrypt_snapshot, generate_key_pair
-from tests.support.control_service import FLEET_ID, write_privacy
+from tests.support.control_service import FLEET_ID, drop_token_expiry_schema, write_privacy
 
 
 @pytest.mark.parametrize(
@@ -113,6 +113,7 @@ def test_schema_eleven_keeps_users_privacy_and_history_tables(tmp_path: Path, ol
     with sqlite3.connect(path) as db:
         db.execute("DROP TABLE devices")
         db.execute("ALTER TABLE users DROP COLUMN device_limit")
+        drop_token_expiry_schema(db)
         if old_version == 9:
             for table in ("privacy", "privacy_changes", "traffic_daily", "node_traffic_daily"):
                 db.execute(f"DROP TABLE {table}")
@@ -127,8 +128,6 @@ def test_schema_eleven_keeps_users_privacy_and_history_tables(tmp_path: Path, ol
     finally:
         service.close()
     with sqlite3.connect(path) as db:
-        assert (
-            int(db.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()[0]) == SCHEMA_VERSION == 11
-        )
+        assert int(db.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()[0]) == SCHEMA_VERSION
         if old_version == 10:
             assert db.execute("SELECT up, down FROM traffic_daily").fetchone() == (10, 20)

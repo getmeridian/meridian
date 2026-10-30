@@ -1,0 +1,96 @@
+{
+  "additionalProperties": false,
+  "description": "A freshly minted token: the only response that ever carries its secret.",
+  "properties": {
+    "created_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in Z.",
+      "maxLength": 40,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+      "title": "Created At",
+      "type": "string"
+    },
+    "expires_at": {
+      "anyOf": [
+        {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expires At"
+    },
+    "id": {
+      "pattern": "^[0-9a-f]{12}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "last_used_at": {
+      "anyOf": [
+        {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Coarse: updated at most once a minute.",
+      "title": "Last Used At"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "revoked_at": {
+      "anyOf": [
+        {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Revoked At"
+    },
+    "scope": {
+      "enum": [
+        "read",
+        "propose",
+        "approve",
+        "people",
+        "admin"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "token": {
+      "description": "Opaque base64url token.",
+      "maxLength": 256,
+      "minLength": 32,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Token",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "scope",
+    "created_at",
+    "token"
+  ],
+  "title": "IssuedToken",
+  "type": "object"
+}

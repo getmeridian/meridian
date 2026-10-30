@@ -61,7 +61,7 @@ from meridian.control.subscriptions import (
     unknown_subscription,
 )
 from meridian.control.times import utc_now
-from meridian.control.tokens import API_TOKENS_TABLE, TokenRegistry
+from meridian.control.tokens import API_TOKENS_TABLE_V4, TokenRegistry
 from meridian.control.traffic import DAILY_TABLES, PER_EPOCH_BASELINES, TrafficLedger
 from meridian.control.user_lifecycle import extend_user_expiry
 from meridian.control.user_policy import enforced_status, period_began, whole_seconds
@@ -72,7 +72,7 @@ from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 from meridian.core.client_devices import DevicesRemoved
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 MAX_WAIT_SECONDS = 55
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -119,7 +119,7 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "ALTER TABLE users ADD COLUMN traffic_offset_bytes INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE users ADD COLUMN traffic_reset_at TEXT",
     ),
-    (API_TOKENS_TABLE,),
+    (API_TOKENS_TABLE_V4,),
     (REVISIONS_TABLE, APPLY_FENCE_TABLE),
     ("ALTER TABLE users ADD COLUMN traffic_carried_bytes INTEGER NOT NULL DEFAULT 0",),
     (BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE),
@@ -130,6 +130,8 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (*PRIVACY_TABLES, *DAILY_TABLES),
     # 10 -> 11: subscription devices and operator-owned per-user caps.
     (DEVICES_TABLE, "ALTER TABLE users ADD COLUMN device_limit INTEGER"),
+    # 11 -> 12: optional expiry of scoped API tokens; existing tokens never expire.
+    ("ALTER TABLE api_tokens ADD COLUMN expires_at TEXT",),
 )
 # meta key prefix: the last revision a deleted node was signed at.
 _RETIRED_REVISION = "retired_revision:"

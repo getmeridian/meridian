@@ -7,10 +7,14 @@ from typing import Annotated, Any, Literal, Union
 from pydantic import BaseModel, Field, RootModel, create_model
 
 from meridian.control.models import (
+    IssuedToken,
     PrivacySettings,
     PrivacyState,
     PrivacyUpdateResult,
     RevisionList,
+    TokenCreate,
+    TokenList,
+    TokenRecord,
     TrafficDailySummary,
     UserUsage,
 )
@@ -594,6 +598,10 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "privacy-state": PrivacyState,
     "privacy-update": PrivacyUpdateResult,
     "traffic-daily": TrafficDailySummary,
+    "token-create": TokenCreate,
+    "token-record": TokenRecord,
+    "token-issued": IssuedToken,
+    "token-list": TokenList,
     "client-add-envelope": ClientAddOutputEnvelope,
     "client-remove-envelope": ClientRemoveOutputEnvelope,
     "client-reissue-envelope": ClientReissueOutputEnvelope,

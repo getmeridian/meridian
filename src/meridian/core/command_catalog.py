@@ -121,7 +121,7 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         outcomes=[
             _ok("all requested clients were added"),
             _ok(
-                "clients were added with failed requests or incomplete page, limits, or local-state follow-up",
+                "clients were added with incomplete page or local-state follow-up",
                 exit_code=3,
             ),
             _user("invalid input or client conflict"),

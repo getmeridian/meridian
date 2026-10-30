@@ -20,6 +20,7 @@ import sqlite3
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 
 from meridian.control.enrollment import token_sha256
 from meridian.control.errors import ServiceError
@@ -41,7 +42,7 @@ LAST_USED_RESOLUTION_SECONDS = 60
 # Compared against when no row matches, so an unknown token costs what a known one does.
 _NO_HASH = "0" * 64
 
-API_TOKENS_TABLE = """CREATE TABLE IF NOT EXISTS api_tokens (
+API_TOKENS_TABLE_V4 = """CREATE TABLE IF NOT EXISTS api_tokens (
     token_id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     scope TEXT NOT NULL,
@@ -50,7 +51,9 @@ API_TOKENS_TABLE = """CREATE TABLE IF NOT EXISTS api_tokens (
     last_used_at TEXT,
     revoked_at TEXT
 )"""
-_COLUMNS = "token_id, name, scope, token_sha256, created_at, last_used_at, revoked_at"
+# Keep step 4's table unchanged: older databases still pass through step 12's ALTER.
+API_TOKENS_TABLE = API_TOKENS_TABLE_V4.removesuffix("\n)") + ",\n    expires_at TEXT\n)"
+_COLUMNS = "token_id, name, scope, token_sha256, created_at, last_used_at, revoked_at, expires_at"
 
 
 @dataclass(frozen=True)
@@ -72,7 +75,7 @@ WEB_OWNER = Caller(token_id=None, scope="admin", name="owner")
 
 
 def unauthenticated() -> ServiceError:
-    """The one refusal for a missing, wrong, or revoked token, so none tells the others apart."""
+    """The one refusal for a missing, wrong, revoked, or expired token."""
     return ServiceError("unauthenticated", "Authentication required.", 401)
 
 
@@ -88,13 +91,18 @@ class TokenRegistry:
         return RevisionActor(token_id=caller.token_id, name=name)
 
     def authenticate(self, token: str) -> Caller:
-        """The issued, unrevoked token `token` names; touches `last_used_at` at most once a minute."""
+        """The issued, unrevoked, unexpired token; touches `last_used_at` at most once a minute."""
         match = _TOKEN.fullmatch(token)
         row = self._row(match[1]) if match else None
         expected = str(row["token_sha256"]) if row is not None else _NO_HASH
-        if not hmac.compare_digest(token_sha256(token), expected) or row is None or row["revoked_at"] is not None:
-            raise unauthenticated()
         now = self._clock()
+        if (
+            not hmac.compare_digest(token_sha256(token), expected)
+            or row is None
+            or row["revoked_at"] is not None
+            or (row["expires_at"] is not None and datetime.fromisoformat(row["expires_at"]).timestamp() <= now)
+        ):
+            raise unauthenticated()
         last = row["last_used_at"]
         if last is None or now - parse_timestamp(str(last)) >= LAST_USED_RESOLUTION_SECONDS:
             with self._store.transaction():
@@ -121,9 +129,16 @@ class TokenRegistry:
         with self._store.transaction():
             if still_allowed is not None:
                 still_allowed()
+            now = self._clock()
+            expires_at = request.expires_at
+            if request.expires_in_days is not None:
+                expires_at = format_timestamp(now + request.expires_in_days * 86400)
+            if expires_at is not None and datetime.fromisoformat(expires_at).timestamp() <= now:
+                raise ServiceError("invalid_request", "Token expiry must be in the future.", 400)
             self._store.db.execute(
-                "INSERT INTO api_tokens (token_id, name, scope, token_sha256, created_at) VALUES (?, ?, ?, ?, ?)",
-                (token_id, request.name, request.scope, token_sha256(token), format_timestamp(self._clock())),
+                "INSERT INTO api_tokens (token_id, name, scope, token_sha256, created_at, expires_at)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (token_id, request.name, request.scope, token_sha256(token), format_timestamp(now), expires_at),
             )
         return IssuedToken(**self.get(token_id).model_dump(), token=token)
 
@@ -159,4 +174,5 @@ def _record(row: sqlite3.Row) -> TokenRecord:
         created_at=str(row["created_at"]),
         last_used_at=row["last_used_at"],
         revoked_at=row["revoked_at"],
+        expires_at=row["expires_at"],
     )

@@ -1,6 +1,7 @@
 # control/ui — The owner's web console (M5, #95)
 
 ## Design decisions
+- **New console tokens last 90 days by default** — Tokens offers 7, 30, 90 days or never, always sends the choice through the existing owner step-up, and shows expiry or an expired state alongside revocation metadata.
 - **People tokens** — after the usual owner step-up, Tokens can mint the separate people capability; it manages accounts and credentials, with the same declared-person remove/reissue guard as an owner session.
 - **Served by the service, under the secret path** — `ui_routes.py` serves `index.html` at `/` and these files at `/ui/<name>`; the API lives in the same process, so there is no CORS, no build step, and no outside request (system fonts, a local icon, QR codes are SVG data URIs from `segno`).
 - **Vanilla JS on one namespace** — `boot.js` sets theme and direction before paint; `core.js` owns `M.h` (the only DOM builder), `M.api`, dialogs, and formatting; each screen file adds `M.screens.*`; `app.js` runs the state machine (setup link → no owner → sign in → shell).

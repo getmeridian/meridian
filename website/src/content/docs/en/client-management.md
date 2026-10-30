@@ -234,4 +234,6 @@ Read tokens never see anyone's keys or subscription ID. Choose **People** for a 
 
 A people token cannot remove or reissue a person declared in the fleet file: the API returns `409 declared_user` with the CLI command to run. This also applies while an approved or failed apply still declares the person. An unapproved proposal does not declare anyone. Status, limits, expiry, and device caps remain editable.
 
-Tokens don't expire on their own: revoke one in **Tokens** and anything using it loses access at once. Treat a people token as a password, because it grants access to people's connection credentials.
+Choose **7, 30, or 90 days**, or **Never expires**; new console tokens default to 90 days. The list shows the expiry and marks expired tokens. Expiry and revocation both refuse the next request with the same `401 unauthenticated` response. Existing tokens keep no expiry. Treat a people token as a password, because it grants access to people's connection credentials.
+
+`POST /api/tokens` accepts `expires_in_days` from 1 to 3650, or `null` for no expiry. Omitting it also means no expiry. You may instead supply a future UTC `expires_at`; choose one expiry field. `TokenRecord.expires_at` is always returned, including `null`. Token operations require admin API access or an owner console session; creation in the console also requires password confirmation. A people token cannot mint tokens. The `token-create`, `token-record`, `token-issued`, and `token-list` schemas are available through `meridian api schema NAME`.

@@ -16,9 +16,9 @@ from meridian.control.client import ControlClient, ControlServiceScopeError
 from meridian.control.devices import DEVICE_HMAC_SECRET
 from meridian.control.models import DeviceKeyCreate, PrivacySettings, ServiceSettings
 from meridian.control.restore import stage_restored_database
-from meridian.control.service import ControlService
+from meridian.control.service import SCHEMA_VERSION, ControlService
 from meridian.control.snapshot import decrypt_snapshot, generate_key_pair
-from tests.support.control_service import ADMIN_TOKEN, FLEET_ID, serve_control
+from tests.support.control_service import ADMIN_TOKEN, FLEET_ID, drop_token_expiry_schema, serve_control
 
 NOW = "2026-10-29T12:00:00Z"
 DEVICE_TABLE = """CREATE TABLE IF NOT EXISTS devices (
@@ -210,10 +210,11 @@ def test_schema_nine_migrates_once_through_steps_ten_and_eleven_without_changing
         for table in ("privacy", "privacy_changes", "traffic_daily", "node_traffic_daily", "devices"):
             db.execute(f"DROP TABLE {table}")
         db.execute("ALTER TABLE users DROP COLUMN device_limit")
+        drop_token_expiry_schema(db)
         db.execute("UPDATE meta SET value = '9' WHERE key = 'schema_version'")
     for _ in range(2):
         migrated = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
-        assert migrated._store.meta("schema_version") == "11"
+        assert migrated._store.meta("schema_version") == str(SCHEMA_VERSION)
         assert migrated.privacy() == PrivacySettings()
         assert migrated.get_user("alice").lifetime_traffic_bytes == 10
         migrated.close()

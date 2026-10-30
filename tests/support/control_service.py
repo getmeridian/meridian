@@ -34,6 +34,13 @@ def drop_device_privacy_schema(db: sqlite3.Connection) -> None:
     for table in ("devices", "privacy_changes", "privacy"):
         db.execute(f"DROP TABLE {table}")
     db.execute("ALTER TABLE users DROP COLUMN device_limit")
+    drop_token_expiry_schema(db)
+
+
+def drop_token_expiry_schema(db: sqlite3.Connection) -> None:
+    """An older-schema fixture must not retain the column step 12 adds."""
+    if "expires_at" in {column[1] for column in db.execute("PRAGMA table_info(api_tokens)")}:
+        db.execute("ALTER TABLE api_tokens DROP COLUMN expires_at")
 
 
 @contextmanager

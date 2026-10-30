@@ -372,7 +372,7 @@ export const commandCatalog = {
         "0": "all requested clients were added",
         "1": "unexpected Meridian bug",
         "2": "invalid input or client conflict",
-        "3": "clients were added with failed requests or incomplete page, limits, or local-state follow-up; system or panel failure",
+        "3": "clients were added with incomplete page or local-state follow-up; system or panel failure",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
@@ -396,7 +396,7 @@ export const commandCatalog = {
         {
           "category": "none",
           "exit_code": 3,
-          "meaning": "clients were added with failed requests or incomplete page, limits, or local-state follow-up",
+          "meaning": "clients were added with incomplete page or local-state follow-up",
           "status": "ok"
         },
         {

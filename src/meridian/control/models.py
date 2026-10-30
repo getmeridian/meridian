@@ -421,6 +421,25 @@ class TokenCreate(CoreModel):
 
     name: str = Field(min_length=1, max_length=64, pattern=r"^[^\x00-\x1f\x7f]+$")
     scope: TokenScope
+    expires_at: Timestamp | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Optional UTC expiry; use either this or expires_in_days. Null or omitted means never.",
+    )
+    expires_in_days: int | None = Field(
+        default=None,
+        ge=1,
+        le=3650,
+        strict=True,
+        exclude_if=lambda value: value is None,
+        description="Whole days from issuance, measured by the service clock; null or omitted means never.",
+    )
+
+    @model_validator(mode="after")
+    def _expiry_choice(self) -> TokenCreate:
+        if self.expires_at is not None and self.expires_in_days is not None:
+            raise ValueError("Choose either expires_at or expires_in_days.")
+        return self
 
 
 class TokenRecord(CoreModel):
@@ -432,6 +451,7 @@ class TokenRecord(CoreModel):
     created_at: Timestamp
     last_used_at: Timestamp | None = Field(default=None, description="Coarse: updated at most once a minute.")
     revoked_at: Timestamp | None = None
+    expires_at: Timestamp | None = None
 
 
 class IssuedToken(TokenRecord):

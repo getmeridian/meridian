@@ -242,9 +242,13 @@ class ControlClient:
     def delete_endpoint(self, endpoint_id: str) -> None:
         self._call("DELETE", f"api/endpoints/{_segment(endpoint_id)}")
 
-    def create_token(self, name: str, scope: TokenScope) -> IssuedToken:
+    def create_token(
+        self, name: str, scope: TokenScope, *, expires_in_days: int | None = None, expires_at: str | None = None
+    ) -> IssuedToken:
         """Mint a device's or agent's token; the secret is in this response only."""
-        body = TokenCreate(name=name, scope=scope).model_dump(mode="json")
+        body = TokenCreate(name=name, scope=scope, expires_in_days=expires_in_days, expires_at=expires_at).model_dump(
+            mode="json"
+        )
         return IssuedToken.model_validate(self._call("POST", "api/tokens", body))
 
     def list_tokens(self) -> list[TokenRecord]:

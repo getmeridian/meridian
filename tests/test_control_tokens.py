@@ -10,6 +10,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -431,3 +432,86 @@ def test_extend_api_requires_one_bounded_integer(fleet: Fleet, days: Any) -> Non
     status, answer = _request(fleet.url + "/api/users/alice/extend", "POST", {"days": days}, ADMIN_TOKEN)
     assert (status, answer["error"]["code"]) == (400, "invalid_request")
     assert fleet.service.get_user("alice") == original
+
+
+def test_token_expiry_refuses_at_the_boundary_like_revocation(fleet: Fleet) -> None:
+    status, issued = _request(
+        f"{fleet.url}/api/tokens", "POST", {"name": "temporary", "scope": "read", "expires_in_days": 1}, ADMIN_TOKEN
+    )
+    assert status == 200, issued
+    assert issued["expires_at"] is not None
+    fleet.clock.now += 86400 - 1
+    assert _request(f"{fleet.url}/api/health", token=issued["token"])[0] == 200
+    last_used = fleet.service.tokens.get(issued["id"]).last_used_at
+    fleet.clock.now += 1
+    assert _request(f"{fleet.url}/api/health", token=issued["token"]) == (
+        401,
+        {"error": {"code": "unauthenticated", "message": "Authentication required."}},
+    )
+    assert fleet.service.tokens.get(issued["id"]).last_used_at == last_used
+
+
+@pytest.mark.parametrize("days", [1, 3650, None])
+def test_client_token_expiry_uses_the_registry_clock_and_supports_never(fleet: Fleet, days: int | None) -> None:
+    with ControlClient(fleet.url, ADMIN_TOKEN) as client:
+        issued = client.create_token("temporary", "read", expires_in_days=days)
+    expected = datetime.fromtimestamp(fleet.clock.now, UTC) + timedelta(days=days or 0)
+    assert issued.expires_at == (expected.strftime("%Y-%m-%dT%H:%M:%SZ") if days is not None else None)
+    assert fleet.service.tokens.get(issued.id).expires_at == issued.expires_at
+    if days is None:
+        fleet.clock.now += 3651 * 86400
+        assert fleet.service.tokens.authenticate(issued.token).scope == "read"
+
+
+@pytest.mark.parametrize("days", [0, -1, 3651, 1.5, "7", True])
+def test_token_api_refuses_invalid_expiry_durations(fleet: Fleet, days: Any) -> None:
+    before = fleet.service.tokens.list_tokens()
+    status, answer = _request(
+        fleet.url + "/api/tokens", "POST", {"name": "temporary", "scope": "read", "expires_in_days": days}, ADMIN_TOKEN
+    )
+    assert (status, answer["error"]["code"]) == (400, "invalid_request")
+    assert fleet.service.tokens.list_tokens() == before
+
+
+def test_absolute_token_expiry_is_precise_and_refused_before_scope_checks(fleet: Fleet) -> None:
+    initial = fleet.clock.now
+    expiry = datetime.fromtimestamp(fleet.clock.now, UTC).strftime("%Y-%m-%dT%H:%M:%S.5Z")
+    status, issued = _request(
+        fleet.url + "/api/tokens", "POST", {"name": "temporary", "scope": "people", "expires_at": expiry}, ADMIN_TOKEN
+    )
+    assert status == 200, issued
+    fleet.clock.now = initial + 0.49
+    assert _request(fleet.url + "/api/users", token=issued["token"])[0] == 200
+    fleet.clock.now = initial + 0.5
+    assert _request(fleet.url + "/api/nodes/main", token=issued["token"])[0] == 401
+
+
+def test_token_create_requires_one_future_expiry_choice(fleet: Fleet) -> None:
+    for extra in (
+        {"expires_at": "2999-01-01T00:00:00Z", "expires_in_days": 7},
+        {"expires_at": "2020-01-01T00:00:00Z"},
+    ):
+        status, answer = _request(
+            fleet.url + "/api/tokens", "POST", {"name": "temporary", "scope": "read", **extra}, ADMIN_TOKEN
+        )
+        assert (status, answer["error"]["code"]) == (400, "invalid_request")
+    assert fleet.service.tokens.list_tokens().tokens == []
+
+
+def test_step_twelve_preserves_existing_tokens_without_expiry_and_migrates_once(tmp_path: Path) -> None:
+    path = tmp_path / "control.db"
+    service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
+    issued = service.tokens.issue(TokenCreate(name="existing", scope="read"), issuer=ROOT)
+    service.close()
+    with sqlite3.connect(path) as db:
+        if "expires_at" in {column[1] for column in db.execute("PRAGMA table_info(api_tokens)")}:
+            db.execute("ALTER TABLE api_tokens DROP COLUMN expires_at")
+        db.execute("UPDATE meta SET value = '11' WHERE key = 'schema_version'")
+    for _ in range(2):
+        service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
+        try:
+            assert service.tokens.authenticate(issued.token).scope == "read"
+            assert service.tokens.get(issued.id).expires_at is None
+            assert service._store.meta("schema_version") == str(SCHEMA_VERSION)
+        finally:
+            service.close()

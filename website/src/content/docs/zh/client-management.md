@@ -234,4 +234,6 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 
 People 令牌无法删除服务器配置文件中声明的用户，也无法为他们重新签发连接凭据。API 会返回 `409 declared_user` 和需要运行的 CLI 命令。已经批准或失败的应用仍声明该用户时，这项限制同样有效；未经批准的提案不会声明任何用户。状态、限额、到期时间和设备上限仍可修改。
 
-令牌不会自行过期：在 **Tokens** 中撤销后，使用它的程序会立即失去访问权限。请像保护密码一样保护 people 令牌，因为它可以读取用户的连接凭据。
+可以选择 **7、30 或 90 天**，或**永不过期**；控制台新令牌默认有效期为 90 天。列表会显示到期时间并标记已过期令牌。到期和撤销都会在下一次请求时返回相同的 `401 unauthenticated` 响应。现有令牌仍保持无到期时间。请像保护密码一样保护 people 令牌，因为它可以读取用户的连接凭据。
+
+`POST /api/tokens` 接受 1–3650 的 `expires_in_days`，或用 `null` 表示永不过期。省略该字段也表示永不过期。也可改为传入将来的 UTC 时间 `expires_at`；只能选择一个到期字段。响应总会包含 `TokenRecord.expires_at`，无到期时间时为 `null`。管理令牌需要 admin API 权限或控制台所有者会话；在控制台创建令牌还需要再次确认密码。People 令牌无法签发令牌。可通过 `meridian api schema NAME` 查看 `token-create`、`token-record`、`token-issued` 和 `token-list` 模式。

@@ -1,0 +1,61 @@
+{
+  "additionalProperties": false,
+  "description": "Mint one device's or agent's API token; the scope may not exceed the caller's.",
+  "properties": {
+    "expires_at": {
+      "anyOf": [
+        {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional UTC expiry; use either this or expires_in_days. Null or omitted means never.",
+      "title": "Expires At"
+    },
+    "expires_in_days": {
+      "anyOf": [
+        {
+          "maximum": 3650,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Whole days from issuance, measured by the service clock; null or omitted means never.",
+      "title": "Expires In Days"
+    },
+    "name": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+      "title": "Name",
+      "type": "string"
+    },
+    "scope": {
+      "enum": [
+        "read",
+        "propose",
+        "approve",
+        "people",
+        "admin"
+      ],
+      "title": "Scope",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "scope"
+  ],
+  "title": "TokenCreate",
+  "type": "object"
+}

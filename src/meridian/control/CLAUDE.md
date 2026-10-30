@@ -1,6 +1,7 @@
 # control — Meridian's own control service (`meridian serve`)
 
 ## Design decisions
+- **Token expiry is registry time** — schema step 12 adds nullable `api_tokens.expires_at`; old tokens remain indefinite. Issuance accepts a future UTC expiry or 1–3650 days, computed inside the insert transaction, and authentication refuses at the deadline with the same 401 as revocation, without touching last use. Historical step 4 keeps its original table definition so an older database adds expiry only once.
 - **Duration extensions** — `user_lifecycle.py` computes max(now, expiry) plus whole days inside the service's write transaction, then enforces and composes before returning; disabled status and traffic cutoffs remain the operator's.
 - **People capability** — `people` is separate from `read < propose < approve`, and `admin` covers both; `server.ROUTES` allows either read or people for user reads, only people/admin for user mutations, and no people access to fleet, settings, privacy, enrollment, tokens, or backups. People reads include credentials, while declared remove/reissue refusals run in the write's transaction for people tokens as well as the owner session.
 - **Replaces Remnawave** — every fleet shape but client-IP forwarding (exits anywhere, relays, routing gateways as agent nodes, WARP, a control server without an exit), users, signed node documents, and every subscription format; the only backend since the flip (#95). Client-IP forwarding waits for its own review, so `--client-ips` is hidden and `migrate` drops it.

@@ -235,12 +235,16 @@
           h("button", { class: "btn btn-primary", type: "button", onclick: function () { createToken(view); } },
             M.icon("plus"), M.t("tokens.create"))),
         tokens.length ? h("div", { class: "list" }, tokens.map(function (token) {
-          return h("div", { class: "row" + (token.revoked_at ? " row-dim" : "") },
+          var expired = token.expires_at && Date.parse(token.expires_at) <= Date.now();
+          return h("div", { class: "row" + (token.revoked_at || expired ? " row-dim" : "") },
             h("div", { class: "row-main" },
               h("div", { class: "row-title" }, h("span", { class: "name", text: token.name }),
                 M.pill(token.scope === "admin" ? "warn" : "muted", M.t("scope." + token.scope))),
               h("div", { class: "row-sub" },
                 h("span", { text: M.t("tokens.created", { when: M.date(token.created_at) }) }),
+                h("span", { text: token.expires_at
+                  ? M.t(expired ? "tokens.expired" : "tokens.expires", { when: M.date(token.expires_at, true) })
+                  : M.t("tokens.expires_never") }),
                 h("span", { text: token.revoked_at ? M.t("tokens.revoked", { when: M.date(token.revoked_at) })
                   : M.t("tokens.used", { when: M.ago(token.last_used_at) }) }))),
             token.revoked_at ? null : h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
@@ -265,9 +269,14 @@
       var scope = h("select", {}, ["read", "propose", "approve", "people"].map(function (s) {
         return h("option", { value: s, text: M.t("scope." + s) + " — " + M.t("scope." + s + "_hint") });
       }));
+      var expiry = h("select", {}, [7, 30, 90, null].map(function (days) {
+        return h("option", { value: days === null ? "never" : String(days), selected: days === 90,
+          text: days === null ? M.t("tokens.expires_never") : M.t("tokens.expiry_days", { days: M.count(days) }) });
+      }));
       var form = h("form", { class: "stack", novalidate: true },
         M.field(M.t("tokens.name"), name, M.t("tokens.name_hint")),
         M.field(M.t("tokens.scope"), scope),
+        M.field(M.t("tokens.expiry"), expiry),
         h("p", { class: "form-error", role: "alert" }),
         h("div", { class: "actions" },
           h("button", { class: "btn btn-ghost", type: "button", onclick: function () { close(); } }, M.t("action.cancel")),
@@ -279,7 +288,8 @@
         issuing = true;
         close.lock(true);
         M.busy(form, function () {
-          return M.api("POST", "api/tokens", { name: name.value.trim(), scope: scope.value });
+          return M.api("POST", "api/tokens", { name: name.value.trim(), scope: scope.value,
+            expires_in_days: expiry.value === "never" ? null : Number(expiry.value) });
         }).then(function (issued) {
           close.lock(false);
           close(issued && typeof issued.token === "string" && issued.token ? issued : { uncertain: true });
