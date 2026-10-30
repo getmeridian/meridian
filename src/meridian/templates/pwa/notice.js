@@ -2,7 +2,7 @@
 (function () {
 'use strict';
 var TITLES = {
-  en: 'Notice from the owner', ru: 'Сообщение владельца',
+  en: 'Notice from the owner', ru: 'Сообщение от владельца',
   fa: 'پیام مدیر اتصال', zh: '管理者通知'
 };
 var timer = null;
