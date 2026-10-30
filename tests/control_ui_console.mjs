@@ -16,7 +16,7 @@ const events = [], writes = [], delayed = {};
 let fakeNow = Date.now(), timerId = 0, hidden = false, failPolls = false;
 let localeReady = false;
 const timers = new Map(), rounds = new Map();
-const virtual = mode.startsWith('live-') || mode.startsWith('deadline-');
+const virtual = mode.startsWith('live-') || mode.startsWith('deadline-') || mode.startsWith('commands-');
 if (virtual) {
   w.Date.now = () => fakeNow;
   w.setTimeout = (fn, delay = 0) => { const id = ++timerId; timers.set(id, { fn, at: fakeNow + delay }); return id; };
@@ -42,6 +42,15 @@ function reply(body, status = 200) {
 }
 w.fetch = (url, options) => {
   events.push({ method: options.method, url, headers: options.headers, at: fakeNow });
+  if (mode.startsWith('commands-')) {
+    const node = url.split('/')[2];
+    const commandId = url.split('/').at(-1);
+    if (node === 'node-a') return Promise.resolve(reply({ node_id: node, command: { command_id: commandId },
+      status: 'succeeded', result: { status: 'succeeded', effect: data.effect || null, error: null } }));
+    if (data.errorStatus) return Promise.resolve(reply({ error: { code: 'http_' + data.errorStatus,
+      message: '<img src=x onerror="window.pwned=1"> cannot read the command' } }, data.errorStatus));
+    return Promise.resolve(reply({ node_id: node, command: { command_id: commandId }, status: 'pending', result: null }));
+  }
   if (mode.startsWith('expiry-')) {
     const user = { username: 'sample', status: 'active', created_at: '2026-10-29T00:00:00Z',
       expire_at: '2031-12-31T00:00:00Z', traffic_limit_bytes: 0, traffic_limit_strategy: 'month' };
@@ -124,6 +133,29 @@ async function advance(ms) {
 function visibility(value) {
   hidden = value;
   w.document.dispatchEvent(new w.Event('visibilitychange'));
+}
+
+if (mode.startsWith('commands-')) {
+  w.eval(fs.readFileSync(path.join(ui, 'commands.js'), 'utf8'));
+  const a = { node_id: 'node-a', command: { command_id: '00000000-0000-4000-8000-000000000001' },
+    status: data.initialA || 'pending', result: data.initialA === 'succeeded'
+      ? { status: 'succeeded', effect: data.effect || null, error: null } : null };
+  const b = { node_id: 'node-b', command: { command_id: '00000000-0000-4000-8000-000000000002' }, status: 'pending', result: null };
+  const labels = () => Object.fromEntries([...w.document.querySelectorAll('dialog section.stack-sm')]
+    .map(section => [section.querySelector('bdi').textContent, section.querySelector('p').textContent]));
+  const reads = () => events.filter(event => event.url?.startsWith('api/nodes/'));
+  M.showCommandResults([a, b]);
+  await settle();
+  report.first = labels();
+  report.firstReads = reads().map(event => event.url);
+  await advance(data.advance || 1000);
+  report.last = labels();
+  report.text = w.document.querySelector('dialog').textContent;
+  report.beforeStop = reads().length;
+  await advance(30000);
+  report.afterStop = reads().length;
+  report.images = w.document.querySelectorAll('img').length;
+  report.pwned = !!w.pwned;
 }
 
 if (mode === 'servers') {

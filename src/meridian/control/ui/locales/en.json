@@ -381,6 +381,7 @@
   "commands.done": "Done",
   "commands.core_restart": "Done with a core restart",
   "commands.failed": "Failed",
+  "commands.read_error": "Result unavailable",
   "commands.timed_out": "Timed out",
   "error.command_queue_full": "This node has 64 unanswered commands. Wait for them to finish and retry.",
   "commands.restart": "Restart Xray",

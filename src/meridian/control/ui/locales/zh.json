@@ -381,6 +381,7 @@
   "commands.done": "已完成",
   "commands.core_restart": "通过重启 Xray 完成",
   "commands.failed": "失败",
+  "commands.read_error": "结果不可用",
   "commands.timed_out": "等待超时",
   "error.command_queue_full": "此节点有 64 条命令尚未响应。请等待它们完成后重试。",
   "commands.restart": "重启 Xray",

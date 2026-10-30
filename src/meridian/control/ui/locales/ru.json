@@ -381,6 +381,7 @@
   "commands.done": "Выполнено",
   "commands.core_restart": "Выполнено с перезапуском Xray",
   "commands.failed": "Не выполнено",
+  "commands.read_error": "Результат недоступен",
   "commands.timed_out": "Время ожидания истекло",
   "error.command_queue_full": "У этого сервера уже 64 команды без ответа. Дождитесь их завершения и повторите попытку.",
   "commands.restart": "Перезапустить Xray",

@@ -381,6 +381,7 @@
   "commands.done": "انجام شد",
   "commands.core_restart": "با راه‌اندازی مجدد Xray انجام شد",
   "commands.failed": "ناموفق",
+  "commands.read_error": "نتیجه در دسترس نیست",
   "commands.timed_out": "زمان انتظار پایان یافت",
   "error.command_queue_full": "این سرور ۶۴ فرمانِ بی‌پاسخ دارد. پس از پایان آن‌ها دوباره تلاش کنید.",
   "commands.restart": "راه‌اندازی مجدد Xray",

@@ -20,6 +20,7 @@
 - **Assets revalidate by ETag** (content hash, `no-cache`); anything holding a secret is `no-store`.
 
 ## Pitfalls
+- Command polling keeps successful sibling replies, times out only a node's pending records, and stops terminal read errors with an unavailable result while preserving finished outcomes.
 - People keeps rendering and polling users when fleet metadata fails, using cached names and declared markers; user-list failures still keep stale data with retry.
 - A failed language switch keeps the previous catalog, language, and direction when both fetches fail; switch to English only after its catalog loads successfully.
 - Both person expiry forms validate the converted UTC end of day before submitting; a local date before 2099 can cross into the legacy no-expiry range.
