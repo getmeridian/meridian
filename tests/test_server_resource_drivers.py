@@ -21,6 +21,7 @@ from meridian.compiler.models import (
     make_resource,
 )
 from meridian.provision.steps import StepResult
+from meridian.reconciler import render_contract
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceReconcileError,
@@ -99,6 +100,23 @@ def test_baseline_attestation_ignores_other_servers_joining_or_leaving() -> None
     relay = DeploymentTarget(host="198.51.100.20", user="root", port=22)
     assert attest(**{"srv-exit": own}) == attest(**{"srv-exit": own, "srv-relay": relay})
     assert attest(**{"srv-exit": own}) != attest(**{"srv-exit": own.model_copy(update={"port": 2222})})
+
+
+def test_baseline_attestation_ignores_releases_and_other_renderers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A new CLI version or another renderer's bump once re-ran every server's whole baseline."""
+    plan, action = _action()
+    own = DeploymentTarget(host="198.51.100.10", user="root", port=22)
+
+    def attest(version: str, digest: str) -> str:
+        contract = DeploymentContract(
+            server_targets={"srv-exit": own}, runtime_pins={"meridian_version": version}, renderer_contract=digest
+        )
+        return baseline_attestation(action, plan.model_copy(update={"deployment_contract": contract}), "srv-exit")
+
+    before = attest("4.0.0", "test-v1")
+    assert attest("4.0.1", "test-v2") == before
+    monkeypatch.setitem(render_contract._RENDERER_MANIFEST, "server-baseline", "next")
+    assert attest("4.0.0", "test-v1") != before
 
 
 def test_server_baseline_observes_every_durable_check_and_attestation() -> None:

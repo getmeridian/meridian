@@ -22,3 +22,8 @@ _RENDERER_MANIFEST = {
 }
 
 RENDERER_CONTRACT = "meridian.renderer-contract/v1@sha256:" + canonical_hash(_RENDERER_MANIFEST)
+
+
+def renderer_stamp(component: str) -> str:
+    """One renderer's own stamp, for attestations that must not follow every other renderer's bump."""
+    return f"{component}={_RENDERER_MANIFEST[component]}"

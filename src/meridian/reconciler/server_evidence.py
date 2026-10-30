@@ -7,6 +7,7 @@ from typing import NoReturn, Protocol
 
 from meridian.compiler.models import ResourcePlan, canonical_hash
 from meridian.diagnostics.checks import command_evidence_unavailable
+from meridian.reconciler.render_contract import renderer_stamp
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceObservation,
@@ -267,14 +268,12 @@ def _raise_unavailable(logical_id: str, description: str, reason: str, *, retrya
 
 
 def baseline_attestation(action: ResourceAction, plan: ResourcePlan, server_ref: str) -> str:
-    """Hash only what the baseline consumes, so other servers joining or leaving never re-run it."""
-    contract = plan.deployment_contract
-    target = contract.server_targets.get(server_ref)
+    """Hash only what the baseline consumes, so other servers, releases, or renderers never re-run it."""
+    target = plan.deployment_contract.server_targets.get(server_ref)
     return canonical_hash(
         {
             "resource": action.expected_hash,
             "server_target": target.model_dump(mode="json") if target is not None else None,
-            "runtime_pins": contract.runtime_pins,
-            "renderer_contract": contract.renderer_contract,
+            "renderer": renderer_stamp("server-baseline"),
         }
     )
