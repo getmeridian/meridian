@@ -2,7 +2,7 @@
 
 ## Design decisions
 **One result contract** — every reported check is a core `VerificationCheck`; SSH primitives return frozen `CheckResult`, lifted with `evidence.check_from_result()`.
-**No CLI rendering** — checks return data and never import console, Rich, or Typer; commands own output, so Engine and tests reuse the checks.
+**No CLI rendering** — checks return data and never import console, Rich, or Typer; commands own output, so tests reuse the checks.
 **I/O follows perspective** — server health runs through a `core.execution.ServerConnection`; external checks use bounded sockets and argv-only subprocesses.
 **Flow checks** — `network.py` owns low-level TLS I/O and the child-interpreter `run_json_helper()`; `tls_probe.py` is the stage-timed flow primitive (connect, handshake, bytes until EOF or stall); `blocking.py` builds the SNI-vs-IP differential and data-stall checks from deployment facts (`blocking_jobs`, shared by `test --probe` and `check`); `probe.py` selects the rest.
 **Log tails** — `logs.py` maps fleet roles to sources (`ctld`, `netagent`, and `netcore` units, Realm units from `server_render`, nginx's error log) and returns redacted `LogTail`s; a missing source or lost SSH is an error, never an empty log.

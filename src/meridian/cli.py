@@ -58,7 +58,7 @@ _HELP_LAYOUT: tuple[tuple[str, tuple[str, ...]], ...] = (
     (CLIENTS, ("client",)),
     (SERVERS, ("node", "relay", "route", "fleet", "server", "context")),
     (CHECK_AND_FIX, ("check", "test", "probe", "doctor", "logs", "plan", "apply", "backup", "restore")),
-    (ADVANCED, ("panel", "privacy", "scan", "studio", "update", "migrate", "teardown", "api")),
+    (ADVANCED, ("panel", "privacy", "scan", "update", "migrate", "teardown", "api")),
 )
 # Option panels inside `deploy --help`.
 SERVER_ACCESS = "Server access"
@@ -77,6 +77,10 @@ RENAMED: dict[str, str] = {
     "relay deploy": "relay add",
 }
 RENAMED_OPTIONS: dict[str, str] = {"--server": "the first argument"}
+# Removed commands with no successor spelling: the refusal says where the work moved.
+RETIRED: dict[str, str] = {
+    "studio": "`meridian studio` was removed. Manage the fleet in the owner's web console: `meridian panel`.",
+}
 
 
 @dataclass(frozen=True)
@@ -135,6 +139,8 @@ def _refuse_renamed(ctx: click.Context, path: list[str], command: click.Command 
     old = " ".join(path)
     if old in RENAMED:
         _fail_renamed(ctx, old, f"`meridian {old}` is now `meridian {RENAMED[old]}`", rest)
+    if old in RETIRED:
+        _fail_renamed(ctx, old, RETIRED[old], rest)
     if command is None or isinstance(command, click.Group):
         return
     for arg in rest:
@@ -313,34 +319,6 @@ def _offer_setup_or_help(ctx: typer.Context, *, interactive: bool) -> None:
             setup_v4.run()
             return
     typer.echo(ctx.get_help())
-
-
-@app.command("studio", rich_help_panel=ADVANCED)
-def studio_cmd(
-    port: int | None = typer.Option(
-        None,
-        "--port",
-        min=0,
-        max=65535,
-        show_default=False,
-        help="Localhost port (default 7391, or the next free one, so browser drafts survive restarts); 0 picks any",
-    ),
-    assets_dir: str = typer.Option("", "--assets-dir", help="Directory containing built Studio assets"),
-    no_open: bool = typer.Option(False, "--no-open", help="Print the URL without opening a browser"),
-) -> None:
-    """Open Meridian Studio, the local web UI (experimental)"""
-    try:
-        from meridian.commands.studio import run
-    except ModuleNotFoundError as exc:
-        from meridian.console import fail
-
-        fail(
-            f"Meridian Studio needs extra packages ({exc.name})",
-            hint="Install them with: uv tool install 'meridian-vpn[studio]'  (or pip install 'meridian-vpn[studio]')",
-            hint_type="user",
-        )
-
-    run(port=port, assets_dir=assets_dir, no_open=no_open)
 
 
 @app.command("help", rich_help_panel=GET_STARTED)
@@ -540,7 +518,7 @@ def deploy_cmd(
         "",
         "--cancel-file",
         hidden=True,
-        help="Stop at the next safe point once this file exists (used by Studio)",
+        help="Stop at the next safe point once this file exists (used by automation)",
     ),
 ) -> None:
     """Deploy one server and get a shareable connection link

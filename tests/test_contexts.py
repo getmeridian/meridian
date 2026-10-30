@@ -384,31 +384,3 @@ def test_every_public_leaf_accepts_context_except_the_context_group() -> None:
 
     for path, command in public_commands().items():
         assert ("--context" in long_options(command)) != path.startswith("context."), path
-
-
-def test_studio_deploys_run_on_the_context_studio_serves(install: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    import subprocess
-
-    from meridian.adapters import deploy_process
-    from meridian.core.deploy import DeployRequest
-
-    seen: list[list[str]] = []
-
-    class _Stop(Exception):
-        pass
-
-    def popen(argv: list[str], **_kwargs: Any) -> None:
-        seen.append(argv)
-        raise _Stop
-
-    monkeypatch.setattr(subprocess, "Popen", popen)
-    config.select_context("work")
-    with pytest.raises(_Stop):
-        deploy_process.run_deploy_process(DeployRequest(ip="198.51.100.10"), operation=_Operation())
-
-    assert seen[0][-2:] == ["--context", "work"]
-
-
-class _Operation:
-    def on_cancel(self, _callback: Any) -> None:
-        return None

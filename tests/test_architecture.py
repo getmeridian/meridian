@@ -53,29 +53,11 @@ CORE_FORBIDDEN = (
     "click",
 )
 
-# engine/ must not import commands, provisioning runtime, or console.
-# meridian.config is allowed (path constants needed for server state).
-ENGINE_FORBIDDEN = (
-    "meridian.commands",
-    "meridian.console",
-    "meridian.provision",
-    "meridian.remnawave",
-    "meridian.renderers",
-    "meridian.ssh",
-    "rich",
-    "typer",
-    "click",
-)
-
-# adapters/ bridge core↔concrete — never depend on engine.
-ADAPTER_FORBIDDEN = ("meridian.engine",)
-
 # compiler/ is a pure transformation from typed intent to typed resources.
 COMPILER_FORBIDDEN = (
     "meridian.commands",
     "meridian.config",
     "meridian.console",
-    "meridian.engine",
     "meridian.provision",
     "meridian.remnawave",
     "meridian.ssh",
@@ -94,7 +76,6 @@ CONTROL_FORBIDDEN = (
     "meridian.commands",
     "meridian.config",
     "meridian.console",
-    "meridian.engine",
     "meridian.provision",
     "meridian.reconciler",
     "meridian.remnawave",
@@ -120,14 +101,6 @@ class TestLayerBoundaries:
         imports = _imports(SRC / "core" / "command_catalog.py")
 
         assert "meridian.core.schema" not in imports
-
-    def test_engine_never_imports_commands_or_runtime(self) -> None:
-        violations = _scan_violations(SRC / "engine", ENGINE_FORBIDDEN)
-        assert violations == [], "engine/ has forbidden imports:\n" + "\n".join(violations)
-
-    def test_adapters_never_import_engine(self) -> None:
-        violations = _scan_violations(SRC / "adapters", ADAPTER_FORBIDDEN)
-        assert violations == [], "adapters/ has forbidden imports:\n" + "\n".join(violations)
 
     def test_compiler_has_no_runtime_or_randomness_dependencies(self) -> None:
         violations = _scan_violations(SRC / "compiler", COMPILER_FORBIDDEN)
@@ -208,38 +181,6 @@ class TestContractDrift:
             expected = {f.name for f in dataclasses.fields(cls) if not f.name.startswith("_")}
             # Just verify each class has typed public fields (the derivation test)
             assert len(expected) > 0, f"{cls.__name__} has no public fields"
-
-    def test_operation_state_is_single_source(self) -> None:
-        """OperationState must be defined once in core, not redefined in engine."""
-        # engine should import from core, not redefine
-        import meridian.engine.operations as eng_mod
-        from meridian.core.operations import OperationKind, OperationState
-
-        source = ast.parse(Path(eng_mod.__file__).read_text())
-        for node in ast.walk(source):
-            if isinstance(node, ast.Assign):
-                for target in node.targets:
-                    if isinstance(target, ast.Name) and target.id in ("OperationState", "OperationKind"):
-                        raise AssertionError(f"engine/operations.py redefines {target.id} — import from core instead")
-
-        # Verify the engine module actually uses the core types
-        assert OperationState is not None
-        assert OperationKind is not None
-
-    def test_engine_snapshot_returns_core_model(self) -> None:
-        """EngineOperation.snapshot() must return a core OperationSnapshot."""
-        import inspect
-
-        from meridian.core.operations import OperationSnapshot
-        from meridian.engine.operations import EngineOperation
-
-        sig = inspect.signature(EngineOperation.snapshot)
-        ret = sig.return_annotation
-        # Accept both the class itself and string annotations
-        if isinstance(ret, str):
-            assert "OperationSnapshot" in ret
-        elif ret is not inspect.Parameter.empty:
-            assert ret is OperationSnapshot or (hasattr(ret, "__name__") and ret.__name__ == "OperationSnapshot")
 
 
 # File size budget — catches god-modules at 850 lines, not 2500.

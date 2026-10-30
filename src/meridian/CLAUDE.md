@@ -3,10 +3,11 @@
 **Cluster config** — one hidden Schema V4 `cluster.yml` holds topology intent, bindings, allocations, and checkpoints (`cluster.py` model, `cluster_persistence.py` YAML); users and operator-owned privacy live in the control service.
 **Service access** — `control/client.py` speaks HTTPS from the deployer's machine to nginx's secret path on 443 with the admin token; no SSH tunnel. `remnawave/` keeps only migrate's `RemnawaveReader`, the `User`/`Node`/`Host` shapes the access adapters return, and the error types they raise.
 **SSH abstraction** — `ServerConnection` runs locally or over SSH (non-root adds `sudo -n`); `conn.run()` returns `CommandResult`, `ssh_transfer.py` moves files, and the `SSHUI` callbacks (`ssh_auth.py`) keep Rich out of transport. Keepalives end a silent connection in ~15s, and a timeout or exit 255 drops the ControlMaster (`reset_multiplex()`) so the next command redials.
-**One key bootstrap** — `ssh_keys.py` owns Meridian's key pair, the `authorized_keys` install, and the key-login check for Engine and CLI alike; `resolve.install_meridian_key()` is the CLI's one-time-password path.
+**One key bootstrap** — `ssh_keys.py` owns Meridian's key pair, the `authorized_keys` install, and the key-login check for the CLI; `resolve.install_meridian_key()` is the CLI's one-time-password path.
 **Server facts** — `facts.py` caches OS, kernel, Docker, UFW, containers, sshd ports, disk, and sysctl; use it before adding one-off probe parsing.
 **Errors over exits** — library modules raise `MeridianError` subclasses (`core/errors.py`) carrying a `category`; only command entry points call `console.fail()`, whose `hint_type` picks the footer and exit code (tested). Every error must be actionable.
-**Shared logic stays out of commands** — `resolve.py` and `setup/` serve commands and Engine; library code never imports `commands/`.
+**Shared logic stays out of commands** — `resolve.py` and `setup/` serve commands; library code never imports `commands/`.
+**Deploy targets** — `resolve.resolve_deploy_target()` turns a request and the server shelf into IP, SSH user, and port without opening SSH; `deploy` and its dry run share it.
 **Protocol keys** — `core/topology.py` owns the protocol vocabulary; `handoff.protocol_key()` classifies delivered links.
 **Exit country** — `registry_country.py` reads the RIR country via RDAP (no geo-IP) when an exit is first named and stores it in `ExitIntent.region` (`--country` overrides), keeping the compiler pure.
 **Local home** — `config.default_home()` prefers `$XDG_CONFIG_HOME/meridian` (`~/.config/meridian`), adopting an older 4.x home (`~/.meridian-v4`, `~/.meridian`) only if XDG is absent and it holds `servers.json`; `MERIDIAN_HOME` overrides.

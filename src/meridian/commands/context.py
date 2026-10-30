@@ -45,7 +45,7 @@ from meridian.i18n import t
 from meridian.renderers import emit_json
 
 # Commands that may start a fleet in a context that does not exist yet (bare `meridian` offers setup).
-CREATES_FLEET = frozenset({"", "deploy", "setup", "studio", "restore"})
+CREATES_FLEET = frozenset({"", "deploy", "setup", "restore"})
 # Command groups that never read a fleet, so a missing or malformed selection must not stop them.
 FLEET_FREE = frozenset({"context", "help", "update", "api", "serve"})
 # What a fleet still on Remnawave may run: moving it (deploy offers the move), removing it, and

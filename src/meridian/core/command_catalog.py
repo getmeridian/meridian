@@ -468,7 +468,6 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         stability="preview",
     ),
     "scan": None,
-    "studio": None,
     "migrate": None,
     "backup.pull": None,
     "backup.recovery-key": None,

@@ -1,4 +1,4 @@
-"""Typed verification results shared by probe, test, CLI, and Engine adapters."""
+"""Typed verification results shared by probe, test, and CLI adapters."""
 
 from __future__ import annotations
 

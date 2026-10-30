@@ -59,7 +59,7 @@ CONCEPTS: list[dict[str, object]] = [
         "text": "Where you run <code>meridian</code>: a laptop or the server itself (<code>local</code>). "
         "The install home (<code>~/.config/meridian</code>) keeps what belongs to you, not to a fleet: "
         "Meridian's SSH key, preferences, the update cache, and the Xray used by <code>test</code>.",
-        "commands": ["update", "help", "studio"],
+        "commands": ["update", "help"],
     },
     {
         "id": "context",

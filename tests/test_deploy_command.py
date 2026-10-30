@@ -14,8 +14,8 @@ from typer.testing import CliRunner
 
 import meridian.cli as cli
 from meridian.cli import app
-from meridian.commands.deploy import _print_success
 from meridian.cluster import ClusterConfig, PanelConfig
+from meridian.commands.deploy import _print_success
 from meridian.console import set_json_mode, set_quiet_mode
 from meridian.core.deploy import DeployRequest
 from meridian.handoff import HandoffLinks
@@ -103,6 +103,21 @@ def test_dry_run_refuses_a_cluster_without_topology_with_rebuild_guidance(tmp_ho
     error = json.loads(result.stdout)["errors"][0]
     assert "development build" in error["message"]
     assert "cluster.yml" in error["hint"]
+
+
+def test_cancel_file_stops_a_machine_deploy_before_it_connects(tmp_home: Path, monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    marker = tmp_path / "cancel"
+    marker.touch()
+
+    with patch("meridian.commands.deploy.resolve_server") as resolve_server:
+        result = _invoke(["deploy", "198.51.100.10", "--yes", "--json", "--cancel-file", str(marker)])
+
+    assert result.exit_code == 5, result.output
+    envelope = json.loads(result.stdout)
+    assert envelope["status"] == "cancelled"
+    assert envelope["data"]["phase"] == "preflight"
+    resolve_server.assert_not_called()
 
 
 def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypatch) -> None:

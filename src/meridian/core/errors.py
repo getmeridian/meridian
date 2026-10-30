@@ -1,7 +1,7 @@
 """Shared exception hierarchy for all Meridian subsystems.
 
 Every user-facing subsystem error inherits ``MeridianError``.  CLI adapters
-catch it to render human-readable output via ``console.fail()``.  Engine/API
+catch it to render human-readable output via ``console.fail()``.  Machine
 adapters catch it to build typed JSON error responses via ``to_error_model()``.
 """
 
@@ -21,7 +21,7 @@ class MeridianError(Exception):
     """Base for all typed Meridian exceptions.
 
     Subsystem errors inherit this.  CLI adapters catch it to render
-    human-readable output.  Engine/API adapters catch it to build
+    human-readable output.  Other adapters catch it to build
     typed error responses.  The ``to_error_model()`` method serializes
     to the JSON-safe ``ErrorModel`` Pydantic model.
     """
@@ -54,17 +54,6 @@ class MeridianError(Exception):
             retryable=self.retryable,
             exit_code=self.exit_code,
         )
-
-
-class EngineError(MeridianError):
-    """Typed Engine error for CLI/API adapters to render.
-
-    Lives in core so that both adapters and engine can import it
-    without creating circular dependencies.
-    """
-
-    def __init__(self, message: str, *, hint: str = "", category: ErrorCategory = "user") -> None:
-        super().__init__(message, hint=hint, category=category)
 
 
 class ProvisioningError(MeridianError):

@@ -192,7 +192,7 @@ def run(
         if machine_mode and not request.yes:
             fail(
                 "Machine deploy requires confirmation in the request",
-                hint="Set `yes: true` after the UI user confirms the deployment.",
+                hint="Set `yes: true` after the person running it confirms the deployment.",
                 hint_type="user",
             )
         cancellation = FileCancellationToken(Path(cancel_file)) if cancel_file else None

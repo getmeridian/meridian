@@ -6,7 +6,7 @@
 **SSH for infrastructure, REST for configuration** — steps install the service and nginx; users, endpoints, and settings go over its admin API once it runs.
 **nginx and TLS split** — `nginx_render.py` renders config strings, `nginx.py` holds the steps, `tls.py` issues acme.sh certificates.
 **Semantic ensure helpers** — `ensure.py` wraps package, file, service, and UFW operations; use it plus `ServerFacts` instead of new check/act shell snippets.
-**Renderer-free steps** — `Provisioner.run()` emits typed core events; Rich lives only in `progress.py` (`RichStepRenderer` for the CLI, `NoopStepRenderer` for Engine and tests).
+**Renderer-free steps** — `Provisioner.run()` emits typed core events; Rich lives only in `progress.py` (`RichStepRenderer` for the CLI, `NoopStepRenderer` for tests).
 **Cooperative cancellation** — `Provisioner.run(cancellation=...)` polls only before each step; a running step and its SSH commands always finish.
 **Relay steps are panel-agnostic** — `RelayContext` and `InstallRealm` back the reconciler's Realm driver; the binary installs as `RELAY_BINARY_PATH` and the sshd drop-in is `00-hardening.conf`.
 **Control service install** — `InstallControlService` puts a sha256-pinned uv under `/opt/ctld`, installs the exact `meridian-vpn` (or `control_artifacts`' dev wheel) on uv-managed Python 3.12, and restarts `ctld` only after a change, never over a newer recorded package (`core/version_skew.py`).

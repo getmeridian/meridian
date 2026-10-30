@@ -88,18 +88,6 @@ from meridian.core.models import (
     Summary,
 )
 from meridian.core.node_commands import NodeRestartRequest, NodeRestartResult
-from meridian.core.operations import (
-    DeployOperationResult,
-    OperationCancel,
-    OperationDiagnostics,
-    OperationEnvelope,
-    OperationError,
-    OperationEvents,
-    OperationList,
-    OperationResultEnvelope,
-    OperationSnapshot,
-    OperationStart,
-)
 from meridian.core.plan import (
     CompiledPlanDriftResult,
     CompiledPlanResourceResult,
@@ -126,7 +114,7 @@ from meridian.core.verification import (
     VerificationResult,
     VerificationTarget,
 )
-from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowCatalogEntry, WorkflowPlan
+from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowPlan
 
 
 class EmptyData(CoreModel):
@@ -649,17 +637,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     **service_delivery_schemas(envelope_base=_ContractEnvelope, failure_data_type=EmptyData),
     "event": Event,
     "error": ErrorModel,
-    "operation": OperationEnvelope,
-    "deploy-operation-result": DeployOperationResult,
-    "operation-cancel": OperationCancel,
     "operation-cancellation": OperationCancellation,
-    "operation-diagnostics": OperationDiagnostics,
-    "operation-error": OperationError,
-    "operation-events": OperationEvents,
-    "operation-list": OperationList,
-    "operation-result": OperationResultEnvelope,
-    "operation-snapshot": OperationSnapshot,
-    "operation-start": OperationStart,
     "summary": Summary,
     "client-list": ClientListResult,
     "client-show": ClientShowResult,
@@ -701,7 +679,6 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "deploy-plan": DeployPlan,
     "deploy-ports": DeployPorts,
     "workflow-plan": WorkflowPlan,
-    "workflow-catalog-entry": WorkflowCatalogEntry,
     "input-field": InputField,
     "input-option": InputOption,
     "input-section": InputSection,

@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+- Meridian Studio and `meridian studio` are removed, along with the local Engine behind them and the `studio` install extra. The owner's web console (`meridian panel` prints its address) is where fleet management lives. `meridian deploy --json`, `--events=jsonl`, `--request`, and `--dry-run` are unchanged for scripts and agents.
 - The website and README show the product: screenshots of the connection page and the owner console, and a clickable owner console demo at `/demo/console/` beside the connection page demo. Both run in the browser on one invented fleet, recorded from a real control service and checked against current API models.
 - The version and beta banner prints once a day (and after an upgrade), not before every command.
 - Russian text rewritten across the CLI, web console, connection and support pages, website, and docs, with one glossary throughout.
