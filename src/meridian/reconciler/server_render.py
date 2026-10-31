@@ -11,10 +11,10 @@ from meridian.compiler.models import (
     NginxArtifactPayload,
     NginxRouteSpec,
     RealmHopPayload,
-    certificate_directory,
 )
 from meridian.config import RELAY_BINARY_PATH
 from meridian.core.errors import MeridianError
+from meridian.host_runtime import certificate_directory
 from meridian.provision.nginx_render import NGINX_LOCATION_DIR
 
 

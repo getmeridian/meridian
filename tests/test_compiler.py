@@ -982,7 +982,8 @@ def test_fingerprint_copies_cover_direct_tls_paths_only() -> None:
 
 
 def test_bare_ip_paths_join_the_panel_on_the_control_and_own_the_no_sni_route_elsewhere() -> None:
-    from meridian.compiler.models import CertificatePayload, NginxArtifactPayload, certificate_directory
+    from meridian.compiler.models import CertificatePayload, NginxArtifactPayload
+    from meridian.host_runtime import certificate_directory
     from meridian.setup.editor import add_exit_to_intent
     from meridian.setup.single_server import single_server_intent
 

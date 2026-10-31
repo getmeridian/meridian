@@ -12,8 +12,8 @@ from meridian.cluster import ManagedResourceBinding
 from meridian.compiler.models import (
     CertificatePayload,
     ControlServicePayload,
-    certificate_directory,
 )
+from meridian.host_runtime import certificate_directory
 from meridian.reconciler.resources import ResourceReconcileError
 from meridian.reconciler.server_render import (
     legacy_realm_config_path,

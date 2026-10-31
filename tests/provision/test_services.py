@@ -6,6 +6,7 @@ import time
 
 import pytest
 
+from meridian.host_runtime import certificate_directory
 from meridian.provision.nginx import (
     ConfigureNginx,
     InstallNginx,
@@ -130,6 +131,8 @@ PRESENT = {
         # Domain mode has real content, so port 80 redirects to HTTPS.
         "return 301",
         "$host$request_uri",
+        # The panel domain's certificate lives apart from the server's IP certificate.
+        f"{certificate_directory('example.com')}/fullchain.pem",
         *_SECURITY_HEADERS,
         *_CONNECTION_PAGES,
         *_HTTP2,
@@ -160,6 +163,8 @@ PRESENT = {
 }
 
 ABSENT = {
+    # A same-server exit's IP certificate once overwrote the panel domain's in this directory.
+    "domain": ("/etc/ssl/meridian/fullchain.pem",),
     # An empty WSS path rendered a second `location /` to port 0, which fails `nginx -t`.
     "domain_no_wss": ("VLESS+WSS", "127.0.0.1:0", "location / {\n            proxy_pass"),
     "stream": ("example.com", "blackhole"),
@@ -327,7 +332,7 @@ class TestInstallNginx:
 def _nginx_conn(*, cert_exists: bool) -> MockConnection:
     conn = MockConnection()
     conn.when("dig +short", stdout="198.51.100.1")
-    conn.when("test -f /etc/ssl/meridian/fullchain.pem", rc=0 if cert_exists else 1)
+    conn.when("test -f /etc/ssl/meridian/", rc=0 if cert_exists else 1)
     conn.when("grep", stdout="stream {", rc=0)
     conn.when("nginx -t", stdout="syntax is ok")
     return conn
@@ -354,12 +359,14 @@ class TestConfigureNginx:
         bootstrap_calls = [c for c in conn.calls if "openssl req -x509" in c]
         assert bootstrap_calls
         assert san in bootstrap_calls[0]
+        # In the directory IssueTLSCert installs the trusted certificate to.
+        assert f"-keyout {certificate_directory(domain or '198.51.100.1')}/key.pem" in bootstrap_calls[0]
 
     @staticmethod
     def _rerun(*, v4_owns_443: bool) -> MockConnection:
         conn = MockConnection()
         conn.when("meridian-v4-*.conf", rc=0 if v4_owns_443 else 2)
-        conn.when("test -f /etc/ssl/meridian/fullchain.pem", stdout="", rc=0)
+        conn.when("test -f /etc/ssl/meridian/", stdout="", rc=0)
         conn.when("grep", stdout="stream {", rc=0)
         conn.when("nginx -t", stdout="syntax is ok")
         ctx = ProvisionContext(ip="198.51.100.1")
@@ -479,6 +486,16 @@ class TestIssueTLSCert:
         _, issue_calls = _issue(_acme(), domain="example.com")
         assert "shortlived" not in issue_calls[0]
         assert "--days" not in issue_calls[0]
+
+    def test_a_panel_domain_and_the_servers_ip_install_to_separate_files(self):
+        """Both once installed to /etc/ssl/meridian, so an exit's IP certificate replaced the panel's."""
+        installs = {}
+        for domain in ("example.com", ""):
+            conn = _acme()
+            _issue(conn, domain=domain)
+            installs[domain] = next(call for call in conn.calls if "acme.sh --install-cert" in call)
+        assert f"--fullchain-file {certificate_directory('example.com')}/fullchain.pem" in installs["example.com"]
+        assert "--fullchain-file /etc/ssl/meridian/fullchain.pem" in installs[""]
 
     def test_uses_configured_acme_server(self, monkeypatch):
         monkeypatch.setattr("meridian.provision.tls.ACME_SERVER", "https://acme.test/directory")

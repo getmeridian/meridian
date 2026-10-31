@@ -13,6 +13,7 @@
 ## Pitfalls
 - **nginx `add_header` inheritance** — a child `location` with `add_header` drops the parent's headers; use maps for cache and robots policies and keep page headers together.
 - **acme.sh short-lived IP certificates** need `--days 5` and an explicit renew window; report acme.sh's last lines (its first are timestamps), and name a rate limit's retry time instead of port advice.
+- **Every certificate installs to `host_runtime.certificate_directory()` of its own name** — the panel's domain certificate once shared the IP certificate's directory, so a same-server exit's IP certificate replaced it and renewals kept swapping them.
 - **nginx stream is a dynamic module** (`libnginx-mod-stream`), and `http2 on;` needs nginx ≥ 1.25 from nginx.org; keep old conffiles and add the `sites-enabled` include on every run, since a preinstalled nginx.org build never had it.
 - **Internal TLS servers need `absolute_redirect off` and `http2 on`** — behind the 443 stream router, redirects otherwise point at the internal port, and Xray's XHTTP client speaks HTTP/2 whatever ALPN says.
 - **XHTTP locations need `client_max_body_size 0`** — nginx counts streamed bodies against its default limit.

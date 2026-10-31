@@ -15,9 +15,9 @@ from meridian.compiler.models import (
     InboundPayload,
     ServiceOutboundSpec,
     WorkloadRouteSpec,
-    certificate_directory,
 )
 from meridian.core.errors import MeridianError
+from meridian.host_runtime import certificate_directory
 from meridian.provision.warp import WARP_PROXY_PORT
 
 REALITY_MIN_CLIENT_VERSION = "1.8.0"

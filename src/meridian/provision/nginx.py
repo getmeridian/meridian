@@ -10,6 +10,7 @@ import re
 import shlex
 
 from meridian.config import ACME_SH_SHA256, ACME_SH_VERSION
+from meridian.host_runtime import certificate_directory
 from meridian.provision.apt_keys import verify_apt_key
 from meridian.provision.ensure import apt_failure, apt_lock_held, apt_update_and_install, resolve_ctx, run_apt
 from meridian.provision.nginx_render import (
@@ -320,18 +321,24 @@ class ConfigureNginx:
                 return StepResult(name=self.name, status="failed", detail=dns_result)
 
         # -- Bootstrap: generate self-signed cert so nginx can start --
-        check = conn.run("test -f /etc/ssl/meridian/fullchain.pem", timeout=15)
+        # In the directory IssueTLSCert installs to, so a panel domain never shares the IP's files.
+        cert_host = server_ip if self.ip_mode else self.domain
+        cert_dir = certificate_directory(cert_host)
+        q_cert_dir = shlex.quote(cert_dir)
+        q_key = shlex.quote(f"{cert_dir}/key.pem")
+        q_fullchain = shlex.quote(f"{cert_dir}/fullchain.pem")
+        check = conn.run(f"test -f {q_fullchain}", timeout=15)
         if check.returncode != 0:
-            cert_host = server_ip if self.ip_mode else self.domain
             q_subj = shlex.quote(f"/CN={cert_host}")
             san_ext = shlex.quote(f"subjectAltName=DNS:{cert_host}")
             if self.ip_mode:
                 san_ext = shlex.quote(f"subjectAltName=IP:{cert_host}")
             result = conn.run(
-                f"openssl req -x509 -newkey rsa:2048 -keyout /etc/ssl/meridian/key.pem "
-                f"-out /etc/ssl/meridian/fullchain.pem -days 1 -nodes "
+                f"mkdir -p {q_cert_dir} && chmod 700 {q_cert_dir} && "
+                f"openssl req -x509 -newkey rsa:2048 -keyout {q_key} "
+                f"-out {q_fullchain} -days 1 -nodes "
                 f"-subj {q_subj} -addext {san_ext} && "
-                f"chmod 600 /etc/ssl/meridian/key.pem",
+                f"chmod 600 {q_key}",
                 timeout=15,
             )
             if result.returncode != 0:

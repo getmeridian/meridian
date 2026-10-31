@@ -16,7 +16,7 @@ _RENDERER_MANIFEST = {
     "control-api": "stale-client-nudge-v1",
     "control-ui": "web-panel-copy-v1",
     "firewall": "ufw-comment-v2",
-    "nginx": "service-pages-v12",
+    "nginx": "panel-domain-certificate-v13",
     "realm": "neutral-systemd-musl-v3",
     "server-baseline": "lean-packages-v4",
     "xray-workload": "exit-doh-v8",

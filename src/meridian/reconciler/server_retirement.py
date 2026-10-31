@@ -8,11 +8,10 @@ from typing import Any
 
 from meridian.cluster import ManagedResourceBinding
 from meridian.compiler.models import (
-    IP_CERTIFICATE_DIRECTORY,
     CertificatePayload,
     ControlServicePayload,
-    certificate_directory,
 )
+from meridian.host_runtime import IP_CERTIFICATE_DIRECTORY, certificate_directory
 from meridian.reconciler.resources import ResourceReconcileError
 from meridian.reconciler.server_render import (
     legacy_firewall_marker,
