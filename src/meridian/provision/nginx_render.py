@@ -10,6 +10,7 @@ from __future__ import annotations
 import textwrap
 
 from meridian.core.defaults import CONTROL_PROXY_TLS_PORT
+from meridian.host_runtime import certificate_directory
 
 # ---------------------------------------------------------------------------
 # nginx stream configuration (SNI routing — replaces HAProxy)
@@ -291,6 +292,7 @@ def render_nginx_server_block(
     # Port 80 behavior: domain mode redirects (has real content),
     # IP mode serves ACME challenges only (no redirect — redirect to
     # HTTPS that returns 403 is a contradiction signal for censors).
+    cert_dir = certificate_directory(host)
     if redirect_http:
         http_default = "return 301 https://$host$request_uri;"
     else:
@@ -339,8 +341,8 @@ def render_nginx_server_block(
             # absolute redirect (/<path> -> /<path>/) would send browsers to it.
             absolute_redirect off;
 
-            ssl_certificate     /etc/ssl/meridian/fullchain.pem;
-            ssl_certificate_key /etc/ssl/meridian/key.pem;
+            ssl_certificate     {cert_dir}/fullchain.pem;
+            ssl_certificate_key {cert_dir}/key.pem;
             ssl_protocols TLSv1.2 TLSv1.3;
 
             # TLS session resumption — avoids full handshake on reconnect

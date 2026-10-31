@@ -18,6 +18,7 @@ from meridian.core.cancellation import CancellationToken
 from meridian.core.inputs import is_ip
 from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
+from meridian.host_runtime import certificate_directory
 from meridian.provision.baseline import build_server_baseline_checks, build_server_baseline_steps
 from meridian.provision.ensure import ensure_file_content, ensure_ufw_rule, ufw_rule_present
 from meridian.provision.nginx import InstallNginx
@@ -48,7 +49,6 @@ from meridian.reconciler.server_evidence import (
 from meridian.reconciler.server_render import (
     artifact_token,
     baseline_marker_path,
-    certificate_directory,
     firewall_marker,
     legacy_baseline_marker_path,
     legacy_firewall_marker,
@@ -384,7 +384,6 @@ class CertificateDriver(retirement.CertificateRetirement):
             # Let's Encrypt's short-lived profile is the only one that certifies an IP address.
             ip_mode=bare_ip,
             server_ip=payload.hostname if bare_ip else None,
-            certificate_directory=cert_dir,
         ).run(
             conn,
             ProvisionContext(

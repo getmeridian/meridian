@@ -35,6 +35,6 @@
 - **Attest server artifacts against their own inputs** (target, pins, own stamp) — hashing the whole deployment re-runs every server on any edit.
 - **Delete, never mark inactive** — give a kind an idempotent `retire()` (404 = done) before adding it to `RETIREMENT_ORDER`; the one exception is `forget_server()` for an unreachable removed server, on the operator's word.
 - **Commit forgets superseded bindings** — keep the newest per (logical ID, remote ID) plus active and current-generation ones, or `cluster.yml` grows on every apply. New generations find resources by name.
-- **Certificates retire through acme.sh's record** (`Le_RealFullChainPath`), and only while nothing (control service or nginx route) still uses the file.
+- **Certificates retire through acme.sh's record** (`Le_RealFullChainPath`), and only while nothing still uses the file: the control service holds its domain's certificate, or the IP's only without a domain (assuming it always held the IP's kept an unused short-lived certificate renewing).
 - **An agent retires with its core** — stop and delete both units with their config, keys, and state; removing only the agent left Xray serving.
 - **Renames migrate, never orphan** — a surviving pre-rename unit or UFW comment is drift; stop the old unit before the new one binds.

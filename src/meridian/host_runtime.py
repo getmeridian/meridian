@@ -7,7 +7,10 @@ units, nothing here names proxy software. The Docker names below are only read b
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
+
+from meridian.core.inputs import is_ip
 
 
 @dataclass(frozen=True)
@@ -57,3 +60,17 @@ AGENT_LIB_DIR = f"/usr/local/lib/{AGENT_NAME}"
 CORE_BINARY = f"{AGENT_LIB_DIR}/netcore"
 CORE_CONFIG = f"{AGENT_CONFIG_DIR}/core.json"
 CORE_UNIT = "netcore.service"
+
+
+# One acme.sh entry per IP address, shared by the control bootstrap and exit certificates: a
+# second entry for the same IP would double Let's Encrypt's short-lived renewals. Each domain
+# gets its own directory, so a panel domain and the server's IP never overwrite each other.
+IP_CERTIFICATE_DIRECTORY = "/etc/ssl/meridian"
+
+
+def certificate_directory(hostname: str) -> str:
+    """Return the on-server directory holding the issued certificate for ``hostname``."""
+    if is_ip(hostname):
+        return IP_CERTIFICATE_DIRECTORY
+    token = hashlib.sha256(hostname.encode("utf-8")).hexdigest()[:16]
+    return f"/etc/ssl/meridian/certs/{token}"

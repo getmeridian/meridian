@@ -8,11 +8,10 @@ from typing import Any
 
 from meridian.cluster import ManagedResourceBinding
 from meridian.compiler.models import (
-    IP_CERTIFICATE_DIRECTORY,
     CertificatePayload,
     ControlServicePayload,
-    certificate_directory,
 )
+from meridian.host_runtime import IP_CERTIFICATE_DIRECTORY, certificate_directory
 from meridian.reconciler.resources import ResourceReconcileError
 from meridian.reconciler.server_render import (
     legacy_firewall_marker,
@@ -92,10 +91,10 @@ class CertificateRetirement:
     """Stop renewing a certificate no Host uses any more and delete its files.
 
     acme.sh records where it installs each certificate, so the renewal entry is found
-    from the binding's ``fullchain.pem`` path, even for a hashed domain directory. The
-    control service shares the server's IP certificate, so nothing is touched
-    while it runs there or another certificate in the plan has the same files. The ACME
-    challenge listener goes once no certificate is left on the server.
+    from the binding's ``fullchain.pem`` path, even for a hashed domain directory. Nothing is
+    touched while the control service there serves the same files (its domain's, or the
+    server's IP certificate without one) or another certificate in the plan has them. The
+    ACME challenge listener goes once no certificate is left on the server.
     """
 
     context: Any
@@ -111,9 +110,16 @@ class CertificateRetirement:
             if isinstance(resource.payload, CertificatePayload | ControlServicePayload)
             and resource.payload.server_ref == binding.server_ref
         ]
-        if any(isinstance(payload, ControlServicePayload) for payload in kept):
-            return
         directory = fullchain.rsplit("/", 1)[0]
+        # A panel with its own domain no longer uses the IP certificate, which would otherwise
+        # keep renewing after the last IP-addressed path left.
+        if any(
+            isinstance(payload, ControlServicePayload)
+            and directory
+            == (certificate_directory(payload.public_hostname) if payload.public_hostname else IP_CERTIFICATE_DIRECTORY)
+            for payload in kept
+        ):
+            return
         if any(
             isinstance(payload, CertificatePayload) and certificate_directory(payload.hostname) == directory
             for payload in kept

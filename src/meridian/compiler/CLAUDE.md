@@ -22,7 +22,7 @@
 - **Raise `TopologyCompileError` for unsupported intent**; deployment contracts are empty or cover every topology server ref exactly.
 - **Build every published name through `names.py`** — length limits per format, and `host_remark()` composes flag, country, method, and fingerprint.
 - **Endpoints publish only after their listener and runtime**, in `PROTOCOL_PRIORITY` order with the control server's exit first (the entry clients pick by default); Xray-JSON-only entries exclude other formats, or sing-box and Stash list duplicates.
-- **Bare-IP clients send no SNI** — IP paths route on the no-SNI stream key.
+- **Bare-IP clients send no SNI** — IP paths route on the no-SNI stream key. On the control server's 443, a TLS path joins the panel's server as locations only when the panel holds its name (its domain, or the IP of a panel without one); with a panel domain, IP paths take the no-SNI route for their own IP-certified server, since the panel's serves only the domain's certificate.
 - **Geodata categories must exist in stock dat files** — an unknown `geosite:` makes Xray refuse the whole config; `geodata.py` checks server rules against `core/geodata_lists.py`, generated from the pinned Xray archive (compare both when the pin moves).
 - **Every TCP path carries its fingerprint** — empty means Go's ClientHello, a DPI signature; Hysteria2 carries none.
 - **Client Xray JSON's `dns` block stays unused** — the final balancer rule matches every domain first; narrowing it sends plain lookups to resolvers Russia redirects, through DIRECT.

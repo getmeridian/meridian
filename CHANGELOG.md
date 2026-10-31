@@ -9,8 +9,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 Meridian 4 is a new foundation. Its own control service and web management
 panel replace 3x-ui; one reviewed topology in `~/.config/meridian/cluster.yml`
 describes your whole fleet; a small agent on every server applies it; and no
-server needs Docker. The first section lists what changed since the previous
-beta, 4.0.0b8; the second is what 4.0 changes compared with 3.x.
+server needs Docker. The first sections list what changed in each beta,
+newest first; the last is what 4.0 changes compared with 3.x.
+
+### Since 4.0.0b9
+
+#### Fixed
+- **A web panel on its own domain keeps its certificate** when the same server
+  also runs an exit (#110). The panel's domain certificate was installed where
+  the server's IP certificate lives, so an exit's IP certificate replaced it,
+  every later renewal swapped them again, and the CLI could no longer reach the
+  panel. Each name now has its own certificate files; `meridian apply` moves an
+  existing panel's certificate, and an IP certificate nothing uses any more
+  stops renewing.
+- **XHTTP and WebSocket can use the panel's domain** on the control server
+  (#110): they join the panel's TLS server instead of failing to compile with
+  "cannot route SNI … to multiple workloads". With a panel domain, XHTTP over
+  the server's IP gets its own TLS server and IP certificate, because the
+  panel's server holds only the domain's.
 
 ### Since 4.0.0b8
 

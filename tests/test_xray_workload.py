@@ -14,9 +14,9 @@ from meridian.compiler.models import (
     InboundPayload,
     ServiceOutboundSpec,
     WorkloadRouteSpec,
-    certificate_directory,
 )
 from meridian.core.topology import OrderedRouteIntent, RoutingGatewayIntent
+from meridian.host_runtime import certificate_directory
 from meridian.xray_workload import (
     EXIT_DOH_RESOLVERS,
     ServiceRouteCredential,

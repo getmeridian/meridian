@@ -24,7 +24,6 @@ from meridian.core.inputs import (
     PortValue,
     ServerReferenceValue,
     SshUserValue,
-    is_ip,
 )
 from meridian.core.models import CoreModel
 from meridian.core.owner_contact import OwnerContactSettings
@@ -386,19 +385,6 @@ class CertificatePayload(CoreModel):
     kind: Literal["certificate"] = "certificate"
     server_ref: str
     hostname: str
-
-
-# One acme.sh entry per IP address, shared with the panel: a second entry for the same IP
-# would double Let's Encrypt's short-lived renewals and overwrite the panel's install target.
-IP_CERTIFICATE_DIRECTORY = "/etc/ssl/meridian"
-
-
-def certificate_directory(hostname: str) -> str:
-    """Return the on-server directory holding the issued certificate for ``hostname``."""
-    if is_ip(hostname):
-        return IP_CERTIFICATE_DIRECTORY
-    token = hashlib.sha256(hostname.encode("utf-8")).hexdigest()[:16]
-    return f"/etc/ssl/meridian/certs/{token}"
 
 
 class RoutingGatewayPayload(CoreModel):

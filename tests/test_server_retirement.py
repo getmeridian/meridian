@@ -12,8 +12,8 @@ from meridian.cluster import ManagedResourceBinding
 from meridian.compiler.models import (
     CertificatePayload,
     ControlServicePayload,
-    certificate_directory,
 )
+from meridian.host_runtime import certificate_directory
 from meridian.reconciler.resources import ResourceReconcileError
 from meridian.reconciler.server_render import (
     legacy_realm_config_path,
@@ -221,6 +221,27 @@ def test_the_control_servers_shared_ip_certificate_is_never_removed() -> None:
     runtime = ControlServicePayload.model_construct(server_ref="srv-a")
 
     _certificate_driver(conn, runtime).retire(_binding("/etc/ssl/meridian/fullchain.pem"))
+
+    assert conn.calls == []
+
+
+def test_a_panel_with_its_own_domain_lets_the_unused_ip_certificate_go() -> None:
+    conn = MockConnection()
+    runtime = ControlServicePayload.model_construct(server_ref="srv-a", public_hostname="panel.example.com")
+
+    _certificate_driver(conn, runtime).retire(_binding("/etc/ssl/meridian/fullchain.pem"))
+
+    (command,) = conn.calls
+    assert shlex.quote("Le_RealFullChainPath='/etc/ssl/meridian/fullchain.pem'") in command
+    # The panel still needs the ACME challenge listener for its own certificate.
+    assert "meridian-v4-acme.conf" not in command
+
+
+def test_a_panel_domains_certificate_is_never_removed() -> None:
+    conn = MockConnection()
+    runtime = ControlServicePayload.model_construct(server_ref="srv-a", public_hostname="vpn.example.com")
+
+    _certificate_driver(conn, runtime).retire(_binding(_DOMAIN_CERT))
 
     assert conn.calls == []
 
