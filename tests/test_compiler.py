@@ -1012,6 +1012,57 @@ def test_bare_ip_paths_join_the_panel_on_the_control_and_own_the_no_sni_route_el
     assert certificate_directory("198.51.100.10") == "/etc/ssl/meridian"
 
 
+def _panel_domain_intent(*, exit_domain: str) -> SetupIntent:
+    """The wizard's panel domain on a server that also runs the exit (#110)."""
+    from meridian.setup.single_server import single_server_intent
+
+    intent = single_server_intent(None, server_ref="srv-a", address="198.51.100.10", domain=exit_domain)
+    return SetupIntent.model_validate(
+        {
+            **intent.model_dump(),
+            "control": {**intent.control.model_dump(), "public_hostname": "panel.example.com"},
+        }
+    )
+
+
+def test_tls_paths_on_the_panel_domain_join_the_panel_instead_of_competing_for_its_route() -> None:
+    from meridian.compiler.models import CertificatePayload, NginxArtifactPayload
+
+    resources = {
+        resource.logical_id: resource.payload
+        for resource in compile_panel_pass(_panel_domain_intent(exit_domain="panel.example.com")).resources
+    }
+    nginx = [payload for payload in resources.values() if isinstance(payload, NginxArtifactPayload)]
+    locations = [item for item in nginx if item.layer == "location"]
+    assert sorted(route.protocol for item in locations for route in item.routes) == ["wss", "xhttp"]
+    assert not [item for item in nginx if item.layer == "http"]
+    stream = next(item for item in nginx if item.layer == "stream")
+    assert [route.server_names for route in stream.routes if route.protocol != "reality"] == [["", "panel.example.com"]]
+    # Hysteria2's certificate is the panel's own: one acme.sh entry, one directory.
+    certificates = [payload for payload in resources.values() if isinstance(payload, CertificatePayload)]
+    assert [item.hostname for item in certificates] == ["panel.example.com"]
+
+
+def test_a_panel_domain_leaves_the_no_sni_route_to_ip_paths_on_its_server() -> None:
+    """The panel's TLS server holds only the domain's certificate; IP clients would fail on it."""
+    from meridian.compiler.models import CertificatePayload, NginxArtifactPayload
+    from meridian.core.defaults import CONTROL_TLS_PORT
+
+    resources = {
+        resource.logical_id: resource.payload
+        for resource in compile_panel_pass(_panel_domain_intent(exit_domain="")).resources
+    }
+    nginx = [payload for payload in resources.values() if isinstance(payload, NginxArtifactPayload)]
+    assert not [item for item in nginx if item.layer == "location"]
+    exit_http = next(item for item in nginx if item.layer == "http")
+    assert exit_http.tls_hostname == "198.51.100.10"
+    stream = next(item for item in nginx if item.layer == "stream")
+    routes = {tuple(route.server_names): route.backend_port for route in stream.routes if route.protocol != "reality"}
+    assert routes == {("panel.example.com",): CONTROL_TLS_PORT, ("",): exit_http.listener_port}
+    certificates = [payload for payload in resources.values() if isinstance(payload, CertificatePayload)]
+    assert [item.hostname for item in certificates] == ["198.51.100.10"]
+
+
 def test_hosts_follow_exit_order_within_each_protocol() -> None:
     """The control server's exit leads even when another exit's ID sorts first ("exit-2" < "main")."""
     from meridian.setup.editor import add_exit_to_intent

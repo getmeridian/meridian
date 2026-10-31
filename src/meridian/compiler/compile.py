@@ -109,7 +109,7 @@ def compile_topology(
     stream_targets: dict[tuple[str, int, str], tuple[str, int]] = {}
     stream_fallbacks: dict[tuple[str, int], str] = {}
     local_fallbacks: dict[tuple[str, int], int] = {}
-    control_names = [""]
+    control_names = [] if _ip_paths_own_no_sni(intent) else [""]
     if intent.control.public_hostname:
         control_names.append(intent.control.public_hostname)
     control_stream_key = (intent.control.server_ref, 443)
@@ -303,6 +303,7 @@ def compile_topology(
             ports=ports,
             exit_=exit_,
             control_server_ref=intent.control.server_ref,
+            control_hostname=intent.control.public_hostname,
             place=places[exit_.id],
             runtime_id=runtime_id,
             inbound_by_path=inbound_by_path,
@@ -445,6 +446,7 @@ def _compile_exit_endpoints(
     ports: PortAllocator,
     exit_: ExitIntent,
     control_server_ref: str,
+    control_hostname: str,
     place: str,
     runtime_id: str,
     inbound_by_path: dict[tuple[str, str], str],
@@ -524,11 +526,13 @@ def _compile_exit_endpoints(
             for path in sorted(paths, key=lambda item: item.id)
         ]
         inbound_ids = [inbound_by_path[(exit_.id, path.id)] for path in paths]
-        # A client dialing a bare IP sends no SNI. The control server already routes no-SNI
-        # connections to its panel TLS server (which holds the IP certificate), so its IP paths
-        # join that server as included locations instead of competing for the route.
+        # A path whose TLS name the panel's own server already holds (the panel domain, or the
+        # bare IP of a panel without one) joins that server as included locations instead of
+        # competing for its route. With a panel domain, IP paths keep their own server and IP
+        # certificate: the panel's holds only the domain's (see _ip_paths_own_no_sni).
         bare_ip = is_ip(tls_sni)
-        if bare_ip and exit_.server_ref == control_server_ref and public_port == 443:
+        panel_name = tls_sni == control_hostname if control_hostname else bare_ip
+        if panel_name and exit_.server_ref == control_server_ref and public_port == 443:
             location_id = f"nginx:{exit_.id}:{stable_token(tls_sni)}:location"
             builder.add(
                 location_id,
@@ -743,6 +747,25 @@ def _compile_probes(
             dependencies=[gateway_id],
             postconditions=[ResourcePostcondition(kind="probe_succeeds", target_ref=gateway_id)],
         )
+
+
+def _ip_paths_own_no_sni(intent: SetupIntent) -> bool:
+    """Whether the control server's no-SNI route belongs to an exit's IP paths, not the panel.
+
+    Bare-IP clients send no SNI. A panel with a domain serves only that domain's certificate,
+    so IP-addressed XHTTP/WSS on the same 443 listener needs the route for its own TLS server;
+    the service and agents reach a panel with a domain by name.
+    """
+    if not intent.control.public_hostname:
+        return False
+    return any(
+        exit_.server_ref == intent.control.server_ref
+        and path.protocol in {"xhttp", "wss"}
+        and path.public_port == 443
+        and is_ip(path.tls_sni)
+        for exit_ in intent.exits
+        for path in exit_.paths
+    )
 
 
 def _decoy_port(decoy: SelfStealDecoy | None) -> int:
