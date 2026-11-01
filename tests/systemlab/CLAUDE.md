@@ -13,6 +13,7 @@ uv run pytest tests/systemlab/ -q
 
 ## What's done well
 - Fresh deploy checks every unit, `fleet status`, a no-op second apply, and that no unit, process, or `/opt` name reveals proxy software.
+- A panel on its own domain (`panel.lab.test`, a compose alias for exit B) runs beside IP-addressed XHTTP and then on a shared domain, proving per-name certificates as clients see them (#110).
 - Delivered documents are executed or checked by real clients (Xray, `mihomo -t`, `sing-box check`) at pinned versions.
 - Resilience proves one-exit-down failover both ways and fail-closed all-down behaviour; plan/apply covers SIGKILL recovery mid-mutation.
 - Removal diffs active bindings (`assert-retired.py`), proving every retired resource absent through the service and SSH.
