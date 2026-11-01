@@ -1,6 +1,7 @@
 # content/docs — Markdown documentation source
 
 ## Design decisions
+**People query API** — client guides describe shared filters, contextual counts, stable cursors, and people-only reads in all four locales.
 **Account schedules** — client and CLI guides document UTC anniversaries, first-traffic durations, capped renewal catch-up, previews, pending extension, and preservation; connecting guides explain first use and the page's dates in every locale.
 **Person guides** — explain Leave/Stay, memory-only drafts, preserved focus, visible 30-second refresh, and owner idle expiry; browser-local expiry, exact UTC, calendar-month clamping, explicit null, and changed-field saves; captioned PNG/SVG QR export, clipboard fallback, and local-only rendering; and effective enable results. With the CLI guides they document individual credentials, explicit format URLs, their people/admin access, and the producing-output boundary.
 **Client, connecting, and CLI guides** — distinguish automatic browser defaults, the explicit subscription-language default and page/app languages, nullable person overrides, saved page choices, console edits, stable English status codes, the connection page's own picker, and JSON `--yes`; and document operator notices, safe substitutions, expiry, rendered confirmation, encrypted snapshots, and content-free events. Client and connecting guides explain reviewed public owner contact, user-initiated support links, explicit clearing, and bounded inactive remarks.

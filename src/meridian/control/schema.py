@@ -8,6 +8,7 @@ from meridian.control.devices import DEVICES_TABLE
 from meridian.control.errors import ServiceError
 from meridian.control.events import EVENT_TABLES
 from meridian.control.owner import UI_TABLES
+from meridian.control.people_schema import PEOPLE_SCHEMA
 from meridian.control.period_usage import DIRECTIONAL_PERIOD_MIGRATION
 from meridian.control.privacy import PRIVACY_TABLES
 from meridian.control.revisions import APPLY_FENCE_TABLE, REVISIONS_TABLE
@@ -16,7 +17,7 @@ from meridian.control.store import Store
 from meridian.control.tokens import API_TOKENS_TABLE_V4
 from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPOCH_BASELINES
 
-SCHEMA_VERSION = 19
+SCHEMA_VERSION = 20
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS secrets (name TEXT PRIMARY KEY, value BLOB NOT NULL);
@@ -118,6 +119,8 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "ALTER TABLE users ADD COLUMN renewal_anchor_at TEXT",
         "UPDATE users SET traffic_reset_anchor_day = CAST(strftime('%d', created_at) AS INTEGER)",
     ),
+    # 19 -> 20: shared people queries, monotonic row versions, and reviewed receipts.
+    PEOPLE_SCHEMA,
 )
 
 
@@ -127,5 +130,9 @@ def migrate(store: Store) -> None:
         raise ServiceError("conflict", "The database was written by a newer Meridian.", 409)
     for statements in _MIGRATIONS[stored - 1 : SCHEMA_VERSION - 1]:
         for statement in statements:
+            store.db.execute(statement)
+    # Fresh databases already have the base schema; guarded statements also cover them.
+    if store.meta("schema_version") is None:
+        for statement in PEOPLE_SCHEMA:
             store.db.execute(statement)
     store.set_meta("schema_version", str(SCHEMA_VERSION))

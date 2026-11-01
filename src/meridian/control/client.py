@@ -70,6 +70,7 @@ from meridian.core.errors import MeridianError
 from meridian.core.fleet_events import FleetEventPage, FleetEventQuery
 from meridian.core.languages import LanguageSettings, LanguageState
 from meridian.core.notices import NoticeState, NoticeWrite
+from meridian.core.people_query import PeoplePage, PeopleQuery
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 
@@ -267,6 +268,14 @@ class ControlClient:
             return UserRecord.model_validate(self._call("GET", f"api/users/{_segment(username)}"))
         except ControlServiceNotFound:
             return None
+
+    def query_people(self, query: PeopleQuery) -> PeoplePage:
+        params = {
+            key: str(int(value)) if isinstance(value, bool) else value
+            for key, value in query.model_dump().items()
+            if value is not None
+        }
+        return PeoplePage.model_validate(self._call("GET", "api/people?" + urlencode(params)))
 
     def list_users(self) -> list[UserRecord]:
         return [UserRecord.model_validate(item) for item in self._call("GET", "api/users")["users"]]

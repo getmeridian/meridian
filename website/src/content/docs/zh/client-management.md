@@ -298,6 +298,7 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 
 | 用户 API 端点 | 操作 |
 |---|---|
+| `GET /api/people` | 查找人员并返回带分类计数的游标页面 |
 | `POST /api/users/preview` | 预览创建或修改账户的 UTC 日期，不保存；需要 people/admin 或所有者会话 |
 | `POST /api/users` | 在一个事务中创建用户，同时设置 `username`、`status`、`expire_at`、`traffic_limit_bytes`、`traffic_limit_strategy` 和 `device_limit` |
 | `PATCH /api/users/{username}` | 修改状态、到期时间、流量限额或重置策略、设备上限；未发送的字段保持原值 |
@@ -378,3 +379,9 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 响应头经过脱敏：URL 被替换，编码后的配置名称和通知只保留 `base64:` 前缀。预览不返回订阅正文、URI、密钥、私有备注或标签。User-Agent 最多 512 个 Unicode 字符，Accept 最多 256 个字符，两者均为单行。输入仅用于本次请求，不保存或回显，不注册设备，也不触发备份写入。
 
 `POST /api/subscription/preview` 需要 read 权限或管理者会话。发送 `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`，省略的请求头默认为空字符串。网页面板设置提供同样的表单，不接受 HWID 或设备请求头。对于通过 API 管理的端点，`enabled: false` 会将保存的端点从订阅中排除，并显示原因为 `disabled_endpoint`；默认值为 true，序列化时省略。经过审核的端点应用操作会恢复拓扑规定的连接提供方式。
+
+## 在服务端查询人员
+
+服务按用户名或显示名称、状态、标签、未来 1–365 天内到期、配额使用率达到 1–100%、从未使用的证据、提醒原因和生命周期状态（`pending`、`renewing`、`fixed`、`unlimited`）查找人员。可按名称、本期流量、到期时间或最近活动排序；未知日期排在最后。计数会考虑其他活动筛选条件。游标不包含首页查询后新增的人员，有效期为 15 分钟。查询参数不会作为请求历史保存。
+
+`GET /api/people` 需要 people/admin 或所有者会话，返回 `users`、`total`、`population`、分类 `facets` 与 `next_cursor`。查询键：`q`、`status`、`tag`、`expires`、`quota`、`never`（0/1）、`attention`、`lifecycle`、`sort`、`order`、`limit`（1–500）、`cursor`。继续游标时保持相同筛选和排序。原有 `GET /api/users` 保留。查询响应不含凭据与私人备注；CLI 的 JSON 通过现有授权单人读取接口保留备注。

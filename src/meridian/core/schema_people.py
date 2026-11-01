@@ -7,8 +7,13 @@ from pydantic import BaseModel
 from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.models import UserImport, UserImportBatch, UserPatch, UserRecord, UserUpdate
 from meridian.core.account_schedule import AccountLifecycleSettings, AccountSchedulePreview
+from meridian.core.people_query import PeopleFacets, PeoplePage, PeoplePerson, PeopleQuery
 
 PEOPLE_SCHEMAS: dict[str, type[BaseModel]] = {
+    "people-query": PeopleQuery,
+    "people-page": PeoplePage,
+    "people-person": PeoplePerson,
+    "people-facets": PeopleFacets,
     "account-lifecycle-settings": AccountLifecycleSettings,
     "account-schedule-preview": AccountSchedulePreview,
     "user-schedule-preview-request": UserSchedulePreviewRequest,

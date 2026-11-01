@@ -298,6 +298,7 @@ Read tokens never see anyone's keys or subscription ID. Choose **People** for a 
 
 | People endpoint | Action |
 |---|---|
+| `GET /api/people` | Find people and return cursor pages and contextual counts |
 | `POST /api/users/preview` | Preview creation or an edit’s UTC schedule dates without saving; people/admin or owner session |
 | `POST /api/users` | Create a person with `username`, `status`, `expire_at`, `traffic_limit_bytes`, `traffic_limit_strategy`, and `device_limit` in one transaction |
 | `PATCH /api/users/{username}` | Change the status, expiry, traffic limit or reset strategy, or device cap; omitted fields keep their values |
@@ -378,3 +379,9 @@ Two apps earn one inert extra entry at the end of their subscription, in the per
 Response headers are redacted: URLs are replaced, and encoded profile titles and notices show only their `base64:` prefix. The preview returns no body, URIs, keys, private notes, or tags. User-Agent is bounded to 512 Unicode characters and Accept to 256, each one line. Inputs are transient: they are neither stored nor echoed, never register a device, and trigger no backup write.
 
 `POST /api/subscription/preview` needs read scope or the owner session. Send `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`; omitted headers default to empty strings. Settings in the web panel has the same form. No HWID or device-header input is accepted. For API-managed endpoints, `enabled: false` excludes the saved endpoint from subscriptions and appears as `disabled_endpoint`; true is the default and is omitted from serialized endpoints. A reviewed endpoint apply restores topology-defined delivery.
+
+## Server-side people queries
+
+The service finds people by username or display name, status, tag, expiry within 1–365 days, quota share at or above 1–100%, never-used evidence, attention reason, and lifecycle (`pending`, `renewing`, `fixed`, `unlimited`). Sort by name, period traffic, expiry, or last activity; missing dates sort last. Counts apply the other active filters. Cursors exclude later insertions and expire after 15 minutes. Query parameters are not saved as request history.
+
+`GET /api/people` requires people/admin or an owner session. It returns `users`, `total`, `population`, contextual `facets`, and `next_cursor`. Query keys: `q`, `status`, `tag`, `expires`, `quota`, `never` (0/1), `attention`, `lifecycle`, `sort`, `order`, `limit` (1–500), `cursor`. Keep filters and order when continuing a cursor. The plain `GET /api/users` route remains available. Query responses omit credentials and private notes; CLI JSON retains its existing note view through the authorized per-person read.

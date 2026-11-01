@@ -1,0 +1,50 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "attention": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Attention",
+      "type": "object"
+    },
+    "expires": {
+      "default": 0,
+      "title": "Expires",
+      "type": "integer"
+    },
+    "lifecycle": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Lifecycle",
+      "type": "object"
+    },
+    "never": {
+      "default": 0,
+      "title": "Never",
+      "type": "integer"
+    },
+    "quota": {
+      "default": 0,
+      "title": "Quota",
+      "type": "integer"
+    },
+    "status": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Status",
+      "type": "object"
+    },
+    "tag": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Tag",
+      "type": "object"
+    }
+  },
+  "title": "PeopleFacets",
+  "type": "object"
+}

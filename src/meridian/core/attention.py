@@ -11,7 +11,7 @@ from pydantic import Field, model_validator
 from meridian.control.models import NodeStatus, UserRecord
 from meridian.core.agent_types import NodeId, Timestamp
 from meridian.core.models import CoreModel
-from meridian.core.person_activity import PersonAttentionReason, is_never_used
+from meridian.core.person_activity import PersonAttentionEvidence, PersonAttentionReason, is_never_used
 from meridian.core.server_allowances import ServerUsage
 from meridian.core.traffic import quota_percent
 
@@ -69,7 +69,9 @@ class AttentionList(CoreModel):
     servers: list[ServerAttention] = Field(default_factory=list)
 
 
-def person_reasons(user: UserRecord, thresholds: AttentionThresholds, moment: datetime) -> list[PersonAttentionReason]:
+def person_reasons(
+    user: PersonAttentionEvidence, thresholds: AttentionThresholds, moment: datetime
+) -> list[PersonAttentionReason]:
     """Disjoint never-used and stopped-use findings from default aggregate evidence."""
     reasons: list[PersonAttentionReason] = []
     if user.expire_at is not None and moment <= datetime.fromisoformat(user.expire_at) <= moment + timedelta(

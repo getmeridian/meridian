@@ -1,0 +1,477 @@
+{
+  "$defs": {
+    "AccountSchedulePreview": {
+      "additionalProperties": false,
+      "description": "Effective dates after catch-up; calculating them never writes or activates an account.",
+      "properties": {
+        "activation_duration_days": {
+          "anyOf": [
+            {
+              "maximum": 3650,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Activation Duration Days"
+        },
+        "activation_pending": {
+          "title": "Activation Pending",
+          "type": "boolean"
+        },
+        "expire_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Expire At"
+        },
+        "next_renewal_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Renewal At"
+        },
+        "next_reset_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Reset At"
+        },
+        "renewal_enabled": {
+          "title": "Renewal Enabled",
+          "type": "boolean"
+        },
+        "renewals_completed": {
+          "minimum": 0,
+          "title": "Renewals Completed",
+          "type": "integer"
+        },
+        "renewals_due": {
+          "description": "Missed renewals applied together with one traffic reset.",
+          "minimum": 0,
+          "title": "Renewals Due",
+          "type": "integer"
+        },
+        "renewals_left": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Null for unlimited renewals or when renewal is off.",
+          "title": "Renewals Left"
+        }
+      },
+      "required": [
+        "activation_pending",
+        "activation_duration_days",
+        "expire_at",
+        "next_reset_at",
+        "renewal_enabled",
+        "next_renewal_at",
+        "renewals_left",
+        "renewals_due",
+        "renewals_completed"
+      ],
+      "title": "AccountSchedulePreview",
+      "type": "object"
+    },
+    "PeriodTraffic": {
+      "additionalProperties": false,
+      "description": "Period counters; legacy traffic with no known direction is included in download.",
+      "properties": {
+        "download_bytes": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Download Bytes",
+          "type": "integer"
+        },
+        "unattributed_bytes": {
+          "default": 0,
+          "description": "Part of download whose direction an import or an older reset did not retain.",
+          "minimum": 0,
+          "title": "Unattributed Bytes",
+          "type": "integer"
+        },
+        "upload_bytes": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Upload Bytes",
+          "type": "integer"
+        }
+      },
+      "title": "PeriodTraffic",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "List evidence without connection credentials or private notes.",
+  "properties": {
+    "activation_duration_days": {
+      "anyOf": [
+        {
+          "maximum": 3650,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Whole UTC days from first traffic.",
+      "title": "Activation Duration Days"
+    },
+    "attention_reasons": {
+      "items": {
+        "enum": [
+          "expiring",
+          "quota",
+          "unused",
+          "stopped"
+        ],
+        "type": "string"
+      },
+      "title": "Attention Reasons",
+      "type": "array"
+    },
+    "created_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in Z.",
+      "maxLength": 40,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+      "title": "Created At",
+      "type": "string"
+    },
+    "declared": {
+      "title": "Declared",
+      "type": "boolean"
+    },
+    "device_limit": {
+      "anyOf": [
+        {
+          "maximum": 100,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Device Limit"
+    },
+    "display_name": {
+      "title": "Display Name",
+      "type": "string"
+    },
+    "expire_at": {
+      "anyOf": [
+        {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Expire At"
+    },
+    "first_traffic_at": {
+      "anyOf": [
+        {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "When the service first accepted traffic growth; unknown for historical use.",
+      "title": "First Traffic At"
+    },
+    "language": {
+      "anyOf": [
+        {
+          "enum": [
+            "en",
+            "ru",
+            "fa",
+            "zh"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Language"
+    },
+    "last_traffic_node": {
+      "anyOf": [
+        {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The node whose latest accepted growth set the user's last traffic time.",
+      "title": "Last Traffic Node"
+    },
+    "lifetime_traffic_bytes": {
+      "minimum": 0,
+      "title": "Lifetime Traffic Bytes",
+      "type": "integer"
+    },
+    "never_used": {
+      "title": "Never Used",
+      "type": "boolean"
+    },
+    "online_at": {
+      "anyOf": [
+        {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Online At"
+    },
+    "period_traffic": {
+      "$ref": "#/$defs/PeriodTraffic"
+    },
+    "quota_used_percent": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Quota Used Percent"
+    },
+    "renewal_anchor_at": {
+      "anyOf": [
+        {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Original expiry of the current renewal series.",
+      "title": "Renewal Anchor At"
+    },
+    "renewal_interval_days": {
+      "anyOf": [
+        {
+          "maximum": 3650,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Renewal Interval Days"
+    },
+    "renewal_interval_months": {
+      "anyOf": [
+        {
+          "maximum": 120,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Renewal Interval Months"
+    },
+    "renewal_limit": {
+      "anyOf": [
+        {
+          "maximum": 10000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Renewals in this series; null means unlimited.",
+      "title": "Renewal Limit"
+    },
+    "renewals_completed": {
+      "default": 0,
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Renewals Completed",
+      "type": "integer"
+    },
+    "row_version": {
+      "minimum": 1,
+      "title": "Row Version",
+      "type": "integer"
+    },
+    "schedule": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AccountSchedulePreview"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "status": {
+      "enum": [
+        "active",
+        "disabled",
+        "expired",
+        "limited"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "tag": {
+      "pattern": "^[A-Z0-9_]{0,16}$",
+      "title": "Tag",
+      "type": "string"
+    },
+    "traffic_limit_bytes": {
+      "minimum": 0,
+      "title": "Traffic Limit Bytes",
+      "type": "integer"
+    },
+    "traffic_limit_strategy": {
+      "enum": [
+        "no_reset",
+        "day",
+        "week",
+        "month",
+        "month_rolling"
+      ],
+      "title": "Traffic Limit Strategy",
+      "type": "string"
+    },
+    "traffic_reset_anchor_day": {
+      "anyOf": [
+        {
+          "maximum": 31,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "UTC month day; null uses creation day.",
+      "title": "Traffic Reset Anchor Day"
+    },
+    "traffic_reset_at": {
+      "anyOf": [
+        {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Traffic Reset At"
+    },
+    "used_traffic_bytes": {
+      "minimum": 0,
+      "title": "Used Traffic Bytes",
+      "type": "integer"
+    },
+    "user_id": {
+      "title": "User Id",
+      "type": "string"
+    },
+    "username": {
+      "title": "Username",
+      "type": "string"
+    }
+  },
+  "required": [
+    "username",
+    "user_id",
+    "display_name",
+    "declared",
+    "row_version",
+    "status",
+    "created_at",
+    "expire_at",
+    "traffic_limit_bytes",
+    "traffic_limit_strategy",
+    "traffic_reset_at",
+    "used_traffic_bytes",
+    "lifetime_traffic_bytes",
+    "period_traffic",
+    "online_at",
+    "never_used",
+    "quota_used_percent",
+    "attention_reasons",
+    "device_limit",
+    "tag",
+    "schedule"
+  ],
+  "title": "PeoplePerson",
+  "type": "object"
+}
