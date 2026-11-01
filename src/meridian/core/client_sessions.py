@@ -6,6 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
+from meridian.core.agent_protocol import CommandEffect
 from meridian.core.agent_types import MAX_SAFE_INTEGER, InboundTag, NodeId, NodeStateRef
 from meridian.core.models import CoreModel
 
@@ -16,6 +17,22 @@ FlowBlockReason = Literal["disabled", "expired", "limited", "removed", "credenti
 
 class UserCutOffRequest(CoreModel):
     cut_off: bool = False
+
+
+class CutOffNode(CoreModel):
+    node_id: NodeId
+    inbound_tags: list[InboundTag]
+    effect: CommandEffect = Field(
+        default="inbound_reset",
+        description="A core restart reconnects every Xray inbound and bridge on this node; "
+        "an inbound reset reconnects the listed inbounds, with whole-core fallback on failure.",
+    )
+
+
+class CutOffPlan(CoreModel):
+    """Every managed inbound that may hold the person's open sessions; contains no person or credential."""
+
+    nodes: list[CutOffNode]
 
 
 class CredentialRotationRequest(UserCutOffRequest):

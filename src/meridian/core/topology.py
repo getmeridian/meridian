@@ -30,12 +30,12 @@ from meridian.core.inputs import (
 )
 from meridian.core.models import CoreModel
 from meridian.core.owner_contact import OwnerContactSettings
+from meridian.core.protocols import ProtocolKind as ProtocolKind
 from meridian.core.server_allowances import ServerMetadata
 
 ServerCapability = Literal["panel", "exit", "relay", "routing_gateway"]
 # route: through an exit or pool; direct: out of the gateway's own address; block: dropped.
 TrafficRouteAction = Literal["route", "direct", "block"]
-ProtocolKind = Literal["reality", "xhttp", "wss", "hysteria2"]
 # Subscription order: the most censorship-resistant TCP path first, the UDP fallback last.
 PROTOCOL_PRIORITY: Final[tuple[ProtocolKind, ...]] = ("reality", "xhttp", "wss", "hysteria2")
 TlsFingerprint = Literal["chrome", "firefox", "safari", "ios", "android", "edge", "random", "randomized"]

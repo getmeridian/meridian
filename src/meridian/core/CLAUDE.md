@@ -2,6 +2,7 @@
 
 ## Design decisions
 - **Capacity has one projection** — `capacity.py` owns freshness, nullable current evidence, integer derived values, and recent/hourly bounds for service, fleet JSON, and console.
+- **Connection vocabulary stays in core** — session cut-off scopes and protocol names must not import service records, or shared apply contracts cycle through topology.
 - **People queries have one typed request** — paging controls never change which people match a selection.
 - **Bulk contracts separate selection from mutation** — before/after fields and receipts omit credentials and private notes.
 - **Token grants are independent of presets** — frozen explicit capabilities compose separately from identity and future resource bounds; token schemas and command envelopes live in `schema_tokens.py`.
