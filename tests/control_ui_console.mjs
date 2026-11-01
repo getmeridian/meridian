@@ -94,11 +94,22 @@ w.fetch = (url, options) => {
     return Promise.resolve({ ...reply(content), json: () => Promise.resolve(content) });
   }
   if (mode.startsWith('token-')) {
+    if (url === 'api/token-capabilities') return Promise.resolve(reply(data.capability_catalog));
+    if (url === 'api/tokens/preview') {
+      const body = JSON.parse(options.body);
+      const capabilities = body.capabilities || data.capability_catalog.presets[body.scope];
+      return Promise.resolve(reply({ scope: body.scope || null, capabilities,
+        permissions: capabilities.map(capability => data.capability_catalog.capabilities.find(row => row.capability === capability)),
+        expires_at: body.never_expires ? null : new Date(fakeNow + (body.expires_in_days || 90) * 86400000).toISOString() }));
+    }
     if (url === 'api/tokens' && options.method === 'GET') return Promise.resolve(reply({ tokens: [] }));
     if (url === 'api/tokens' && options.method === 'POST') {
       writes.push(JSON.parse(options.body));
       if (mode === 'token-uncertain') return Promise.reject(new Error('reply lost'));
       if (mode === 'token-missing-secret') return Promise.resolve(reply(null));
+      if (mode === 'token-grants' || mode === 'token-preview-edit') return Promise.resolve(reply({
+        id: '0123456789ab', token: 'demo-only-secret', ...JSON.parse(options.body),
+      }));
       return new Promise(resolve => { delayed.issue = resolve; });
     }
   }
@@ -135,11 +146,12 @@ w.fetch = (url, options) => {
     return { ...reply, text: async () => JSON.stringify(peoplePage((body.users || []).map(user => ({ ...user, display_name: data?.fleet?.display_names?.[user.username] || user.username, declared: (data?.fleet?.declared_users || []).includes(user.username) })))) };
   });
 };
-for (const script of ['core.js', 'drafts.js', 'passkeys.js', 'qr-export.js', 'people.js', 'people-bulk.js', 'people-bulk-fields.js', 'people-list.js', 'expiry.js', 'lifecycle.js', 'person-connections.js', 'fleet.js']) {
+for (const script of ['core.js', 'drafts.js', 'passkeys.js', 'qr-export.js', 'people.js', 'people-bulk.js', 'people-bulk-fields.js', 'people-list.js', 'expiry.js', 'lifecycle.js', 'person-connections.js', 'fleet.js', 'tokens.js']) {
   w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 }
 const M = w.M;
 M.i18n = { locale: () => locale === 'zh' ? 'zh-CN' : locale,
+  lang: locale,
   langs: ['en', 'ru', 'fa', 'zh'], names: { en: 'English', ru: 'Русский', fa: 'فارسی', zh: '中文' } };
 M.t = (key, params = {}) => (catalog[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? ''));
 M.toast = (text) => events.push({ toast: text });
@@ -438,6 +450,23 @@ if (mode.startsWith('token-')) {
   view.querySelector('.btn-primary').click();
   const form = w.document.querySelector('dialog form');
   form.querySelector('input').value = 'sample';
+  if (data.grants) {
+    form.querySelectorAll('input[type="checkbox"]').forEach(input => {
+      input.checked = data.grants.includes(input.value);
+      input.dispatchEvent(new w.Event('change'));
+    });
+  }
+  form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  report.preview = form.textContent;
+  report.writesAfterPreview = writes.length;
+  if (mode === 'token-preview-edit') {
+    const expiry = form.querySelectorAll('select')[1];
+    expiry.value = '30'; expiry.dispatchEvent(new w.Event('change'));
+    form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+    await settle();
+    report.writesAfterEdit = writes.length;
+  }
   form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
   await settle();
   if (mode === 'token-pending') {
@@ -459,6 +488,7 @@ if (mode.startsWith('token-')) {
   report.dialog = w.document.querySelector('dialog')?.textContent || '';
   report.listReads = events.filter(event => event.url === 'api/tokens' && event.method === 'GET').length;
   report.writes = writes.length;
+  report.bodies = writes;
 }
 
 if (mode.startsWith('locale-')) {

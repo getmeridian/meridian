@@ -5,7 +5,8 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(new URL('../website/package.json', import.meta.url));
 const { JSDOM } = require('jsdom');
-const [ui, mode = 'default', locale = 'en'] = process.argv.slice(2);
+const [ui, mode = 'default', locale = 'en', rawData = 'null'] = process.argv.slice(2);
+const data = JSON.parse(rawData === '-' ? fs.readFileSync(0, 'utf8') : rawData);
 const dom = new JSDOM('<!doctype html><body><div id="view"></div></body>', {
   url: 'https://198.51.100.1/console/', runScripts: 'outside-only',
 });
@@ -28,6 +29,14 @@ function reply(body, status = 200) {
 }
 w.fetch = (url, options) => {
   events.push(options.method + ':' + url);
+  if (url === 'api/token-capabilities') return Promise.resolve(reply(data.capability_catalog));
+  if (url === 'api/tokens/preview') {
+    const body = JSON.parse(options.body);
+    const capabilities = body.capabilities || data.capability_catalog.presets[body.scope];
+    return Promise.resolve(reply({ scope: body.scope || null, capabilities,
+      permissions: capabilities.map(capability => data.capability_catalog.capabilities.find(row => row.capability === capability)),
+      expires_at: body.never_expires ? null : new Date(now + (body.expires_in_days || 90) * 86400000).toISOString() }));
+  }
   if (url !== 'api/tokens') throw new Error('Unexpected request: ' + url);
   if (options.method === 'GET') return Promise.resolve(reply({ tokens }));
   writes.push({ body: JSON.parse(options.body), csrf: options.headers['X-Meridian-Request'] });
@@ -35,14 +44,14 @@ w.fetch = (url, options) => {
   const body = writes.at(-1).body;
   const issued = { id: '000000000004', name: body.name, scope: body.scope,
     created_at: '2026-10-29T12:00:00Z', last_used_at: null, revoked_at: null,
-    expires_at: body.expires_in_days ? new Date(now + body.expires_in_days * 86400000).toISOString() : null,
+    expires_at: body.expires_at || null,
     token: 'token-shown-once-for-tests-only' };
   tokens.push(issued);
   return Promise.resolve(reply(issued));
 };
-for (const script of ['core.js', 'fleet.js']) w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
+for (const script of ['core.js', 'fleet.js', 'tokens.js']) w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 const M = w.M;
-M.i18n = { locale: () => locale === 'zh' ? 'zh-CN' : locale };
+M.i18n = { lang: locale, locale: () => locale === 'zh' ? 'zh-CN' : locale };
 M.t = (key, params = {}) => (catalog[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? ''));
 M.toast = (text) => events.push('toast:' + text);
 M.confirmIdentity = () => { events.push('step-up'); return Promise.resolve(); };
@@ -62,10 +71,17 @@ const report = { rows, defaultExpiry: expiry?.value || null,
   expiries: expiry ? [...expiry.options].map((option) => option.value) : [] };
 form.querySelector('input').value = 'People desk';
 scope.value = 'people';
+scope.dispatchEvent(new w.Event('change'));
 if (expiry && mode !== 'default' && mode !== 'cancel') expiry.value = mode;
 if (mode === 'cancel') form.querySelector('.actions').children[0].click();
 else form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
 await settle();
+report.preview = form.textContent;
+report.writesBeforeCreate = writes.length;
+if (mode !== 'cancel') {
+  form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+}
 report.events = events;
 report.writes = writes;
 report.text = view.textContent;

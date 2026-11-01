@@ -11,6 +11,7 @@ from meridian.control.models import UserRecord
 from meridian.core.agent_types import MAX_SAFE_INTEGER, Timestamp
 from meridian.core.fleet_events import MAX_EVENTS
 from meridian.core.models import CoreModel
+from meridian.core.token_models import TokenCapability, TokenScope
 
 
 class UserList(CoreModel):
@@ -80,4 +81,7 @@ class OpenApiDocument(CoreModel):
     security: list[dict[str, list[str]]]
     scope_grants: dict[str, list[str]] = Field(
         validation_alias="x-meridian-scope-grants", serialization_alias="x-meridian-scope-grants"
+    )
+    capability_grants: dict[TokenScope, list[TokenCapability]] = Field(
+        validation_alias="x-meridian-capability-grants", serialization_alias="x-meridian-capability-grants"
     )

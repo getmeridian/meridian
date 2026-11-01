@@ -59,15 +59,40 @@ from meridian.control.route_metadata import (
     HISTORY_OFF,
     NOT_FOUND,
 )
-from meridian.control.route_types import WRITE, ApiRoute, route
+from meridian.control.route_types import WRITE, ApiRoute, ExtraCapability, route
+from meridian.control.ui_models import FleetView, ShareView
 from meridian.core.attention import AttentionList, AttentionThresholds
+from meridian.core.client_limits import CalendarExpiryPreview
 from meridian.core.fleet_events import FleetEventPage
 from meridian.core.languages import LanguageSettings, LanguageState
 from meridian.core.notices import NoticeState, NoticeWrite
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
+from meridian.core.token_models import CapabilityCatalog, TokenPreview
 
 API_ROUTES: tuple[ApiRoute, ...] = (
+    route(
+        "GET",
+        "/api/token-capabilities",
+        ("read", "people"),
+        "token_capabilities",
+        None,
+        CapabilityCatalog,
+        "Read action capabilities, compatible presets, and effective permission labels.",
+        credentials=False,
+        capability="api.read",
+    ),
+    route(
+        "POST",
+        "/api/tokens/preview",
+        "admin",
+        "preview_token",
+        TokenCreate,
+        TokenPreview,
+        "Preview a token's effective permissions and expiry without issuing it.",
+        credentials=False,
+        capability="tokens.issue",
+    ),
     route(
         "GET",
         "/api/openapi.json",
@@ -77,6 +102,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         OpenApiDocument,
         "Read the admin API contract.",
         credentials=False,
+        capability="api.read",
     ),
     route(
         "GET",
@@ -87,6 +113,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         ServiceHealth,
         "Read service health and version.",
         credentials=False,
+        capability="fleet.read",
     ),
     route(
         "GET",
@@ -97,6 +124,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         ServiceSettings,
         "Read delivery and server settings.",
         credentials=False,
+        capability="fleet.read",
     ),
     route(
         "PUT",
@@ -107,6 +135,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         ServiceSettings,
         "Replace reviewed delivery and server settings.",
         credentials=False,
+        capability="fleet.apply",
     ),
     route(
         "GET",
@@ -117,6 +146,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         PrivacyState,
         "Read privacy settings and recent changes.",
         credentials=False,
+        capability="fleet.read",
     ),
     route(
         "PUT",
@@ -127,6 +157,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         PrivacyUpdateResult,
         "Set operator-owned privacy levels.",
         credentials=False,
+        capability="settings.edit",
     ),
     route(
         "GET",
@@ -137,6 +168,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         NodeStatus,
         "Read a node's status and traffic evidence.",
         credentials=False,
+        capability="topology.read",
         refusals=(NOT_FOUND,),
     ),
     route(
@@ -148,6 +180,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         NodeStatus,
         "Replace a node's desired specification.",
         credentials=False,
+        capability="fleet.apply",
     ),
     route(
         "DELETE",
@@ -158,6 +191,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         DeletedResource,
         "Remove a node's desired specification.",
         credentials=False,
+        capability="fleet.apply",
     ),
     route(
         "POST",
@@ -168,6 +202,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         EnrollmentGrant,
         "Issue a node enrollment token.",
         credentials=True,
+        capability="nodes.enroll",
         internal_reason="Single-use bootstrap credentials for the internal node enrollment protocol.",
     ),
     *node_command_routes(NOT_FOUND),
@@ -180,6 +215,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         FleetAuthority,
         "Read the node bootstrap authority.",
         credentials=False,
+        capability="topology.read",
         internal_reason="CA pinning for the internal node enrollment protocol.",
     ),
     route(
@@ -191,6 +227,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         TrafficSummary,
         "Read lifetime traffic totals per person.",
         credentials=False,
+        capability="fleet.read",
     ),
     route(
         "GET",
@@ -201,6 +238,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         FleetEventPage,
         "Read a bounded page of local lifecycle events.",
         credentials=False,
+        capability="fleet.read",
         query_model=FleetEventsQuery,
     ),
     route(
@@ -212,6 +250,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         AttentionList,
         "Read derived person, node, and server warnings.",
         credentials=False,
+        capability="fleet.read",
         query_model=AttentionThresholds,
     ),
     route(
@@ -223,6 +262,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         ServerUsageList,
         "Read server allowance and payment evidence.",
         credentials=False,
+        capability="fleet.read",
     ),
     route(
         "GET",
@@ -233,6 +273,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         TrafficDailySummary,
         "Read retained daily traffic across nodes.",
         credentials=False,
+        capability="fleet.read",
         query_model=HistoryQuery,
         refusals=(HISTORY_OFF,),
         description="Other query options are ignored. Daily history must be enabled by the operator.",
@@ -248,6 +289,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         ClientEndpoint,
         "Read a public connection endpoint.",
         credentials=True,
+        capability="topology.read",
         refusals=(NOT_FOUND,),
         description="The endpoint may include a transport obfuscation password.",
     ),
@@ -260,6 +302,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         ClientEndpoint,
         "Replace a public connection endpoint.",
         credentials=True,
+        capability="fleet.apply",
         description="The endpoint may include a transport obfuscation password.",
     ),
     route(
@@ -271,6 +314,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         DeletedResource,
         "Remove a public connection endpoint.",
         credentials=False,
+        capability="fleet.apply",
     ),
     route(
         "GET",
@@ -281,6 +325,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         TokenList,
         "List API token metadata without secrets.",
         credentials=False,
+        capability="tokens.read",
     ),
     route(
         "POST",
@@ -291,6 +336,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         IssuedToken,
         "Issue a scoped API token with optional expiry.",
         credentials=True,
+        capability="tokens.issue",
         description="The token secret is shown only in this response.",
     ),
     route(
@@ -302,6 +348,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         TokenRecord,
         "Revoke an API token immediately.",
         credentials=False,
+        capability="tokens.revoke",
         refusals=(NOT_FOUND,),
     ),
     route(
@@ -313,6 +360,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         RevisionList,
         "List reviewed fleet revisions, newest first.",
         credentials=False,
+        capability="revisions.read",
     ),
     route(
         "POST",
@@ -323,6 +371,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         RevisionRecord,
         "Propose a reviewed fleet revision without secrets.",
         credentials=False,
+        capability="revisions.propose",
     ),
     route(
         "GET",
@@ -333,6 +382,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         RevisionRecord,
         "Read a reviewed fleet revision.",
         credentials=False,
+        capability="revisions.read",
         refusals=(NOT_FOUND,),
     ),
     route(
@@ -344,6 +394,8 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         RevisionRecord,
         "Approve a proposed fleet revision.",
         credentials=False,
+        capability="revisions.approve",
+        extra_capabilities=(ExtraCapability("self_approval", "revisions.approve_own", "admin"),),
         refusals=(NOT_FOUND, CONFLICT),
         description="Only an admin token may approve a revision proposed by the same caller.",
     ),
@@ -356,6 +408,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         RevisionRecord,
         "Record an approved revision's apply outcome.",
         credentials=False,
+        capability="fleet.apply",
         refusals=(NOT_FOUND, CONFLICT),
     ),
     route(
@@ -367,6 +420,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         ApplyFenceState,
         "Read the apply fence and its compare-and-swap version.",
         credentials=False,
+        capability="topology.read",
     ),
     route(
         "PUT",
@@ -377,6 +431,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         ApplyFenceState,
         "Replace the apply fence if its version still matches.",
         credentials=False,
+        capability="fleet.apply",
         refusals=(CONFLICT,),
     ),
     route(
@@ -388,6 +443,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         DeviceKeyList,
         "List registered public backup keys.",
         credentials=False,
+        capability="backup.read",
     ),
     route(
         "POST",
@@ -398,6 +454,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         DeviceKeyRecord,
         "Register a device's public backup key.",
         credentials=False,
+        capability="backup.edit",
         refusals=(CONFLICT,),
     ),
     route(
@@ -409,6 +466,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         DeviceKeyRecord,
         "Revoke a device's public backup key.",
         credentials=False,
+        capability="backup.edit",
         refusals=(NOT_FOUND,),
     ),
     route(
@@ -420,6 +478,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         RecoveryKeyState,
         "Read the public recovery key.",
         credentials=False,
+        capability="backup.read",
     ),
     route(
         "PUT",
@@ -430,6 +489,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         RecoveryKeyState,
         "Replace the public recovery key.",
         credentials=False,
+        capability="backup.edit",
     ),
     route(
         "PUT",
@@ -440,6 +500,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         DeployerStateReceipt,
         "Deposit fleet files for the next encrypted snapshot.",
         credentials=False,
+        capability="backup.edit",
         refusals=(CONFLICT,),
     ),
     route(
@@ -451,6 +512,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         SnapshotResponse,
         "Download an encrypted fleet snapshot.",
         credentials=True,
+        capability="backup.read",
         content_type="application/octet-stream",
         refusals=(CONFLICT,),
         description="The encrypted snapshot contains account credentials and token registry data.",
@@ -464,6 +526,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         NoticeState,
         "Read the owner's notice to people.",
         credentials=False,
+        capability="fleet.read",
         query_model=NoticeQuery,
         refusals=(NOT_FOUND,),
     ),
@@ -476,6 +539,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         NoticeState,
         "Set or clear the owner's notice to people.",
         credentials=False,
+        capability="settings.edit",
         refusals=(NOT_FOUND,),
     ),
     route(
@@ -487,6 +551,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         LanguageState,
         "Read the default language for connection/support pages and app status remarks.",
         credentials=False,
+        capability="fleet.read",
     ),
     route(
         "PUT",
@@ -497,6 +562,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         LanguageState,
         "Set the page/app default; auto follows browsers and keeps app status remarks English.",
         credentials=False,
+        capability="settings.edit",
     ),
     route(
         "POST",
@@ -507,6 +573,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         SubscriptionPreview,
         "Explain which format a client would receive, without credentials.",
         credentials=False,
+        capability="fleet.read",
         refusals=(NOT_FOUND,),
     ),
     route(
@@ -518,6 +585,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         OwnerStatus,
         "Read console owner setup state.",
         credentials=False,
+        capability="owner.read",
         internal_reason="Console owner/session setup; used by the meridian panel command.",
     ),
     route(
@@ -529,11 +597,53 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         SetupLinkGrant,
         "Issue a one-time console setup link.",
         credentials=True,
+        capability="root",
         internal_reason="Console owner recovery; only the configured root token may issue a link.",
     ),
 )
 
-API_BY_HANDLER: dict[tuple[str, str], ApiRoute] = {(item.method, item.operation_id): item for item in API_ROUTES}
+PROTECTED_UI_ROUTES: tuple[ApiRoute, ...] = (
+    route(
+        "GET",
+        "/ui/api/fleet",
+        "read",
+        ui_routes.fleet,
+        None,
+        FleetView,
+        "Read the console fleet view.",
+        credentials=False,
+        capability=("fleet.read", "console.read"),
+        internal_reason="Console-specific fleet projection.",
+    ),
+    route(
+        "GET",
+        "/ui/api/people/{username}/share",
+        "admin",
+        ui_routes.share,
+        None,
+        ShareView,
+        "Read a person's console sharing view.",
+        credentials=True,
+        capability=("people.credentials", "console.read"),
+        internal_reason="Console-specific credential sharing.",
+    ),
+    route(
+        "GET",
+        "/ui/api/people/{username}/expiry",
+        "people",
+        ui_routes.expiry_preview,
+        None,
+        CalendarExpiryPreview,
+        "Preview a console expiry edit.",
+        credentials=False,
+        capability="people.edit",
+        internal_reason="Console-specific calendar expiry preview.",
+    ),
+)
+
+API_BY_HANDLER: dict[tuple[str, str], ApiRoute] = {
+    (item.method, item.operation_id): item for item in (*API_ROUTES, *PROTECTED_UI_ROUTES)
+}
 
 
 def api_route_for(method: str, handler_name: str) -> ApiRoute | None:

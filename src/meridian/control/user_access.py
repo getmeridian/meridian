@@ -6,6 +6,7 @@ from contextlib import AbstractContextManager, nullcontext
 from typing import TYPE_CHECKING
 
 from meridian.control.errors import ServiceError
+from meridian.control.route_metadata import DECLARED_CAPABILITY
 from meridian.control.tokens import Caller
 from meridian.control.ui_views import is_declared
 
@@ -22,7 +23,7 @@ def refuse_declared(
     owner_session: OwnerSession | None,
 ) -> AbstractContextManager[None]:
     """Admin API tokens may mutate; people and owner callers cannot move a declared connection page."""
-    if owner_session is None and (caller is None or caller.scope != "people"):
+    if owner_session is None and (caller is None or caller.allows(DECLARED_CAPABILITY.capability)):
         return nullcontext()
 
     def undeclared() -> None:

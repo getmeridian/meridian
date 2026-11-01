@@ -139,9 +139,9 @@ class RevisionLedger:
             row = self._require(number)
             if row["status"] != "proposed":
                 raise ServiceError("conflict", f"Revision {number} is {row['status']}, not proposed.", 409)
-            if row["author_token_id"] == caller.token_id and caller.scope != "admin":
+            if row["author_token_id"] == caller.token_id and not caller.allows("revisions.approve_own"):
                 raise ServiceError(
-                    "insufficient_scope", "Only an admin token may approve a revision it proposed itself.", 403
+                    "insufficient_scope", "Approving your own proposal needs revisions.approve_own permission.", 403
                 )
             self._store.db.execute(
                 "UPDATE revisions SET status = 'approved', approver_token_id = ?, approver_name = ?, approved_at = ?"

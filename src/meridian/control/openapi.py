@@ -16,6 +16,7 @@ from meridian.control.api_models import OpenApiDocument, OpenApiInfo, OpenApiSer
 from meridian.control.models import TOKEN_SCOPES, scope_covers
 from meridian.control.route_catalog import API_ROUTES
 from meridian.control.route_types import ApiRoute, path_schema
+from meridian.control.token_capabilities import legacy_capabilities
 
 CREDENTIAL_SENTENCE = "This response can contain credentials; keep it private and do not log it."
 
@@ -49,8 +50,9 @@ def openapi_document(version: str = __version__) -> OpenApiDocument:
         info=OpenApiInfo(
             title="Meridian admin API",
             version=version,
-            description="Scoped bearer-token operations behind the operator's private console address. "
-            "The read, propose, and approve scopes form a chain; people is separate, and admin covers both. "
+            description="Explicit-capability bearer-token operations behind the operator's private console address. "
+            "Capabilities are declared per action and frozen on tokens. Compatible read/propose/approve/people/admin "
+            "presets expand to equivalent grants; credentials and private metadata require explicit permissions. "
             "Node enrollment, agent, subscription, page, and console-session surfaces are internal or public "
             "and are excluded from this document.",
         ),
@@ -69,13 +71,15 @@ def openapi_document(version: str = __version__) -> OpenApiDocument:
                     "type": "http",
                     "scheme": "bearer",
                     "bearerFormat": "Meridian scoped API token",
-                    "description": "Send Authorization: Bearer <token>. Required scopes are declared by "
-                    "x-meridian-scopes; either listed scope or a scope that covers it is sufficient.",
+                    "description": "Send Authorization: Bearer <token>. All x-meridian-capabilities are required; "
+                    "conditional capabilities describe body choices and response fields. x-meridian-scopes records "
+                    "compatible presets, expanded by x-meridian-capability-grants.",
                 }
             },
         },
         security=[{"meridianToken": []}],
         scope_grants={held: [needed for needed in TOKEN_SCOPES if scope_covers(held, needed)] for held in TOKEN_SCOPES},
+        capability_grants={scope: sorted(legacy_capabilities(scope)) for scope in TOKEN_SCOPES},
     )
 
 
@@ -97,13 +101,17 @@ def _operation(
     schemas: Mapping[tuple[Any, JsonSchemaMode], dict[str, Any]],
     definitions: dict[str, Any],
 ) -> dict[str, Any]:
-    description = f"Requires {' or '.join(item.scopes)} scope, or a scope that covers it."
+    description = (
+        f"Requires {' and '.join(item.capabilities)} capabilities. "
+        f"Compatible presets: {' or '.join(item.scopes)}, including scopes that cover them."
+    )
     if item.description:
         description += " " + item.description
     for condition in item.body_scopes:
-        scopes = (condition.scope,) if isinstance(condition.scope, str) else condition.scope
-        description += (
-            f" Setting {condition.field} to {str(condition.equals).lower()} also requires {' or '.join(scopes)} scope."
+        description += f" Setting {condition.field} to {str(condition.equals).lower()} " + (
+            f"requires {condition.capability} instead."
+            if condition.replaces
+            else f"also requires {condition.capability}."
         )
     if item.credentials:
         description += " " + CREDENTIAL_SENTENCE
@@ -114,6 +122,8 @@ def _operation(
         "tags": ["contract" if item.path == "/api/openapi.json" else item.path.split("/")[2]],
         "security": [{"meridianToken": []}],
         "x-meridian-scopes": list(item.scopes),
+        "x-meridian-capabilities": list(item.capabilities),
+        "x-meridian-capability-mode": "all",
         "x-meridian-scope-mode": "any",
         "x-meridian-credentials": item.credentials,
         "responses": {
@@ -133,6 +143,17 @@ def _operation(
             }
             for condition in item.body_scopes
         ]
+        operation["x-meridian-conditional-capabilities"] = [
+            {
+                "field": rule.field,
+                "equals": rule.equals,
+                "capability": rule.capability,
+                "mode": "replace" if rule.replaces else "additional",
+            }
+            for rule in item.body_scopes
+        ]
+    if item.extra_capabilities:
+        operation["x-meridian-extra-capabilities"] = {rule.purpose: rule.capability for rule in item.extra_capabilities}
     parameters = [
         {"name": name, "in": "path", "required": True, "schema": path_schema(name)}
         for name in re.findall(r"\{([a-z_]+)\}", item.path)

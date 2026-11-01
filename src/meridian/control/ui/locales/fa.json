@@ -780,5 +780,11 @@
   "commands.error_apply_pending": "کلیدها و تنظیمات فعلی هنوز اعمال نشده‌اند. meridian apply را اجرا کنید و سپس این فرمان را دوباره بفرستید.",
   "commands.error_document_not_applied": "meridian apply را اجرا کنید، منتظر اعمال سند فعلی روی سرور بمانید و سپس این فرمان را دوباره بفرستید.",
   "commands.error_config_not_installed": "فایل تنظیمات Xray روی سرور وجود ندارد. meridian apply را اجرا کنید و سپس این فرمان را دوباره بفرستید.",
-  "commands.error_config_mismatch": "تنظیمات نصب‌شدهٔ Xray با سند فعلی یکسان نیست. meridian apply را اجرا کنید و سپس این فرمان را دوباره بفرستید."
+  "commands.error_config_mismatch": "تنظیمات نصب‌شدهٔ Xray با سند فعلی یکسان نیست. meridian apply را اجرا کنید و سپس این فرمان را دوباره بفرستید.",
+  "scope.custom": "دسترسی‌های انتخاب‌شده",
+  "tokens.permissions": "دسترسی‌های مؤثر",
+  "tokens.actions": "عملیات مجاز",
+  "tokens.review": "بررسی توکن",
+  "tokens.action_required": "حداقل یک عملیات انتخاب کنید.",
+  "tokens.cli_permissions": "برای دسترسی مدیریت توپولوژی و پشتیبان از meridian token create استفاده کنید."
 }

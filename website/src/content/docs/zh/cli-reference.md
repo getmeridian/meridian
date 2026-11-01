@@ -574,6 +574,19 @@ meridian logs [SERVER] [--lines N] [--grep TEXT] [--component NAME]
 
 没有集群角色的服务器，或其未运行的 `--component`，会在连接之前以 `2` 退出。无法读取的日志（服务缺失、SSH 连接丢失）会显示为不可用，命令以 `3` 退出。
 
+### meridian token
+
+按具体操作签发令牌。先预览权限，令牌秘密只显示一次。
+
+```bash
+meridian token capabilities [--json]
+meridian token list [--json]
+meridian token create NAME [--capability ACTION ... | --scope PRESET] [--expires-days DAYS | --expires-at UTC | --never-expires] [--dry-run] [--yes] [--json]
+meridian token revoke TOKEN_ID [--yes] [--json]
+```
+
+选择一个 --scope 预设，或重复 --capability。默认有效期为 90 天；不过期必须明确使用 --never-expires。--dry-run 不签发令牌，JSON 修改需要 --yes。JSON 的 data.preview 保留权限预览，只有签发输出中的 data.issued.token 显示秘密。
+
 ### meridian panel
 
 显示网页面板的地址；在面板还没有所有者时，同时显示一次性设置链接。

@@ -574,6 +574,19 @@ Every line passes through the same redaction as `meridian doctor`: tokens, passw
 
 A server without a fleet role, or a `--component` it doesn't run, exits `2` before connecting. A log that can't be read (a missing service, a lost SSH connection) is shown as unavailable and the command exits `3`.
 
+### meridian token
+
+Issue tokens with explicit action permissions. Review first; the secret is shown once.
+
+```bash
+meridian token capabilities [--json]
+meridian token list [--json]
+meridian token create NAME [--capability ACTION ... | --scope PRESET] [--expires-days DAYS | --expires-at UTC | --never-expires] [--dry-run] [--yes] [--json]
+meridian token revoke TOKEN_ID [--yes] [--json]
+```
+
+Use one preset or repeat --capability. New tokens default to 90 days; --never-expires is explicit. --dry-run creates no token. --yes is required for JSON mutations. Creation JSON keeps the review under data.preview and reveals only data.issued.token in the producing output.
+
 ### meridian panel
 
 Show the web panel's address, and a one-time setup link while it has no owner.

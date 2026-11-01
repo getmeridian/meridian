@@ -1,7 +1,7 @@
 """The signed-node-command routes and their permission metadata."""
 
 from meridian.control.command_models import NodeCommandRecord, NodeCommandRequest, NodeCommandTargets
-from meridian.control.route_types import WRITE, ApiRoute, ErrorResponse, route
+from meridian.control.route_types import WRITE, ApiRoute, BodyScope, ErrorResponse, route
 
 
 def node_command_routes(not_found: ErrorResponse) -> tuple[ApiRoute, ...]:
@@ -15,6 +15,8 @@ def node_command_routes(not_found: ErrorResponse) -> tuple[ApiRoute, ...]:
             NodeCommandRecord,
             "Queue a signed command for a node.",
             credentials=False,
+            capability="commands.run",
+            body_scopes=(BodyScope("kind", "restart_unit", "admin", "commands.restart", replaces=True),),
             refusals=(not_found, ErrorResponse(409, ("conflict", "command_queue_full"))),
         ),
         route(
@@ -26,6 +28,7 @@ def node_command_routes(not_found: ErrorResponse) -> tuple[ApiRoute, ...]:
             NodeCommandRecord,
             "Read a queued command and its result.",
             credentials=False,
+            capability="commands.read",
             refusals=(not_found,),
         ),
         route(
@@ -37,6 +40,7 @@ def node_command_routes(not_found: ErrorResponse) -> tuple[ApiRoute, ...]:
             NodeCommandTargets,
             "List a node's managed command targets.",
             credentials=False,
+            capability="commands.read",
             refusals=(not_found,),
         ),
     )

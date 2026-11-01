@@ -64,6 +64,11 @@ def set_locale(locale: Locale) -> None:
     _current = locale
 
 
+def current_locale() -> Locale:
+    """The human-output language selected by the root callback."""
+    return _current
+
+
 def normalize_locale(value: str) -> Locale | None:
     """Map ``ru``, ``ru_RU.UTF-8``, ``zh-Hans``, or ``fa-IR`` to a supported locale."""
     code = value.strip().lower().replace("-", "_").split(".")[0].split("_")[0]

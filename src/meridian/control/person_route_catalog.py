@@ -28,10 +28,12 @@ from meridian.control.route_metadata import (
     CONFLICT,
     CUT_OFF_ERRORS,
     CUT_OFF_SCOPE,
+    DECLARED_CAPABILITY,
     DECLARED_USER,
     HISTORY_OFF,
     NOT_FOUND,
     USER_CREDENTIALS,
+    USER_RESPONSE_CAPABILITIES,
 )
 from meridian.control.route_types import ApiRoute, ErrorResponse, route
 from meridian.core.account_schedule import AccountSchedulePreview
@@ -50,6 +52,8 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         UserList,
         "List all people and their account state.",
         credentials=True,
+        capability="people.read",
+        extra_capabilities=USER_RESPONSE_CAPABILITIES,
         description=USER_CREDENTIALS,
     ),
     route(
@@ -61,6 +65,8 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         UserRecord,
         "Create a person with their first limits.",
         credentials=True,
+        capability="people.edit",
+        extra_capabilities=USER_RESPONSE_CAPABILITIES,
         refusals=(ErrorResponse(409, ("user_exists",)),),
     ),
     route(
@@ -72,6 +78,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         UserImportResult,
         "Import credentials, account settings, and usage atomically.",
         credentials=False,
+        capability="people.bulk",
         refusals=(CONFLICT,),
     ),
     route(
@@ -84,6 +91,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         "Preview account schedule dates without changing anything.",
         # All /api routes authenticate through _Handler._authorize(scope). This flag only marks response credentials.
         credentials=False,
+        capability="people.edit",
         refusals=(NOT_FOUND,),
         description="Requires a people-capable API token or an authenticated owner session. Returns dates only.",
     ),
@@ -96,6 +104,8 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         UserRecord,
         "Read one person's account state.",
         credentials=True,
+        capability="people.read",
+        extra_capabilities=USER_RESPONSE_CAPABILITIES,
         refusals=(NOT_FOUND,),
         description=USER_CREDENTIALS,
     ),
@@ -108,6 +118,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         ClientConnections,
         "List one person's individual connections and explicit format URLs.",
         credentials=True,
+        capability="people.credentials",
         refusals=(NOT_FOUND,),
         description="Each connection URI and format URL connects as the person.",
     ),
@@ -120,6 +131,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         UserUsage,
         "Read one person's retained daily usage.",
         credentials=False,
+        capability="people.read",
         query_model=HistoryQuery,
         refusals=(NOT_FOUND, HISTORY_OFF),
         description="Other query options are ignored. Daily history must be enabled by the operator.",
@@ -133,6 +145,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         UserFlowBlocks,
         "Read per-node evidence that a person's new flows are blocked.",
         credentials=False,
+        capability="people.read",
         refusals=(NOT_FOUND,),
         description="Blocked covers new TCP streams and UDP associations. Already dispatched flows may continue.",
     ),
@@ -145,6 +158,8 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         UserRecord,
         "Ensure a person exists, preserving existing settings.",
         credentials=True,
+        capability="people.edit",
+        extra_capabilities=USER_RESPONSE_CAPABILITIES,
         description="No request body is read. A missing person starts active with default limits.",
     ),
     route(
@@ -156,6 +171,8 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         UserRecord,
         "Edit a person named in the request body.",
         credentials=True,
+        capability="people.edit",
+        extra_capabilities=USER_RESPONSE_CAPABILITIES,
         refusals=(NOT_FOUND,),
     ),
     route(
@@ -167,6 +184,8 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         UserRecord,
         "Edit only the supplied account fields.",
         credentials=True,
+        capability="people.edit",
+        extra_capabilities=USER_RESPONSE_CAPABILITIES,
         refusals=(NOT_FOUND,),
     ),
     route(
@@ -178,6 +197,8 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         UserReissueResponse,
         "Replace a person's subscription URL and connection credentials.",
         credentials=True,
+        capability="people.reissue",
+        extra_capabilities=(*USER_RESPONSE_CAPABILITIES, DECLARED_CAPABILITY),
         body_required=False,
         body_scopes=CUT_OFF_SCOPE,
         refusals=(NOT_FOUND, CUT_OFF_ERRORS),
@@ -192,6 +213,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         CutOffPlan,
         "List inbounds affected by a session cut-off.",
         credentials=False,
+        capability="commands.read",
         refusals=(NOT_FOUND,),
     ),
     route(
@@ -203,6 +225,8 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         UserCredentialRotation,
         "Rotate connection credentials keeping the subscription URL.",
         credentials=True,
+        capability="people.reissue",
+        extra_capabilities=(*USER_RESPONSE_CAPABILITIES, DECLARED_CAPABILITY),
         body_scopes=CUT_OFF_SCOPE,
         refusals=(
             NOT_FOUND,
@@ -210,7 +234,8 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         ),
         description="Preserves device registrations and operator settings. "
         "Read the current credential_generation first. "
-        "Owner and people callers use the CLI for a declared person. Optional cut_off also requires admin.",
+        "A declared person also needs fleet.apply; owner sessions use the CLI. "
+        "Optional cut_off also requires commands.cut_off.",
     ),
     route(
         "POST",
@@ -221,6 +246,8 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         UserRecord,
         "Reset a person's current-period traffic use.",
         credentials=True,
+        capability="people.reset",
+        extra_capabilities=USER_RESPONSE_CAPABILITIES,
         refusals=(NOT_FOUND,),
     ),
     route(
@@ -232,6 +259,8 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         UserRecord,
         "Extend expiry from the later of now and current expiry.",
         credentials=True,
+        capability="people.edit",
+        extra_capabilities=USER_RESPONSE_CAPABILITIES,
         refusals=(NOT_FOUND,),
     ),
     route(
@@ -243,6 +272,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         UserDevices,
         "Read registrations allowed by the privacy level.",
         credentials=False,
+        capability="people.read",
         refusals=(NOT_FOUND,),
     ),
     route(
@@ -254,6 +284,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         DevicesRemoved,
         "Remove one device registration.",
         credentials=False,
+        capability="people.devices",
         refusals=(NOT_FOUND,),
     ),
     route(
@@ -265,6 +296,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         DevicesRemoved,
         "Clear all device registrations for a person.",
         credentials=False,
+        capability="people.devices",
         refusals=(NOT_FOUND,),
     ),
     route(
@@ -276,6 +308,8 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         UserDeleteResponse,
         "Remove a person and optionally queue session cut-offs.",
         credentials=False,
+        capability="people.remove",
+        extra_capabilities=(DECLARED_CAPABILITY,),
         body_required=False,
         body_scopes=CUT_OFF_SCOPE,
         refusals=(NOT_FOUND, CUT_OFF_ERRORS),

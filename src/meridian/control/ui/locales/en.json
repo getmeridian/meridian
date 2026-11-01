@@ -780,5 +780,11 @@
   "commands.error_apply_pending": "The current credentials and configuration have not been applied. Run meridian apply, then retry this command.",
   "commands.error_document_not_applied": "Run meridian apply, wait for this node to apply its held document, then retry this command.",
   "commands.error_config_not_installed": "The node's Xray configuration is missing. Run meridian apply, then retry this command.",
-  "commands.error_config_mismatch": "The installed Xray configuration differs from the held document. Run meridian apply, then retry this command."
+  "commands.error_config_mismatch": "The installed Xray configuration differs from the held document. Run meridian apply, then retry this command.",
+  "scope.custom": "Custom permissions",
+  "tokens.permissions": "Effective permissions",
+  "tokens.actions": "Allowed actions",
+  "tokens.review": "Review token",
+  "tokens.action_required": "Select at least one action.",
+  "tokens.cli_permissions": "Use meridian token create for fleet administration and backup permissions."
 }

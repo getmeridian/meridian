@@ -1,0 +1,437 @@
+{
+  "$defs": {
+    "CapabilityCatalog": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "items": {
+            "$ref": "#/$defs/CapabilityRecord"
+          },
+          "title": "Capabilities",
+          "type": "array"
+        },
+        "presets": {
+          "additionalProperties": {
+            "items": {
+              "enum": [
+                "api.read",
+                "fleet.read",
+                "topology.read",
+                "fleet.apply",
+                "nodes.enroll",
+                "people.read",
+                "people.query",
+                "people.batch",
+                "people.private",
+                "people.edit",
+                "people.credentials",
+                "people.reset",
+                "people.reissue",
+                "people.remove",
+                "people.devices",
+                "people.bulk",
+                "commands.read",
+                "commands.restart",
+                "commands.run",
+                "commands.cut_off",
+                "backup.read",
+                "backup.edit",
+                "settings.edit",
+                "tokens.read",
+                "tokens.issue",
+                "tokens.revoke",
+                "revisions.read",
+                "revisions.propose",
+                "revisions.approve",
+                "revisions.approve_own",
+                "owner.read",
+                "console.read"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "propertyNames": {
+            "enum": [
+              "read",
+              "propose",
+              "approve",
+              "people",
+              "admin"
+            ]
+          },
+          "title": "Presets",
+          "type": "object"
+        }
+      },
+      "required": [
+        "capabilities",
+        "presets"
+      ],
+      "title": "CapabilityCatalog",
+      "type": "object"
+    },
+    "CapabilityOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "conditional": {
+          "default": false,
+          "title": "Conditional",
+          "type": "boolean"
+        },
+        "method": {
+          "title": "Method",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "method",
+        "path"
+      ],
+      "title": "CapabilityOperation",
+      "type": "object"
+    },
+    "CapabilityRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "capability": {
+          "enum": [
+            "api.read",
+            "fleet.read",
+            "topology.read",
+            "fleet.apply",
+            "nodes.enroll",
+            "people.read",
+            "people.query",
+            "people.batch",
+            "people.private",
+            "people.edit",
+            "people.credentials",
+            "people.reset",
+            "people.reissue",
+            "people.remove",
+            "people.devices",
+            "people.bulk",
+            "commands.read",
+            "commands.restart",
+            "commands.run",
+            "commands.cut_off",
+            "backup.read",
+            "backup.edit",
+            "settings.edit",
+            "tokens.read",
+            "tokens.issue",
+            "tokens.revoke",
+            "revisions.read",
+            "revisions.propose",
+            "revisions.approve",
+            "revisions.approve_own",
+            "owner.read",
+            "console.read"
+          ],
+          "title": "Capability",
+          "type": "string"
+        },
+        "console_delegable": {
+          "title": "Console Delegable",
+          "type": "boolean"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "propertyNames": {
+            "enum": [
+              "en",
+              "ru",
+              "fa",
+              "zh"
+            ]
+          },
+          "title": "Labels",
+          "type": "object"
+        },
+        "operations": {
+          "items": {
+            "$ref": "#/$defs/CapabilityOperation"
+          },
+          "title": "Operations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "capability",
+        "labels",
+        "operations",
+        "console_delegable"
+      ],
+      "title": "CapabilityRecord",
+      "type": "object"
+    },
+    "EmptyData": {
+      "additionalProperties": false,
+      "description": "Empty data object used by envelopes without command-specific failure data.",
+      "properties": {},
+      "title": "EmptyData",
+      "type": "object"
+    },
+    "ErrorModel": {
+      "additionalProperties": false,
+      "description": "Structured error safe for JSON/API clients.",
+      "properties": {
+        "category": {
+          "enum": [
+            "user",
+            "system",
+            "bug",
+            "cancelled"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "cause": {
+          "additionalProperties": true,
+          "title": "Cause",
+          "type": "object"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "exit_code": {
+          "default": 1,
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "hint": {
+          "default": "",
+          "title": "Hint",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "message"
+      ],
+      "title": "MeridianError",
+      "type": "object"
+    },
+    "Summary": {
+      "additionalProperties": false,
+      "description": "Structured summary shown in JSON envelopes and UI dashboards.",
+      "properties": {
+        "changed": {
+          "default": false,
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "Summary",
+      "type": "object"
+    },
+    "_TokenCapabilitiesSuccessEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "token.capabilities",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/CapabilityCatalog"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "maxItems": 0,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "ok",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_TokenCapabilitiesSuccessEnvelope",
+      "type": "object"
+    },
+    "_TokenCapabilitiesTerminalEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "token.capabilities",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/EmptyData"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "minItems": 1,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "failed",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_TokenCapabilitiesTerminalEnvelope",
+      "type": "object"
+    }
+  },
+  "description": "Envelope schema for meridian token capabilities --json.",
+  "discriminator": {
+    "mapping": {
+      "failed": "#/$defs/_TokenCapabilitiesTerminalEnvelope",
+      "ok": "#/$defs/_TokenCapabilitiesSuccessEnvelope"
+    },
+    "propertyName": "status"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/_TokenCapabilitiesSuccessEnvelope"
+    },
+    {
+      "$ref": "#/$defs/_TokenCapabilitiesTerminalEnvelope"
+    }
+  ],
+  "title": "TokenCapabilitiesOutputEnvelope"
+}

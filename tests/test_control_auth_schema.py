@@ -1,11 +1,13 @@
 """Owner credentials stay local while issued token grants survive schema upgrades."""
 
+import json
 import sqlite3
 from pathlib import Path
 
 from meridian.control.backups import strip_unsnapshotted
 from meridian.control.models import TokenCreate
 from meridian.control.service import SCHEMA_VERSION, ControlService
+from meridian.control.token_capabilities import legacy_capabilities
 from meridian.control.tokens import ROOT
 from tests.support.control_service import FLEET_ID, drop_owner_capability_schema
 
@@ -23,7 +25,8 @@ def test_schema_twenty_one_preserves_tokens_and_adds_owner_passkey_storage(tmp_p
     with sqlite3.connect(database) as db:
         tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
         assert {"ui_passkeys", "ui_passkey_owner"} <= tables
-        assert db.execute("SELECT capabilities FROM api_tokens WHERE token_id = ?", (issued.id,)).fetchone() == (None,)
+        stored = db.execute("SELECT capabilities FROM api_tokens WHERE token_id = ?", (issued.id,)).fetchone()[0]
+        assert json.loads(stored) == sorted(legacy_capabilities("people"))
         assert db.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone() == (str(SCHEMA_VERSION),)
 
 

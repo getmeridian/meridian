@@ -780,5 +780,11 @@
   "commands.error_apply_pending": "Текущие ключи и конфигурация ещё не применены. Выполните meridian apply и повторите команду.",
   "commands.error_document_not_applied": "Выполните meridian apply, дождитесь применения текущего документа на сервере и повторите команду.",
   "commands.error_config_not_installed": "На сервере нет конфигурационного файла Xray. Выполните meridian apply и повторите команду.",
-  "commands.error_config_mismatch": "Установленный конфигурационный файл Xray отличается от текущего документа. Выполните meridian apply и повторите команду."
+  "commands.error_config_mismatch": "Установленный конфигурационный файл Xray отличается от текущего документа. Выполните meridian apply и повторите команду.",
+  "scope.custom": "Выбранные права",
+  "tokens.permissions": "Выданные права",
+  "tokens.actions": "Разрешённые действия",
+  "tokens.review": "Проверить токен",
+  "tokens.action_required": "Выберите хотя бы одно действие.",
+  "tokens.cli_permissions": "Для прав на управление топологией и резервными копиями используйте meridian token create."
 }

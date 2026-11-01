@@ -3886,6 +3886,243 @@
         "ok",
         "failed"
       ]
+    },
+    {
+      "argv": [
+        "token",
+        "capabilities"
+      ],
+      "command": "token.capabilities",
+      "data_schema": "token-capabilities",
+      "description": "List available actions and compatible scope presets",
+      "envelope_schema": "token-capabilities-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "capabilities listed",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "capabilities listed",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "token",
+        "create",
+        "NAME"
+      ],
+      "command": "token.create",
+      "data_schema": "token-create-result",
+      "description": "Review effective permissions and issue a token shown once",
+      "envelope_schema": "token-create-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "token issued; token permissions previewed",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--capability",
+        "--scope",
+        "--expires-days",
+        "--expires-at",
+        "--never-expires",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "token issued",
+          "status": "changed"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "token permissions previewed",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "changed",
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "token",
+        "list"
+      ],
+      "command": "token.list",
+      "data_schema": "token-list",
+      "description": "List token metadata without secrets",
+      "envelope_schema": "token-list-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "token metadata listed",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "token metadata listed",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "token",
+        "revoke",
+        "TOKEN_ID"
+      ],
+      "command": "token.revoke",
+      "data_schema": "token-record",
+      "description": "Revoke one token from its next request",
+      "envelope_schema": "token-revoke-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "token revoked",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "token revoked",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
     }
   ],
   "schema": "meridian.command-catalog/v1"

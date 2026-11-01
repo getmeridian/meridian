@@ -13,6 +13,7 @@ from meridian.control.http_errors import ApiErrorResponse
 from meridian.control.models import DeviceKeyRecord, ScopeRequirement, TokenRecord, TokenScope, UserCreate
 from meridian.core.agent_types import NodeId
 from meridian.core.client_devices import ClientDevice
+from meridian.core.token_models import Permission, PermissionRequirement, TokenCapability
 
 HttpMethod = Literal["GET", "POST", "PUT", "PATCH", "DELETE"]
 Handler = str | Callable[[Any, re.Match[str]], Any]
@@ -64,7 +65,16 @@ class ErrorResponse:
 @dataclass(frozen=True)
 class BodyScope:
     field: str
-    equals: bool
+    equals: bool | str
+    scope: ScopeRequirement
+    capability: TokenCapability
+    replaces: bool = False
+
+
+@dataclass(frozen=True)
+class ExtraCapability:
+    purpose: str
+    capability: TokenCapability
     scope: ScopeRequirement
 
 
@@ -79,12 +89,14 @@ class ApiRoute:
     errors: tuple[ErrorResponse, ...]
     summary: str
     credentials: bool
+    capability: PermissionRequirement
     query_model: type[BaseModel] | None = None
     body_required: bool = True
     body_scopes: tuple[BodyScope, ...] = ()
     content_type: str = "application/json"
     description: str = ""
     internal_reason: str | None = None
+    extra_capabilities: tuple[ExtraCapability, ...] = ()
 
     @property
     def operation_id(self) -> str:
@@ -93,6 +105,14 @@ class ApiRoute:
     @property
     def scopes(self) -> tuple[TokenScope, ...]:
         return (self.scope,) if isinstance(self.scope, str) else self.scope
+
+    @property
+    def capabilities(self) -> tuple[Permission, ...]:
+        return (self.capability,) if isinstance(self.capability, str) else self.capability
+
+    @property
+    def conditional_capabilities(self) -> tuple[BodyScope | ExtraCapability, ...]:
+        return (*self.body_scopes, *self.extra_capabilities)
 
 
 def route(
@@ -105,6 +125,7 @@ def route(
     summary: str,
     *,
     credentials: bool,
+    capability: PermissionRequirement,
     refusals: tuple[ErrorResponse, ...] = (),
     query_model: type[BaseModel] | None = None,
     **options: Any,
@@ -128,6 +149,7 @@ def route(
         (*errors, *refusals),
         summary,
         credentials,
+        capability,
         query_model=query_model,
         **options,
     )

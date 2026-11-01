@@ -298,23 +298,34 @@ Person actions name the person in their result. Enabling someone whose access is
 
 ### API tokens
 
-Scripts and community bots, such as a Telegram bot that tells people how much traffic they have left, talk to the control service's API. Give each one its own token:
+Give each integration its own revocable token. In **Tokens**, select individual actions or a compatible preset, choose an expiry, then click **Review token**. The service shows the effective permissions and exact expiry before **Create token**. Editing the choices requires another review. The secret is shown once and stays out of browser storage; an uncertain response reloads metadata and explains that the secret cannot be recovered.
 
-1. Open the web panel (`meridian panel` prints the address), go to **Tokens**, and choose **Create token**.
-2. Name it after the bot and pick **Read**. The panel shows the token once; store it with the bot's secrets.
-3. Point the bot at the panel address and send the token as `Authorization: Bearer <token>`. API paths go below that address, for example `https://198.51.100.10/<secret-path>/api/users/alice`. The address contains the secret path, so keep it as private as the token.
+From the managing machine:
+
+```bash
+meridian token capabilities
+meridian token create "Account reader" --capability people.read --expires-days 30 --dry-run --json
+meridian token create "Account reader" --capability people.read --expires-days 30 --yes --json
+meridian token list --json
+meridian token revoke TOKEN_ID --yes --json
+```
+
+Actions are independent. `people.read` reads account state and device records permitted by the privacy level; it exposes no connection credentials or private notes. `people.private` permits notes/tags, and `people.credentials` permits keys, subscription links, and individual connections. `people.edit`, `people.reset`, `people.reissue`, `people.remove`, `people.devices`, and `people.bulk` separately allow account edits, period resets, rotation, removal, device-registration removal, and credential import. Mutation responses follow the same redaction as reads.
+
+People queries require `people.query` and `people.private`; bulk previews, commits, receipts, and undo require `people.batch` and `people.private`, because these views include tags. Credential import keeps its separate `people.bulk` grant. The people/admin presets retain their previous query and bulk access; read/propose/approve presets cannot call those routes.
+
+`commands.restart` permits Xray unit restarts; other maintenance commands need `commands.run`. A reissue/removal with `cut_off: true` additionally needs `commands.cut_off`. Removing or reissuing a declared person requires `fleet.apply`; owner sessions use the CLI. `settings.edit` changes privacy, notices, and page language; reviewed topology settings require `fleet.apply`. `backup.read` downloads encrypted snapshots and reads public backup keys; it cannot add a key or decrypt a snapshot. `backup.edit` manages backup keys and stored fleet files. Proposing, approving others, approving oneself, and applying are separate grants (`revisions.propose`, `revisions.approve`, `revisions.approve_own`, `fleet.apply`); self-approval also needs the normal approval grant.
+
+The console can issue the existing read/propose/approve/people presets and narrow permissions for its service-owned edits and restarts. Fleet administration and backup permissions use the CLI or an authorized API token. Creation requires recent password/TOTP or passkey confirmation. A token can delegate only permissions it holds, cannot outlive its issuer, and a revoked or expired issuer cannot mint through a cached request.
+
+New API, CLI, and console tokens default to **90 days**. `expires_in_days` accepts 1–3650, or use a future UTC `expires_at`. To choose no expiry, explicitly send `never_expires: true` or use `--never-expires`; null alone is refused. Existing expiry values stay unchanged. The compatible `read`, `propose`, `approve`, `people`, and `admin` presets are expanded once into equivalent stored grants; future catalog changes do not re-expand issued tokens. Read presets keep their existing node/endpoint access, including endpoint credentials, while people’s UUIDs and subscription tokens remain blank. A custom token has `scope: null`; every record lists its effective `capabilities`. Expiry and revocation refuse the next request with `401 unauthenticated`. Protect any token that grants credentials like a password.
 
 #### OpenAPI contract
 
-Fetch **`GET /api/openapi.json`** below the panel address with the same `Authorization: Bearer <token>` header. Any valid API token can read the document, including `people`; expired or revoked tokens receive `401`. It is an English **OpenAPI 3.1** contract with the installed service's version, request and response schemas, errors, and required scopes. A checked-in copy lives at `contracts/meridian/v1/admin/openapi.json`; when using that copy, set your client's base URL to the panel address, including the secret path.
+Read **OpenAPI 3.1** from `GET /api/openapi.json`, or the generated `contracts/meridian/v1/admin/openapi.json`. Send `Authorization: Bearer <token>`. All `x-meridian-capabilities` are required; `x-meridian-conditional-capabilities` describes body choices, and `x-meridian-extra-capabilities` describes credential/private-field and self-approval gates. `x-meridian-scopes` and `x-meridian-capability-grants` document compatible presets. `x-meridian-credentials: true` marks responses that may contain credentials: keep them private and do not log them. Agent enrollment/protocol, subscriptions, pages, and console authentication are separate surfaces.
 
-`x-meridian-scopes` lists alternative required scopes. `x-meridian-credentials: true` on an operation and its successful response means that response can carry credentials: keep it private and do not log it. User reads carry connection credentials only for `people` or `admin`; read tokens receive empty UUIDs and subscription tokens. Endpoint responses may carry a transport password, and encrypted snapshots contain credentials too. Agent enrollment, agent protocol, subscriptions, pages, and web panel sessions have separate surfaces and are excluded.
-
-The operation tables below are checked against the contract. A read token sees:
-
-| Endpoint | Returns |
+| Operation | Purpose |
 |---|---|
-| `GET /api/users/{username}` | One person's status, traffic used and limit, reset period, and expiry |
 | `GET /api/users/{username}/flow-blocks` | Per-node evidence for blocking new flows; no connection addresses or device data |
 | `GET /api/users` | Every person |
 | `GET /api/traffic` | Traffic totals per person |
@@ -322,18 +333,18 @@ The operation tables below are checked against the contract. A read token sees:
 | `GET /api/openapi.json` | The admin API contract |
 | `GET /api/events` | A bounded page of local lifecycle events |
 | `GET /api/attention` | Derived account, node, and server warnings |
+| `GET /api/token-capabilities` | Actions, compatible presets, and permission labels in all four languages |
+| `POST /api/tokens/preview` | Effective permissions and expiry; creates no token, event, or backup pull |
+| `POST /api/tokens` | Issue with `name` and either `scope` or a nonempty `capabilities` array |
+| `GET /api/tokens` | Metadata without secrets; `tokens.read` |
+| `DELETE /api/tokens/{token_id}` | Revoke; `tokens.revoke` |
+| `GET /api/users/{username}` | Account state; `people.read`, with separately granted private/credential fields |
+| `PATCH /api/users/{username}` | Edited account fields; `people.edit` |
+| `POST /api/users/{username}/reset-traffic` | Reset period use; `people.reset` |
+| `POST /api/users/{username}/reissue` | Rotate credentials; `people.reissue` |
+| `DELETE /api/users/{username}` | Remove; `people.remove` |
 
-Read tokens never see anyone's keys or subscription ID. Choose **People** for a bot that manages accounts and shares connection credentials. Creating it requires the same password confirmation as any other web panel token.
-
-| Scope | Access |
-|---|---|
-| `read` | View the fleet and people without connection credentials |
-| `propose` | Read access, plus proposing revisions |
-| `approve` | Propose access, plus approving other callers' revisions |
-| `people` | Read and manage people, including their UUIDs and subscription tokens |
-| `admin` | Both sets of permissions, including topology writes, enrollment, tokens, and backups; issued through the deployer's API access |
-
-`people` is separate from the read → propose → approve chain. It can access `/api/users` and read `/api/openapi.json`: it cannot read or change nodes, endpoints, the apply fence, revisions, backups, enrollment, API tokens, privacy, or settings. Admin includes people access.
+The `token-create`, `token-record`, `token-issued`, `token-list`, `token-preview`, and `token-capabilities` schemas are available through `meridian api schema NAME`. CLI creation JSON contains `data.preview` and, after issuance, `data.issued.token`; listings and later responses never recover that secret. Grants have a separate immutable model so later access-profile bounds can compose with them; profile bounds are not yet accepted or silently ignored.
 
 | People endpoint | Action |
 |---|---|
@@ -354,15 +365,11 @@ Read tokens never see anyone's keys or subscription ID. Choose **People** for a 
 | `DELETE /api/users/{username}/devices` | Clear all registrations |
 | `DELETE /api/users/{username}/devices/{device_key}` | Remove one registration |
 
-Read `credential_generation` from `GET /api/users/{username}`, then send `{"expected_generation": N}` to `POST /api/users/{username}/rotate-credentials`. A stale generation returns `409 credentials_changed`, so an uncertain retry cannot rotate twice. The response contains `user`, `subscription_preserved: true`, `flow_blocks`, and `commands`. Adding `"cut_off": true` requires admin and queues the same revision-gated hard cut-off as reissue. Owner and people callers cannot rotate a declared person.
+Read `credential_generation` from `GET /api/users/{username}`, then send `{"expected_generation": N}` to `POST /api/users/{username}/rotate-credentials` with `people.reissue`. A stale generation returns `409 credentials_changed`, so an uncertain retry cannot rotate twice. The response contains `user`, `subscription_preserved: true`, `flow_blocks`, and `commands`; its person fields follow the same credential and private-metadata grants as reads. Adding `"cut_off": true` requires `commands.cut_off` and queues the same revision-gated hard cut-off as reissue. Rotating a declared person also requires `fleet.apply`; owner sessions use the CLI.
 
 A people token cannot remove or reissue a person declared in the fleet file: the API returns `409 declared_user` with the CLI command to run. This also applies while an approved or failed apply still declares the person. An unapproved proposal does not declare anyone. Status, limits, expiry, and device caps remain editable.
 
-Reissue and deletion accept optional `{"cut_off": true}`; rotation includes it alongside `expected_generation` in its request. This requires `admin`, as declared by `x-meridian-conditional-scopes`. Review each node's scope: core restarts affect every Xray inbound and bridge, while inbound resets affect the listed inbounds and can fall back to a whole-core restart. Reissue/deletion keep their usual response without a cut-off and include queued commands with it; rotation always returns its command list and receipts.
-
-Choose **7, 30, or 90 days**, or **Never expires**; new web panel tokens default to 90 days. The list shows the expiry and marks expired tokens. Expiry and revocation both refuse the next request with the same `401 unauthenticated` response. Existing tokens keep no expiry. Treat a people token as a password, because it grants access to people's connection credentials.
-
-`POST /api/tokens` accepts `expires_in_days` from 1 to 3650, or `null` for no expiry. Omitting it also means no expiry. You may instead supply a future UTC `expires_at`; choose one expiry field. `TokenRecord.expires_at` is always returned, including `null`. Token operations require admin API access or an owner web panel session; creation in the web panel also requires password confirmation. A people token cannot mint tokens. The `token-create`, `token-record`, `token-issued`, and `token-list` schemas are available through `meridian api schema NAME`.
+Reissue and deletion accept optional `{"cut_off": true}`; rotation includes it alongside `expected_generation` in its request. This requires `commands.cut_off`, as declared by `x-meridian-conditional-capabilities`; the admin preset includes it. Review each node's scope: core restarts affect every Xray inbound and bridge, while inbound resets affect the listed inbounds and can fall back to a whole-core restart. Reissue/deletion keep their usual response without a cut-off and include queued commands with it; rotation always returns its command list and receipts.
 
 ## Owner contact on connection pages
 

@@ -780,5 +780,11 @@
   "commands.error_apply_pending": "当前凭据与配置尚未应用。先运行 meridian apply，再重试此命令。",
   "commands.error_document_not_applied": "运行 meridian apply，等待节点应用当前文档，再重试此命令。",
   "commands.error_config_not_installed": "节点缺少 Xray 配置文件。运行 meridian apply 后重试此命令。",
-  "commands.error_config_mismatch": "磁盘上的 Xray 配置与当前文档不一致。运行 meridian apply 后重试此命令。"
+  "commands.error_config_mismatch": "磁盘上的 Xray 配置与当前文档不一致。运行 meridian apply 后重试此命令。",
+  "scope.custom": "自选权限",
+  "tokens.permissions": "实际权限",
+  "tokens.actions": "允许的操作",
+  "tokens.review": "预览令牌",
+  "tokens.action_required": "请至少选择一项操作。",
+  "tokens.cli_permissions": "拓扑管理和备份权限请通过 meridian token create 签发。"
 }

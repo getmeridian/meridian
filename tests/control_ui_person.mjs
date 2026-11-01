@@ -105,6 +105,7 @@ M.personHistory = M.devicesCard = M.privacySection = M.cliHint = () => null;
 M.noticeSection = M.languageSection = M.formatPreviewSection = () => null;
 M.renderServers = view => M.mount(view, M.h('h1', { text: M.t('nav.servers') }));
 M.renderRevisions = M.renderTokens = () => null;
+load('passkeys.js');
 load('auth.js');
 load('people.js');
 load('people-bulk.js'); load('people-bulk-fields.js'); load('people-list.js');

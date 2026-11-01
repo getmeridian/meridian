@@ -76,6 +76,7 @@ from meridian.core.people_bulk import BulkCommitRequest, BulkPreview, BulkPrevie
 from meridian.core.people_query import PeoplePage, PeopleQuery
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
+from meridian.core.token_models import DEFAULT_TOKEN_DAYS, CapabilityCatalog, TokenCapability, TokenPreview
 
 _GATEWAY_FAILURES = frozenset({502, 503, 504})
 # Transport errors raised before any request bytes left this machine.
@@ -375,13 +376,42 @@ class ControlClient:
         self._call("DELETE", f"api/endpoints/{_segment(endpoint_id)}")
 
     def create_token(
-        self, name: str, scope: TokenScope, *, expires_in_days: int | None = None, expires_at: str | None = None
+        self,
+        name: str,
+        scope: TokenScope | None = None,
+        *,
+        capabilities: list[TokenCapability] | None = None,
+        expires_in_days: int | None = None,
+        expires_at: str | None = None,
+        never_expires: bool = False,
     ) -> IssuedToken:
         """Mint a device's or agent's token; the secret is in this response only."""
-        body = TokenCreate(name=name, scope=scope, expires_in_days=expires_in_days, expires_at=expires_at).model_dump(
-            mode="json"
+        days = (
+            expires_in_days
+            if expires_in_days is not None or expires_at is not None or never_expires
+            else DEFAULT_TOKEN_DAYS
         )
-        return IssuedToken.model_validate(self._call("POST", "api/tokens", body))
+        return self.issue_token(
+            TokenCreate(
+                name=name,
+                scope=scope,
+                capabilities=capabilities,
+                expires_in_days=days,
+                expires_at=expires_at,
+                never_expires=never_expires,
+            )
+        )
+
+    def issue_token(self, request: TokenCreate) -> IssuedToken:
+        return IssuedToken.model_validate(self._call("POST", "api/tokens", request.to_data()))
+
+    def preview_token(self, request: TokenCreate) -> TokenPreview:
+        return TokenPreview.model_validate(
+            self._request("POST", "api/tokens/preview", request.to_data(), mutation_method="GET").json()
+        )
+
+    def token_capabilities(self) -> CapabilityCatalog:
+        return CapabilityCatalog.model_validate(self._call("GET", "api/token-capabilities"))
 
     def list_tokens(self) -> list[TokenRecord]:
         return TokenList.model_validate(self._call("GET", "api/tokens")).tokens

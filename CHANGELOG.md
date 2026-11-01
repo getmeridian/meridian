@@ -23,6 +23,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
   explicit JSON confirmation, and receipt recovery after an uncertain reply.
 - People selection by keyboard or across all matching pages, with bounded
   server reads, preserved rows, bulk reviews, receipts, and undo in the console.
+- API tokens can grant individual action families, with shared permission and
+  expiry previews in the API, console, and `meridian token`. Existing tokens keep
+  equivalent frozen grants and their expiry; new tokens default to 90 days (#95).
 - Owner passkeys on reviewed HTTPS domains, with local ES256/Ed25519 verification,
   named keys in Settings, sign-in and step-up, and unchanged root-only recovery.
   Removing a key signs out other sessions; bare-IP panels keep password/TOTP (#95).

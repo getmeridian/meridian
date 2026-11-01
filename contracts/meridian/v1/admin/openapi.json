@@ -1622,6 +1622,242 @@
         "title": "BulkUndoRequest",
         "type": "object"
       },
+      "CapabilityCatalog": {
+        "additionalProperties": false,
+        "properties": {
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityRecord"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "presets": {
+            "additionalProperties": {
+              "items": {
+                "enum": [
+                  "api.read",
+                  "fleet.read",
+                  "topology.read",
+                  "fleet.apply",
+                  "nodes.enroll",
+                  "people.read",
+                  "people.query",
+                  "people.batch",
+                  "people.private",
+                  "people.edit",
+                  "people.credentials",
+                  "people.reset",
+                  "people.reissue",
+                  "people.remove",
+                  "people.devices",
+                  "people.bulk",
+                  "commands.read",
+                  "commands.restart",
+                  "commands.run",
+                  "commands.cut_off",
+                  "backup.read",
+                  "backup.edit",
+                  "settings.edit",
+                  "tokens.read",
+                  "tokens.issue",
+                  "tokens.revoke",
+                  "revisions.read",
+                  "revisions.propose",
+                  "revisions.approve",
+                  "revisions.approve_own",
+                  "owner.read",
+                  "console.read"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "propertyNames": {
+              "enum": [
+                "read",
+                "propose",
+                "approve",
+                "people",
+                "admin"
+              ]
+            },
+            "title": "Presets",
+            "type": "object"
+          }
+        },
+        "required": [
+          "capabilities",
+          "presets"
+        ],
+        "title": "CapabilityCatalog",
+        "type": "object"
+      },
+      "CapabilityOperation": {
+        "additionalProperties": false,
+        "properties": {
+          "conditional": {
+            "default": false,
+            "title": "Conditional",
+            "type": "boolean"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "method",
+          "path"
+        ],
+        "title": "CapabilityOperation",
+        "type": "object"
+      },
+      "CapabilityPermission": {
+        "additionalProperties": false,
+        "properties": {
+          "capability": {
+            "enum": [
+              "api.read",
+              "fleet.read",
+              "topology.read",
+              "fleet.apply",
+              "nodes.enroll",
+              "people.read",
+              "people.query",
+              "people.batch",
+              "people.private",
+              "people.edit",
+              "people.credentials",
+              "people.reset",
+              "people.reissue",
+              "people.remove",
+              "people.devices",
+              "people.bulk",
+              "commands.read",
+              "commands.restart",
+              "commands.run",
+              "commands.cut_off",
+              "backup.read",
+              "backup.edit",
+              "settings.edit",
+              "tokens.read",
+              "tokens.issue",
+              "tokens.revoke",
+              "revisions.read",
+              "revisions.propose",
+              "revisions.approve",
+              "revisions.approve_own",
+              "owner.read",
+              "console.read"
+            ],
+            "title": "Capability",
+            "type": "string"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "enum": [
+                "en",
+                "ru",
+                "fa",
+                "zh"
+              ]
+            },
+            "title": "Labels",
+            "type": "object"
+          }
+        },
+        "required": [
+          "capability",
+          "labels"
+        ],
+        "title": "CapabilityPermission",
+        "type": "object"
+      },
+      "CapabilityRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "capability": {
+            "enum": [
+              "api.read",
+              "fleet.read",
+              "topology.read",
+              "fleet.apply",
+              "nodes.enroll",
+              "people.read",
+              "people.query",
+              "people.batch",
+              "people.private",
+              "people.edit",
+              "people.credentials",
+              "people.reset",
+              "people.reissue",
+              "people.remove",
+              "people.devices",
+              "people.bulk",
+              "commands.read",
+              "commands.restart",
+              "commands.run",
+              "commands.cut_off",
+              "backup.read",
+              "backup.edit",
+              "settings.edit",
+              "tokens.read",
+              "tokens.issue",
+              "tokens.revoke",
+              "revisions.read",
+              "revisions.propose",
+              "revisions.approve",
+              "revisions.approve_own",
+              "owner.read",
+              "console.read"
+            ],
+            "title": "Capability",
+            "type": "string"
+          },
+          "console_delegable": {
+            "title": "Console Delegable",
+            "type": "boolean"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "enum": [
+                "en",
+                "ru",
+                "fa",
+                "zh"
+              ]
+            },
+            "title": "Labels",
+            "type": "object"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityOperation"
+            },
+            "title": "Operations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "capability",
+          "labels",
+          "operations",
+          "console_delegable"
+        ],
+        "title": "CapabilityRecord",
+        "type": "object"
+      },
       "ClientConnection": {
         "additionalProperties": false,
         "description": "One canonical subscription entry; URI and QR are credentials, never passive output.",
@@ -2936,8 +3172,49 @@
       },
       "IssuedToken": {
         "additionalProperties": false,
-        "description": "A freshly minted token: the only response that ever carries its secret.",
+        "description": "Only this producing response contains the token secret.",
         "properties": {
+          "capabilities": {
+            "items": {
+              "enum": [
+                "api.read",
+                "fleet.read",
+                "topology.read",
+                "fleet.apply",
+                "nodes.enroll",
+                "people.read",
+                "people.query",
+                "people.batch",
+                "people.private",
+                "people.edit",
+                "people.credentials",
+                "people.reset",
+                "people.reissue",
+                "people.remove",
+                "people.devices",
+                "people.bulk",
+                "commands.read",
+                "commands.restart",
+                "commands.run",
+                "commands.cut_off",
+                "backup.read",
+                "backup.edit",
+                "settings.edit",
+                "tokens.read",
+                "tokens.issue",
+                "tokens.revoke",
+                "revisions.read",
+                "revisions.propose",
+                "revisions.approve",
+                "revisions.approve_own",
+                "owner.read",
+                "console.read"
+              ],
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
           "created_at": {
             "description": "RFC 3339 timestamp in UTC, ending in Z.",
             "maxLength": 40,
@@ -3001,15 +3278,22 @@
             "title": "Revoked At"
           },
           "scope": {
-            "enum": [
-              "read",
-              "propose",
-              "approve",
-              "people",
-              "admin"
+            "anyOf": [
+              {
+                "enum": [
+                  "read",
+                  "propose",
+                  "approve",
+                  "people",
+                  "admin"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Scope",
-            "type": "string"
+            "title": "Scope"
           },
           "token": {
             "description": "Opaque base64url token.",
@@ -4235,6 +4519,59 @@
             "title": "Servers",
             "type": "array"
           },
+          "x-meridian-capability-grants": {
+            "additionalProperties": {
+              "items": {
+                "enum": [
+                  "api.read",
+                  "fleet.read",
+                  "topology.read",
+                  "fleet.apply",
+                  "nodes.enroll",
+                  "people.read",
+                  "people.query",
+                  "people.batch",
+                  "people.private",
+                  "people.edit",
+                  "people.credentials",
+                  "people.reset",
+                  "people.reissue",
+                  "people.remove",
+                  "people.devices",
+                  "people.bulk",
+                  "commands.read",
+                  "commands.restart",
+                  "commands.run",
+                  "commands.cut_off",
+                  "backup.read",
+                  "backup.edit",
+                  "settings.edit",
+                  "tokens.read",
+                  "tokens.issue",
+                  "tokens.revoke",
+                  "revisions.read",
+                  "revisions.propose",
+                  "revisions.approve",
+                  "revisions.approve_own",
+                  "owner.read",
+                  "console.read"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "propertyNames": {
+              "enum": [
+                "read",
+                "propose",
+                "approve",
+                "people",
+                "admin"
+              ]
+            },
+            "title": "X-Meridian-Capability-Grants",
+            "type": "object"
+          },
           "x-meridian-scope-grants": {
             "additionalProperties": {
               "items": {
@@ -4253,7 +4590,8 @@
           "paths",
           "components",
           "security",
-          "x-meridian-scope-grants"
+          "x-meridian-scope-grants",
+          "x-meridian-capability-grants"
         ],
         "title": "OpenApiDocument",
         "type": "object"
@@ -6924,8 +7262,59 @@
       },
       "TokenCreate": {
         "additionalProperties": false,
-        "description": "Mint one device's or agent's API token; the scope may not exceed the caller's.",
+        "description": "Choose one compatible preset or an explicit nonempty grant; new tokens expire by default.",
         "properties": {
+          "capabilities": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "api.read",
+                    "fleet.read",
+                    "topology.read",
+                    "fleet.apply",
+                    "nodes.enroll",
+                    "people.read",
+                    "people.query",
+                    "people.batch",
+                    "people.private",
+                    "people.edit",
+                    "people.credentials",
+                    "people.reset",
+                    "people.reissue",
+                    "people.remove",
+                    "people.devices",
+                    "people.bulk",
+                    "commands.read",
+                    "commands.restart",
+                    "commands.run",
+                    "commands.cut_off",
+                    "backup.read",
+                    "backup.edit",
+                    "settings.edit",
+                    "tokens.read",
+                    "tokens.issue",
+                    "tokens.revoke",
+                    "revisions.read",
+                    "revisions.propose",
+                    "revisions.approve",
+                    "revisions.approve_own",
+                    "owner.read",
+                    "console.read"
+                  ],
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Capabilities"
+          },
           "expires_at": {
             "anyOf": [
               {
@@ -6939,7 +7328,7 @@
               }
             ],
             "default": null,
-            "description": "Optional UTC expiry; use either this or expires_in_days. Null or omitted means never.",
+            "description": "Future UTC expiry instead of expires_in_days.",
             "title": "Expires At"
           },
           "expires_in_days": {
@@ -6953,8 +7342,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Whole days from issuance, measured by the service clock; null or omitted means never.",
+            "default": 90,
+            "description": "Whole days from issuance; defaults to 90. Null needs never_expires=true.",
             "title": "Expires In Days"
           },
           "name": {
@@ -6964,21 +7353,34 @@
             "title": "Name",
             "type": "string"
           },
+          "never_expires": {
+            "default": false,
+            "description": "Explicitly opt out of expiry; cannot accompany an expiry value.",
+            "title": "Never Expires",
+            "type": "boolean"
+          },
           "scope": {
-            "enum": [
-              "read",
-              "propose",
-              "approve",
-              "people",
-              "admin"
+            "anyOf": [
+              {
+                "enum": [
+                  "read",
+                  "propose",
+                  "approve",
+                  "people",
+                  "admin"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Scope",
-            "type": "string"
+            "default": null,
+            "title": "Scope"
           }
         },
         "required": [
-          "name",
-          "scope"
+          "name"
         ],
         "title": "TokenCreate",
         "type": "object"
@@ -6986,6 +7388,47 @@
       "TokenEventDetail": {
         "additionalProperties": false,
         "properties": {
+          "capabilities": {
+            "items": {
+              "enum": [
+                "api.read",
+                "fleet.read",
+                "topology.read",
+                "fleet.apply",
+                "nodes.enroll",
+                "people.read",
+                "people.query",
+                "people.batch",
+                "people.private",
+                "people.edit",
+                "people.credentials",
+                "people.reset",
+                "people.reissue",
+                "people.remove",
+                "people.devices",
+                "people.bulk",
+                "commands.read",
+                "commands.restart",
+                "commands.run",
+                "commands.cut_off",
+                "backup.read",
+                "backup.edit",
+                "settings.edit",
+                "tokens.read",
+                "tokens.issue",
+                "tokens.revoke",
+                "revisions.read",
+                "revisions.propose",
+                "revisions.approve",
+                "revisions.approve_own",
+                "owner.read",
+                "console.read"
+              ],
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
           "name": {
             "maxLength": 64,
             "minLength": 1,
@@ -6994,15 +7437,22 @@
             "type": "string"
           },
           "scope": {
-            "enum": [
-              "read",
-              "propose",
-              "approve",
-              "people",
-              "admin"
+            "anyOf": [
+              {
+                "enum": [
+                  "read",
+                  "propose",
+                  "approve",
+                  "people",
+                  "admin"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Scope",
-            "type": "string"
+            "title": "Scope"
           }
         },
         "required": [
@@ -7029,10 +7479,145 @@
         "title": "TokenList",
         "type": "object"
       },
+      "TokenPreview": {
+        "additionalProperties": false,
+        "description": "Effective permissions and expiry, without a token or any write.",
+        "properties": {
+          "capabilities": {
+            "items": {
+              "enum": [
+                "api.read",
+                "fleet.read",
+                "topology.read",
+                "fleet.apply",
+                "nodes.enroll",
+                "people.read",
+                "people.query",
+                "people.batch",
+                "people.private",
+                "people.edit",
+                "people.credentials",
+                "people.reset",
+                "people.reissue",
+                "people.remove",
+                "people.devices",
+                "people.bulk",
+                "commands.read",
+                "commands.restart",
+                "commands.run",
+                "commands.cut_off",
+                "backup.read",
+                "backup.edit",
+                "settings.edit",
+                "tokens.read",
+                "tokens.issue",
+                "tokens.revoke",
+                "revisions.read",
+                "revisions.propose",
+                "revisions.approve",
+                "revisions.approve_own",
+                "owner.read",
+                "console.read"
+              ],
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "permissions": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityPermission"
+            },
+            "title": "Permissions",
+            "type": "array"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "enum": [
+                  "read",
+                  "propose",
+                  "approve",
+                  "people",
+                  "admin"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          }
+        },
+        "required": [
+          "scope",
+          "capabilities",
+          "permissions",
+          "expires_at"
+        ],
+        "title": "TokenPreview",
+        "type": "object"
+      },
       "TokenRecord": {
         "additionalProperties": false,
-        "description": "One API token's metadata; never its secret, hash, or where it was used from.",
+        "description": "Metadata only. A null scope is an explicit grant; stored grants never expand implicitly.",
         "properties": {
+          "capabilities": {
+            "items": {
+              "enum": [
+                "api.read",
+                "fleet.read",
+                "topology.read",
+                "fleet.apply",
+                "nodes.enroll",
+                "people.read",
+                "people.query",
+                "people.batch",
+                "people.private",
+                "people.edit",
+                "people.credentials",
+                "people.reset",
+                "people.reissue",
+                "people.remove",
+                "people.devices",
+                "people.bulk",
+                "commands.read",
+                "commands.restart",
+                "commands.run",
+                "commands.cut_off",
+                "backup.read",
+                "backup.edit",
+                "settings.edit",
+                "tokens.read",
+                "tokens.issue",
+                "tokens.revoke",
+                "revisions.read",
+                "revisions.propose",
+                "revisions.approve",
+                "revisions.approve_own",
+                "owner.read",
+                "console.read"
+              ],
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
           "created_at": {
             "description": "RFC 3339 timestamp in UTC, ending in Z.",
             "maxLength": 40,
@@ -7096,15 +7681,22 @@
             "title": "Revoked At"
           },
           "scope": {
-            "enum": [
-              "read",
-              "propose",
-              "approve",
-              "people",
-              "admin"
+            "anyOf": [
+              {
+                "enum": [
+                  "read",
+                  "propose",
+                  "approve",
+                  "people",
+                  "admin"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Scope",
-            "type": "string"
+            "title": "Scope"
           }
         },
         "required": [
@@ -9162,14 +9754,14 @@
     "securitySchemes": {
       "meridianToken": {
         "bearerFormat": "Meridian scoped API token",
-        "description": "Send Authorization: Bearer <token>. Required scopes are declared by x-meridian-scopes; either listed scope or a scope that covers it is sufficient.",
+        "description": "Send Authorization: Bearer <token>. All x-meridian-capabilities are required; conditional capabilities describe body choices and response fields. x-meridian-scopes records compatible presets, expanded by x-meridian-capability-grants.",
         "scheme": "bearer",
         "type": "http"
       }
     }
   },
   "info": {
-    "description": "Scoped bearer-token operations behind the operator's private console address. The read, propose, and approve scopes form a chain; people is separate, and admin covers both. Node enrollment, agent, subscription, page, and console-session surfaces are internal or public and are excluded from this document.",
+    "description": "Explicit-capability bearer-token operations behind the operator's private console address. Capabilities are declared per action and frozen on tokens. Compatible read/propose/approve/people/admin presets expand to equivalent grants; credentials and private metadata require explicit permissions. Node enrollment, agent, subscription, page, and console-session surfaces are internal or public and are excluded from this document.",
     "title": "Meridian admin API",
     "version": "4.0.0b10"
   },
@@ -9178,7 +9770,7 @@
   "paths": {
     "/api/attention": {
       "get": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires fleet.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "attention",
         "parameters": [
           {
@@ -9340,6 +9932,10 @@
         "tags": [
           "attention"
         ],
+        "x-meridian-capabilities": [
+          "fleet.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -9349,7 +9945,7 @@
     },
     "/api/backup/deployer-state": {
       "put": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires backup.edit capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "deposit_deployer_state",
         "requestBody": {
           "content": {
@@ -9461,6 +10057,10 @@
         "tags": [
           "backup"
         ],
+        "x-meridian-capabilities": [
+          "backup.edit"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -9470,7 +10070,7 @@
     },
     "/api/backup/devices": {
       "get": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires backup.read capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "list_device_keys",
         "responses": {
           "200": {
@@ -9533,6 +10133,10 @@
         "tags": [
           "backup"
         ],
+        "x-meridian-capabilities": [
+          "backup.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -9540,7 +10144,7 @@
         ]
       },
       "post": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires backup.edit capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "register_device_key",
         "requestBody": {
           "content": {
@@ -9652,6 +10256,10 @@
         "tags": [
           "backup"
         ],
+        "x-meridian-capabilities": [
+          "backup.edit"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -9661,7 +10269,7 @@
     },
     "/api/backup/devices/{device_id}": {
       "delete": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires backup.edit capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "revoke_device_key",
         "parameters": [
           {
@@ -9748,6 +10356,10 @@
         "tags": [
           "backup"
         ],
+        "x-meridian-capabilities": [
+          "backup.edit"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -9757,7 +10369,7 @@
     },
     "/api/backup/recovery-key": {
       "get": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires backup.read capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "get_recovery_key",
         "responses": {
           "200": {
@@ -9820,6 +10432,10 @@
         "tags": [
           "backup"
         ],
+        "x-meridian-capabilities": [
+          "backup.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -9827,7 +10443,7 @@
         ]
       },
       "put": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires backup.edit capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "put_recovery_key",
         "requestBody": {
           "content": {
@@ -9926,6 +10542,10 @@
         "tags": [
           "backup"
         ],
+        "x-meridian-capabilities": [
+          "backup.edit"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -9935,7 +10555,7 @@
     },
     "/api/backup/snapshot": {
       "get": {
-        "description": "Requires admin scope, or a scope that covers it. The encrypted snapshot contains account credentials and token registry data. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires backup.read capabilities. Compatible presets: admin, including scopes that cover them. The encrypted snapshot contains account credentials and token registry data. This response can contain credentials; keep it private and do not log it.",
         "operationId": "snapshot",
         "responses": {
           "200": {
@@ -10011,6 +10631,10 @@
         "tags": [
           "backup"
         ],
+        "x-meridian-capabilities": [
+          "backup.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": true,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -10020,7 +10644,7 @@
     },
     "/api/endpoints/{endpoint_id}": {
       "delete": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires fleet.apply capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "delete_endpoint",
         "parameters": [
           {
@@ -10094,6 +10718,10 @@
         "tags": [
           "endpoints"
         ],
+        "x-meridian-capabilities": [
+          "fleet.apply"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -10101,7 +10729,7 @@
         ]
       },
       "get": {
-        "description": "Requires read scope, or a scope that covers it. The endpoint may include a transport obfuscation password. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires topology.read capabilities. Compatible presets: read, including scopes that cover them. The endpoint may include a transport obfuscation password. This response can contain credentials; keep it private and do not log it.",
         "operationId": "get_endpoint",
         "parameters": [
           {
@@ -10188,6 +10816,10 @@
         "tags": [
           "endpoints"
         ],
+        "x-meridian-capabilities": [
+          "topology.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": true,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -10195,7 +10827,7 @@
         ]
       },
       "put": {
-        "description": "Requires admin scope, or a scope that covers it. The endpoint may include a transport obfuscation password. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires fleet.apply capabilities. Compatible presets: admin, including scopes that cover them. The endpoint may include a transport obfuscation password. This response can contain credentials; keep it private and do not log it.",
         "operationId": "put_endpoint",
         "parameters": [
           {
@@ -10305,6 +10937,10 @@
         "tags": [
           "endpoints"
         ],
+        "x-meridian-capabilities": [
+          "fleet.apply"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": true,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -10314,7 +10950,7 @@
     },
     "/api/events": {
       "get": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires fleet.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "events",
         "parameters": [
           {
@@ -10417,6 +11053,10 @@
         "tags": [
           "events"
         ],
+        "x-meridian-capabilities": [
+          "fleet.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -10426,7 +11066,7 @@
     },
     "/api/fence": {
       "get": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires topology.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "get_fence",
         "responses": {
           "200": {
@@ -10489,6 +11129,10 @@
         "tags": [
           "fence"
         ],
+        "x-meridian-capabilities": [
+          "topology.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -10496,7 +11140,7 @@
         ]
       },
       "put": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires fleet.apply capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "swap_fence",
         "requestBody": {
           "content": {
@@ -10608,6 +11252,10 @@
         "tags": [
           "fence"
         ],
+        "x-meridian-capabilities": [
+          "fleet.apply"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -10617,7 +11265,7 @@
     },
     "/api/health": {
       "get": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires fleet.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "health",
         "responses": {
           "200": {
@@ -10680,6 +11328,10 @@
         "tags": [
           "health"
         ],
+        "x-meridian-capabilities": [
+          "fleet.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -10689,7 +11341,7 @@
     },
     "/api/import/users": {
       "post": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires people.bulk capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "import_users",
         "requestBody": {
           "content": {
@@ -10801,6 +11453,10 @@
         "tags": [
           "import"
         ],
+        "x-meridian-capabilities": [
+          "people.bulk"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -10810,7 +11466,7 @@
     },
     "/api/language": {
       "get": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires fleet.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "get_language",
         "responses": {
           "200": {
@@ -10873,6 +11529,10 @@
         "tags": [
           "language"
         ],
+        "x-meridian-capabilities": [
+          "fleet.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -10880,7 +11540,7 @@
         ]
       },
       "put": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires settings.edit capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "put_language",
         "requestBody": {
           "content": {
@@ -10979,6 +11639,10 @@
         "tags": [
           "language"
         ],
+        "x-meridian-capabilities": [
+          "settings.edit"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -10988,7 +11652,7 @@
     },
     "/api/nodes/{node_id}": {
       "delete": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires fleet.apply capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "delete_node",
         "parameters": [
           {
@@ -11064,6 +11728,10 @@
         "tags": [
           "nodes"
         ],
+        "x-meridian-capabilities": [
+          "fleet.apply"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -11071,7 +11739,7 @@
         ]
       },
       "get": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires topology.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "get_node",
         "parameters": [
           {
@@ -11160,6 +11828,10 @@
         "tags": [
           "nodes"
         ],
+        "x-meridian-capabilities": [
+          "topology.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -11167,7 +11839,7 @@
         ]
       },
       "put": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires fleet.apply capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "put_node",
         "parameters": [
           {
@@ -11279,6 +11951,10 @@
         "tags": [
           "nodes"
         ],
+        "x-meridian-capabilities": [
+          "fleet.apply"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -11288,7 +11964,7 @@
     },
     "/api/nodes/{node_id}/command-targets": {
       "get": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires commands.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "command_targets",
         "parameters": [
           {
@@ -11377,6 +12053,10 @@
         "tags": [
           "nodes"
         ],
+        "x-meridian-capabilities": [
+          "commands.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -11386,7 +12066,7 @@
     },
     "/api/nodes/{node_id}/commands": {
       "post": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires commands.run capabilities. Compatible presets: admin, including scopes that cover them. Setting kind to restart_unit requires commands.restart instead.",
         "operationId": "issue_command",
         "parameters": [
           {
@@ -11525,6 +12205,27 @@
         "tags": [
           "nodes"
         ],
+        "x-meridian-capabilities": [
+          "commands.run"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-conditional-capabilities": [
+          {
+            "capability": "commands.restart",
+            "equals": "restart_unit",
+            "field": "kind",
+            "mode": "replace"
+          }
+        ],
+        "x-meridian-conditional-scopes": [
+          {
+            "equals": "restart_unit",
+            "field": "kind",
+            "scopes": [
+              "admin"
+            ]
+          }
+        ],
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -11534,7 +12235,7 @@
     },
     "/api/nodes/{node_id}/commands/{command_id}": {
       "get": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires commands.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "get_command",
         "parameters": [
           {
@@ -11632,6 +12333,10 @@
         "tags": [
           "nodes"
         ],
+        "x-meridian-capabilities": [
+          "commands.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -11641,7 +12346,7 @@
     },
     "/api/notice": {
       "get": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires fleet.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "get_notice",
         "parameters": [
           {
@@ -11751,6 +12456,10 @@
         "tags": [
           "notice"
         ],
+        "x-meridian-capabilities": [
+          "fleet.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -11758,7 +12467,7 @@
         ]
       },
       "put": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires settings.edit capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "put_notice",
         "requestBody": {
           "content": {
@@ -11870,6 +12579,10 @@
         "tags": [
           "notice"
         ],
+        "x-meridian-capabilities": [
+          "settings.edit"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -11879,7 +12592,7 @@
     },
     "/api/openapi.json": {
       "get": {
-        "description": "Requires read or people scope, or a scope that covers it.",
+        "description": "Requires api.read capabilities. Compatible presets: read or people, including scopes that cover them.",
         "operationId": "openapi",
         "responses": {
           "200": {
@@ -11942,6 +12655,10 @@
         "tags": [
           "contract"
         ],
+        "x-meridian-capabilities": [
+          "api.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -11952,7 +12669,7 @@
     },
     "/api/people": {
       "get": {
-        "description": "Requires people scope, or a scope that covers it. Case-folded username/display-name search; missing dates sort last. Cursors exclude later insertions and expire after 15 minutes.",
+        "description": "Requires people.query and people.private capabilities. Compatible presets: people, including scopes that cover them. Case-folded username/display-name search; missing dates sort last. Cursors exclude later insertions and expire after 15 minutes.",
         "operationId": "query_people",
         "parameters": [
           {
@@ -12219,6 +12936,11 @@
         "tags": [
           "people"
         ],
+        "x-meridian-capabilities": [
+          "people.query",
+          "people.private"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -12228,7 +12950,7 @@
     },
     "/api/people/bulk/commit": {
       "post": {
-        "description": "Requires people scope, or a scope that covers it. Requires the preview ID and hash. Any changed person or enforcement result refuses the entire operation. A retry returns the same receipt.",
+        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Requires the preview ID and hash. Any changed person or enforcement result refuses the entire operation. A retry returns the same receipt.",
         "operationId": "commit_people_bulk",
         "requestBody": {
           "content": {
@@ -12342,6 +13064,11 @@
         "tags": [
           "people"
         ],
+        "x-meridian-capabilities": [
+          "people.batch",
+          "people.private"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -12351,7 +13078,7 @@
     },
     "/api/people/bulk/preview": {
       "post": {
-        "description": "Requires people scope, or a scope that covers it. Previews write no database rows or events. They expire after 10 minutes or a service restart. Declared deletions return exact reviewed CLI commands.",
+        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Previews write no database rows or events. They expire after 10 minutes or a service restart. Declared deletions return exact reviewed CLI commands.",
         "operationId": "preview_people_bulk",
         "requestBody": {
           "content": {
@@ -12463,6 +13190,11 @@
         "tags": [
           "people"
         ],
+        "x-meridian-capabilities": [
+          "people.batch",
+          "people.private"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -12472,7 +13204,7 @@
     },
     "/api/people/bulk/receipts/{receipt_id}": {
       "get": {
-        "description": "Requires people scope, or a scope that covers it.",
+        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them.",
         "operationId": "people_bulk_receipt",
         "parameters": [
           {
@@ -12559,6 +13291,11 @@
         "tags": [
           "people"
         ],
+        "x-meridian-capabilities": [
+          "people.batch",
+          "people.private"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -12568,7 +13305,7 @@
     },
     "/api/people/bulk/undo": {
       "post": {
-        "description": "Requires people scope, or a scope that covers it. Undo lasts 10 minutes, survives service restarts, and is single-use. Reset and delete cannot be undone.",
+        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Undo lasts 10 minutes, survives service restarts, and is single-use. Reset and delete cannot be undone.",
         "operationId": "undo_people_bulk",
         "requestBody": {
           "content": {
@@ -12694,6 +13431,11 @@
         "tags": [
           "people"
         ],
+        "x-meridian-capabilities": [
+          "people.batch",
+          "people.private"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -12703,7 +13445,7 @@
     },
     "/api/privacy": {
       "get": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires fleet.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "get_privacy",
         "responses": {
           "200": {
@@ -12766,6 +13508,10 @@
         "tags": [
           "privacy"
         ],
+        "x-meridian-capabilities": [
+          "fleet.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -12773,7 +13519,7 @@
         ]
       },
       "put": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires settings.edit capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "put_privacy",
         "requestBody": {
           "content": {
@@ -12872,6 +13618,10 @@
         "tags": [
           "privacy"
         ],
+        "x-meridian-capabilities": [
+          "settings.edit"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -12881,7 +13631,7 @@
     },
     "/api/revisions": {
       "get": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires revisions.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "list_revisions",
         "responses": {
           "200": {
@@ -12944,6 +13694,10 @@
         "tags": [
           "revisions"
         ],
+        "x-meridian-capabilities": [
+          "revisions.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -12951,7 +13705,7 @@
         ]
       },
       "post": {
-        "description": "Requires propose scope, or a scope that covers it.",
+        "description": "Requires revisions.propose capabilities. Compatible presets: propose, including scopes that cover them.",
         "operationId": "propose_revision",
         "requestBody": {
           "content": {
@@ -13050,6 +13804,10 @@
         "tags": [
           "revisions"
         ],
+        "x-meridian-capabilities": [
+          "revisions.propose"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -13059,7 +13817,7 @@
     },
     "/api/revisions/{revision}": {
       "get": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires revisions.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "get_revision",
         "parameters": [
           {
@@ -13146,6 +13904,10 @@
         "tags": [
           "revisions"
         ],
+        "x-meridian-capabilities": [
+          "revisions.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -13155,7 +13917,7 @@
     },
     "/api/revisions/{revision}/approve": {
       "post": {
-        "description": "Requires approve scope, or a scope that covers it. Only an admin token may approve a revision proposed by the same caller.",
+        "description": "Requires revisions.approve capabilities. Compatible presets: approve, including scopes that cover them. Only an admin token may approve a revision proposed by the same caller.",
         "operationId": "approve_revision",
         "parameters": [
           {
@@ -13255,7 +14017,14 @@
         "tags": [
           "revisions"
         ],
+        "x-meridian-capabilities": [
+          "revisions.approve"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
+        "x-meridian-extra-capabilities": {
+          "self_approval": "revisions.approve_own"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "approve"
@@ -13264,7 +14033,7 @@
     },
     "/api/revisions/{revision}/result": {
       "post": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires fleet.apply capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "record_revision_result",
         "parameters": [
           {
@@ -13400,6 +14169,10 @@
         "tags": [
           "revisions"
         ],
+        "x-meridian-capabilities": [
+          "fleet.apply"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -13409,7 +14182,7 @@
     },
     "/api/servers": {
       "get": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires fleet.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "server_usage",
         "responses": {
           "200": {
@@ -13472,6 +14245,10 @@
         "tags": [
           "servers"
         ],
+        "x-meridian-capabilities": [
+          "fleet.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -13481,7 +14258,7 @@
     },
     "/api/settings": {
       "get": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires fleet.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "get_settings",
         "responses": {
           "200": {
@@ -13544,6 +14321,10 @@
         "tags": [
           "settings"
         ],
+        "x-meridian-capabilities": [
+          "fleet.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -13551,7 +14332,7 @@
         ]
       },
       "put": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires fleet.apply capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "put_settings",
         "requestBody": {
           "content": {
@@ -13650,6 +14431,10 @@
         "tags": [
           "settings"
         ],
+        "x-meridian-capabilities": [
+          "fleet.apply"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -13659,7 +14444,7 @@
     },
     "/api/subscription/preview": {
       "post": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires fleet.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "subscription_preview",
         "requestBody": {
           "content": {
@@ -13771,6 +14556,10 @@
         "tags": [
           "subscription"
         ],
+        "x-meridian-capabilities": [
+          "fleet.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -13778,9 +14567,86 @@
         ]
       }
     },
+    "/api/token-capabilities": {
+      "get": {
+        "description": "Requires api.read capabilities. Compatible presets: read or people, including scopes that cover them.",
+        "operationId": "token_capabilities",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityCatalog"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Read action capabilities, compatible presets, and effective permission labels.",
+        "tags": [
+          "token-capabilities"
+        ],
+        "x-meridian-capabilities": [
+          "api.read"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "read",
+          "people"
+        ]
+      }
+    },
     "/api/tokens": {
       "get": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires tokens.read capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "list_tokens",
         "responses": {
           "200": {
@@ -13843,6 +14709,10 @@
         "tags": [
           "tokens"
         ],
+        "x-meridian-capabilities": [
+          "tokens.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -13850,7 +14720,7 @@
         ]
       },
       "post": {
-        "description": "Requires admin scope, or a scope that covers it. The token secret is shown only in this response. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires tokens.issue capabilities. Compatible presets: admin, including scopes that cover them. The token secret is shown only in this response. This response can contain credentials; keep it private and do not log it.",
         "operationId": "create_token",
         "requestBody": {
           "content": {
@@ -13949,7 +14819,123 @@
         "tags": [
           "tokens"
         ],
+        "x-meridian-capabilities": [
+          "tokens.issue"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": true,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "admin"
+        ]
+      }
+    },
+    "/api/tokens/preview": {
+      "post": {
+        "description": "Requires tokens.issue capabilities. Compatible presets: admin, including scopes that cover them.",
+        "operationId": "preview_token",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPreview"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Preview a token's effective permissions and expiry without issuing it.",
+        "tags": [
+          "tokens"
+        ],
+        "x-meridian-capabilities": [
+          "tokens.issue"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "admin"
@@ -13958,7 +14944,7 @@
     },
     "/api/tokens/{token_id}": {
       "delete": {
-        "description": "Requires admin scope, or a scope that covers it.",
+        "description": "Requires tokens.revoke capabilities. Compatible presets: admin, including scopes that cover them.",
         "operationId": "revoke_token",
         "parameters": [
           {
@@ -14045,6 +15031,10 @@
         "tags": [
           "tokens"
         ],
+        "x-meridian-capabilities": [
+          "tokens.revoke"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -14054,7 +15044,7 @@
     },
     "/api/traffic": {
       "get": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires fleet.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "traffic",
         "responses": {
           "200": {
@@ -14117,6 +15107,10 @@
         "tags": [
           "traffic"
         ],
+        "x-meridian-capabilities": [
+          "fleet.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -14126,7 +15120,7 @@
     },
     "/api/traffic/daily": {
       "get": {
-        "description": "Requires read scope, or a scope that covers it. Other query options are ignored. Daily history must be enabled by the operator.",
+        "description": "Requires fleet.read capabilities. Compatible presets: read, including scopes that cover them. Other query options are ignored. Daily history must be enabled by the operator.",
         "operationId": "daily_traffic",
         "parameters": [
           {
@@ -14230,6 +15224,10 @@
         "tags": [
           "traffic"
         ],
+        "x-meridian-capabilities": [
+          "fleet.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -14239,7 +15237,7 @@
     },
     "/api/users": {
       "get": {
-        "description": "Requires read or people scope, or a scope that covers it. User UUIDs and subscription tokens are blank unless the caller has people or admin scope; private notes and tags follow the same rule. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them. User UUIDs and subscription tokens need people.credentials; private notes and tags need people.private. These fields are otherwise blank, including in mutation responses. People and admin presets include both. This response can contain credentials; keep it private and do not log it.",
         "operationId": "list_users",
         "responses": {
           "200": {
@@ -14302,7 +15300,15 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": true,
+        "x-meridian-extra-capabilities": {
+          "credentials": "people.credentials",
+          "private_metadata": "people.private"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "read",
@@ -14310,7 +15316,7 @@
         ]
       },
       "patch": {
-        "description": "Requires people scope, or a scope that covers it. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.edit capabilities. Compatible presets: people, including scopes that cover them. This response can contain credentials; keep it private and do not log it.",
         "operationId": "patch_user",
         "requestBody": {
           "content": {
@@ -14422,14 +15428,22 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.edit"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": true,
+        "x-meridian-extra-capabilities": {
+          "credentials": "people.credentials",
+          "private_metadata": "people.private"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "people"
         ]
       },
       "post": {
-        "description": "Requires people scope, or a scope that covers it. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.edit capabilities. Compatible presets: people, including scopes that cover them. This response can contain credentials; keep it private and do not log it.",
         "operationId": "create_user",
         "requestBody": {
           "content": {
@@ -14541,7 +15555,15 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.edit"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": true,
+        "x-meridian-extra-capabilities": {
+          "credentials": "people.credentials",
+          "private_metadata": "people.private"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "people"
@@ -14550,7 +15572,7 @@
     },
     "/api/users/preview": {
       "post": {
-        "description": "Requires people scope, or a scope that covers it. Requires a people-capable API token or an authenticated owner session. Returns dates only.",
+        "description": "Requires people.edit capabilities. Compatible presets: people, including scopes that cover them. Requires a people-capable API token or an authenticated owner session. Returns dates only.",
         "operationId": "preview_user_schedule",
         "requestBody": {
           "content": {
@@ -14662,6 +15684,10 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.edit"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -14671,7 +15697,7 @@
     },
     "/api/users/{username}": {
       "delete": {
-        "description": "Requires people scope, or a scope that covers it. People tokens cannot remove or reissue a person declared by an approved, applied, or failed fleet revision; use the meridian CLI. Setting cut_off to true also requires admin scope.",
+        "description": "Requires people.remove capabilities. Compatible presets: people, including scopes that cover them. Removing or reissuing a person declared by an approved, applied, or failed revision needs fleet.apply. Owner sessions use the meridian CLI. Setting cut_off to true also requires commands.cut_off.",
         "operationId": "delete_user",
         "parameters": [
           {
@@ -14809,6 +15835,18 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.remove"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-conditional-capabilities": [
+          {
+            "capability": "commands.cut_off",
+            "equals": true,
+            "field": "cut_off",
+            "mode": "additional"
+          }
+        ],
         "x-meridian-conditional-scopes": [
           {
             "equals": true,
@@ -14819,13 +15857,16 @@
           }
         ],
         "x-meridian-credentials": false,
+        "x-meridian-extra-capabilities": {
+          "declared_people": "fleet.apply"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "people"
         ]
       },
       "get": {
-        "description": "Requires read or people scope, or a scope that covers it. User UUIDs and subscription tokens are blank unless the caller has people or admin scope; private notes and tags follow the same rule. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them. User UUIDs and subscription tokens need people.credentials; private notes and tags need people.private. These fields are otherwise blank, including in mutation responses. People and admin presets include both. This response can contain credentials; keep it private and do not log it.",
         "operationId": "get_user",
         "parameters": [
           {
@@ -14912,7 +15953,15 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": true,
+        "x-meridian-extra-capabilities": {
+          "credentials": "people.credentials",
+          "private_metadata": "people.private"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "read",
@@ -14920,7 +15969,7 @@
         ]
       },
       "patch": {
-        "description": "Requires people scope, or a scope that covers it. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.edit capabilities. Compatible presets: people, including scopes that cover them. This response can contain credentials; keep it private and do not log it.",
         "operationId": "update_user",
         "parameters": [
           {
@@ -15043,14 +16092,22 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.edit"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": true,
+        "x-meridian-extra-capabilities": {
+          "credentials": "people.credentials",
+          "private_metadata": "people.private"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "people"
         ]
       },
       "put": {
-        "description": "Requires people scope, or a scope that covers it. No request body is read. A missing person starts active with default limits. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.edit capabilities. Compatible presets: people, including scopes that cover them. No request body is read. A missing person starts active with default limits. This response can contain credentials; keep it private and do not log it.",
         "operationId": "put_user",
         "parameters": [
           {
@@ -15124,7 +16181,15 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.edit"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": true,
+        "x-meridian-extra-capabilities": {
+          "credentials": "people.credentials",
+          "private_metadata": "people.private"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "people"
@@ -15133,7 +16198,7 @@
     },
     "/api/users/{username}/connections": {
       "get": {
-        "description": "Requires people scope, or a scope that covers it. Each connection URI and format URL connects as the person. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.credentials capabilities. Compatible presets: people, including scopes that cover them. Each connection URI and format URL connects as the person. This response can contain credentials; keep it private and do not log it.",
         "operationId": "user_connections",
         "parameters": [
           {
@@ -15220,6 +16285,10 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.credentials"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": true,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -15229,7 +16298,7 @@
     },
     "/api/users/{username}/cut-off": {
       "get": {
-        "description": "Requires read scope, or a scope that covers it.",
+        "description": "Requires commands.read capabilities. Compatible presets: read, including scopes that cover them.",
         "operationId": "cut_off_scope",
         "parameters": [
           {
@@ -15316,6 +16385,10 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "commands.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -15325,7 +16398,7 @@
     },
     "/api/users/{username}/devices": {
       "delete": {
-        "description": "Requires people scope, or a scope that covers it.",
+        "description": "Requires people.devices capabilities. Compatible presets: people, including scopes that cover them.",
         "operationId": "clear_user_devices",
         "parameters": [
           {
@@ -15412,6 +16485,10 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.devices"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -15419,7 +16496,7 @@
         ]
       },
       "get": {
-        "description": "Requires read or people scope, or a scope that covers it.",
+        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them.",
         "operationId": "user_devices",
         "parameters": [
           {
@@ -15506,6 +16583,10 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -15516,7 +16597,7 @@
     },
     "/api/users/{username}/devices/{device_key}": {
       "delete": {
-        "description": "Requires people scope, or a scope that covers it.",
+        "description": "Requires people.devices capabilities. Compatible presets: people, including scopes that cover them.",
         "operationId": "delete_user_device",
         "parameters": [
           {
@@ -15614,6 +16695,10 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.devices"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -15623,7 +16708,7 @@
     },
     "/api/users/{username}/extend": {
       "post": {
-        "description": "Requires people scope, or a scope that covers it. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.edit capabilities. Compatible presets: people, including scopes that cover them. This response can contain credentials; keep it private and do not log it.",
         "operationId": "extend_user",
         "parameters": [
           {
@@ -15746,7 +16831,15 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.edit"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": true,
+        "x-meridian-extra-capabilities": {
+          "credentials": "people.credentials",
+          "private_metadata": "people.private"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "people"
@@ -15755,7 +16848,7 @@
     },
     "/api/users/{username}/flow-blocks": {
       "get": {
-        "description": "Requires read or people scope, or a scope that covers it. Blocked covers new TCP streams and UDP associations. Already dispatched flows may continue.",
+        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them. Blocked covers new TCP streams and UDP associations. Already dispatched flows may continue.",
         "operationId": "user_flow_blocks",
         "parameters": [
           {
@@ -15842,6 +16935,10 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -15852,7 +16949,7 @@
     },
     "/api/users/{username}/reissue": {
       "post": {
-        "description": "Requires people scope, or a scope that covers it. People tokens cannot remove or reissue a person declared by an approved, applied, or failed fleet revision; use the meridian CLI. Setting cut_off to true also requires admin scope. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.reissue capabilities. Compatible presets: people, including scopes that cover them. Removing or reissuing a person declared by an approved, applied, or failed revision needs fleet.apply. Owner sessions use the meridian CLI. Setting cut_off to true also requires commands.cut_off. This response can contain credentials; keep it private and do not log it.",
         "operationId": "reissue_user",
         "parameters": [
           {
@@ -15990,6 +17087,18 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.reissue"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-conditional-capabilities": [
+          {
+            "capability": "commands.cut_off",
+            "equals": true,
+            "field": "cut_off",
+            "mode": "additional"
+          }
+        ],
         "x-meridian-conditional-scopes": [
           {
             "equals": true,
@@ -16000,6 +17109,11 @@
           }
         ],
         "x-meridian-credentials": true,
+        "x-meridian-extra-capabilities": {
+          "credentials": "people.credentials",
+          "declared_people": "fleet.apply",
+          "private_metadata": "people.private"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "people"
@@ -16008,7 +17122,7 @@
     },
     "/api/users/{username}/reset-traffic": {
       "post": {
-        "description": "Requires people scope, or a scope that covers it. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.reset capabilities. Compatible presets: people, including scopes that cover them. This response can contain credentials; keep it private and do not log it.",
         "operationId": "reset_user_traffic",
         "parameters": [
           {
@@ -16095,7 +17209,15 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.reset"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": true,
+        "x-meridian-extra-capabilities": {
+          "credentials": "people.credentials",
+          "private_metadata": "people.private"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "people"
@@ -16104,7 +17226,7 @@
     },
     "/api/users/{username}/rotate-credentials": {
       "post": {
-        "description": "Requires people scope, or a scope that covers it. Preserves device registrations and operator settings. Read the current credential_generation first. Owner and people callers use the CLI for a declared person. Optional cut_off also requires admin. Setting cut_off to true also requires admin scope. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.reissue capabilities. Compatible presets: people, including scopes that cover them. Preserves device registrations and operator settings. Read the current credential_generation first. A declared person also needs fleet.apply; owner sessions use the CLI. Optional cut_off also requires commands.cut_off. Setting cut_off to true also requires commands.cut_off. This response can contain credentials; keep it private and do not log it.",
         "operationId": "rotate_credentials",
         "parameters": [
           {
@@ -16243,6 +17365,18 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.reissue"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-conditional-capabilities": [
+          {
+            "capability": "commands.cut_off",
+            "equals": true,
+            "field": "cut_off",
+            "mode": "additional"
+          }
+        ],
         "x-meridian-conditional-scopes": [
           {
             "equals": true,
@@ -16253,6 +17387,11 @@
           }
         ],
         "x-meridian-credentials": true,
+        "x-meridian-extra-capabilities": {
+          "credentials": "people.credentials",
+          "declared_people": "fleet.apply",
+          "private_metadata": "people.private"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "people"
@@ -16261,7 +17400,7 @@
     },
     "/api/users/{username}/usage": {
       "get": {
-        "description": "Requires read or people scope, or a scope that covers it. Other query options are ignored. Daily history must be enabled by the operator.",
+        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them. Other query options are ignored. Daily history must be enabled by the operator.",
         "operationId": "user_usage",
         "parameters": [
           {
@@ -16387,6 +17526,10 @@
         "tags": [
           "users"
         ],
+        "x-meridian-capabilities": [
+          "people.read"
+        ],
+        "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
@@ -16407,6 +17550,85 @@
       "url": ".."
     }
   ],
+  "x-meridian-capability-grants": {
+    "admin": [
+      "api.read",
+      "backup.edit",
+      "backup.read",
+      "commands.cut_off",
+      "commands.read",
+      "commands.restart",
+      "commands.run",
+      "console.read",
+      "fleet.apply",
+      "fleet.read",
+      "nodes.enroll",
+      "owner.read",
+      "people.batch",
+      "people.bulk",
+      "people.credentials",
+      "people.devices",
+      "people.edit",
+      "people.private",
+      "people.query",
+      "people.read",
+      "people.reissue",
+      "people.remove",
+      "people.reset",
+      "revisions.approve",
+      "revisions.approve_own",
+      "revisions.propose",
+      "revisions.read",
+      "settings.edit",
+      "tokens.issue",
+      "tokens.read",
+      "tokens.revoke",
+      "topology.read"
+    ],
+    "approve": [
+      "api.read",
+      "commands.read",
+      "console.read",
+      "fleet.read",
+      "people.read",
+      "revisions.approve",
+      "revisions.propose",
+      "revisions.read",
+      "topology.read"
+    ],
+    "people": [
+      "api.read",
+      "people.batch",
+      "people.credentials",
+      "people.devices",
+      "people.edit",
+      "people.private",
+      "people.query",
+      "people.read",
+      "people.reissue",
+      "people.remove",
+      "people.reset"
+    ],
+    "propose": [
+      "api.read",
+      "commands.read",
+      "console.read",
+      "fleet.read",
+      "people.read",
+      "revisions.propose",
+      "revisions.read",
+      "topology.read"
+    ],
+    "read": [
+      "api.read",
+      "commands.read",
+      "console.read",
+      "fleet.read",
+      "people.read",
+      "revisions.read",
+      "topology.read"
+    ]
+  },
   "x-meridian-scope-grants": {
     "admin": [
       "read",

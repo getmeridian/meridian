@@ -5,6 +5,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 ## Design decisions
 - **People queries share SQL predicates** — cursor pages use monotonic identities, contextual counts, and the same selection across surfaces.
 - **Bulk reviews freeze names and versions** — previews stay in bounded memory; one transaction stores the receipt and composes documents.
+- **Capabilities freeze at issuance** — the route catalog owns base, body-choice, and response-field grants; compatible scopes expand once, while the separate immutable grant can later compose with access-profile bounds. Credentials and private metadata are independent permissions on every typed person result.
 - **Person routes have one catalog** — `person_route_catalog.py` owns account declarations; `route_metadata.py` keeps shared refusals and credential annotations.
 - **Service owns users, deployer owns topology** — the reconciler PUTs node specs, endpoints, and users over the admin API; the service composes each node's whole document (`node_documents.py`), signs it, and serves it to that node's agent. Client-IP forwarding is not ported yet, so `--client-ips` is hidden.
 - **Stdlib HTTP on loopback** — `ThreadingHTTPServer` behind nginx's secret path (stripped, so routes are `/api`, `/agent/v1`, `/sub`); a thread per long-poll is cheap at Meridian's fleet sizes, and `control/` never imports the deployer. `route_catalog.py` declares every `/api` operation (scopes, models, errors, credential marker) and drives dispatch, authorization, and `openapi.py`; `route_table.py` owns matching.
@@ -36,12 +37,15 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - A proposal whose intent contains a secret-shaped key or value, or a malformed `access` block, is refused and never stored.
 
 ## Pitfalls
+- **Redaction preserves supplied fields** — copy only changed values, or omitted bulk action parameters become supplied nulls and invalidate the review.
+- **Bulk grants keep legacy boundaries** — query and batch grants stay separate from reads and credential imports; their tag-bearing views also require private metadata permission.
 - **Bulk deletion carries every retired identity** — compose once with all removed records so each node queues the same receipts as a single deletion, without rotating keys.
 - **Undo shares bulk enforcement** — restore requested choices before judging status, and check managed inbound capacity before composing.
 - **Bulk before is enforced** — project both sides from one account clock, re-check every target before writing, and catch up due resets before schedule edits.
 - **Bulk after stays reviewed** — re-check the projected result at commit; a newly due action schedule needs a fresh review.
 - **Bulk applies use canonical enforcement** — write validated requested fields before enforcing, or quota restoration emits the wrong event and cap edits lose their renewal interval.
 - **Credential text matters to Hysteria2** — imported UUID case changes its auth even when VLESS treats the UUID as equal; advance the generation on the actual stored key change.
+- **Delegation re-reads its issuer** — minting must re-check revocation, permissions, expiry, and owner step-up in the insert transaction; preview emits no secret, event, or backup pull.
 - **Schedules share directional baselines** — renewal and rolling resets clear both directions and carried period use; imports initialize the same projection before enforcement, preserving lifetime totals.
 - **First use means accepted traffic** — subscription and page reads never activate; renewal progress, period offsets, and effective status change in the traffic transaction before new growth.
 - **Renewal anchors survive short months** — expiry or interval edits start a new series, cap edits keep progress, and missed renewals consume the cap with one period reset.

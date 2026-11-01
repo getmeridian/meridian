@@ -574,6 +574,19 @@ meridian logs [SERVER] [--lines N] [--grep TEXT] [--component NAME]
 
 Если у сервера нет роли в топологии или запрошен `--component`, который на нём не используется, команда сразу завершится с кодом `2` без подключения по SSH. Если прочитать какой-либо журнал не удалось (служба не найдена или прервалось SSH-соединение), он помечается как недоступный, а команда возвращает код `3`.
 
+### meridian token
+
+Выдавайте токены для отдельных действий. Сначала проверяйте права; секрет показывается один раз.
+
+```bash
+meridian token capabilities [--json]
+meridian token list [--json]
+meridian token create NAME [--capability ACTION ... | --scope PRESET] [--expires-days DAYS | --expires-at UTC | --never-expires] [--dry-run] [--yes] [--json]
+meridian token revoke TOKEN_ID [--yes] [--json]
+```
+
+Выберите один набор --scope или повторяйте --capability. По умолчанию токен действует 90 дней; бессрочный режим задаётся явно через --never-expires. --dry-run ничего не выпускает. Для изменений в JSON нужен --yes. JSON хранит проверенные права в data.preview и показывает data.issued.token только при выпуске.
+
 ### meridian panel
 
 Выводит адрес веб-панели, а если пароль владельца ещё не задан — одноразовую ссылку для первоначальной настройки.

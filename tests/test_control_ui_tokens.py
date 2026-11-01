@@ -3,29 +3,21 @@
 from __future__ import annotations
 
 import json
-import subprocess
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from meridian.control.ui_routes import UI_DIR
-from tests.support.console_dom import needs_console_dom
+from tests.support.console_dom import needs_console_dom, run_console
 
 ROOT = Path(__file__).resolve().parents[1]
 pytestmark = needs_console_dom
 
 
 def _run(mode: str = "default", locale: str = "en") -> dict[str, Any]:
-    result = subprocess.run(
-        ["node", str(ROOT / "tests/control_ui_tokens.mjs"), str(UI_DIR), mode, locale],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=30,
-    )
-    return dict(json.loads(result.stdout))
+    return run_console("token-expiry-" + mode, locale)
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
@@ -35,6 +27,7 @@ def test_new_console_tokens_default_to_ninety_days_and_keep_the_body_after_step_
     assert result["expiries"] == ["7", "30", "90", "never"]
     assert "people" in result["scopes"]
     assert len(result["writes"]) == 2
+    assert result["writesBeforeCreate"] == 0
     assert all(write["csrf"] == "1" for write in result["writes"])
     assert (
         result["writes"][0]["body"]
@@ -42,16 +35,23 @@ def test_new_console_tokens_default_to_ninety_days_and_keep_the_body_after_step_
         == {
             "name": "People desk",
             "scope": "people",
-            "expires_in_days": 90,
+            "expires_at": "2027-01-27T12:00:00.000Z",
         }
     )
-    assert result["events"] == ["GET:api/tokens", "POST:api/tokens", "step-up", "POST:api/tokens", "GET:api/tokens"]
+    assert result["events"][:3] == ["GET:api/tokens", "GET:api/token-capabilities", "POST:api/tokens/preview"]
+    assert "step-up" in result["events"]
 
 
 @pytest.mark.parametrize(("choice", "days"), [("7", 7), ("30", 30), ("90", 90), ("never", None)])
-def test_the_console_sends_the_chosen_duration_or_explicit_null(choice: str, days: int | None) -> None:
+def test_the_console_issues_the_reviewed_expiry_or_explicit_never(choice: str, days: int | None) -> None:
     result = _run(choice)
-    assert result["writes"][-1]["body"]["expires_in_days"] == days
+    body = result["writes"][-1]["body"]
+    if days is None:
+        assert body["never_expires"] is True and "expires_at" not in body
+    else:
+        assert datetime.fromisoformat(body["expires_at"]) == datetime.fromisoformat("2026-10-29T12:00:00Z") + timedelta(
+            days=days
+        )
 
 
 def test_cancelling_token_creation_sends_no_write_or_step_up() -> None:

@@ -11,7 +11,6 @@ long-poll costs little at fleet sizes Meridian targets.
 
 from __future__ import annotations
 
-import hmac
 import json
 import re
 import shutil
@@ -29,11 +28,12 @@ from pydantic import BaseModel, ValidationError
 from meridian import __version__
 from meridian.control import ui_routes
 from meridian.control.account_schedule_models import UserSchedulePreviewRequest
+from meridian.control.api_auth import authorize_api, authorize_body, bearer_token, visible_result, visible_user
 from meridian.control.api_models import DeletedResource, DeployerStateReceipt, UserList
 from meridian.control.blobs import BlobStore, fleet_artifacts, served_hashes
 from meridian.control.command_models import NodeCommandRequest, UserCutOffRequest
 from meridian.control.delivery_routes import DELIVERY_OWNER_ROUTES
-from meridian.control.enrollment import Session, token_sha256
+from meridian.control.enrollment import Session
 from meridian.control.errors import ServiceError, agent_error
 from meridian.control.http_errors import api_error_response, error_page, validation_message
 from meridian.control.login_limits import LockedOut
@@ -56,7 +56,6 @@ from meridian.control.models import (
     UserPatch,
     UserRecord,
     UserUpdate,
-    scope_covers,
 )
 from meridian.control.openapi import openapi_document
 from meridian.control.operations_api import read_attention, read_events, read_history_days
@@ -68,8 +67,9 @@ from meridian.control.route_types import ApiRoute
 from meridian.control.service import ControlService
 from meridian.control.subscriptions import unknown_subscription
 from meridian.control.times import utc_now
-from meridian.control.tokens import ROOT, WEB_OWNER, Caller, unauthenticated
-from meridian.control.ui_routes import UI_ROUTES, UiContext, owner_session
+from meridian.control.token_capabilities import capability_catalog
+from meridian.control.tokens import Caller, unauthenticated
+from meridian.control.ui_routes import UI_ROUTES, UiContext
 from meridian.control.user_access import refuse_declared
 from meridian.core.agent_http import AGENT_HTTP_SURFACE
 from meridian.core.agent_protocol import (
@@ -194,11 +194,7 @@ class _Handler(BaseHTTPRequestHandler):
     # -- authentication ------------------------------------------------------------------
 
     def _bearer(self) -> str:
-        header = self.headers.get("Authorization", "")
-        scheme, _, token = header.partition(" ")
-        if scheme.lower() != "bearer" or not token:
-            raise unauthenticated()
-        return token.strip()
+        return bearer_token(self.headers)
 
     def _authorize(self, needed: ScopeRequirement) -> Caller:
         """The request's caller: 401 for a missing, wrong, or revoked token, 403 when its scope falls short.
@@ -206,21 +202,7 @@ class _Handler(BaseHTTPRequestHandler):
         A request without `Authorization` may instead carry the web owner's session
         cookie, which holds the admin scope (writes also need the UI's CSRF header).
         """
-        if not self.headers.get("Authorization") and self.headers.get("Cookie"):
-            owner_session(self)
-            caller = WEB_OWNER
-        else:
-            token = self._bearer()
-            if hmac.compare_digest(token_sha256(token), self.server.admin_token_sha256):
-                caller = ROOT
-            else:
-                caller = self.server.service.tokens.authenticate(token)
-        requirements = (needed,) if isinstance(needed, str) else needed
-        if not any(scope_covers(caller.scope, scope) for scope in requirements):
-            raise ServiceError(
-                "insufficient_scope", f"This needs a token with the {' or '.join(requirements)} scope.", 403
-            )
-        return caller
+        return authorize_api(self, needed)
 
     @property
     def _service(self) -> ControlService:
@@ -259,7 +241,9 @@ class _Handler(BaseHTTPRequestHandler):
     def _model(self, model: type[ModelT]) -> ModelT:
         if self.api_route is not None and self.api_route.request_model is not model:
             raise RuntimeError("The request model differs from the route catalog.")
-        return model.model_validate_json(self._body())
+        result = model.model_validate_json(self._body())
+        authorize_body(self, result)
+        return result
 
     def _raw(self) -> tuple[bytes, Any]:
         body = self._body()
@@ -269,6 +253,8 @@ class _Handler(BaseHTTPRequestHandler):
             raise agent_error("invalid_request", "The body is not JSON.") from exc
 
     def _json(self, status: int, body: Any) -> None:
+        if self.caller is not None:
+            body = visible_result(body, self.caller)
         if isinstance(body, BaseModel):
             body = body.model_dump(mode="json")
         data = json.dumps(body, ensure_ascii=False).encode("utf-8")
@@ -409,9 +395,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _visible(self, user: UserRecord) -> UserRecord:
         """A user as this caller may see them: the VLESS UUID and subscription token connect as the user."""
-        if self.caller is not None and scope_covers(self.caller.scope, "people"):
-            return user
-        return user.model_copy(update={"uuid": "", "sub_token": "", "note": "", "tag": ""})
+        return visible_user(user, self._caller())
 
     def put_user(self, match: re.Match[str]) -> Any:
         return self._service.put_user(match[1])
@@ -444,7 +428,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def rotate_credentials(self, match: re.Match[str]) -> Any:
         request = self._model(CredentialRotationRequest)
-        self._body_scopes(request)
+        authorize_body(self, request)
         with self._refuse_declared(match[1], "meridian client rotate-credentials"):
             return self._service.rotate_credentials(
                 match[1], expected_generation=request.expected_generation, cut_off=request.cut_off
@@ -458,14 +442,8 @@ class _Handler(BaseHTTPRequestHandler):
         request = UserCutOffRequest.model_validate_json(body) if body else UserCutOffRequest()
         if self.api_route is None or self.api_route.request_model is not UserCutOffRequest:
             raise RuntimeError("The cut-off request has no route declaration.")
-        self._body_scopes(request)
+        authorize_body(self, request)
         return request.cut_off
-
-    def _body_scopes(self, request: BaseModel) -> None:
-        assert self.api_route is not None
-        for condition in self.api_route.body_scopes:
-            if getattr(request, condition.field) == condition.equals:
-                self._authorize(condition.scope)
 
     def reset_user_traffic(self, match: re.Match[str]) -> Any:
         return self._service.reset_user_traffic(match[1])
@@ -514,16 +492,17 @@ class _Handler(BaseHTTPRequestHandler):
         session = self.owner_session
         if session is None:
             return self._service.tokens.issue(request, issuer=self.caller)
-        # An admin token would reach every route `OWNER_ROUTES` keeps from the console.
-        if request.scope == "admin":
-            raise ServiceError(
-                "insufficient_scope", "The console can create read, propose, approve, or people tokens.", 403
-            )
         owner = self._service.owner
         return self._service.tokens.issue(request, issuer=self.caller, still_allowed=lambda: owner.hold_recent(session))
 
     def list_tokens(self, _match: re.Match[str]) -> Any:
         return self._service.tokens.list_tokens()
+
+    def token_capabilities(self, _match: re.Match[str]) -> Any:
+        return capability_catalog()
+
+    def preview_token(self, _match: re.Match[str]) -> Any:
+        return self._service.tokens.preview(self._model(TokenCreate), issuer=self._caller())
 
     def revoke_token(self, match: re.Match[str]) -> Any:
         return self._service.tokens.revoke(match[1], caller=self._caller())
@@ -690,6 +669,8 @@ OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
         _Handler.command_targets,
         _Handler.issue_command,
         _Handler.list_tokens,
+        _Handler.token_capabilities,
+        _Handler.preview_token,
         _Handler.create_token,
         _Handler.revoke_token,
         _Handler.list_revisions,

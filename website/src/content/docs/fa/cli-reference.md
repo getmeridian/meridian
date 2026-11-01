@@ -574,6 +574,19 @@ meridian logs [SERVER] [--lines N] [--grep TEXT] [--component NAME]
 
 سروری بدون نقش در ناوگان، یا `--component` که اجرا نمی‌کند، پیش از اتصال با کد `2` خارج می‌شود. لاگی که خوانده نشود (سرویس جاافتاده، قطع شدن اتصال SSH) به‌صورت غیرقابل دسترس نشان داده می‌شود و دستور با کد `3` خارج می‌شود.
 
+### meridian token
+
+توکن را برای عملیات مشخص صادر کنید. ابتدا دسترسی‌ها را بررسی کنید؛ مقدار محرمانه یک بار نمایش داده می‌شود.
+
+```bash
+meridian token capabilities [--json]
+meridian token list [--json]
+meridian token create NAME [--capability ACTION ... | --scope PRESET] [--expires-days DAYS | --expires-at UTC | --never-expires] [--dry-run] [--yes] [--json]
+meridian token revoke TOKEN_ID [--yes] [--json]
+```
+
+یک --scope یا چند --capability انتخاب کنید. اعتبار پیش‌فرض ۹۰ روز است؛ --never-expires انتخاب صریح بدون انقضا است. --dry-run توکن نمی‌سازد. تغییر در JSON به --yes نیاز دارد. بررسی در data.preview و مقدار محرمانه فقط هنگام صدور در data.issued.token است.
+
 ### meridian panel
 
 نشانی پنل وب را نشان می‌دهد و تا وقتی پنل مالک ندارد، یک لینک راه‌اندازی یک‌بارمصرف هم می‌دهد.

@@ -96,7 +96,7 @@ def test_a_proposer_may_not_approve_their_own_revision_without_admin(fleet: Flee
     with fleet.client(approver) as bot, fleet.client(reviewer) as other:
         proposed = bot.propose_revision(_proposal())
         assert proposed.author.name == "ci-bot" and proposed.author.token_id is not None
-        with pytest.raises(ControlServiceScopeError, match="proposed itself"):
+        with pytest.raises(ControlServiceScopeError, match="revisions.approve_own"):
             bot.approve_revision(proposed.number)
         approved = other.approve_revision(proposed.number)
 

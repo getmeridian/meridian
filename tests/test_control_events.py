@@ -266,7 +266,7 @@ def test_event_api_is_read_scoped_and_paginates_with_secret_free_token_events(tm
         cursor = page["next_cursor"]
         second = httpx.get(url + f"/api/events?after={cursor}&limit=1", headers=headers).json()
         assert second["events"][0]["kind"] == "token.created"
-        assert second["events"][0]["detail"] == {"name": "reader", "scope": "read"}
+        assert second["events"][0]["detail"] == {"name": "reader", "scope": "read", "capabilities": read.capabilities}
         admin.revoke_token(read.id)
         admin.revoke_token(read.id)
         final = httpx.get(url + f"/api/events?after={second['next_cursor']}", headers=root_headers).json()
@@ -450,7 +450,11 @@ def test_expiring_people_token_events_use_registry_time_and_keep_only_names_and_
     issued = service.tokens.issue(TokenCreate(name="people-tool", scope="people", expires_in_days=1), issuer=ROOT)
     created = service.events.list().events[-1]
     assert created.kind == "token.created" and created.time == issued.created_at == NOW
-    assert created.to_data()["detail"] == {"name": "people-tool", "scope": "people"}
+    assert created.to_data()["detail"] == {
+        "name": "people-tool",
+        "scope": "people",
+        "capabilities": issued.capabilities,
+    }
     assert issued.expires_at == "2026-11-02T12:00:00Z"
     clock[0] += 86400
     with pytest.raises(ServiceError, match="Authentication required"):
