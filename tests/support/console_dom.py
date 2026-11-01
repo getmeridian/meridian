@@ -34,9 +34,11 @@ def run_console(mode: str, locale: str = "en", data: Any = None) -> dict[str, An
     }
     runner = next((name for prefix, name in runners.items() if mode.startswith(prefix)), "control_ui_console.mjs")
     mode = mode.removeprefix("command-")
+    # The scenario travels on stdin: Linux caps a single argument at 128 KiB.
     result = subprocess.run(
-        ["node", str(ROOT / "tests" / runner), str(UI_DIR), mode, locale, json.dumps(data)],
+        ["node", str(ROOT / "tests" / runner), str(UI_DIR), mode, locale, "-"],
         cwd=ROOT,
+        input=json.dumps(data),
         capture_output=True,
         text=True,
         check=True,

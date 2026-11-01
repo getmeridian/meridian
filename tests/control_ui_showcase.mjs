@@ -7,7 +7,8 @@ import { createRequire } from 'node:module';
 const require = createRequire(new URL('../website/package.json', import.meta.url));
 const { JSDOM } = require('jsdom');
 const [, , , mode, locale, input] = process.argv;
-const data = JSON.parse(input);
+// Large scenarios arrive on stdin: Linux caps one argument at 128 KiB.
+const data = JSON.parse(input === '-' ? fs.readFileSync(0, 'utf8') : input);
 const directory = path.resolve(data.directory);
 const html = fs.readFileSync(path.join(directory, 'console/index.html'), 'utf8');
 const dom = new JSDOM(html, { url: `https://198.51.100.1/demo/console/?lang=${locale}`, runScripts: 'outside-only', pretendToBeVisual: true });
