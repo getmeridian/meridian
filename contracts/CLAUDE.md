@@ -14,6 +14,7 @@
 - **People period counters** — administrative records compose `PeriodTraffic`; unattributed historical use is a disclosed subset of download, and both directions sum to period use.
 - **Subscriber device slots** — `device-slots` exports used/allowed integers only; `/info` omits this optional projection when there is no countable device limit.
 - **Attention activity cases** — `unused` means never used after its creation threshold; `stopped` means no recent traffic after its independent bounded threshold, with no new stored history.
+- **People triage facts** — read-only record fields publish never-used evidence, exact floored quota percentage, and default-threshold reasons without stored flags.
 
 **Generated, checked in** — `scripts/export_contracts.py` is the source of truth. Do not hand-edit files below `contracts/meridian/`.
 

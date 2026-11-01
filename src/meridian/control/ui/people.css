@@ -1,0 +1,18 @@
+/* Filters stay readable on phones; list rows retain their own DOM and focus. */
+.people-filter-card { margin-block: 1rem; }
+.people-filter-card > summary { cursor: pointer; font-weight: 600; }
+.people-filter-card[open] > summary { margin-block-end: 1rem; }
+.people-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem; }
+.people-filters .hint { margin: 0; }
+.people-sort { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; margin-block-start: 1rem; }
+.people-sort .field { flex: 1 1 10rem; }
+.people-never { justify-content: center; }
+.people-never .check-row { display: flex; align-items: center; gap: .5rem; min-height: 44px; }
+.people-tags, .people-reasons { display: flex; flex-wrap: wrap; gap: .4rem; }
+.person-tag { color: var(--t2); font-size: .75rem; }
+.people-reasons { margin-block-start: .3rem; }
+.person-reason { color: var(--warn); font-size: .75rem; }
+@media (max-width: 480px) {
+  .people-filters { grid-template-columns: 1fr; }
+  .people-filter-card { padding: 1rem; }
+}

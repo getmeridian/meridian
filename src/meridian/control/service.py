@@ -518,12 +518,13 @@ class ControlService:
     def get_user(self, username: str) -> UserRecord | None:
         with self._lock:
             row = self._db.execute(f"{USER_SELECT} WHERE u.username = ?", (username,)).fetchone()
-        return user_record(row) if row else None
+        return user_record(row, now=datetime.fromisoformat(utc_now())) if row else None
 
     def list_users(self) -> list[UserRecord]:
         with self._lock:
             rows = self._db.execute(f"{USER_SELECT} ORDER BY u.username").fetchall()
-        return [user_record(row) for row in rows]
+        moment = datetime.fromisoformat(utc_now())
+        return [user_record(row, now=moment) for row in rows]
 
     def user_connections(self, username: str) -> ClientConnections:
         return read_connections(self._store, self, username)

@@ -34,6 +34,7 @@ from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_I
 from meridian.core.inputs import ServerReferenceValue, validate_ip_address_value
 from meridian.core.languages import Language
 from meridian.core.models import CoreModel
+from meridian.core.person_activity import PersonAttentionReason
 from meridian.core.person_metadata import PersonTag, PrivateNote
 from meridian.core.server_allowances import ServerAllowanceSpec
 from meridian.core.topology import ClientRoutingPolicy, ProtocolKind, SubscriptionUpdateIntervalHours
@@ -219,6 +220,23 @@ class UserRecord(UserTrafficEvidence):
         default=0, ge=0, description="What agents counted plus what an import carried in from before."
     )
     online_at: Timestamp | None = Field(default=None, description="When an agent last counted the user's traffic.")
+    never_used: bool = Field(
+        default=False,
+        description="Derived from lifetime and activity evidence; never stored.",
+        json_schema_extra={"readOnly": True},
+    )
+    quota_used_percent: int | None = Field(
+        default=None,
+        ge=0,
+        description="Exact integer percentage of period quota, rounded down; null when unlimited.",
+        json_schema_extra={"readOnly": True},
+    )
+    attention_reasons: list[PersonAttentionReason] = Field(
+        default_factory=list,
+        max_length=3,
+        description="Derived default-threshold findings at read time; never stored.",
+        json_schema_extra={"readOnly": True},
+    )
     note: PrivateNote = Field(default="", repr=False, description="Private operator note; people/admin only.")
     tag: PersonTag = Field(default="", repr=False, description="Private operator tag; people/admin only.")
     language: Language | None = Field(

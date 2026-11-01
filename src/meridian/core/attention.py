@@ -11,13 +11,14 @@ from pydantic import Field, model_validator
 from meridian.control.models import NodeStatus, UserRecord
 from meridian.core.agent_types import NodeId, Timestamp
 from meridian.core.models import CoreModel
+from meridian.core.person_activity import PersonAttentionReason, is_never_used
 from meridian.core.server_allowances import ServerUsage
+from meridian.core.traffic import quota_percent
 
 MAX_EXPIRY_DAYS = 30
 MAX_UNUSED_DAYS = 365
 MAX_STOPPED_DAYS = MAX_UNUSED_DAYS
 MAX_PAYMENT_DAYS = 30
-PersonAttentionReason = Literal["expiring", "quota", "unused", "stopped"]
 NodeAttentionReason = Literal["offline", "apply_failed", "unhealthy"]
 ServerAttentionReason = Literal["allowance_near", "allowance_exceeded", "payment_due", "payment_overdue"]
 
@@ -68,11 +69,6 @@ class AttentionList(CoreModel):
     servers: list[ServerAttention] = Field(default_factory=list)
 
 
-def is_never_used(user: UserRecord) -> bool:
-    """No known lifetime traffic or aggregate activity, including undated imported use."""
-    return user.first_traffic_at is None and user.online_at is None and user.lifetime_traffic_bytes == 0
-
-
 def person_reasons(user: UserRecord, thresholds: AttentionThresholds, moment: datetime) -> list[PersonAttentionReason]:
     """Disjoint never-used and stopped-use findings from default aggregate evidence."""
     reasons: list[PersonAttentionReason] = []
@@ -80,10 +76,8 @@ def person_reasons(user: UserRecord, thresholds: AttentionThresholds, moment: da
         days=thresholds.expiry_days
     ):
         reasons.append("expiring")
-    if (
-        user.traffic_limit_bytes > 0
-        and user.used_traffic_bytes * 100 >= user.traffic_limit_bytes * thresholds.quota_percent
-    ):
+    share = quota_percent(user.used_traffic_bytes, user.traffic_limit_bytes)
+    if share is not None and share >= thresholds.quota_percent:
         reasons.append("quota")
     if is_never_used(user) and moment - datetime.fromisoformat(user.created_at) > timedelta(
         days=thresholds.unused_days

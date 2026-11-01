@@ -39,3 +39,4 @@
 - **Client detail carries lifetime traffic beside the period** — resetting period use never erases the lifetime figure.
 - **Period directions sum to used traffic** — `PeriodTraffic.unattributed_bytes` names the part of download whose historical direction is unknown, never a third amount to add.
 - **Never-used and stopped-use attention are disjoint** — `is_never_used` includes imported lifetime evidence; stopped use requires a known last traffic time, never a guessed import date or daily history.
+- **Quota percentages are integer evidence** — floor exact byte ratios once for attention and browser triage, or JavaScript rounds a large cap across the threshold.

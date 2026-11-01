@@ -30,7 +30,7 @@
   };
 
   function back() {
-    return h("a", { class: "back", href: "#/people" }, M.icon("back"), M.t("nav.people"));
+    return h("a", { class: "back", href: M.peopleHash || "#/people" }, M.icon("back"), M.t("nav.people"));
   }
 
   function current(screen) {

@@ -57,6 +57,8 @@ This prints the personal URL, plus status, traffic, expiry, and when the client 
 meridian client list
 ```
 
+In the web panel, open **People → Filters** to combine status, tag (including no tag), expiry within 1–365 days, quota at or above 1–100%, never used, and attention or a specific reason. Expiry covers now through the chosen future boundary; already expired accounts use the status filter. The never-used filter includes new accounts of any age. Each count respects your search and the other filters. Sort by name, period usage, expiry, or last activity, in either order; unknown dates stay last. Search, filters, and order live in the URL fragment, so reloading, sharing the link, or returning from a person preserves the view. No filter data is sent or saved on the server. The list is filtered locally; rows keep their identity while you type. The API supplies read-only `never_used`, exact floored `quota_used_percent` (null for unlimited), and default `attention_reasons`.
+
 A separate **Stopped using** reason (`stopped`) flags a person who previously used the service but has no accepted traffic for more than three days. **Never used** (`unused`) remains a separate reason. `stopped_days` is an independent API threshold from 1–365 days, default 3; `unused_days` keeps its existing bounds and default. Period resets do not erase this evidence, and daily history can stay off. Imported use with no known last traffic time is not guessed to have stopped.
 
 Shows every client with status, traffic, expiry, and last seen.

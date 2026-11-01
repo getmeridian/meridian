@@ -168,6 +168,25 @@ def test_stopped_threshold_is_independent_and_api_reads_remain_secret_free(
             assert httpx.get(url + "/api/attention?" + query, headers=headers).status_code == 400
 
 
+def test_people_reads_include_the_shared_default_triage_facts(service: ControlService) -> None:
+    _person(service, "never", age=4)
+    _person(service, "stopped", used=80, age=10, last_used="2026-10-28T12:00:00Z", limit=100)
+    findings = {person.username: person.reasons for person in service.attention(now=NOW).people}
+    before = service._db.total_changes
+    for user in service.list_users():
+        data = user.to_data()
+        assert data["never_used"] is (user.username == "never")
+        assert data["quota_used_percent"] == (80 if user.username == "stopped" else None)
+        assert data["attention_reasons"] == findings[user.username]
+    assert service._db.total_changes == before
+
+
+def test_quota_triage_does_not_round_a_large_limit_up_to_the_attention_threshold(service: ControlService) -> None:
+    _person(service, "large", limit=9007199254740997, used=7205759403792797)
+    user = service.get_user("large")
+    assert user is not None and user.quota_used_percent == 79 and user.attention_reasons == []
+
+
 def test_node_attention_uses_liveness_apply_failures_and_nonhealthy_reported_health(service: ControlService) -> None:
     for name in ("good", "offline", "failed", "unhealthy", "degraded", "unseen"):
         service.put_node_spec(name, _spec())

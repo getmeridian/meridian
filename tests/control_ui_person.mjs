@@ -85,6 +85,7 @@ M.renderServers = view => M.mount(view, M.h('h1', { text: M.t('nav.servers') }))
 M.renderRevisions = M.renderTokens = () => null;
 load('auth.js');
 load('people.js');
+load('people-list.js');
 load('expiry.js');
 load('person-connections.js');
 if (mode === 'person-device-race' || mode === 'person-devices') load('devices.js');

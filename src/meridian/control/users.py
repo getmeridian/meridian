@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from meridian.control.models import UserRecord
-from meridian.core.traffic import period_usage
+from meridian.core.attention import AttentionThresholds, person_reasons
+from meridian.core.person_activity import is_never_used
+from meridian.core.traffic import period_usage, quota_percent
 
 USER_FIELDS = (
     "username",
@@ -35,12 +38,12 @@ USER_SELECT = (
 )
 
 
-def user_record(row: Any) -> UserRecord:
+def user_record(row: Any, *, now: datetime) -> UserRecord:
     *stored, lifetime, up, down, up_offset, down_offset, carried, online_at, first_traffic_at, last_traffic_node = (
         tuple(row)
     )
     usage = period_usage(up, down, upload_offset=up_offset, download_offset=down_offset, carried_bytes=carried)
-    return UserRecord.model_validate(
+    record = UserRecord.model_validate(
         {
             **dict(zip(USER_FIELDS, stored, strict=True)),
             "lifetime_traffic_bytes": lifetime,
@@ -49,5 +52,13 @@ def user_record(row: Any) -> UserRecord:
             "online_at": online_at,
             "first_traffic_at": first_traffic_at,
             "last_traffic_node": last_traffic_node,
+        }
+    )
+    return UserRecord.model_validate(
+        {
+            **record.to_data(),
+            "never_used": is_never_used(record),
+            "quota_used_percent": quota_percent(record.used_traffic_bytes, record.traffic_limit_bytes),
+            "attention_reasons": person_reasons(record, AttentionThresholds(), now),
         }
     )

@@ -31,6 +31,22 @@
   "additionalProperties": false,
   "description": "One access user as the service stores it.\n\nThe operator sets `active` or `disabled`; the service's enforcement turns an\nactive user `expired` once `expire_at` passes and `limited` at the traffic limit,\nand back once a change or a new traffic period lifts it.",
   "properties": {
+    "attention_reasons": {
+      "description": "Derived default-threshold findings at read time; never stored.",
+      "items": {
+        "enum": [
+          "expiring",
+          "quota",
+          "unused",
+          "stopped"
+        ],
+        "type": "string"
+      },
+      "maxItems": 3,
+      "readOnly": true,
+      "title": "Attention Reasons",
+      "type": "array"
+    },
     "created_at": {
       "description": "RFC 3339 timestamp in UTC, ending in Z.",
       "maxLength": 40,
@@ -126,6 +142,13 @@
       "title": "Lifetime Traffic Bytes",
       "type": "integer"
     },
+    "never_used": {
+      "default": false,
+      "description": "Derived from lifetime and activity evidence; never stored.",
+      "readOnly": true,
+      "title": "Never Used",
+      "type": "boolean"
+    },
     "note": {
       "default": "",
       "description": "Private operator note; people/admin only.",
@@ -151,6 +174,21 @@
     },
     "period_traffic": {
       "$ref": "#/$defs/PeriodTraffic"
+    },
+    "quota_used_percent": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Exact integer percentage of period quota, rounded down; null when unlimited.",
+      "readOnly": true,
+      "title": "Quota Used Percent"
     },
     "status": {
       "enum": [

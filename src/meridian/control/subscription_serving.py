@@ -48,7 +48,7 @@ def serve_subscription(
         row = store.db.execute(f"{USER_SELECT} WHERE u.sub_token = ?", (sub_token,)).fetchone()
         if row is None:
             return unknown_subscription()
-        record = user_record(row)
+        record = user_record(row, now=datetime.fromtimestamp(clock(), UTC))
         bodies = [item[0] for item in store.db.execute("SELECT body FROM endpoints").fetchall()]
         settings = read_settings()
         privacy = read_privacy()

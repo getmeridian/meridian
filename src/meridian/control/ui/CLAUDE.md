@@ -8,6 +8,7 @@
 - **The console changes only what the service owns** — people, tokens, privacy, notices, fleet language, and signed unit restarts. Topology (servers, routing, contact, title, allowances) is read-only and shows the `meridian` command that changes it, because the next apply would undo a console edit.
 - **People the deployer declared stay the deployer's** — users in the last applied revision's intent; removal and reissue show the CLI command, and the service refuses both to owner sessions and people tokens (`declared_user`).
 - **Person drafts live only in memory** — changed forms guard navigation and dismissal with Leave/Stay, and visible reads refresh passively without replacing edits.
+- **People triage lives in the fragment** — validated filters and sorting survive reloads and person navigation; rows stay mounted, and facet counts apply the other active filters and search.
 - **Same locale approach as the PWA** — `locales/{en,ru,fa,zh}.json`, English fallback, `fa` sets `dir="rtl"`, numbers and sizes bidi-isolated.
 - **Passkeys are a seam** — `PasskeyState` reports `no_domain` on a bare IP and `not_built` otherwise; py_webauthn would add pyOpenSSL, pyasn1, and cbor2 to every CLI install, and attestation is never parsed by hand.
 

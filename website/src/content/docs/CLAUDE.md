@@ -8,6 +8,7 @@
 **Browser reissue** — client-management.md explains the shared cut-off review, separate per-node outcomes, and new credentials surviving a failed cut-off.
 **Subscriber device slots** — privacy, connecting, and client-management guides disclose count-only `/info`, full-slot refresh behaviour, uncounted apps, and memory-only page display.
 **Activity attention** — CLI and client guides distinguish `unused` from `stopped`, disclose their independent day thresholds, and keep unknown imported activity unclassified.
+**People triage** — client-management.md describes fragment persistence, contextual filter counts, integer bounds, any-age never-used filtering, and missing dates sorting last.
 **API tokens** — the API-token section in client-management explains scoped issuance, authenticated OpenAPI discovery, credential/scope markers, cut-off permissions, and the separate people capability with its credential access and transactional declared-user refusals; operation tables are checked against the committed admin contract by `scripts/validate_api_docs.py`.
 **Subscription guides** — explain Automatic-first Xray profiles and single-primary routing without mixing fingerprint alternatives, plus transient format preview, shared live rules, omissions, redacted headers, API-managed endpoint disabling, and reviewed apply restoration.
 **Client routing policy** — split-routing.md documents reviewed `ru-split | full`, private/LAN and best-effort Xray BitTorrent bypasses, format limits, subscription refresh, read-only console settings, and separate exit geo-blocking.

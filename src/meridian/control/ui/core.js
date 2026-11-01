@@ -411,11 +411,15 @@
   M.has = function (object, key) { return Object.prototype.hasOwnProperty.call(object, key); };
 
   M.route = function () {
-    var parts = location.hash.replace(/^#\/?/, "").split("/").map(decodePart);
-    return { name: parts[0] || "people", arg: parts[1] || "", extra: parts[2] || "" };
+    var hash = location.hash.replace(/^#\/?/, ""), queryAt = hash.indexOf("?");
+    var parts = (queryAt < 0 ? hash : hash.slice(0, queryAt)).split("/").map(decodePart);
+    var route = { name: parts[0] || "people", arg: parts[1] || "", extra: parts[2] || "" };
+    if (queryAt >= 0) route.query = hash.slice(queryAt + 1);
+    return route;
   };
   M.go = function (name, arg) {
     var hash = "#/" + name + (arg ? "/" + encodeURIComponent(arg) : "");
+    if (name === "people" && !arg && M.peopleHash) hash = M.peopleHash;
     if (M.navigate) return M.navigate(hash);
     if (location.hash === hash && M.render) M.render();
     else location.hash = hash;

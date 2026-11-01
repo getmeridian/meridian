@@ -9,10 +9,10 @@ from pydantic import Field
 
 from meridian.control.command_models import NodeCommandOutcome
 from meridian.control.models import UserStatus, UserUsage
-from meridian.core.attention import PersonAttentionReason
 from meridian.core.client_limits import canonical_expiry, traffic_reset_from_strategy
 from meridian.core.languages import Language
 from meridian.core.models import CoreModel
+from meridian.core.person_activity import PersonAttentionReason
 from meridian.core.person_metadata import PersonTag, PrivateNote
 from meridian.core.topology import ProtocolKind
 from meridian.core.traffic import UserTrafficEvidence

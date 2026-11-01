@@ -19,6 +19,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - **Connection pages at subscriptions** — a browser at `/sub/<token>` gets the page, apps get their format, `/info` stays JSON (`subscription_serving.py`, `connection_pages.py`); shared assets live at token-free `/sub/~pwa/` (`~` is outside the token alphabet).
 - **Derived reads write nothing** — attention and the previews read one view under the store lock and store no request data; `events.py` appends typed facts inside each mutation's transaction.
 - **Stopped-use attention is aggregate evidence** — its own bounded day threshold compares last accepted traffic, including after a period reset; unknown activity stays unknown.
+- **People triage facts are derived reads** — records expose never-used, exact quota percentage, and default attention reasons from shared predicates; no filter flags or request data are stored.
 
 ## What's done well
 - A revision is signed only when the resources' hash or the signing certificate changes, so repeated applies never wake agents.

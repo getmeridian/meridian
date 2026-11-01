@@ -38,6 +38,11 @@ def period_usage(
     )
 
 
+def quota_percent(used_bytes: int, limit_bytes: int) -> int | None:
+    """Floor of exact percentage use; unlimited has no quota share."""
+    return used_bytes * 100 // limit_bytes if limit_bytes > 0 else None
+
+
 class UserTrafficEvidence(CoreModel):
     first_traffic_at: Timestamp | None = Field(
         default=None, description="When the service first accepted traffic growth; unknown for historical use."
