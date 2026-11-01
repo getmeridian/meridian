@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 import typer
@@ -16,6 +17,7 @@ from meridian.console import confirm, err_console, error_context, fail, is_json_
 from meridian.control.access_limits import limit_update
 from meridian.control.client import ControlClient, ControlServiceError, ControlServiceUncertain
 from meridian.control.http_errors import validation_message
+from meridian.control.times import utc_now
 from meridian.core.errors import MeridianError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -26,6 +28,7 @@ from meridian.core.people_bulk import (
     BulkFields,
     BulkPersonChange,
     BulkPreviewRequest,
+    BulkReceipt,
     ClientBulkResult,
 )
 from meridian.core.queries import bounded_integer
@@ -185,13 +188,27 @@ def run_bulk(action: BulkActionName, options: dict[str, Any]) -> None:
                     )
                 except ControlServiceUncertain:
                     # Never repeat an uncertain write; a receipt is safe to read.
-                    try:
-                        receipt = client.bulk_receipt(review.id)
-                    except ControlServiceError:
-                        fail(t("bulk.uncertain", id=review.id), hint_type="system")
+                    receipt = reconcile_receipt(client, review.id)
                 emit_result(command, ClientBulkResult(preview=review, receipt=receipt, applied=True), operation)
         except ControlServiceError as exc:
             fail(exc)
+
+
+def reconcile_receipt(client: ControlClient, receipt_id: str, *, undo: bool = False) -> BulkReceipt:
+    try:
+        receipt = client.bulk_receipt(receipt_id)
+    except ControlServiceError:
+        fail(t("bulk.uncertain", id=receipt_id), hint_type="system")
+    if undo and not receipt.undone_at:
+        fail(t("bulk.uncertain", id=receipt_id), hint_type="system")
+    return receipt
+
+
+def require_undo_eligible(receipt: BulkReceipt) -> None:
+    if receipt.undo_until is None or receipt.undone_at:
+        fail(t("bulk.undo_unavailable"), hint_type="user")
+    if datetime.fromisoformat(utc_now()) > datetime.fromisoformat(receipt.undo_until):
+        fail(t("bulk.undo_expired"), hint_type="user")
 
 
 def run_receipt(receipt_id: str, *, undo: bool = False, yes: bool = False, dry_run: bool = False) -> None:
@@ -204,14 +221,17 @@ def run_receipt(receipt_id: str, *, undo: bool = False, yes: bool = False, dry_r
         try:
             with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
                 receipt = client.bulk_receipt(receipt_id)
+                if undo:
+                    require_undo_eligible(receipt)
                 if not is_json_mode():
                     preview_table(receipt.people, undo=undo)
                 if undo and not dry_run:
-                    if receipt.undo_until is None or receipt.undone_at:
-                        fail(t("bulk.undo_unavailable"), hint_type="user")
                     if not yes and not confirm(t("bulk.undo_confirm", count=receipt.counts.changed)):
                         raise typer.Exit(1)
-                    receipt = client.undo_bulk(receipt_id)
+                    try:
+                        receipt = client.undo_bulk(receipt_id)
+                    except ControlServiceUncertain:
+                        receipt = reconcile_receipt(client, receipt_id, undo=True)
                 emit_result(command, ClientBulkResult(receipt=receipt, applied=undo and not dry_run), operation)
         except ControlServiceError as exc:
             fail(exc)

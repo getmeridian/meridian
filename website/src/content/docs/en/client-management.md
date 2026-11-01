@@ -61,6 +61,8 @@ People, `client list`, and bulk selection use one server query: username/display
 
 Background refreshes keep selection, bulk actions, pagination, and keyboard focus available. A failed refresh keeps the current rows and controls usable; failed Next or Previous requests retain the last loaded page so the pager can retry.
 
+A lost commit or undo reply is checked by reading the receipt; undo is confirmed only when the receipt records that it was undone. The console keeps that updated receipt and reads it again when you reopen it. `client bulk undo ID --dry-run` checks that the receipt is reversible, has not been undone, and is still within its undo window without sending a write; the final undo also checks live people and inbound capacity.
+
 A separate **Stopped using** reason (`stopped`) flags a person who previously used the service but has no accepted traffic for more than three days. **Never used** (`unused`) remains a separate reason. `stopped_days` is an independent API threshold from 1–365 days, default 3; `unused_days` keeps its existing bounds and default. Period resets do not erase this evidence, and daily history can stay off. Imported use with no known last traffic time is not guessed to have stopped.
 
 ## Private notes and tags

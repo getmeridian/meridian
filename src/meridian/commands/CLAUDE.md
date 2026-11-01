@@ -20,6 +20,7 @@
 - `client remove|reissue --cut-off` discloses every affected node and other people's reconnects before confirming, and keeps typed per-node outcomes and new links even on failure.
 
 ## Pitfalls
+- **Undo dry runs check the receipt** — reject irreversible, already-undone, or expired receipts; uncertain undo succeeds only after reading its recorded completion.
 - **`console.fail()` always exits** (user 2, system 3, bug 1) — entry points convert library `MeridianError`s with `fail(exc)`, or the user sees a traceback.
 - **Catch control-service errors inside the command's `error_context`** — it supplies JSON metadata but catches nothing; a non-retryable poll error is a failed outcome, not a timeout.
 - **A local save failure after a remote change exits 3** and says remote state changed.

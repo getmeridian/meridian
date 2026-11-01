@@ -32,6 +32,7 @@ newest first; the last is what 4.0 changes compared with 3.x.
   the fleet default. Remnawave migration keeps device caps, including zero.
 
 #### Fixed
+- CLI and console reconcile lost undo replies through receipts, retain the updated console receipt, and reject unavailable undo dry runs.
 - People background refreshes preserve selection controls and keyboard focus; failed refreshes and page requests keep actions and pagination usable.
 - Client-list JSON preserves integer facet counts for secret-shaped tags such as TOKEN and API_KEY.
 - Bulk undo emits the same lifecycle events as commit and refuses an over-capacity managed inbound without changing people or the receipt.

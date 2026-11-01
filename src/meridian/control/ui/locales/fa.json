@@ -645,7 +645,7 @@
   "bulk.undone": "تغییرات برگشت داده شد.",
   "bulk.undo_unavailable": "این رسید امکان برگشت ندارد.",
   "bulk.preview_only": "پیش‌نمایش آماده است. تغییری اعمال نشد.",
-  "bulk.uncertain": "پاسخ ثبت دریافت نشد. رسید {id} را با meridian client bulk receipt {id} بررسی کنید؛ تا روشن شدن نتیجه، عملیات جایگزین نسازید.",
+  "bulk.uncertain": "پاسخ عملیات دریافت نشد. برای بررسی نتیجه، رسید {id} را باز کنید.",
   "bulk.list_count": "نمایش {shown} نفر از {total} فرد مطابق.",
   "bulk.select_page": "انتخاب این صفحه",
   "bulk.select_person": "انتخاب {name}",

@@ -645,7 +645,7 @@
   "bulk.undone": "更改已撤销。",
   "bulk.undo_unavailable": "此操作回执无法撤销。",
   "bulk.preview_only": "预览已就绪。尚未应用任何更改。",
-  "bulk.uncertain": "提交回复未收到。使用 meridian client bulk receipt {id} 查看回执 {id}；确认结果前请勿创建替代操作。",
+  "bulk.uncertain": "未收到操作回复。请打开回执 {id} 查看结果。",
   "bulk.list_count": "显示 {total} 个匹配人员中的 {shown} 人。",
   "bulk.select_page": "选择本页",
   "bulk.select_person": "选择 {name}",

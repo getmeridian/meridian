@@ -62,10 +62,21 @@
         onclick: function () {
           if (busy) return;
           busy = true; close.lock(true); undo.disabled = true; error.textContent = "";
-          M.api("POST", "api/people/bulk/undo", { receipt_id: receipt.id }).then(function (updated) {
-            receipt = updated; draw(); if (done) done(updated);
-          }, function (failure) { error.textContent = errorText(failure); undo.disabled = false; })
-            .finally(function () { busy = false; close.lock(false); });
+          function accepted(updated) {
+            receipt = updated; M.lastBulkReceipt = updated; draw(); if (done) done(updated);
+          }
+          function unresolved() {
+            error.textContent = M.t("bulk.uncertain", { id: receipt.id }); undo.disabled = true;
+          }
+          M.api("POST", "api/people/bulk/undo", { receipt_id: receipt.id }).then(accepted, function (failure) {
+            if (failure.uncertain) {
+              return M.api("GET", "api/people/bulk/receipts/" + receipt.id).then(function (updated) {
+                M.lastBulkReceipt = updated;
+                if (updated.undone_at) accepted(updated); else unresolved();
+              }, unresolved);
+            }
+            error.textContent = errorText(failure); undo.disabled = false;
+          }).finally(function () { busy = false; close.lock(false); });
         } });
       function draw() {
         M.mount(details, [
@@ -161,7 +172,13 @@
       text: M.t("bulk.preview"), onclick: function () { action(select.value, options.selection(), options.done); } });
     var clear = h("button", { type: "button", class: "btn btn-ghost btn-sm", text: M.t("bulk.clear"), onclick: options.clear });
     var receipt = h("button", { type: "button", class: "btn btn-ghost btn-sm", text: M.t("bulk.receipt_title"), hidden: !M.lastBulkReceipt,
-      onclick: function () { if (M.lastBulkReceipt) M.showBulkReceipt(M.lastBulkReceipt, options.done); } });
+      onclick: function () {
+        if (!M.lastBulkReceipt || receipt.disabled) return;
+        receipt.disabled = true;
+        M.api("GET", "api/people/bulk/receipts/" + M.lastBulkReceipt.id).then(function (updated) {
+          M.lastBulkReceipt = updated; M.showBulkReceipt(updated, options.done);
+        }, function (failure) { M.toast(errorText(failure), "error"); }).finally(function () { receipt.disabled = false; });
+      } });
     var nodes = h("div", { class: "card people-bulk-bar" }, count, matching, select, preview, clear, receipt);
     return { nodes: nodes, matching: matching, update: function (selected, total, all, ready) {
       count.setAttribute("data-bulk-count", String(selected));

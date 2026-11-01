@@ -16,7 +16,7 @@ w.Date.now = () => Date.parse('2026-11-01T12:00:00Z');
 w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
 w.HTMLDialogElement.prototype.close = function () { this.open = false; };
 const catalog = JSON.parse(fs.readFileSync(path.join(ui, 'locales', locale + '.json')));
-const requests = [], report = {};
+const requests = [], report = { receiptReads: 0 };
 let committed = false, undone = false, commits = 0, undos = 0, pendingRead;
 w.fetch = async (url, options = {}) => {
   requests.push(url);
@@ -40,7 +40,17 @@ w.fetch = async (url, options = {}) => {
     commits++; report.commitRequest = JSON.parse(options.body);
     if (data.stale) { status = 409; body = { error: { code: 'stale_people', message: 'p-a changed. Preview again.', subjects: ['p-a'] } }; }
     else { committed = true; body = data.receipt; }
-  } else if (url === 'api/people/bulk/undo') { undos++; undone = true; body = data.undone; }
+  } else if (url === 'api/people/bulk/undo') {
+    undos++;
+    if (data.uncertainUndo === 'not_committed') throw new Error('The undo reply was lost.');
+    undone = true;
+    if (data.uncertainUndo) throw new Error('The undo reply was lost.');
+    body = data.undone;
+  } else if (url.startsWith('api/people/bulk/receipts/')) {
+    report.receiptReads = (report.receiptReads || 0) + 1;
+    if (data.uncertainUndo === 'unavailable') { status = 503; body = { error: { code: 'unavailable', message: 'Try again.' } }; }
+    else body = undone ? data.undone : data.receipt;
+  }
   else throw new Error('Unexpected request: ' + url);
   return { ok: status === 200, status, headers: { get: () => null }, text: async () => JSON.stringify(body) };
 };
@@ -127,6 +137,15 @@ if (mode === 'people-bulk-refresh') {
     w.document.querySelector('[data-bulk-undo]').click();
     await settle();
     report.dialog = w.document.querySelector('dialog')?.textContent || '';
+    report.lastReceiptUndone = !!M.lastBulkReceipt?.undone_at;
+    report.error = w.document.querySelector('dialog .form-error')?.textContent || '';
+    report.undoDisabled = w.document.querySelector('[data-bulk-undo]')?.disabled;
+    if (report.lastReceiptUndone || !data.uncertainUndo) {
+      w.document.querySelector('.dialog-head button').click(); await settle();
+      [...w.document.querySelectorAll('.people-bulk-bar button')].find(button => button.textContent === M.t('bulk.receipt_title')).click();
+      await settle();
+      report.reopenedUndoHidden = w.document.querySelector('[data-bulk-undo]')?.hidden;
+    }
   }
   report.sameRows = [...w.document.querySelectorAll('a.row-link')].every((el, index) => rows[index] === el);
 }

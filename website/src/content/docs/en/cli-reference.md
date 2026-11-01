@@ -185,6 +185,8 @@ Private metadata: `client set NAME --note TEXT --tag TAG` edits only the supplie
 
 `client list` shows the first 100 matches. `--limit 1–500` sets page size; `--cursor VALUE` continues the same query. JSON adds `total`, contextual `facets`, and optional `next_cursor`; summary counts describe the returned page. `client bulk ACTION` uses the same query, freezes a preview, shows a table, confirms, and commits atomically. `--dry-run` returns the preview only; JSON commit and undo require `--yes`. Exact `--person USERNAME` selection cannot be combined with filters. Read receipts with `client bulk receipt ID`; undo unchanged reversible fields with `client bulk undo ID`. A lost commit reply is resolved by reading the receipt.
 
+A lost commit or undo reply is checked by reading the receipt; undo is confirmed only when the receipt records that it was undone. The console keeps that updated receipt and reads it again when you reopen it. `client bulk undo ID --dry-run` checks that the receipt is reversible, has not been undone, and is still within its undo window without sending a write; the final undo also checks live people and inbound capacity.
+
 JSON facet counts stay integers for every valid tag, including tags such as `TOKEN` or `API_KEY`.
 
 Bulk previews show the enforced state before the action, including expiry and refills already due. An action that changes no fields is counted as unchanged. Commit checks that state again for every selected person, including deletions; if a limit or schedule has changed, the refusal names the people to preview again. Refills use the commit time, and undo preserves enforcement that was already due before review.
