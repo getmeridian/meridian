@@ -219,6 +219,16 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         ],
         stability="stable",
     ),
+    "client.rotate-credentials": CommandOutput(
+        data_schema="client-rotate-credentials",
+        outcomes=[
+            _ok("connection credentials rotated; subscription URL preserved"),
+            _ok("credentials rotated but an explicit cut-off timed out", exit_code=3),
+            _ok("credentials rotated but an explicit cut-off failed", exit_code=4),
+            *_FAILURES,
+        ],
+        stability="stable",
+    ),
     "client.reissue": CommandOutput(
         data_schema="client-reissue",
         outcomes=[

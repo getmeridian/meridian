@@ -130,6 +130,7 @@ meridian client devices NAME [--remove ID | --clear] [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
 meridian client reissue NAME [--cut-off] [--yes] [--json]
+meridian client rotate-credentials NAME [--cut-off] [--yes] [--json]
 meridian client remove NAME [--cut-off] [--yes] [--json]
 ```
 
@@ -141,7 +142,7 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 | `--limit SIZE` | none | Traffic limit (`client add`, `client set`): `500MB`, `50GB`, `1.5TB`; `none` or `0` removes it. Units are binary (1 GB = 1024³ bytes), as the control service counts |
 | `--reset PERIOD` | never | When used traffic starts again from zero: `day`, `week`, `month`, or `never`, by calendar day, week, or month |
 | `--expires DATE` | never | When access ends: `YYYY-MM-DD` (the end of that day, UTC), an ISO time such as `2026-12-31T18:00:00+03:00` (a time without an offset is UTC), or `never`. Must be in the future |
-| `--yes`, `-y` | | Confirm `client reissue` or `client remove`; required with `--json` |
+| `--yes`, `-y` | | Confirm `client reissue`, `client rotate-credentials`, or `client remove`; required with `--json` |
 
 **`client add`** — adds one or more people to the topology, applies it, and prints each person's connection page and subscription URL. The page is built from their real subscription, so relays and Hysteria2 appear when present. Names already in the topology or already present in the control service are refused. Names can be in any script (`client add Биба 王小明`): pages and output show them as typed, while the control service, which accepts only Latin letters, digits, `.`, `-`, and `_`, gets a transliterated username (`biba`, `wangxiaoming`). Other client commands accept either form. If a client's subscription link can't be built, the client is still added and the command exits `3`. `--limit`, `--reset`, `--expires`, and `--devices` are carried in the reviewed plan and created with each account in one transaction. A failed apply prints no links; rerun `meridian apply` to finish. Later applies preserve operator edits.
 
@@ -164,6 +165,10 @@ First reported traffic and the last reporting node come from accepted traffic gr
 **`client extend`** — adds 1–3650 whole days after the later of now and the current expiry; a person without expiry gets now plus that duration. `--days N` is required. The calculation and enforcement share one service transaction, so concurrent extensions both count. An expired person can connect again, while operator disable and traffic limits still apply. JSON returns the effective status and expiry in `data.client`.
 
 **`client enable` / `client disable`** — resume or suspend access. New connections are blocked after each node applies the change. A disable lasts until `client enable`; reviewed applies preserve it.
+
+**`client rotate-credentials`** — Use `meridian client rotate-credentials NAME --yes` when connection credentials need replacing. It generates a new VLESS UUID and Hysteria2 auth while keeping the subscription token, page URL, device registrations, status, limits, expiry, traffic, notes, tags, and language. Apps receive the keys on their next subscription refresh; ask the person to refresh now. Old identities lose new streams as each node applies the change. A leaked subscription URL requires `client reissue`, which issues a new URL and clears device registrations.
+
+The web panel offers **Rotate connection keys** for people added there. Declared people use the CLI, following the same ownership rule as reissue. CLI JSON requires `--yes` and returns `client-rotate-credentials`, including the generation and per-node `flow_blocks`. Optional `--cut-off` also ends existing flows with the disclosed shared-inbound reset or node-wide core restart.
 
 **`client reissue`** — replaces a client's links after a leak. The control service issues a new subscription ID and new keys, so the old subscription URL, connection page, and links stop working. Meridian prints the new subscription URL, which also opens the new connection page. Status, limits, and expiry stay as set. Asks for confirmation unless `--yes`, and refuses names that aren't your clients.
 

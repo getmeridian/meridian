@@ -26,6 +26,7 @@ from meridian.control.client import (
     ControlServiceScopeError,
 )
 from meridian.control.command_models import NodeCommandRecord
+from meridian.control.credential_models import UserCredentialRotation
 from meridian.control.models import (
     PrivacySettings,
     PrivacyState,
@@ -40,6 +41,7 @@ from meridian.core.account_schedule import LIFECYCLE_FIELDS, AccountLifecycleSta
 from meridian.core.attention import AttentionList
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientLimitChange
+from meridian.core.client_sessions import CredentialRotationRequest
 from meridian.core.clients import ClientConnections
 from meridian.core.fleet import FleetTopology
 from meridian.core.languages import LanguageSettings, LanguageState
@@ -79,6 +81,13 @@ class ServiceAccessPanel:
     def get_user(self, username: str) -> User | None:
         record = _translated(lambda: self._client.get_user(username))
         return self._user(record) if record is not None else None
+
+    def user_credentials(self, username: str) -> UserRecord | None:
+        """Typed credential metadata for a generation-checked rotation."""
+        return self._client.get_user(username)
+
+    def rotate_credentials(self, username: str, request: CredentialRotationRequest) -> UserCredentialRotation:
+        return self._client.rotate_credentials(username, request)
 
     def list_users(self) -> list[User]:
         return [self._user(record) for record in _translated(self._client.list_users)]

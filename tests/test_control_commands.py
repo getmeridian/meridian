@@ -583,9 +583,6 @@ def test_schema_fourteen_keeps_token_expiry_accounting_and_events_from_schema_th
     with sqlite3.connect(path) as db:
         db.execute("DROP TABLE commands")
         db.execute("DROP TABLE agent_command_capabilities")
-        db.execute("DROP TABLE user_flow_blocks")
-        db.execute("ALTER TABLE users DROP COLUMN credential_generation")
-        db.execute("ALTER TABLE nodes DROP COLUMN agent_capabilities")
         drop_person_metadata_schema(db)
         db.execute("UPDATE meta SET value = '13' WHERE key = 'schema_version'")
     migrated = ControlService(path, fleet_id=FLEET_ID, version="4.0.0", clock=clock)

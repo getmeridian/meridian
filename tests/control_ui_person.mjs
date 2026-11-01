@@ -64,6 +64,7 @@ w.fetch = (url, options = {}) => {
   if (url.startsWith('ui/api/people/sample/expiry')) return Promise.resolve(reply({ expire_at: data.preview, months: data.months }));
   if (url.startsWith('ui/api/people/')) return Promise.resolve(reply({ ...share, username: url.split('/')[3] }));
   if (url.endsWith('/devices')) return Promise.resolve(reply(data.devices || { level: 'private', count: 1, limit: user.device_limit || 3, devices: [] }));
+  if (url.endsWith('/cut-off')) return Promise.resolve(reply(data.plan || { nodes: [{ node_id: 'main', inbound_tags: ['vless'], effect: 'core_restart' }] }));
   if (url === 'api/users/sample') {
     if (failInitial) return Promise.resolve(reply({ error: { code: 'network' } }, 503));
     const round = (rounds.get(url) || 0) + 1;
@@ -110,6 +111,7 @@ load('people-bulk.js'); load('people-bulk-fields.js'); load('people-list.js');
 load('expiry.js');
 if (fs.existsSync(path.join(ui, 'lifecycle.js'))) load('lifecycle.js');
 load('person-connections.js');
+if (mode === 'person-credential-rotation') load('commands.js');
 if (mode === 'person-device-race' || mode === 'person-devices') load('devices.js');
 load('person.js');
 load('settings.js');
@@ -572,6 +574,31 @@ if (mode === 'person-period-traffic') {
   const card = view().querySelector('.cards .card-slot');
   report.facts = [...card.querySelector('dl').children].map(el => el.textContent);
   report.note = card.querySelector('p.muted')?.textContent || '';
+}
+
+if (mode === 'person-credential-rotation') {
+  const rotate = button('person.rotate');
+  report.found = !!rotate;
+  if (rotate) {
+    const note = view().querySelector('textarea');
+    note.value = 'Private draft'; note.dispatchEvent(new w.Event('input', { bubbles: true }));
+    rotate.click(); await settle();
+    report.beforeConfirm = writes.slice();
+    const dialog = w.document.querySelector('dialog');
+    const checkbox = dialog?.querySelector('input[name="cut-off"]');
+    if (checkbox) checkbox.checked = !!data.cutOff;
+    dialog?.querySelector('.btn-danger')?.click();
+    await settle();
+    rotate.click(); await settle();
+    user = { ...user, credential_generation: 2 };
+    share.flow_blocks = { username: 'sample', credential_generation: 2, nodes: [] };
+    for (const resolve of pending.splice(0)) resolve(reply({ user, subscription_preserved: true, flow_blocks: share.flow_blocks, commands: [] }));
+    await settle(); await settle();
+    report.draft = view().querySelector('textarea')?.value;
+    report.disabledAfter = button('person.rotate')?.disabled;
+  }
+  report.text = view().textContent;
+  report.writes = writes.map(write => write.body);
 }
 
 if (mode === 'person-flow-blocks') {

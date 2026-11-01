@@ -182,7 +182,7 @@ def test_stale_reports_or_a_new_epoch_never_claim_blocked_and_reads_write_nothin
     assert service.user_flow_blocks("alice").nodes[0].status == "pending_node"
 
 
-def test_schema_seventeen_gains_one_generation_and_receipts_step(tmp_path: Path):
+def test_schema_nineteen_gains_one_generation_and_receipts_step(tmp_path: Path):
     import sqlite3
 
     path = tmp_path / "old.db"
@@ -190,10 +190,10 @@ def test_schema_seventeen_gains_one_generation_and_receipts_step(tmp_path: Path)
     user = service.put_user("alice")
     service.close()
     with sqlite3.connect(path) as database:
-        database.execute("DROP TABLE user_flow_blocks")
-        database.execute("ALTER TABLE users DROP COLUMN credential_generation")
-        database.execute("ALTER TABLE nodes DROP COLUMN agent_capabilities")
-        database.execute("UPDATE meta SET value = '17' WHERE key = 'schema_version'")
+        from tests.support.control_service import drop_people_query_schema
+
+        drop_people_query_schema(database)
+        database.execute("UPDATE meta SET value = '19' WHERE key = 'schema_version'")
     restored = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
     try:
         current = restored.get_user("alice")

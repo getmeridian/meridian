@@ -72,6 +72,9 @@ meridian fleet usage --days 7 --json
 # A link leaked: replace it (the old page and subscription stop working)
 meridian client reissue alice --yes --json
 
+# Replace connection keys while keeping the subscription URL for app refresh
+meridian client rotate-credentials alice --yes --json
+
 # Add an exit in another country, then a relay in front of it
 meridian node add 198.51.100.20 --name nl --yes
 meridian relay add 203.0.113.10 --exit nl --yes

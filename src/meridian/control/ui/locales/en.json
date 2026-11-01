@@ -728,5 +728,12 @@
   "person.flow_blocked": "New streams blocked",
   "person.flow_pending_node": "Waiting for node",
   "person.flow_agent_too_old": "Agent update required",
-  "commands.core_scope": "VLESS requires a core restart on: {nodes}. Every Xray session on these nodes ends."
+  "commands.core_scope": "VLESS requires a core restart on: {nodes}. Every Xray session on these nodes ends.",
+  "person.rotate": "Rotate connection keys",
+  "person.rotate_text": "Keeps the subscription URL and device registrations. Apps get new keys on refresh. Use a new link if this URL leaked.",
+  "person.rotate_declared": "The fleet file declares this person. Rotate their connection keys from the CLI.",
+  "person.rotate_title": "Rotate connection keys?",
+  "person.rotate_confirm": "Replace connection keys while keeping this subscription URL? Apps must refresh their subscription. Use a new link if this URL leaked.",
+  "person.rotated_toast": "Connection keys changed; the subscription URL is unchanged.",
+  "error.credentials_changed": "The connection keys changed. Refresh this person and try again."
 }

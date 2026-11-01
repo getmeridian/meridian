@@ -5,9 +5,10 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from meridian.control.account_schedule_models import UserSchedulePreviewRequest
+from meridian.control.credential_models import UserCredentialRotation
 from meridian.control.models import UserImport, UserImportBatch, UserPatch, UserRecord, UserUpdate
 from meridian.core.account_schedule import AccountLifecycleSettings, AccountSchedulePreview
-from meridian.core.client_sessions import UserFlowBlocks
+from meridian.core.client_sessions import CredentialRotationRequest, UserFlowBlocks
 from meridian.core.people_bulk import (
     BulkAction,
     BulkCommitRequest,
@@ -40,4 +41,6 @@ PEOPLE_SCHEMAS: dict[str, type[BaseModel]] = {
     "user-import": UserImport,
     "user-import-batch": UserImportBatch,
     "user-flow-blocks": UserFlowBlocks,
+    "credential-rotation-request": CredentialRotationRequest,
+    "user-credential-rotation": UserCredentialRotation,
 }

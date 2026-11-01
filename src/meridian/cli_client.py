@@ -259,6 +259,19 @@ def client_reissue_cmd(
     run_reissue(name, yes=yes, cut_off=cut_off)
 
 
+@client_app.command("rotate-credentials")
+def client_rotate_credentials_cmd(
+    name: str = typer.Argument(..., help="Client name"),
+    yes: Yes = False,
+    _json: Json = False,
+    cut_off: CutOff = False,
+) -> None:
+    """Rotate connection keys keeping the subscription URL; apps pick them up on refresh"""
+    from meridian.commands.client_credentials import run_rotate_credentials
+
+    run_rotate_credentials(name, yes=yes, cut_off=cut_off)
+
+
 @client_app.command("enable")
 def client_enable_cmd(
     name: str = typer.Argument(..., help="Client name"),

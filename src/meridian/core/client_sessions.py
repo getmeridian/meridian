@@ -9,9 +9,19 @@ from pydantic import Field
 from meridian.core.agent_types import MAX_SAFE_INTEGER, InboundTag, NodeId, NodeStateRef
 from meridian.core.models import CoreModel
 
-CredentialGeneration = Annotated[int, Field(ge=1, le=MAX_SAFE_INTEGER)]
+CredentialGeneration = Annotated[int, Field(strict=True, ge=1, le=MAX_SAFE_INTEGER)]
 FlowBlockStatus = Literal["blocked", "pending_node", "agent_too_old"]
 FlowBlockReason = Literal["disabled", "expired", "limited", "removed", "credentials", "access_changed"]
+
+
+class UserCutOffRequest(CoreModel):
+    cut_off: bool = False
+
+
+class CredentialRotationRequest(UserCutOffRequest):
+    expected_generation: CredentialGeneration = Field(
+        description="Read credential_generation from the person first; stale requests cannot rotate again."
+    )
 
 
 class UserFlowBlockNode(CoreModel):

@@ -187,6 +187,17 @@ meridian client enable alice
 
 禁用会持续到执行 `client enable`：应用、重新部署和集群变更都不会改动它。
 
+## 更换密钥并保留链接
+
+需要更换连接凭据并保留链接时，执行 `meridian client rotate-credentials NAME --yes`。它生成新的 VLESS UUID 和 Hysteria2 密码，保留订阅令牌、页面 URL、设备登记、状态、限额、到期时间、流量、备注、标签和语言。应用下次刷新订阅时获取新密钥；请用户立即刷新。各节点应用变更后会阻止旧身份的新数据流。若订阅 URL 本身泄露，请使用 `client reissue`；该命令签发新 URL 并清除设备登记。
+
+```bash
+meridian client rotate-credentials alice --yes
+```
+
+网页面板为在面板添加的用户提供**更换连接密钥**。配置文件声明的用户通过 CLI 操作，遵循与重新签发链接相同的所有权规则。JSON 模式需要 `--yes`，结果 `client-rotate-credentials` 包含凭据代次和每个节点的 `flow_blocks`。可选 `--cut-off` 也结束现有数据流；确认前会说明重置入站或重启整个节点核心的影响。
+
+
 ## 替换泄露的链接
 
 如果客户端的链接或连接页面落到了不该拿到的人手里，请替换它：
@@ -316,10 +327,13 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 | `POST /api/users/{username}/reset-traffic` | 重置已用流量 |
 | `POST /api/users/{username}/extend` | 发送 `{"days": N}`（1–3650），从当前时间和原到期时间中较晚者起增加天数；未设到期时间则从现在起算 |
 | `POST /api/users/{username}/reissue` | 更换连接凭据并清除设备注册 |
+| `POST /api/users/{username}/rotate-credentials` | 更换 VLESS UUID 和 Hysteria2 密码，保留订阅 URL 和登记；发送当前用户记录的 `expected_generation` |
 | `DELETE /api/users/{username}` | 删除用户 |
 | `GET /api/users/{username}/devices` | 按所有者选择的隐私级别读取设备注册 |
 | `DELETE /api/users/{username}/devices` | 清除全部注册 |
 | `DELETE /api/users/{username}/devices/{device_key}` | 删除一项注册 |
+
+先从 `GET /api/users/{username}` 读取 `credential_generation`，再向 `POST /api/users/{username}/rotate-credentials` 发送 `{"expected_generation": N}`。过期代次返回 `409 credentials_changed`，防止响应不确定时重试而再次更换密钥。响应包含 `user`、`subscription_preserved: true`、`flow_blocks` 和 `commands`。添加 `"cut_off": true` 需要 admin 权限，并排队执行与重新签发相同的版本门控完整终止操作。所有者会话和 people 令牌不能更换配置文件声明的用户的密钥。
 
 People 令牌无法删除服务器配置文件中声明的用户，也无法为他们重新签发连接凭据。API 会返回 `409 declared_user` 和需要运行的 CLI 命令。已经批准或失败的应用仍声明该用户时，这项限制同样有效；未经批准的提案不会声明任何用户。状态、限额、到期时间和设备上限仍可修改。
 

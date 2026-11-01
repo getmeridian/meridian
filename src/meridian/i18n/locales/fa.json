@@ -741,5 +741,21 @@
   "events.kind.people.bulk": "تغییر گروهی افراد",
   "events.bulk": "{action}: تغییر {changed} نفر از {targeted}؛ نیازمند CLI: {cli_required}.",
   "bulk.action.undo": "برگرداندن تغییر فیلدها",
-  "node_commands.cut_off_core_scope": "برای پایان نشست‌های VLESS، Xray باید در این سرورها دوباره راه‌اندازی شود: {nodes}. همهٔ نشست‌های Xray آن‌ها پایان می‌یابد."
+  "node_commands.cut_off_core_scope": "برای پایان نشست‌های VLESS، Xray باید در این سرورها دوباره راه‌اندازی شود: {nodes}. همهٔ نشست‌های Xray آن‌ها پایان می‌یابد.",
+  "client.credentials_requires_yes": "برای تغییر مشخصات اتصال در حالت JSON، گزینهٔ --yes لازم است.",
+  "client.credentials_yes_hint": "برای تأیید، --yes را اضافه کنید.",
+  "client.credentials_not_declared": "کلاینت «{name}» در پیکربندی این مجموعه تعریف نشده است.",
+  "client.credentials_console_hint": "افراد اضافه‌شده در پنل را از همان پنل یا API با دسترسی people مدیریت کنید.",
+  "client.credentials_missing": "کلاینت تعریف‌شدهٔ «{name}» در سرویس کنترل وجود ندارد.",
+  "client.credentials_apply_hint": "برای بازیابی فرد، meridian apply را اجرا کنید.",
+  "client.credentials_confirm": "کلیدهای اتصال {name} تغییر کنند؟ نشانی اشتراک همان می‌ماند. برنامه‌ها باید اشتراک را تازه کنند. اگر خود پیوند فاش شده، از reissue استفاده کنید.",
+  "client.credentials_changed": "مشخصات اتصال هنگام تأیید شما تغییر کرد.",
+  "client.credentials_refresh_hint": "اطلاعات فرد را تازه کنید و دوباره تلاش کنید.",
+  "client.credentials_rotated": "کلیدهای اتصال {name} تغییر کردند؛ نشانی اشتراک همان است.",
+  "client.credentials_refresh": "از کاربر بخواهید اشتراک را در برنامه تازه کند. برای پیوند فاش‌شده از client reissue استفاده کنید.",
+  "node_commands.flow_blocked": "جریان‌های جدید مسدود شده‌اند.",
+  "node_commands.flow_pending": "در انتظار تأیید مسدودسازی توسط سرور.",
+  "node_commands.flow_old_agent": "عامل باید به‌روز شود: meridian apply.",
+  "events.kind.user.flow_blocking": "مسدودسازی جریان‌های اتصال",
+  "events.kind.user.credentials_rotated": "کلیدهای اتصال تغییر کردند"
 }

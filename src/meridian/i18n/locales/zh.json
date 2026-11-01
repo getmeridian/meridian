@@ -741,5 +741,21 @@
   "events.kind.people.bulk": "人员批量更改",
   "events.bulk": "{action}：已更改 {targeted} 人中的 {changed} 人；{cli_required} 人需运行命令。",
   "bulk.action.undo": "撤销字段更改",
-  "node_commands.cut_off_core_scope": "以下节点需重启 Xray 才能关闭 VLESS 会话：{nodes}。这些节点上的全部 Xray 会话都会结束。"
+  "node_commands.cut_off_core_scope": "以下节点需重启 Xray 才能关闭 VLESS 会话：{nodes}。这些节点上的全部 Xray 会话都会结束。",
+  "client.credentials_requires_yes": "在 JSON 模式下更换连接凭据需要 --yes。",
+  "client.credentials_yes_hint": "添加 --yes 确认。",
+  "client.credentials_not_declared": "此配置未声明客户端“{name}”。",
+  "client.credentials_console_hint": "通过网页面板或 people API 管理面板添加的用户。",
+  "client.credentials_missing": "已声明的客户端“{name}”不在控制服务中。",
+  "client.credentials_apply_hint": "执行 meridian apply 恢复该用户。",
+  "client.credentials_confirm": "更换 {name} 的连接密钥？订阅 URL 保持不变，应用需刷新订阅。若链接本身泄露，请使用 reissue。",
+  "client.credentials_changed": "确认期间连接凭据已改变。",
+  "client.credentials_refresh_hint": "刷新用户信息后重试。",
+  "client.credentials_rotated": "已更换 {name} 的连接密钥；订阅 URL 未改变。",
+  "client.credentials_refresh": "请用户在应用中刷新订阅。若链接泄露，请使用 client reissue。",
+  "node_commands.flow_blocked": "已阻止新数据流。",
+  "node_commands.flow_pending": "等待节点确认阻止新数据流。",
+  "node_commands.flow_old_agent": "需要更新节点 agent：meridian apply。",
+  "events.kind.user.flow_blocking": "连接数据流阻止状态",
+  "events.kind.user.credentials_rotated": "连接密钥已更换"
 }

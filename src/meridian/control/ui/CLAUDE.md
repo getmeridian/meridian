@@ -15,6 +15,7 @@
 - **Passkeys are a seam** — `PasskeyState` reports `no_domain` on a bare IP and `not_built` otherwise; py_webauthn would add pyOpenSSL, pyasn1, and cbor2 to every CLI install, and attestation is never parsed by hand.
 
 ## What's done well
+- **Connection keys and leaked links have separate actions** — rotation preserves the subscription URL, sends the displayed generation, and locks confirmation and submission; declared people receive the CLI command.
 - **Revocation receipts name their boundary** — show each node's blocked, pending, or old-agent state with the remaining transfers and shared-inbound cut-off effect.
 - **CSP with no script exceptions** — `default-src 'none'`, `script-src 'self'`, `frame-ancestors 'none'`, `no-referrer` on every response; `test_control_ui_assets.py` refuses inline script, style, handlers, HTML sinks, outside URLs, and locale drift.
 - **Every mutating request is same-origin twice** — `SameSite=Strict` plus the `X-Meridian-Request: 1` header `M.api` adds (and matching `Origin`/`Sec-Fetch-Site` when sent).

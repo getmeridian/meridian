@@ -728,5 +728,12 @@
   "person.flow_blocked": "已阻止新数据流",
   "person.flow_pending_node": "等待节点确认",
   "person.flow_agent_too_old": "需要更新节点 agent",
-  "commands.core_scope": "以下节点的 VLESS 会话需要重启 Xray 才能关闭：{nodes}。这些节点上的全部 Xray 会话都会结束。"
+  "commands.core_scope": "以下节点的 VLESS 会话需要重启 Xray 才能关闭：{nodes}。这些节点上的全部 Xray 会话都会结束。",
+  "person.rotate": "更换连接密钥",
+  "person.rotate_text": "保留订阅 URL 和设备登记。应用刷新后获取新密钥。若此 URL 已泄露，请重新签发链接。",
+  "person.rotate_declared": "配置文件已声明此用户。请通过 CLI 更换其连接密钥。",
+  "person.rotate_title": "更换连接密钥？",
+  "person.rotate_confirm": "保留此订阅 URL 并更换连接密钥？应用需刷新订阅。若此 URL 已泄露，请重新签发链接。",
+  "person.rotated_toast": "连接密钥已更换；订阅 URL 未改变。",
+  "error.credentials_changed": "连接密钥已改变。刷新用户信息后重试。"
 }

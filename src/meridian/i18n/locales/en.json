@@ -741,5 +741,21 @@
   "events.kind.people.bulk": "Bulk people change",
   "events.bulk": "{action}: {changed} of {targeted} people changed; {cli_required} require CLI.",
   "bulk.action.undo": "Undo field changes",
-  "node_commands.cut_off_core_scope": "These nodes need an Xray restart to close VLESS sessions: {nodes}. Every Xray session on them will end."
+  "node_commands.cut_off_core_scope": "These nodes need an Xray restart to close VLESS sessions: {nodes}. Every Xray session on them will end.",
+  "client.credentials_requires_yes": "Rotating connection credentials requires --yes in JSON mode.",
+  "client.credentials_yes_hint": "Pass --yes to confirm.",
+  "client.credentials_not_declared": "Client '{name}' is not declared in this fleet.",
+  "client.credentials_console_hint": "Manage people added in the console through the console or people API.",
+  "client.credentials_missing": "Declared client '{name}' is missing from the control service.",
+  "client.credentials_apply_hint": "Run meridian apply to restore the person.",
+  "client.credentials_confirm": "Rotate connection keys for {name}? Their subscription URL stays the same. Apps must refresh it. Use reissue if the link itself leaked.",
+  "client.credentials_changed": "The connection credentials changed while you were confirming.",
+  "client.credentials_refresh_hint": "Refresh the person and try again.",
+  "client.credentials_rotated": "Rotated connection keys for {name}; their subscription URL is unchanged.",
+  "client.credentials_refresh": "Ask them to refresh the subscription in their app. Use client reissue after a leaked link.",
+  "node_commands.flow_blocked": "New streams blocked.",
+  "node_commands.flow_pending": "Waiting for the node to confirm blocking.",
+  "node_commands.flow_old_agent": "Agent update required: meridian apply.",
+  "events.kind.user.flow_blocking": "Connection flow blocking",
+  "events.kind.user.credentials_rotated": "Connection keys rotated"
 }

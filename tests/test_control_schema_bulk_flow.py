@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 from meridian.control.service import SCHEMA_VERSION, ControlService
-from tests.support.control_service import FLEET_ID
+from tests.support.control_service import FLEET_ID, drop_flow_blocks_schema
 
 
 def test_bulk_schema_twenty_upgrades_without_replaying_people_versions(tmp_path: Path):
@@ -14,9 +14,7 @@ def test_bulk_schema_twenty_upgrades_without_replaying_people_versions(tmp_path:
     before = service._store.row("SELECT * FROM people_versions WHERE user_id = ?", (user.user_id,))
     service.close()
     with sqlite3.connect(path) as database:
-        database.execute("DROP TABLE user_flow_blocks")
-        database.execute("ALTER TABLE users DROP COLUMN credential_generation")
-        database.execute("ALTER TABLE nodes DROP COLUMN agent_capabilities")
+        drop_flow_blocks_schema(database)
         database.execute("UPDATE meta SET value = ? WHERE key = ?", ("20", "schema_version"))
     restored = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
     try:

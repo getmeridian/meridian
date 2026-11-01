@@ -11,10 +11,8 @@ and wakes that node's waiting poll.
 from __future__ import annotations
 
 import json
-import secrets
 import sqlite3
 import time
-import uuid as uuid_module
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
 from datetime import datetime
@@ -29,6 +27,7 @@ from meridian.control.backups import BackupLedger
 from meridian.control.command_models import CommandRequest, NodeCommandRecord, UserCutOffMutation
 from meridian.control.commands import CommandLedger
 from meridian.control.connection_pages import ConnectionPages
+from meridian.control.credential_models import UserCredentialRotation
 from meridian.control.cutoff import CutOffLedger
 from meridian.control.devices import DeviceLedger, HeaderReader
 from meridian.control.enrollment import NodeAuthority
@@ -73,6 +72,7 @@ from meridian.control.subscriptions import SubscriptionResponse
 from meridian.control.times import format_timestamp, utc_now
 from meridian.control.tokens import TokenRegistry
 from meridian.control.traffic import TrafficLedger
+from meridian.control.user_credentials import replace_credentials
 from meridian.control.user_flow_blocks import FlowBlockLedger
 from meridian.control.user_import import import_users
 from meridian.control.user_lifecycle import extend_user_expiry, insert_user
@@ -85,7 +85,7 @@ from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.client_devices import DevicesRemoved
-from meridian.core.client_sessions import UserFlowBlocks
+from meridian.core.client_sessions import CredentialRotationRequest, UserFlowBlocks
 from meridian.core.clients import ClientConnections
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
@@ -415,16 +415,40 @@ class ControlService:
 
     def reissue_user(self, username: str) -> UserRecord:
         """Replace link credentials and forget devices atomically; old links stop working."""
-        with self._transaction():
-            user = self._require_user(username)
-            self.devices.remove(user.user_id)
-            self._db.execute(
-                "UPDATE users SET uuid = ?, sub_token = ?, credential_generation = ? WHERE username = ?",
-                (str(uuid_module.uuid4()), secrets.token_urlsafe(18), user.credential_generation + 1, username),
-            )
-            self.events.append("user.reissued", username)
-            self._compose_all()
-            return self._require_user(username)
+        return self._replace_credentials(username, keep_subscription=False)
+
+    def _replace_credentials(
+        self, username: str, *, keep_subscription: bool, expected_generation: int | None = None
+    ) -> UserRecord:
+        return replace_credentials(
+            self._store,
+            username,
+            keep_subscription=keep_subscription,
+            expected_generation=expected_generation,
+            read_user=self._require_user,
+            devices=self.devices,
+            events=self.events,
+            compose=self._compose_all,
+        )
+
+    def rotate_credentials(
+        self, username: str, *, expected_generation: int, cut_off: bool = False
+    ) -> UserCredentialRotation:
+        request = CredentialRotationRequest(expected_generation=expected_generation, cut_off=cut_off)
+        with self._lock:
+
+            def mutate(name: str) -> UserRecord:
+                return self._replace_credentials(
+                    name, keep_subscription=True, expected_generation=request.expected_generation
+                )
+
+            if request.cut_off:
+                result = self.cutoffs.change(username, mutate)
+                assert result.user is not None
+                user, commands = result.user, result.commands
+            else:
+                user, commands = mutate(username), []
+            return UserCredentialRotation(user=user, flow_blocks=self.user_flow_blocks(username), commands=commands)
 
     def extend_user(self, username: str, *, days: int) -> UserRecord:
         """Extend from now or the current expiry, preserving operator disable and enforcing traffic limits."""

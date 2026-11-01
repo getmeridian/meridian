@@ -48,7 +48,7 @@
     if (!current(screen)) return;
     screen.version++;
     draw(screen, user, screen.share, savedForm);
-    if (["person.reissued_toast", "person.enabled_toast", "person.disabled_toast", "person.saved_toast", "person.reset_toast"].indexOf(toastKey) >= 0) {
+    if (["person.reissued_toast", "person.rotated_toast", "person.enabled_toast", "person.disabled_toast", "person.saved_toast", "person.reset_toast"].indexOf(toastKey) >= 0) {
       var version = screen.version;
       M.api("GET", "ui/api/people/" + encodeURIComponent(screen.username) + "/share").then(function (share) {
         if (current(screen) && screen.version === version) draw(screen, screen.user, share);
@@ -294,6 +294,7 @@
     var name = user.username;
     return h("section", { class: "card card-danger" },
       h("h2", { text: M.t("person.danger") }),
+      rotationRow(user, declared, screen),
       h("div", { class: "danger-row" },
         h("div", {}, h("p", { class: "strong", text: M.t("person.reissue") }),
           h("p", { class: "muted small", text: M.t(declared ? "person.reissue_declared" : "person.reissue_text") }),
@@ -326,5 +327,38 @@
             }, function (e) { failed(label, e); });
           }, function (e) { failed(M.displayName(name), e); });
         } }, M.t("person.remove"))));
+  }
+
+  function rotationRow(user, declared, screen) {
+    var name = user.username;
+    var button = declared ? null : h("button", { class: "btn btn-ghost btn-sm", type: "button", "data-credential-rotation": "1",
+      disabled: !!screen.rotating, onclick: function () {
+        if (screen.rotating || !current(screen)) return;
+        if (!Number.isSafeInteger(user.credential_generation) || user.credential_generation < 1) {
+          M.toast(M.t("error.credentials_changed"), "error"); return;
+        }
+        screen.rotating = true; button.disabled = true;
+        var expected = user.credential_generation;
+        M.confirmCredentialRotation(name).then(function (choice) {
+          if (!choice || !current(screen)) return;
+          return act(screen, function () {
+            return M.api("POST", path(name, "/rotate-credentials"), { expected_generation: expected, cut_off: choice.cut_off }).then(function (result) {
+              if (result.commands && result.commands.length) M.showCommandResults(result.commands);
+              return result.user;
+            });
+          }, "person.rotated_toast");
+        }).catch(function (error) { if (current(screen)) failed(M.displayName(name), error); })
+          .finally(function () {
+            screen.rotating = false;
+            if (current(screen)) {
+              var currentButton = screen.dangerSlot.querySelector("[data-credential-rotation]");
+              if (currentButton) currentButton.disabled = false;
+            }
+          });
+      } }, M.t("person.rotate"));
+    return h("div", { class: "danger-row" },
+      h("div", {}, h("p", { class: "strong", text: M.t("person.rotate") }),
+        h("p", { class: "muted small", text: M.t(declared ? "person.rotate_declared" : "person.rotate_text") }),
+        declared ? M.command("meridian client rotate-credentials " + name) : null), button);
   }
 })();

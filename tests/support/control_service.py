@@ -50,7 +50,7 @@ def drop_person_metadata_schema(db: sqlite3.Connection) -> None:
     """Older fixtures must not retain the operator metadata added in schema step 15."""
     drop_people_query_schema(db)
     columns = {column[1] for column in db.execute("PRAGMA table_info(users)")}
-    for column in ("note", "tag", "language"):
+    for column in ("note", "tag", "language", "credential_generation"):
         if column in columns:
             db.execute(f"ALTER TABLE users DROP COLUMN {column}")
     drop_period_usage_schema(db)
@@ -73,6 +73,17 @@ def drop_account_schedule_schema(db: sqlite3.Connection) -> None:
     for column in AccountLifecycleState.model_fields:
         if column in columns:
             db.execute(f"ALTER TABLE users DROP COLUMN {column}")
+    drop_flow_blocks_schema(db)
+
+
+def drop_flow_blocks_schema(db: sqlite3.Connection) -> None:
+    """Rewind the generation and flow-block receipts introduced in schema step 21."""
+    columns = {column[1] for column in db.execute("PRAGMA table_info(users)")}
+    if "credential_generation" in columns:
+        db.execute("ALTER TABLE users DROP COLUMN credential_generation")
+    db.execute("DROP TABLE IF EXISTS user_flow_blocks")
+    if "agent_capabilities" in {column[1] for column in db.execute("PRAGMA table_info(nodes)")}:
+        db.execute("ALTER TABLE nodes DROP COLUMN agent_capabilities")
 
 
 def drop_operations_schema(db: sqlite3.Connection) -> None:
@@ -121,3 +132,4 @@ def drop_people_query_schema(db: sqlite3.Connection) -> None:
         db.execute(f"DROP {kind.upper()} {name}")
     db.execute("DROP TABLE IF EXISTS bulk_receipts")
     db.execute("DROP TABLE IF EXISTS people_versions")
+    drop_flow_blocks_schema(db)

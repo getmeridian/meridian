@@ -16,6 +16,7 @@
 **Retired spellings** — `cli.RENAMED`/`RENAMED_OPTIONS` refuse old commands and flags with exit 2 and the new spelling; `cli.RETIRED` refuses a command removed without a successor (`studio`) and points to where the work moved.
 
 ## What's done well
+- **Connection-key rotation follows reissue ownership** — the CLI targets declared people and uses a service generation precondition; the API and console rotate service-owned people, keeping links and registrations.
 - `fleet upgrade` reads each relay's running Realm (a failed upgrade leaves the saved pin ahead), applies the unchanged intent, then runs `check`.
 - `client remove|reissue --cut-off` discloses every affected node and other people's reconnects before confirming, and keeps typed per-node outcomes and new links even on failure.
 

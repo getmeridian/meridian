@@ -9,6 +9,7 @@ from pydantic import Field, RootModel
 from meridian.control.models import UserRecord
 from meridian.core.agent_protocol import AgentCommand, Capability, CommandEffect, CommandResult, CommandResultStatus
 from meridian.core.agent_types import InboundTag, NodeId, NodeStateRef, ResourceId
+from meridian.core.client_sessions import UserCutOffRequest as UserCutOffRequest
 from meridian.core.models import CoreModel
 
 
@@ -86,10 +87,6 @@ class CutOffPlan(CoreModel):
     """Every managed inbound that may hold the person's open sessions; contains no person or credential."""
 
     nodes: list[CutOffNode]
-
-
-class UserCutOffRequest(CoreModel):
-    cut_off: bool = False
 
 
 class UserCutOffMutation(CoreModel):

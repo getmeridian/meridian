@@ -375,6 +375,7 @@
         "user.enabled",
         "user.disabled",
         "user.reissued",
+        "user.credentials_rotated",
         "user.removed",
         "user.traffic_reset",
         "user.expired",

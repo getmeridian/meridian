@@ -59,7 +59,7 @@ from meridian.control.route_metadata import (
     HISTORY_OFF,
     NOT_FOUND,
 )
-from meridian.control.route_types import WRITE, ApiRoute, ErrorResponse, route
+from meridian.control.route_types import WRITE, ApiRoute, route
 from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.fleet_events import FleetEventPage
 from meridian.core.languages import LanguageSettings, LanguageState

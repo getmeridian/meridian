@@ -77,7 +77,9 @@ if (restarting) M.renderServers(view); else M.renderPerson(view, 'person-a');
 await settle();
 const report = { requests, writes };
 report.serverText = view.querySelector('.server')?.textContent || '';
-const remove = view.querySelector(restarting ? '.server .row-actions button' : reissuing ? '.card-danger > .danger-row:first-of-type > button' : '.card-danger button.btn-danger');
+const remove = reissuing
+  ? [...view.querySelectorAll('.card-danger button')].find(button => button.textContent === M.t('person.reissue'))
+  : view.querySelector(restarting ? '.server .row-actions button' : '.card-danger button.btn-danger');
 if (mode === 'declared') {
   report.hasRemove = !!remove;
   report.declaredText = view.querySelector('.card-danger').textContent;

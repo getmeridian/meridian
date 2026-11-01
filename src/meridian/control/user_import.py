@@ -61,6 +61,11 @@ def import_users(
                 {
                     **item.model_dump(exclude={"created_at"}),
                     "user_id": existing.user_id if existing is not None else f"u{secrets.token_hex(8)}",
+                    "credential_generation": (
+                        existing.credential_generation + int(existing.uuid.lower() != item.uuid.lower())
+                    )
+                    if existing is not None
+                    else 1,
                     "created_at": created_at,
                     "language": existing.language if existing is not None else None,
                     "expire_at": whole_seconds(require_finite_user_expiry(item.expire_at)),

@@ -205,7 +205,7 @@ def test_removing_a_user_rolls_back_their_accounting_with_the_user(
     tables = ("users", "traffic_totals", "traffic_counters", "traffic_reports", "traffic_daily", "node_traffic_daily")
     before = {table: [tuple(row) for row in service.traffic._store.rows(f"SELECT * FROM {table}")] for table in tables}
 
-    def refused() -> None:
+    def refused(*, retired: object = None) -> None:
         raise RuntimeError("composition refused")
 
     monkeypatch.setattr(service, "_compose_all", refused)
@@ -368,7 +368,11 @@ def test_schema_thirteen_backfills_retained_node_evidence_once_and_marks_the_acc
     service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0", clock=clock)
     service.put_user("alice")
     for index in range(KEPT_EPOCHS + 2):
-        service.record_stats("main", _report(service, f"{index:08x}-6c1d-4e8b-9a7f-2b5d4c3e1f00", 1, alice=(4, 6)))
+        service.record_stats(
+            "main",
+            _report(service, f"{index:08x}-6c1d-4e8b-9a7f-2b5d4c3e1f00", 1, alice=(4, 6)),
+            now="2026-11-01T11:00:00Z",
+        )
     service.close()
     with sqlite3.connect(path) as db:
         drop_operations_schema(db)

@@ -11,6 +11,7 @@
 **No markup in catalogs** — callers escape catalog text and add Rich styles themselves, so a translator can never break rendering.
 
 ## What's done well
+- **Credential rotation explains refresh and ownership** — all locales distinguish preserved subscription URLs from reissued links and label per-node blocking outcomes.
 - **Cut-off previews identify core restarts** — VLESS's all-node reconnect effect has matching CLI and console text in every locale.
 - Fleet browser/default labels, person overrides, and JSON confirmation guidance match across all four locales; the console locale remains separate from the language given to people's pages.
 - Individual connection and format headings and unavailable labels match across all four CLI locales.

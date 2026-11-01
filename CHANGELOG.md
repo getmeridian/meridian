@@ -30,6 +30,12 @@ newest first; the last is what 4.0 changes compared with 3.x.
   preserving lifetime traffic.
 - Per-person unlimited device caps in the API, CLI, and panel, distinct from
   the fleet default. Remnawave migration keeps device caps, including zero.
+- **Rotate connection keys while keeping the subscription URL** with
+  `meridian client rotate-credentials`, the people API, or the web panel (#95).
+  Devices receive the new VLESS UUID and Hysteria2 auth on subscription refresh;
+  registrations and account settings stay in place. Generation checks prevent
+  an uncertain retry from rotating twice. Reissue remains the new-URL action
+  for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
 - Bulk expiry validates dates before preview, so blank or invalid input never clears expiry; clearing it requires the explicit No end date choice.

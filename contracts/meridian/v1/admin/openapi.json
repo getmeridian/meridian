@@ -2139,6 +2139,28 @@
         "title": "CommandUnitTarget",
         "type": "object"
       },
+      "CredentialRotationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "cut_off": {
+            "default": false,
+            "title": "Cut Off",
+            "type": "boolean"
+          },
+          "expected_generation": {
+            "description": "Read credential_generation from the person first; stale requests cannot rotate again.",
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "title": "Expected Generation",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_generation"
+        ],
+        "title": "CredentialRotationRequest",
+        "type": "object"
+      },
       "CutOffNode": {
         "additionalProperties": false,
         "properties": {
@@ -2614,6 +2636,7 @@
               "user.enabled",
               "user.disabled",
               "user.reissued",
+              "user.credentials_rotated",
               "user.removed",
               "user.traffic_reset",
               "user.expired",
@@ -7289,6 +7312,36 @@
           "username"
         ],
         "title": "UserCreate",
+        "type": "object"
+      },
+      "UserCredentialRotation": {
+        "additionalProperties": false,
+        "properties": {
+          "commands": {
+            "items": {
+              "$ref": "#/components/schemas/NodeCommandRecord"
+            },
+            "title": "Commands",
+            "type": "array"
+          },
+          "flow_blocks": {
+            "$ref": "#/components/schemas/UserFlowBlocks"
+          },
+          "subscription_preserved": {
+            "const": true,
+            "default": true,
+            "title": "Subscription Preserved",
+            "type": "boolean"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserRecord"
+          }
+        },
+        "required": [
+          "user",
+          "flow_blocks"
+        ],
+        "title": "UserCredentialRotation",
         "type": "object"
       },
       "UserCutOffMutation": {
@@ -15926,7 +15979,7 @@
             "meridianToken": []
           }
         ],
-        "summary": "Replace a person's connection credentials.",
+        "summary": "Replace a person's subscription URL and connection credentials.",
         "tags": [
           "users"
         ],
@@ -16034,6 +16087,163 @@
         "summary": "Reset a person's current-period traffic use.",
         "tags": [
           "users"
+        ],
+        "x-meridian-credentials": true,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "people"
+        ]
+      }
+    },
+    "/api/users/{username}/rotate-credentials": {
+      "post": {
+        "description": "Requires people scope, or a scope that covers it. Preserves device registrations and operator settings. Read the current credential_generation first. Owner and people callers use the CLI for a declared person. Optional cut_off also requires admin. Setting cut_off to true also requires admin scope. This response can contain credentials; keep it private and do not log it.",
+        "operationId": "rotate_credentials",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "username",
+            "required": true,
+            "schema": {
+              "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialRotationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserCredentialRotation"
+                }
+              }
+            },
+            "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "x-meridian-credentials": true
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "command_queue_full",
+              "conflict",
+              "credentials_changed",
+              "declared_user"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Rotate connection credentials keeping the subscription URL.",
+        "tags": [
+          "users"
+        ],
+        "x-meridian-conditional-scopes": [
+          {
+            "equals": true,
+            "field": "cut_off",
+            "scopes": [
+              "admin"
+            ]
+          }
         ],
         "x-meridian-credentials": true,
         "x-meridian-scope-mode": "any",

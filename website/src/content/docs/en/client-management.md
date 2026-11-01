@@ -185,6 +185,17 @@ A disable blocks new connections after each node applies the change; `enable` re
 
 A disable lasts until `client enable`: apply, redeploys, and fleet changes leave it alone.
 
+## Rotate connection keys keeping the link
+
+Use `meridian client rotate-credentials NAME --yes` when connection credentials need replacing. It generates a new VLESS UUID and Hysteria2 auth while keeping the subscription token, page URL, device registrations, status, limits, expiry, traffic, notes, tags, and language. Apps receive the keys on their next subscription refresh; ask the person to refresh now. Old identities lose new streams as each node applies the change. A leaked subscription URL requires `client reissue`, which issues a new URL and clears device registrations.
+
+```bash
+meridian client rotate-credentials alice --yes
+```
+
+The web panel offers **Rotate connection keys** for people added there. Declared people use the CLI, following the same ownership rule as reissue. CLI JSON requires `--yes` and returns `client-rotate-credentials`, including the generation and per-node `flow_blocks`. Optional `--cut-off` also ends existing flows with the disclosed shared-inbound reset or node-wide core restart.
+
+
 ## Replacing a leaked link
 
 If a client's link or connection page reaches someone it shouldn't, replace it:
@@ -314,10 +325,13 @@ Read tokens never see anyone's keys or subscription ID. Choose **People** for a 
 | `POST /api/users/{username}/reset-traffic` | Reset used traffic |
 | `POST /api/users/{username}/extend` | Send `{"days": N}` (1–3650) to add days after the later of now and the current expiry; no expiry starts from now |
 | `POST /api/users/{username}/reissue` | Replace connection credentials and clear device registrations |
+| `POST /api/users/{username}/rotate-credentials` | Rotate the VLESS UUID and Hysteria2 auth while preserving the subscription URL and registrations; send `expected_generation` from the current user record |
 | `DELETE /api/users/{username}` | Remove a person |
 | `GET /api/users/{username}/devices` | Read registrations allowed by the owner's privacy level |
 | `DELETE /api/users/{username}/devices` | Clear all registrations |
 | `DELETE /api/users/{username}/devices/{device_key}` | Remove one registration |
+
+Read `credential_generation` from `GET /api/users/{username}`, then send `{"expected_generation": N}` to `POST /api/users/{username}/rotate-credentials`. A stale generation returns `409 credentials_changed`, so an uncertain retry cannot rotate twice. The response contains `user`, `subscription_preserved: true`, `flow_blocks`, and `commands`. Adding `"cut_off": true` requires admin and queues the same revision-gated hard cut-off as reissue. Owner and people callers cannot rotate a declared person.
 
 A people token cannot remove or reissue a person declared in the fleet file: the API returns `409 declared_user` with the CLI command to run. This also applies while an approved or failed apply still declares the person. An unapproved proposal does not declare anyone. Status, limits, expiry, and device caps remain editable.
 
