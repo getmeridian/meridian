@@ -119,6 +119,10 @@
     history.replaceState({ meridianPosition: position }, "", location.pathname + location.search + hash);
   }
 
+  M.replaceRouteHash = function (hash) {
+    remember(hash, position);
+  };
+
   M.navigate = function (hash) {
     var mine = ++navigationTurn;
     return M.tryLeave().then(function (leave) {

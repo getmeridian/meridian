@@ -4,6 +4,21 @@
       "additionalProperties": false,
       "description": "One user carried over from another control plane (`meridian migrate`), credentials and usage included.\n\nThe UUID and subscription token keep every link the user already has working.\n`used_traffic_bytes` is the use of the current traffic period and counts toward\nthe limit; `lifetime_traffic_bytes` (never below it) is everything ever counted.\n`traffic_reset_at` is when the source last reset the period, if it knows.",
       "properties": {
+        "activation_duration_days": {
+          "anyOf": [
+            {
+              "maximum": 3650,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whole UTC days from first traffic.",
+          "title": "Activation Duration Days"
+        },
         "created_at": {
           "anyOf": [
             {
@@ -18,6 +33,20 @@
           ],
           "default": null,
           "title": "Created At"
+        },
+        "device_limit": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Device Limit"
         },
         "expire_at": {
           "anyOf": [
@@ -34,6 +63,21 @@
           "default": null,
           "title": "Expire At"
         },
+        "first_traffic_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "First Traffic At"
+        },
         "lifetime_traffic_bytes": {
           "default": 0,
           "maximum": 9007199254740991,
@@ -46,6 +90,72 @@
           "maxLength": 500,
           "title": "Note",
           "type": "string"
+        },
+        "renewal_anchor_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Original expiry of the current renewal series.",
+          "title": "Renewal Anchor At"
+        },
+        "renewal_interval_days": {
+          "anyOf": [
+            {
+              "maximum": 3650,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Renewal Interval Days"
+        },
+        "renewal_interval_months": {
+          "anyOf": [
+            {
+              "maximum": 120,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Renewal Interval Months"
+        },
+        "renewal_limit": {
+          "anyOf": [
+            {
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Renewals in this series; null means unlimited.",
+          "title": "Renewal Limit"
+        },
+        "renewals_completed": {
+          "default": 0,
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Renewals Completed",
+          "type": "integer"
         },
         "status": {
           "default": "active",
@@ -82,10 +192,26 @@
             "no_reset",
             "day",
             "week",
-            "month"
+            "month",
+            "month_rolling"
           ],
           "title": "Traffic Limit Strategy",
           "type": "string"
+        },
+        "traffic_reset_anchor_day": {
+          "anyOf": [
+            {
+              "maximum": 31,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "UTC month day; null uses creation day.",
+          "title": "Traffic Reset Anchor Day"
         },
         "traffic_reset_at": {
           "anyOf": [

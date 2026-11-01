@@ -11,6 +11,7 @@ from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import BeforeValidator, Field, field_validator, model_validator
 
+from meridian.core.account_schedule import AccountLifecycleSettings, AccountLifecycleState, AccountSchedulePreview
 from meridian.core.agent_desired import AgentResource
 from meridian.core.agent_protocol import NodeHealth, NodeVersions
 from meridian.core.agent_types import (
@@ -27,17 +28,18 @@ from meridian.core.agent_types import (
     Timestamp,
     Version,
 )
-from meridian.core.client_devices import ClientDevicesResult
+from meridian.core.client_devices import ClientDevicesResult, DeviceCap
 from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES, LimitStrategy, UserCreationSettings
 from meridian.core.connection_pages import ConnectionPageSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import ServerReferenceValue, validate_ip_address_value
 from meridian.core.languages import Language
 from meridian.core.models import CoreModel
+from meridian.core.person_activity import PersonAttentionReason
 from meridian.core.person_metadata import PersonTag, PrivateNote
 from meridian.core.server_allowances import ServerAllowanceSpec
 from meridian.core.topology import ClientRoutingPolicy, ProtocolKind, SubscriptionUpdateIntervalHours
-from meridian.core.traffic import NodeTrafficAccounting, UserTrafficEvidence
+from meridian.core.traffic import NodeTrafficAccounting, PeriodTraffic, UserTrafficEvidence
 
 
 class ManagedInbound(CoreModel):
@@ -194,7 +196,7 @@ class UserDevices(ClientDevicesResult):
     level: DeviceLimitLevel
 
 
-class UserRecord(UserTrafficEvidence):
+class UserRecord(UserTrafficEvidence, AccountLifecycleState):
     """One access user as the service stores it.
 
     The operator sets `active` or `disabled`; the service's enforcement turns an
@@ -211,28 +213,49 @@ class UserRecord(UserTrafficEvidence):
     expire_at: Timestamp | None = None
     traffic_limit_bytes: int = Field(default=0, ge=0, le=MAX_TRAFFIC_LIMIT_BYTES, description="0 means unlimited.")
     traffic_limit_strategy: LimitStrategy = "no_reset"
-    device_limit: int | None = Field(default=None, ge=1, le=100, description="None uses the fleet's default cap.")
+    device_limit: DeviceCap | None = Field(default=None, description="Null uses the fleet's cap; 0 means unlimited.")
     traffic_reset_at: Timestamp | None = Field(default=None, description="When the current traffic period began.")
     used_traffic_bytes: int = Field(default=0, ge=0, description="Traffic since the period began.")
+    period_traffic: PeriodTraffic = Field(default_factory=PeriodTraffic)
     lifetime_traffic_bytes: int = Field(
         default=0, ge=0, description="What agents counted plus what an import carried in from before."
     )
     online_at: Timestamp | None = Field(default=None, description="When an agent last counted the user's traffic.")
+    never_used: bool = Field(
+        default=False,
+        description="Derived from lifetime and activity evidence; never stored.",
+        json_schema_extra={"readOnly": True},
+    )
+    quota_used_percent: int | None = Field(
+        default=None,
+        ge=0,
+        description="Exact integer percentage of period quota, rounded down; null when unlimited.",
+        json_schema_extra={"readOnly": True},
+    )
+    attention_reasons: list[PersonAttentionReason] = Field(
+        default_factory=list,
+        max_length=3,
+        description="Derived default-threshold findings at read time; never stored.",
+        json_schema_extra={"readOnly": True},
+    )
     note: PrivateNote = Field(default="", repr=False, description="Private operator note; people/admin only.")
     tag: PersonTag = Field(default="", repr=False, description="Private operator tag; people/admin only.")
     language: Language | None = Field(
         default=None, description="Starting connection/support page and app status language; null follows the fleet."
     )
+    schedule: AccountSchedulePreview | None = Field(
+        default=None, description="Read-only UTC dates from the shared calculator."
+    )
 
 
-class UserUpdate(CoreModel):
+class UserUpdate(AccountLifecycleSettings):
     """A partial change: omitted fields keep their value; null clears expiry or selects the default device cap."""
 
     status: Literal["active", "disabled"] | None = None
     expire_at: Timestamp | None = None
     traffic_limit_bytes: int | None = Field(default=None, ge=0, le=MAX_TRAFFIC_LIMIT_BYTES)
     traffic_limit_strategy: LimitStrategy | None = None
-    device_limit: int | None = Field(default=None, ge=1, le=100)
+    device_limit: DeviceCap | None = None
     note: PrivateNote = Field(default="", repr=False)
     tag: PersonTag = Field(default="", repr=False)
     language: Language | None = Field(
@@ -262,7 +285,7 @@ class UserPatch(UserUpdate):
         return UserUpdate.model_validate(self.model_dump(include=self.model_fields_set - {"username"}))
 
 
-class UserImport(CoreModel):
+class UserImport(AccountLifecycleState):
     """One user carried over from another control plane (`meridian migrate`), credentials and usage included.
 
     The UUID and subscription token keep every link the user already has working.
@@ -279,9 +302,11 @@ class UserImport(CoreModel):
     traffic_limit_bytes: Count = 0
     traffic_limit_strategy: LimitStrategy = "no_reset"
     used_traffic_bytes: Count = 0
+    device_limit: DeviceCap | None = None
     lifetime_traffic_bytes: Count = 0
     traffic_reset_at: Timestamp | None = None
     created_at: Timestamp | None = None
+    first_traffic_at: Timestamp | None = None
     note: PrivateNote = Field(default="", repr=False)
     tag: PersonTag = Field(default="", repr=False)
 

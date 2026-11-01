@@ -25,6 +25,8 @@ The control service already holds people's accounts and connection credentials, 
 
 The default cap is **3 devices**, adjustable from **1 to 100**. It applies when a person has no cap of their own. See [Client management](/en/client-management/).
 
+With countable device limits enabled, `/info` and the connection page reveal only used and allowed slots (`user.deviceSlots.used` and `allowed`). Anyone with that personal link can see these counts, including a full or lowered cap. No device identifiers, names, systems, models, or device timestamps are included. The page keeps the count only in memory and shows nothing when limits are off. When slots are full, a new device receives a limit notice on subscription refresh; existing registrations stay allowed. Apps that do not report a supported device identifier are not counted.
+
 ## Usage history
 
 | Level | What Meridian keeps |

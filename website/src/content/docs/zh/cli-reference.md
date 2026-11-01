@@ -100,15 +100,30 @@ JSON `data` 包含 `plan_hash`、`generation` 和 `actions[]` 带 `status: "conv
 
 ### meridian client
 
+以下时间安排选项适用于 `client add` 和 `client set`。初始设置仅在创建时应用，后续 apply 会保留管理员修改。`client show` 的 JSON 包含类型明确的字段和服务计算的 `schedule`。`client set --dry-run` 返回 `data.schedule_preview` 与 `applied: false`；JSON 模式保存时间安排需添加 `--yes`。`client extend --days N` 对待激活账户只增加有效天数，不开始计时；激活后延长到期时间，并开始新一轮续期。
+
+| 选项 | 含义 |
+| --- | --- |
+| `--reset-day N\|default` | 每月指定日 1–31；default 使用创建日 |
+| `--duration DAYS\|none` | 首次产生流量后 1–3650 天；none 清除有效期 |
+| `--renew-days DAYS` | 每 1–3650 个 UTC 天续期 |
+| `--renew-months MONTHS` | 每 1–120 个日历月续期 |
+| `--renewals N\|unlimited` | 1–10000 次续期；unlimited 移除上限 |
+| `--no-renew` | 关闭自动续期 |
+| `--dry-run` | 预览日期，不保存 |
+| `--yes` | 确认时间安排修改 |
+
+使用 `--devices unlimited`（或 `0`）可让此人不受默认设备上限约束。`--devices default` 则恢复服务器默认上限；面板中提供两个独立选项。API 中 `device_limit: 0` 表示不限，`null` 表示继承默认值。隐私级别仍然生效。Remnawave 迁移会保留每人的设备上限，包括零，但不会导入设备登记记录。
+
 管理连接的人。
 
 ```
-meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
+meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--json]
 meridian client show NAME [--connections] [--json]
 meridian client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX] [--json]
 meridian client usage NAME [--days N] [--json]
 meridian client list [--attention] [--tag TAG|none] [--json]
-meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]
@@ -138,7 +153,7 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 **`client list`** — 列出客户端及其状态、流量、到期时间和最后在线时间，包括在网页面板中添加的用户（JSON 中为 `declared: false`）。带 `--json`，返回 `data.summary` 计数和 `data.clients[]`。
 
-`client list --attention` 仅显示七天内到期（包含当前时刻）、已用流量达到限额的 80%，或创建超过三天且从未记录过流量的用户。原因列说明每行；JSON 包含 `clients[].attention_reasons`，汇总数量仅统计筛选后的用户。导入的历史流量即使日期未知，以及重置过的流量周期，都不会被误判为从未使用。
+`client list --attention` 仅显示七天内到期（包含当前时刻）、已用流量达到限额的 80%，或创建超过三天且从未记录过流量的用户。原因列说明每行；JSON 包含 `clients[].attention_reasons`，汇总数量仅统计筛选后的用户。导入的历史流量即使日期未知，以及重置过的流量周期，都不会被误判为从未使用。 另一个原因 **已停止使用**（`stopped`）会标记曾使用服务、但超过三天没有新流量的用户。**尚未使用**（`unused`）仍是独立原因。API 参数 `stopped_days` 可独立设置为 1–365 天，默认 3 天；`unused_days` 的范围和默认值保持不变。周期重置不会抹去这些证据，且无需启用每日历史。导入用量缺少最后活动时间时，不会猜测用户已停止使用。
 
 `GET /api/attention` 需要 `read` 权限，也允许已登录的所有者访问。返回 `observed_at`、`thresholds`、含用户名和原因的 `people[]`，以及含节点 ID 和原因的 `nodes[]`。节点问题包括离线或尚未联系服务的 agent、配置应用失败，以及报告为 `degraded` 或 `unhealthy` 的健康状态。可选参数为 `expiry_days`（1–30，默认 7）、`quota_percent`（1–100，默认 80）和 `unused_days`（1–365，默认 3）。关注列表直接计算，不保存警告标记、会话、地址或设备数据。
 

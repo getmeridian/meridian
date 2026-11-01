@@ -30,7 +30,7 @@
   };
 
   function back() {
-    return h("a", { class: "back", href: "#/people" }, M.icon("back"), M.t("nav.people"));
+    return h("a", { class: "back", href: M.peopleHash || "#/people" }, M.icon("back"), M.t("nav.people"));
   }
 
   function current(screen) {
@@ -59,8 +59,9 @@
   function act(screen, work, toastKey) {
     if (!current(screen)) return Promise.resolve();
     var label = M.displayName(screen.username);
-    return work().then(function (user) {
-      completed(screen, user, toastKey, label);
+    return work().then(function (result) {
+      completed(screen, result.user || result, toastKey, label);
+      if (current(screen) && result.commands) M.showCommandResults(result.commands);
     }, function (e) { failed(label, e); });
   }
 
@@ -100,7 +101,8 @@
     }
     var accessForm = screen.accessSlot.querySelector("form");
     var changedAccess = !previous || previous.expire_at !== user.expire_at || previous.traffic_limit_bytes !== user.traffic_limit_bytes
-      || previous.traffic_limit_strategy !== user.traffic_limit_strategy || previous.language !== user.language;
+      || previous.traffic_limit_strategy !== user.traffic_limit_strategy || previous.language !== user.language
+      || !M.sameLifecycle(previous, user) || JSON.stringify(previous.schedule) !== JSON.stringify(user.schedule);
     if (!accessForm || editable(accessForm) && (changedAccess || accessForm === savedForm)) {
       M.mount(screen.accessSlot, accessCard(user, screen));
     } else {
@@ -148,13 +150,20 @@
     var name = user.username;
     return h("section", { class: "card" },
       h("h2", { text: M.t("person.traffic") }),
-      M.usage(user),
+      M.usage(user), M.scheduleFacts(user.schedule),
       h("dl", { class: "facts" },
+        user.period_traffic ? [
+          h("dt", { text: M.t("usage.up") }), h("dd", { text: M.bytes(user.period_traffic.upload_bytes) }),
+          h("dt", { text: M.t("usage.down") }), h("dd", { text: M.bytes(user.period_traffic.download_bytes) })
+        ] : null,
         h("dt", { text: M.t("people.reset") }), h("dd", { text: M.t("reset." + user.traffic_limit_strategy) }),
         h("dt", { text: M.t("person.period_began") }),
         h("dd", { text: user.traffic_reset_at ? M.date(user.traffic_reset_at, true) : M.t("person.since_created") }),
         h("dt", { text: M.t("person.lifetime") }), h("dd", { text: M.bytes(user.lifetime_traffic_bytes) }),
         h("dt", { text: M.t("person.last_online") }), h("dd", { text: M.ago(user.online_at) })),
+      user.period_traffic && user.period_traffic.unattributed_bytes ?
+        h("p", { class: "muted small", text: M.t("person.traffic_unattributed", {
+          bytes: M.bytes(user.period_traffic.unattributed_bytes) }) }) : null,
       h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
         M.confirm(M.t("person.reset_title"), M.t("person.reset_text"), M.t("person.reset_traffic")).then(function (ok) {
           if (ok) act(screen, function () { return M.api("POST", path(name, "/reset-traffic"), {}); }, "person.reset_toast");
@@ -166,6 +175,7 @@
     var name = user.username;
     var expiry = M.expiryFields(user.expire_at, name);
     var limits = M.limitFields(user);
+    var lifecycle = M.lifecycleFields(user, expiry, limits);
     var initialLanguage = user.language || "default";
     var language = h("select", { name: "language" },
       h("option", { value: "default", text: M.t("language.person_default") }),
@@ -174,7 +184,7 @@
       }));
     language.value = initialLanguage;
     var form = h("form", { class: "stack", novalidate: true },
-      expiry.nodes,
+      lifecycle.nodes,
       limits.nodes,
       M.field(M.t("language.person"), language, M.t("language.person_hint")),
       h("p", { class: "form-error", role: "alert" }),
@@ -184,7 +194,7 @@
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var change = limits.value();
-      Object.assign(change, expiry.change());
+      Object.assign(change, lifecycle.change());
       if (language.value !== initialLanguage) change.language = language.value === "default" ? null : language.value;
       if (!Object.keys(change).length) {
         M.resetDraft(form);
@@ -274,10 +284,15 @@
           h("p", { class: "muted small", text: M.t(declared ? "person.reissue_declared" : "person.reissue_text") }),
           declared ? M.command("meridian client reissue " + name) : null),
         declared ? null : h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
-          M.confirm(M.t("person.reissue_title"), M.t("person.reissue_confirm"), M.t("person.reissue"), true)
-            .then(function (ok) {
-              if (ok) act(screen, function () { return M.api("POST", path(name, "/reissue"), {}); }, "person.reissued_toast");
-            });
+          if (screen.reissuing || !current(screen)) return;
+          screen.reissuing = true;
+          M.confirmCutOffReissue(name).then(function (choice) {
+            if (!choice || !current(screen)) return;
+            return act(screen, function () {
+              return M.api("POST", path(name, "/reissue"), { cut_off: choice.cut_off });
+            }, "person.reissued_toast");
+          }, function (e) { failed(M.displayName(name), e); })
+            .finally(function () { screen.reissuing = false; });
         } }, M.t("person.reissue"))),
       h("div", { class: "danger-row" },
         h("div", {}, h("p", { class: "strong", text: M.t("person.remove") }),

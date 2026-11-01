@@ -1,6 +1,112 @@
 {
   "components": {
     "schemas": {
+      "AccountSchedulePreview": {
+        "additionalProperties": false,
+        "description": "Effective dates after catch-up; calculating them never writes or activates an account.",
+        "properties": {
+          "activation_duration_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activation Duration Days"
+          },
+          "activation_pending": {
+            "title": "Activation Pending",
+            "type": "boolean"
+          },
+          "expire_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expire At"
+          },
+          "next_renewal_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Renewal At"
+          },
+          "next_reset_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Reset At"
+          },
+          "renewal_enabled": {
+            "title": "Renewal Enabled",
+            "type": "boolean"
+          },
+          "renewals_completed": {
+            "minimum": 0,
+            "title": "Renewals Completed",
+            "type": "integer"
+          },
+          "renewals_due": {
+            "description": "Missed renewals applied together with one traffic reset.",
+            "minimum": 0,
+            "title": "Renewals Due",
+            "type": "integer"
+          },
+          "renewals_left": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for unlimited renewals or when renewal is off.",
+            "title": "Renewals Left"
+          }
+        },
+        "required": [
+          "activation_pending",
+          "activation_duration_days",
+          "expire_at",
+          "next_reset_at",
+          "renewal_enabled",
+          "next_renewal_at",
+          "renewals_left",
+          "renewals_due",
+          "renewals_completed"
+        ],
+        "title": "AccountSchedulePreview",
+        "type": "object"
+      },
       "AgentUpgradeResource": {
         "additionalProperties": false,
         "description": "A staged self-upgrade of the agent with automatic rollback.\n\nThe agent downloads and verifies the new binary, keeps the running one as the\nprevious version, swaps, and restarts. The new agent must complete `hello` and\nreport this resource `applied` within `health_timeout_seconds`; otherwise the\nprevious binary is restored and the resource reports `failed` / `rolled_back`.",
@@ -306,6 +412,13 @@
             "maximum": 100,
             "minimum": 1,
             "title": "Quota Percent",
+            "type": "integer"
+          },
+          "stopped_days": {
+            "default": 3,
+            "maximum": 365,
+            "minimum": 1,
+            "title": "Stopped Days",
             "type": "integer"
           },
           "unused_days": {
@@ -3169,6 +3282,33 @@
         "title": "OwnerContact",
         "type": "object"
       },
+      "PeriodTraffic": {
+        "additionalProperties": false,
+        "description": "Period counters; legacy traffic with no known direction is included in download.",
+        "properties": {
+          "download_bytes": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Download Bytes",
+            "type": "integer"
+          },
+          "unattributed_bytes": {
+            "default": 0,
+            "description": "Part of download whose direction an import or an older reset did not retain.",
+            "minimum": 0,
+            "title": "Unattributed Bytes",
+            "type": "integer"
+          },
+          "upload_bytes": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Upload Bytes",
+            "type": "integer"
+          }
+        },
+        "title": "PeriodTraffic",
+        "type": "object"
+      },
       "PersonAttention": {
         "additionalProperties": false,
         "properties": {
@@ -3177,7 +3317,8 @@
               "enum": [
                 "expiring",
                 "quota",
-                "unused"
+                "unused",
+                "stopped"
               ],
               "type": "string"
             },
@@ -5409,11 +5550,26 @@
         "additionalProperties": false,
         "description": "A new user with their first settings, created in one step (the console's \"Add person\").",
         "properties": {
+          "activation_duration_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whole UTC days from first traffic.",
+            "title": "Activation Duration Days"
+          },
           "device_limit": {
             "anyOf": [
               {
                 "maximum": 100,
-                "minimum": 1,
+                "minimum": 0,
                 "type": "integer"
               },
               {
@@ -5438,6 +5594,49 @@
             "default": null,
             "title": "Expire At"
           },
+          "renewal_interval_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Days"
+          },
+          "renewal_interval_months": {
+            "anyOf": [
+              {
+                "maximum": 120,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Months"
+          },
+          "renewal_limit": {
+            "anyOf": [
+              {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Renewals in this series; null means unlimited.",
+            "title": "Renewal Limit"
+          },
           "status": {
             "default": "active",
             "enum": [
@@ -5460,10 +5659,26 @@
               "no_reset",
               "day",
               "week",
-              "month"
+              "month",
+              "month_rolling"
             ],
             "title": "Traffic Limit Strategy",
             "type": "string"
+          },
+          "traffic_reset_anchor_day": {
+            "anyOf": [
+              {
+                "maximum": 31,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UTC month day; null uses creation day.",
+            "title": "Traffic Reset Anchor Day"
           },
           "username": {
             "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
@@ -5583,9 +5798,9 @@
             "type": "string"
           },
           "limit": {
-            "description": "The person's cap, or the fleet default when none is set.",
+            "description": "The effective device cap; 0 means unlimited.",
             "maximum": 100,
-            "minimum": 1,
+            "minimum": 0,
             "title": "Limit",
             "type": "integer"
           },
@@ -5626,11 +5841,18 @@
                 "created_at",
                 "traffic_reset_at",
                 "lifetime_traffic_bytes",
-                "language"
+                "language",
+                "traffic_reset_anchor_day",
+                "activation_duration_days",
+                "renewal_interval_days",
+                "renewal_interval_months",
+                "renewal_limit",
+                "renewals_completed",
+                "renewal_anchor_at"
               ],
               "type": "string"
             },
-            "maxItems": 10,
+            "maxItems": 17,
             "minItems": 1,
             "title": "Fields",
             "type": "array"
@@ -5646,6 +5868,21 @@
         "additionalProperties": false,
         "description": "One user carried over from another control plane (`meridian migrate`), credentials and usage included.\n\nThe UUID and subscription token keep every link the user already has working.\n`used_traffic_bytes` is the use of the current traffic period and counts toward\nthe limit; `lifetime_traffic_bytes` (never below it) is everything ever counted.\n`traffic_reset_at` is when the source last reset the period, if it knows.",
         "properties": {
+          "activation_duration_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whole UTC days from first traffic.",
+            "title": "Activation Duration Days"
+          },
           "created_at": {
             "anyOf": [
               {
@@ -5660,6 +5897,20 @@
             ],
             "default": null,
             "title": "Created At"
+          },
+          "device_limit": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Device Limit"
           },
           "expire_at": {
             "anyOf": [
@@ -5676,6 +5927,21 @@
             "default": null,
             "title": "Expire At"
           },
+          "first_traffic_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First Traffic At"
+          },
           "lifetime_traffic_bytes": {
             "default": 0,
             "maximum": 9007199254740991,
@@ -5688,6 +5954,72 @@
             "maxLength": 500,
             "title": "Note",
             "type": "string"
+          },
+          "renewal_anchor_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Original expiry of the current renewal series.",
+            "title": "Renewal Anchor At"
+          },
+          "renewal_interval_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Days"
+          },
+          "renewal_interval_months": {
+            "anyOf": [
+              {
+                "maximum": 120,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Months"
+          },
+          "renewal_limit": {
+            "anyOf": [
+              {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Renewals in this series; null means unlimited.",
+            "title": "Renewal Limit"
+          },
+          "renewals_completed": {
+            "default": 0,
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Renewals Completed",
+            "type": "integer"
           },
           "status": {
             "default": "active",
@@ -5724,10 +6056,26 @@
               "no_reset",
               "day",
               "week",
-              "month"
+              "month",
+              "month_rolling"
             ],
             "title": "Traffic Limit Strategy",
             "type": "string"
+          },
+          "traffic_reset_anchor_day": {
+            "anyOf": [
+              {
+                "maximum": 31,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UTC month day; null uses creation day.",
+            "title": "Traffic Reset Anchor Day"
           },
           "traffic_reset_at": {
             "anyOf": [
@@ -5851,11 +6199,26 @@
         "additionalProperties": false,
         "description": "A partial edit at `PATCH /api/users`, naming the person in the JSON body.",
         "properties": {
+          "activation_duration_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whole UTC days from first traffic.",
+            "title": "Activation Duration Days"
+          },
           "device_limit": {
             "anyOf": [
               {
                 "maximum": 100,
-                "minimum": 1,
+                "minimum": 0,
                 "type": "integer"
               },
               {
@@ -5905,6 +6268,49 @@
             "title": "Note",
             "type": "string"
           },
+          "renewal_interval_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Days"
+          },
+          "renewal_interval_months": {
+            "anyOf": [
+              {
+                "maximum": 120,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Months"
+          },
+          "renewal_limit": {
+            "anyOf": [
+              {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Renewals in this series; null means unlimited.",
+            "title": "Renewal Limit"
+          },
           "status": {
             "anyOf": [
               {
@@ -5948,7 +6354,8 @@
                   "no_reset",
                   "day",
                   "week",
-                  "month"
+                  "month",
+                  "month_rolling"
                 ],
                 "type": "string"
               },
@@ -5958,6 +6365,21 @@
             ],
             "default": null,
             "title": "Traffic Limit Strategy"
+          },
+          "traffic_reset_anchor_day": {
+            "anyOf": [
+              {
+                "maximum": 31,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UTC month day; null uses creation day.",
+            "title": "Traffic Reset Anchor Day"
           },
           "username": {
             "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
@@ -5975,6 +6397,37 @@
         "additionalProperties": false,
         "description": "One access user as the service stores it.\n\nThe operator sets `active` or `disabled`; the service's enforcement turns an\nactive user `expired` once `expire_at` passes and `limited` at the traffic limit,\nand back once a change or a new traffic period lifts it.",
         "properties": {
+          "activation_duration_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whole UTC days from first traffic.",
+            "title": "Activation Duration Days"
+          },
+          "attention_reasons": {
+            "description": "Derived default-threshold findings at read time; never stored.",
+            "items": {
+              "enum": [
+                "expiring",
+                "quota",
+                "unused",
+                "stopped"
+              ],
+              "type": "string"
+            },
+            "maxItems": 3,
+            "readOnly": true,
+            "title": "Attention Reasons",
+            "type": "array"
+          },
           "created_at": {
             "description": "RFC 3339 timestamp in UTC, ending in Z.",
             "maxLength": 40,
@@ -5986,7 +6439,7 @@
             "anyOf": [
               {
                 "maximum": 100,
-                "minimum": 1,
+                "minimum": 0,
                 "type": "integer"
               },
               {
@@ -5994,7 +6447,7 @@
               }
             ],
             "default": null,
-            "description": "None uses the fleet's default cap.",
+            "description": "Null uses the fleet's cap; 0 means unlimited.",
             "title": "Device Limit"
           },
           "expire_at": {
@@ -6070,6 +6523,13 @@
             "title": "Lifetime Traffic Bytes",
             "type": "integer"
           },
+          "never_used": {
+            "default": false,
+            "description": "Derived from lifetime and activity evidence; never stored.",
+            "readOnly": true,
+            "title": "Never Used",
+            "type": "boolean"
+          },
           "note": {
             "default": "",
             "description": "Private operator note; people/admin only.",
@@ -6092,6 +6552,102 @@
             "default": null,
             "description": "When an agent last counted the user's traffic.",
             "title": "Online At"
+          },
+          "period_traffic": {
+            "$ref": "#/components/schemas/PeriodTraffic"
+          },
+          "quota_used_percent": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact integer percentage of period quota, rounded down; null when unlimited.",
+            "readOnly": true,
+            "title": "Quota Used Percent"
+          },
+          "renewal_anchor_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Original expiry of the current renewal series.",
+            "title": "Renewal Anchor At"
+          },
+          "renewal_interval_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Days"
+          },
+          "renewal_interval_months": {
+            "anyOf": [
+              {
+                "maximum": 120,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Months"
+          },
+          "renewal_limit": {
+            "anyOf": [
+              {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Renewals in this series; null means unlimited.",
+            "title": "Renewal Limit"
+          },
+          "renewals_completed": {
+            "default": 0,
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Renewals Completed",
+            "type": "integer"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountSchedulePreview"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Read-only UTC dates from the shared calculator."
           },
           "status": {
             "enum": [
@@ -6128,10 +6684,26 @@
               "no_reset",
               "day",
               "week",
-              "month"
+              "month",
+              "month_rolling"
             ],
             "title": "Traffic Limit Strategy",
             "type": "string"
+          },
+          "traffic_reset_anchor_day": {
+            "anyOf": [
+              {
+                "maximum": 31,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UTC month day; null uses creation day.",
+            "title": "Traffic Reset Anchor Day"
           },
           "traffic_reset_at": {
             "anyOf": [
@@ -6191,6 +6763,134 @@
         ],
         "description": "A user, or the new user and queued commands when cut_off is true.",
         "title": "UserReissueResponse"
+      },
+      "UserSchedulePreviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "activation_duration_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whole UTC days from first traffic.",
+            "title": "Activation Duration Days"
+          },
+          "expire_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expire At"
+          },
+          "renewal_interval_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Days"
+          },
+          "renewal_interval_months": {
+            "anyOf": [
+              {
+                "maximum": 120,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Months"
+          },
+          "renewal_limit": {
+            "anyOf": [
+              {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Renewals in this series; null means unlimited.",
+            "title": "Renewal Limit"
+          },
+          "traffic_limit_strategy": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_reset",
+                  "day",
+                  "week",
+                  "month",
+                  "month_rolling"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Traffic Limit Strategy"
+          },
+          "traffic_reset_anchor_day": {
+            "anyOf": [
+              {
+                "maximum": 31,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UTC month day; null uses creation day.",
+            "title": "Traffic Reset Anchor Day"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Null previews a new account.",
+            "title": "Username"
+          }
+        },
+        "title": "UserSchedulePreviewRequest",
+        "type": "object"
       },
       "UserStateDetail": {
         "additionalProperties": false,
@@ -6290,11 +6990,26 @@
         "additionalProperties": false,
         "description": "A partial change: omitted fields keep their value; null clears expiry or selects the default device cap.",
         "properties": {
+          "activation_duration_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whole UTC days from first traffic.",
+            "title": "Activation Duration Days"
+          },
           "device_limit": {
             "anyOf": [
               {
                 "maximum": 100,
-                "minimum": 1,
+                "minimum": 0,
                 "type": "integer"
               },
               {
@@ -6344,6 +7059,49 @@
             "title": "Note",
             "type": "string"
           },
+          "renewal_interval_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Days"
+          },
+          "renewal_interval_months": {
+            "anyOf": [
+              {
+                "maximum": 120,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Months"
+          },
+          "renewal_limit": {
+            "anyOf": [
+              {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Renewals in this series; null means unlimited.",
+            "title": "Renewal Limit"
+          },
           "status": {
             "anyOf": [
               {
@@ -6387,7 +7145,8 @@
                   "no_reset",
                   "day",
                   "week",
-                  "month"
+                  "month",
+                  "month_rolling"
                 ],
                 "type": "string"
               },
@@ -6397,6 +7156,21 @@
             ],
             "default": null,
             "title": "Traffic Limit Strategy"
+          },
+          "traffic_reset_anchor_day": {
+            "anyOf": [
+              {
+                "maximum": 31,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UTC month day; null uses creation day.",
+            "title": "Traffic Reset Anchor Day"
           }
         },
         "title": "UserUpdate",
@@ -6648,6 +7422,18 @@
               "maximum": 365,
               "minimum": 1,
               "title": "Unused Days",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stopped_days",
+            "required": false,
+            "schema": {
+              "default": 3,
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Stopped Days",
               "type": "integer"
             }
           },
@@ -11213,6 +11999,127 @@
           "users"
         ],
         "x-meridian-credentials": true,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "people"
+        ]
+      }
+    },
+    "/api/users/preview": {
+      "post": {
+        "description": "Requires people scope, or a scope that covers it. Requires a people-capable API token or an authenticated owner session. Returns dates only.",
+        "operationId": "preview_user_schedule",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserSchedulePreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountSchedulePreview"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Preview account schedule dates without changing anything.",
+        "tags": [
+          "users"
+        ],
+        "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "people"

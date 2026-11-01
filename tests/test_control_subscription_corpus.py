@@ -331,7 +331,18 @@ def _expected(capture: Capture) -> Response:
         )
         + ADDED_HEADERS
     )
-    return Response(golden.status, golden.format, golden.encoding, headers, golden.body)
+    body = golden.body
+    if golden.format == "json":
+        info = json.loads(body)
+        if isinstance(info, dict) and info.get("isFound") and "user" in info:
+            # Named info extension: directional period counters, volatile like the other traffic fields.
+            info["user"].update(
+                trafficUploadBytes="<volatile>",
+                trafficDownloadBytes="<volatile>",
+                trafficUnattributedBytes="<volatile>",
+            )
+            body = json.dumps(info)
+    return Response(golden.status, golden.format, golden.encoding, headers, body)
 
 
 def _document(text: str) -> Any:

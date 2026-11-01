@@ -12,6 +12,7 @@ from meridian.core.agent_types import MAX_SAFE_INTEGER
 from meridian.core.attention import (
     MAX_EXPIRY_DAYS,
     MAX_PAYMENT_DAYS,
+    MAX_STOPPED_DAYS,
     MAX_UNUSED_DAYS,
     AttentionList,
     AttentionThresholds,
@@ -64,6 +65,7 @@ def read_attention(service: ControlService, path: str) -> AttentionList:
             expiry_days=bounded_integer(options["expiry_days"], "expiry_days", 1, MAX_EXPIRY_DAYS),
             quota_percent=bounded_integer(options["quota_percent"], "quota_percent", 1, 100),
             unused_days=bounded_integer(options["unused_days"], "unused_days", 1, MAX_UNUSED_DAYS),
+            stopped_days=bounded_integer(options["stopped_days"], "stopped_days", 1, MAX_STOPPED_DAYS),
             allowance_percent=bounded_integer(options["allowance_percent"], "allowance_percent", 1, 100),
             allowance_exceeded_percent=bounded_integer(
                 options["allowance_exceeded_percent"], "allowance_exceeded_percent", 1, 100

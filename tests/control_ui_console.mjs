@@ -6,7 +6,9 @@ import { deliveryReply, runDeliveryScenario } from './control_ui_delivery.mjs';
 
 const require = createRequire(new URL('../website/package.json', import.meta.url));
 const { JSDOM } = require('jsdom');
-const [ui, mode, locale = 'en', dataText = 'null'] = process.argv.slice(2);
+const [ui, mode, locale = 'en', rawData = 'null'] = process.argv.slice(2);
+// Large scenarios arrive on stdin: Linux caps one argument at 128 KiB.
+const dataText = rawData === '-' ? fs.readFileSync(0, 'utf8') : rawData;
 const data = JSON.parse(dataText);
 const dom = new JSDOM('<!doctype html><body><div id="view"></div></body>', {
   url: 'https://198.51.100.1/console/', runScripts: 'outside-only', pretendToBeVisual: true,
@@ -120,7 +122,7 @@ w.fetch = (url, options) => {
     server_usage: data?.server_usage || [], server_attention: data?.server_attention || [] }));
   throw new Error('Unexpected request: ' + url);
 };
-for (const script of ['core.js', 'drafts.js', 'qr-export.js', 'people.js', 'expiry.js', 'person-connections.js', 'fleet.js']) {
+for (const script of ['core.js', 'drafts.js', 'qr-export.js', 'people.js', 'people-list.js', 'expiry.js', 'lifecycle.js', 'person-connections.js', 'fleet.js']) {
   w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 }
 const M = w.M;

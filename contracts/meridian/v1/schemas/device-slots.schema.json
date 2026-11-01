@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "allowed": {
+      "maximum": 100,
+      "minimum": 1,
+      "title": "Allowed",
+      "type": "integer"
+    },
+    "used": {
+      "minimum": 0,
+      "title": "Used",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "used",
+    "allowed"
+  ],
+  "title": "DeviceSlots",
+  "type": "object"
+}

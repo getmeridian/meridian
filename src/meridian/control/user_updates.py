@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from meridian.control.account_lifecycle import merge_user_update
 from meridian.control.events import EventLedger
 from meridian.control.models import UserRecord, UserUpdate
 from meridian.control.store import Store
-from meridian.control.user_expiry import require_finite_user_expiry
+from meridian.core.account_schedule import AccountLifecycleState
 
 
 def update_user(
@@ -24,18 +25,14 @@ def update_user(
     """Preserve omitted fields, record the edit, enforce limits, and compose atomically."""
     with store.transaction():
         user = read_user(username)
-        changes = update.model_dump(include=update.model_fields_set)
-        require_finite_user_expiry(changes.get("expire_at"))
-        if "status" in changes and changes["status"] is None:
-            del changes["status"]
-        for field in ("traffic_limit_bytes", "traffic_limit_strategy"):
-            if field in changes and changes[field] is None:
-                del changes[field]
-        merged = UserRecord.model_validate({**user.model_dump(), **changes})
+        moment = now()
+        merged = merge_user_update(user, update, moment)
         events.user_updated(user, merged)
+        schedule_fields = tuple(AccountLifecycleState.model_fields)
+        schedule_sql = ", ".join(f"{field} = ?" for field in schedule_fields)
         store.db.execute(
             "UPDATE users SET status = ?, expire_at = ?, traffic_limit_bytes = ?, traffic_limit_strategy = ?,"
-            " device_limit = ?, note = ?, tag = ?, language = ? WHERE username = ?",
+            f" device_limit = ?, note = ?, tag = ?, language = ?, {schedule_sql} WHERE username = ?",
             (
                 merged.status,
                 merged.expire_at,
@@ -45,9 +42,10 @@ def update_user(
                 merged.note,
                 merged.tag,
                 merged.language,
+                *(getattr(merged, field) for field in schedule_fields),
                 username,
             ),
         )
-        enforce(now())
+        enforce(moment)
         compose()
         return read_user(username)

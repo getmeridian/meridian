@@ -2,30 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 
 from meridian.control.models import LimitStrategy
+from meridian.core.account_schedule import next_period_start as schedule_next_period
+from meridian.core.account_schedule import period_start as schedule_period_start
 
 
-def period_start(strategy: LimitStrategy, now: datetime) -> datetime | None:
+def period_start(strategy: LimitStrategy, now: datetime, anchor_day: int | None = None) -> datetime | None:
     """The start of the traffic period *now* falls in (UTC), or None when traffic never resets."""
-    midnight = now.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    if strategy == "day":
-        return midnight
-    if strategy == "week":
-        return midnight - timedelta(days=midnight.weekday())
-    if strategy == "month":
-        return midnight.replace(day=1)
-    return None
+    return schedule_period_start(strategy, now, anchor_day)
 
 
-def next_period_start(strategy: LimitStrategy, now: datetime) -> datetime | None:
+def next_period_start(strategy: LimitStrategy, now: datetime, anchor_day: int | None = None) -> datetime | None:
     """The first instant of the next UTC period; weeks start on Monday."""
-    start = period_start(strategy, now)
-    if start is None:
-        return None
-    if strategy == "day":
-        return start + timedelta(days=1)
-    if strategy == "week":
-        return start + timedelta(days=7)
-    return start.replace(year=start.year + 1, month=1) if start.month == 12 else start.replace(month=start.month + 1)
+    return schedule_next_period(strategy, now, anchor_day)

@@ -9,7 +9,9 @@
 - **Stale-client nudge** — `stale_clients.py` maps a User-Agent to one inert entry (`outdated` v2rayNG below 1.9.17, `abandoned` NekoRay), each rule with its documented reason; it is read per request, stored nowhere, last in every format, and the preview reports it as `stale_client`.
 
 ## Pitfalls
+- **Named `/info` extensions appear only when they carry something** — unit corpus users have no schedule, so an always-present `accountSchedule` passed every unit test and failed only the System Lab's live replay.
 - **Every structured renderer gets the routing policy** — pass the topology's `client_routing` to each one, including Xray fingerprint groups and Stash.
+- **Header and `/info` traffic use the same period projection** — legacy combined use is included in download and explicitly exposed as unattributed, so a reset never erases lifetime accounting.
 - **Names before filters** — sort endpoints once, then allocate unique presentation names before filtering, reserving generated groups and the direct/reject labels; primary filters and fingerprint groups preserve that order because generated numeric suffixes sort differently. Preserve original suffix-shaped remarks, and use the same names in proxies, tags, and copy exclusions.
 - **Availability notices are inert and shared** — Xray availability checks primary endpoints, so fingerprint copies alone must show the same inert availability notices as Mihomo and sing-box. Empty supported endpoint sets use inert availability placeholders in all four locales, with existing status notices taking priority; filter Stash XHTTP and sing-box XHTTP/copies before checking availability.
 - **Never compress or send Referrer-Policy on `/sub/`** — nginx gzips JSON/Base64 (YAML stays plain, as `gzip_types` has none) and adds its own Referrer-Policy; the panel's duplicate was a corpus defect.

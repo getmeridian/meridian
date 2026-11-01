@@ -100,15 +100,30 @@ JSON `data` شامل `plan_hash`، `generation` و `actions[]` با `status: "co
 
 ### meridian client
 
+گزینه‌های زیر با `client add` و `client set` کار می‌کنند. تنظیمات اولیه فقط هنگام ایجاد حساب اعمال می‌شوند و اعمال بعدی تغییرات مدیر را حفظ می‌کنند. `client show` فیلدهای نوع‌دار و `schedule` محاسبه‌شدهٔ سرویس را در JSON می‌دهد. `client set --dry-run` مقدار `data.schedule_preview` و `applied: false` می‌دهد؛ تغییر زمان‌بندی در JSON به `--yes` نیاز دارد. `client extend --days N` روزها را به مدتِ در انتظار اولین استفاده اضافه می‌کند و حساب را فعال نمی‌کند؛ پس از فعال‌سازی تاریخ پایان را تمدید و سری جدیدی از تمدیدها آغاز می‌کند.
+
+| گزینه | کاربرد |
+| --- | --- |
+| `--reset-day N\|default` | روز بازنشانی ۱–۳۱؛ default روز ایجاد را به کار می‌برد |
+| `--duration DAYS\|none` | ۱–۳۶۵۰ روز از اولین ترافیک؛ none مدت را پاک می‌کند |
+| `--renew-days DAYS` | تمدید هر ۱–۳۶۵۰ روز UTC |
+| `--renew-months MONTHS` | تمدید هر ۱–۱۲۰ ماه تقویمی |
+| `--renewals N\|unlimited` | ۱–۱۰۰۰۰ تمدید؛ unlimited سقف را حذف می‌کند |
+| `--no-renew` | خاموش کردن تمدید خودکار |
+| `--dry-run` | پیش‌نمایش تاریخ‌ها بدون ذخیره |
+| `--yes` | تأیید تغییر زمان‌بندی |
+
+با `--devices unlimited` (یا `0`) فرد را از سقف عمومی دستگاه‌ها معاف کنید. `--devices default` سقف پیش‌فرض سرورها را به کار می‌برد؛ در پنل این دو گزینه جدا هستند. در API مقدار `device_limit: 0` یعنی نامحدود و `null` یعنی استفاده از پیش‌فرض. سطح حریم خصوصی همچنان اعمال می‌شود. مهاجرت از Remnawave سقف‌های افراد، از جمله صفر، را حفظ می‌کند اما سوابق دستگاه‌ها را منتقل نمی‌کند.
+
 افرادی را که متصل می‌شوند مدیریت کنید.
 
 ```
-meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
+meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--json]
 meridian client show NAME [--connections] [--json]
 meridian client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX] [--json]
 meridian client usage NAME [--days N] [--json]
 meridian client list [--attention] [--tag TAG|none] [--json]
-meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]
@@ -138,7 +153,7 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 **`client list`** — کلاینت‌ها را همراه با وضعیت، ترافیک، تاریخ انقضا و آخرین اتصال فهرست می‌کند، از جمله افرادی که در پنل وب اضافه شده‌اند (`declared: false` در JSON). با `--json`، شمارنده‌های `data.summary` و `data.clients[]` را برمی‌گرداند.
 
-`client list --attention` فقط افرادی را نشان می‌دهد که دسترسی‌شان تا هفت روز آینده منقضی می‌شود (شامل همین لحظه)، دست‌کم ۸۰٪ سهمیه را مصرف کرده‌اند، یا بیش از سه روز از ایجاد حسابشان گذشته و هنوز هیچ ترافیکی ندارند. دلیل در ستونی جداگانه آمده است؛ JSON شامل `clients[].attention_reasons` است و شمارش خلاصه فقط افراد نمایش‌داده‌شده را در بر می‌گیرد. ترافیک واردشده بدون تاریخ دقیق و بازنشانی دوره به معنی استفاده‌نشدن نیست.
+`client list --attention` فقط افرادی را نشان می‌دهد که دسترسی‌شان تا هفت روز آینده منقضی می‌شود (شامل همین لحظه)، دست‌کم ۸۰٪ سهمیه را مصرف کرده‌اند، یا بیش از سه روز از ایجاد حسابشان گذشته و هنوز هیچ ترافیکی ندارند. دلیل در ستونی جداگانه آمده است؛ JSON شامل `clients[].attention_reasons` است و شمارش خلاصه فقط افراد نمایش‌داده‌شده را در بر می‌گیرد. ترافیک واردشده بدون تاریخ دقیق و بازنشانی دوره به معنی استفاده‌نشدن نیست. دلیل جداگانهٔ **مدتی است استفاده نشده** (`stopped`) فردی را مشخص می‌کند که قبلاً از سرویس استفاده کرده اما بیش از سه روز ترافیک تازه‌ای نداشته است. **هنوز استفاده نشده** (`unused`) دلیل جداگانه‌ای می‌ماند. پارامتر API به نام `stopped_days` آستانهٔ مستقلی از ۱ تا ۳۶۵ روز با پیش‌فرض ۳ است؛ حدود و پیش‌فرض `unused_days` تغییر نمی‌کنند. بازنشانی دوره این شواهد را پاک نمی‌کند و تاریخچهٔ روزانه می‌تواند خاموش بماند. برای مصرف واردشده با زمان نامعلوم آخرین فعالیت، توقف استفاده حدس زده نمی‌شود.
 
 `GET /api/attention` به سطح `read` نیاز دارد و برای مالک واردشده نیز قابل دسترسی است. پاسخ شامل `observed_at`، `thresholds`، `people[]` با نام کاربری و دلیل، و `nodes[]` با شناسهٔ گره و دلیل است. گره‌های قطع‌شده یا هنوز دیده‌نشده، منابعی که اعمالشان ناموفق بوده، و سلامت گزارش‌شدهٔ `degraded` یا `unhealthy` بررسی می‌شوند. پارامترهای اختیاری: `expiry_days` (۱–۳۰، پیش‌فرض ۷)، `quota_percent` (۱–۱۰۰، پیش‌فرض ۸۰) و `unused_days` (۱–۳۶۵، پیش‌فرض ۳). این فهرست بدون ذخیرهٔ پرچم، نشست، نشانی یا دادهٔ دستگاه محاسبه می‌شود.
 

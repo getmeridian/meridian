@@ -100,15 +100,30 @@ Every apply is recorded in the control service as a revision (see `meridian flee
 
 ### meridian client
 
+The schedule options below work with `client add` and `client set`. New settings are applied only at creation; later applies preserve operator edits. `client show` carries the typed fields and the service’s computed `schedule` in JSON. `client set --dry-run` returns `data.schedule_preview` and `applied: false`; schedule changes in JSON need `--yes`. `client extend --days N` adds days to a pending first-use duration without activating it; after activation it extends the expiry and starts a new renewal series.
+
+| Option | Meaning |
+| --- | --- |
+| `--reset-day N\|default` | Anniversary reset day, 1–31; default uses creation day |
+| `--duration DAYS\|none` | 1–3650 days from first traffic; none clears the duration |
+| `--renew-days DAYS` | Renew every 1–3650 UTC days |
+| `--renew-months MONTHS` | Renew every 1–120 calendar months |
+| `--renewals N\|unlimited` | 1–10000 renewals; unlimited removes the cap |
+| `--no-renew` | Turn automatic renewal off |
+| `--dry-run` | Preview schedule dates without saving |
+| `--yes` | Confirm schedule changes |
+
+Use `--devices unlimited` (or `0`) to exempt a person from the fleet cap. `--devices default` inherits it; these are separate choices in the panel. The API uses `device_limit: 0` for unlimited and `null` for inheritance. The privacy level still applies. Remnawave migration preserves each cap, including zero, without importing device registrations.
+
 Manage the people who connect.
 
 ```
-meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
+meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--json]
 meridian client show NAME [--connections] [--json]
 meridian client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX] [--json]
 meridian client usage NAME [--days N] [--json]
 meridian client list [--attention] [--tag TAG|none] [--json]
-meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]
@@ -138,7 +153,7 @@ First reported traffic and the last reporting node come from accepted traffic gr
 
 **`client list`** — lists clients with status, traffic, expiry, and last seen, including people added in the web panel (`declared: false` in JSON). With `--json`, returns `data.summary` counts and `data.clients[]`.
 
-`client list --attention` shows only people expiring within seven days (including the current instant), at or above 80% of quota, or with no lifetime traffic more than three days after creation. A reason column explains each row; JSON includes `clients[].attention_reasons`, and summary counts cover the filtered list. Undated imported traffic and reset periods still count as previous use.
+`client list --attention` shows only people expiring within seven days (including the current instant), at or above 80% of quota, or with no lifetime traffic more than three days after creation. A reason column explains each row; JSON includes `clients[].attention_reasons`, and summary counts cover the filtered list. Undated imported traffic and reset periods still count as previous use. A separate **Stopped using** reason (`stopped`) flags a person who previously used the service but has no accepted traffic for more than three days. **Never used** (`unused`) remains a separate reason. `stopped_days` is an independent API threshold from 1–365 days, default 3; `unused_days` keeps its existing bounds and default. Period resets do not erase this evidence, and daily history can stay off. Imported use with no known last traffic time is not guessed to have stopped.
 
 `GET /api/attention` needs `read` scope and also admits the signed-in owner. It returns `observed_at`, `thresholds`, `people[]` with usernames/reasons, and `nodes[]` with node IDs/reasons. Node findings include offline or not-yet-seen agents, failed apply resources, and degraded or unhealthy reported health. Optional query parameters are `expiry_days` (1–30, default 7), `quota_percent` (1–100, default 80), and `unused_days` (1–365, default 3). Attention is derived without stored flags, sessions, addresses, or device data.
 

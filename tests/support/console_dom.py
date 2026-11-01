@@ -24,14 +24,21 @@ needs_console_dom = pytest.mark.skipif(
 
 
 def run_console(mode: str, locale: str = "en", data: Any = None) -> dict[str, Any]:
-    runner = (
-        "control_ui_showcase.mjs"
-        if mode.startswith("showcase-")
-        else ("control_ui_person.mjs" if mode.startswith("person-") else "control_ui_console.mjs")
-    )
+    runners = {
+        "page-": "control_ui_page.mjs",
+        "people-triage": "control_ui_people.mjs",
+        "account-": "connection_account.mjs",
+        "command-": "control_ui_commands.mjs",
+        "showcase-": "control_ui_showcase.mjs",
+        "person-": "control_ui_person.mjs",
+    }
+    runner = next((name for prefix, name in runners.items() if mode.startswith(prefix)), "control_ui_console.mjs")
+    mode = mode.removeprefix("command-")
+    # The scenario travels on stdin: Linux caps a single argument at 128 KiB.
     result = subprocess.run(
-        ["node", str(ROOT / "tests" / runner), str(UI_DIR), mode, locale, json.dumps(data)],
+        ["node", str(ROOT / "tests" / runner), str(UI_DIR), mode, locale, "-"],
         cwd=ROOT,
+        input=json.dumps(data),
         capture_output=True,
         text=True,
         check=True,

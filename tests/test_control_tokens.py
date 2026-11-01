@@ -114,6 +114,7 @@ ROUTE_SAMPLES = {
     "get_language": ("/api/language", None),
     "put_language": ("/api/language", {"language": "ru"}),
     "subscription_preview": ("/api/subscription/preview", {"username": "alice", "user_agent": "Hiddify/2"}),
+    "preview_user_schedule": ("/api/users/preview", {"username": "alice", "activation_duration_days": 30}),
     "get_node": ("/api/nodes/main", None),
     "put_node": ("/api/nodes/edge", {"resources": []}),
     "delete_node": ("/api/nodes/main", None),

@@ -288,8 +288,8 @@ def test_a_user_delete_cascades_devices_and_a_status_edit_keeps_the_cap(
     assert device_rows(tmp_path) == []
 
 
-@pytest.mark.parametrize("cap", [0, -1, 101], ids=["zero", "negative", "over-100"])
-def test_invalid_caps_never_enter_user_models(cap: int) -> None:
+@pytest.mark.parametrize("cap", [-1, 101, True, 1.5, "2"], ids=["negative", "over-100", "bool", "fraction", "text"])
+def test_invalid_caps_never_enter_user_models(cap: object) -> None:
     for model, extra in ((UserUpdate, {}), (UserCreate, {"username": "alice"})):
         with pytest.raises(ValidationError):
             model.model_validate({**extra, "device_limit": cap})

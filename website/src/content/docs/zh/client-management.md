@@ -57,6 +57,10 @@ meridian client show alice
 meridian client list
 ```
 
+在网页面板中打开 **用户 → 筛选**，可组合状态、标签（包括无标签）、未来 1–365 天内到期、最低已用额度 1–100%、尚未使用，以及关注或特定原因。到期筛选覆盖当前时刻至所选未来边界；已到期账户请使用状态筛选。尚未使用筛选也包含任意创建时长的新账户。每个计数都会考虑搜索和其他筛选。可按名称、周期用量、到期时间或最后活动升序或降序排列；未知日期始终排在最后。搜索、筛选和顺序保存在 URL 片段中，重新加载、分享链接或从用户页面返回都会保留视图。筛选参数不会发送或保存到服务器。筛选在浏览器中执行，输入时不会重建列表行。API 提供只读的 `never_used`、精确向下取整的 `quota_used_percent`（不限额度时为 `null`）和采用默认阈值的 `attention_reasons`。
+
+另一个原因 **已停止使用**（`stopped`）会标记曾使用服务、但超过三天没有新流量的用户。**尚未使用**（`unused`）仍是独立原因。API 参数 `stopped_days` 可独立设置为 1–365 天，默认 3 天；`unused_days` 的范围和默认值保持不变。周期重置不会抹去这些证据，且无需启用每日历史。导入用量缺少最后活动时间时，不会猜测用户已停止使用。
+
 显示所有客户端的状态、流量、到期时间和最近在线时间。
 
 ## 私人备注和标签
@@ -99,6 +103,8 @@ meridian client set alice --limit none --expires never
 meridian client reset-traffic alice
 ```
 
+应用的 `Subscription-Userinfo` 标头、`/info`、API 的 `period_traffic` 和网页面板共用周期上传与下载计数。手动和定期重置都会清零周期用量，同时保留累计用量。导入数据或旧周期缺少可恢复的方向信息时，每个字节都会保留：未知方向的用量计入下载，在 `unattributed_bytes`（`/info` 中为 `trafficUnattributedBytes`）中列出，面板也会说明，直到下次重置。Meridian 原生记录且从未重置的累计周期会保留已知的方向信息。
+
 `client show` 会显示当前情况：
 
 ```
@@ -108,6 +114,28 @@ meridian client reset-traffic alice
 ```
 
 应用、重新部署和服务器变更都不会改动客户端的限额和到期时间。
+
+## 账户有效期与自动续期
+
+自动续期和每月指定日的流量重置都会同时清零本期上传、下载计数（包括导入时方向未知的流量），累计流量保持不变。
+
+`--reset month` 在每个 UTC 月的第一天重置流量。`--reset month_rolling` 使用账户保存的每月指定日，默认是创建日。用 `--reset-day 1–31` 设置，或用 `default` 恢复创建日。指定 31 日时，二月使用 28 或 29 日，三月恢复 31 日。停机后，服务会在计入新报告的流量前补齐重置，并只清零一次。Remnawave 迁移会保留 `MONTH_ROLLING` 和原创建日；缺少创建日期时会拒绝迁移，不会猜测。
+
+`--duration N` 设置首次使用后 1–3650 天的有效期，每天为 24 个 UTC 小时。只有节点代理首次报告并被接受的流量会开始计时；打开连接页面或获取订阅不会开始计时。激活前，CLI、面板和页面显示“首次使用后有效 30 天”；激活后显示真实到期时间。有效天数与 `--expires` 二选一。对已使用账户设置有效期时，使用已记录的首次流量时间；历史时间未知时须设置固定到期时间。`--duration none` 清除有效天数并保留已激活的到期时间。延长尚未使用的账户只增加待激活天数，不会激活账户。
+
+```bash
+meridian client add example --duration 30 --limit 50GiB --reset month_rolling --reset-day 31
+meridian client set example --renew-months 1 --renewals 3 --dry-run --json
+meridian client set example --renew-months 1 --renewals 3 --yes --json
+meridian client set example --renew-days 7 --renewals unlimited --yes
+meridian client set example --no-renew --yes
+```
+
+使用 `--renew-days N`（1–3650 个 UTC 天）或 `--renew-months N`（1–120 个日历月）配置自动续期。日期从原到期时间向前推进，在短月后仍保留原 UTC 时间与月日期。`--renewals N` 将每轮续期限制为 1–10000 次；`unlimited` 移除上限。停机期间每个错过的续期日都会计入次数，服务在一个事务中补齐续期，本期流量只清零一次，累计流量保留。已停用账户继续按时续期，但保持停用。受限账户仅在有效期和流量额度允许时恢复有效。待激活账户会等待首次使用。CLI、面板和页面显示下次流量重置、下次续期和剩余续期次数。
+
+`client set --dry-run` 获取服务计算的日期且不保存。JSON 在 `data.schedule_preview` 中返回结果，并标明 `applied: false`。JSON 模式修改时间安排须添加 `--yes`；交互模式会在确认前显示日期。`--no-renew` 关闭自动续期。修改到期时间、有效天数或续期间隔会开始新一轮续期；仅修改次数上限会保留已完成次数。激活后的手动延长也会开始新一轮续期。面板编辑器提供相同选项，日期按浏览器时区显示并附准确 UTC 时间。服务器配置文件、批量导入、加密备份及恢复均保留这些字段；后续 apply 不会覆盖管理员修改。
+
+`POST /api/users/preview` 需要 people/admin 权限或已认证的所有者会话。不传 `username` 可预览创建账户，传入则预览修改。请求使用类型明确的 `traffic_reset_anchor_day`、`activation_duration_days`、`renewal_interval_days`、`renewal_interval_months`、`renewal_limit`、`expire_at` 和 `traffic_limit_strategy`。`POST /api/users` 与 `PATCH /api/users/{username}` 使用相同设置。省略字段保留原值，显式 null 清除选项。只读字段 `renewals_completed`、`renewal_anchor_at` 和 `schedule` 描述已完成次数与计算日期。预览不保存账户修改、设备数据或请求详情。
 
 ## 限制设备数量
 
@@ -124,7 +152,10 @@ Private 模式也不存储首次或最近获取订阅的时间。指纹包含在
 meridian client add alice --devices 2
 meridian client set alice --devices 4
 meridian client set alice --devices default
+meridian client set alice --devices unlimited
 ```
+
+使用 `--devices unlimited`（或 `0`）可让此人不受默认设备上限约束。`--devices default` 则恢复服务器默认上限；面板中提供两个独立选项。API 中 `device_limit: 0` 表示不限，`null` 表示继承默认值。隐私级别仍然生效。Remnawave 迁移会保留每人的设备上限，包括零，但不会导入设备登记记录。
 
 查看或清除登记：
 
@@ -134,6 +165,8 @@ meridian client devices alice --json
 meridian client devices alice --remove ID
 meridian client devices alice --clear
 ```
+
+所有者启用设备上限后，您的账户会显示已用 / 允许的设备名额。名额用满后，新设备刷新订阅时会收到上限提示。不报告设备标识的应用不计数。页面只显示计数，不会将其保存在浏览器中。
 
 Private 模式只显示“N / M 台设备”；JSON 还返回指纹 ID，以便单独移除。Full 模式列出 ID、系统及版本、型号、应用、首次和最近获取时间。网页面板中的用户页面显示相同的数量或列表，提供全部清除按钮，full 模式还提供单台设备移除按钮。
 
@@ -157,6 +190,8 @@ meridian client enable alice
 ```
 meridian client reissue alice
 ```
+
+网页面板中的重新签发和删除共用同一确认流程：终止会话选项默认关闭，列出受影响节点，确认后才执行修改。重复点击重新签发只提交一次。重新签发会刷新新链接，并单独显示各节点结果；终止会话失败或超时不会撤销新凭证。配置中声明的用户会显示 CLI 命令。
 
 控制服务会为该客户端生成新的订阅 ID 和新的密钥。旧的订阅 URL 和连接页面返回 404，服务器拒绝旧密钥。Meridian 打印新的订阅 URL，它同时打开新的连接页面。他们需要重新导入一次新链接：应用无法刷新一个已经不存在的订阅 URL。状态、流量限额和用量、到期时间及设备上限保持不变。设备登记会被清除。
 
@@ -263,6 +298,7 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 
 | 用户 API 端点 | 操作 |
 |---|---|
+| `POST /api/users/preview` | 预览创建或修改账户的 UTC 日期，不保存；需要 people/admin 或所有者会话 |
 | `POST /api/users` | 在一个事务中创建用户，同时设置 `username`、`status`、`expire_at`、`traffic_limit_bytes`、`traffic_limit_strategy` 和 `device_limit` |
 | `PATCH /api/users/{username}` | 修改状态、到期时间、流量限额或重置策略、设备上限；未发送的字段保持原值 |
 | `POST /api/users/{username}/reset-traffic` | 重置已用流量 |

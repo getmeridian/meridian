@@ -280,11 +280,18 @@
               "created_at",
               "traffic_reset_at",
               "lifetime_traffic_bytes",
-              "language"
+              "language",
+              "traffic_reset_anchor_day",
+              "activation_duration_days",
+              "renewal_interval_days",
+              "renewal_interval_months",
+              "renewal_limit",
+              "renewals_completed",
+              "renewal_anchor_at"
             ],
             "type": "string"
           },
-          "maxItems": 10,
+          "maxItems": 17,
           "minItems": 1,
           "title": "Fields",
           "type": "array"

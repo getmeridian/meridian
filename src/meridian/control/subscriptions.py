@@ -27,6 +27,7 @@ from meridian.control.formats.xray_json import xray_json_document
 from meridian.control.models import ClientEndpoint
 from meridian.control.periods import next_period_start
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
+from meridian.core.device_slots import DeviceSlots
 from meridian.core.notices import RenderedNotice
 from meridian.core.owner_contact import OwnerContact
 from meridian.core.subscription_preview import StaleClient
@@ -74,6 +75,7 @@ def render_subscription(
     owner_contact: OwnerContact | None = None,
     notice: RenderedNotice | None = None,
     stale_client: StaleClient | None = None,
+    device_slots: DeviceSlots | None = None,
 ) -> SubscriptionResponse:
     """Render *document* for *user*; a suspended user's entries are status placeholders.
 
@@ -93,6 +95,8 @@ def render_subscription(
         )
         if notice is not None:
             info["notice"] = notice.to_data()
+        if device_slots is not None:
+            info["user"]["deviceSlots"] = device_slots.to_data()
         return SubscriptionResponse(200, JSON_TYPE, _json(info), dict(COMMON_HEADERS) | _refill_headers(user, moment))
     headers = subscription_headers(
         user,
@@ -148,12 +152,13 @@ def subscription_headers(
     headers = dict(COMMON_HEADERS)
     headers.update(_refill_headers(user, now or datetime.now(UTC)))
     headers["content-disposition"] = _disposition(user.username)
-    # Upload and download are one total until per-direction counters exist; `expire` 0 is "never".
+    # `expire` 0 is "never"; both directions use the person's shared period projection.
     expire = 0
     if user.expires_at is not None and user.expires_at < NEVER_EXPIRES:
         expire = int(user.expires_at.timestamp())
+    traffic = user.traffic
     headers["subscription-userinfo"] = (
-        f"upload=0; download={user.used_bytes}; total={user.limit_bytes}; expire={expire}"
+        f"upload={traffic.upload_bytes}; download={traffic.download_bytes}; total={user.limit_bytes}; expire={expire}"
     )
     if support_link:
         headers["support-url"] = support_link
@@ -174,7 +179,11 @@ def subscription_url(public_url: str, short_id: str) -> str:
 
 
 def _refill_headers(user: SubscriptionUser, now: datetime) -> dict[str, str]:
-    next_start = next_period_start(user.limit_strategy, now)
+    if user.schedule is not None:
+        reset_at = user.schedule.next_reset_at
+        next_start = datetime.fromisoformat(reset_at) if reset_at else None
+    else:
+        next_start = next_period_start(user.limit_strategy, now, user.reset_anchor_day)
     return {"subscription-refill-date": str(int(next_start.timestamp()))} if next_start is not None else {}
 
 

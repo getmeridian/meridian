@@ -20,17 +20,21 @@ _UNITS = ("B", "KiB", "MiB", "GiB", "TiB", "PiB")
 
 def subscription_info(user: SubscriptionUser, links: list[str], subscription_url: str, now: datetime) -> dict[str, Any]:
     expires = user.expires_at or NEVER_EXPIRES
-    return {
+    traffic = user.traffic
+    info: dict[str, Any] = {
         "isFound": True,
         "user": {
             "shortUuid": user.short_id,
             "daysLeft": max(0, math.ceil((expires - now).total_seconds() / 86_400)),
-            "trafficUsed": readable_bytes(user.used_bytes),
+            "trafficUsed": readable_bytes(traffic.total_bytes),
             "trafficLimit": readable_bytes(user.limit_bytes),
             "lifetimeTrafficUsed": readable_bytes(user.lifetime_used_bytes),
             "lifetimeTrafficUsedBytes": str(user.lifetime_used_bytes),
             "trafficLimitBytes": str(user.limit_bytes),
-            "trafficUsedBytes": str(user.used_bytes),
+            "trafficUsedBytes": str(traffic.total_bytes),
+            "trafficUploadBytes": str(traffic.upload_bytes),
+            "trafficDownloadBytes": str(traffic.download_bytes),
+            "trafficUnattributedBytes": str(traffic.unattributed_bytes),
             "username": user.username,
             "expiresAt": iso_timestamp(expires),
             "isActive": user.status == "active",
@@ -41,6 +45,11 @@ def subscription_info(user: SubscriptionUser, links: list[str], subscription_url
         "ssConfLinks": {},
         "subscriptionUrl": subscription_url,
     }
+    schedule = user.schedule
+    # A named extension only when it says something: the frozen Remnawave answers have no such key.
+    if schedule is not None and (schedule.activation_pending or schedule.renewal_enabled or schedule.next_reset_at):
+        info["user"]["accountSchedule"] = schedule.to_data()
+    return info
 
 
 def not_found() -> dict[str, Any]:

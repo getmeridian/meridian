@@ -52,7 +52,7 @@ def test_expiry_display(expires_at: str, shown: str) -> None:
         ("MONTH", 50 * GIB, "12.4 GiB / 50 GiB (resets monthly)"),
         ("NO_RESET", 50 * GIB, "12.4 GiB / 50 GiB"),
         ("", 0, "12.4 GiB"),
-        ("MONTH_ROLLING", 50 * GIB, "12.4 GiB / 50 GiB (resets monthly on the day they were added)"),
+        ("MONTH_ROLLING", 50 * GIB, "12.4 GiB / 50 GiB (resets monthly on the chosen UTC day)"),
     ],
     ids=["monthly", "no-reset", "unlimited", "panel-rolling"],
 )

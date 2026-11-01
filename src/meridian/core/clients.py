@@ -9,10 +9,12 @@ from pydantic import Field
 
 from meridian.control.command_models import NodeCommandOutcome
 from meridian.control.models import UserStatus, UserUsage
-from meridian.core.attention import PersonAttentionReason
+from meridian.core.account_schedule import AccountLifecycleState, AccountSchedulePreview
+from meridian.core.client_devices import DeviceCap
 from meridian.core.client_limits import canonical_expiry, traffic_reset_from_strategy
 from meridian.core.languages import Language
 from meridian.core.models import CoreModel
+from meridian.core.person_activity import PersonAttentionReason
 from meridian.core.person_metadata import PersonTag, PrivateNote
 from meridian.core.topology import ProtocolKind
 from meridian.core.traffic import UserTrafficEvidence
@@ -62,7 +64,7 @@ class PanelUserLike(Protocol):
     def hwid_device_limit(self) -> int | None: ...
 
 
-class ClientRecord(UserTrafficEvidence):
+class ClientRecord(UserTrafficEvidence, AccountLifecycleState):
     """Redacted client metadata suitable for list views."""
 
     username: str
@@ -71,8 +73,7 @@ class ClientRecord(UserTrafficEvidence):
     traffic_used_bytes: int
     traffic_limit_bytes: int = Field(description="0 means unlimited.")
     traffic_reset: str = Field(
-        description="When used traffic starts again from zero: never, day, week, month, or the panel-only "
-        "month_rolling (monthly from the day the client was created).",
+        description="When used traffic resets: never, day, week, month, or month_rolling on the stored UTC anchor day.",
     )
     expires_at: str = Field(description="UTC timestamp; empty means never.")
     created_at: str
@@ -80,12 +81,13 @@ class ClientRecord(UserTrafficEvidence):
     attention_reasons: list[PersonAttentionReason] = Field(
         default_factory=list, description="Derived reasons when client list --attention was requested; never stored."
     )
-    device_limit: int | None = Field(default=None, ge=1, le=100, description="None uses the fleet's default cap.")
+    device_limit: DeviceCap | None = Field(default=None, description="Null uses the fleet's cap; 0 means unlimited.")
     note: PrivateNote = Field(default="", repr=False, description="Private operator note; people/admin only.")
     tag: PersonTag = Field(default="", repr=False, description="Private operator tag; people/admin only.")
     language: Language | None = Field(
         default=None, description="Subscription status language; null uses the fleet default."
     )
+    schedule: AccountSchedulePreview | None = None
     declared: bool = Field(
         default=True,
         description="False for a person added in the control service's web console rather than the fleet's "
@@ -235,6 +237,8 @@ class ClientLimitsResult(CoreModel):
     """Result for changing a client's limits or resetting their traffic: the client as the panel now has it."""
 
     client: ClientRecord
+    schedule_preview: AccountSchedulePreview | None = Field(default=None, exclude_if=lambda value: value is None)
+    applied: bool = Field(default=True, exclude_if=lambda value: value is True)
 
 
 def client_metadata_paths(records: Sequence[ClientRecord] | None = None) -> frozenset[str]:
@@ -263,6 +267,12 @@ def build_client_record(
 ) -> ClientRecord:
     """Build a redacted client record from a panel user object."""
     return ClientRecord(
+        **AccountLifecycleState.model_validate(
+            {
+                field: getattr(user, field, model_field.default)
+                for field, model_field in AccountLifecycleState.model_fields.items()
+            }
+        ).model_dump(),
         username=user.username,
         id=user.id,
         status=user.status,
@@ -279,6 +289,7 @@ def build_client_record(
         note=getattr(user, "description", ""),
         tag=getattr(user, "tag", ""),
         language=getattr(user, "language", None),
+        schedule=getattr(user, "schedule", None),
         declared=declared,
     )
 

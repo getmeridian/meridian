@@ -19,7 +19,7 @@ from meridian.control.service import SCHEMA_VERSION, ControlService
 from meridian.control.snapshot import decrypt_snapshot, generate_key_pair
 from meridian.control.subscriptions import render_subscription
 from meridian.core.languages import Language, LanguageSettings
-from tests.support.control_service import FLEET_ID
+from tests.support.control_service import FLEET_ID, drop_account_schedule_schema, drop_period_usage_schema
 from tests.test_control_subscription_corpus import FLEETS, SHORT_ID, STATUS_LANGUAGE, UUID
 from tests.test_control_ui_http import ADMIN_TOKEN, Fleet
 from tests.test_control_ui_http import fleet as fleet
@@ -114,7 +114,9 @@ def test_schema_16_database_migrates_to_nullable_person_language(tmp_path: Path)
     service.put_user("person")
     service.close()
     with sqlite3.connect(path) as db:
+        drop_account_schedule_schema(db)
         db.execute("ALTER TABLE users DROP COLUMN language")
+        drop_period_usage_schema(db)
         db.execute("UPDATE meta SET value = '16' WHERE key = 'schema_version'")
     service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
     try:

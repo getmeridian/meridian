@@ -5,6 +5,9 @@ description: You received a Meridian link. Install an app, add the connection, a
 
 Someone who runs a Meridian server sent you a link. This page is for you: you need no command line and no server knowledge.
 
+
+An account may be valid for a number of days from first use. Opening this page or refreshing the subscription does not start that time: it starts when the server’s agent first reports your traffic. Before then the account remains ready to connect; afterwards the account panel shows the actual expiry, in your browser’s time zone with UTC. If automatic renewal is configured, the panel also shows the next renewal, next traffic reset, and renewals left.
+
 ## Open the link
 
 Open the link on the device you want to connect. It leads to your **connection page**, which recognizes your device and walks you through three steps:
@@ -16,6 +19,8 @@ Open the link on the device you want to connect. It leads to your **connection p
 To set up a phone from a computer, open the link on the computer and scan the QR code beside the steps with the phone's camera or the app's scanner.
 
 Keep the link to yourself. It is your personal access, and anyone who has it can connect as you.
+
+If the owner enables device limits, Your account shows used / allowed device slots. When full, new devices get a limit notice on subscription refresh. Apps that do not report a device are not counted. Only counts appear; they are not saved in your browser.
 
 ## Language
 

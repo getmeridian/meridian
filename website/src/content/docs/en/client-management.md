@@ -57,6 +57,10 @@ This prints the personal URL, plus status, traffic, expiry, and when the client 
 meridian client list
 ```
 
+In the web panel, open **People → Filters** to combine status, tag (including no tag), expiry within 1–365 days, quota at or above 1–100%, never used, and attention or a specific reason. Expiry covers now through the chosen future boundary; already expired accounts use the status filter. The never-used filter includes new accounts of any age. Each count respects your search and the other filters. Sort by name, period usage, expiry, or last activity, in either order; unknown dates stay last. Search, filters, and order live in the URL fragment, so reloading, sharing the link, or returning from a person preserves the view. No filter data is sent or saved on the server. The list is filtered locally; rows keep their identity while you type. The API supplies read-only `never_used`, exact floored `quota_used_percent` (null for unlimited), and default `attention_reasons`.
+
+A separate **Stopped using** reason (`stopped`) flags a person who previously used the service but has no accepted traffic for more than three days. **Never used** (`unused`) remains a separate reason. `stopped_days` is an independent API threshold from 1–365 days, default 3; `unused_days` keeps its existing bounds and default. Period resets do not erase this evidence, and daily history can stay off. Imported use with no known last traffic time is not guessed to have stopped.
+
 Shows every client with status, traffic, expiry, and last seen.
 
 ## Private notes and tags
@@ -99,6 +103,8 @@ A client who reaches the limit shows as `limited`, and one past the expiry as `e
 meridian client reset-traffic alice
 ```
 
+The app’s `Subscription-Userinfo` header, `/info`, the API’s `period_traffic`, and the web panel share the same period upload/download counters. Both manual and scheduled resets clear the period while leaving lifetime totals untouched. Imports and older periods with no recoverable split keep every byte: unclassified use is included in download, exposed as `unattributed_bytes` (`trafficUnattributedBytes` on `/info`), and disclosed in the panel until the next reset. A native lifetime period with no reset keeps its known split.
+
 `client show` prints where they stand:
 
 ```
@@ -108,6 +114,28 @@ meridian client reset-traffic alice
 ```
 
 Apply, redeploys, and fleet changes never change a client's limits or expiry.
+
+## Account schedules
+
+Renewals and anniversary resets clear both period upload and download, including imported use with an unknown direction. Lifetime traffic stays intact.
+
+`--reset month` resets on the first day of each UTC month. `--reset month_rolling` resets on the account’s monthly anniversary: its stored UTC anchor day defaults to the creation day. Set it with `--reset-day 1–31`, or use `default` to return to the creation day. Day 31 becomes February 28 or 29, then March 31. After downtime, the service resets once before counting new reported traffic. Remnawave migration keeps `MONTH_ROLLING` and the original creation-day anchor; a missing creation date is refused.
+
+`--duration N` gives 1–3650 days from first use, with each day lasting 24 hours in UTC. Only the first accepted traffic reported by an agent activates it; opening the connection page or fetching a subscription never does. Before activation, the CLI, panel, and page say “valid for 30 days from first use”; afterwards they show the actual expiry. Choose a duration or `--expires`, not both. Setting a duration on an already-used account uses its recorded first traffic; if that historical time is unknown, set a fixed expiry. `--duration none` clears the duration while keeping an existing activated expiry. Extending an unused account adds days to its pending duration without activating it.
+
+```bash
+meridian client add example --duration 30 --limit 50GiB --reset month_rolling --reset-day 31
+meridian client set example --renew-months 1 --renewals 3 --dry-run --json
+meridian client set example --renew-months 1 --renewals 3 --yes --json
+meridian client set example --renew-days 7 --renewals unlimited --yes
+meridian client set example --no-renew --yes
+```
+
+Automatic renewal uses `--renew-days N` (1–3650 UTC days) or `--renew-months N` (1–120 calendar months). It advances from the original expiry, retaining its UTC time and original month day through short months. `--renewals N` caps the series at 1–10000 renewals; `unlimited` removes the cap. Every missed boundary counts toward the cap; downtime is caught up in one transaction and resets period traffic once, preserving lifetime traffic. A disabled account still follows its schedule and stays disabled. A limited account becomes active only when expiry and quota allow it. Pending accounts wait for first use. The CLI, panel, and page show the next reset, next renewal, and renewals left.
+
+`client set --dry-run` reads a service-calculated date preview and saves nothing. JSON returns `data.schedule_preview` with `applied: false`. Schedule edits require `--yes` in JSON mode; interactive edits show the dates before confirmation. `--no-renew` turns renewal off. Changing the expiry, duration, or renewal interval starts a new series; editing only the cap preserves the completed count. A manual extension after activation also starts a new series. The panel’s expiry and limit editors offer the same choices, with browser-local dates and exact UTC. These fields survive fleet documents, import batches, encrypted backup and restore; later applies preserve operator edits.
+
+`POST /api/users/preview` requires people/admin scope or the authenticated owner session. Omit `username` to preview creation; include it to preview an edit. Requests use typed `traffic_reset_anchor_day`, `activation_duration_days`, `renewal_interval_days`, `renewal_interval_months`, `renewal_limit`, `expire_at`, and `traffic_limit_strategy`. The same settings travel in `POST /api/users` and `PATCH /api/users/{username}`. Omitted fields preserve values; explicit null clears a choice. Read-only `renewals_completed`, `renewal_anchor_at`, and `schedule` describe progress and computed dates. Previews store no account changes, device data, or request details.
 
 ## Limit devices
 
@@ -124,7 +152,10 @@ Set a cap from 1 to 100, at creation or later. `default` uses the fleet cap (ini
 meridian client add alice --devices 2
 meridian client set alice --devices 4
 meridian client set alice --devices default
+meridian client set alice --devices unlimited
 ```
+
+Use `--devices unlimited` (or `0`) to exempt a person from the fleet cap. `--devices default` inherits it; these are separate choices in the panel. The API uses `device_limit: 0` for unlimited and `null` for inheritance. The privacy level still applies. Remnawave migration preserves each cap, including zero, without importing device registrations.
 
 Read or forget registrations:
 
@@ -134,6 +165,8 @@ meridian client devices alice --json
 meridian client devices alice --remove ID
 meridian client devices alice --clear
 ```
+
+If the owner enables device limits, Your account shows used / allowed device slots. When full, new devices get a limit notice on subscription refresh. Apps that do not report a device are not counted. Only counts appear; they are not saved in your browser.
 
 Private mode shows only “N of M devices”; JSON also returns fingerprint IDs for removing one. Full mode lists IDs, systems and versions, models, apps, and first/last fetch times. The person's view in the web panel has the same count or list, with a clear button and, in full mode, individual remove buttons.
 
@@ -157,6 +190,8 @@ If a client's link or connection page reaches someone it shouldn't, replace it:
 ```
 meridian client reissue alice
 ```
+
+In the web panel, reissue and removal use the same review: the session cut-off checkbox starts off, affected nodes are listed, and you confirm before anything changes. Repeated reissue clicks submit one change. Reissue refreshes the new link and shows per-node results separately; a failed or timed-out cut-off does not undo the new credentials. Declared people show the CLI command.
 
 The control service gives the client a new subscription ID and new keys. The old subscription URL and connection page return 404, and the servers refuse the old keys. Meridian prints the new subscription URL, which also opens the new connection page. They import the new link once: their apps can't follow a subscription URL that no longer exists. Status, traffic limit and usage, expiry, and the device cap stay. Registered devices are cleared.
 
@@ -263,6 +298,7 @@ Read tokens never see anyone's keys or subscription ID. Choose **People** for a 
 
 | People endpoint | Action |
 |---|---|
+| `POST /api/users/preview` | Preview creation or an edit’s UTC schedule dates without saving; people/admin or owner session |
 | `POST /api/users` | Create a person with `username`, `status`, `expire_at`, `traffic_limit_bytes`, `traffic_limit_strategy`, and `device_limit` in one transaction |
 | `PATCH /api/users/{username}` | Change the status, expiry, traffic limit or reset strategy, or device cap; omitted fields keep their values |
 | `POST /api/users/{username}/reset-traffic` | Reset used traffic |

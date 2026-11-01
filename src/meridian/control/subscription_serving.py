@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+from meridian.control.device_slots import read_device_slots
 from meridian.control.devices import DeviceLedger, HeaderReader, browser_request
 from meridian.control.formats.entries import SubscriptionUser
 from meridian.control.formats.selector import explain_format
@@ -47,10 +48,11 @@ def serve_subscription(
         row = store.db.execute(f"{USER_SELECT} WHERE u.sub_token = ?", (sub_token,)).fetchone()
         if row is None:
             return unknown_subscription()
-        record = user_record(row)
+        record = user_record(row, now=datetime.fromtimestamp(clock(), UTC))
         bodies = [item[0] for item in store.db.execute("SELECT body FROM endpoints").fetchall()]
         settings = read_settings()
         privacy = read_privacy()
+        slots = read_device_slots(store, record, privacy) if document == "browser" else None
         notice = read_notice(record)
         language = resolve_language(read_language().language, record.language)
         # The connection page's account check (`/info`) is never an app fetching its configs.
@@ -69,12 +71,18 @@ def serve_subscription(
         client_routing=settings.client_routing,
         owner_contact=settings.owner_contact,
         notice=notice,
+        device_slots=slots,
         now=datetime.fromtimestamp(clock(), UTC),
         placeholder_remarks=DEVICE_LIMIT_REMARKS if "x-hwid-limit" in hwid_flags else None,
         extra_headers=hwid_flags,
         # Read from this request's header alone: never stored, logged, or kept beside a device.
         stale_client=None if document == "browser" else stale_client(user_agent),
     )
+
+
+def effective_expiry(record: UserRecord) -> str | None:
+    """The expiry delivery shows: the calculated one once a schedule exists, else the stored one."""
+    return record.schedule.expire_at if record.schedule is not None else record.expire_at
 
 
 def subscription_user(record: UserRecord, language: FleetLanguage) -> SubscriptionUser:
@@ -84,10 +92,15 @@ def subscription_user(record: UserRecord, language: FleetLanguage) -> Subscripti
         uuid=record.uuid,
         short_id=record.sub_token,
         status=record.status,
-        expires_at=datetime.fromisoformat(record.expire_at) if record.expire_at else None,
+        # The calculated expiry: a renewal due before the next enforcement tick (or a first use)
+        # must not send an old expire= beside the new refill date.
+        expires_at=datetime.fromisoformat(expiry) if (expiry := effective_expiry(record)) else None,
         used_bytes=record.used_traffic_bytes,
+        period_traffic=record.period_traffic,
         limit_bytes=record.traffic_limit_bytes,
         lifetime_used_bytes=record.lifetime_traffic_bytes,
         limit_strategy=record.traffic_limit_strategy,
+        reset_anchor_day=record.traffic_reset_anchor_day,
+        schedule=record.schedule,
         language=language_or_english(language),
     )

@@ -9,7 +9,9 @@ from typing import Literal
 from meridian.compiler.names import fingerprint_label
 from meridian.control.formats.status_remarks import STATUS_REMARKS
 from meridian.control.models import ENDPOINT_REMARK_MAX_LENGTH, ClientEndpoint, LimitStrategy
+from meridian.core.account_schedule import AccountSchedulePreview
 from meridian.core.languages import DEFAULT_LANGUAGE, Language
+from meridian.core.traffic import PeriodTraffic, period_usage
 
 UserStatus = Literal["active", "disabled", "limited", "expired"]
 
@@ -48,7 +50,19 @@ class SubscriptionUser:
     limit_bytes: int = 0
     lifetime_used_bytes: int = 0
     limit_strategy: LimitStrategy = "no_reset"
+    reset_anchor_day: int | None = None
+    schedule: AccountSchedulePreview | None = None
     language: Language = DEFAULT_LANGUAGE
+    period_traffic: PeriodTraffic | None = None
+
+    @property
+    def traffic(self) -> PeriodTraffic:
+        """Delivery counters, with the same explicit fallback for a combined-only input."""
+        return (
+            self.period_traffic
+            if self.period_traffic is not None
+            else period_usage(0, 0, carried_bytes=self.used_bytes)
+        )
 
     @property
     def placeholders(self) -> tuple[str, ...]:

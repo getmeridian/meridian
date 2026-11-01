@@ -1,6 +1,7 @@
 # core — Meridian API contracts
 
 ## Design decisions
+- **One account clock** — `account_schedule.py` computes UTC activation, anniversary refills, and clamped renewal catch-up; billing shares `calendar.monthly_period()`.
 - **No CLI globals** — core never imports Typer, Rich, console, config, or command modules (tested); the CLI and the control service are adapters. Constants live in `core/defaults.py`.
 - **Envelope first** — JSON clients get one stable `meridian.output/v1` shape with command data under `data`; `schema_envelopes.py` builds command envelopes from the catalog, and `schema.py` composes contract families from their owning modules.
 - **Command metadata is schema-neutral** — `command_catalog.COMMAND_OUTPUTS` maps every public command path to its JSON output or `None`; argv, flags, and help come from the Typer tree via `meridian.cli_catalog`.
@@ -22,6 +23,7 @@
 - Commands build typed, redacted results before any envelope or rendering, and reporter primitives emit typed events without choosing a renderer.
 
 ## Pitfalls
+- **Device cap zero is unlimited** — only null inherits the fleet cap; never resolve a cap by truthiness.
 - **Never emit raw SSH commands, panel tokens, private keys, database URLs, or subscription secrets.**
 - **`redact_string()` is the only secret masker** (SSH debug logs included) — teach it a new secret form instead of adding a local regex.
 - **Reveal exact paths only** — connection URIs and QR fields are complete credentials; JSON reveal options name exact dotted paths (list indices included) and never expose neighbouring fields. Preview redaction masks whole URIs and replaces opaque Base64 headers.
@@ -37,3 +39,6 @@
 - **Command catalogs list only completed JSON outcomes** — an interruption exits 130 without an envelope; a cooperative cancel is a `cancelled` outcome with exit 5.
 - **Fleet results keep reachability, runtime, and convergence apart** — a live poll never makes an old health report current, and a healthy runtime can still await convergence.
 - **Client detail carries lifetime traffic beside the period** — resetting period use never erases the lifetime figure.
+- **Period directions sum to used traffic** — `PeriodTraffic.unattributed_bytes` names the part of download whose historical direction is unknown, never a third amount to add.
+- **Never-used and stopped-use attention are disjoint** — `is_never_used` includes imported lifetime evidence; stopped use requires a known last traffic time, never a guessed import date or daily history.
+- **Quota percentages are integer evidence** — floor exact byte ratios once for attention and browser triage, or JavaScript rounds a large cap across the threshold.

@@ -14,7 +14,21 @@ newest first; the last is what 4.0 changes compared with 3.x.
 
 ### Since 4.0.0b9
 
+#### Added
+- Account anniversary resets, durations from first traffic, and automatic
+  expiry renewal with optional caps. API, CLI, panel, connection pages, and
+  refill headers share UTC dates; migration keeps rolling-month anchors.
+  Renewal and rolling resets clear both period directions and carried use,
+  preserving lifetime traffic.
+- Per-person unlimited device caps in the API, CLI, and panel, distinct from
+  the fleet default. Remnawave migration keeps device caps, including zero.
+
 #### Fixed
+- **The People screen filters by status, tag, upcoming expiry, quota share, never-used accounts, and attention**, with facet counts and sorting by name, usage, expiry, or last activity. The fragment retains the view across reloads, and searching keeps existing rows and focus (#95).
+- **People attention distinguishes never-used accounts from people who stopped using the service**, using the stored last traffic time and separate bounded thresholds. Period resets and disabled daily history preserve that evidence (#95).
+- **Connection pages show used and allowed device slots when limits are enabled**, with localized guidance for full slots and apps that cannot report a device. Only counts are revealed, and the page never saves them (#95).
+- **Reissuing a link in the web panel offers the same session cut-off choice as removal**, reviews affected nodes, and shows each node’s outcome while retaining the new link (#95).
+- **Subscription traffic reports upload and download for the current period**, shared with the API and web panel. Manual and scheduled resets keep both directions and lifetime totals consistent; imports and older periods keep unclassified use with an explicit disclosure (#95).
 - **A web panel on its own domain keeps its certificate** when the same server
   also runs an exit (#110). The panel's domain certificate was installed where
   the server's IP certificate lives, so an exit's IP certificate replaced it,

@@ -78,21 +78,24 @@
     }).then(stop);
   };
 
-  M.confirmCutOffRemoval = function (name) {
+  function confirmCutOff(name, reissue) {
     return M.api("GET", "api/users/" + encodeURIComponent(name) + "/cut-off").then(function (plan) {
-      return M.dialog(M.t("person.remove_title", { name: M.displayName(name) }), function (close) {
+      return M.dialog(M.t(reissue ? "person.reissue_title" : "person.remove_title", { name: M.displayName(name) }), function (close) {
         var opt = h("input", { type: "checkbox", name: "cut-off", disabled: !plan.nodes.length });
         var scope = plan.nodes.map(function (node) { return node.node_id; }).join(", ");
-        return [h("p", { class: "muted", text: M.t("person.remove_confirm") }),
+        return [h("p", { class: "muted", text: M.t(reissue ? "person.reissue_confirm" : "person.remove_confirm") }),
           h("label", { class: "check-row" }, opt, " ", M.t("commands.cut_off_label")),
           h("p", { class: "hint", text: M.t("commands.cut_off_help") }),
           h("p", { class: "muted small", text: scope ? M.t("commands.scope", { nodes: "\u2068" + scope + "\u2069" }) : M.t("commands.no_inbounds") }),
           h("div", { class: "actions" },
             h("button", { class: "btn btn-ghost", type: "button", onclick: function () { close(); } }, M.t("action.cancel")),
-            h("button", { class: "btn btn-danger", type: "button", onclick: function () { close({ cut_off: opt.checked }); } }, M.t("person.remove")))];
+            h("button", { class: "btn btn-danger", type: "button", onclick: function () { close({ cut_off: opt.checked }); } }, M.t(reissue ? "person.reissue" : "person.remove")))];
       });
     });
-  };
+  }
+
+  M.confirmCutOffRemoval = function (name) { return confirmCutOff(name, false); };
+  M.confirmCutOffReissue = function (name) { return confirmCutOff(name, true); };
 
   var restarting = Object.create(null);
   M.restartNode = function (node) {

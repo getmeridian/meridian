@@ -36,6 +36,13 @@
       "title": "Quota Percent",
       "type": "integer"
     },
+    "stopped_days": {
+      "default": 3,
+      "maximum": 365,
+      "minimum": 1,
+      "title": "Stopped Days",
+      "type": "integer"
+    },
     "unused_days": {
       "default": 3,
       "maximum": 365,

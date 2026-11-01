@@ -1,6 +1,7 @@
 # control/ui — The owner's web console
 
 ## Design decisions
+- **Account dates come from the service** — lifecycle forms preview the shared UTC calculator, show browser time beside UTC, and send only edited choices.
 - **Served by the service, under the secret path** — `ui_routes.py` serves `index.html` at `/` and assets at `/ui/<name>`; the API lives in the same process, so there is no CORS, no build step, and no outside request (system fonts, local icons, QR codes as SVG data URIs from `segno`).
 - **Vanilla JS on one namespace** — `boot.js` sets theme and direction before paint; `core.js` owns `M.h` (the only DOM builder), `M.api`, dialogs, and formatting; each screen file adds `M.screens.*`; `app.js` runs the state machine (setup link → no owner → sign in → shell).
 - **Owner sign-in** — one owner: a scrypt password (`passwords.py`) and an optional TOTP code. `owner.py` stores sessions only as SHA-256 with idle and absolute limits, and mints single-use setup links that only the root token can request (`meridian panel`). Passive read polls (`X-Meridian-Passive`) don't extend idle time; writes always re-check session liveness in their transaction.
@@ -8,6 +9,7 @@
 - **The console changes only what the service owns** — people, tokens, privacy, notices, fleet language, and signed unit restarts. Topology (servers, routing, contact, title, allowances) is read-only and shows the `meridian` command that changes it, because the next apply would undo a console edit.
 - **People the deployer declared stay the deployer's** — users in the last applied revision's intent; removal and reissue show the CLI command, and the service refuses both to owner sessions and people tokens (`declared_user`).
 - **Person drafts live only in memory** — changed forms guard navigation and dismissal with Leave/Stay, and visible reads refresh passively without replacing edits.
+- **People triage lives in the fragment** — validated filters and sorting survive reloads and person navigation; rows stay mounted, and facet counts apply the other active filters and search.
 - **Same locale approach as the PWA** — `locales/{en,ru,fa,zh}.json`, English fallback, `fa` sets `dir="rtl"`, numbers and sizes bidi-isolated.
 - **Passkeys are a seam** — `PasskeyState` reports `no_domain` on a bare IP and `not_built` otherwise; py_webauthn would add pyOpenSSL, pyasn1, and cbor2 to every CLI install, and attestation is never parsed by hand.
 
@@ -16,8 +18,11 @@
 - **Every mutating request is same-origin twice** — `SameSite=Strict` plus the `X-Meridian-Request: 1` header `M.api` adds (and matching `Origin`/`Sec-Fetch-Site` when sent).
 - **Assets revalidate by content-hash ETag**; anything holding a secret is `no-store`.
 - Restart and cut-off actions disclose reconnects and affected nodes before confirming, and repeated clicks cannot queue duplicates.
+- **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Settle a form's disabled state before `M.trackForm()`** — a field disabled after the snapshot reads as edited, and the device editor once asked to discard changes nobody made.
+- **Device caps have three choices** — inherit, unlimited, or 1–100; saving another field preserves an exemption.
 - **Scope the session cookie to `ServiceConfig.public_path`** — a `/` cookie would ride every subscription request; without a path, sign-in is refused (`ui_unconfigured`), and so is a setup link.
 - **Guess limits are per bucket, never per source** — every browser arrives as nginx's 127.0.0.1, so `login_limits.py` keeps separate in-memory buckets for sign-in, setup links, and each session's re-checks; one shared bucket let guesses lock out a signed-in owner. Never trust a forwarded-address header.
 - **Judge every guess inside `LoginLimiter.turn()`** (check, hash, count) — checking before the slow hash let concurrent guesses all pass.
@@ -33,6 +38,7 @@
 - **Poll only while visible**, keep stale data with retry and backoff, and accept replies through `M.latestOnly()` — the revision diff once showed one request's reply under another's label.
 - **Command polling keeps finished sibling results** and turns terminal read errors into an unavailable result, never a false timeout.
 - **A relay's null usage is "not measured", never zero**; render billing dates as UTC calendar dates.
+- **Period counters come from the person record** — show its upload/download and disclose carried use; the browser never reconstructs a reset from lifetime totals.
 - **Pass literal strings to `M.confirm`** — it creates its own text node; a DOM node displays as an object label instead of the reviewed text.
 - **Token issuance may be uncertain** — lock the dialog throughout; a success without a secret refreshes the list and says the secret cannot be recovered.
 - **Quotas use GiB/TiB with an explicit Unlimited choice**, refusing values beyond JavaScript's exact integer range; a browser's `badInput` must never clear a cap to its default.

@@ -68,8 +68,8 @@ def test_client_set_changes_only_the_cap_and_default_is_an_explicit_null(
 
 @pytest.mark.parametrize(
     ("typed", "limit"),
-    [("1", 1), ("100", 100), ("۲", 2), ("default", None)],
-    ids=["minimum", "maximum", "persian-digit", "fleet-default"],
+    [("1", 1), ("100", 100), ("۲", 2), ("default", None), ("0", 0), ("unlimited", 0)],
+    ids=["minimum", "maximum", "persian-digit", "fleet-default", "zero", "unlimited"],
 )
 def test_device_cap_input_keeps_the_difference_between_omitted_and_default(typed: str, limit: int | None) -> None:
     change = build_limit_change(devices=typed)
@@ -79,8 +79,8 @@ def test_device_cap_input_keeps_the_difference_between_omitted_and_default(typed
 
 @pytest.mark.parametrize(
     "typed",
-    ["0", "101", "-1", "1.5", "none", "9" * 400],
-    ids=["zero", "over-100", "negative", "fraction", "not-default", "enormous"],
+    ["101", "-1", "1.5", "none", "9" * 400],
+    ids=["over-100", "negative", "fraction", "not-default", "enormous"],
 )
 def test_a_bad_device_cap_returns_a_user_error_before_opening_access(
     fleet: ControlClient,

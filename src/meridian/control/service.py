@@ -21,17 +21,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from meridian.control.account_lifecycle import enforce_user_schedules, preview_user_schedule
+from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.attention import read_attention
 from meridian.control.background_health import BackgroundHealth
-from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE, BackupLedger
+from meridian.control.backups import BackupLedger
 from meridian.control.command_models import CommandRequest, NodeCommandRecord, UserCutOffMutation
-from meridian.control.commands import COMMAND_TABLES, CommandLedger
+from meridian.control.commands import CommandLedger
 from meridian.control.connection_pages import ConnectionPages
 from meridian.control.cutoff import CutOffLedger
-from meridian.control.devices import DEVICES_TABLE, DeviceLedger, HeaderReader
+from meridian.control.devices import DeviceLedger, HeaderReader
 from meridian.control.enrollment import NodeAuthority
 from meridian.control.errors import ServiceError
-from meridian.control.events import EVENT_TABLES, EventLedger
+from meridian.control.events import EventLedger
 from meridian.control.languages import LanguageLedger
 from meridian.control.models import (
     ClientEndpoint,
@@ -53,25 +55,27 @@ from meridian.control.models import (
 from meridian.control.node_documents import with_users
 from meridian.control.node_health import project_runtime
 from meridian.control.notices import NoticeLedger
-from meridian.control.owner import UI_TABLES, OwnerAuth
-from meridian.control.periods import period_start
+from meridian.control.owner import OwnerAuth
+from meridian.control.period_usage import reset_period
 from meridian.control.person_connections import read_connections
-from meridian.control.privacy import PRIVACY_TABLES, PrivacyLedger, read_privacy
-from meridian.control.revisions import APPLY_FENCE_TABLE, REVISIONS_TABLE, RevisionLedger
-from meridian.control.server_allowances import ALLOWANCE_PERIODS_TABLE, advance_server_periods, read_server_usage
+from meridian.control.privacy import PrivacyLedger, read_privacy
+from meridian.control.revisions import RevisionLedger
+from meridian.control.schema import SCHEMA, migrate
+from meridian.control.schema import SCHEMA_VERSION as SCHEMA_VERSION
+from meridian.control.server_allowances import advance_server_periods, read_server_usage
 from meridian.control.service_settings import read_settings, save_settings
 from meridian.control.store import Store
 from meridian.control.subscription_preview import preview_subscription
 from meridian.control.subscription_serving import serve_subscription
 from meridian.control.subscriptions import SubscriptionResponse
-from meridian.control.times import utc_now
-from meridian.control.tokens import API_TOKENS_TABLE_V4, TokenRegistry
-from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPOCH_BASELINES, TrafficLedger
-from meridian.control.user_expiry import require_finite_user_expiry
+from meridian.control.times import format_timestamp, utc_now
+from meridian.control.tokens import TokenRegistry
+from meridian.control.traffic import TrafficLedger
+from meridian.control.user_import import import_users
 from meridian.control.user_lifecycle import extend_user_expiry, insert_user
-from meridian.control.user_policy import enforced_status, period_began, whole_seconds
 from meridian.control.user_updates import update_user
 from meridian.control.users import USER_SELECT, user_record
+from meridian.core.account_schedule import AccountSchedulePreview
 from meridian.core.agent_desired import DesiredNodeState
 from meridian.core.agent_protocol import Capability, ObservedStateReport, PollRequest, StatsAck, StatsReport
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
@@ -82,85 +86,7 @@ from meridian.core.clients import ClientConnections
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 
-SCHEMA_VERSION = 17
 MAX_WAIT_SECONDS = 55
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS secrets (name TEXT PRIMARY KEY, value BLOB NOT NULL);
-CREATE TABLE IF NOT EXISTS nodes (
-    node_id TEXT PRIMARY KEY,
-    spec TEXT,
-    spec_sha256 TEXT,
-    revision INTEGER,
-    document TEXT,
-    doc_sha256 TEXT,
-    applied_revision INTEGER,
-    applied_sha256 TEXT,
-    last_seen_at TEXT,
-    agent_version TEXT,
-    report TEXT
-);
-CREATE TABLE IF NOT EXISTS users (
-    username TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL UNIQUE,
-    uuid TEXT NOT NULL UNIQUE,
-    sub_token TEXT NOT NULL UNIQUE,
-    status TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    expire_at TEXT,
-    traffic_limit_bytes INTEGER NOT NULL DEFAULT 0,
-    traffic_limit_strategy TEXT NOT NULL DEFAULT 'no_reset',
-    traffic_offset_bytes INTEGER NOT NULL DEFAULT 0,
-    traffic_reset_at TEXT,
-    traffic_carried_bytes INTEGER NOT NULL DEFAULT 0,
-    device_limit INTEGER,
-    note TEXT NOT NULL DEFAULT '',
-    tag TEXT NOT NULL DEFAULT '',
-    language TEXT
-);
-CREATE TABLE IF NOT EXISTS endpoints (endpoint_id TEXT PRIMARY KEY, body TEXT NOT NULL);
-"""
-_SCHEMA += "\n".join(PRIVACY_TABLES) + "\n" + DEVICES_TABLE + ";\n"
-_SCHEMA += ";\n".join(COMMAND_TABLES) + ";\n"
-_SCHEMA += ALLOWANCE_PERIODS_TABLE + ";\n"
-# Statements that bring a database from version N to N + 1 (index N - 1).
-_MIGRATIONS: tuple[tuple[str, ...], ...] = (
-    (
-        "ALTER TABLE users ADD COLUMN expire_at TEXT",
-        "ALTER TABLE users ADD COLUMN traffic_limit_bytes INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE users ADD COLUMN traffic_limit_strategy TEXT NOT NULL DEFAULT 'no_reset'",
-    ),
-    (
-        "ALTER TABLE users ADD COLUMN traffic_offset_bytes INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE users ADD COLUMN traffic_reset_at TEXT",
-    ),
-    (API_TOKENS_TABLE_V4,),
-    (REVISIONS_TABLE, APPLY_FENCE_TABLE),
-    ("ALTER TABLE users ADD COLUMN traffic_carried_bytes INTEGER NOT NULL DEFAULT 0",),
-    (BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE),
-    # 7 -> 8: the web UI's owner, sessions, and setup links (`owner.py`).
-    UI_TABLES,
-    PER_EPOCH_BASELINES,
-    # 9 -> 10: operator-owned privacy settings and optional UTC daily usage.
-    (*PRIVACY_TABLES, *DAILY_TABLES),
-    # 10 -> 11: subscription devices and operator-owned per-user caps.
-    (DEVICES_TABLE, "ALTER TABLE users ADD COLUMN device_limit INTEGER"),
-    # 11 -> 12: optional expiry of scoped API tokens; existing tokens never expire.
-    ("ALTER TABLE api_tokens ADD COLUMN expires_at TEXT",),
-    # 12 -> 13: durable accounting, aggregate activity, and local lifecycle events.
-    (*ACCOUNTING_MIGRATION, *EVENT_TABLES),
-    # 13 -> 14: signed node commands and the capabilities accepted by each session.
-    COMMAND_TABLES,
-    # 14 -> 15: private, operator-owned person notes and tags.
-    (
-        "ALTER TABLE users ADD COLUMN note TEXT NOT NULL DEFAULT ''",
-        "ALTER TABLE users ADD COLUMN tag TEXT NOT NULL DEFAULT ''",
-    ),
-    # 15 -> 16: server allowance offsets over durable accepted node totals.
-    (ALLOWANCE_PERIODS_TABLE,),
-    # 16 -> 17: optional operator-owned subscription language per person.
-    ("ALTER TABLE users ADD COLUMN language TEXT",),
-)
 # meta key prefix: the last revision a deleted node was signed at.
 _RETIRED_REVISION = "retired_revision:"
 
@@ -176,7 +102,7 @@ class ControlService:
         self._lock = self._store.lock
         self._changed = self._store.changed
         self._db = self._store.db
-        self._store.create(_SCHEMA)
+        self._store.create(SCHEMA)
         # Users read their traffic from the ledger's table, so it exists before any user query.
         self.traffic = TrafficLedger(self._store)
         self.events = EventLedger(self._store, clock=clock)
@@ -245,6 +171,9 @@ class ControlService:
             read_privacy=self.privacy,
             clock=self._clock,
         )
+
+    def preview_user_schedule(self, request: UserSchedulePreviewRequest) -> AccountSchedulePreview:
+        return preview_user_schedule(self._store, request, now=format_timestamp(self._clock()), read_user=self.get_user)
 
     def server_usage(self, *, now: str | None = None) -> ServerUsageList:
         return read_server_usage(self._store, now or utc_now())
@@ -441,78 +370,16 @@ class ControlService:
         self.events.append("user.created", create.username)
 
     def import_users(self, batch: UserImportBatch) -> UserImportResult:
-        """Create users with the credentials, status, limits, and usage another control plane gave them.
-
-        All or nothing, and idempotent: a user that already exists with the same UUID and
-        token is left as it is (the first import wins); one with other credentials, or
-        credentials another user holds, refuses the whole batch. With `replace` the batch
-        overwrites users that exist (the source still serves and changed them since).
-        """
-        created: list[str] = []
-        unchanged: list[str] = []
-        replaced: list[str] = []
-        with self._transaction():
-            now = utc_now()
-            for item in batch.users:
-                # Kept as given: Hysteria2 authenticates with the exact string (VLESS parses it either way).
-                uuid, sub_token = item.uuid, item.sub_token
-                existing = self.get_user(item.username)
-                if existing is not None and not batch.replace:
-                    if (existing.uuid.lower(), existing.sub_token) != (uuid.lower(), sub_token):
-                        raise ServiceError(
-                            "conflict", f"User {item.username!r} already exists with other credentials.", 409
-                        )
-                    unchanged.append(item.username)
-                    continue
-                holder = self._db.execute(
-                    "SELECT username FROM users WHERE (lower(uuid) = ? OR sub_token = ?) AND username != ?",
-                    (uuid.lower(), sub_token, item.username),
-                ).fetchone()
-                if holder is not None:
-                    raise ServiceError(
-                        "conflict", f"User {item.username!r} has credentials that {holder[0]!r} already holds.", 409
-                    )
-                # Carried use counts as lifetime traffic; the offset leaves exactly the period's use toward the limit.
-                carried = max(item.lifetime_traffic_bytes, item.used_traffic_bytes)
-                values = (
-                    uuid,
-                    sub_token,
-                    item.status,
-                    whole_seconds(item.created_at) or now,
-                    whole_seconds(require_finite_user_expiry(item.expire_at)),
-                    item.traffic_limit_bytes,
-                    item.traffic_limit_strategy,
-                    period_began(item, now),
-                    carried,
-                    item.note,
-                    item.tag,
-                )
-                if existing is None:
-                    self._db.execute(
-                        "INSERT INTO users (uuid, sub_token, status, created_at, expire_at, traffic_limit_bytes,"
-                        " traffic_limit_strategy, traffic_reset_at, traffic_carried_bytes, note, tag,"
-                        " traffic_offset_bytes, username, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        (*values, carried - item.used_traffic_bytes, item.username, f"u{secrets.token_hex(8)}"),
-                    )
-                    created.append(item.username)
-                    self.events.append("user.created", item.username)
-                    continue
-                # What the ledger already counted stays counted, beside the newly carried use.
-                (old_carried,) = self._db.execute(
-                    "SELECT traffic_carried_bytes FROM users WHERE username = ?", (item.username,)
-                ).fetchone()
-                counted = existing.lifetime_traffic_bytes - old_carried
-                self._db.execute(
-                    "UPDATE users SET uuid = ?, sub_token = ?, status = ?, created_at = ?, expire_at = ?,"
-                    " traffic_limit_bytes = ?, traffic_limit_strategy = ?, traffic_reset_at = ?,"
-                    " traffic_carried_bytes = ?, note = ?, tag = ?, traffic_offset_bytes = ? WHERE username = ?",
-                    (*values, counted + carried - item.used_traffic_bytes, item.username),
-                )
-                replaced.append(item.username)
-                self.events.user_updated(existing, self._require_user(item.username))
-            self._enforce(now)
-            self._compose_all()
-        return UserImportResult(created=created, unchanged=unchanged, replaced=replaced)
+        """Keep credentials, limits, schedules, and usage in one idempotent transaction."""
+        return import_users(
+            self._store,
+            batch,
+            read_user=self.get_user,
+            now=utc_now,
+            enforce=self._enforce,
+            compose=self._compose_all,
+            events=self.events,
+        )
 
     def update_user(self, username: str, update: UserUpdate) -> UserRecord:
         """Apply the operator's change; extending an expiry or raising a limit makes the user active again."""
@@ -595,12 +462,13 @@ class ControlService:
     def get_user(self, username: str) -> UserRecord | None:
         with self._lock:
             row = self._db.execute(f"{USER_SELECT} WHERE u.username = ?", (username,)).fetchone()
-        return user_record(row) if row else None
+        return user_record(row, now=datetime.fromisoformat(utc_now())) if row else None
 
     def list_users(self) -> list[UserRecord]:
         with self._lock:
             rows = self._db.execute(f"{USER_SELECT} ORDER BY u.username").fetchall()
-        return [user_record(row) for row in rows]
+        moment = datetime.fromisoformat(utc_now())
+        return [user_record(row, now=moment) for row in rows]
 
     def user_connections(self, username: str) -> ClientConnections:
         return read_connections(self._store, self, username)
@@ -635,27 +503,17 @@ class ControlService:
 
     def _enforce(self, now: str) -> list[str]:
         advance_server_periods(self._store, now)
-        changed: list[str] = []
-        for user in self.list_users():
-            start = period_start(user.traffic_limit_strategy, datetime.fromisoformat(now))
-            if start is not None and (
-                user.traffic_reset_at is None or datetime.fromisoformat(user.traffic_reset_at) < start
-            ):
-                self._reset_traffic(user, now)
-                self.events.append("user.traffic_reset", user.username, actor="system", now=now)
-                user = self._require_user(user.username)
-            status = enforced_status(user, now)
-            if status != user.status:
-                self.events.enforcement(user.username, user.status, status, now)
-                self._db.execute("UPDATE users SET status = ? WHERE username = ?", (status, user.username))
-                changed.append(user.username)
-        return changed
+        return enforce_user_schedules(
+            self._store,
+            self.list_users(),
+            now,
+            read_user=self._require_user,
+            reset_traffic=self._reset_traffic,
+            events=self.events,
+        )
 
     def _reset_traffic(self, user: UserRecord, now: str) -> None:
-        self._db.execute(
-            "UPDATE users SET traffic_offset_bytes = ?, traffic_reset_at = ? WHERE username = ?",
-            (user.lifetime_traffic_bytes, now, user.username),
-        )
+        reset_period(self._store, user, now)
 
     def put_endpoint(self, endpoint_id: str, endpoint: ClientEndpoint) -> ClientEndpoint:
         with self._transaction():
@@ -741,13 +599,7 @@ class ControlService:
     # -- storage helpers -----------------------------------------------------------------
 
     def _migrate(self) -> None:
-        stored = int(self._meta("schema_version") or SCHEMA_VERSION)
-        if stored > SCHEMA_VERSION:
-            raise ServiceError("conflict", "The database was written by a newer Meridian.", 409)
-        for statements in _MIGRATIONS[stored - 1 : SCHEMA_VERSION - 1]:
-            for statement in statements:
-                self._db.execute(statement)
-        self._set_meta("schema_version", str(SCHEMA_VERSION))
+        migrate(self._store)
 
     @contextmanager
     def _transaction(self) -> Iterator[None]:

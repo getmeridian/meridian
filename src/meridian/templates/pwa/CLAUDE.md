@@ -11,12 +11,14 @@ Server-hosted PWA; Meridian's only connection-page implementation.
 **No indexing** — the shell and nginx both say `noindex, nofollow, noarchive`.
 **Catalog** — embedded apps render immediately; a valid shared `apps.json` may replace setup within seconds, preserving platform, app, focus, selection, and disclosures.
 **Account** — same-origin `/info` on open, return, and refresh; save only status, traffic, expiry, and check time, and treat a saved answer as unverified until checked again.
+**Device slots** — show fresh used/allowed counts and the full-slot rule only when `/info` includes them; keep counts in memory, never in the saved account snapshot.
 **Three-step setup** — platform and app pickers drive install, import, and Connect; manual import shows a selectable URL and the app's menu path. Choices stay in memory.
 **i18n** — English markup with `data-t` swaps; `language.js` runs in the head before CSS and picks saved page choice > person/fleet default > browser for `auto` > English, setting lang and dir (Persian is RTL); dates and numbers use Intl.
 **Self-check** — client clock vs server Date, a probe stream, and subscription status; copied reports contain no links, hostnames, UUIDs, or device data.
 **App help** — the collapsed **Not connecting?** panel holds generic app tips (a red ping is not a failure, refresh, update on launch, clock) and fetches nothing.
 
 ## What's done well
+- **Account schedule cache stays anonymous** — only duration, activation state, future dates, and renewals left join the account projection; malformed optional dates never block setup.
 - **SW scope and privacy** — the worker caches only content-versioned shared assets; person pages, config, account checks, and probes always use the network. Old `/pwa/sw.js` URLs serve a retirement worker that clears Meridian caches and unregisters.
 - **One clock threshold** — `CLOCK_WARN_MS` mirrors `core.defaults.CLOCK_DRIFT_WARN_SECONDS`, and the page says connections *can* fail.
 - **Connection remarks stay verbatim** — translate protocol hints only, and show entries in subscription order.

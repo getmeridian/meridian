@@ -2,11 +2,26 @@
   "additionalProperties": false,
   "description": "A partial edit at `PATCH /api/users`, naming the person in the JSON body.",
   "properties": {
+    "activation_duration_days": {
+      "anyOf": [
+        {
+          "maximum": 3650,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Whole UTC days from first traffic.",
+      "title": "Activation Duration Days"
+    },
     "device_limit": {
       "anyOf": [
         {
           "maximum": 100,
-          "minimum": 1,
+          "minimum": 0,
           "type": "integer"
         },
         {
@@ -56,6 +71,49 @@
       "title": "Note",
       "type": "string"
     },
+    "renewal_interval_days": {
+      "anyOf": [
+        {
+          "maximum": 3650,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Renewal Interval Days"
+    },
+    "renewal_interval_months": {
+      "anyOf": [
+        {
+          "maximum": 120,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Renewal Interval Months"
+    },
+    "renewal_limit": {
+      "anyOf": [
+        {
+          "maximum": 10000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Renewals in this series; null means unlimited.",
+      "title": "Renewal Limit"
+    },
     "status": {
       "anyOf": [
         {
@@ -99,7 +157,8 @@
             "no_reset",
             "day",
             "week",
-            "month"
+            "month",
+            "month_rolling"
           ],
           "type": "string"
         },
@@ -109,6 +168,21 @@
       ],
       "default": null,
       "title": "Traffic Limit Strategy"
+    },
+    "traffic_reset_anchor_day": {
+      "anyOf": [
+        {
+          "maximum": 31,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "UTC month day; null uses creation day.",
+      "title": "Traffic Reset Anchor Day"
     },
     "username": {
       "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",

@@ -13,6 +13,7 @@ from meridian.control.models import PrivacySettings, ServiceConfig
 from meridian.control.server import ControlServer
 from meridian.control.service import ControlService
 from meridian.control_artifacts import ServicePackage
+from meridian.core.account_schedule import AccountLifecycleState
 from meridian.provision.control_service import ControlServiceInstall
 from meridian.provision.steps import ProvisionContext
 
@@ -49,6 +50,24 @@ def drop_person_metadata_schema(db: sqlite3.Connection) -> None:
     """Older fixtures must not retain the operator metadata added in schema step 15."""
     columns = {column[1] for column in db.execute("PRAGMA table_info(users)")}
     for column in ("note", "tag", "language"):
+        if column in columns:
+            db.execute(f"ALTER TABLE users DROP COLUMN {column}")
+    drop_period_usage_schema(db)
+
+
+def drop_period_usage_schema(db: sqlite3.Connection) -> None:
+    """Remove directional baselines before rewinding to a combined-only period schema."""
+    columns = {column[1] for column in db.execute("PRAGMA table_info(users)")}
+    for column in ("traffic_upload_offset_bytes", "traffic_download_offset_bytes", "traffic_period_carried_bytes"):
+        if column in columns:
+            db.execute(f"ALTER TABLE users DROP COLUMN {column}")
+    drop_account_schedule_schema(db)
+
+
+def drop_account_schedule_schema(db: sqlite3.Connection) -> None:
+    """Rewind schema step 19 without retaining its account schedule columns."""
+    columns = {column[1] for column in db.execute("PRAGMA table_info(users)")}
+    for column in AccountLifecycleState.model_fields:
         if column in columns:
             db.execute(f"ALTER TABLE users DROP COLUMN {column}")
 

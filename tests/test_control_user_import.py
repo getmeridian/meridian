@@ -11,7 +11,8 @@ from pydantic import ValidationError
 
 from meridian.control.client import ControlClient, ControlServiceConflict
 from meridian.control.models import UserImport, UserImportBatch
-from meridian.control.service import ControlService, ServiceError, period_start
+from meridian.control.periods import period_start
+from meridian.control.service import ControlService, ServiceError
 from meridian.core.agent_protocol import StatsReport, UserTraffic
 from tests.support.control_service import ADMIN_TOKEN, drop_device_privacy_schema, serve_control
 

@@ -106,7 +106,7 @@ def test_reset_period_parses_calendar_periods(text: str, expected: str) -> None:
     assert parse_traffic_reset(text) == expected
 
 
-@pytest.mark.parametrize("text", ["hourly", "year", "month_rolling", ""])
+@pytest.mark.parametrize("text", ["hourly", "year", ""])
 def test_reset_period_refuses_other_periods(text: str) -> None:
     with pytest.raises(ClientLimitError):
         parse_traffic_reset(text)

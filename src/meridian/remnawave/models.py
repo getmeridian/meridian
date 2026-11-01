@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from meridian.control.models import NodeRuntime
+from meridian.core.account_schedule import AccountSchedulePreview
 from meridian.core.languages import Language
 
 
@@ -44,9 +45,17 @@ class User:
     tag: str = ""
     email: str = ""
     telegram_id: str = ""
-    # The control projection also uses this cap; migrate reports the panel's instead of importing it.
+    # Null inherits the fleet cap; the panel's zero is an explicit unlimited cap.
     hwid_device_limit: int | None = None
     language: Language | None = None  # Meridian's operator preference; legacy panel users leave it unset.
+    traffic_reset_anchor_day: int | None = None
+    activation_duration_days: int | None = None
+    renewal_interval_days: int | None = None
+    renewal_interval_months: int | None = None
+    renewal_limit: int | None = None
+    renewals_completed: int = 0
+    renewal_anchor_at: str | None = None
+    schedule: AccountSchedulePreview | None = None
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 

@@ -1,6 +1,7 @@
 # contracts — Generated meridian-core artifacts
 
 ## Design decisions
+- **Account schedule contracts** — typed anchors, durations, intervals, and renewal progress travel in person and creation schemas; authenticated previews return dates without changing state.
 - Fleet-language contracts include `auto` as the default for browser-led pages and English app remarks; nullable person overrides keep the four-code enum, and CLI changes expose `--yes`.
 - `admin/openapi.json` is the English OpenAPI 3.1 contract generated from the control route catalog and Pydantic models; it uses the package version on export and the installed service version at runtime, with explicit credential and scope extensions.
 - Calendar-renewal schemas describe the one/three-month preview and exact UTC result; previews never mutate a user.
@@ -11,6 +12,10 @@
 - Owner contact request/result schemas and inherited presentation fields export their text bounds and allowed URI schemes; default empty contact stays omitted from intent and settings payloads.
 - Administrative person schemas describe private notes and tags with their bounds; generated schemas contain no private values, and lower-scope API records keep these fields as empty strings.
 - **Server billing contracts** — server list/set envelopes, metadata, service settings, and nullable period usage are exported from `core/schema_servers.py`; fleet and attention contracts compose the same server evidence.
+- **People period counters** — administrative records compose `PeriodTraffic`; unattributed historical use is a disclosed subset of download, and both directions sum to period use.
+- **Subscriber device slots** — `device-slots` exports used/allowed integers only; `/info` omits this optional projection when there is no countable device limit.
+- **Attention activity cases** — `unused` means never used after its creation threshold; `stopped` means no recent traffic after its independent bounded threshold, with no new stored history.
+- **People triage facts** — read-only record fields publish never-used evidence, exact floored quota percentage, and default-threshold reasons without stored flags.
 
 **Generated, checked in** — `scripts/export_contracts.py` is the source of truth. Do not hand-edit files below `contracts/meridian/`.
 

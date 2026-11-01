@@ -28,6 +28,7 @@ from pydantic import BaseModel, ValidationError
 
 from meridian import __version__
 from meridian.control import ui_routes
+from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.api_models import DeletedResource, DeployerStateReceipt, UserList
 from meridian.control.blobs import BlobStore, fleet_artifacts, served_hashes
 from meridian.control.command_models import NodeCommandRequest, UserCutOffRequest
@@ -416,6 +417,9 @@ class _Handler(BaseHTTPRequestHandler):
     def create_user(self, _match: re.Match[str]) -> Any:
         return self._service.create_user(self._model(UserCreate))
 
+    def preview_user_schedule(self, _match: re.Match[str]) -> Any:
+        return self._service.preview_user_schedule(self._model(UserSchedulePreviewRequest))
+
     def import_users(self, _match: re.Match[str]) -> Any:
         return self._service.import_users(self._model(UserImportBatch))
 
@@ -652,6 +656,7 @@ OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
         _Handler.get_user,
         _Handler.user_connections,
         _Handler.create_user,
+        _Handler.preview_user_schedule,
         _Handler.update_user,
         _Handler.reissue_user,
         _Handler.reset_user_traffic,
@@ -708,6 +713,7 @@ def serve(config_path: Path) -> None:
 
 
 def _enforce_forever(service: ControlService, stop: threading.Event) -> None:
-    """Expire users on time even when nothing else changes."""
+    """Expire users on time even when nothing else changes, starting with renewals missed while stopped."""
+    service.background.enforcement.run(service.enforce)
     while not stop.wait(ENFORCE_INTERVAL_SECONDS):
         service.background.enforcement.run(service.enforce)

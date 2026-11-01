@@ -42,69 +42,10 @@
   };
 
   M.expiryText = function (user) {
+    if (!user.expire_at && user.activation_duration_days) return M.firstUseText(user.activation_duration_days);
     if (!user.expire_at) return M.t("people.no_expiry");
     var past = new Date(user.expire_at).getTime() <= Date.now();
     return M.t(past ? "people.expired_on" : "people.expires", { when: M.ago(user.expire_at) });
-  };
-
-  M.renderPeople = function (view) {
-    var list = h("div", { class: "list live-data" }, h("div", { class: "empty" }, h("span", { class: "spinner" })));
-    var status = h("div", { class: "live-status" });
-    var search = h("input", { type: "search", class: "search", placeholder: M.t("people.search"),
-      "aria-label": M.t("people.search"), autocomplete: "off" });
-    var users = [];
-
-    function draw() {
-      var q = search.value.trim().toLowerCase();
-      var shown = users.filter(function (u) {
-        return !q || u.username.toLowerCase().indexOf(q) >= 0 || M.displayName(u.username).toLowerCase().indexOf(q) >= 0;
-      });
-      if (!users.length) {
-        M.mount(list, h("div", { class: "empty" }, h("p", { text: M.t("people.empty") })));
-        return;
-      }
-      if (!shown.length) {
-        M.mount(list, h("div", { class: "empty" }, h("p", { text: M.t("people.no_match") })));
-        return;
-      }
-      M.mount(list, shown.map(function (user) {
-        return h("a", { class: "row row-link", href: "#/people/" + encodeURIComponent(user.username) },
-          h("div", { class: "row-main" },
-            h("div", { class: "row-title" },
-              h("span", { class: "name", text: M.displayName(user.username) }),
-              M.isDeclared(user.username) ? h("span", { class: "tag", title: M.t("people.declared_hint"),
-                text: M.t("people.declared") }) : null),
-            h("div", { class: "row-sub" },
-              h("span", { text: M.expiryText(user) }),
-              h("span", { text: M.t("people.online", { when: M.ago(user.online_at) }) }))),
-          h("div", { class: "row-side" }, M.statusPill(user.status), M.usage(user)));
-      }));
-    }
-
-    search.addEventListener("input", draw);
-    M.mount(view, [
-      h("div", { class: "page-head" },
-        h("div", {}, h("h1", { text: M.t("nav.people") }), h("p", { class: "muted", text: M.t("people.lede") })),
-        h("button", { class: "btn btn-primary", type: "button", onclick: addPerson }, M.icon("plus"),
-          M.t("people.add"))),
-      search,
-      status,
-      list,
-    ]);
-    // The fleet view comes again with the list: who is declared changes whenever the deployer applies.
-    return M.liveView(view, {
-      status: status, interval: 30000,
-      load: function (passive) {
-        return Promise.all([M.api("GET", "api/users", undefined, { passive: passive }),
-          M.api("GET", "ui/api/fleet", undefined, { passive: passive }).catch(function () { return M.state.fleet || {}; })]);
-      },
-      draw: function (results) {
-        M.state.fleet = results[1];
-        users = results[0].users || [];
-        draw();
-      },
-      empty: function () { M.clear(list); },
-    });
   };
 
   /* Keep the person screen's existing helper name; amounts are now binary GiB, unrounded. */
@@ -147,8 +88,8 @@
     unit.value = "GiB";
     var gb = h("input", { type: "text", maxlength: "64", inputmode: "decimal", autocomplete: "off",
       value: user ? M.gbText(user.traffic_limit_bytes) : "" });
-    var strategy = h("select", {},
-      ["no_reset", "day", "week", "month"].map(function (s) {
+    var strategy = h("select", { name: "traffic_limit_strategy" },
+      ["no_reset", "day", "week", "month", "month_rolling"].map(function (s) {
         return h("option", { value: s, selected: user ? user.traffic_limit_strategy === s : s === "month",
           text: M.t("reset." + s) });
       }));
@@ -201,15 +142,16 @@
     };
   };
 
-  function addPerson() {
+  M.addPerson = function () {
     M.dialog(M.t("people.add_title"), function (close) {
       var name = h("input", { type: "text", required: true, maxlength: "64", pattern: "[A-Za-z0-9_.\\-]{1,64}",
         autocomplete: "off", autocapitalize: "off", spellcheck: "false" });
       var expiry = M.expiryFields();
       var limits = M.limitFields(null);
+      var lifecycle = M.lifecycleFields(null, expiry, limits);
       var form = h("form", { class: "stack", novalidate: true },
         M.field(M.t("people.name"), name, M.t("people.name_hint")),
-        expiry.nodes,
+        lifecycle.nodes,
         limits.nodes,
         h("p", { class: "form-error", role: "alert" }),
         h("div", { class: "actions" },
@@ -227,7 +169,7 @@
         // One request with the settings: create-then-PATCH left an unlimited person when the PATCH failed.
         var body = limits.value();
         body.username = username;
-        body.expire_at = expiry.value();
+        Object.assign(body, lifecycle.change());
         M.saveDraft(form, function () { return M.api("POST", "api/users", body); }).then(function () {
           close();
           M.toast(M.t("people.added_toast", { name: username }));
@@ -236,5 +178,5 @@
       });
       return form;
     });
-  }
+  };
 })();
