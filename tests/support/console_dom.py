@@ -26,6 +26,7 @@ needs_console_dom = pytest.mark.skipif(
 def run_console(mode: str, locale: str = "en", data: Any = None) -> dict[str, Any]:
     runners = {
         "page-": "control_ui_page.mjs",
+        "people-bulk": "control_ui_people_bulk.mjs",
         "people-triage": "control_ui_people.mjs",
         "account-": "connection_account.mjs",
         "command-": "control_ui_commands.mjs",
@@ -33,6 +34,10 @@ def run_console(mode: str, locale: str = "en", data: Any = None) -> dict[str, An
         "person-": "control_ui_person.mjs",
     }
     runner = next((name for prefix, name in runners.items() if mode.startswith(prefix)), "control_ui_console.mjs")
+    if mode.startswith("people-triage"):
+        from tests.support.people_queries import with_people_replies
+
+        data = with_people_replies(data)
     mode = mode.removeprefix("command-")
     # The scenario travels on stdin: Linux caps a single argument at 128 KiB.
     result = subprocess.run(

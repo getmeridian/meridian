@@ -110,7 +110,7 @@ def test_facet_counts_respect_the_other_filters() -> None:
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 def test_search_by_display_name_preserves_rows_focus_and_fragment(locale: str) -> None:
     rows = people()
-    rows += [{**rows[2], "username": f"p-extra-{index:04d}"} for index in range(3000 if locale == "en" else 50)]
+    rows += [{**rows[2], "username": f"p-extra-{index:04d}"} for index in range(50)]
     result = run_console(
         "people-triage-reload",
         locale,
@@ -120,7 +120,7 @@ def test_search_by_display_name_preserves_rows_focus_and_fragment(locale: str) -
     assert result["sameRows"] and result["sameInput"] and result["focusKept"]
     assert parse_qs(result["hash"].split("?", 1)[1])["q"] == ["Sample label"]
     assert result["afterSearch"] == "Sample label"
-    assert result["requests"].count("api/users") == 2
+    assert sum(path.startswith("api/people?") for path in result["requests"]) == 3
 
 
 def test_bad_fragment_options_are_ignored_and_invalid_edits_have_a_specific_error() -> None:

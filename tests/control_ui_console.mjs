@@ -1,4 +1,5 @@
 /* Execute the shipped scripts with a DOM and local API doubles. */
+import { peoplePage } from './console_people_page.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -122,7 +123,19 @@ w.fetch = (url, options) => {
     server_usage: data?.server_usage || [], server_attention: data?.server_attention || [] }));
   throw new Error('Unexpected request: ' + url);
 };
-for (const script of ['core.js', 'drafts.js', 'qr-export.js', 'people.js', 'people-list.js', 'expiry.js', 'lifecycle.js', 'person-connections.js', 'fleet.js']) {
+const legacyFetch = w.fetch;
+w.fetch = (url, options) => {
+  if (!url.startsWith('api/people?')) return legacyFetch(url, options);
+  const index = events.length;
+  const response = legacyFetch('api/users', options);
+  if (events[index]) events[index].url = url;
+  return Promise.resolve(response).then(async reply => {
+    if (!reply.ok) return reply;
+    const body = JSON.parse(await reply.text());
+    return { ...reply, text: async () => JSON.stringify(peoplePage((body.users || []).map(user => ({ ...user, display_name: data?.fleet?.display_names?.[user.username] || user.username, declared: (data?.fleet?.declared_users || []).includes(user.username) })))) };
+  });
+};
+for (const script of ['core.js', 'drafts.js', 'qr-export.js', 'people.js', 'people-bulk.js', 'people-bulk-fields.js', 'people-list.js', 'expiry.js', 'lifecycle.js', 'person-connections.js', 'fleet.js']) {
   w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 }
 const M = w.M;
@@ -336,7 +349,7 @@ if (mode.startsWith('live-')) {
   if (mode === 'live-fleet-failure') M.state.fleet = data.fleet;
   const cleanup = data.screen === 'servers' ? M.renderServers(view) : M.renderPeople(view);
   await settle();
-  const fleetCalls = () => events.filter(event => event.url === 'ui/api/fleet');
+  const fleetCalls = () => events.filter(event => data.screen === 'servers' ? event.url === 'ui/api/fleet' : event.url.startsWith('api/people?'));
   const liveData = () => (view.querySelector('.live-data') || view).textContent;
   if (mode === 'live-fleet-failure') {
     report.names = [...view.querySelectorAll('.name')].map(el => el.textContent);

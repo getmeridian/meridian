@@ -21,6 +21,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   receipts, and offer guarded ten-minute undo for reversible fields.
 - Reviewed `client bulk` actions with shared list filters, preview tables,
   explicit JSON confirmation, and receipt recovery after an uncertain reply.
+- People selection by keyboard or across all matching pages, with bounded
+  server reads, preserved rows, bulk reviews, receipts, and undo in the console.
 - Account anniversary resets, durations from first traffic, and automatic
   expiry renewal with optional caps. API, CLI, panel, connection pages, and
   refill headers share UTC dates; migration keeps rolling-month anchors.

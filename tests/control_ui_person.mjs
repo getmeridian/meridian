@@ -1,4 +1,5 @@
 /* Person-screen journeys execute the shipped console against same-origin API doubles. */
+import { peoplePage } from './console_people_page.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -77,6 +78,18 @@ w.fetch = (url, options = {}) => {
 };
 w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
 w.HTMLDialogElement.prototype.close = function () { this.open = false; };
+const legacyFetch = w.fetch;
+w.fetch = (url, options) => {
+  if (!url.startsWith('api/people?')) return legacyFetch(url, options);
+  const index = events.length;
+  const response = legacyFetch('api/users', options);
+  if (events[index]) events[index].url = url;
+  return Promise.resolve(response).then(async reply => {
+    if (!reply.ok) return reply;
+    const body = JSON.parse(await reply.text());
+    return { ...reply, text: async () => JSON.stringify(peoplePage(body.users || [])) };
+  });
+};
 const load = script => w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 load('core.js');
 load('drafts.js');
@@ -93,7 +106,7 @@ M.renderServers = view => M.mount(view, M.h('h1', { text: M.t('nav.servers') }))
 M.renderRevisions = M.renderTokens = () => null;
 load('auth.js');
 load('people.js');
-load('people-list.js');
+load('people-bulk.js'); load('people-bulk-fields.js'); load('people-list.js');
 load('expiry.js');
 if (fs.existsSync(path.join(ui, 'lifecycle.js'))) load('lifecycle.js');
 load('person-connections.js');

@@ -68,7 +68,7 @@ _API_CALL = re.compile(
     r'M\.api\("([A-Z]+)", (?:"([^"]+)"( \+ [\w.]+(?:\([\w.]+\))?(?: \+ "([^"]*)")?)?'
     r'|path\(\w+(?:, "([^"]+)"( \+ encodeURIComponent\(\w+\))?)?\)|commandPath\((\w+)\))'
 )
-_ID_SAMPLES = ("1", "0123456789ab")  # usernames and revision numbers; token IDs
+_ID_SAMPLES = ("1", "0123456789ab", "a" * 32)  # usernames and revision numbers; token IDs
 
 
 def test_every_route_the_console_calls_admits_an_owner_session() -> None:

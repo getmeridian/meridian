@@ -1,4 +1,5 @@
 /* People triage through the shipped console, including hash reload and row identity. */
+import { queryKey } from './console_people_page.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -21,13 +22,13 @@ w.fetch = (url, options) => {
   let body;
   if (url === 'auth/state') body = { configured: true, owner_exists: true, signed_in: true };
   else if (url === 'ui/api/fleet') body = { servers: [], declared_users: [], display_names: data.names || {} };
-  else if (url === 'api/users' && data.failUsers) return Promise.resolve({ ok: false, status: 500, headers: { get: () => null }, text: () => Promise.resolve('{}') });
-  else if (url === 'api/users') body = { users: data.people };
+  else if (url.startsWith('api/people?') && data.failUsers) return Promise.resolve({ ok: false, status: 500, headers: { get: () => null }, text: () => Promise.resolve('{}') });
+  else if (url.startsWith('api/people?')) body = data.replies[queryKey(url.split('?')[1])];
   else throw new Error('Unexpected request: ' + url);
   return Promise.resolve({ ok: true, status: 200, headers: { get: () => null }, text: () => Promise.resolve(JSON.stringify(body)) });
 };
 const load = name => w.eval(fs.readFileSync(path.join(ui, name), 'utf8'));
-load('core.js'); load('drafts.js'); load('people.js');
+load('core.js'); load('drafts.js'); load('people.js'); load('people-bulk.js'); load('people-bulk-fields.js');
 if (fs.existsSync(path.join(ui, 'people-list.js'))) load('people-list.js');
 const M = w.M;
 M.i18n = { locale: () => locale === 'zh' ? 'zh-CN' : locale, load: () => Promise.resolve() };

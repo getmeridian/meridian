@@ -14,7 +14,7 @@ _RENDERER_MANIFEST = {
     "pwa": "account-schedules-v3",
     "control-service": "reviewed-people-bulk-v1",
     "control-api": "reviewed-people-bulk-v1",
-    "control-ui": "account-schedules-v3",
+    "control-ui": "people-query-bulk-v1",
     "firewall": "ufw-comment-v2",
     "nginx": "panel-domain-certificate-v13",
     "realm": "neutral-systemd-musl-v3",
