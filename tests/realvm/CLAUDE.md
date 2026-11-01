@@ -4,8 +4,9 @@ Provisions real cloud VMs (Hetzner via `hcloud-python`), deploys Meridian agains
 
 ## Design decisions
 - **Never in CI** — `HCLOUD_TOKEN` is never a GitHub secret (a misbehaving workflow would burn budget silently); harness files live outside `.github/workflows/`; `pyproject.toml` `norecursedirs = ["realvm"]` keeps `pytest` from collecting. Runs only via `make real-lab` locally.
-- **Topology per YAML file** — YAML declares provider / region / size / nodes, but `up` rejects any topology or verification manifest without an implemented verifier before provider access; `single` is the only one today.
-- **Executable claims only** — Tier α covers LE issuer, optional nmap, SSH, fail2ban, fleet, client CRUD, plan, and subscription HTTP; planned domain/interactive tiers stay out of manifests until implemented.
+- **Topology per YAML file** — YAML declares provider / region / size / nodes, but `up` rejects any topology or verification manifest without an implemented verifier before provider access; `single` and `domain` are the implemented ones.
+- **Inconclusive is not failed** — `domain` needs real DNS, so `verify/domain.sh` exits 75 when Let's Encrypt rate-limits issuance; `domain_support.py` holds its pure decisions (panel name, intent, path switch, rate-limit match).
+- **Executable claims only** — Tier α covers LE issuer, optional nmap, SSH, fail2ban, fleet, client CRUD, plan, and subscription HTTP (`single`), plus panel-domain certificates (`domain`); planned CDN/interactive tiers stay out of manifests until implemented.
 - **Labs are for journeys, `up` is for claims** — `lab.py` keeps named VMs up with a per-lab key, pinned host keys, ssh wrappers, and `env.sh`; `journey.sh`, `drive_wizard.py`, and `pwa_shots.py` run against it. Only `orchestrator up` verifies topology manifests.
 - **MERIDIAN_HOME isolation per fleet** — orchestrator sets `MERIDIAN_HOME=<fleet-id>/` before invoking `meridian deploy`, so the harness's cluster.yml doesn't clobber the developer's real `~/.config/meridian/`.
 
@@ -19,6 +20,8 @@ Provisions real cloud VMs (Hetzner via `hcloud-python`), deploys Meridian agains
 - **JSON command output is enveloped** — read command fields below `data`; there are no legacy top-level payloads in v4.
 - **Never return success for an unsupported topology** — add its verifier and manifest contract before allowing provisioning.
 - **Let's Encrypt IP-cert rate limit** — repeated bare-IP runs can trigger self-signed fallback and fail the issuer assertion; recreate the VM for a fresh IP.
+- **sslip.io names share Let's Encrypt limits with the world** (not on the Public Suffix List) — repeated `domain` runs hit `rateLimited`; wait it out or set `REALVM_PANEL_DOMAIN` to a name you own.
+- **A checkout deploys only the agent it built** — `up` refuses before provisioning without `agent/dist` (`make agent`) or `MERIDIAN_AGENT_BINARY`, since the setup would otherwise fail after the VM exists.
 - **Keep the default SNI** — a bad camouflage target (see `src/meridian/CLAUDE.md`) converges but passes no traffic.
 - **Check the managed certificate without SNI** — `openssl -servername <IP>` routes to the camouflage fallback; use `-noservername`.
 - **Labs live outside the checkout** — some synced folders refuse Unix-socket connects, so Meridian's SSH ControlPath under a repo-local `MERIDIAN_HOME` failed with "Operation not permitted".

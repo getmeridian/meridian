@@ -1,0 +1,49 @@
+# Topology: domain — one server whose web panel has its own domain and which also runs an exit.
+#
+# Regression guard for #110: the panel's domain certificate and the server's IP certificate once
+# landed in the same file, so whichever acme.sh installed last won and either the panel or the
+# exit's XHTTP/Hysteria2 over the IP broke. Needs real Let's Encrypt and real DNS, which the Docker
+# system-lab cannot give.
+#
+# The verifier deploys with the panel on a domain and exit paths on the IP, asserts both
+# certificates are served and kept apart, then moves the exit paths onto the domain and asserts the
+# IP certificate is retired.
+#
+# DNS: the panel domain defaults to `<ip-with-dashes>.sslip.io` (203-0-113-10.sslip.io resolves to
+# 203.0.113.10). Set REALVM_PANEL_DOMAIN to use your own name instead; the verifier waits up to
+# REALVM_DNS_WAIT seconds (default 120) for it to resolve to the new VM's address.
+#
+# RATE LIMITS: sslip.io is NOT on the Public Suffix List, so every sslip.io name in the world
+# shares Let's Encrypt's per-domain limits with this run. When issuance is refused as `rateLimited`
+# the verifier exits 75 ("inconclusive") instead of 1: it proved nothing about the product. Retry
+# later, or use REALVM_PANEL_DOMAIN with a name you own.
+#
+# Provider: Hetzner Cloud. Change `provider:` to switch (once other providers are implemented).
+
+name: domain
+description: "Panel on its own domain beside an exit on the server's IP — real Let's Encrypt, real DNS"
+
+provider: hetzner
+region: nbg1           # Nuremberg DE — cheapest, closest EU datacenter
+size: cx23             # 2 vCPU, 4 GB — new-gen x86 (CX22 was deprecated late 2025)
+image: ubuntu-24.04
+
+nodes:
+  - role: exit          # the control plane and the exit share this one server
+    name: exit-1
+    harden: true
+
+verify:
+  tier_alpha:
+    - panel_certificate_names_domain      # 443 with SNI = panel domain serves a certificate with that DNS SAN
+    - ip_certificate_without_sni          # 443 without SNI serves a certificate with the server's IP SAN
+    - acme_entries_use_separate_files     # two acme.sh entries, two different Le_RealFullChainPath files
+    - connection_test_ip_paths            # meridian test: no failed checks, exit paths on the IP
+    - health_check_ip_paths               # meridian check passes
+    - plan_converged_ip_paths             # meridian plan exits 0
+    - exit_paths_moved_to_domain          # fleet export, tls_sni/host IP -> domain, fleet import --yes
+    - panel_certificate_survives_move     # the panel still serves its domain certificate
+    - connection_test_domain_paths        # meridian test: no failed checks, exit paths on the domain
+    - health_check_domain_paths           # meridian check passes
+    - plan_converged_domain_paths         # meridian plan exits 0
+    - ip_certificate_retired              # the unused IP certificate's acme.sh entry is gone
