@@ -30,6 +30,7 @@ def _spawn(home: Path, *args: str, lang: str = "ru_RU.UTF-8"):
         encoding="utf-8",
         timeout=30,
         dimensions=(40, 120),
+        use_poll=True,
     )
 
 
@@ -62,3 +63,25 @@ def test_saved_language_skips_the_question_and_lang_flag_overrides_it(tmp_path: 
     child.close()
 
     assert child.exitstatus == 0
+
+
+def test_wizard_process_accepts_a_terminal_descriptor_above_select_limit(tmp_path: Path) -> None:
+    resource = pytest.importorskip("resource")
+    if resource.getrlimit(resource.RLIMIT_NOFILE)[0] < 2100:
+        pytest.skip("the descriptor limit is too low to exercise select's boundary")
+    descriptors = []
+    try:
+        while not descriptors or descriptors[-1] < 2048:
+            descriptors.append(os.open(os.devnull, os.O_RDONLY))
+        child = _spawn(tmp_path, "--lang", "en", "setup", lang="C")
+        try:
+            assert child.child_fd > 1024
+            child.expect("Server address")
+            child.sendline("quit")
+            child.expect(pexpect.EOF)
+        finally:
+            child.close(force=True)
+        assert child.exitstatus == 0
+    finally:
+        for descriptor in descriptors:
+            os.close(descriptor)

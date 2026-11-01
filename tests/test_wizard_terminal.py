@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
+import selectors
 from collections.abc import Iterator
+from types import SimpleNamespace
 
 import pytest
 from prompt_toolkit.input import PipeInput, create_pipe_input
@@ -19,6 +22,22 @@ SITES = [Choice("www.google.com", "www.google.com"), Choice("dl.google.com", "dl
 SERVERS = [Choice("srv-a", "alpha"), Choice("srv-b", "beta"), Choice("srv-c", "gamma")]
 
 
+@pytest.fixture(autouse=True)
+def _selector_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The full suite can allocate input descriptors above select's FD_SETSIZE."""
+
+    def readable(
+        readers: list[int], writers: list[int], errors: list[int], timeout: float
+    ) -> tuple[list[int], list[int], list[int]]:
+        assert not writers and not errors
+        with selectors.DefaultSelector() as selector:
+            for descriptor in readers:
+                selector.register(descriptor, selectors.EVENT_READ)
+            return [key.fd for key, _event in selector.select(timeout)], [], []
+
+    monkeypatch.setattr("prompt_toolkit.input.posix_utils.select", SimpleNamespace(select=readable))
+
+
 class RecordingTerminalIO(TerminalWizardIO):
     def __init__(self, keys: PipeInput) -> None:
         super().__init__(input=keys, output=DummyOutput())
@@ -32,6 +51,27 @@ class RecordingTerminalIO(TerminalWizardIO):
 def keys() -> Iterator[PipeInput]:
     with create_pipe_input() as pipe:
         yield pipe
+
+
+def test_pipe_keys_accept_descriptors_above_select_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    fcntl = pytest.importorskip("fcntl")
+    original_pipe = os.pipe
+
+    def high_pipe() -> tuple[int, int]:
+        reader, writer = original_pipe()
+        try:
+            return (
+                fcntl.fcntl(reader, fcntl.F_DUPFD, 2048),
+                fcntl.fcntl(writer, fcntl.F_DUPFD, 2048),
+            )
+        finally:
+            os.close(reader)
+            os.close(writer)
+
+    monkeypatch.setattr(os, "pipe", high_pipe)
+    with create_pipe_input() as pipe:
+        pipe.send_text("1")
+        assert [key.data for key in pipe.read_keys()] == ["1"]
 
 
 @pytest.mark.parametrize(
