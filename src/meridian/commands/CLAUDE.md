@@ -1,6 +1,7 @@
 # commands — One module per subcommand
 
 ## Design decisions
+**Bulk reviews** — `client bulk` and `client list` use the service query; commit only the returned ID/hash, and read the receipt after an uncertain reply.
 **Client registration** — `cli_client.py` owns the client group so lifecycle options do not grow `cli_groups.py`.
 **One file per command** — `cli.py` registers top-level commands and the root callback, `cli_groups.py` the sub-apps (a group may live in its own `cli_*.py`); both parse flags and defer to the command module.
 **Commands edit intent** — fleet commands load `cluster.yml` with `load_topology_cluster()`, edit `topology_intent`, and apply it through `_helpers.apply_reviewed_intent()` with the exact review hash; removals let reviewed retirement delete what vanished. Never mutate panel or server state beside the compiled plan; the exceptions are operator-owned service data (client status, limits, devices, expiry, notes, tags, language, privacy, notices, fleet language), which applies never touch.

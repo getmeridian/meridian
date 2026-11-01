@@ -14,6 +14,7 @@ from meridian.core.client_devices import DeviceCap
 from meridian.core.client_limits import canonical_expiry, traffic_reset_from_strategy
 from meridian.core.languages import Language
 from meridian.core.models import CoreModel
+from meridian.core.people_query import PeopleFacets
 from meridian.core.person_activity import PersonAttentionReason
 from meridian.core.person_metadata import PersonTag, PrivateNote
 from meridian.core.topology import ProtocolKind
@@ -163,6 +164,9 @@ class ClientListResult(CoreModel):
 
     summary: ClientListSummary
     clients: list[ClientRecord] = Field(default_factory=list)
+    total: int | None = Field(default=None, exclude_if=lambda value: value is None)
+    next_cursor: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    facets: PeopleFacets | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class ClientShowResult(CoreModel):

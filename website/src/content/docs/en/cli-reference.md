@@ -181,6 +181,36 @@ Private metadata: `client set NAME --note TEXT --tag TAG` edits only the supplie
 
 `client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` explains selection and omissions without credentials. User-Agent is limited to 512 Unicode characters; Accept to 256, both one line and transient. `--suffix` forces one of the existing format URL suffixes. JSON returns `subscription-preview`; the API is the read-scoped `POST /api/subscription/preview`.
 
+#### Reviewed bulk changes
+
+`client list` shows the first 100 matches. `--limit 1–500` sets page size; `--cursor VALUE` continues the same query. JSON adds `total`, contextual `facets`, and optional `next_cursor`; summary counts describe the returned page. `client bulk ACTION` uses the same query, freezes a preview, shows a table, confirms, and commits atomically. `--dry-run` returns the preview only; JSON commit and undo require `--yes`. Exact `--person USERNAME` selection cannot be combined with filters. Read receipts with `client bulk receipt ID`; undo unchanged reversible fields with `client bulk undo ID`. A lost commit reply is resolved by reading the receipt.
+
+| Command | Reviewed change |
+|---|---|
+| `meridian client bulk extend --days 7` | Extend expiry or pending duration |
+| `meridian client bulk expiry --expires never` | Set or clear expiry |
+| `meridian client bulk quota --limit 50GB --reset month --reset-day 15` | Set or clear quota and reset strategy |
+| `meridian client bulk reset-traffic` | Reset period traffic (irreversible) |
+| `meridian client bulk enable` | Enable with effective status |
+| `meridian client bulk disable` | Disable |
+| `meridian client bulk tag --set-tag none` | Set or clear tag |
+| `meridian client bulk devices --devices unlimited` | Set device cap |
+| `meridian client bulk renewal --renew-days 30 --renewals 5` | Set or clear renewal |
+| `meridian client bulk delete` | Delete service-only people; declared people return commands |
+| `meridian client bulk undo ID` | Undo reversible fields within ten minutes |
+| `meridian client bulk receipt ID` | Read a durable receipt |
+
+Shared filters: `--search TEXT`, `--status STATUS`, `--tag TAG`, `--expiring-within DAYS`, `--quota-at-least PERCENT`, `--never-used`, `--attention`, `--attention-reason REASON`, `--lifecycle STATE`, `--sort name|usage|expiry|activity`, `--order asc|desc`. Use either `--attention` (any default reason) or `--attention-reason`. Lifecycle choices: `pending`, `renewing`, `fixed`, `unlimited`. Names sort by case-folded display name, then exact username. See [client management](/en/client-management/) for review and privacy rules.
+
+`meridian client bulk extend --months 1 --person sample-a --dry-run --json`
+
+`meridian client bulk renewal --renew-months 1`
+
+`meridian client bulk renewal --no-renew`
+
+`meridian client bulk disable --tag TRIAL_7 --yes --json`
+
+
 ### meridian privacy
 
 Choose what the control service stores. Both device limits and daily history default to off; applying the fleet never changes these settings. See [Privacy](/en/privacy/) for the disclosures and seizure consequences.

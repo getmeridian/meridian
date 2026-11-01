@@ -410,6 +410,56 @@
       ],
       "title": "ClientRecord",
       "type": "object"
+    },
+    "PeopleFacets": {
+      "additionalProperties": false,
+      "properties": {
+        "attention": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Attention",
+          "type": "object"
+        },
+        "expires": {
+          "default": 0,
+          "title": "Expires",
+          "type": "integer"
+        },
+        "lifecycle": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Lifecycle",
+          "type": "object"
+        },
+        "never": {
+          "default": 0,
+          "title": "Never",
+          "type": "integer"
+        },
+        "quota": {
+          "default": 0,
+          "title": "Quota",
+          "type": "integer"
+        },
+        "status": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Status",
+          "type": "object"
+        },
+        "tag": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Tag",
+          "type": "object"
+        }
+      },
+      "title": "PeopleFacets",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -422,8 +472,43 @@
       "title": "Clients",
       "type": "array"
     },
+    "facets": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PeopleFacets"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "next_cursor": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Next Cursor"
+    },
     "summary": {
       "$ref": "#/$defs/ClientListSummary"
+    },
+    "total": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Total"
     }
   },
   "required": [

@@ -33,8 +33,10 @@ from meridian.console import confirm, err_console, error_context, fail, is_json_
 from meridian.control.client import ControlServiceError
 from meridian.control_access import access_panel
 from meridian.core.clients import (
+    ClientListResult,
     ClientMutationStatus,
     PanelUserLike,
+    build_client_list_result,
     build_client_reissue_result,
     build_client_status_result,
     client_metadata_paths,
@@ -42,9 +44,10 @@ from meridian.core.clients import (
 )
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
+from meridian.core.people_query import PeopleQuery
 from meridian.core.person_metadata import PersonMetadataError, parse_tag_option
 from meridian.core.redaction import HANDOFF_LINK_KEYS
-from meridian.core.services.clients import ClientNotFoundError, collect_client_list, collect_client_show
+from meridian.core.services.clients import ClientListServiceResult, ClientNotFoundError, collect_client_show
 from meridian.handoff import client_handoffs, page_url
 from meridian.i18n import t
 from meridian.remnawave import RemnawaveError
@@ -197,7 +200,7 @@ def _show(*, name: str, operation: OperationContext, connections: bool = False) 
     err_console.print()
 
 
-def run_list(*, attention: bool = False, tag: str | None = None) -> None:
+def run_list(*, attention: bool = False, tag: str | None = None, query: PeopleQuery | None = None) -> None:
     """List the fleet's clients from the control service."""
     operation = OperationContext()
     with error_context("client.list", timer=operation.timer):
@@ -205,23 +208,34 @@ def run_list(*, attention: bool = False, tag: str | None = None) -> None:
             wanted_tag = parse_tag_option(tag) if tag is not None else None
         except PersonMetadataError:
             fail(t("client.tag_invalid"), hint_type="user")
-        _list(operation=operation, attention=attention, tag=wanted_tag)
+        _list(
+            operation=operation,
+            query=query
+            or PeopleQuery(
+                attention="all" if attention else "",
+                tag=("none" if wanted_tag == "" else wanted_tag) if wanted_tag is not None else "",
+            ),
+        )
 
 
-def _list(*, operation: OperationContext, attention: bool = False, tag: str | None = None) -> None:
+def _list(*, operation: OperationContext, query: PeopleQuery) -> None:
     from rich.box import ROUNDED
     from rich.table import Table
 
     cluster = load_topology_cluster()
     try:
-        panel = access_panel(cluster)
-        result = collect_client_list(
-            panel,
-            allowed_usernames=_readable_users(cluster),
-            declared_usernames=_access_users(cluster),
-            read_attention=panel.attention if attention else None,
-            tag=tag,
+        with access_panel(cluster) as panel:
+            page, users = panel.query_users(query, include_metadata=is_json_mode())
+        listed = build_client_list_result(
+            users,
+            declared=[person.username for person in page.users if person.declared],
+            attention={person.username: person.attention_reasons for person in page.users} if query.attention else None,
         )
+        listed = ClientListResult.model_validate(
+            {**listed.model_dump(), "total": page.total, "next_cursor": page.next_cursor, "facets": page.facets}
+        )
+        result = ClientListServiceResult(clients=listed)
+        attention = bool(query.attention)
     except RemnawaveError as e:
         fail(
             f"Could not list clients: {e}",
@@ -242,7 +256,7 @@ def _list(*, operation: OperationContext, attention: bool = False, tag: str | No
                 ),
                 timer=operation.timer,
             ),
-            reveal=client_metadata_paths(result.clients.clients),
+            reveal=client_metadata_paths(result.clients.clients) | {"data.facets.tag"},
         )
         return
 
@@ -262,9 +276,9 @@ def _list(*, operation: OperationContext, attention: bool = False, tag: str | No
     if attention:
         table.add_column(t("attention.label.reason"), no_wrap=True)
 
-    access = require_intent(cluster).access
+    names = {person.username: person.display_name for person in page.users}
     for client in result.clients.clients:
-        shown = access.display_name(client.username)
+        shown = names.get(client.username, client.username)
         label = escape(shown if shown == client.username else f"{shown} ({client.username})")
         row = [
             label if client.declared else f"{label} [dim]· console[/dim]",
@@ -279,12 +293,12 @@ def _list(*, operation: OperationContext, attention: bool = False, tag: str | No
         table.add_row(*row)
 
     count = result.clients.summary.clients
-    suffix = "s" if count != 1 else ""
-
     err_console.print()
     err_console.print(table)
     err_console.print()
-    err_console.print(f"  [dim]Total: {count} client{suffix}[/dim]")
+    err_console.print(f"  [dim]{escape(t('bulk.list_count', shown=count, total=page.total))}[/dim]")
+    if page.next_cursor:
+        err_console.print(f"  [dim]--cursor {escape(page.next_cursor)}[/dim]")
     if not all(client.declared for client in result.clients.clients):
         err_console.print(f"  [dim]{escape(t('client.console_note'))}[/dim]")
     err_console.print()

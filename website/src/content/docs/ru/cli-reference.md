@@ -181,6 +181,36 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 Команда `client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` показывает, какой формат подписки получит приложение и какие подключения будут опущены, не раскрывая ключей доступа. Длина `User-Agent` ограничена 512 символами Unicode, `Accept` — 256 символами (оба без переносов строк; значения нигде не сохраняются). Флаг `--suffix` принудительно выбирает один из суффиксов формата URL. В JSON возвращается схема `subscription-preview`; в API за это отвечает метод `POST /api/subscription/preview` (требует права `read`).
 
+#### Групповые изменения с проверкой
+
+`client list` показывает первые 100 найденных людей. `--limit 1–500` задаёт размер страницы, `--cursor VALUE` продолжает тот же запрос. В JSON добавлены `total`, счётчики `facets` и необязательный `next_cursor`; сводка относится к возвращённой странице. `client bulk ACTION` использует те же фильтры, фиксирует проверку, показывает таблицу, запрашивает подтверждение и применяет всё одной транзакцией. `--dry-run` возвращает только проверку; для применения и отмены в JSON нужен `--yes`. Выбор точных имён через `--person USERNAME` нельзя совмещать с фильтрами. Квитанцию читает `client bulk receipt ID`; отмену выполняет `client bulk undo ID`. Потерянный ответ на применение проверяется по квитанции.
+
+| Команда | Изменение с проверкой |
+|---|---|
+| `meridian client bulk extend --days 7` | Продлить срок или длительность до первого использования |
+| `meridian client bulk expiry --expires never` | Указать или убрать срок доступа |
+| `meridian client bulk quota --limit 50GB --reset month --reset-day 15` | Указать или убрать квоту и период сброса |
+| `meridian client bulk reset-traffic` | Обнулить трафик за период (необратимо) |
+| `meridian client bulk enable` | Включить с учётом ограничений |
+| `meridian client bulk disable` | Отключить |
+| `meridian client bulk tag --set-tag none` | Указать или убрать метку |
+| `meridian client bulk devices --devices unlimited` | Указать лимит устройств |
+| `meridian client bulk renewal --renew-days 30 --renewals 5` | Настроить или отключить продление |
+| `meridian client bulk delete` | Удалить людей сервиса; для объявленных получить команду |
+| `meridian client bulk undo ID` | Отменить обратимые поля в течение десяти минут |
+| `meridian client bulk receipt ID` | Прочитать квитанцию |
+
+Общие фильтры: `--search TEXT`, `--status STATUS`, `--tag TAG`, `--expiring-within DAYS`, `--quota-at-least PERCENT`, `--never-used`, `--attention`, `--attention-reason REASON`, `--lifecycle STATE`, `--sort name|usage|expiry|activity`, `--order asc|desc`. Используйте либо `--attention` (любая причина), либо `--attention-reason`. Состояния срока: `pending`, `renewing`, `fixed`, `unlimited`. Сортировка по имени не учитывает регистр, затем используется точное имя пользователя. Правила проверки и приватности — в [управлении клиентами](/ru/client-management/).
+
+`meridian client bulk extend --months 1 --person sample-a --dry-run --json`
+
+`meridian client bulk renewal --renew-months 1`
+
+`meridian client bulk renewal --no-renew`
+
+`meridian client bulk disable --tag TRIAL_7 --yes --json`
+
+
 ### meridian privacy
 
 Управление тем, какие данные хранит сервис управления. Ограничение числа устройств и посуточная история трафика по умолчанию выключены; применение конфигурации (`apply`) эти настройки никогда не меняет. Подробное описание каждого режима и того, какие данные окажутся на сервере в случае его изъятия, приведено в разделе [Конфиденциальность](/ru/privacy/).

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import typer
 
+from meridian.cli_client_bulk import bulk_app
 from meridian.cli_client_preview import client_preview_cmd
 from meridian.cli_options import (
     ActivationDuration,
@@ -20,10 +21,12 @@ from meridian.cli_options import (
     TrafficResetPeriod,
     Yes,
 )
+from meridian.cli_people import Attention, Expiring, Lifecycle, Never, Order, Quota, Reason, Search, Sort, Status, Tag
 
 client_app = typer.Typer(
     help="Manage who can connect: add, show, list, limit, reissue, enable, disable, remove", no_args_is_help=True
 )
+client_app.add_typer(bulk_app, name="bulk", rich_help_panel="Bulk changes")
 client_app.command("preview", rich_help_panel="Connections")(client_preview_cmd)
 
 
@@ -91,15 +94,24 @@ def client_show_cmd(
 @client_app.command("list")
 def client_list_cmd(
     _json: Json = False,
-    attention: bool = typer.Option(
-        False, "--attention", help="Only people expiring soon, near quota, never used, or without recent traffic"
-    ),
-    tag: str | None = typer.Option(None, "--tag", metavar="TAG", help="Only people with this tag; none for untagged"),
+    q: Search = "",
+    status: Status = "",
+    tag: Tag = None,
+    expiring: Expiring = None,
+    quota: Quota = None,
+    never: Never = False,
+    attention: Attention = False,
+    reason: Reason = "",
+    lifecycle: Lifecycle = "",
+    sort: Sort = "name",
+    order: Order = None,
+    page_size: str = typer.Option("100", "--limit", help="People per page, 1–500"),
+    cursor: str | None = typer.Option(None, "--cursor", help="Continue the same query using next_cursor"),
 ) -> None:
-    """List managed access clients with status and traffic"""
-    from meridian.commands.client import run_list
+    """Find people using shared service filters, counts, and stable cursor pages."""
+    from meridian.commands.client_query import run_list_query
 
-    run_list(attention=attention, tag=tag)
+    run_list_query(locals())
 
 
 @client_app.command("usage")

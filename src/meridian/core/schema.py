@@ -97,6 +97,7 @@ from meridian.core.plan import (
 )
 from meridian.core.relay_check import RelayCheckResult
 from meridian.core.routes import RouteListResult, RouteMutationResult
+from meridian.core.schema_bulk import bulk_envelopes
 from meridian.core.schema_delivery import delivery_schemas
 from meridian.core.schema_delivery_service import service_delivery_schemas
 from meridian.core.schema_envelopes import make_command_envelope
@@ -555,6 +556,7 @@ _, _, ApiWorkflowOutputEnvelope = _make_command_envelope(
 
 _SCHEMAS: dict[str, type[BaseModel]] = {
     **PEOPLE_SCHEMAS,
+    **bulk_envelopes(envelope_base=_ContractEnvelope, failure_data_type=EmptyData),
     "output-envelope": OutputEnvelope,
     "apply-command-data": ApplyCommandData,
     "apply-counts": ApplyCounts,

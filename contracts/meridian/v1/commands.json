@@ -431,6 +431,834 @@
     {
       "argv": [
         "client",
+        "bulk",
+        "delete"
+      ],
+      "command": "client.bulk.delete",
+      "data_schema": "client-bulk",
+      "description": "Review delete for selected people, then commit the exact preview.",
+      "envelope_schema": "client-bulk-delete-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "review or durable receipt returned",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--search",
+        "--status",
+        "--tag",
+        "--expiring-within",
+        "--quota-at-least",
+        "--never-used",
+        "--attention",
+        "--attention-reason",
+        "--lifecycle",
+        "--sort",
+        "--order",
+        "--person",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "review or durable receipt returned",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "bulk",
+        "devices"
+      ],
+      "command": "client.bulk.devices",
+      "data_schema": "client-bulk",
+      "description": "Review devices for selected people, then commit the exact preview.",
+      "envelope_schema": "client-bulk-devices-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "review or durable receipt returned",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--devices",
+        "--search",
+        "--status",
+        "--tag",
+        "--expiring-within",
+        "--quota-at-least",
+        "--never-used",
+        "--attention",
+        "--attention-reason",
+        "--lifecycle",
+        "--sort",
+        "--order",
+        "--person",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "review or durable receipt returned",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "bulk",
+        "disable"
+      ],
+      "command": "client.bulk.disable",
+      "data_schema": "client-bulk",
+      "description": "Review disable for selected people, then commit the exact preview.",
+      "envelope_schema": "client-bulk-disable-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "review or durable receipt returned",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--search",
+        "--status",
+        "--tag",
+        "--expiring-within",
+        "--quota-at-least",
+        "--never-used",
+        "--attention",
+        "--attention-reason",
+        "--lifecycle",
+        "--sort",
+        "--order",
+        "--person",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "review or durable receipt returned",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "bulk",
+        "enable"
+      ],
+      "command": "client.bulk.enable",
+      "data_schema": "client-bulk",
+      "description": "Review enable for selected people, then commit the exact preview.",
+      "envelope_schema": "client-bulk-enable-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "review or durable receipt returned",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--search",
+        "--status",
+        "--tag",
+        "--expiring-within",
+        "--quota-at-least",
+        "--never-used",
+        "--attention",
+        "--attention-reason",
+        "--lifecycle",
+        "--sort",
+        "--order",
+        "--person",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "review or durable receipt returned",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "bulk",
+        "expiry"
+      ],
+      "command": "client.bulk.expiry",
+      "data_schema": "client-bulk",
+      "description": "Review expiry for selected people, then commit the exact preview.",
+      "envelope_schema": "client-bulk-expiry-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "review or durable receipt returned",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--expires",
+        "--search",
+        "--status",
+        "--tag",
+        "--expiring-within",
+        "--quota-at-least",
+        "--never-used",
+        "--attention",
+        "--attention-reason",
+        "--lifecycle",
+        "--sort",
+        "--order",
+        "--person",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "review or durable receipt returned",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "bulk",
+        "extend"
+      ],
+      "command": "client.bulk.extend",
+      "data_schema": "client-bulk",
+      "description": "Review extend for selected people, then commit the exact preview.",
+      "envelope_schema": "client-bulk-extend-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "review or durable receipt returned",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--days",
+        "--months",
+        "--search",
+        "--status",
+        "--tag",
+        "--expiring-within",
+        "--quota-at-least",
+        "--never-used",
+        "--attention",
+        "--attention-reason",
+        "--lifecycle",
+        "--sort",
+        "--order",
+        "--person",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "review or durable receipt returned",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "bulk",
+        "quota"
+      ],
+      "command": "client.bulk.quota",
+      "data_schema": "client-bulk",
+      "description": "Review quota for selected people, then commit the exact preview.",
+      "envelope_schema": "client-bulk-quota-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "review or durable receipt returned",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--limit",
+        "--reset",
+        "--reset-day",
+        "--search",
+        "--status",
+        "--tag",
+        "--expiring-within",
+        "--quota-at-least",
+        "--never-used",
+        "--attention",
+        "--attention-reason",
+        "--lifecycle",
+        "--sort",
+        "--order",
+        "--person",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "review or durable receipt returned",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "bulk",
+        "receipt",
+        "RECEIPT_ID"
+      ],
+      "command": "client.bulk.receipt",
+      "data_schema": "client-bulk",
+      "description": "Read a durable receipt without private notes or credentials.",
+      "envelope_schema": "client-bulk-receipt-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "review or durable receipt returned",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "review or durable receipt returned",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "bulk",
+        "renewal"
+      ],
+      "command": "client.bulk.renewal",
+      "data_schema": "client-bulk",
+      "description": "Review renewal for selected people, then commit the exact preview.",
+      "envelope_schema": "client-bulk-renewal-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "review or durable receipt returned",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--renew-days",
+        "--renew-months",
+        "--renewals",
+        "--no-renew",
+        "--search",
+        "--status",
+        "--tag",
+        "--expiring-within",
+        "--quota-at-least",
+        "--never-used",
+        "--attention",
+        "--attention-reason",
+        "--lifecycle",
+        "--sort",
+        "--order",
+        "--person",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "review or durable receipt returned",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "bulk",
+        "reset-traffic"
+      ],
+      "command": "client.bulk.reset-traffic",
+      "data_schema": "client-bulk",
+      "description": "Reset selected people's period traffic after reviewing the exact changes.",
+      "envelope_schema": "client-bulk-reset-traffic-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "review or durable receipt returned",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--search",
+        "--status",
+        "--tag",
+        "--expiring-within",
+        "--quota-at-least",
+        "--never-used",
+        "--attention",
+        "--attention-reason",
+        "--lifecycle",
+        "--sort",
+        "--order",
+        "--person",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "review or durable receipt returned",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "bulk",
+        "tag"
+      ],
+      "command": "client.bulk.tag",
+      "data_schema": "client-bulk",
+      "description": "Review tag for selected people, then commit the exact preview.",
+      "envelope_schema": "client-bulk-tag-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "review or durable receipt returned",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--set-tag",
+        "--search",
+        "--status",
+        "--tag",
+        "--expiring-within",
+        "--quota-at-least",
+        "--never-used",
+        "--attention",
+        "--attention-reason",
+        "--lifecycle",
+        "--sort",
+        "--order",
+        "--person",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "review or durable receipt returned",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "bulk",
+        "undo",
+        "RECEIPT_ID"
+      ],
+      "command": "client.bulk.undo",
+      "data_schema": "client-bulk",
+      "description": "Undo reversible fields within ten minutes when every person is unchanged.",
+      "envelope_schema": "client-bulk-undo-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "review or durable receipt returned",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--yes",
+        "--dry-run",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "review or durable receipt returned",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
         "devices",
         "NAME"
       ],
@@ -662,7 +1490,7 @@
       ],
       "command": "client.list",
       "data_schema": "client-list",
-      "description": "List managed access clients with status and traffic",
+      "description": "Find people using shared service filters, counts, and stable cursor pages.",
       "envelope_schema": "client-list-envelope",
       "error_schema": "error",
       "exit_codes": {
@@ -676,8 +1504,19 @@
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json",
-        "--attention",
+        "--search",
+        "--status",
         "--tag",
+        "--expiring-within",
+        "--quota-at-least",
+        "--never-used",
+        "--attention",
+        "--attention-reason",
+        "--lifecycle",
+        "--sort",
+        "--order",
+        "--limit",
+        "--cursor",
         "--context"
       ],
       "outcomes": [

@@ -260,7 +260,7 @@ class TestRunList:
         with _cli(_make_cluster(tmp_home), panel):
             run_list()
 
-        panel.list_users.assert_called_once()
+        panel.query_users.assert_called_once()
 
     def test_list_json_outputs_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
         with _cli(_make_cluster(tmp_home), json_mode=True):

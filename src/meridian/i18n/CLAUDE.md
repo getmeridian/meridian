@@ -1,7 +1,7 @@
 # i18n — CLI message catalog
 
 ## Design decisions
-- **Bulk events stay content-free** — action and counts have native en/ru/fa/zh labels.
+- **Bulk text matches across surfaces** — selection, before/after, irreversibility, stale people, and undo have native en/ru/fa/zh labels.
 - Locale types and native language names come from core.languages; CLI detection never sets the operator's subscription language, whose fixed status catalog lives in control/formats/status_remarks.py.
 
 **Flat JSON per locale** — `locales/<code>.json` maps dotted keys to text with `{name}` placeholders; English is the source and the fallback for a missing key. Locales match the website: en, ru, fa, zh.

@@ -44,6 +44,7 @@ from meridian.core.clients import ClientConnections
 from meridian.core.fleet import FleetTopology
 from meridian.core.languages import LanguageSettings, LanguageState
 from meridian.core.notices import NoticeState, NoticeWrite
+from meridian.core.people_query import PeoplePage, PeopleQuery
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 from meridian.core.traffic import NodeTrafficEvidence
@@ -81,6 +82,34 @@ class ServiceAccessPanel:
 
     def list_users(self) -> list[User]:
         return [self._user(record) for record in _translated(self._client.list_users)]
+
+    def query_users(self, query: PeopleQuery, *, include_metadata: bool = False) -> tuple[PeoplePage, list[User]]:
+        page = _translated(lambda: self._client.query_people(query))
+        metadata = {}
+        if include_metadata:
+            # Retain CLI JSON's established note read through the existing person
+            # route. The new query and every bulk preview/receipt omit notes.
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                records = list(
+                    pool.map(lambda person: _translated(lambda: self._client.get_user(person.username)), page.users)
+                )
+            metadata = {record.username: record.note for record in records if record is not None}
+        users = [
+            self._user(
+                UserRecord.model_validate(
+                    {
+                        **person.model_dump(include=set(UserRecord.model_fields)),
+                        "uuid": "",
+                        "sub_token": "",
+                        "note": metadata.get(person.username, ""),
+                    }
+                )
+            )
+            for person in page.users
+        ]
+        return page, users
 
     def privacy(self) -> PrivacyState:
         return _translated(self._client.privacy)

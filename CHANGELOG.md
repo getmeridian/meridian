@@ -19,6 +19,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   cursor pages without notes or credentials.
 - Bulk previews freeze targets and versions, commit atomically, retain durable
   receipts, and offer guarded ten-minute undo for reversible fields.
+- Reviewed `client bulk` actions with shared list filters, preview tables,
+  explicit JSON confirmation, and receipt recovery after an uncertain reply.
 - Account anniversary resets, durations from first traffic, and automatic
   expiry renewal with optional caps. API, CLI, panel, connection pages, and
   refill headers share UTC dates; migration keeps rolling-month anchors.
