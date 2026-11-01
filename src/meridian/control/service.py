@@ -23,15 +23,15 @@ from typing import Any
 
 from meridian.control.attention import read_attention
 from meridian.control.background_health import BackgroundHealth
-from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE, BackupLedger
+from meridian.control.backups import BackupLedger
 from meridian.control.command_models import CommandRequest, NodeCommandRecord, UserCutOffMutation
-from meridian.control.commands import COMMAND_TABLES, CommandLedger
+from meridian.control.commands import CommandLedger
 from meridian.control.connection_pages import ConnectionPages
 from meridian.control.cutoff import CutOffLedger
-from meridian.control.devices import DEVICES_TABLE, DeviceLedger, HeaderReader
+from meridian.control.devices import DeviceLedger, HeaderReader
 from meridian.control.enrollment import NodeAuthority
 from meridian.control.errors import ServiceError
-from meridian.control.events import EVENT_TABLES, EventLedger
+from meridian.control.events import EventLedger
 from meridian.control.languages import LanguageLedger
 from meridian.control.models import (
     ClientEndpoint,
@@ -53,20 +53,22 @@ from meridian.control.models import (
 from meridian.control.node_documents import with_users
 from meridian.control.node_health import project_runtime
 from meridian.control.notices import NoticeLedger
-from meridian.control.owner import UI_TABLES, OwnerAuth
+from meridian.control.owner import OwnerAuth
 from meridian.control.periods import period_start
 from meridian.control.person_connections import read_connections
-from meridian.control.privacy import PRIVACY_TABLES, PrivacyLedger, read_privacy
-from meridian.control.revisions import APPLY_FENCE_TABLE, REVISIONS_TABLE, RevisionLedger
-from meridian.control.server_allowances import ALLOWANCE_PERIODS_TABLE, advance_server_periods, read_server_usage
+from meridian.control.privacy import PrivacyLedger, read_privacy
+from meridian.control.revisions import RevisionLedger
+from meridian.control.schema import SCHEMA, migrate
+from meridian.control.schema import SCHEMA_VERSION as SCHEMA_VERSION
+from meridian.control.server_allowances import advance_server_periods, read_server_usage
 from meridian.control.service_settings import read_settings, save_settings
 from meridian.control.store import Store
 from meridian.control.subscription_preview import preview_subscription
 from meridian.control.subscription_serving import serve_subscription
 from meridian.control.subscriptions import SubscriptionResponse
 from meridian.control.times import utc_now
-from meridian.control.tokens import API_TOKENS_TABLE_V4, TokenRegistry
-from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPOCH_BASELINES, TrafficLedger
+from meridian.control.tokens import TokenRegistry
+from meridian.control.traffic import TrafficLedger
 from meridian.control.user_expiry import require_finite_user_expiry
 from meridian.control.user_lifecycle import extend_user_expiry, insert_user
 from meridian.control.user_policy import enforced_status, period_began, whole_seconds
@@ -82,85 +84,7 @@ from meridian.core.clients import ClientConnections
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 
-SCHEMA_VERSION = 17
 MAX_WAIT_SECONDS = 55
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS secrets (name TEXT PRIMARY KEY, value BLOB NOT NULL);
-CREATE TABLE IF NOT EXISTS nodes (
-    node_id TEXT PRIMARY KEY,
-    spec TEXT,
-    spec_sha256 TEXT,
-    revision INTEGER,
-    document TEXT,
-    doc_sha256 TEXT,
-    applied_revision INTEGER,
-    applied_sha256 TEXT,
-    last_seen_at TEXT,
-    agent_version TEXT,
-    report TEXT
-);
-CREATE TABLE IF NOT EXISTS users (
-    username TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL UNIQUE,
-    uuid TEXT NOT NULL UNIQUE,
-    sub_token TEXT NOT NULL UNIQUE,
-    status TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    expire_at TEXT,
-    traffic_limit_bytes INTEGER NOT NULL DEFAULT 0,
-    traffic_limit_strategy TEXT NOT NULL DEFAULT 'no_reset',
-    traffic_offset_bytes INTEGER NOT NULL DEFAULT 0,
-    traffic_reset_at TEXT,
-    traffic_carried_bytes INTEGER NOT NULL DEFAULT 0,
-    device_limit INTEGER,
-    note TEXT NOT NULL DEFAULT '',
-    tag TEXT NOT NULL DEFAULT '',
-    language TEXT
-);
-CREATE TABLE IF NOT EXISTS endpoints (endpoint_id TEXT PRIMARY KEY, body TEXT NOT NULL);
-"""
-_SCHEMA += "\n".join(PRIVACY_TABLES) + "\n" + DEVICES_TABLE + ";\n"
-_SCHEMA += ";\n".join(COMMAND_TABLES) + ";\n"
-_SCHEMA += ALLOWANCE_PERIODS_TABLE + ";\n"
-# Statements that bring a database from version N to N + 1 (index N - 1).
-_MIGRATIONS: tuple[tuple[str, ...], ...] = (
-    (
-        "ALTER TABLE users ADD COLUMN expire_at TEXT",
-        "ALTER TABLE users ADD COLUMN traffic_limit_bytes INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE users ADD COLUMN traffic_limit_strategy TEXT NOT NULL DEFAULT 'no_reset'",
-    ),
-    (
-        "ALTER TABLE users ADD COLUMN traffic_offset_bytes INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE users ADD COLUMN traffic_reset_at TEXT",
-    ),
-    (API_TOKENS_TABLE_V4,),
-    (REVISIONS_TABLE, APPLY_FENCE_TABLE),
-    ("ALTER TABLE users ADD COLUMN traffic_carried_bytes INTEGER NOT NULL DEFAULT 0",),
-    (BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE),
-    # 7 -> 8: the web UI's owner, sessions, and setup links (`owner.py`).
-    UI_TABLES,
-    PER_EPOCH_BASELINES,
-    # 9 -> 10: operator-owned privacy settings and optional UTC daily usage.
-    (*PRIVACY_TABLES, *DAILY_TABLES),
-    # 10 -> 11: subscription devices and operator-owned per-user caps.
-    (DEVICES_TABLE, "ALTER TABLE users ADD COLUMN device_limit INTEGER"),
-    # 11 -> 12: optional expiry of scoped API tokens; existing tokens never expire.
-    ("ALTER TABLE api_tokens ADD COLUMN expires_at TEXT",),
-    # 12 -> 13: durable accounting, aggregate activity, and local lifecycle events.
-    (*ACCOUNTING_MIGRATION, *EVENT_TABLES),
-    # 13 -> 14: signed node commands and the capabilities accepted by each session.
-    COMMAND_TABLES,
-    # 14 -> 15: private, operator-owned person notes and tags.
-    (
-        "ALTER TABLE users ADD COLUMN note TEXT NOT NULL DEFAULT ''",
-        "ALTER TABLE users ADD COLUMN tag TEXT NOT NULL DEFAULT ''",
-    ),
-    # 15 -> 16: server allowance offsets over durable accepted node totals.
-    (ALLOWANCE_PERIODS_TABLE,),
-    # 16 -> 17: optional operator-owned subscription language per person.
-    ("ALTER TABLE users ADD COLUMN language TEXT",),
-)
 # meta key prefix: the last revision a deleted node was signed at.
 _RETIRED_REVISION = "retired_revision:"
 
@@ -176,7 +100,7 @@ class ControlService:
         self._lock = self._store.lock
         self._changed = self._store.changed
         self._db = self._store.db
-        self._store.create(_SCHEMA)
+        self._store.create(SCHEMA)
         # Users read their traffic from the ledger's table, so it exists before any user query.
         self.traffic = TrafficLedger(self._store)
         self.events = EventLedger(self._store, clock=clock)
@@ -741,13 +665,7 @@ class ControlService:
     # -- storage helpers -----------------------------------------------------------------
 
     def _migrate(self) -> None:
-        stored = int(self._meta("schema_version") or SCHEMA_VERSION)
-        if stored > SCHEMA_VERSION:
-            raise ServiceError("conflict", "The database was written by a newer Meridian.", 409)
-        for statements in _MIGRATIONS[stored - 1 : SCHEMA_VERSION - 1]:
-            for statement in statements:
-                self._db.execute(statement)
-        self._set_meta("schema_version", str(SCHEMA_VERSION))
+        migrate(self._store)
 
     @contextmanager
     def _transaction(self) -> Iterator[None]:
