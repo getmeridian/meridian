@@ -18,11 +18,7 @@ from meridian.control.api_models import (
     OpenApiDocument,
     SnapshotResponse,
 )
-from meridian.control.command_models import (
-    NodeCommandRecord,
-    NodeCommandRequest,
-    NodeCommandTargets,
-)
+from meridian.control.command_routes import node_command_routes
 from meridian.control.models import (
     ApplyFenceState,
     ApplyFenceSwap,
@@ -174,39 +170,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         credentials=True,
         internal_reason="Single-use bootstrap credentials for the internal node enrollment protocol.",
     ),
-    route(
-        "POST",
-        "/api/nodes/{node_id}/commands",
-        WRITE,
-        "issue_command",
-        NodeCommandRequest,
-        NodeCommandRecord,
-        "Queue a signed command for a node.",
-        credentials=False,
-        refusals=(NOT_FOUND, ErrorResponse(409, ("conflict", "command_queue_full"))),
-    ),
-    route(
-        "GET",
-        "/api/nodes/{node_id}/commands/{command_id}",
-        "read",
-        "get_command",
-        None,
-        NodeCommandRecord,
-        "Read a queued command and its result.",
-        credentials=False,
-        refusals=(NOT_FOUND,),
-    ),
-    route(
-        "GET",
-        "/api/nodes/{node_id}/command-targets",
-        "read",
-        "command_targets",
-        None,
-        NodeCommandTargets,
-        "List a node's managed command targets.",
-        credentials=False,
-        refusals=(NOT_FOUND,),
-    ),
+    *node_command_routes(NOT_FOUND),
     route(
         "GET",
         "/api/ca",
