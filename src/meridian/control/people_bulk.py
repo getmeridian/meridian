@@ -15,7 +15,7 @@ from meridian.control.bulk_effects import BulkEffect, prepare_effect, prepare_un
 from meridian.control.errors import ServiceError
 from meridian.control.events import EventLedger
 from meridian.control.models import NodeSpec, UserRecord
-from meridian.control.node_documents import with_users
+from meridian.control.node_documents import NodeDocumentComposer, with_users
 from meridian.control.people_query import PeopleQueryEngine
 from meridian.control.period_usage import reset_period
 from meridian.control.store import Store
@@ -79,7 +79,7 @@ class BulkLedger:
         *,
         read_user: Callable[[str], UserRecord],
         read_users: Callable[[], list[UserRecord]],
-        compose: Callable[[], None],
+        compose: NodeDocumentComposer,
         clock: Callable[[], float],
     ) -> None:
         self.store, self.people, self.events, self.traffic = store, people, events, traffic
@@ -335,12 +335,14 @@ class BulkLedger:
             # Catch up the reviewed baseline before an expiry or interval edit can hide a due reset.
             self._enforce(list(users.values()), now)
             outcomes = []
+            removed: list[UserRecord] = []
             for person in review.people:
                 if person.outcome != "changed":
                     outcomes.append(person)
                     continue
                 user = self.read_user(person.username)
                 if person.after is None:
+                    removed.append(user)
                     self.traffic.forget_user(user.user_id)
                     self.store.db.execute("DELETE FROM users WHERE user_id = ?", (user.user_id,))
                     self.events.append("user.removed", user.username, now=now)
@@ -363,7 +365,10 @@ class BulkLedger:
                 )
             committed_counts = counts(outcomes)
             if committed_counts.changed or baseline_changed:
-                self.compose()
+                if removed:
+                    self.compose(retired=removed)
+                else:
+                    self.compose()
             receipt = BulkReceipt(
                 id=review.id,
                 preview_hash=review.preview_hash,

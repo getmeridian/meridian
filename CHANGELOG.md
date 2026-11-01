@@ -38,6 +38,7 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Keep every bulk-deleted person in per-node flow-block receipts without rotating connection keys or subscription URLs (#95).
 - Bulk expiry validates dates before preview, so blank or invalid input never clears expiry; clearing it requires the explicit No end date choice.
 - CLI and console reconcile lost undo replies through receipts, retain the updated console receipt, and reject unavailable undo dry runs.
 - People background refreshes preserve selection controls and keyboard focus; failed refreshes and page requests keep actions and pagination usable.

@@ -433,3 +433,5 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 持久回执保存操作、参数、计数及各人的结果。如果人员及限制执行结果未变化，可在十分钟内撤销一次可逆字段，重启服务后也可撤销。流量重置、删除和会重置流量的计划更改不可逆，提交前明确提示。重置保留累计流量。回执不含私人备注、连接凭据、客户端地址或设备标识符；事件仅包含操作与计数及现有不含私人内容的单人事件。`topology_intent.access.users` 中的人员可接受服务字段更改；删除时返回确切的 `meridian client remove USERNAME` 命令以单独审核，服务批次不会删除他们。
 
 `GET /api/people` 需要 people/admin 或所有者会话，返回 `users`、`total`、`population`、分类 `facets` 与 `next_cursor`。查询键：`q`、`status`、`tag`、`expires`、`quota`、`never`（0/1）、`attention`、`lifecycle`、`sort`、`order`、`limit`（1–500）、`cursor`。继续游标时保持相同筛选和排序。原有 `GET /api/users` 保留。查询响应不含凭据与私人备注；CLI 的 JSON 通过现有授权单人读取接口保留备注。
+
+批量停用、删除或到期变更使用户失去访问权限时，服务会为每位用户和每个受影响节点记录与单个用户操作相同的流阻断回执。连接密钥和订阅链接保持不变。节点确认已应用配置后才会阻断新流；已经开始的传输和 UDP 会话可能继续。删除用户记录后，回执仍保留，以便后续节点报告确认阻断。

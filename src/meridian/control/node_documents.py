@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Protocol
 
 from meridian.control.errors import ServiceError
 from meridian.control.models import ManagedInbound, NodeSpec, UserRecord, users_resource_id
+
+RetiredUsers = UserRecord | list[UserRecord] | None
+
+
+class NodeDocumentComposer(Protocol):
+    def __call__(self, *, retired: RetiredUsers = None) -> None: ...
 
 
 def with_users(spec: NodeSpec, users: list[UserRecord]) -> list[dict[str, Any]]:

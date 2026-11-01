@@ -12,6 +12,7 @@ from typing import Any
 from meridian.control.events import EventLedger
 from meridian.control.flow_block_evidence import FlowBlockEvidence
 from meridian.control.models import UserRecord
+from meridian.control.node_documents import RetiredUsers
 from meridian.control.store import Store
 from meridian.control.times import format_timestamp
 from meridian.core.agent_protocol import Capability, ObservedStateReport
@@ -64,12 +65,12 @@ class FlowBlockLedger:
         after: list[dict[str, Any]],
         required: NodeStateRef,
         users: list[UserRecord],
-        retired: UserRecord | None = None,
+        retired: RetiredUsers = None,
     ) -> None:
         """Record every lost identity in the document mutation's transaction, once per person and node."""
-        directory = {user.user_id: user for user in users}
-        if retired is not None:
-            directory[retired.user_id] = retired
+        removed = [retired] if isinstance(retired, UserRecord) else retired or []
+        retired_by_id = {user.user_id: user for user in removed}
+        directory = {**{user.user_id: user for user in users}, **retired_by_id}
         old, new = carried(before), carried(after)
         kinds = {r["inbound_tag"]: r["kind"] for r in before if r["kind"] in {"xray_users", "hysteria2_users"}}
         gone: set[str] = set()
@@ -95,7 +96,7 @@ class FlowBlockLedger:
                 continue
             reason: FlowBlockReason = "access_changed"
             generation = max(1, user.credential_generation - int(user_id in credentials_changed))
-            if retired is not None and retired.user_id == user_id:
+            if user_id in retired_by_id:
                 reason = "removed"
             elif user.status == "disabled":
                 reason = "disabled"

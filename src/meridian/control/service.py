@@ -51,7 +51,7 @@ from meridian.control.models import (
     UserRecord,
     UserUpdate,
 )
-from meridian.control.node_documents import with_users
+from meridian.control.node_documents import RetiredUsers, with_users
 from meridian.control.node_health import project_runtime
 from meridian.control.notices import NoticeLedger
 from meridian.control.owner import OwnerAuth
@@ -607,12 +607,12 @@ class ControlService:
 
     # -- composition -------------------------------------------------------------------
 
-    def _compose_all(self, *, retired: UserRecord | None = None) -> None:
+    def _compose_all(self, *, retired: RetiredUsers = None) -> None:
         for (node_id,) in self._db.execute("SELECT node_id FROM nodes WHERE spec IS NOT NULL").fetchall():
             self._compose(str(node_id), retired=retired)
         self.cutoffs.finish()
 
-    def _compose(self, node_id: str, *, retired: UserRecord | None = None) -> None:
+    def _compose(self, node_id: str, *, retired: RetiredUsers = None) -> None:
         """Sign a new revision when the node's resources changed, and wake its poll."""
         row = self._node(node_id)
         if row is None or not row["spec"]:

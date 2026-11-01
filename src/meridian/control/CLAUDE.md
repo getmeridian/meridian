@@ -35,6 +35,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - A proposal whose intent contains a secret-shaped key or value, or a malformed `access` block, is refused and never stored.
 
 ## Pitfalls
+- **Bulk deletion carries every retired identity** — compose once with all removed records so each node queues the same receipts as a single deletion, without rotating keys.
 - **Undo shares bulk enforcement** — restore requested choices before judging status, and check managed inbound capacity before composing.
 - **Bulk before is enforced** — project both sides from one account clock, re-check every target before writing, and catch up due resets before schedule edits.
 - **Bulk after stays reviewed** — re-check the projected result at commit; a newly due action schedule needs a fresh review.
