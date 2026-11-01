@@ -22,6 +22,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Bulk expiry validates before reading** — a deferred submit listener cannot guard direct values; clearing expiry requires the explicit No end date choice.
 - **Undo replies can be uncertain** — read the receipt before reporting success, keep its latest state, and never enable a blind retry after a lost reply.
 - **People refreshes keep usable controls** — passive reads never disable selections or the pager; failed page requests restore the last accepted cursor and controls.
 - **Settle a form's disabled state before `M.trackForm()`** — a field disabled after the snapshot reads as edited, and the device editor once asked to discard changes nobody made.

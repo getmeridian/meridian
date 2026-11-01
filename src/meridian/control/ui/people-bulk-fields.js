@@ -33,8 +33,11 @@
       var expiry = M.expiryFields(null);
       nodes.appendChild(expiry.nodes);
       read = function () {
-        var value = expiry.value();
-        return value === undefined ? null : { expire_at: value };
+        if (!expiry.validate()) {
+          var input = expiry.date.validationMessage ? expiry.date : expiry.time;
+          input.focus(); input.reportValidity(); return null;
+        }
+        return { expire_at: expiry.value() };
       };
     } else if (kind === "tag") {
       var tag = h("input", { name: "bulk-tag", type: "text", maxlength: "16", autocomplete: "off" });

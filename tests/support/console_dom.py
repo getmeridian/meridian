@@ -26,6 +26,7 @@ needs_console_dom = pytest.mark.skipif(
 def run_console(mode: str, locale: str = "en", data: Any = None) -> dict[str, Any]:
     runners = {
         "page-": "control_ui_page.mjs",
+        "people-bulk-expiry": "control_ui_bulk_expiry.mjs",
         "people-bulk": "control_ui_people_bulk.mjs",
         "people-triage": "control_ui_people.mjs",
         "account-": "connection_account.mjs",

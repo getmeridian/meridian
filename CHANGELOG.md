@@ -32,6 +32,7 @@ newest first; the last is what 4.0 changes compared with 3.x.
   the fleet default. Remnawave migration keeps device caps, including zero.
 
 #### Fixed
+- Bulk expiry validates dates before preview, so blank or invalid input never clears expiry; clearing it requires the explicit No end date choice.
 - CLI and console reconcile lost undo replies through receipts, retain the updated console receipt, and reject unavailable undo dry runs.
 - People background refreshes preserve selection controls and keyboard focus; failed refreshes and page requests keep actions and pagination usable.
 - Client-list JSON preserves integer facet counts for secret-shaped tags such as TOKEN and API_KEY.
