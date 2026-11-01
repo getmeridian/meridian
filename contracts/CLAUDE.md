@@ -2,6 +2,7 @@
 
 ## Design decisions
 - **People query contracts** — bounded pages and contextual facets expose row versions without notes or credentials.
+- **Reviewed bulk contracts** — frozen hashes, receipts, undo, and named stale refusals use typed people-only boundaries.
 - **Account schedule contracts** — typed anchors, durations, intervals, and renewal progress travel in person and creation schemas; authenticated previews return dates without changing state.
 - Fleet-language contracts include `auto` as the default for browser-led pages and English app remarks; nullable person overrides keep the four-code enum, and CLI changes expose `--yes`.
 - `admin/openapi.json` is the English OpenAPI 3.1 contract generated from the control route catalog and Pydantic models; it uses the package version on export and the installed service version at runtime, with explicit credential and scope extensions.

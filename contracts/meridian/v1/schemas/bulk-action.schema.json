@@ -1,0 +1,178 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "enum": [
+        "extend",
+        "expiry",
+        "quota",
+        "reset-traffic",
+        "enable",
+        "disable",
+        "tag",
+        "devices",
+        "renewal",
+        "delete"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "days": {
+      "anyOf": [
+        {
+          "maximum": 3650,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Days"
+    },
+    "device_limit": {
+      "anyOf": [
+        {
+          "maximum": 100,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Device Limit"
+    },
+    "expire_at": {
+      "anyOf": [
+        {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expire At"
+    },
+    "months": {
+      "anyOf": [
+        {
+          "maximum": 120,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Months"
+    },
+    "renewal_interval_days": {
+      "anyOf": [
+        {
+          "maximum": 3650,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Renewal Interval Days"
+    },
+    "renewal_interval_months": {
+      "anyOf": [
+        {
+          "maximum": 120,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Renewal Interval Months"
+    },
+    "renewal_limit": {
+      "anyOf": [
+        {
+          "maximum": 10000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Renewal Limit"
+    },
+    "tag": {
+      "default": "",
+      "pattern": "^[A-Z0-9_]{0,16}$",
+      "title": "Tag",
+      "type": "string"
+    },
+    "traffic_limit_bytes": {
+      "anyOf": [
+        {
+          "maximum": 9223372036854775807,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Traffic Limit Bytes"
+    },
+    "traffic_limit_strategy": {
+      "anyOf": [
+        {
+          "enum": [
+            "no_reset",
+            "day",
+            "week",
+            "month",
+            "month_rolling"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Traffic Limit Strategy"
+    },
+    "traffic_reset_anchor_day": {
+      "anyOf": [
+        {
+          "maximum": 31,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Traffic Reset Anchor Day"
+    }
+  },
+  "required": [
+    "action"
+  ],
+  "title": "BulkAction",
+  "type": "object"
+}

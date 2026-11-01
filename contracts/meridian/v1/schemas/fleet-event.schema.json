@@ -1,5 +1,63 @@
 {
   "$defs": {
+    "BulkEventDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "anyOf": [
+            {
+              "enum": [
+                "extend",
+                "expiry",
+                "quota",
+                "reset-traffic",
+                "enable",
+                "disable",
+                "tag",
+                "devices",
+                "renewal",
+                "delete"
+              ],
+              "type": "string"
+            },
+            {
+              "const": "undo",
+              "type": "string"
+            }
+          ],
+          "title": "Action"
+        },
+        "changed": {
+          "minimum": 0,
+          "title": "Changed",
+          "type": "integer"
+        },
+        "cli_required": {
+          "minimum": 0,
+          "title": "Cli Required",
+          "type": "integer"
+        },
+        "targeted": {
+          "minimum": 0,
+          "title": "Targeted",
+          "type": "integer"
+        },
+        "unchanged": {
+          "minimum": 0,
+          "title": "Unchanged",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "action",
+        "targeted",
+        "changed",
+        "unchanged",
+        "cli_required"
+      ],
+      "title": "BulkEventDetail",
+      "type": "object"
+    },
     "CommandIssuedDetail": {
       "additionalProperties": false,
       "properties": {
@@ -237,6 +295,9 @@
     "detail": {
       "anyOf": [
         {
+          "$ref": "#/$defs/BulkEventDetail"
+        },
+        {
           "$ref": "#/$defs/EmptyEventDetail"
         },
         {
@@ -272,6 +333,7 @@
     },
     "kind": {
       "enum": [
+        "people.bulk",
         "user.created",
         "user.updated",
         "user.enabled",

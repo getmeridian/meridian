@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from http import HTTPStatus
 
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 
 from meridian.control.errors import ServiceError
 from meridian.core.models import CoreModel
@@ -13,6 +13,7 @@ from meridian.core.models import CoreModel
 class ApiErrorDetail(CoreModel):
     code: str
     message: str
+    subjects: list[str] | None = Field(default=None, max_length=50000, exclude_if=lambda value: value is None)
 
 
 class ApiErrorResponse(CoreModel):
@@ -22,7 +23,7 @@ class ApiErrorResponse(CoreModel):
 
 
 def api_error_response(exc: ServiceError) -> ApiErrorResponse:
-    return ApiErrorResponse(error=ApiErrorDetail(code=exc.code, message=str(exc)))
+    return ApiErrorResponse(error=ApiErrorDetail(code=exc.code, message=str(exc), subjects=exc.subjects))
 
 
 def error_page(code: int) -> bytes:

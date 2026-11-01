@@ -630,5 +630,18 @@
   "events.field.renewal_limit": "续期次数上限",
   "events.field.renewals_completed": "续期次数",
   "events.field.renewal_anchor_at": "到期时间",
-  "lifecycle.valid_from_first_use_one": "首次使用后有效 {days} 天"
+  "lifecycle.valid_from_first_use_one": "首次使用后有效 {days} 天",
+  "bulk.action.extend": "延长有效期",
+  "bulk.action.expiry": "设置或清除到期时间",
+  "bulk.action.quota": "配额与重置策略",
+  "bulk.action.reset-traffic": "重置周期流量",
+  "bulk.action.enable": "启用",
+  "bulk.action.disable": "停用",
+  "bulk.action.tag": "设置或清除标签",
+  "bulk.action.devices": "设置设备限制",
+  "bulk.action.renewal": "设置或清除续期",
+  "bulk.action.delete": "删除",
+  "events.kind.people.bulk": "人员批量更改",
+  "events.bulk": "{action}：已更改 {targeted} 人中的 {changed} 人；{cli_required} 人需运行命令。",
+  "bulk.action.undo": "撤销字段更改"
 }

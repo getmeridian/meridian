@@ -630,5 +630,18 @@
   "events.field.renewal_limit": "سقف تمدیدها",
   "events.field.renewals_completed": "تعداد تمدیدها",
   "events.field.renewal_anchor_at": "پایان اعتبار",
-  "lifecycle.valid_from_first_use_one": "از اولین استفاده به‌مدت {days} روز معتبر است"
+  "lifecycle.valid_from_first_use_one": "از اولین استفاده به‌مدت {days} روز معتبر است",
+  "bulk.action.extend": "تمدید اعتبار",
+  "bulk.action.expiry": "تنظیم یا پاک کردن پایان اعتبار",
+  "bulk.action.quota": "سهمیه و روش بازنشانی",
+  "bulk.action.reset-traffic": "بازنشانی ترافیک دوره",
+  "bulk.action.enable": "فعال‌سازی",
+  "bulk.action.disable": "غیرفعال‌سازی",
+  "bulk.action.tag": "تنظیم یا پاک کردن برچسب",
+  "bulk.action.devices": "تنظیم محدودیت دستگاه",
+  "bulk.action.renewal": "تنظیم یا لغو تمدید",
+  "bulk.action.delete": "حذف",
+  "events.kind.people.bulk": "تغییر گروهی افراد",
+  "events.bulk": "{action}: تغییر {changed} نفر از {targeted}؛ نیازمند CLI: {cli_required}.",
+  "bulk.action.undo": "برگرداندن تغییر فیلدها"
 }

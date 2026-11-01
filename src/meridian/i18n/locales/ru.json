@@ -630,5 +630,18 @@
   "events.field.renewal_limit": "Лимит продлений",
   "events.field.renewals_completed": "Число продлений",
   "events.field.renewal_anchor_at": "Срок доступа",
-  "lifecycle.valid_from_first_use_one": "Доступ на {days} день с первого использования"
+  "lifecycle.valid_from_first_use_one": "Доступ на {days} день с первого использования",
+  "bulk.action.extend": "Продлить доступ",
+  "bulk.action.expiry": "Указать или убрать срок доступа",
+  "bulk.action.quota": "Квота и период сброса",
+  "bulk.action.reset-traffic": "Обнулить трафик за период",
+  "bulk.action.enable": "Включить",
+  "bulk.action.disable": "Отключить",
+  "bulk.action.tag": "Указать или убрать метку",
+  "bulk.action.devices": "Указать лимит устройств",
+  "bulk.action.renewal": "Настроить или отключить продление",
+  "bulk.action.delete": "Удалить",
+  "events.kind.people.bulk": "Групповое изменение людей",
+  "events.bulk": "{action}: изменено {changed} из {targeted}; нужна команда CLI: {cli_required}.",
+  "bulk.action.undo": "Отменить изменения полей"
 }

@@ -299,6 +299,10 @@ Read tokens never see anyone's keys or subscription ID. Choose **People** for a 
 | People endpoint | Action |
 |---|---|
 | `GET /api/people` | Find people and return cursor pages and contextual counts |
+| `POST /api/people/bulk/preview` | Freeze exact usernames or a query without account or receipt writes |
+| `POST /api/people/bulk/commit` | Commit preview_id and preview_hash atomically; name stale people |
+| `GET /api/people/bulk/receipts/{receipt_id}` | Read a receipt without notes or credentials |
+| `POST /api/people/bulk/undo` | Undo unchanged reversible fields once within ten minutes |
 | `POST /api/users/preview` | Preview creation or an edit’s UTC schedule dates without saving; people/admin or owner session |
 | `POST /api/users` | Create a person with `username`, `status`, `expire_at`, `traffic_limit_bytes`, `traffic_limit_strategy`, and `device_limit` in one transaction |
 | `PATCH /api/users/{username}` | Change the status, expiry, traffic limit or reset strategy, or device cap; omitted fields keep their values |
@@ -385,3 +389,11 @@ Response headers are redacted: URLs are replaced, and encoded profile titles and
 The service finds people by username or display name, status, tag, expiry within 1–365 days, quota share at or above 1–100%, never-used evidence, attention reason, and lifecycle (`pending`, `renewing`, `fixed`, `unlimited`). Sort by name, period traffic, expiry, or last activity; missing dates sort last. Counts apply the other active filters. Cursors exclude later insertions and expire after 15 minutes. Query parameters are not saved as request history.
 
 `GET /api/people` requires people/admin or an owner session. It returns `users`, `total`, `population`, contextual `facets`, and `next_cursor`. Query keys: `q`, `status`, `tag`, `expires`, `quota`, `never` (0/1), `attention`, `lifecycle`, `sort`, `order`, `limit` (1–500), `cursor`. Keep filters and order when continuing a cursor. The plain `GET /api/users` route remains available. Query responses omit credentials and private notes; CLI JSON retains its existing note view through the authorized per-person read.
+
+## Review changes for many people
+
+Preview freezes explicit usernames or everyone matching the same query for ten minutes. Review each person’s before/after, warnings, and the number of changed node documents. Commit sends only the preview ID and hash. Changed people, enforcement results, or node configuration refuse the entire batch; stale people are named. Changes and the receipt share one transaction, with one document composition.
+
+Extend by whole days or calendar months from the later of now and expiry, with short months clamped. Pending first-use durations grow without activation; calendar months add the days between the preview's UTC date and that date after the selected months. Set or clear expiry, quota and reset strategy, tag, device cap (inherit/unlimited/N), or renewal; enable, disable, reset period traffic, or delete. Omitted fields preserve values; reset strategy and renewal cap can be edited independently. The existing node contract permits 10,000 active people per managed inbound; previews reject changes that exceed it.
+
+Durable receipts retain action, parameters, counts, and per-person outcomes. Reversible fields can be undone once within ten minutes, even after a service restart, only while people and the reviewed enforcement outcome remain unchanged. Traffic reset, deletion, and schedule changes that reset traffic are irreversible and disclosed before commit. Resets preserve lifetime totals. Receipts contain no private notes, credentials, client addresses, or device identifiers. Events contain the action and counts plus the existing content-free per-person events. People declared in `topology_intent.access.users` may receive service-owned edits; their deletion returns the exact `meridian client remove USERNAME` command for a separate topology review and never deletes them in the service batch.

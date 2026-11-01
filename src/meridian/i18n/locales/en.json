@@ -630,5 +630,18 @@
   "events.field.renewal_limit": "Renewal cap",
   "events.field.renewals_completed": "Number of renewals",
   "events.field.renewal_anchor_at": "Expiry",
-  "lifecycle.valid_from_first_use_one": "Valid for {days} day from first use"
+  "lifecycle.valid_from_first_use_one": "Valid for {days} day from first use",
+  "bulk.action.extend": "Extend expiry",
+  "bulk.action.expiry": "Set or clear expiry",
+  "bulk.action.quota": "Quota and reset strategy",
+  "bulk.action.reset-traffic": "Reset period traffic",
+  "bulk.action.enable": "Enable",
+  "bulk.action.disable": "Disable",
+  "bulk.action.tag": "Set or clear tag",
+  "bulk.action.devices": "Set device limit",
+  "bulk.action.renewal": "Set or clear renewal",
+  "bulk.action.delete": "Delete",
+  "events.kind.people.bulk": "Bulk people change",
+  "events.bulk": "{action}: {changed} of {targeted} people changed; {cli_required} require CLI.",
+  "bulk.action.undo": "Undo field changes"
 }

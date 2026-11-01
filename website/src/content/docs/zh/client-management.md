@@ -299,6 +299,10 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 | 用户 API 端点 | 操作 |
 |---|---|
 | `GET /api/people` | 查找人员并返回带分类计数的游标页面 |
+| `POST /api/people/bulk/preview` | 冻结用户名或查询，不写入更改或回执 |
+| `POST /api/people/bulk/commit` | 原子提交 preview_id 与 preview_hash，列出变化人员 |
+| `GET /api/people/bulk/receipts/{receipt_id}` | 读取不含备注或凭据的回执 |
+| `POST /api/people/bulk/undo` | 十分钟内撤销一次未发生后续变化的字段 |
 | `POST /api/users/preview` | 预览创建或修改账户的 UTC 日期，不保存；需要 people/admin 或所有者会话 |
 | `POST /api/users` | 在一个事务中创建用户，同时设置 `username`、`status`、`expire_at`、`traffic_limit_bytes`、`traffic_limit_strategy` 和 `device_limit` |
 | `PATCH /api/users/{username}` | 修改状态、到期时间、流量限额或重置策略、设备上限；未发送的字段保持原值 |
@@ -385,3 +389,11 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 服务按用户名或显示名称、状态、标签、未来 1–365 天内到期、配额使用率达到 1–100%、从未使用的证据、提醒原因和生命周期状态（`pending`、`renewing`、`fixed`、`unlimited`）查找人员。可按名称、本期流量、到期时间或最近活动排序；未知日期排在最后。计数会考虑其他活动筛选条件。游标不包含首页查询后新增的人员，有效期为 15 分钟。查询参数不会作为请求历史保存。
 
 `GET /api/people` 需要 people/admin 或所有者会话，返回 `users`、`total`、`population`、分类 `facets` 与 `next_cursor`。查询键：`q`、`status`、`tag`、`expires`、`quota`、`never`（0/1）、`attention`、`lifecycle`、`sort`、`order`、`limit`（1–500）、`cursor`。继续游标时保持相同筛选和排序。原有 `GET /api/users` 保留。查询响应不含凭据与私人备注；CLI 的 JSON 通过现有授权单人读取接口保留备注。
+
+## 审核批量更改
+
+预览会将明确选择的用户名或同一查询匹配的全部人员固定十分钟。请检查每人的修改前后值、警告和受影响的节点文档数量。提交只发送预览 ID 和哈希。人员数据、限制执行结果或节点配置变化会拒绝整批操作，并列出已变化的人员。变更和收据在同一事务中保存，文档仅统一生成一次。
+
+有效期按整天或日历月从当前时间与原到期时间中较晚者延长，并处理短月份。等待首次使用的人员只增加时长，不激活；月数换算为从预览 UTC 日期到相应月份日期的天数。可设置或清除到期时间、配额与重置策略、标签、设备限制（继承／不限／N）或续期，也可启用、停用、重置周期流量或删除。省略的字段保持原值，重置策略与续期次数上限可单独更改。现有节点协议每个受管入站最多支持 10,000 名启用人员，预览拒绝超过此限制的更改。
+
+持久回执保存操作、参数、计数及各人的结果。如果人员及限制执行结果未变化，可在十分钟内撤销一次可逆字段，重启服务后也可撤销。流量重置、删除和会重置流量的计划更改不可逆，提交前明确提示。重置保留累计流量。回执不含私人备注、连接凭据、客户端地址或设备标识符；事件仅包含操作与计数及现有不含私人内容的单人事件。`topology_intent.access.users` 中的人员可接受服务字段更改；删除时返回确切的 `meridian client remove USERNAME` 命令以单独审核，服务批次不会删除他们。

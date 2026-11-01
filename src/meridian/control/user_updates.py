@@ -28,24 +28,20 @@ def update_user(
         moment = now()
         merged = merge_user_update(user, update, moment)
         events.user_updated(user, merged)
-        schedule_fields = tuple(AccountLifecycleState.model_fields)
-        schedule_sql = ", ".join(f"{field} = ?" for field in schedule_fields)
-        store.db.execute(
-            "UPDATE users SET status = ?, expire_at = ?, traffic_limit_bytes = ?, traffic_limit_strategy = ?,"
-            f" device_limit = ?, note = ?, tag = ?, language = ?, {schedule_sql} WHERE username = ?",
-            (
-                merged.status,
-                merged.expire_at,
-                merged.traffic_limit_bytes,
-                merged.traffic_limit_strategy,
-                merged.device_limit,
-                merged.note,
-                merged.tag,
-                merged.language,
-                *(getattr(merged, field) for field in schedule_fields),
-                username,
-            ),
-        )
+        save_user_fields(store, merged)
         enforce(moment)
         compose()
         return read_user(username)
+
+
+OPERATOR_FIELDS = tuple(dict.fromkeys((*UserUpdate.model_fields, *AccountLifecycleState.model_fields)))
+
+
+def save_user_fields(store: Store, user: UserRecord, fields: tuple[str, ...] = OPERATOR_FIELDS) -> None:
+    """Write validated operator fields in the caller's existing transaction."""
+    if not set(fields) <= set(OPERATOR_FIELDS):
+        raise ValueError("Only operator-owned fields may be changed.")
+    columns = ", ".join(f"{field} = ?" for field in fields)
+    store.db.execute(
+        f"UPDATE users SET {columns} WHERE user_id = ?", (*(getattr(user, field) for field in fields), user.user_id)
+    )

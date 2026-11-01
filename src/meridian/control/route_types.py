@@ -26,6 +26,7 @@ PATH_TYPES: dict[str, Any] = {
     "endpoint_id": Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9_.:-]{0,127}$")],
     "token_id": TokenRecord.model_fields["id"].rebuild_annotation(),
     "device_id": DeviceKeyRecord.model_fields["id"].rebuild_annotation(),
+    "receipt_id": Annotated[str, Field(pattern=r"^[0-9a-f]{32}$")],
     "revision": Annotated[str, Field(pattern=r"^[1-9][0-9]{0,15}$")],
     "command_id": Annotated[str, Field(pattern=r"^[0-9a-f-]{36}$")],
     "device_key": ClientDevice.model_fields["device_key"].rebuild_annotation(),

@@ -17,6 +17,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
 #### Added
 - Server-side people queries with contextual counts, row versions, and stable
   cursor pages without notes or credentials.
+- Bulk previews freeze targets and versions, commit atomically, retain durable
+  receipts, and offer guarded ten-minute undo for reversible fields.
 - Account anniversary resets, durations from first traffic, and automatic
   expiry renewal with optional caps. API, CLI, panel, connection pages, and
   refill headers share UTC dates; migration keeps rolling-month anchors.
