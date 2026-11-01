@@ -18,7 +18,13 @@ from typing import Protocol
 from meridian.control.models import DeviceLimitLevel, PrivacySettings, UserDevices, UserRecord
 from meridian.control.store import Store
 from meridian.control.times import format_timestamp
-from meridian.core.client_devices import DEVICE_KEY_PATTERN, ClientDevice, ClientDeviceDetails, DevicesRemoved
+from meridian.core.client_devices import (
+    DEVICE_KEY_PATTERN,
+    ClientDevice,
+    ClientDeviceDetails,
+    DevicesRemoved,
+    effective_device_limit,
+)
 
 DEVICES_TABLE = """CREATE TABLE IF NOT EXISTS devices (
     user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
@@ -98,7 +104,8 @@ class DeviceLedger:
             if user.status != "active":
                 return result
             count = self._count(user.user_id)
-            if count >= (user.device_limit or privacy.default_device_limit):
+            cap = effective_device_limit(user.device_limit, privacy.default_device_limit)
+            if cap != 0 and count >= cap:
                 return {**result, "x-hwid-max-devices-reached": "true", "x-hwid-limit": "true"}
             self._store.db.execute("INSERT INTO devices (user_id, device_key) VALUES (?, ?)", (user.user_id, key))
         if privacy.device_limits == "full":
@@ -146,7 +153,7 @@ class DeviceLedger:
             username=user.username,
             level=privacy.device_limits,
             count=len(devices),
-            limit=user.device_limit or privacy.default_device_limit,
+            limit=effective_device_limit(user.device_limit, privacy.default_device_limit),
             devices=devices,
         )
 

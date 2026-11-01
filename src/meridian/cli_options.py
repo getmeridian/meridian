@@ -78,7 +78,10 @@ Expires = Annotated[
 DeviceLimit = Annotated[
     str | None,
     typer.Option(
-        "--devices", metavar="N|default", help="Device cap, 1–100; default uses the fleet's cap", show_default=False
+        "--devices",
+        metavar="N|unlimited|default",
+        help="Device cap, 1–100; unlimited exempts; default uses the fleet's cap",
+        show_default=False,
     ),
 ]
 

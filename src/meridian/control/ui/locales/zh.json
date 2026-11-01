@@ -354,7 +354,7 @@
   "error.history_off": "每日用量历史已关闭。在隐私设置中启用后开始记录。",
   "devices.title": "设备",
   "devices.limit": "设备上限",
-  "devices.limit_hint": "留空使用集群默认上限。在 Settings → Privacy 中启用设备限制后，上限才会生效。",
+  "devices.limit_hint": "上限须为 1 至 100 的整数。在设置 → 隐私中启用设备限制后生效。",
   "devices.limit_invalid": "请输入 1 到 100 的整数，或留空使用集群默认上限。",
   "devices.count": "{count} / {limit} 台设备",
   "devices.off": "设备限制已关闭。不读取或存储任何设备信息。",
@@ -564,5 +564,10 @@
   "people.shown_count": "显示 {shown} 人，共 {total} 人",
   "people.no_filter_match": "没有用户符合筛选条件。请清除筛选或更改搜索。",
   "people.expires_invalid": "请输入 1–365 天的整数，或留空。",
-  "people.quota_invalid": "请输入 1–100 的整数百分比，或留空。"
+  "people.quota_invalid": "请输入 1–100 的整数百分比，或留空。",
+  "devices.unlimited": "不限",
+  "devices.unlimited_count": "{count} 台设备 · 不限",
+  "devices.inherit": "使用服务器默认值",
+  "devices.custom": "设置上限",
+  "devices.choice_hint": "选择不限后，此人不受服务器默认设备上限约束。隐私级别仍然生效。"
 }

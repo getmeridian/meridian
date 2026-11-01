@@ -130,7 +130,10 @@ Set a cap from 1 to 100, at creation or later. `default` uses the fleet cap (ini
 meridian client add alice --devices 2
 meridian client set alice --devices 4
 meridian client set alice --devices default
+meridian client set alice --devices unlimited
 ```
+
+Use `--devices unlimited` (or `0`) to exempt a person from the fleet cap. `--devices default` inherits it; these are separate choices in the panel. The API uses `device_limit: 0` for unlimited and `null` for inheritance. The privacy level still applies. Remnawave migration preserves each cap, including zero, without importing device registrations.
 
 Read or forget registrations:
 

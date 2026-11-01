@@ -4,7 +4,7 @@
 - **Only migrate's reader remains** — `__init__.py` is the compatibility facade: `RemnawaveReader` (`client.py`, users only), the `User`/`Node`/`Host` shapes the control service's access adapters still return (`models.py`), the typed error hierarchy (`runtime.py`), and `XRAY_JSON_CLIENT_TYPE`.
 - **Raw REST over one `httpx.Client`, no SDK** — the official SDK stalled at 2.8, and Meridian needs only a few endpoints; `_request` owns retry, typed errors, and envelope unwrapping.
 - **Convert at the boundary** — `models.py` owns stable Meridian shapes and converts REST payloads immediately (`parse_user()`).
-- **`User` serves both sides** — it reads lifetime/reset and panel-only metadata for migrate, and its HWID cap field also carries the control service's nullable device cap (panel caps and registrations are reported, never imported). `User.language` carries only Meridian's nullable subscription-language preference, and the control service's optional first-traffic time and last reporting node ride it too; legacy panel reads leave all three unknown.
+- **`User` serves both sides** — it reads lifetime/reset and panel-only metadata for migrate, and its HWID cap field also carries the control service's nullable device cap (caps carry over, registrations never do). `User.language` carries only Meridian's nullable subscription-language preference, and the control service's optional first-traffic time and last reporting node ride it too; legacy panel reads leave all three unknown.
 
 ## What's done well
 - Wire shapes are pinned by tests against the 3.4.5 fixture and the upstream `remnawave/backend` contract (`libs/contract`).

@@ -58,7 +58,7 @@
       "anyOf": [
         {
           "maximum": 100,
-          "minimum": 1,
+          "minimum": 0,
           "type": "integer"
         },
         {
@@ -66,7 +66,7 @@
         }
       ],
       "default": null,
-      "description": "None uses the fleet's default cap.",
+      "description": "Null uses the fleet's cap; 0 means unlimited.",
       "title": "Device Limit"
     },
     "expire_at": {

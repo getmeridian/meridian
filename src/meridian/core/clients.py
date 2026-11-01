@@ -9,6 +9,7 @@ from pydantic import Field
 
 from meridian.control.command_models import NodeCommandOutcome
 from meridian.control.models import UserStatus, UserUsage
+from meridian.core.client_devices import DeviceCap
 from meridian.core.client_limits import canonical_expiry, traffic_reset_from_strategy
 from meridian.core.languages import Language
 from meridian.core.models import CoreModel
@@ -80,7 +81,7 @@ class ClientRecord(UserTrafficEvidence):
     attention_reasons: list[PersonAttentionReason] = Field(
         default_factory=list, description="Derived reasons when client list --attention was requested; never stored."
     )
-    device_limit: int | None = Field(default=None, ge=1, le=100, description="None uses the fleet's default cap.")
+    device_limit: DeviceCap | None = Field(default=None, description="Null uses the fleet's cap; 0 means unlimited.")
     note: PrivateNote = Field(default="", repr=False, description="Private operator note; people/admin only.")
     tag: PersonTag = Field(default="", repr=False, description="Private operator tag; people/admin only.")
     language: Language | None = Field(

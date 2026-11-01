@@ -89,5 +89,5 @@ def test_a_partial_http_cap_edit_keeps_other_limits_and_an_explicit_null_uses_th
         assert after.device_limit is None and after.traffic_limit_bytes == 5000
         assert admin.user_devices("alice").limit == 7
         with httpx.Client(base_url=url, trust_env=False, headers={"Authorization": "Bearer " + ADMIN_TOKEN}) as raw:
-            assert raw.patch("/api/users/alice", json={"device_limit": 0}).status_code == 400
-        assert admin.user_devices("alice").limit == 7
+            assert raw.patch("/api/users/alice", json={"device_limit": 0}).status_code == 200
+        assert admin.user_devices("alice").limit == 0

@@ -69,7 +69,8 @@ def run_devices(name: str, *, remove: str | None = None, clear: bool = False) ->
             )
             return
         err_console.print()
-        err_console.print("  " + escape(t("client.devices_count", count=result.count, limit=result.limit)))
+        key = "client.devices_unlimited_count" if result.limit == 0 else "client.devices_count"
+        err_console.print("  " + escape(t(key, count=result.count, limit=result.limit)))
         if removed:
             err_console.print("  " + escape(t("client.devices_removed", count=removed)))
         if result.level == "off":

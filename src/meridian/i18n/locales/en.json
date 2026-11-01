@@ -582,5 +582,7 @@
   "preview.invalid_suffix": "Choose info, json, v2ray-json, mihomo, clash, stash, or singbox for the suffix.",
   "preview.title": "{name}: subscription format",
   "language.auto": "Follow each person's browser",
-  "language.confirm_json": "Pass --yes to change the default language in JSON mode."
+  "language.confirm_json": "Pass --yes to change the default language in JSON mode.",
+  "client.device_unlimited": "Unlimited",
+  "client.devices_unlimited_count": "{count} devices · unlimited"
 }

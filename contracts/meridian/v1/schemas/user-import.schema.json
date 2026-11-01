@@ -17,6 +17,20 @@
       "default": null,
       "title": "Created At"
     },
+    "device_limit": {
+      "anyOf": [
+        {
+          "maximum": 100,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Device Limit"
+    },
     "expire_at": {
       "anyOf": [
         {

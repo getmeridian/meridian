@@ -22,6 +22,7 @@
 - Commands build typed, redacted results before any envelope or rendering, and reporter primitives emit typed events without choosing a renderer.
 
 ## Pitfalls
+- **Device cap zero is unlimited** — only null inherits the fleet cap; never resolve a cap by truthiness.
 - **Never emit raw SSH commands, panel tokens, private keys, database URLs, or subscription secrets.**
 - **`redact_string()` is the only secret masker** (SSH debug logs included) — teach it a new secret form instead of adding a local regex.
 - **Reveal exact paths only** — connection URIs and QR fields are complete credentials; JSON reveal options name exact dotted paths (list indices included) and never expose neighbouring fields. Preview redaction masks whole URIs and replaces opaque Base64 headers.

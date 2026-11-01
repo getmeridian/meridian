@@ -582,5 +582,7 @@
   "preview.invalid_suffix": "后缀请选择 info、json、v2ray-json、mihomo、clash、stash 或 singbox。",
   "preview.title": "{name}：订阅格式",
   "language.auto": "跟随每个人的浏览器语言",
-  "language.confirm_json": "在 JSON 模式下更改默认语言，请添加 --yes。"
+  "language.confirm_json": "在 JSON 模式下更改默认语言，请添加 --yes。",
+  "client.device_unlimited": "不限",
+  "client.devices_unlimited_count": "{count} 台设备 · 不限"
 }

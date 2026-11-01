@@ -582,5 +582,7 @@
   "preview.invalid_suffix": "Для суффикса укажите info, json, v2ray-json, mihomo, clash, stash или singbox.",
   "preview.title": "{name}: формат подписки",
   "language.auto": "По языку браузера пользователя",
-  "language.confirm_json": "Чтобы изменить язык по умолчанию в режиме JSON, укажите флаг --yes."
+  "language.confirm_json": "Чтобы изменить язык по умолчанию в режиме JSON, укажите флаг --yes.",
+  "client.device_unlimited": "Без ограничений",
+  "client.devices_unlimited_count": "Устройства: {count} · без ограничений"
 }

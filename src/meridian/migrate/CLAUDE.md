@@ -10,6 +10,7 @@
 - **Links are proven, then the panel goes** — every user's subscription URL must equal the saved one, or a `bug` error stops before the panel and its leftover state are removed.
 
 ## What's done well
+- **Device caps survive migration** — zero stays unlimited and null stays inherited; registrations never move.
 - **Steps are monkeypatchable module names in `flow.py`** — tests run the whole flow, a resume, and the no-op with fakes, and prove the service publishes what the panel did.
 
 ## Pitfalls

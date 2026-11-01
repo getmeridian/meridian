@@ -14,6 +14,10 @@ newest first; the last is what 4.0 changes compared with 3.x.
 
 ### Since 4.0.0b9
 
+#### Added
+- Per-person unlimited device caps in the API, CLI, and panel, distinct from
+  the fleet default. Remnawave migration keeps device caps, including zero.
+
 #### Fixed
 - **The People screen filters by status, tag, upcoming expiry, quota share, never-used accounts, and attention**, with facet counts and sorting by name, usage, expiry, or last activity. The fragment retains the view across reloads, and searching keeps existing rows and focus (#95).
 - **People attention distinguishes never-used accounts from people who stopped using the service**, using the stored last traffic time and separate bounded thresholds. Period resets and disabled daily history preserve that evidence (#95).

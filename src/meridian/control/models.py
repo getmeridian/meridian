@@ -27,7 +27,7 @@ from meridian.core.agent_types import (
     Timestamp,
     Version,
 )
-from meridian.core.client_devices import ClientDevicesResult
+from meridian.core.client_devices import ClientDevicesResult, DeviceCap
 from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES, LimitStrategy, UserCreationSettings
 from meridian.core.connection_pages import ConnectionPageSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
@@ -212,7 +212,7 @@ class UserRecord(UserTrafficEvidence):
     expire_at: Timestamp | None = None
     traffic_limit_bytes: int = Field(default=0, ge=0, le=MAX_TRAFFIC_LIMIT_BYTES, description="0 means unlimited.")
     traffic_limit_strategy: LimitStrategy = "no_reset"
-    device_limit: int | None = Field(default=None, ge=1, le=100, description="None uses the fleet's default cap.")
+    device_limit: DeviceCap | None = Field(default=None, description="Null uses the fleet's cap; 0 means unlimited.")
     traffic_reset_at: Timestamp | None = Field(default=None, description="When the current traffic period began.")
     used_traffic_bytes: int = Field(default=0, ge=0, description="Traffic since the period began.")
     period_traffic: PeriodTraffic = Field(default_factory=PeriodTraffic)
@@ -251,7 +251,7 @@ class UserUpdate(CoreModel):
     expire_at: Timestamp | None = None
     traffic_limit_bytes: int | None = Field(default=None, ge=0, le=MAX_TRAFFIC_LIMIT_BYTES)
     traffic_limit_strategy: LimitStrategy | None = None
-    device_limit: int | None = Field(default=None, ge=1, le=100)
+    device_limit: DeviceCap | None = None
     note: PrivateNote = Field(default="", repr=False)
     tag: PersonTag = Field(default="", repr=False)
     language: Language | None = Field(
@@ -298,6 +298,7 @@ class UserImport(CoreModel):
     traffic_limit_bytes: Count = 0
     traffic_limit_strategy: LimitStrategy = "no_reset"
     used_traffic_bytes: Count = 0
+    device_limit: DeviceCap | None = None
     lifetime_traffic_bytes: Count = 0
     traffic_reset_at: Timestamp | None = None
     created_at: Timestamp | None = None

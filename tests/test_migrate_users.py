@@ -90,10 +90,9 @@ def test_only_intent_users_move_and_the_rest_is_named() -> None:
     ("changes", "note"),
     [
         ({"traffic_limit_strategy": "MONTH_ROLLING"}, "monthly reset on the user's own day becomes the calendar month"),
-        ({"hwid_device_limit": 3}, "HWID device limit 3"),
         ({"telegram_id": "1000001"}, "Telegram ID"),
     ],
-    ids=["month-rolling", "hwid", "telegram"],
+    ids=["month-rolling", "telegram"],
 )
 def test_what_the_service_cannot_hold_is_reported(changes: dict[str, object], note: str) -> None:
     carried = carry_users([_user(**changes)], ["alice"])

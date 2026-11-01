@@ -130,7 +130,10 @@ meridian client reset-traffic alice
 meridian client add alice --devices 2
 meridian client set alice --devices 4
 meridian client set alice --devices default
+meridian client set alice --devices unlimited
 ```
+
+`--devices unlimited` (или `0`) снимает с пользователя ограничение числа устройств. `--devices default` возвращает общий лимит из настроек серверов. В панели это два отдельных варианта. В API `device_limit: 0` означает отсутствие лимита, а `null` — общий лимит. Настройки конфиденциальности сохраняют силу. При миграции с Remnawave персональные лимиты, включая ноль, сохраняются; записи об устройствах не переносятся.
 
 Посмотреть или сбросить зарегистрированные устройства:
 

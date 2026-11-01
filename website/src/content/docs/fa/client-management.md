@@ -130,7 +130,10 @@ apply، بازاستقرار و تغییرات سرورها هرگز سقف و �
 meridian client add alice --devices 2
 meridian client set alice --devices 4
 meridian client set alice --devices default
+meridian client set alice --devices unlimited
 ```
+
+با `--devices unlimited` (یا `0`) فرد را از سقف عمومی دستگاه‌ها معاف کنید. `--devices default` سقف پیش‌فرض سرورها را به کار می‌برد؛ در پنل این دو گزینه جدا هستند. در API مقدار `device_limit: 0` یعنی نامحدود و `null` یعنی استفاده از پیش‌فرض. سطح حریم خصوصی همچنان اعمال می‌شود. مهاجرت از Remnawave سقف‌های افراد، از جمله صفر، را حفظ می‌کند اما سوابق دستگاه‌ها را منتقل نمی‌کند.
 
 ثبت‌ها را ببینید یا فراموش کنید:
 

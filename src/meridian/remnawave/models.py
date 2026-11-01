@@ -44,7 +44,7 @@ class User:
     tag: str = ""
     email: str = ""
     telegram_id: str = ""
-    # The control projection also uses this cap; migrate reports the panel's instead of importing it.
+    # Null inherits the fleet cap; the panel's zero is an explicit unlimited cap.
     hwid_device_limit: int | None = None
     language: Language | None = None  # Meridian's operator preference; legacy panel users leave it unset.
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)

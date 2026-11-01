@@ -354,7 +354,7 @@
   "error.history_off": "Daily usage history is off. Enable it in Privacy settings to begin recording.",
   "devices.title": "Devices",
   "devices.limit": "Device cap",
-  "devices.limit_hint": "Leave empty for the fleet default. Caps take effect when device limits are on in Settings → Privacy.",
+  "devices.limit_hint": "For a cap, enter a whole number from 1 to 100. Device limits take effect when enabled in Settings → Privacy.",
   "devices.limit_invalid": "Use a whole number from 1 to 100, or leave empty for the fleet default.",
   "devices.count": "{count} of {limit} devices",
   "devices.off": "Device limits are off. No device information is read or stored.",
@@ -564,5 +564,10 @@
   "people.shown_count": "Showing {shown} of {total} people",
   "people.no_filter_match": "No people match these filters. Clear filters or change your search.",
   "people.expires_invalid": "Use a whole number from 1 to 365 days, or leave blank.",
-  "people.quota_invalid": "Use a whole percentage from 1 to 100, or leave blank."
+  "people.quota_invalid": "Use a whole percentage from 1 to 100, or leave blank.",
+  "devices.unlimited": "Unlimited",
+  "devices.unlimited_count": "{count} devices · unlimited",
+  "devices.inherit": "Use fleet default",
+  "devices.custom": "Set a cap",
+  "devices.choice_hint": "Unlimited exempts this person from the fleet cap. The privacy level still applies."
 }

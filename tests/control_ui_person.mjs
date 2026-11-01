@@ -110,6 +110,11 @@ if (mode === 'person-devices') {
   report.shown = card.textContent;
   if (data.action === 'cap') {
     const input = card.querySelector('input[type="number"]');
+    const mode = card.querySelector('select[name="device_mode"]');
+    if (mode && (data.capMode || data.value !== null)) {
+      mode.value = data.capMode || (data.value === '' ? 'default' : 'limited');
+      mode.dispatchEvent(new w.Event('change', { bubbles: true }));
+    }
     if (data.value !== null) input.value = data.value;
     if (data.badInput) Object.defineProperty(input, 'validity', { value: { badInput: true } });
     input.dispatchEvent(new w.Event('input', { bubbles: true }));

@@ -582,5 +582,7 @@
   "preview.invalid_suffix": "برای پسوند یکی از info، json، v2ray-json، mihomo، clash، stash یا singbox را انتخاب کنید.",
   "preview.title": "{name}: قالب اشتراک",
   "language.auto": "زبان مرورگر هر فرد",
-  "language.confirm_json": "برای تغییر زبان پیش‌فرض در حالت JSON، گزینهٔ --yes را وارد کنید."
+  "language.confirm_json": "برای تغییر زبان پیش‌فرض در حالت JSON، گزینهٔ --yes را وارد کنید.",
+  "client.device_unlimited": "نامحدود",
+  "client.devices_unlimited_count": "{count} دستگاه · نامحدود"
 }

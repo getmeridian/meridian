@@ -411,12 +411,13 @@ class ControlService:
                     carried,
                     item.note,
                     item.tag,
+                    item.device_limit,
                 )
                 if existing is None:
                     self._db.execute(
                         "INSERT INTO users (uuid, sub_token, status, created_at, expire_at, traffic_limit_bytes,"
-                        " traffic_limit_strategy, traffic_reset_at, traffic_carried_bytes, note, tag,"
-                        " username, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        " traffic_limit_strategy, traffic_reset_at, traffic_carried_bytes, note, tag, device_limit,"
+                        " username, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (*values, item.username, f"u{secrets.token_hex(8)}"),
                     )
                     import_period(self._store, item.username, item.used_traffic_bytes)
@@ -427,7 +428,7 @@ class ControlService:
                 self._db.execute(
                     "UPDATE users SET uuid = ?, sub_token = ?, status = ?, created_at = ?, expire_at = ?,"
                     " traffic_limit_bytes = ?, traffic_limit_strategy = ?, traffic_reset_at = ?,"
-                    " traffic_carried_bytes = ?, note = ?, tag = ? WHERE username = ?",
+                    " traffic_carried_bytes = ?, note = ?, tag = ?, device_limit = ? WHERE username = ?",
                     (*values, item.username),
                 )
                 import_period(self._store, item.username, item.used_traffic_bytes)

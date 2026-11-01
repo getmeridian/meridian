@@ -54,7 +54,8 @@
       M.mount(list, h("p", { class: "muted small", text: M.t("devices.off") }));
       return;
     }
-    var count = h("bdi", { text: M.t("devices.count", { count: result.count, limit: result.limit }) });
+    var count = h("bdi", { text: M.t(result.limit === 0 ? "devices.unlimited_count" : "devices.count",
+      { count: result.count, limit: result.limit }) });
     var content = [h("div", { class: "card-head" }, count, removeButton(user.username, null, result.count, reload, current))];
     if (result.level === "private") {
       content.push(h("p", { class: "muted small", text: M.t("devices.private") }));
@@ -69,29 +70,41 @@
   }
 
   function capForm(user, saved, current) {
-    var original = user.device_limit === null || user.device_limit === undefined ? "" : String(user.device_limit);
+    var initial = user.device_limit === undefined ? null : user.device_limit;
+    var original = initial === null || initial === 0 ? "" : String(initial);
+    var mode = h("select", { name: "device_mode" },
+      h("option", { value: "default", text: M.t("devices.inherit") }),
+      h("option", { value: "unlimited", text: M.t("devices.unlimited") }),
+      h("option", { value: "limited", text: M.t("devices.custom") }));
+    mode.value = initial === null ? "default" : initial === 0 ? "unlimited" : "limited";
     var limit = h("input", { type: "number", min: "1", max: "100", step: "1", inputmode: "numeric", value: original });
     var form = h("form", { class: "stack", novalidate: true },
+      M.field(M.t("devices.limit"), mode, M.t("devices.choice_hint")),
       M.field(M.t("devices.limit"), limit, M.t("devices.limit_hint")),
       h("p", { class: "form-error", role: "alert" }),
       h("div", { class: "row-actions" },
         h("button", { class: "btn btn-primary btn-sm", type: "submit" }, M.t("action.save"))));
     M.trackForm(form);
+    function sync() { limit.disabled = mode.value !== "limited"; }
+    mode.addEventListener("change", sync);
+    sync();
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var value = limit.value.trim();
       if ((limit.validity && limit.validity.badInput) ||
-          (value && (!/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 100))) {
+          mode.value === "limited" && (!/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 100) ||
+          !["default", "unlimited", "limited"].includes(mode.value)) {
         form.querySelector(".form-error").textContent = M.t("devices.limit_invalid");
         return;
       }
-      if (value === original) {
+      var cap = mode.value === "default" ? null : mode.value === "unlimited" ? 0 : Number(value);
+      if (cap === initial) {
         M.toast(M.t("person.nothing_changed"));
         return;
       }
       var label = M.displayName(user.username);
       M.saveDraft(form, function () {
-        return M.api("PATCH", path(user.username), { device_limit: value ? Number(value) : null });
+        return M.api("PATCH", path(user.username), { device_limit: cap });
       }).then(function (changed) {
         M.toast(M.t("person.saved_toast", { name: label }));
         if (current()) saved(changed);

@@ -130,7 +130,10 @@ Private 模式也不存储首次或最近获取订阅的时间。指纹包含在
 meridian client add alice --devices 2
 meridian client set alice --devices 4
 meridian client set alice --devices default
+meridian client set alice --devices unlimited
 ```
+
+使用 `--devices unlimited`（或 `0`）可让此人不受默认设备上限约束。`--devices default` 则恢复服务器默认上限；面板中提供两个独立选项。API 中 `device_limit: 0` 表示不限，`null` 表示继承默认值。隐私级别仍然生效。Remnawave 迁移会保留每人的设备上限，包括零，但不会导入设备登记记录。
 
 查看或清除登记：
 

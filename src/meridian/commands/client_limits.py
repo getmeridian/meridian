@@ -93,7 +93,11 @@ def print_client_usage(record: ClientRecord) -> None:
         (t("client.label.expires"), escape(format_expiry(record.expires_at))),
         (
             t("client.label.devices"),
-            str(record.device_limit) if record.device_limit is not None else t("client.device_default"),
+            t("client.device_unlimited")
+            if record.device_limit == 0
+            else str(record.device_limit)
+            if record.device_limit is not None
+            else t("client.device_default"),
         ),
     ]
     if isinstance(record, ClientDetail):

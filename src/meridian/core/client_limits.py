@@ -18,6 +18,7 @@ from pydantic import Field, field_validator
 
 from meridian.core.agent_types import Timestamp
 from meridian.core.calendar import month_date, shift_month
+from meridian.core.client_devices import DeviceCap
 from meridian.core.errors import MeridianError
 from meridian.core.languages import Language, parse_person_language
 from meridian.core.models import CoreModel
@@ -55,7 +56,7 @@ class UserCreationSettings(CoreModel):
     expire_at: Timestamp | None = None
     traffic_limit_bytes: int = Field(default=0, ge=0, le=MAX_TRAFFIC_LIMIT_BYTES)
     traffic_limit_strategy: LimitStrategy = "no_reset"
-    device_limit: int | None = Field(default=None, ge=1, le=100)
+    device_limit: DeviceCap | None = None
 
 
 class ClientExtendRequest(CoreModel):
@@ -111,7 +112,7 @@ class ClientLimitChange(CoreModel):
     )
     traffic_reset: TrafficReset | None = Field(default=None, description="When used traffic starts again from zero.")
     expires_at: Timestamp | None = Field(default=None, description="UTC; null with the field set means never.")
-    device_limit: int | None = Field(default=None, ge=1, le=100, description="Explicit null uses the fleet default.")
+    device_limit: DeviceCap | None = Field(default=None, description="Null uses the fleet default; 0 means unlimited.")
     note: PrivateNote | None = Field(
         default=None, repr=False, description="Omitted keeps the private note; empty clears."
     )
@@ -183,11 +184,13 @@ def parse_device_limit(text: str) -> int | None:
     value = _normalized(text)
     if value == "default":
         return None
+    if value in {"0", "unlimited"}:
+        return 0
     if value.isascii() and value.isdigit() and len(value) <= 3 and 1 <= int(value) <= 100:
         return int(value)
     raise ClientLimitError(
         f"Device limit '{text}' is not between 1 and 100",
-        hint="Use --devices 1 to 100, or --devices default for the fleet's cap.",
+        hint="Use --devices 1 to 100, unlimited, or default for the fleet's cap.",
     )
 
 

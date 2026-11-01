@@ -4,7 +4,7 @@ Only `topology_intent.access.users` move: the panel's service users and anything
 an operator created by hand stay behind. Each import keeps the VLESS UUID (also
 the Hysteria2 password) and the short UUID (the subscription token), so every
 link keeps working, plus status, expiry, limit, reset strategy, and usage.
-Nothing IP- or device-based is imported.
+Device caps carry over; device registrations and addresses never do.
 """
 
 from __future__ import annotations
@@ -115,6 +115,7 @@ def _import(user: User, *, note: str, tag: str) -> UserImport:
             created_at=_timestamp(user.created_at),
             note=note,
             tag=tag,
+            device_limit=user.hwid_device_limit,
         )
     except ValueError as exc:
         raise MigrationError(
@@ -128,8 +129,6 @@ def _dropped(user: User) -> list[str]:
     dropped: list[str] = []
     if user.traffic_limit_strategy.upper() == "MONTH_ROLLING":
         dropped.append("monthly reset on the user's own day becomes the calendar month (1st, UTC)")
-    if user.hwid_device_limit is not None:
-        dropped.append(f"HWID device limit {user.hwid_device_limit}")
     for label, value in (
         ("email", user.email),
         ("Telegram ID", user.telegram_id),

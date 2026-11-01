@@ -5448,7 +5448,7 @@
             "anyOf": [
               {
                 "maximum": 100,
-                "minimum": 1,
+                "minimum": 0,
                 "type": "integer"
               },
               {
@@ -5618,9 +5618,9 @@
             "type": "string"
           },
           "limit": {
-            "description": "The person's cap, or the fleet default when none is set.",
+            "description": "The effective device cap; 0 means unlimited.",
             "maximum": 100,
-            "minimum": 1,
+            "minimum": 0,
             "title": "Limit",
             "type": "integer"
           },
@@ -5695,6 +5695,20 @@
             ],
             "default": null,
             "title": "Created At"
+          },
+          "device_limit": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Device Limit"
           },
           "expire_at": {
             "anyOf": [
@@ -5890,7 +5904,7 @@
             "anyOf": [
               {
                 "maximum": 100,
-                "minimum": 1,
+                "minimum": 0,
                 "type": "integer"
               },
               {
@@ -6037,7 +6051,7 @@
             "anyOf": [
               {
                 "maximum": 100,
-                "minimum": 1,
+                "minimum": 0,
                 "type": "integer"
               },
               {
@@ -6045,7 +6059,7 @@
               }
             ],
             "default": null,
-            "description": "None uses the fleet's default cap.",
+            "description": "Null uses the fleet's cap; 0 means unlimited.",
             "title": "Device Limit"
           },
           "expire_at": {
@@ -6370,7 +6384,7 @@
             "anyOf": [
               {
                 "maximum": 100,
-                "minimum": 1,
+                "minimum": 0,
                 "type": "integer"
               },
               {

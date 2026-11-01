@@ -142,9 +142,9 @@
       "type": "string"
     },
     "limit": {
-      "description": "The person's cap, or the fleet default when none is set.",
+      "description": "The effective device cap; 0 means unlimited.",
       "maximum": 100,
-      "minimum": 1,
+      "minimum": 0,
       "title": "Limit",
       "type": "integer"
     },
