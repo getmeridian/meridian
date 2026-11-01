@@ -54,7 +54,7 @@ API_TOKENS_TABLE_V4 = """CREATE TABLE IF NOT EXISTS api_tokens (
     revoked_at TEXT
 )"""
 # Keep step 4's table unchanged: older databases still pass through step 12's ALTER.
-API_TOKENS_TABLE = API_TOKENS_TABLE_V4.removesuffix("\n)") + ",\n    expires_at TEXT\n)"
+API_TOKENS_TABLE = API_TOKENS_TABLE_V4.removesuffix("\n)") + ",\n    expires_at TEXT,\n    capabilities TEXT\n)"
 _COLUMNS = "token_id, name, scope, token_sha256, created_at, last_used_at, revoked_at, expires_at"
 
 

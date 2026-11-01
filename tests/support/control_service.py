@@ -86,6 +86,15 @@ def drop_flow_blocks_schema(db: sqlite3.Connection) -> None:
     for column in ("agent_capabilities", "report_seen_at"):
         if column in columns:
             db.execute(f"ALTER TABLE nodes DROP COLUMN {column}")
+    drop_owner_capability_schema(db)
+
+
+def drop_owner_capability_schema(db: sqlite3.Connection) -> None:
+    """Rewind schema step 22 before replaying any earlier migration."""
+    for table in ("ui_passkeys", "ui_passkey_owner"):
+        db.execute(f"DROP TABLE IF EXISTS {table}")
+    if "capabilities" in {row[1] for row in db.execute("PRAGMA table_info(api_tokens)")}:
+        db.execute("ALTER TABLE api_tokens DROP COLUMN capabilities")
 
 
 def drop_operations_schema(db: sqlite3.Connection) -> None:

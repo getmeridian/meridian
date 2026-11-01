@@ -12,7 +12,7 @@ _RENDERER_MANIFEST = {
     "control-subscriptions": "account-schedules-v3",
     "control-commands": "cut-off-disclosures-v6",
     "pwa": "account-schedules-v3",
-    "control-service": "bulk-session-close-v22",
+    "control-service": "owner-auth-storage-v23",
     "control-api": "bulk-session-close-v22",
     "control-ui": "bulk-session-close-v21",
     "firewall": "ufw-comment-v2",
