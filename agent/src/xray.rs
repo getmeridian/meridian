@@ -24,6 +24,7 @@ use crate::compose::{self, UsersRef};
 use crate::fsutil::{self, host_path};
 use crate::model::{Hysteria2UsersSpec, Resource, Spec, XrayConfigSpec, XrayUsersSpec};
 use crate::state::LedgerEntry;
+use crate::xray_live_apply::LiveApply;
 use crate::{debug, info};
 
 /// Users of one inbound to change through the API.
@@ -300,43 +301,27 @@ impl Engine<'_> {
         }
 
         let live = self.live_plan(spec, resources, entries, current.as_deref(), &composed);
-        if live.is_some() {
-            let before = current
-                .as_ref()
-                .and_then(|bytes| serde_json::from_slice::<Value>(bytes).ok());
-            match self.guard_live_users(
-                &binary,
-                &spec.api_address,
-                &composed,
+        let live_done = if let Some(changes) = live {
+            let previous: Value =
+                serde_json::from_slice(current.as_ref().expect("live plan checked the file"))
+                    .map_err(|_| {
+                        Failure::new("validation_failed", "The previous Xray config is invalid.")
+                    })?;
+            self.apply_live_config(LiveApply {
+                spec,
                 resources,
-                before.as_ref(),
-            ) {
-                Err(failure) if !failure.can_apply_authentication => {
-                    let _ = fs::remove_file(&tmp);
-                    return Err(Failure::new("flow_guard_pending", failure.message));
-                }
-                Err(_) => {
-                    info!("revocation rules pending; applying authentication changes and retrying")
-                }
-                Ok(()) => {}
-            }
-        }
-
-        let live_done = match live {
-            Some(changes) => match self.apply_live(&binary, &spec.api_address, &changes) {
-                Ok(()) => true,
-                Err(message) => {
-                    info!("xray api: {message}; restarting xray instead");
-                    false
-                }
-            },
-            None => false,
-        };
-        if !live_done {
+                composed: &composed,
+                binary: &binary,
+                previous: &previous,
+                changes: &changes,
+                temporary: &tmp,
+            })?
+        } else {
             self.keep_previous(&dest);
-        }
-        fsutil::commit(&tmp, &dest, 0o600, None)
-            .map_err(|err| Failure::io(&err, "cannot install config"))?;
+            fsutil::commit(&tmp, &dest, 0o600, None)
+                .map_err(|err| Failure::io(&err, "cannot install config"))?;
+            false
+        };
         placed.extend(users.iter().map(|(u, _)| u.id().to_string()));
         if live_done {
             info!("changed xray users through the api; wrote {}", spec.path);
@@ -451,7 +436,12 @@ impl Engine<'_> {
     }
 
     /// Remove, then add, users through `xray api`; any shortfall is an error (the caller restarts).
-    fn apply_live(&self, binary: &str, api: &str, changes: &[LiveChange]) -> Result<(), String> {
+    pub(crate) fn apply_live(
+        &self,
+        binary: &str,
+        api: &str,
+        changes: &[LiveChange],
+    ) -> Result<(), String> {
         let server = format!("--server={api}");
         for change in changes {
             if let Some(inbound) = &change.rebuild {

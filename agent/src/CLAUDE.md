@@ -16,10 +16,10 @@
 - **Secrets stay out of logs and reports** — no token, key, service URL (`Client::scrub`), user UUID, or sensitive content; messages are trimmed.
 - **Atomic writes everywhere** — private temp sibling, fsync, mode and owner, rename, directory fsync (`fsutil::write_atomic`).
 ## Pitfalls
+- **Write live credentials before changing accounts** — a restart overlapping apply must load the new keys; verify the core invocation around the write and reconcile an uncertain instance.
 - **Every core command checks the applied document and exact config bytes** — restarts and reset fallbacks must not reload revoked credentials from stale core.json; failed preconditions are retryable.
-- **Re-enable clears live blocks before adding accounts** — use rule removal independently of rule installation, and keep the document pending if matching blocks remain.
 - **IPIfNonMatch needs an unmatched first pass** — an active-user catch-all suppresses DNS and bypasses private/country blocks and IP egress; install only revoked-identity blocks.
-- **Guard retries preserve earlier blocks** — save retry intent before removing authentication, and retry the complete graph with all revocations after a failed replacement.
+- **Guard retries preserve earlier blocks** — save intent before removing authentication, clear blocks for active identities before adding accounts, and retry the complete graph after a failed replacement.
 - **Removing a password leaves authenticated QUIC and mux sessions usable** — block new dispatched streams before `rmu`; existing TCP/UDP associations survive. VLESS's accepted flows also outlive an inbound reset, so its explicit cut-off must restart the core; Hysteria2's reset closes QUIC.
 - **Expiry gates only the start of a command** — keep results and executed IDs beyond the service's redelivery window, or clock rounding repeats an action.
 - **Serde unit variants ignore extra fields even with `deny_unknown_fields`** — use empty struct variants so signed extras are rejected.

@@ -21,6 +21,7 @@ struct CoreExec {
     host: FakeExec,
     root: PathBuf,
     process: Mutex<Option<Child>>,
+    restart_before_remove: Mutex<Option<(u16, u16)>>,
 }
 
 impl Drop for CoreExec {
@@ -39,6 +40,28 @@ impl Exec for CoreExec {
         args: &[&str],
         env: &[(&str, &str)],
     ) -> std::io::Result<CmdOutput> {
+        if args.first() == Some(&"api")
+            && args.get(1) == Some(&"rmu")
+            && let Some((client, target)) = self.restart_before_remove.lock().unwrap().take()
+        {
+            let config: Value =
+                serde_json::from_slice(&std::fs::read(self.root.join("etc/netagent/core.json"))?)
+                    .unwrap();
+            let can_authenticate = config["inbounds"][0]["settings"]["clients"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|user| user["email"].as_str() == args.get(4).copied());
+            self.run("systemctl", &["restart", "netcore.service"], &[])?;
+            if can_authenticate {
+                warm(client, target);
+            } else {
+                assert!(
+                    !probe(client, target),
+                    "a restart reintroduced the removed credential"
+                );
+            }
+        }
         if args.first() == Some(&"api")
             && args.get(1) == Some(&"adrules")
             && *self.host.routing_down.lock().unwrap()
@@ -148,6 +171,7 @@ fn removing_or_rotating_only_blocks_the_old_identitys_new_streams() {
         host: FakeExec::default(),
         root: get("root").into(),
         process: Mutex::new(None),
+        restart_before_remove: Mutex::new(None),
     };
     let engine = Engine {
         root: get("root").into(),
@@ -205,6 +229,20 @@ fn removing_or_rotating_only_blocks_the_old_identitys_new_streams() {
     let mut transfer_b = socks(port("client_b"), target).unwrap();
     assert!(exchange(&mut transfer_a) && exchange(&mut transfer_b));
     exec.host.clear();
+    let concurrent_restart = fixture["concurrent_restart"].as_bool().unwrap_or(false);
+    let old_client = if concurrent_restart {
+        port("client_fresh")
+    } else {
+        port("client_a")
+    };
+    if concurrent_restart {
+        *exec.restart_before_remove.lock().unwrap() = Some((old_client, target));
+    }
+    let active_client = if concurrent_restart {
+        port("client_fresh_b")
+    } else {
+        port("client_b")
+    };
     let guard_failure = fixture["guard_failure"].as_bool().unwrap_or(false);
     *exec.host.routing_down.lock().unwrap() = guard_failure;
     let mut changed = engine.apply(
@@ -219,14 +257,14 @@ fn removing_or_rotating_only_blocks_the_old_identitys_new_streams() {
     );
     if guard_failure {
         assert!(
-            probe(port("client_b"), target),
+            probe(active_client, target),
             "a failed install blocked an active person"
         );
         if fixture["rotation"].as_bool().unwrap() {
             warm(port("client_new"), target);
         }
         assert!(
-            probe(port("client_a"), target),
+            probe(old_client, target),
             "the failed install must remain pending"
         );
         *exec.host.routing_down.lock().unwrap() = false;
@@ -243,40 +281,44 @@ fn removing_or_rotating_only_blocks_the_old_identitys_new_streams() {
     }
     observations = changed.observations;
     assert!(
-        !probe(port("client_a"), target),
+        !probe(old_client, target),
         "revoked identity opened another stream on its live session"
     );
     assert!(
-        probe(port("client_b"), target),
+        probe(active_client, target),
         "another person's new stream was blocked"
     );
-    assert!(
-        exchange(&mut transfer_a),
-        "the documented in-flight transfer boundary changed"
-    );
-    assert!(
-        exchange(&mut transfer_b),
-        "another person's transfer was interrupted"
-    );
-    assert!(
-        exec.host
-            .calls()
-            .iter()
-            .all(|call| !call.contains(" api rmi ") && !call.contains("systemctl restart"))
-    );
+    if !concurrent_restart {
+        assert!(
+            exchange(&mut transfer_a),
+            "the documented in-flight transfer boundary changed"
+        );
+        assert!(
+            exchange(&mut transfer_b),
+            "another person's transfer was interrupted"
+        );
+        assert!(
+            exec.host
+                .calls()
+                .iter()
+                .all(|call| !call.contains(" api rmi ") && !call.contains("systemctl restart"))
+        );
+    }
     if fixture["rotation"].as_bool().unwrap() {
         warm(port("client_new"), target);
     }
 
     // Retry intent repairs missing runtime blocks while the same core still
     // holds authenticated sessions; rules never travel through core.json.
-    assert!(
-        RealExec
-            .run(binary, &["api", "adrules", &api, get("base_routing")], &[])
-            .unwrap()
-            .success
-    );
-    assert!(probe(port("client_a"), target));
+    if !concurrent_restart {
+        assert!(
+            RealExec
+                .run(binary, &["api", "adrules", &api, get("base_routing")], &[])
+                .unwrap()
+                .success
+        );
+        assert!(probe(old_client, target));
+    }
     let repaired = engine.apply(
         &parse(&after),
         &mut ledger,
@@ -287,8 +329,11 @@ fn removing_or_rotating_only_blocks_the_old_identitys_new_streams() {
         repaired.converged && repaired.flow_error.is_none(),
         "{repaired:?}"
     );
-    assert!(!probe(port("client_a"), target));
-    assert!(probe(port("client_b"), target) && exchange(&mut transfer_b));
+    assert!(!probe(old_client, target));
+    assert!(probe(active_client, target));
+    if !concurrent_restart {
+        assert!(exchange(&mut transfer_b));
+    }
     if !fixture["rotation"].as_bool().unwrap() {
         *exec.host.routing_down.lock().unwrap() = true;
         let restored = engine.apply(
@@ -301,8 +346,10 @@ fn removing_or_rotating_only_blocks_the_old_identitys_new_streams() {
             restored.converged && restored.flow_error.is_none(),
             "{restored:?}"
         );
-        warm(port("client_a"), target);
-        assert!(exchange(&mut transfer_b));
+        warm(old_client, target);
+        if !concurrent_restart {
+            assert!(exchange(&mut transfer_b));
+        }
         *exec.host.routing_down.lock().unwrap() = false;
     }
     // The retained explicit reset is the all-sessions path, including in-flight
@@ -340,7 +387,9 @@ fn removing_or_rotating_only_blocks_the_old_identitys_new_streams() {
                 .unwrap()
                 .success
         );
-        assert!(exchange(&mut transfer_a) && exchange(&mut transfer_b));
+        if !concurrent_restart {
+            assert!(exchange(&mut transfer_a) && exchange(&mut transfer_b));
+        }
         assert!(
             exec.run("systemctl", &["restart", "netcore.service"], &[])
                 .unwrap()
@@ -350,7 +399,7 @@ fn removing_or_rotating_only_blocks_the_old_identitys_new_streams() {
             !exchange(&mut transfer_a) && !exchange(&mut transfer_b),
             "core restart left an in-flight transfer alive"
         );
-        warm(port("client_b"), target);
+        warm(active_client, target);
     }
 }
 
@@ -409,6 +458,7 @@ fn active_domains_keep_the_dns_routing_pass_after_revocation() {
         host: FakeExec::default(),
         root: get("root").into(),
         process: Mutex::new(None),
+        restart_before_remove: Mutex::new(None),
     };
     let engine = Engine {
         root: get("root").into(),

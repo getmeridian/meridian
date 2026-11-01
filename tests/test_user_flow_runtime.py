@@ -120,15 +120,15 @@ def start(stack, binary, config, tmp_path, name):
 
 @pytest.mark.parametrize("protocol", ["hysteria2", "vless-mux"])
 @pytest.mark.parametrize(
-    "rotation,guard_failure",
-    [(False, False), (True, False), (True, True)],
-    ids=["remove", "rotate", "failed-guard-rotation"],
+    "rotation,guard_failure,concurrent_restart",
+    [(False, False, False), (True, False, False), (True, True, False), (False, False, True)],
+    ids=["remove", "rotate", "failed-guard-rotation", "concurrent-restart"],
 )
 def test_live_sessions_lose_only_the_revoked_identitys_new_streams(
-    xray_binary, runtime_driver, tmp_path, protocol, rotation, guard_failure
+    xray_binary, runtime_driver, tmp_path, protocol, rotation, guard_failure, concurrent_restart
 ):
     api, inbound_port = port(), port(socket.SOCK_DGRAM if protocol == "hysteria2" else socket.SOCK_STREAM)
-    client_ports = [port() for _ in range(3)]
+    client_ports = [port() for _ in range(5)]
     tag = "hy2" if protocol == "hysteria2" else "vless"
     identities = [("u-a", UUID_A), ("u-b", UUID_B)]
     inbound = {
@@ -240,7 +240,7 @@ def test_live_sessions_lose_only_the_revoked_identitys_new_streams(
         threading.Thread(target=target.serve_forever, daemon=True).start()
         stack.callback(target.shutdown)
         processes = []
-        for index, credential in enumerate([UUID_A, UUID_B, UUID_NEW]):
+        for index, credential in enumerate([UUID_A, UUID_B, UUID_NEW, UUID_A, UUID_B]):
             outbound = {
                 "protocol": "vless",
                 "settings": {
@@ -307,8 +307,11 @@ def test_live_sessions_lose_only_the_revoked_identitys_new_streams(
                     "client_a": client_ports[0],
                     "client_b": client_ports[1],
                     "client_new": client_ports[2],
+                    "client_fresh": client_ports[3],
+                    "client_fresh_b": client_ports[4],
                     "rotation": rotation,
                     "guard_failure": guard_failure,
+                    "concurrent_restart": concurrent_restart,
                 }
             )
         )

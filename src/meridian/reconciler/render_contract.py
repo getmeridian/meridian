@@ -7,7 +7,7 @@ from meridian.compiler.models import COMPILER_VERSION, canonical_hash
 _RENDERER_MANIFEST = {
     "schema": "meridian.renderer-contract/v1",
     "compiler": COMPILER_VERSION,
-    "agent-runtime": "core-command-preflight-v8",
+    "agent-runtime": "concurrent-core-revocations-v9",
     "agent-spec": "routing-service-v2",
     "control-subscriptions": "account-schedules-v3",
     "control-commands": "core-command-preflight-v5",
