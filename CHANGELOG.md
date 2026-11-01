@@ -32,6 +32,7 @@ newest first; the last is what 4.0 changes compared with 3.x.
   the fleet default. Remnawave migration keeps device caps, including zero.
 
 #### Fixed
+- Client-list JSON preserves integer facet counts for secret-shaped tags such as TOKEN and API_KEY.
 - Bulk undo emits the same lifecycle events as commit and refuses an over-capacity managed inbound without changing people or the receipt.
 - Bulk reviews compare enforced account states, refuse named stale targets even for deletion, preserve due refills, and count no-op actions as unchanged.
 - **The People screen filters by status, tag, upcoming expiry, quota share, never-used accounts, and attention**, with facet counts and sorting by name, usage, expiry, or last activity. The fragment retains the view across reloads, and searching keeps existing rows and focus (#95).

@@ -203,7 +203,8 @@ def _is_safe_metadata_key(key: str, value: Any) -> bool:
 def redact(value: Any, *, reveal: frozenset[str] = frozenset()) -> Any:
     """Return a JSON-safe structure with obvious secrets removed.
 
-    String values under a key or exact dotted JSON path in ``reveal`` are kept verbatim.
+    String values at a key or exact dotted path in ``reveal`` are kept verbatim.
+    Non-string scalar metadata beneath a revealed path also keeps its type.
     """
     return _redact(value, reveal, "")
 
@@ -224,10 +225,14 @@ def _redact(value: Any, reveal: frozenset[str], path: str) -> Any:
         return value.value
     if isinstance(value, dict):
         redacted: dict[str, Any] = {}
+        revealed_metadata = any(path == branch or path.startswith(branch + ".") for branch in reveal)
         for key, item in value.items():
             key_str = str(key)
             item_path = _child_path(path, key_str)
-            if (key_str in reveal or item_path in reveal) and isinstance(item, str):
+            revealed = key_str in reveal or item_path in reveal
+            if (revealed and isinstance(item, str)) or (
+                (item is None or isinstance(item, bool | int | float)) and (revealed or revealed_metadata)
+            ):
                 redacted[key_str] = item
             elif key_str == "properties" and isinstance(item, dict) and _is_json_schema_property_map(item):
                 redacted[key_str] = {

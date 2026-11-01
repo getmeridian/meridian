@@ -256,7 +256,7 @@ def _list(*, operation: OperationContext, query: PeopleQuery) -> None:
                 ),
                 timer=operation.timer,
             ),
-            reveal=client_metadata_paths(result.clients.clients) | {"data.facets.tag"},
+            reveal=client_metadata_paths(result.clients.clients) | {"data.facets"},
         )
         return
 

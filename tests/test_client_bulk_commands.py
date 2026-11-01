@@ -97,3 +97,25 @@ def test_invalid_bulk_action_parameters_are_refused_before_opening_the_service()
         result = CliRunner().invoke(app, ["client", "bulk", "extend", "--days", "0", "--yes", "--json"])
     assert result.exit_code == 2
     load.assert_not_called()
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_client_list_json_keeps_secret_shaped_tag_counts_as_integers(tmp_path, tmp_home, locale):
+    from meridian.core.schema import schema_model
+
+    tags = ["TOKEN", "SECRET", "PASSWORD", "PASSWD", "JWT", "URI", "API_KEY", "VIP_TOKEN"]
+    with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN, report_mutations=False) as admin:
+        for index, tag in enumerate(tags):
+            username = f"sample-tag-{index}"
+            admin.put_user(username)
+            admin.update_user(username, UserUpdate(tag=tag))
+        cluster = ClusterConfig(
+            panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, server_ip="198.51.100.1"),
+            topology_intent=single_exit_intent(users=["topology-person"]),
+        )
+        with patch("meridian.commands.client.load_topology_cluster", return_value=cluster):
+            result = CliRunner().invoke(app, ["--lang", locale, "client", "list", "--limit", "2", "--json"])
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.stdout)
+        assert all(payload["data"]["facets"]["tag"][tag] == 1 for tag in tags)
+        schema_model("client-list-envelope").model_validate(payload)

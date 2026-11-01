@@ -12,7 +12,7 @@ _RENDERER_MANIFEST = {
     "control-subscriptions": "account-schedules-v3",
     "control-commands": "node-restart-console-v3",
     "pwa": "account-schedules-v3",
-    "control-service": "reviewed-people-bulk-v3",
+    "control-service": "reviewed-people-bulk-v4",
     "control-api": "reviewed-people-bulk-v3",
     "control-ui": "people-query-bulk-v1",
     "firewall": "ufw-comment-v2",
