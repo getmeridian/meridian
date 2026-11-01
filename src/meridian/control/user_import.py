@@ -70,6 +70,9 @@ def import_users(
                     "renewal_anchor_at": item.renewal_anchor_at
                     or (item.expire_at if item.renewal_enabled and item.renewals_completed == 0 else None),
                     "lifetime_traffic_bytes": counted + carried,
+                    # A replacing import keeps the first use the service already counted.
+                    "first_traffic_at": item.first_traffic_at
+                    or (existing.first_traffic_at if existing is not None else None),
                 }
             )
             validate_user_schedule(record, moment)

@@ -25,7 +25,8 @@ from meridian.commands.client_handoff import (
     resolve_client_name,
     validate_client_name,
 )
-from meridian.commands.client_limits import format_expiry, parse_limit_options, print_client_usage
+from meridian.commands.client_limits import parse_limit_options, print_client_usage
+from meridian.commands.client_schedule import account_expiry
 from meridian.commands.client_usage import print_usage
 from meridian.commands.client_v4 import run_add_v4, run_remove_v4
 from meridian.console import confirm, err_console, error_context, fail, is_json_mode, ok, warn
@@ -270,7 +271,7 @@ def _list(*, operation: OperationContext, attention: bool = False, tag: str | No
             escape(client.tag or "-"),
             format_status(client.status),
             format_traffic(client.traffic_used_bytes, client.traffic_limit_bytes),
-            escape(format_expiry(client.expires_at) if client.expires_at else "-"),
+            escape(account_expiry(client) if client.expires_at or client.activation_duration_days is not None else "-"),
             escape(client.last_seen or "-"),
         ]
         if attention:

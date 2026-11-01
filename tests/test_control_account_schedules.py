@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from meridian.control.errors import ServiceError
 from meridian.control.models import UserCreate, UserImport, UserImportBatch, UserUpdate
 from meridian.control.service import ControlService
 from meridian.core.agent_protocol import StatsReport, UserTraffic
@@ -327,3 +328,77 @@ def test_replacing_an_import_keeps_the_language_the_source_does_not_own(schedule
     service.update_user("example", UserUpdate(language="ru"))
     service.import_users(UserImportBatch(users=[item], replace=True))
     assert service.get_user("example").language == "ru"
+
+
+def test_a_renewal_cap_needs_an_interval_and_clearing_the_interval_clears_the_cap(scheduled) -> None:
+    service, _clock = scheduled
+    service.create_user(UserCreate(username="example", expire_at="2027-03-01T00:00:00Z"))
+    with pytest.raises(ServiceError, match="renewal cap needs"):
+        service.update_user("example", UserUpdate(renewal_limit=3))
+    service.update_user("example", UserUpdate(renewal_interval_days=7, renewal_limit=3))
+    person = service.update_user("example", UserUpdate(renewal_interval_days=None))
+    assert (person.renewal_interval_days, person.renewal_limit) == (None, None)
+
+
+def test_a_first_use_duration_that_could_cross_2099_is_refused_before_traffic_arrives(scheduled) -> None:
+    service, clock = scheduled
+    clock[0] = "2090-06-01T00:00:00Z"
+    with pytest.raises(ServiceError, match="before 2099"):
+        service.create_user(UserCreate(username="example", activation_duration_days=3650))
+
+
+def test_a_renewal_that_could_never_happen_before_2099_is_refused(scheduled) -> None:
+    service, clock = scheduled
+    clock[0] = "2090-06-01T00:00:00Z"
+    with pytest.raises(ServiceError, match="before 2099"):
+        service.create_user(
+            UserCreate(
+                username="example",
+                expire_at="2095-06-01T00:00:00Z",
+                renewal_interval_months=60,
+                renewal_limit=2,
+            )
+        )
+
+
+def test_an_import_whose_renewal_start_disagrees_with_its_expiry_is_refused(scheduled) -> None:
+    service, _clock = scheduled
+    item = UserImport(
+        username="example",
+        uuid="3f2a9c4e-7b1d-4e6a-9c2f-1a2b3c4d5e6f",
+        sub_token="exampleToken0001",
+        expire_at="2027-03-31T00:00:00Z",
+        renewal_interval_months=1,
+        renewals_completed=2,
+        renewal_anchor_at="2026-11-30T00:00:00Z",
+    )
+    with pytest.raises(ServiceError, match="do not agree"):
+        service.import_users(UserImportBatch(users=[item]))
+    assert service.get_user("example") is None
+
+
+def test_the_usage_header_names_the_renewed_expiry_before_enforcement_catches_up(scheduled) -> None:
+    service, clock = scheduled
+    person = service.create_user(
+        UserCreate(username="example", expire_at="2027-02-07T12:00:00Z", renewal_interval_days=7)
+    )
+    clock[0] = "2027-02-08T12:00:00Z"
+    renewed = int(datetime.fromisoformat("2027-02-14T12:00:00Z").timestamp())
+    headers = service.subscription(person.sub_token).headers
+    assert f"expire={renewed}" in headers["subscription-userinfo"]
+    assert headers["subscription-refill-date"] == str(renewed)
+
+
+def test_a_replacing_import_keeps_the_first_use_the_service_already_counted(scheduled) -> None:
+    service, clock = scheduled
+    item = UserImport(
+        username="example",
+        uuid="3f2a9c4e-7b1d-4e6a-9c2f-1a2b3c4d5e6f",
+        sub_token="exampleToken0001",
+        activation_duration_days=30,
+    )
+    service.import_users(UserImportBatch(users=[item]))
+    count(service, clock, 5)
+    first_use = service.get_user("example").first_traffic_at
+    service.import_users(UserImportBatch(users=[item], replace=True))
+    assert service.get_user("example").first_traffic_at == first_use

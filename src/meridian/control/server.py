@@ -713,6 +713,7 @@ def serve(config_path: Path) -> None:
 
 
 def _enforce_forever(service: ControlService, stop: threading.Event) -> None:
-    """Expire users on time even when nothing else changes."""
+    """Expire users on time even when nothing else changes, starting with renewals missed while stopped."""
+    service.background.enforcement.run(service.enforce)
     while not stop.wait(ENFORCE_INTERVAL_SECONDS):
         service.background.enforcement.run(service.enforce)

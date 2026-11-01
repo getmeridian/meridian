@@ -136,8 +136,9 @@ def activation_expiry(source: ScheduleSource) -> datetime | None:
     duration = source.activation_duration_days
     if expiry is None and duration is not None and source.first_traffic_at is not None:
         expiry = datetime.fromisoformat(source.first_traffic_at).astimezone(UTC) + timedelta(days=duration)
-        if expiry.year >= FINITE_EXPIRY_YEAR:
-            raise ValueError(f"Expiry must be before {FINITE_EXPIRY_YEAR}.")
+        # Writes refuse durations that would cross the finite range; a late first use clamps
+        # instead of raising, so reading an account can never fail.
+        expiry = min(expiry, datetime(FINITE_EXPIRY_YEAR, 1, 1, tzinfo=UTC) - timedelta(seconds=1))
     return expiry
 
 
@@ -162,7 +163,7 @@ def calculate_schedule(source: ScheduleSource, now: datetime) -> AccountSchedule
         due = min(due, max(0, _last_supported_renewal(source, anchor) - completed))
         completed += due
         if due:
-            expiry = _renewed_expiry(source, anchor, completed)
+            expiry = renewed_expiry(source, anchor, completed)
         if left is not None:
             left -= due
         if (left is None or left > 0) and completed < _last_supported_renewal(source, anchor):
@@ -183,7 +184,7 @@ def calculate_schedule(source: ScheduleSource, now: datetime) -> AccountSchedule
     )
 
 
-def _renewed_expiry(source: ScheduleSource, anchor: datetime, index: int) -> datetime:
+def renewed_expiry(source: ScheduleSource, anchor: datetime, index: int) -> datetime:
     if source.renewal_interval_days is not None:
         return anchor + timedelta(days=source.renewal_interval_days * index)
     assert source.renewal_interval_months is not None
@@ -207,6 +208,6 @@ def _renewals_due(source: ScheduleSource, anchor: datetime, expiry: datetime, no
     assert source.renewal_interval_months is not None
     elapsed = (now.year - anchor.year) * 12 + now.month - anchor.month
     index = max(0, elapsed // source.renewal_interval_months)
-    if _renewed_expiry(source, anchor, index) > now:
+    if renewed_expiry(source, anchor, index) > now:
         index -= 1
     return max(0, index - source.renewals_completed + 1)

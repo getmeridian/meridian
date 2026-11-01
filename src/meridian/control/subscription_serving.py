@@ -80,6 +80,11 @@ def serve_subscription(
     )
 
 
+def effective_expiry(record: UserRecord) -> str | None:
+    """The expiry delivery shows: the calculated one once a schedule exists, else the stored one."""
+    return record.schedule.expire_at if record.schedule is not None else record.expire_at
+
+
 def subscription_user(record: UserRecord, language: FleetLanguage) -> SubscriptionUser:
     """One account projection for live delivery and preview; no private metadata travels."""
     return SubscriptionUser(
@@ -87,7 +92,9 @@ def subscription_user(record: UserRecord, language: FleetLanguage) -> Subscripti
         uuid=record.uuid,
         short_id=record.sub_token,
         status=record.status,
-        expires_at=datetime.fromisoformat(record.expire_at) if record.expire_at else None,
+        # The calculated expiry: a renewal due before the next enforcement tick (or a first use)
+        # must not send an old expire= beside the new refill date.
+        expires_at=datetime.fromisoformat(expiry) if (expiry := effective_expiry(record)) else None,
         used_bytes=record.used_traffic_bytes,
         period_traffic=record.period_traffic,
         limit_bytes=record.traffic_limit_bytes,

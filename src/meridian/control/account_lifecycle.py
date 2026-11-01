@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.errors import ServiceError
@@ -13,10 +13,12 @@ from meridian.control.store import Store
 from meridian.control.user_expiry import require_finite_user_expiry
 from meridian.control.user_policy import enforced_status
 from meridian.core.account_schedule import (
+    FINITE_EXPIRY_YEAR,
     AccountSchedulePreview,
     activation_expiry,
     calculate_schedule,
     period_start,
+    renewed_expiry,
     timestamp,
 )
 
@@ -31,14 +33,29 @@ def validate_user_schedule(user: UserRecord, now: str) -> AccountSchedulePreview
     if user.activation_duration_days is not None and user.expire_at is None:
         if user.first_traffic_at is None and user.lifetime_traffic_bytes > 0:
             raise ServiceError("invalid_request", "First use is unknown for this account. Set a fixed expiry.", 400)
+    if user.renewal_limit is not None and not user.renewal_enabled:
+        raise ServiceError("invalid_request", "A renewal cap needs an automatic renewal interval.", 400)
     if user.renewals_completed and user.renewal_anchor_at is None:
         raise ServiceError("invalid_request", "Renewal progress needs the original renewal expiry.", 400)
+    moment = datetime.fromisoformat(now)
+    too_late = ServiceError("invalid_request", "The schedule must end before 2099. Use a shorter interval.", 400)
+    if user.activation_duration_days is not None and user.expire_at is None and user.first_traffic_at is None:
+        # Checked now, so the first byte of traffic can never activate an expiry past the finite range.
+        if (moment.astimezone(UTC) + timedelta(days=user.activation_duration_days)).year >= FINITE_EXPIRY_YEAR:
+            raise too_late
+    if user.renewal_enabled and user.renewal_anchor_at is not None and user.expire_at is not None:
+        anchor = datetime.fromisoformat(user.renewal_anchor_at)
+        if renewed_expiry(user, anchor, user.renewals_completed) != datetime.fromisoformat(user.expire_at):
+            raise ServiceError(
+                "invalid_request", "The renewal start, expiry, and renewals completed do not agree.", 400
+            )
     try:
-        return calculate_schedule(user, datetime.fromisoformat(now))
+        preview = calculate_schedule(user, moment)
     except (ValueError, OverflowError) as exc:
-        raise ServiceError(
-            "invalid_request", "The schedule must end before 2099. Use a shorter interval.", 400
-        ) from exc
+        raise too_late from exc
+    if preview.renewal_enabled and preview.expire_at and preview.next_renewal_at is None and preview.renewals_left != 0:
+        raise too_late
+    return preview
 
 
 def merge_user_update(user: UserRecord, update: UserUpdate, now: str) -> UserRecord:
@@ -72,6 +89,8 @@ def merge_user_update(user: UserRecord, update: UserUpdate, now: str) -> UserRec
             for field in ("renewal_interval_days", "renewal_interval_months")
         )
         changes["renewal_anchor_at"] = changes.get("expire_at", user.expire_at) if enabled else None
+        if not enabled:
+            changes["renewal_limit"] = None
     merged = UserRecord.model_validate({**user.model_dump(), **changes})
     validate_user_schedule(merged, now)
     return merged

@@ -31,6 +31,8 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - **Schedules share directional baselines** — renewal and rolling resets clear both directions and carried period use; imports initialize the same projection before enforcement, preserving lifetime totals.
 - **First use means accepted traffic** — subscription and page reads never activate; renewal progress, period offsets, and effective status change in the traffic transaction before new growth.
 - **Renewal anchors survive short months** — expiry or interval edits start a new series, cap edits keep progress, and missed renewals consume the cap with one period reset.
+- **Every write checks the whole schedule** — the renewal start, expiry, and count must agree, a cap needs an interval, and durations or renewals that would cross 2099 are refused at write time; an imported mismatched start once moved expiry backwards on renewal.
+- **Delivery reads the calculated expiry** (`effective_expiry()`) — the stored one lags a due renewal until enforcement runs, which once sent an old `expire=` beside the new refill date.
 - **Classify every route in the catalog** — internal routes need a reason, and credential markers must cover conditionally visible people records, endpoint passwords, and snapshots.
 - **Decode the path before routing** — `ControlClient` percent-encodes IDs, so an undecoded `%3A` made every endpoint PUT 404.
 - **Answer like nginx everywhere** — `HEAD` as `GET`, nginx's error pages, the unknown-subscription answer for any miss under `/sub/`, and small bodies before authentication; anything else names the backend to a scanner.
