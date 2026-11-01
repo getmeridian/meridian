@@ -2,7 +2,7 @@
 ## Design decisions
 **Secret-free draft** — `setup.json` stores only validated server refs, topology choices, stage progress, and reviewed/applied hashes, replaced atomically (0600) at every stage boundary; passwords, keys, and tokens use one-time runtime channels.
 **Server shelf IDs** — names and IPs resolve to immutable `srv-*` profile IDs before entering the draft.
-**Reviewed runtime** — setup hashes resolved targets and runtime pins, persists intent before mutation, and verifies delivered subscriptions before handoff.
+**Reviewed runtime** — setup hashes resolved targets and runtime pins, persists intent before mutation, and before handoff verifies delivered subscriptions and each XHTTP/WSS endpoint's certificate as its clients will (subscriptions alone passed while every TLS client was refused).
 **Retirement-bound review** — `SetupReview.review_hash` binds the plan hash to the exact retirement set and the SSH targets of every server it touches, including removed ones; the plan hash alone stays the generation identity.
 **Default paths are invisible-first** — `default_exit_paths()` is the one builder for deploy, `node add`, and the wizard: Reality always, XHTTP and Hysteria2 on the domain or the IPv4 address, WebSocket only with a domain. Redeploys keep saved SNI, fingerprint, and paths.
 **Attested control-service bootstrap** — `control_service.py` installs the service behind the control server's nginx and saves its URL and admin token in `cluster.panel`, so links keep their shape; readiness attests only the bootstrap's own inputs, so editing another server never re-runs it.

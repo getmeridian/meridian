@@ -240,6 +240,35 @@ def test_control_service_readiness_requires_a_current_certificate_for_its_name(
     assert bool(pings) is pinged
 
 
+def test_setup_verification_validates_each_published_tls_endpoint_once(monkeypatch) -> None:
+    """Valid subscriptions once hid a certificate every XHTTP client refused (#110)."""
+    from meridian.compiler.models import DeploymentContract, DeploymentTarget
+    from meridian.setup import control_service
+
+    contract = DeploymentContract(
+        server_targets={"srv-a": DeploymentTarget(host=ADDRESS, user="root", port=22)},
+        runtime_pins={"remnawave_node_image": "remnawave/node:3.4.2"},
+        renderer_contract="test-v1",
+    )
+    plan = compile_topology(_domain_intent()).model_copy(update={"deployment_contract": contract})
+    dialed: list[tuple[str, str, int]] = []
+    verdicts = {DOMAIN: "certificate verify failed: IP address mismatch"}
+
+    def validate(ip: str, name: str, *, port: int, timeout: float) -> str | None:
+        dialed.append((ip, name, port))
+        return verdicts.get(name, "")
+
+    monkeypatch.setattr(control_service, "certificate_validation_error", validate)
+
+    errors = control_service.endpoint_certificate_errors(plan)
+
+    # XHTTP and WSS share the domain and port: one handshake, dialing the server, not a CDN.
+    assert dialed == [(ADDRESS, DOMAIN, 443)]
+    assert len(errors) == 1 and f"({DOMAIN}): certificate verify failed" in errors[0]
+    verdicts[DOMAIN] = None  # unavailable evidence is never a failure
+    assert control_service.endpoint_certificate_errors(plan) == []
+
+
 def test_control_bootstrap_refuses_before_provisioning_without_an_agent_build(tmp_home, monkeypatch) -> None:
     """A wheel install carries no agent: finding out at the first agent left a service with no nodes."""
     from meridian.cluster import ClusterConfig

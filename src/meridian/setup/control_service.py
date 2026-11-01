@@ -17,6 +17,7 @@ from collections.abc import Callable, Mapping
 from meridian.cluster import ClusterConfig
 from meridian.compiler.models import (
     AgentRuntimePayload,
+    ClientEndpointPayload,
     ControlServicePayload,
     ControlUserPayload,
     NodeWorkloadPayload,
@@ -33,6 +34,7 @@ from meridian.core.defaults import DEFAULT_SNI
 from meridian.core.errors import ProvisioningError
 from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
+from meridian.diagnostics.network import certificate_validation_error
 from meridian.host_runtime import CONTROL_SERVICE_STATE_DIR
 from meridian.provision.ensure import ensure_file_content
 from meridian.provision.tls import certificate_inspection_command, certificate_names_host
@@ -277,7 +279,41 @@ def verify_control_service(plan: ResourcePlan, cluster: ClusterConfig) -> tuple[
             if not xray_subscription_is_valid(_Document(urls.get(item.payload.username, "sub"), document)):
                 raise ResourceReconcileError(f"Canonical subscription for {item.payload.username!r} is invalid.")
             urls[item.payload.username] = cluster.panel.subscription_url(user.sub_token)
+    invalid = endpoint_certificate_errors(plan)
+    if invalid:
+        raise ResourceReconcileError(
+            "A published endpoint serves a certificate clients will refuse: " + "; ".join(invalid),
+            hint="Run `meridian apply` to reinstall it, then `meridian test` to check every endpoint.",
+        )
     return version, len(nodes), urls
+
+
+def endpoint_certificate_errors(plan: ResourcePlan) -> list[str]:
+    """Validate each published XHTTP/WebSocket endpoint's certificate as its clients will.
+
+    Subscriptions could all be valid while a swapped certificate refused every TLS client
+    (#110). Each server is dialed directly with the endpoint's SNI (none for an IP), so a
+    CDN-fronted name checks the origin's own certificate. Unavailable evidence is skipped.
+    """
+    targets = plan.deployment_contract.server_targets
+    checked: set[tuple[str, str, int]] = set()
+    errors: list[str] = []
+    for item in plan.resources:
+        endpoint = item.payload
+        if not isinstance(endpoint, ClientEndpointPayload) or endpoint.protocol not in {"xhttp", "wss"}:
+            continue
+        target = targets.get(endpoint.address_server_ref)
+        if target is None:
+            continue
+        identity = endpoint.sni or target.host
+        key = (target.host, identity, endpoint.public_port)
+        if key in checked:
+            continue
+        checked.add(key)
+        error = certificate_validation_error(target.host, identity, port=endpoint.public_port, timeout=10)
+        if error:
+            errors.append(f"{endpoint.remark} ({identity}): {error}")
+    return errors
 
 
 class _Document:
