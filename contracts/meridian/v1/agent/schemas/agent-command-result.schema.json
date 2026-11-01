@@ -15,6 +15,11 @@
             "reload_failed",
             "service_failed",
             "xray_api_failed",
+            "flow_guard_pending",
+            "apply_pending",
+            "document_not_applied",
+            "config_not_installed",
+            "config_mismatch",
             "rolled_back",
             "timeout",
             "unsupported",
@@ -30,7 +35,7 @@
           "type": "string"
         },
         "retryable": {
-          "description": "True when the agent will retry on its own.",
+          "description": "True when retrying after the stated condition can succeed; resources retry automatically, while commands require a new ID.",
           "title": "Retryable",
           "type": "boolean"
         }
@@ -67,7 +72,7 @@
         }
       ],
       "default": null,
-      "description": "For a successful reset_inbound: whether the inbound API reset or a fallback core restart ended its sessions. Null for other outcomes. Sent only by sessions negotiating command kinds.",
+      "description": "For a successful reset_inbound: inbound_reset or core_restart. Null for other wire results. Admin records also mark a succeeded revision-gated core restart as core_restart. Sent only by sessions negotiating command kinds.",
       "title": "Effect"
     },
     "error": {

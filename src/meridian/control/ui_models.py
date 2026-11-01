@@ -9,6 +9,7 @@ from pydantic import Field
 from meridian.control.models import NodeRuntime
 from meridian.core.agent_types import OpaqueToken
 from meridian.core.attention import ServerAttention
+from meridian.core.client_sessions import UserFlowBlocks
 from meridian.core.clients import ClientConnection, SubscriptionFormatUrl
 from meridian.core.models import CoreModel
 from meridian.core.server_allowances import ServerUsage
@@ -127,3 +128,4 @@ class ShareView(CoreModel):
     profile_title: str = ""
     connections: list[ClientConnection] = Field(default_factory=list)
     formats: list[SubscriptionFormatUrl] = Field(default_factory=list)
+    flow_blocks: UserFlowBlocks | None = None

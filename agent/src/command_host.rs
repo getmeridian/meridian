@@ -2,9 +2,8 @@
 
 use crate::apply::{Engine, Failure};
 use crate::commands::CommandEffect;
-use crate::compose::{self, UsersRef};
 use crate::fsutil;
-use crate::model::{Resource, Spec, check_loopback, check_tag};
+use crate::model::{Resource, Spec, check_tag};
 use crate::xray_health::{self, CORE_UNIT};
 
 impl Engine<'_> {
@@ -46,6 +45,9 @@ impl Engine<'_> {
                 "The managed unit file differs from the held document; reconcile first.",
             ));
         }
+        if spec.name == CORE_UNIT {
+            self.command_core_configuration(resources)?;
+        }
         self.start_and_check(spec, resources, "restart")
             .map_err(|_| {
                 Failure::new(
@@ -62,25 +64,6 @@ impl Engine<'_> {
     ) -> Result<CommandEffect, Failure> {
         let invalid = |message: &str| Failure::new("validation_failed", message);
         check_tag(tag).map_err(|_| invalid("The inbound tag is invalid."))?;
-        let config = resources
-            .iter()
-            .find_map(|resource| match &resource.spec {
-                Spec::XrayConfig(config) => Some(config),
-                _ => None,
-            })
-            .ok_or_else(|| invalid("This node has no composed Xray configuration."))?;
-        fsutil::check_path(&config.path)
-            .map_err(|_| invalid("The Xray config path is not allowed."))?;
-        check_loopback(&config.api_address)
-            .map_err(|_| invalid("The Xray API address is not loopback."))?;
-        let users: Vec<_> = resources
-            .iter()
-            .filter_map(|resource| match &resource.spec {
-                Spec::XrayUsers(users) => Some(UsersRef::Vless(users)),
-                Spec::Hysteria2Users(users) => Some(UsersRef::Hysteria2(users)),
-                _ => None,
-            })
-            .collect();
         let managed = resources.iter().any(|resource| match &resource.spec {
             Spec::XrayUsers(users) => users.inbound_tag == tag,
             Spec::Hysteria2Users(users) => users.inbound_tag == tag,
@@ -89,15 +72,7 @@ impl Engine<'_> {
         if !managed {
             return Err(invalid("This node does not manage users on that inbound."));
         }
-        let composed = compose::compose(&config.config, &users)
-            .map_err(|_| invalid("The held Xray configuration cannot be composed."))?;
-        let bytes = std::fs::read(fsutil::host_path(&self.root, &config.path))
-            .map_err(|_| invalid("The composed Xray configuration is not installed."))?;
-        if bytes != compose::render(&composed) {
-            return Err(invalid(
-                "The installed Xray credentials differ from the held document; reconcile first.",
-            ));
-        }
+        let composed = self.command_core_configuration(resources)?;
         let pin = resources
             .iter()
             .find_map(|resource| match &resource.spec {
@@ -131,12 +106,22 @@ impl Engine<'_> {
                     "The inbound reset failed and this node has no managed core to restart.",
                 )
             })?;
-        self.restart_for_command(&core.id, resources).map_err(|_| {
-            Failure::new(
-                "service_failed",
-                "The inbound reset failed and the fallback core restart did not become ready.",
-            )
-        })?;
+        self.restart_for_command(&core.id, resources)
+            .map_err(|failure| {
+                if matches!(
+                    failure.code,
+                    "apply_pending"
+                        | "document_not_applied"
+                        | "config_not_installed"
+                        | "config_mismatch"
+                ) {
+                    return failure;
+                }
+                Failure::new(
+                    "service_failed",
+                    "The inbound reset failed and the fallback core restart did not become ready.",
+                )
+            })?;
         Ok(CommandEffect::CoreRestart)
     }
 }

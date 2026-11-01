@@ -18,6 +18,7 @@ from meridian.control.command_models import (
     UserCutOffMutation,
     UserCutOffRequest,
 )
+from meridian.control.credential_models import UserCredentialRotation
 from meridian.control.models import (
     ApplyFenceRecord,
     ApplyFenceState,
@@ -65,6 +66,7 @@ from meridian.core.account_schedule import AccountSchedulePreview
 from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientExtendRequest
+from meridian.core.client_sessions import CredentialRotationRequest, UserFlowBlocks
 from meridian.core.clients import ClientConnections
 from meridian.core.errors import MeridianError
 from meridian.core.fleet_events import FleetEventPage, FleetEventQuery
@@ -109,6 +111,10 @@ class ControlServiceNotFound(ControlServiceError):
 
 class ControlServiceConflict(ControlServiceError):
     """The request lost a race or does not fit the object's state (HTTP 409)."""
+
+
+class ControlServiceCredentialsChanged(ControlServiceConflict):
+    """A stale credential generation cannot rotate again after another change."""
 
 
 class ControlServiceHistoryOff(ControlServiceConflict):
@@ -169,6 +175,15 @@ class ControlClient:
 
     def cut_off_scope(self, username: str) -> CutOffPlan:
         return CutOffPlan.model_validate(self._call("GET", f"api/users/{quote(username, safe='')}/cut-off"))
+
+    def user_flow_blocks(self, username: str) -> UserFlowBlocks:
+        return UserFlowBlocks.model_validate(self._call("GET", f"api/users/{quote(username, safe='')}/flow-blocks"))
+
+    def rotate_credentials(self, username: str, request: CredentialRotationRequest) -> UserCredentialRotation:
+        request = CredentialRotationRequest.model_validate(request.model_dump(mode="json"))
+        return UserCredentialRotation.model_validate(
+            self._call("POST", f"api/users/{quote(username, safe='')}/rotate-credentials", request.to_data())
+        )
 
     def reissue_user_with_cut_off(self, username: str) -> UserCutOffMutation:
         return UserCutOffMutation.model_validate(
@@ -467,6 +482,8 @@ class ControlClient:
         if response.status_code == 404:
             raise ControlServiceNotFound(_message(response), category="user")
         if response.status_code == 409:
+            if _error_body(response).get("code") == "credentials_changed":
+                raise ControlServiceCredentialsChanged(_message(response), category="user")
             if _error_body(response).get("code") == "history_off":
                 raise ControlServiceHistoryOff(
                     _message(response),

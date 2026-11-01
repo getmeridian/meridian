@@ -81,6 +81,7 @@ from meridian.core.agent_protocol import (
     StatsReport,
 )
 from meridian.core.client_limits import ClientExtendRequest
+from meridian.core.client_sessions import CredentialRotationRequest
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 MAX_BODY_BYTES = AGENT_HTTP_SURFACE.max_request_bytes
@@ -441,15 +442,30 @@ class _Handler(BaseHTTPRequestHandler):
     def cut_off_scope(self, match: re.Match[str]) -> Any:
         return self._service.cutoffs.scope(match[1])
 
+    def rotate_credentials(self, match: re.Match[str]) -> Any:
+        request = self._model(CredentialRotationRequest)
+        self._body_scopes(request)
+        with self._refuse_declared(match[1], "meridian client rotate-credentials"):
+            return self._service.rotate_credentials(
+                match[1], expected_generation=request.expected_generation, cut_off=request.cut_off
+            )
+
+    def user_flow_blocks(self, match: re.Match[str]) -> Any:
+        return self._service.user_flow_blocks(match[1])
+
     def _cut_off_requested(self) -> bool:
         body = self._body()
         request = UserCutOffRequest.model_validate_json(body) if body else UserCutOffRequest()
         if self.api_route is None or self.api_route.request_model is not UserCutOffRequest:
             raise RuntimeError("The cut-off request has no route declaration.")
+        self._body_scopes(request)
+        return request.cut_off
+
+    def _body_scopes(self, request: BaseModel) -> None:
+        assert self.api_route is not None
         for condition in self.api_route.body_scopes:
             if getattr(request, condition.field) == condition.equals:
                 self._authorize(condition.scope)
-        return request.cut_off
 
     def reset_user_traffic(self, match: re.Match[str]) -> Any:
         return self._service.reset_user_traffic(match[1])
@@ -573,7 +589,7 @@ class _Handler(BaseHTTPRequestHandler):
         if not isinstance(raw, dict):
             raise agent_error("invalid_request", "The body is not a JSON object.")
         request, welcome = service.authority.hello(raw)
-        service.node_seen(request.node_id, request.agent_version)
+        service.node_seen(request.node_id, request.agent_version, capabilities=welcome.capabilities)
         return welcome
 
     def agent_renew(self, _match: re.Match[str]) -> Any:
@@ -597,6 +613,8 @@ class _Handler(BaseHTTPRequestHandler):
         service, session = self._session()
         body, raw = self._raw()
         report = ObservedStateReport.model_validate_json(body)
+        if report.user_flow_blocking is not None and "user_flow_blocking" not in session.capabilities:
+            raise agent_error("invalid_request", "The user flow blocking capability was not negotiated.")
         return service.report(session.node_id, report, raw)
 
     def agent_stats(self, _match: re.Match[str]) -> Any:
@@ -660,6 +678,7 @@ OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
         _Handler.preview_user_schedule,
         _Handler.update_user,
         _Handler.reissue_user,
+        _Handler.rotate_credentials,
         _Handler.reset_user_traffic,
         _Handler.extend_user,
         _Handler.user_devices,

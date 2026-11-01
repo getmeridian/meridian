@@ -14,10 +14,13 @@ from meridian.control.command_models import (
     NodeCommandOutcomeStatus,
     NodeCommandRecord,
 )
+from meridian.core.client_sessions import UserFlowBlocks
 from meridian.core.models import ErrorModel
 from meridian.core.redaction import redact_diagnostic_text
 
 COMMAND_WAIT_SECONDS = 300
+# An agent reports right after it applies, so a reachable node confirms within seconds.
+FLOW_BLOCK_WAIT_SECONDS = 15.0
 
 
 def cut_off_scope(cluster: ClusterConfig, username: str) -> CutOffPlan:
@@ -84,6 +87,26 @@ def wait_for_commands(
             status = "done"
         outcomes.append(NodeCommandOutcome(node_id=node_id, status=status, commands=records, errors=errors))
     return outcomes
+
+
+def wait_for_flow_blocks(
+    read: Callable[[], UserFlowBlocks],
+    current: UserFlowBlocks,
+    *,
+    timeout: float = FLOW_BLOCK_WAIT_SECONDS,
+    clock: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
+) -> UserFlowBlocks:
+    """Re-read receipts until no node is pending; a commit-time answer is always pending."""
+    deadline = clock() + max(0.0, timeout)
+    while any(node.status == "pending_node" for node in current.nodes) and clock() < deadline:
+        sleep(min(1.0, max(0.0, deadline - clock())))
+        try:
+            current = read()
+        except ControlServiceError as exc:
+            if not exc.retryable:
+                break
+    return current
 
 
 def wait_commands(cluster: ClusterConfig, commands: Sequence[NodeCommandRecord]) -> list[NodeCommandOutcome]:

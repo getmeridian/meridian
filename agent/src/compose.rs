@@ -26,7 +26,14 @@ impl UsersRef<'_> {
         }
     }
 
-    fn clients(&self) -> Vec<Value> {
+    fn clients(&self, generations: bool) -> Vec<Value> {
+        let email = |id: &str, credential: &str| {
+            if generations {
+                crate::xray_identity::email(id, credential)
+            } else {
+                id.to_string()
+            }
+        };
         match self {
             UsersRef::Vless(spec) => spec
                 .users
@@ -34,7 +41,7 @@ impl UsersRef<'_> {
                 .map(|user| {
                     let mut client = Map::new();
                     client.insert("id".into(), json!(user.uuid));
-                    client.insert("email".into(), json!(user.user_id));
+                    client.insert("email".into(), json!(email(&user.user_id, &user.uuid)));
                     if !user.flow.is_empty() {
                         client.insert("flow".into(), json!(user.flow));
                     }
@@ -44,7 +51,7 @@ impl UsersRef<'_> {
             UsersRef::Hysteria2(spec) => spec
                 .users
                 .iter()
-                .map(|user| json!({"auth": user.auth, "email": user.user_id}))
+                .map(|user| json!({"auth": user.auth, "email": email(&user.user_id, &user.auth)}))
                 .collect(),
         }
     }
@@ -52,6 +59,7 @@ impl UsersRef<'_> {
 
 /// Fill `settings.clients` of every inbound a users resource names.
 pub fn compose(config: &Value, users: &[UsersRef<'_>]) -> Result<Value, String> {
+    let generations = crate::xray_identity::enabled(config);
     let mut composed = config.clone();
     let inbounds = composed.get_mut("inbounds").and_then(Value::as_array_mut);
     let Some(inbounds) = inbounds else {
@@ -73,7 +81,7 @@ pub fn compose(config: &Value, users: &[UsersRef<'_>]) -> Result<Value, String> 
         let settings = settings
             .as_object_mut()
             .ok_or("inbound settings is not an object")?;
-        settings.insert("clients".into(), Value::Array(entry.clients()));
+        settings.insert("clients".into(), Value::Array(entry.clients(generations)));
     }
     Ok(composed)
 }

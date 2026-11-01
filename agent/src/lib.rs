@@ -11,6 +11,7 @@ pub mod agent;
 pub mod apply;
 mod backoff;
 pub mod bootstrap;
+mod command_core;
 mod command_host;
 pub mod commands;
 pub mod compose;
@@ -31,7 +32,12 @@ pub mod timeutil;
 mod unit;
 pub mod verify;
 pub mod xray;
+mod xray_flow;
 mod xray_health;
+mod xray_hysteria;
+pub mod xray_identity;
+mod xray_live_apply;
+mod xray_revocations;
 
 /// The build version (`build.rs`), reported as `agent_version` and `versions.agent`.
 pub const VERSION: &str = env!("NETAGENT_VERSION");

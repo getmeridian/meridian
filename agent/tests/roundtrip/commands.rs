@@ -5,6 +5,12 @@ mod retention;
 #[path = "command_sessions.rs"]
 mod sessions;
 
+#[path = "core_commands.rs"]
+mod core_commands;
+
+#[path = "flow_reports.rs"]
+mod flow_reports;
+
 use super::*;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;

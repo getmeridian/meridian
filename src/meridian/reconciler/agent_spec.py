@@ -142,7 +142,7 @@ def _with_api(config: dict[str, Any]) -> dict[str, Any]:
     routing["rules"] = [{"type": "field", "inboundTag": ["api"], "outboundTag": "api"}, *routing["rules"]]
     return {
         **config,
-        "api": {"tag": "api", "services": ["HandlerService", "StatsService"]},
+        "api": {"tag": "api", "services": ["HandlerService", "StatsService", "RoutingService"]},
         "stats": {},
         "policy": {"levels": {"0": {"statsUserUplink": True, "statsUserDownlink": True}}},
         "routing": routing,

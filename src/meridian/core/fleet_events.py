@@ -14,6 +14,7 @@ from pydantic import Field, model_validator
 from meridian.control.models import TokenScope, UserStatus
 from meridian.core.agent_protocol import CommandEffect, CommandKind, CommandResultStatus
 from meridian.core.agent_types import MAX_SAFE_INTEGER, CommandId, Timestamp
+from meridian.core.client_sessions import CredentialGeneration, FlowBlockStatus
 from meridian.core.models import CoreModel
 from meridian.core.people_bulk import BulkActionName
 
@@ -26,11 +27,13 @@ FleetEventKind = Literal[
     "user.enabled",
     "user.disabled",
     "user.reissued",
+    "user.credentials_rotated",
     "user.removed",
     "user.traffic_reset",
     "user.expired",
     "user.limited",
     "user.restored",
+    "user.flow_blocking",
     "node.offline",
     "node.online",
     "node.apply_failed",
@@ -84,6 +87,12 @@ class UserStateDetail(CoreModel):
     previous_status: UserStatus
 
 
+class UserFlowBlockDetail(CoreModel):
+    node_id: str = Field(min_length=1, max_length=64)
+    credential_generation: CredentialGeneration
+    status: FlowBlockStatus
+
+
 class NodeEventDetail(CoreModel):
     reason: Literal["live_window_elapsed", "agent_seen", "apply_failed", "apply_recovered"]
     failed_resources: int = Field(
@@ -130,6 +139,7 @@ EventDetail: TypeAlias = (
     | TokenEventDetail
     | CommandIssuedDetail
     | CommandResultDetail
+    | UserFlowBlockDetail
 )
 _DETAIL_TYPES: dict[FleetEventKind, type[CoreModel]] = {
     "people.bulk": BulkEventDetail,
@@ -137,12 +147,14 @@ _DETAIL_TYPES: dict[FleetEventKind, type[CoreModel]] = {
     "user.enabled": EmptyEventDetail,
     "user.disabled": EmptyEventDetail,
     "user.reissued": EmptyEventDetail,
+    "user.credentials_rotated": EmptyEventDetail,
     "user.removed": EmptyEventDetail,
     "user.traffic_reset": EmptyEventDetail,
     "user.updated": UserFieldsDetail,
     "user.expired": UserStateDetail,
     "user.limited": UserStateDetail,
     "user.restored": UserStateDetail,
+    "user.flow_blocking": UserFlowBlockDetail,
     "node.offline": NodeEventDetail,
     "node.online": NodeEventDetail,
     "node.apply_failed": NodeEventDetail,

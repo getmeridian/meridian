@@ -618,6 +618,10 @@ def test_declared_people_are_the_clis_to_remove_or_relink(fleet: Fleet) -> None:
         assert refused.status == 409 and refused.body["error"]["code"] == "declared_user", path
         refused = fleet.ui(method, path, {"cut_off": True})
         assert refused.status == 409 and refused.body["error"]["code"] == "declared_user", path
+    refused = fleet.ui(
+        "POST", "/api/users/alice/rotate-credentials", {"expected_generation": before.credential_generation}
+    )
+    assert refused.status == 409 and refused.body["error"]["code"] == "declared_user"
     after = service.get_user("alice")
     assert after is not None and after.uuid == before.uuid
     assert fleet.ui("GET", "/ui/api/people/alice/share").body["declared"] is True

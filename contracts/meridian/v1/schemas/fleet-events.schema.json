@@ -188,6 +188,9 @@
             },
             {
               "$ref": "#/$defs/CommandResultDetail"
+            },
+            {
+              "$ref": "#/$defs/UserFlowBlockDetail"
             }
           ],
           "title": "Detail"
@@ -207,11 +210,13 @@
             "user.enabled",
             "user.disabled",
             "user.reissued",
+            "user.credentials_rotated",
             "user.removed",
             "user.traffic_reset",
             "user.expired",
             "user.limited",
             "user.restored",
+            "user.flow_blocking",
             "node.offline",
             "node.online",
             "node.apply_failed",
@@ -363,6 +368,39 @@
         "fields"
       ],
       "title": "UserFieldsDetail",
+      "type": "object"
+    },
+    "UserFlowBlockDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "credential_generation": {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Credential Generation",
+          "type": "integer"
+        },
+        "node_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Node Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "blocked",
+            "pending_node",
+            "agent_too_old"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "credential_generation",
+        "status"
+      ],
+      "title": "UserFlowBlockDetail",
       "type": "object"
     },
     "UserStateDetail": {

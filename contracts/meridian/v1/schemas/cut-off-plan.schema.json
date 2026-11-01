@@ -3,6 +3,16 @@
     "CutOffNode": {
       "additionalProperties": false,
       "properties": {
+        "effect": {
+          "default": "inbound_reset",
+          "description": "A core restart reconnects every Xray inbound and bridge on this node; an inbound reset reconnects the listed inbounds, with whole-core fallback on failure.",
+          "enum": [
+            "inbound_reset",
+            "core_restart"
+          ],
+          "title": "Effect",
+          "type": "string"
+        },
         "inbound_tags": {
           "items": {
             "description": "Xray inbound tag.",

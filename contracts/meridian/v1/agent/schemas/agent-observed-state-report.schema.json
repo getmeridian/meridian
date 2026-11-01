@@ -232,6 +232,11 @@
             "reload_failed",
             "service_failed",
             "xray_api_failed",
+            "flow_guard_pending",
+            "apply_pending",
+            "document_not_applied",
+            "config_not_installed",
+            "config_mismatch",
             "rolled_back",
             "timeout",
             "unsupported",
@@ -247,7 +252,7 @@
           "type": "string"
         },
         "retryable": {
-          "description": "True when the agent will retry on its own.",
+          "description": "True when retrying after the stated condition can succeed; resources retry automatically, while commands require a new ID.",
           "title": "Retryable",
           "type": "boolean"
         }
@@ -342,6 +347,41 @@
       ],
       "title": "ResourceObservation",
       "type": "object"
+    },
+    "UserFlowBlocking": {
+      "additionalProperties": false,
+      "description": "Revoked identities cannot dispatch new flows, or their sessions ended in a core restart.\n\nCovers newly dispatched TCP streams and UDP associations, including an\nauthenticated QUIC or mux connection. Already dispatched flows and XUDP\nassociations may continue. Sent only with `user_flow_blocking` negotiated.\nAuthentication still applies if routing fails; the agent reports pending\nand retries the guard without requesting an inbound reset. Revocation rules\nlive only in the running core; restarting it clears their need.",
+      "properties": {
+        "document": {
+          "$ref": "#/$defs/NodeStateRef",
+          "description": "The applied document covered by fresh runtime evidence, which may precede unrelated service revisions."
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "ready",
+            "pending"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "document",
+        "status",
+        "error"
+      ],
+      "title": "UserFlowBlocking",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -408,6 +448,18 @@
       "title": "Type",
       "type": "string"
     },
+    "user_flow_blocking": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UserFlowBlocking"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Runtime user flow guard; omitted unless its capability was negotiated."
+    },
     "versions": {
       "$ref": "#/$defs/NodeVersions"
     }
@@ -421,7 +473,8 @@
     "resources",
     "health",
     "versions",
-    "observed_at"
+    "observed_at",
+    "user_flow_blocking"
   ],
   "title": "ObservedStateReport",
   "type": "object"

@@ -30,19 +30,48 @@ newest first; the last is what 4.0 changes compared with 3.x.
   preserving lifetime traffic.
 - Per-person unlimited device caps in the API, CLI, and panel, distinct from
   the fleet default. Remnawave migration keeps device caps, including zero.
+- **Rotate connection keys while keeping the subscription URL** with
+  `meridian client rotate-credentials`, the people API, or the web panel (#95).
+  Devices receive the new VLESS UUID and Hysteria2 auth on subscription refresh;
+  registrations and account settings stay in place. Generation checks prevent
+  an uncertain retry from rotating twice. Reissue remains the new-URL action
+  for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Keep every bulk-deleted person in per-node flow-block receipts without rotating connection keys or subscription URLs (#95).
 - Bulk expiry validates dates before preview, so blank or invalid input never clears expiry; clearing it requires the explicit No end date choice.
 - CLI and console reconcile lost undo replies through receipts, retain the updated console receipt, and reject unavailable undo dry runs.
 - People background refreshes preserve selection controls and keyboard focus; failed refreshes and page requests keep actions and pagination usable.
 - Client-list JSON preserves integer facet counts for secret-shaped tags such as TOKEN and API_KEY.
 - Bulk undo emits the same lifecycle events as commit and refuses an over-capacity managed inbound without changing people or the receipt.
 - Bulk reviews compare enforced account states, refuse named stale targets even for deletion, preserve due refills, and count no-op actions as unchanged.
+- State each node's exact reconnect scope in CLI and console cut-off reviews,
+  including every Xray inbound and bridge on a core restart, reset fallbacks,
+  and credential rotation. Render bracketed names literally and translate
+  retryable core refusals in all four languages (#95).
+- Keep confirmed revocation receipts through hellos and unrelated revisions, check their own same-epoch revision and fresh service receipt time, and emit only real status transitions (#95).
+- Report fresh core evidence after command, fallback, and systemd restarts; completed restarts no longer retain stale pending guard errors or claim that temporary rules are required (#95).
+- Track the actual revoked credential generation and cause per node, clear restored keys, and show distinct receipts in all console languages; private fingerprints stay off the wire (#95).
+- Keep revoked credentials out of concurrent core restarts during apply, with current-file writes before live account changes and invocation checks (#95).
+- Refuse core restarts and inbound resets until the held revision and on-disk credentials agree; return retryable command results for pending application (#95).
+- Preserve Xray's DNS and IP routing while blocking revoked identities. Live
+  blocks survive retries, clear on core restart or credential re-enable, and
+  never deny active credentials after an install failure. A bounded retry
+  ledger reports pending recovery at 4096 rules (#95).
 - **The People screen filters by status, tag, upcoming expiry, quota share, never-used accounts, and attention**, with facet counts and sorting by name, usage, expiry, or last activity. The fragment retains the view across reloads, and searching keeps existing rows and focus (#95).
 - **People attention distinguishes never-used accounts from people who stopped using the service**, using the stored last traffic time and separate bounded thresholds. Period resets and disabled daily history preserve that evidence (#95).
 - **Connection pages show used and allowed device slots when limits are enabled**, with localized guidance for full slots and apps that cannot report a device. Only counts are revealed, and the page never saves them (#95).
 - **Reissuing a link in the web panel offers the same session cut-off choice as removal**, reviews affected nodes, and shows each node’s outcome while retaining the new link (#95).
 - **Subscription traffic reports upload and download for the current period**, shared with the API and web panel. Manual and scheduled resets keep both directions and lifetime totals consistent; imports and older periods keep unclassified use with an explicit disclosure (#95).
+- **Revoked people cannot open new streams on live Hysteria2 or VLESS mux connections**
+  once their node applies the change (#95). Disable, expiry, quota suspension,
+  removal, and credential replacement now use authenticated identities in live
+  routing; other people's sessions stay connected. The person view and events
+  distinguish confirmed blocking, pending nodes, and agents that need an update.
+  Earlier TCP transfers and UDP associations can continue; `--cut-off` still
+  uses a core restart for VLESS (its inbound reset leaves accepted flows alive)
+  and an inbound reset for Hysteria2. Hysteria2 credential additions now
+  use its typed user API instead of resetting the inbound on updated nodes.
 - **A web panel on its own domain keeps its certificate** when the same server
   also runs an exit (#110). The panel's domain certificate was installed where
   the server's IP certificate lives, so an exit's IP certificate replaced it,

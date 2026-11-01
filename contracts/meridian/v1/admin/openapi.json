@@ -2007,7 +2007,7 @@
               }
             ],
             "default": null,
-            "description": "For a successful reset_inbound: whether the inbound API reset or a fallback core restart ended its sessions. Null for other outcomes. Sent only by sessions negotiating command kinds.",
+            "description": "For a successful reset_inbound: inbound_reset or core_restart. Null for other wire results. Admin records also mark a succeeded revision-gated core restart as core_restart. Sent only by sessions negotiating command kinds.",
             "title": "Effect"
           },
           "error": {
@@ -2139,9 +2139,41 @@
         "title": "CommandUnitTarget",
         "type": "object"
       },
+      "CredentialRotationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "cut_off": {
+            "default": false,
+            "title": "Cut Off",
+            "type": "boolean"
+          },
+          "expected_generation": {
+            "description": "Read credential_generation from the person first; stale requests cannot rotate again.",
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "title": "Expected Generation",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_generation"
+        ],
+        "title": "CredentialRotationRequest",
+        "type": "object"
+      },
       "CutOffNode": {
         "additionalProperties": false,
         "properties": {
+          "effect": {
+            "default": "inbound_reset",
+            "description": "A core restart reconnects every Xray inbound and bridge on this node; an inbound reset reconnects the listed inbounds, with whole-core fallback on failure.",
+            "enum": [
+              "inbound_reset",
+              "core_restart"
+            ],
+            "title": "Effect",
+            "type": "string"
+          },
           "inbound_tags": {
             "items": {
               "description": "Xray inbound tag.",
@@ -2582,6 +2614,9 @@
               },
               {
                 "$ref": "#/components/schemas/CommandResultDetail"
+              },
+              {
+                "$ref": "#/components/schemas/UserFlowBlockDetail"
               }
             ],
             "title": "Detail"
@@ -2601,11 +2636,13 @@
               "user.enabled",
               "user.disabled",
               "user.reissued",
+              "user.credentials_rotated",
               "user.removed",
               "user.traffic_reset",
               "user.expired",
               "user.limited",
               "user.restored",
+              "user.flow_blocking",
               "node.offline",
               "node.online",
               "node.apply_failed",
@@ -3316,6 +3353,7 @@
                 "xray_config",
                 "xray_users",
                 "hysteria2_users",
+                "user_flow_blocking",
                 "realm_forwarders",
                 "firewall_rules",
                 "binary_pins",
@@ -5564,7 +5602,7 @@
       },
       "ResetInboundCommand": {
         "additionalProperties": false,
-        "description": "Remove and re-add one Xray inbound through gRPC to end open sessions after an urgent cut-off.",
+        "description": "Remove and re-add one managed inbound. Hysteria2 sessions close; accepted VLESS TCP flows may survive.\n\nAn urgent VLESS cut-off uses a revision-gated restart_unit of the core instead.",
         "properties": {
           "command_id": {
             "description": "Idempotency key of a command: a lowercase UUID chosen by the service, never reused.",
@@ -5682,6 +5720,11 @@
               "reload_failed",
               "service_failed",
               "xray_api_failed",
+              "flow_guard_pending",
+              "apply_pending",
+              "document_not_applied",
+              "config_not_installed",
+              "config_mismatch",
               "rolled_back",
               "timeout",
               "unsupported",
@@ -5697,7 +5740,7 @@
             "type": "string"
           },
           "retryable": {
-            "description": "True when the agent will retry on its own.",
+            "description": "True when retrying after the stated condition can succeed; resources retry automatically, while commands require a new ID.",
             "title": "Retryable",
             "type": "boolean"
           }
@@ -7276,6 +7319,36 @@
         "title": "UserCreate",
         "type": "object"
       },
+      "UserCredentialRotation": {
+        "additionalProperties": false,
+        "properties": {
+          "commands": {
+            "items": {
+              "$ref": "#/components/schemas/NodeCommandRecord"
+            },
+            "title": "Commands",
+            "type": "array"
+          },
+          "flow_blocks": {
+            "$ref": "#/components/schemas/UserFlowBlocks"
+          },
+          "subscription_preserved": {
+            "const": true,
+            "default": true,
+            "title": "Subscription Preserved",
+            "type": "boolean"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserRecord"
+          }
+        },
+        "required": [
+          "user",
+          "flow_blocks"
+        ],
+        "title": "UserCredentialRotation",
+        "type": "object"
+      },
       "UserCutOffMutation": {
         "additionalProperties": false,
         "properties": {
@@ -7446,6 +7519,134 @@
           "fields"
         ],
         "title": "UserFieldsDetail",
+        "type": "object"
+      },
+      "UserFlowBlockDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "credential_generation": {
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "title": "Credential Generation",
+            "type": "integer"
+          },
+          "node_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Node Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "blocked",
+              "pending_node",
+              "agent_too_old"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "credential_generation",
+          "status"
+        ],
+        "title": "UserFlowBlockDetail",
+        "type": "object"
+      },
+      "UserFlowBlockNode": {
+        "additionalProperties": false,
+        "properties": {
+          "credential_generation": {
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "title": "Credential Generation",
+            "type": "integer"
+          },
+          "inbound_tags": {
+            "items": {
+              "description": "Xray inbound tag.",
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Inbound Tags",
+            "type": "array"
+          },
+          "node_id": {
+            "description": "Node identifier: the server's lowercase topology ID, unique within the fleet.",
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "title": "Node Id",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "disabled",
+              "expired",
+              "limited",
+              "removed",
+              "credentials",
+              "access_changed"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "required": {
+            "$ref": "#/components/schemas/NodeStateRef",
+            "description": "The revocation revision; fresh applied revisions at or after it in the same epoch also cover it."
+          },
+          "status": {
+            "enum": [
+              "blocked",
+              "pending_node",
+              "agent_too_old"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "credential_generation",
+          "reason",
+          "status",
+          "required"
+        ],
+        "title": "UserFlowBlockNode",
+        "type": "object"
+      },
+      "UserFlowBlocks": {
+        "additionalProperties": false,
+        "description": "A blocked result covers new streams and UDP associations, not already dispatched flows.",
+        "properties": {
+          "credential_generation": {
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "title": "Credential Generation",
+            "type": "integer"
+          },
+          "nodes": {
+            "description": "One receipt per revoked credential generation and node; fingerprints stay private.",
+            "items": {
+              "$ref": "#/components/schemas/UserFlowBlockNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "credential_generation"
+        ],
+        "title": "UserFlowBlocks",
         "type": "object"
       },
       "UserImport": {
@@ -8018,6 +8219,13 @@
             "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
             "title": "Created At",
             "type": "string"
+          },
+          "credential_generation": {
+            "default": 1,
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "title": "Credential Generation",
+            "type": "integer"
           },
           "device_limit": {
             "anyOf": [
@@ -15545,6 +15753,103 @@
         ]
       }
     },
+    "/api/users/{username}/flow-blocks": {
+      "get": {
+        "description": "Requires read or people scope, or a scope that covers it. Blocked covers new TCP streams and UDP associations. Already dispatched flows may continue.",
+        "operationId": "user_flow_blocks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "username",
+            "required": true,
+            "schema": {
+              "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserFlowBlocks"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Read per-node evidence that a person's new flows are blocked.",
+        "tags": [
+          "users"
+        ],
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "read",
+          "people"
+        ]
+      }
+    },
     "/api/users/{username}/reissue": {
       "post": {
         "description": "Requires people scope, or a scope that covers it. People tokens cannot remove or reissue a person declared by an approved, applied, or failed fleet revision; use the meridian CLI. Setting cut_off to true also requires admin scope. This response can contain credentials; keep it private and do not log it.",
@@ -15681,7 +15986,7 @@
             "meridianToken": []
           }
         ],
-        "summary": "Replace a person's connection credentials.",
+        "summary": "Replace a person's subscription URL and connection credentials.",
         "tags": [
           "users"
         ],
@@ -15789,6 +16094,163 @@
         "summary": "Reset a person's current-period traffic use.",
         "tags": [
           "users"
+        ],
+        "x-meridian-credentials": true,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "people"
+        ]
+      }
+    },
+    "/api/users/{username}/rotate-credentials": {
+      "post": {
+        "description": "Requires people scope, or a scope that covers it. Preserves device registrations and operator settings. Read the current credential_generation first. Owner and people callers use the CLI for a declared person. Optional cut_off also requires admin. Setting cut_off to true also requires admin scope. This response can contain credentials; keep it private and do not log it.",
+        "operationId": "rotate_credentials",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "username",
+            "required": true,
+            "schema": {
+              "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialRotationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserCredentialRotation"
+                }
+              }
+            },
+            "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "x-meridian-credentials": true
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "command_queue_full",
+              "conflict",
+              "credentials_changed",
+              "declared_user"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Rotate connection credentials keeping the subscription URL.",
+        "tags": [
+          "users"
+        ],
+        "x-meridian-conditional-scopes": [
+          {
+            "equals": true,
+            "field": "cut_off",
+            "scopes": [
+              "admin"
+            ]
+          }
         ],
         "x-meridian-credentials": true,
         "x-meridian-scope-mode": "any",

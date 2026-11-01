@@ -19,6 +19,8 @@
 - **Subscription vocabulary** — `subscription_formats.py` owns document and suffix names; `subscription_preview.py` bounds transient headers and explains selection without credentials.
 
 ## What's done well
+- **Credential rotation composes existing client status and node outcomes** — its request requires an integer generation, its CLI result carries no credential, and stale retries cannot create another generation.
+- **Flow-block evidence is capability-gated and revision-bound** — account generations and node outcomes carry no connection or device data.
 - **Defaults stay off the wire** — new intent and settings fields omit their defaults (routing `ru-split`, the six-hour refresh, empty mappings), so existing plans and payloads keep their hashes.
 - **Command kinds are hello capabilities**, and a reset result discloses its effect without carrying a user identifier.
 - No barrel re-exports in `__init__.py`; consumers import specific submodules.
@@ -27,6 +29,9 @@
 ## Pitfalls
 - **Revealed metadata keeps scalar types** — secret-shaped tag keys must not replace facet counts with redaction strings; container reveals still mask string credentials.
 - **Bulk action schemas retain parameter types** — use post-init checks and a model schema hook, or a dict-returning serializer hides them behind an after-validator.
+- **Agent refusal codes are a shared contract** — export every Rust resource/command code before using it, and localize human command errors by code.
+- **Receipts identify the revoked key** — generations and causes stay distinct, while private per-inbound fingerprints clear a key that becomes active again.
+- **Ready includes a core restart** — revocation evidence describes old identities losing new streams, not a claim that the fresh core needs or holds block rules.
 - **Device cap zero is unlimited** — only null inherits the fleet cap; never resolve a cap by truthiness.
 - **Never emit raw SSH commands, panel tokens, private keys, database URLs, or subscription secrets.**
 - **`redact_string()` is the only secret masker** (SSH debug logs included) — teach it a new secret form instead of adding a local regex.

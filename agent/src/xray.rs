@@ -24,6 +24,7 @@ use crate::compose::{self, UsersRef};
 use crate::fsutil::{self, host_path};
 use crate::model::{Hysteria2UsersSpec, Resource, Spec, XrayConfigSpec, XrayUsersSpec};
 use crate::state::LedgerEntry;
+use crate::xray_live_apply::LiveApply;
 use crate::{debug, info};
 
 /// Users of one inbound to change through the API.
@@ -37,6 +38,8 @@ pub struct LiveChange {
     /// Hysteria2 with users to add: the whole composed inbound, removed and added back
     /// (`remove` and `add` are then empty: the rebuilt inbound carries every user).
     pub rebuild: Option<Value>,
+    /// Typed Hysteria2 account additions with generation identities.
+    pub hysteria2: bool,
 }
 
 impl LiveChange {
@@ -89,23 +92,54 @@ pub fn diff_hysteria2_users(
     };
     let (before, after) = (auth(previous), auth(current));
     let adds = after.iter().any(|(id, key)| before.get(id) != Some(key));
-    if adds {
+    let generations = crate::xray_identity::enabled(composed);
+    if adds && !generations {
         return Ok(LiveChange {
             tag: current.inbound_tag.clone(),
             remove: Vec::new(),
             add: None,
             rebuild: Some(composed_inbound(composed, &current.inbound_tag)?),
+            hysteria2: false,
         });
     }
+    let email = |id: &str, auth: &str| {
+        if generations {
+            crate::xray_identity::email(id, auth)
+        } else {
+            id.to_string()
+        }
+    };
+    let added: BTreeSet<String> = after
+        .iter()
+        .filter(|(id, key)| before.get(*id) != Some(*key))
+        .map(|(id, auth)| email(id, auth))
+        .collect();
+    let add = if added.is_empty() {
+        None
+    } else {
+        let mut inbound = composed_inbound(composed, &current.inbound_tag)?;
+        let clients = inbound
+            .pointer_mut("/settings/clients")
+            .and_then(Value::as_array_mut)
+            .ok_or("the inbound has no clients list")?;
+        clients.retain(|client| {
+            client
+                .get("email")
+                .and_then(Value::as_str)
+                .is_some_and(|email| added.contains(email))
+        });
+        Some(inbound)
+    };
     Ok(LiveChange {
         tag: current.inbound_tag.clone(),
         remove: before
-            .keys()
-            .filter(|id| !after.contains_key(*id))
-            .cloned()
+            .iter()
+            .filter(|(id, key)| after.get(*id) != Some(*key))
+            .map(|(id, auth)| email(id, auth))
             .collect(),
-        add: None,
+        add,
         rebuild: None,
+        hysteria2: generations,
     })
 }
 
@@ -117,15 +151,22 @@ pub fn diff_users(
 ) -> Result<LiveChange, String> {
     let before = vless_clients(previous);
     let after = vless_clients(current);
+    let email = |id: &str, uuid: &str| {
+        if crate::xray_identity::enabled(composed) {
+            crate::xray_identity::email(id, uuid)
+        } else {
+            id.to_string()
+        }
+    };
     let remove: Vec<String> = before
         .iter()
         .filter(|(id, creds)| after.get(*id) != Some(creds))
-        .map(|(id, _)| id.to_string())
+        .map(|(id, (uuid, _))| email(id, uuid))
         .collect();
-    let added: BTreeSet<&str> = after
+    let added: BTreeSet<String> = after
         .iter()
         .filter(|(id, creds)| before.get(*id) != Some(creds))
-        .map(|(id, _)| *id)
+        .map(|(id, (uuid, _))| email(id, uuid))
         .collect();
     let add = if added.is_empty() {
         None
@@ -148,6 +189,7 @@ pub fn diff_users(
         remove,
         add,
         rebuild: None,
+        hysteria2: false,
     })
 }
 
@@ -259,21 +301,27 @@ impl Engine<'_> {
         }
 
         let live = self.live_plan(spec, resources, entries, current.as_deref(), &composed);
-        let live_done = match live {
-            Some(changes) => match self.apply_live(&binary, &spec.api_address, &changes) {
-                Ok(()) => true,
-                Err(message) => {
-                    info!("xray api: {message}; restarting xray instead");
-                    false
-                }
-            },
-            None => false,
-        };
-        if !live_done {
+        let live_done = if let Some(changes) = live {
+            let previous: Value =
+                serde_json::from_slice(current.as_ref().expect("live plan checked the file"))
+                    .map_err(|_| {
+                        Failure::new("validation_failed", "The previous Xray config is invalid.")
+                    })?;
+            self.apply_live_config(LiveApply {
+                spec,
+                resources,
+                composed: &composed,
+                binary: &binary,
+                previous: &previous,
+                changes: &changes,
+                temporary: &tmp,
+            })?
+        } else {
             self.keep_previous(&dest);
-        }
-        fsutil::commit(&tmp, &dest, 0o600, None)
-            .map_err(|err| Failure::io(&err, "cannot install config"))?;
+            fsutil::commit(&tmp, &dest, 0o600, None)
+                .map_err(|err| Failure::io(&err, "cannot install config"))?;
+            false
+        };
         placed.extend(users.iter().map(|(u, _)| u.id().to_string()));
         if live_done {
             info!("changed xray users through the api; wrote {}", spec.path);
@@ -388,7 +436,12 @@ impl Engine<'_> {
     }
 
     /// Remove, then add, users through `xray api`; any shortfall is an error (the caller restarts).
-    fn apply_live(&self, binary: &str, api: &str, changes: &[LiveChange]) -> Result<(), String> {
+    pub(crate) fn apply_live(
+        &self,
+        binary: &str,
+        api: &str,
+        changes: &[LiveChange],
+    ) -> Result<(), String> {
         let server = format!("--server={api}");
         for change in changes {
             if let Some(inbound) = &change.rebuild {
@@ -404,6 +457,25 @@ impl Engine<'_> {
                 expect_count(&output, "Removed", change.remove.len())?;
             }
             if let Some(inbound) = &change.add {
+                if change.hysteria2 {
+                    for client in inbound
+                        .pointer("/settings/clients")
+                        .and_then(Value::as_array)
+                        .into_iter()
+                        .flatten()
+                    {
+                        let email = client
+                            .get("email")
+                            .and_then(Value::as_str)
+                            .ok_or("the Hysteria2 user has no email")?;
+                        let auth = client
+                            .get("auth")
+                            .and_then(Value::as_str)
+                            .ok_or("the Hysteria2 user has no auth")?;
+                        self.add_hysteria_user(api, &change.tag, email, auth)?;
+                    }
+                    continue;
+                }
                 fs::create_dir_all(&self.cache_dir).map_err(|err| err.to_string())?;
                 // Holds the inbound's keys and the new UUIDs: private, and removed at once.
                 let path = self.cache_dir.join(format!("adu-{}.json", change.tag));
@@ -447,7 +519,7 @@ impl Engine<'_> {
         added.map(|_| ())
     }
 
-    fn xray_api(&self, binary: &str, args: &[&str]) -> Result<String, String> {
+    pub(crate) fn xray_api(&self, binary: &str, args: &[&str]) -> Result<String, String> {
         match self.exec.run(binary, args, &[]) {
             Ok(output) if output.success => Ok(output.stdout),
             Ok(output) => Err(format!(

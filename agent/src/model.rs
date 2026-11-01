@@ -115,6 +115,15 @@ pub struct ObservedStateReport {
     pub health: NodeHealth,
     pub versions: NodeVersions,
     pub observed_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_flow_blocking: Option<UserFlowBlocking>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct UserFlowBlocking {
+    pub document: NodeStateRef,
+    pub status: &'static str,
+    pub error: Option<ResourceError>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -379,7 +388,7 @@ pub(crate) fn check_tag(tag: &str) -> Result<(), String> {
 }
 
 /// `UserId` in `meridian.core.agent_types`.
-fn check_user_id(user_id: &str) -> Result<(), String> {
+pub(crate) fn check_user_id(user_id: &str) -> Result<(), String> {
     let allowed = |b: u8| b.is_ascii_lowercase() || b.is_ascii_digit();
     let mut bytes = user_id.bytes();
     let first = bytes.next().is_some_and(allowed);

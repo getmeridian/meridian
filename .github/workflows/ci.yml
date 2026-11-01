@@ -58,6 +58,13 @@ jobs:
         with:
           version: 10.33.3
 
+      - name: Prepare the agent for real Xray session tests
+        if: matrix.python-version == '3.12'
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          cargo fetch --locked --manifest-path agent/Cargo.toml
+
       - uses: actions/setup-node@v6
         if: matrix.python-version == '3.12'
         with:

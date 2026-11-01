@@ -98,6 +98,7 @@ from meridian.core.plan import (
 from meridian.core.relay_check import RelayCheckResult
 from meridian.core.routes import RouteListResult, RouteMutationResult
 from meridian.core.schema_bulk import bulk_envelopes
+from meridian.core.schema_credentials import credential_command_schemas
 from meridian.core.schema_delivery import delivery_schemas
 from meridian.core.schema_delivery_service import service_delivery_schemas
 from meridian.core.schema_envelopes import make_command_envelope
@@ -661,6 +662,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "server-add-request": ServerAddRequest,
     "server-remove-request": ServerRemoveRequest,
     **SERVER_SCHEMAS,
+    **credential_command_schemas(_ContractEnvelope, EmptyData),
     **server_command_schemas(_ContractEnvelope, EmptyData),
     **TOPOLOGY_SCHEMAS,
     "node-add-request": NodeAddRequest,

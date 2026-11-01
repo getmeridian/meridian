@@ -48,7 +48,7 @@
     if (!current(screen)) return;
     screen.version++;
     draw(screen, user, screen.share, savedForm);
-    if (toastKey === "person.reissued_toast") {
+    if (["person.reissued_toast", "person.rotated_toast", "person.enabled_toast", "person.disabled_toast", "person.saved_toast", "person.reset_toast"].indexOf(toastKey) >= 0) {
       var version = screen.version;
       M.api("GET", "ui/api/people/" + encodeURIComponent(screen.username) + "/share").then(function (share) {
         if (current(screen) && screen.version === version) draw(screen, screen.user, share);
@@ -83,8 +83,9 @@
       screen.head = h("div", { class: "page-head" });
       screen.shareSlot = h("div"); screen.usageSlot = h("div", { class: "card-slot" });
       screen.accessSlot = h("div", { class: "card-slot" }); screen.metadataSlot = h("div"); screen.dangerSlot = h("div");
+      screen.flowSlot = h("div");
       M.mount(screen.view, [back(), screen.head, screen.liveStatus, screen.shareSlot,
-        h("div", { class: "cards" }, screen.usageSlot, screen.accessSlot), screen.metadataSlot,
+        h("div", { class: "cards" }, screen.usageSlot, screen.accessSlot), screen.flowSlot, screen.metadataSlot,
         M.personHistory(name), M.devicesCard(user, function (changed) {
           if (!current(screen)) return;
           screen.version++;
@@ -92,6 +93,7 @@
         }), screen.dangerSlot]);
     }
     M.mount(screen.head, heading(user));
+    M.mount(screen.flowSlot, flowCard(share.flow_blocks));
     M.mount(screen.usageSlot, usageCard(user, screen));
     if (!oldShare || JSON.stringify(oldShare) !== JSON.stringify(share)) {
       var disclosure = screen.shareSlot.querySelector("details");
@@ -169,6 +171,31 @@
           if (ok) act(screen, function () { return M.api("POST", path(name, "/reset-traffic"), {}); }, "person.reset_toast");
         });
       } }, M.t("person.reset_traffic")));
+  }
+
+  function flowCard(state) {
+    if (!state || !state.nodes || !state.nodes.length) return null;
+    var labels = { blocked: M.t("person.flow_blocked"), pending_node: M.t("person.flow_pending_node"),
+      agent_too_old: M.t("person.flow_agent_too_old") };
+    var reasons = {
+      credentials: M.t("person.flow_reason_credentials"), disabled: M.t("person.flow_reason_disabled"),
+      expired: M.t("person.flow_reason_expired"), limited: M.t("person.flow_reason_limited"),
+      removed: M.t("person.flow_reason_removed"), access_changed: M.t("person.flow_reason_access_changed")
+    };
+    return h("section", { class: "card flow-block-status", "aria-live": "polite" },
+      h("h2", { text: M.t("person.flow_title") }),
+      h("p", { class: "muted small", text: M.t("person.flow_text") }),
+      h("dl", { class: "facts" }, state.nodes.map(function (node) {
+        var generation = Number.isSafeInteger(node.credential_generation) ?
+          h("span", { class: "muted small", "data-flow-generation": node.credential_generation,
+            text: " · " + M.t("person.flow_generation", {
+              generation: new Intl.NumberFormat(M.i18n.locale()).format(node.credential_generation)
+            }) }) : null;
+        var reason = reasons[node.reason] ?
+          h("span", { class: "muted small", "data-flow-reason": node.reason, text: " · " + reasons[node.reason] }) : null;
+        return [h("dt", {}, h("bdi", { text: node.node_id }), generation, reason),
+          h("dd", { "data-flow-state": node.status, text: labels[node.status] || labels.pending_node })];
+      })));
   }
 
   function accessCard(user, screen) {
@@ -279,6 +306,7 @@
     var name = user.username;
     return h("section", { class: "card card-danger" },
       h("h2", { text: M.t("person.danger") }),
+      rotationRow(user, declared, screen),
       h("div", { class: "danger-row" },
         h("div", {}, h("p", { class: "strong", text: M.t("person.reissue") }),
           h("p", { class: "muted small", text: M.t(declared ? "person.reissue_declared" : "person.reissue_text") }),
@@ -311,5 +339,38 @@
             }, function (e) { failed(label, e); });
           }, function (e) { failed(M.displayName(name), e); });
         } }, M.t("person.remove"))));
+  }
+
+  function rotationRow(user, declared, screen) {
+    var name = user.username;
+    var button = declared ? null : h("button", { class: "btn btn-ghost btn-sm", type: "button", "data-credential-rotation": "1",
+      disabled: !!screen.rotating, onclick: function () {
+        if (screen.rotating || !current(screen)) return;
+        if (!Number.isSafeInteger(user.credential_generation) || user.credential_generation < 1) {
+          M.toast(M.t("error.credentials_changed"), "error"); return;
+        }
+        screen.rotating = true; button.disabled = true;
+        var expected = user.credential_generation;
+        M.confirmCredentialRotation(name).then(function (choice) {
+          if (!choice || !current(screen)) return;
+          return act(screen, function () {
+            return M.api("POST", path(name, "/rotate-credentials"), { expected_generation: expected, cut_off: choice.cut_off }).then(function (result) {
+              if (result.commands && result.commands.length) M.showCommandResults(result.commands);
+              return result.user;
+            });
+          }, "person.rotated_toast");
+        }).catch(function (error) { if (current(screen)) failed(M.displayName(name), error); })
+          .finally(function () {
+            screen.rotating = false;
+            if (current(screen)) {
+              var currentButton = screen.dangerSlot.querySelector("[data-credential-rotation]");
+              if (currentButton) currentButton.disabled = false;
+            }
+          });
+      } }, M.t("person.rotate"));
+    return h("div", { class: "danger-row" },
+      h("div", {}, h("p", { class: "strong", text: M.t("person.rotate") }),
+        h("p", { class: "muted small", text: M.t(declared ? "person.rotate_declared" : "person.rotate_text") }),
+        declared ? M.command("meridian client rotate-credentials " + name) : null), button);
   }
 })();

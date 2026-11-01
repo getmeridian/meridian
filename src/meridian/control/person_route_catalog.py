@@ -13,6 +13,7 @@ from meridian.control.command_models import (
     CutOffPlan,
     UserCutOffRequest,
 )
+from meridian.control.credential_models import UserCredentialRotation
 from meridian.control.models import (
     UserCreate,
     UserDevices,
@@ -36,6 +37,7 @@ from meridian.control.route_types import ApiRoute, ErrorResponse, route
 from meridian.core.account_schedule import AccountSchedulePreview
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientExtendRequest
+from meridian.core.client_sessions import CredentialRotationRequest, UserFlowBlocks
 from meridian.core.clients import ClientConnections
 
 PERSON_ROUTES: tuple[ApiRoute, ...] = (
@@ -123,6 +125,18 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         description="Other query options are ignored. Daily history must be enabled by the operator.",
     ),
     route(
+        "GET",
+        "/api/users/{username}/flow-blocks",
+        ("read", "people"),
+        "user_flow_blocks",
+        None,
+        UserFlowBlocks,
+        "Read per-node evidence that a person's new flows are blocked.",
+        credentials=False,
+        refusals=(NOT_FOUND,),
+        description="Blocked covers new TCP streams and UDP associations. Already dispatched flows may continue.",
+    ),
+    route(
         "PUT",
         "/api/users/{username}",
         "people",
@@ -162,7 +176,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         "reissue_user",
         UserCutOffRequest,
         UserReissueResponse,
-        "Replace a person's connection credentials.",
+        "Replace a person's subscription URL and connection credentials.",
         credentials=True,
         body_required=False,
         body_scopes=CUT_OFF_SCOPE,
@@ -179,6 +193,24 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         "List inbounds affected by a session cut-off.",
         credentials=False,
         refusals=(NOT_FOUND,),
+    ),
+    route(
+        "POST",
+        "/api/users/{username}/rotate-credentials",
+        "people",
+        "rotate_credentials",
+        CredentialRotationRequest,
+        UserCredentialRotation,
+        "Rotate connection credentials keeping the subscription URL.",
+        credentials=True,
+        body_scopes=CUT_OFF_SCOPE,
+        refusals=(
+            NOT_FOUND,
+            ErrorResponse(409, ("credentials_changed", "declared_user", "conflict", "command_queue_full")),
+        ),
+        description="Preserves device registrations and operator settings. "
+        "Read the current credential_generation first. "
+        "Owner and people callers use the CLI for a declared person. Optional cut_off also requires admin.",
     ),
     route(
         "POST",

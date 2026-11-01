@@ -130,6 +130,7 @@ meridian client devices NAME [--remove ID | --clear] [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
 meridian client reissue NAME [--cut-off] [--yes] [--json]
+meridian client rotate-credentials NAME [--cut-off] [--yes] [--json]
 meridian client remove NAME [--cut-off] [--yes] [--json]
 ```
 
@@ -163,7 +164,11 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 **`client extend`** — 从当前时间和原到期时间中较晚者起增加 1–3650 个完整日；未设到期时间则从现在起算。必须提供 `--days N`。计算和限制检查在同一个服务事务中完成，因此并发的延长操作都会累加。已到期用户可以恢复访问，但管理者的禁用设置和流量限额仍然有效。JSON 在 `data.client` 中返回实际状态和到期时间。
 
-**`client enable` / `client disable`** — 立即恢复或暂停客户端。禁用持续到你运行 `client enable`；应用（包括重新部署和 `client add`、`node add`、`relay add`）保持客户端的状态不变。
+**`client enable` / `client disable`** — 恢复或暂停访问。每个节点应用变更后会阻止新连接。禁用持续到执行 `client enable`；应用配置不会撤销禁用。
+
+**`client rotate-credentials`** — 需要更换连接凭据并保留链接时，执行 `meridian client rotate-credentials NAME --yes`。它生成新的 VLESS UUID 和 Hysteria2 密码，保留订阅令牌、页面 URL、设备登记、状态、限额、到期时间、流量、备注、标签和语言。应用下次刷新订阅时获取新密钥；请用户立即刷新。各节点应用变更后会阻止旧身份的新数据流。若订阅 URL 本身泄露，请使用 `client reissue`；该命令签发新 URL 并清除设备登记。
+
+网页面板为在面板添加的用户提供**更换连接密钥**。配置文件声明的用户通过 CLI 操作，遵循与重新签发链接相同的所有权规则。JSON 模式需要 `--yes`，结果 `client-rotate-credentials` 包含凭据代次和每个节点的 `flow_blocks`。可选 `--cut-off` 也结束现有数据流；确认前会说明重置入站或重启整个节点核心的影响。
 
 **`client reissue`** — 在链接泄露后替换客户端的链接。控制服务生成新的订阅 ID 和新的密钥，因此旧的订阅 URL、连接页面和链接全部失效。Meridian 打印新的订阅 URL，它同时打开新的连接页面。状态、限额和到期时间保持不变。除非 `--yes`，否则要求确认；不属于你的客户端的名称会被拒绝。
 
@@ -175,7 +180,9 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 修改服务中用户设置的命令（`client enable`、`disable`、`set`、`reset-traffic` 以及删除设备注册）也适用于网页面板添加的用户。精确匹配的服务用户名优先；忽略大小写或按显示名称匹配时必须只对应一个用户。若有歧义，请使用 `client list` 中显示的精确用户名。删除用户、重新签发凭据和发布连接页面仍仅适用于拓扑中声明的用户。
 
-已建立的 VLESS 会话可能在凭证撤销后继续存在。`client remove` 或 `client reissue` 的 **`--cut-off`** 会等待每个受影响节点应用不含旧凭证的版本，再重置相关入站。这些入站上的所有会话都会终止，包括其他用户的会话；他们会短暂重连。若入站 API 失败，会重启 Xray 并终止该节点上的所有 Xray 会话。此选项需主动启用，建议在链接泄露时使用。JSON 在 `data.cut_off` 中报告各节点的 `done`、`core_restart`、`failed` 或 `timed_out` 状态。最多等待五分钟；失败退出码为 `4`，超时为 `3`。删除在网页面板中添加的用户时，网页面板也提供此选项。
+禁用、到期、达到流量上限、删除用户及更换连接凭据，会阻止已撤销身份的新 TCP 数据流和 UDP 会话，包括已认证的 Hysteria2 QUIC 连接或 VLESS mux 连接上的新数据流。其他用户的会话保持连接。用户详情页和 `GET /api/users/{username}/flow-blocks` 按节点返回 `blocked`、`pending_node` 或 `agent_too_old`。尚未确认的节点在收到并应用变更前可能继续使用旧配置；控制服务不可用时也如此。使用 `meridian apply` 更新旧节点 agent。事件只记录节点和结果，不记录连接地址或设备数据。
+
+撤销前开始的 TCP 流、Hysteria2 UDP 会话或 VLESS XUDP 会话，可能继续直到结束。固定版本的核心没有关闭单个用户会话的接口。`client remove`、`client reissue` 和 `client rotate-credentials` 的 **`--cut-off`** 会等待凭据变更应用。确认时会逐个节点说明范围：核心重启会让使用该节点任意 Xray 入站或桥接连接的所有用户重连；入站重置只影响列出的入站。如果重置失败，回退的核心重启会影响该节点所有入站与桥接连接。VLESS 节点使用核心重启；仅使用 Hysteria2 的节点重置相关入站。JSON 在 `data.cut_off` 下返回 `done`、`core_restart`、`failed` 或 `timed_out`。最多等待五分钟；失败退出码为 `4`，超时为 `3`。网页面板为在面板中添加的用户提供相同的删除、重新签发与凭据轮换选择。
 
 私人字段：`client set NAME --note TEXT --tag TAG` 只更改指定的字段。备注最多 500 个纯文本字符，支持换行；`--note ""` 清除备注。标签使用 1–16 个拉丁字母、数字或下划线，保存为大写；`--tag none` 清除标签。`client show` 显示这两个字段，`client list --tag TAG` 筛选标签列（`none` 选择没有标签的人）。读取和编辑需要 people/admin 权限。网页面板编辑相同字段；应用配置保留它们，加密快照保存它们。参见[私人备注和标签](/zh/client-management/#私人备注和标签)。
 
@@ -314,6 +321,8 @@ meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 **`node list`** — 列出节点及其 agent 的实时状态、版本和流量。如果控制服务无法访问，已配置的节点会显示为 `unknown`，命令以退出码 `3` 结束。
 
 **`node restart`** — 向节点 agent 发送签名命令，并等待服务就绪。默认或 `--core` 重启 Xray（`netcore`）；`--all` 逐一重启当前节点文档管理的所有运行中服务。每个服务重启时，其现有连接都会中断。`--core` 和 `--all` 互斥；`--json` 需要 `--yes`。JSON 在 `data.nodes[]` 中保留各条命令及节点的 `done`、`failed` 或 `timed_out` 结果。失败退出码为 `4`，等待五分钟后超时的退出码为 `3`。网页面板的服务器视图提供 **重启 Xray** 按钮，并展示相同的重连提示和执行结果。
+
+重启核心、重置入站及其回退重启，都要求当前持有的文档已应用，并且磁盘上的 `core.json` 与该文档渲染出的凭据完全一致。文档尚未应用或配置过旧时，会在重启或重置核心前返回可重试的失败。先执行 apply，再提交新命令；重复使用同一命令 ID 会返回已保存的结果。
 
 **`node remove`** — 从拓扑中移除一个出口或路由网关。它会列出将被删除的所有资源（节点记录和文档、其 agent 和 Xray、防火墙规则、客户端接入点），请求确认后原样执行该审查计划；服务器本身仍保留在已保存的服务器列表中。控制服务器不能通过此命令移除（请使用 `meridian teardown`）；仍有中继指向该出口时也会拒绝（请先移除中继或传入 `--force`）；有路由网关经由该出口接入集群，或移除后会破坏拓扑（例如导致出口池为空或失去默认出口）时同样会拒绝。绑定到被移除网关的路由规则会一并删除。
 

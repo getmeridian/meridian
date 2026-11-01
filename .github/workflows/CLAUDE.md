@@ -28,6 +28,7 @@
 - **Demo validation** — the website job runs `scripts/build_showcase.py` into `dist/demo` and checks the connection page's assets, its disabled SW, rendered pages, and the console demo's files; the release job builds the same output.
 
 ## Pitfalls
+- **Real-session tests compile the agent offline** — the runtime Python leg needs a stable Rust toolchain and a fetched locked Cargo cache before pytest, even though the separate Agent job prepares its own dependencies.
 
 - **Pre-release notes read only `## [X.Y.Z]`** — beta changes go under its `### Since <previous beta>` part, never a separate `## Unreleased` heading, which no release job extracts (b9's whole changelog once sat there).
 - **Release notes depend on CHANGELOG discipline** — if human forgets to update CHANGELOG before bumping VERSION, release notes fall back to git log (less useful).

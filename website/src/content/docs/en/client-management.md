@@ -181,9 +181,37 @@ meridian client disable alice
 meridian client enable alice
 ```
 
-`disable` cuts the client off immediately; `enable` lets them back in with the same links.
+A disable blocks new connections after each node applies the change; `enable` restores the same links. The person view shows which nodes have confirmed blocking.
 
 A disable lasts until `client enable`: apply, redeploys, and fleet changes leave it alone.
+
+
+Live rules block only the revoked credential on its inbound. Active credentials still follow normal DNS, private and country IP blocks, and IP egress rules. Re-enabling the same credential removes its block; a newly rotated credential never matches an older block. Restarting Xray ends old sessions and discards their temporary rules and pending retries.
+
+One Xray run retains at most 4096 credential/inbound block rules. At the limit, credentials are still removed, but the node stays pending and asks you to restart Xray. This bounds retained state and never blocks active credentials.
+
+
+The agent writes the new credentials to `core.json` before changing live accounts. A restart during apply then loads the current keys; if the core instance changes around the write, the agent reconciles it before confirming the change.
+
+
+Revocation receipts show the old key generation and the reason on each node. Separate pending generations remain visible; restoring the same key clears its matching receipt, even when an import advanced the counter. Private key fingerprints stay in the service database and never appear in the API, events, or console. Older confirmed receipts are discarded when a newer receipt exists.
+
+
+A node confirms revocation from fresh checks of its running core, bound to its applied document. A core restart closes the old sessions, so a fresh core needs no temporary revocation rules and clears an earlier pending guard status.
+
+
+A fresh report confirms a receipt when its applied revision is at or after the revocation revision in the same fleet epoch. Unrelated revisions and agent hellos preserve that evidence. Hellos do not refresh the age of the last runtime report; stale reports stay pending, and flow events are emitted only when a receipt changes status.
+
+## Rotate connection keys keeping the link
+
+Use `meridian client rotate-credentials NAME --yes` when connection credentials need replacing. It generates a new VLESS UUID and Hysteria2 auth while keeping the subscription token, page URL, device registrations, status, limits, expiry, traffic, notes, tags, and language. Apps receive the keys on their next subscription refresh; ask the person to refresh now. Old identities lose new streams as each node applies the change. A leaked subscription URL requires `client reissue`, which issues a new URL and clears device registrations.
+
+```bash
+meridian client rotate-credentials alice --yes
+```
+
+The web panel offers **Rotate connection keys** for people added there. Declared people use the CLI, following the same ownership rule as reissue. CLI JSON requires `--yes` and returns `client-rotate-credentials`, including the generation and per-node `flow_blocks`. Optional `--cut-off` also ends existing flows with the disclosed shared-inbound reset or node-wide core restart.
+
 
 ## Replacing a leaked link
 
@@ -203,7 +231,9 @@ With `--json`, pass `--yes`. The new links appear only in that command's output.
 
 `meridian client remove NAME` removes the client permanently: their links stop working and their connection page stops responding. A fleet keeps at least one client.
 
-Existing VLESS sessions can outlive credential revocation. **`--cut-off`**, with `client remove` or `client reissue`, waits for each affected node to apply the revision without the old credentials, then resets its affected inbounds. Every open session on those inbounds ends, including other people's; they reconnect for a moment. If the inbound API fails, Xray restarts and all its sessions on that node end. The flag is opt-in and recommended after a leak. JSON reports each node under `data.cut_off`: `done`, `core_restart`, `failed`, or `timed_out`. Meridian waits up to five minutes; failed cut-offs exit `4`, timeouts `3`. The web panel offers the same choice when reissuing or removing a person.
+Disable, expiry, quota suspension, removal, and credential replacement block new TCP streams and UDP associations for the affected identity, including new streams on an already authenticated Hysteria2 QUIC or VLESS mux connection. Other people keep their sessions. The person view and `GET /api/users/{username}/flow-blocks` report each node: `blocked`, `pending_node`, or `agent_too_old`. Pending nodes can keep serving their previous configuration until they receive and apply the change; this includes control-service outages. Update an old agent with `meridian apply`. Events record the node and outcome without addresses or device data.
+
+A TCP flow dispatched before revocation, a Hysteria2 UDP association, or a VLESS XUDP association may continue until it ends. The pinned core has no per-user close operation. **`--cut-off`** on `client remove`, `client reissue`, or `client rotate-credentials` waits for the credential change to apply. The review lists each node: a core restart reconnects everyone using any Xray inbound or bridge on that node; an inbound reset reconnects users of the listed inbounds. If a reset fails, the fallback core restart reconnects every inbound and bridge on that node. VLESS nodes use a core restart; Hysteria2-only nodes reset the affected inbounds. JSON reports `done`, `core_restart`, `failed`, or `timed_out` under `data.cut_off`. The wait is up to five minutes; failures exit `4`, timeouts `3`. The web panel offers the same choice for removal, reissue, and rotation of service-owned people.
 
 ## Subscription links
 
@@ -279,6 +309,7 @@ The operation tables below are checked against the contract. A read token sees:
 | Endpoint | Returns |
 |---|---|
 | `GET /api/users/{username}` | One person's status, traffic used and limit, reset period, and expiry |
+| `GET /api/users/{username}/flow-blocks` | Per-node evidence for blocking new flows; no connection addresses or device data |
 | `GET /api/users` | Every person |
 | `GET /api/traffic` | Traffic totals per person |
 | `GET /api/health` | The service's version |
@@ -311,14 +342,17 @@ Read tokens never see anyone's keys or subscription ID. Choose **People** for a 
 | `POST /api/users/{username}/reset-traffic` | Reset used traffic |
 | `POST /api/users/{username}/extend` | Send `{"days": N}` (1–3650) to add days after the later of now and the current expiry; no expiry starts from now |
 | `POST /api/users/{username}/reissue` | Replace connection credentials and clear device registrations |
+| `POST /api/users/{username}/rotate-credentials` | Rotate the VLESS UUID and Hysteria2 auth while preserving the subscription URL and registrations; send `expected_generation` from the current user record |
 | `DELETE /api/users/{username}` | Remove a person |
 | `GET /api/users/{username}/devices` | Read registrations allowed by the owner's privacy level |
 | `DELETE /api/users/{username}/devices` | Clear all registrations |
 | `DELETE /api/users/{username}/devices/{device_key}` | Remove one registration |
 
+Read `credential_generation` from `GET /api/users/{username}`, then send `{"expected_generation": N}` to `POST /api/users/{username}/rotate-credentials`. A stale generation returns `409 credentials_changed`, so an uncertain retry cannot rotate twice. The response contains `user`, `subscription_preserved: true`, `flow_blocks`, and `commands`. Adding `"cut_off": true` requires admin and queues the same revision-gated hard cut-off as reissue. Owner and people callers cannot rotate a declared person.
+
 A people token cannot remove or reissue a person declared in the fleet file: the API returns `409 declared_user` with the CLI command to run. This also applies while an approved or failed apply still declares the person. An unapproved proposal does not declare anyone. Status, limits, expiry, and device caps remain editable.
 
-Reissue and deletion accept an optional `{"cut_off": true}` body to end existing sessions after the credential change is applied. This also requires `admin`, as declared by `x-meridian-conditional-scopes`, and can briefly disconnect other people on the affected inbounds. Without that choice, the response keeps its usual account or deletion shape; with it, the response includes the queued commands.
+Reissue and deletion accept optional `{"cut_off": true}`; rotation includes it alongside `expected_generation` in its request. This requires `admin`, as declared by `x-meridian-conditional-scopes`. Review each node's scope: core restarts affect every Xray inbound and bridge, while inbound resets affect the listed inbounds and can fall back to a whole-core restart. Reissue/deletion keep their usual response without a cut-off and include queued commands with it; rotation always returns its command list and receipts.
 
 Choose **7, 30, or 90 days**, or **Never expires**; new web panel tokens default to 90 days. The list shows the expiry and marks expired tokens. Expiry and revocation both refuse the next request with the same `401 unauthenticated` response. Existing tokens keep no expiry. Treat a people token as a password, because it grants access to people's connection credentials.
 
@@ -397,3 +431,5 @@ Extend by whole days or calendar months from the later of now and expiry, with s
 Durable receipts retain action, parameters, counts, and per-person outcomes. Reversible fields can be undone once within ten minutes, even after a service restart, only while people and the reviewed enforcement outcome remain unchanged. Traffic reset, deletion, and schedule changes that reset traffic are irreversible and disclosed before commit. Resets preserve lifetime totals. Receipts contain no private notes, credentials, client addresses, or device identifiers. Events contain the action and counts plus the existing content-free per-person events. People declared in `topology_intent.access.users` may receive service-owned edits; their deletion returns the exact `meridian client remove USERNAME` command for a separate topology review and never deletes them in the service batch.
 
 `GET /api/people` requires people/admin or an owner session. It returns `users`, `total`, `population`, contextual `facets`, and `next_cursor`. Query keys: `q`, `status`, `tag`, `expires`, `quota`, `never` (0/1), `attention`, `lifecycle`, `sort`, `order`, `limit` (1–500), `cursor`. Keep filters and order when continuing a cursor. The plain `GET /api/users` route remains available. Query responses omit credentials and private notes; CLI JSON retains its existing note view through the authorized per-person read.
+
+When bulk disabling, deletion, or an expiry change removes access, the service records the same flow-block receipts for each person and affected node as an individual edit. Connection keys and subscription URLs stay unchanged. New streams are blocked after the node confirms the applied document; transfers and UDP sessions started earlier may continue. Deleting an account keeps its revocation receipts so later node reports can confirm blocking.

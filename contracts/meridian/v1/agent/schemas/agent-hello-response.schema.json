@@ -49,6 +49,7 @@
           "xray_config",
           "xray_users",
           "hysteria2_users",
+          "user_flow_blocking",
           "realm_forwarders",
           "firewall_rules",
           "binary_pins",

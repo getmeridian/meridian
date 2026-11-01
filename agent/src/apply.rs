@@ -87,6 +87,8 @@ pub struct PassResult {
     pub unretired: Vec<String>,
     /// Resource IDs that changed on the node in this pass.
     pub changed: BTreeSet<String>,
+    /// Authentication applies independently; failed flow guards are reported and retried.
+    pub flow_error: Option<ResourceError>,
 }
 
 /// What the document writes, so retirement never deletes a path or unit it still uses.
@@ -283,6 +285,7 @@ impl Engine<'_> {
             }
         }
         *ledger = next;
+        let flow_error = self.flow_guard_result(resources, &statuses);
         self.drop_kept(resources);
         let _ = fs::remove_dir_all(&self.cache_dir);
         let converged =
@@ -292,6 +295,7 @@ impl Engine<'_> {
             converged,
             unretired,
             changed,
+            flow_error,
         }
     }
 

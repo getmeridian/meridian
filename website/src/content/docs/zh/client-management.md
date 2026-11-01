@@ -183,9 +183,37 @@ meridian client disable alice
 meridian client enable alice
 ```
 
-`disable` 会立即暂停该客户端的访问；`enable` 则允许他们继续使用原有链接连接。
+`disable` 在每个节点应用变更后阻止新连接；`enable` 用原有链接恢复访问。用户详情页显示哪些节点已确认阻止新连接。
 
 禁用会持续到执行 `client enable`：应用、重新部署和集群变更都不会改动它。
+
+
+运行中的临时规则只拦截对应入站上的已撤销凭据。有效凭据仍按正常 DNS、私有地址与国家 IP 屏蔽以及 IP 出口规则路由。重新启用同一凭据会移除其屏蔽；轮换后的新凭据不会匹配旧规则。重启 Xray 会终止旧会话，并清除上一轮运行的临时规则及待重试事项。
+
+每次 Xray 运行最多保留 4096 条凭据与入站组合的屏蔽规则。达到上限后，凭据仍会移除，但节点会保持待处理状态，并提示重启 Xray。这会限制保留状态的大小，不会屏蔽有效凭据。
+
+
+agent 会先把新凭据写入 `core.json`，再修改运行中的账户。这样，即使 apply 期间发生重启，也会加载当前凭据；如果核心实例在文件写入前后发生变化，agent 会先使其与当前文档一致，再确认变更。
+
+
+撤销回执会显示每个节点上旧凭据的版本及原因。尚未确认的不同版本会分别保留；恢复同一凭据会清除对应回执，即使导入操作增加了版本计数。凭据指纹只保留在服务数据库中，不会出现在 API、事件或控制台中。有更新的回执时，已确认的旧回执会移除。
+
+
+节点会检查当前运行的核心，并将撤销确认关联到已应用的文档。核心重启会终止旧会话，因此新核心无需临时撤销规则，也会清除先前的待处理状态。
+
+
+新报告的已应用修订必须达到撤销修订或更新，并属于同一服务器集群时期，才能确认回执。无关修订和 agent 的 hello 消息会保留已有证据。Hello 不会刷新上一次核心状态报告的时间；过期报告仍显示待处理，只有回执状态真正变化时才会产生事件。
+
+## 更换密钥并保留链接
+
+需要更换连接凭据并保留链接时，执行 `meridian client rotate-credentials NAME --yes`。它生成新的 VLESS UUID 和 Hysteria2 密码，保留订阅令牌、页面 URL、设备登记、状态、限额、到期时间、流量、备注、标签和语言。应用下次刷新订阅时获取新密钥；请用户立即刷新。各节点应用变更后会阻止旧身份的新数据流。若订阅 URL 本身泄露，请使用 `client reissue`；该命令签发新 URL 并清除设备登记。
+
+```bash
+meridian client rotate-credentials alice --yes
+```
+
+网页面板为在面板添加的用户提供**更换连接密钥**。配置文件声明的用户通过 CLI 操作，遵循与重新签发链接相同的所有权规则。JSON 模式需要 `--yes`，结果 `client-rotate-credentials` 包含凭据代次和每个节点的 `flow_blocks`。可选 `--cut-off` 也结束现有数据流；确认前会说明重置入站或重启整个节点核心的影响。
+
 
 ## 替换泄露的链接
 
@@ -205,7 +233,9 @@ meridian client reissue alice
 
 `meridian client remove NAME` 永久删除客户端：他们的链接停止工作，他们的连接页面不再可用。集群至少保持一个客户端。
 
-已建立的 VLESS 会话可能在凭证撤销后继续存在。`client remove` 或 `client reissue` 的 **`--cut-off`** 会等待每个受影响节点应用不含旧凭证的版本，再重置相关入站。这些入站上的所有会话都会终止，包括其他用户的会话；他们会短暂重连。若入站 API 失败，会重启 Xray 并终止该节点上的所有 Xray 会话。此选项需主动启用，建议在链接泄露时使用。JSON 在 `data.cut_off` 中报告各节点的 `done`、`core_restart`、`failed` 或 `timed_out` 状态。最多等待五分钟；失败退出码为 `4`，超时为 `3`。重新签发或删除用户时，网页面板也提供此选项。
+禁用、到期、达到流量上限、删除用户及更换连接凭据，会阻止已撤销身份的新 TCP 数据流和 UDP 会话，包括已认证的 Hysteria2 QUIC 连接或 VLESS mux 连接上的新数据流。其他用户的会话保持连接。用户详情页和 `GET /api/users/{username}/flow-blocks` 按节点返回 `blocked`、`pending_node` 或 `agent_too_old`。尚未确认的节点在收到并应用变更前可能继续使用旧配置；控制服务不可用时也如此。使用 `meridian apply` 更新旧节点 agent。事件只记录节点和结果，不记录连接地址或设备数据。
+
+撤销前开始的 TCP 流、Hysteria2 UDP 会话或 VLESS XUDP 会话，可能继续直到结束。固定版本的核心没有关闭单个用户会话的接口。`client remove`、`client reissue` 和 `client rotate-credentials` 的 **`--cut-off`** 会等待凭据变更应用。确认时会逐个节点说明范围：核心重启会让使用该节点任意 Xray 入站或桥接连接的所有用户重连；入站重置只影响列出的入站。如果重置失败，回退的核心重启会影响该节点所有入站与桥接连接。VLESS 节点使用核心重启；仅使用 Hysteria2 的节点重置相关入站。JSON 在 `data.cut_off` 下返回 `done`、`core_restart`、`failed` 或 `timed_out`。最多等待五分钟；失败退出码为 `4`，超时为 `3`。网页面板为在面板中添加的用户提供相同的删除、重新签发与凭据轮换选择。
 
 ## 订阅链接
 
@@ -281,6 +311,7 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 | 端点 | 返回 |
 |---|---|
 | `GET /api/users/{username}` | 某个用户的状态、已用流量和限额、重置周期以及到期时间 |
+| `GET /api/users/{username}/flow-blocks` | 按节点返回阻止新数据流的结果；不含连接地址或设备数据 |
 | `GET /api/users` | 所有用户 |
 | `GET /api/traffic` | 每个用户的流量总计 |
 | `GET /api/health` | 服务的版本 |
@@ -313,14 +344,17 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 | `POST /api/users/{username}/reset-traffic` | 重置已用流量 |
 | `POST /api/users/{username}/extend` | 发送 `{"days": N}`（1–3650），从当前时间和原到期时间中较晚者起增加天数；未设到期时间则从现在起算 |
 | `POST /api/users/{username}/reissue` | 更换连接凭据并清除设备注册 |
+| `POST /api/users/{username}/rotate-credentials` | 更换 VLESS UUID 和 Hysteria2 密码，保留订阅 URL 和登记；发送当前用户记录的 `expected_generation` |
 | `DELETE /api/users/{username}` | 删除用户 |
 | `GET /api/users/{username}/devices` | 按所有者选择的隐私级别读取设备注册 |
 | `DELETE /api/users/{username}/devices` | 清除全部注册 |
 | `DELETE /api/users/{username}/devices/{device_key}` | 删除一项注册 |
 
+先从 `GET /api/users/{username}` 读取 `credential_generation`，再向 `POST /api/users/{username}/rotate-credentials` 发送 `{"expected_generation": N}`。过期代次返回 `409 credentials_changed`，防止响应不确定时重试而再次更换密钥。响应包含 `user`、`subscription_preserved: true`、`flow_blocks` 和 `commands`。添加 `"cut_off": true` 需要 admin 权限，并排队执行与重新签发相同的版本门控完整终止操作。所有者会话和 people 令牌不能更换配置文件声明的用户的密钥。
+
 People 令牌无法删除服务器配置文件中声明的用户，也无法为他们重新签发连接凭据。API 会返回 `409 declared_user` 和需要运行的 CLI 命令。已经批准或失败的应用仍声明该用户时，这项限制同样有效；未经批准的提案不会声明任何用户。状态、限额、到期时间和设备上限仍可修改。
 
-重新签发和删除操作接受可选的 `{"cut_off": true}` 请求体，在凭据变更应用后结束现有会话。根据 `x-meridian-conditional-scopes`，这一选择还需要 `admin` 权限，并可能让相关入站上的其他用户短暂断线。不选择时，响应仍为用户账户或删除确认；选择后，响应包含已排入队列的命令。
+重新签发和删除接受可选的 `{"cut_off": true}`；凭据轮换会将该选项与 `expected_generation` 一起发送。按 `x-meridian-conditional-scopes`，这需要 `admin` 权限。请逐个节点检查范围：核心重启影响所有 Xray 入站与桥接连接，入站重置只影响列出的入站，失败时会回退到整个核心重启。重新签发与删除未选择切断时保留普通响应，选择后包含排队命令；凭据轮换始终返回命令列表与回执。
 
 可以选择 **7、30 或 90 天**，或**永不过期**；网页面板新令牌默认有效期为 90 天。列表会显示到期时间并标记已过期令牌。到期和撤销都会在下一次请求时返回相同的 `401 unauthenticated` 响应。现有令牌仍保持无到期时间。请像保护密码一样保护 people 令牌，因为它可以读取用户的连接凭据。
 
@@ -399,3 +433,5 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 持久回执保存操作、参数、计数及各人的结果。如果人员及限制执行结果未变化，可在十分钟内撤销一次可逆字段，重启服务后也可撤销。流量重置、删除和会重置流量的计划更改不可逆，提交前明确提示。重置保留累计流量。回执不含私人备注、连接凭据、客户端地址或设备标识符；事件仅包含操作与计数及现有不含私人内容的单人事件。`topology_intent.access.users` 中的人员可接受服务字段更改；删除时返回确切的 `meridian client remove USERNAME` 命令以单独审核，服务批次不会删除他们。
 
 `GET /api/people` 需要 people/admin 或所有者会话，返回 `users`、`total`、`population`、分类 `facets` 与 `next_cursor`。查询键：`q`、`status`、`tag`、`expires`、`quota`、`never`（0/1）、`attention`、`lifecycle`、`sort`、`order`、`limit`（1–500）、`cursor`。继续游标时保持相同筛选和排序。原有 `GET /api/users` 保留。查询响应不含凭据与私人备注；CLI 的 JSON 通过现有授权单人读取接口保留备注。
+
+批量停用、删除或到期变更使用户失去访问权限时，服务会为每位用户和每个受影响节点记录与单个用户操作相同的流阻断回执。连接密钥和订阅链接保持不变。节点确认已应用配置后才会阻断新流；已经开始的传输和 UDP 会话可能继续。删除用户记录后，回执仍保留，以便后续节点报告确认阻断。

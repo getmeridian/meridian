@@ -16,11 +16,14 @@
 **Retired spellings** — `cli.RENAMED`/`RENAMED_OPTIONS` refuse old commands and flags with exit 2 and the new spelling; `cli.RETIRED` refuses a command removed without a successor (`studio`) and points to where the work moved.
 
 ## What's done well
+- **Connection-key rotation follows reissue ownership** — the CLI targets declared people and uses a service generation precondition; the API and console rotate service-owned people, keeping links and registrations.
 - `fleet upgrade` reads each relay's running Realm (a failed upgrade leaves the saved pin ahead), applies the unchanged intent, then runs `check`.
 - `client remove|reissue --cut-off` discloses every affected node and other people's reconnects before confirming, and keeps typed per-node outcomes and new links even on failure.
 
 ## Pitfalls
 - **Undo dry runs check the receipt** — reject irreversible, already-undone, or expired receipts; uncertain undo succeeds only after reading its recorded completion.
+- **Escape at the console boundary once** — ok/warn already escape Rich markup; pass translated display names and disclosures unchanged.
+- **Cut-off consent names each node's boundary** — a core restart reaches every Xray inbound and bridge; an inbound reset names its tags and whole-core failure fallback.
 - **`console.fail()` always exits** (user 2, system 3, bug 1) — entry points convert library `MeridianError`s with `fail(exc)`, or the user sees a traceback.
 - **Catch control-service errors inside the command's `error_context`** — it supplies JSON metadata but catches nothing; a non-retryable poll error is a failed outcome, not a timeout.
 - **A local save failure after a remote change exits 3** and says remote state changed.
@@ -31,6 +34,7 @@
 - **Never save intent from a declined or dry-run review**; omitted options preserve saved values.
 - **Role names are server names** — `server set` accepts the exit, gateway, and relay IDs `fleet status` prints, since labs whose saved names are IPs had no other handle.
 - **Topology-owned removal and reissue never touch console-only people** — and `client reissue` clears device registrations and makes the new subscription URL the page URL at once.
+- **Flow-block receipts read at commit time are always pending** — re-read them briefly (`node_commands.wait_for_flow_blocks()`) before reporting, since the agent confirms within seconds of applying.
 - **`client enable` reports the status the service answers** (`expired`/`limited` when those still hold), never the requested one.
 - **Removals refuse the control server and its dependents before review**; `node remove --force` only extends the edit to relay chains into that exit.
 - **`forget_unreachable_servers()` forgets in memory only** — the confirmed apply saves it, or a declined import leaves bindings forgotten on disk.

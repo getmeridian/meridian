@@ -19,6 +19,7 @@ from meridian.core.fleet_events import (
     PrivacyEventDetail,
     TokenEventDetail,
     UserFieldsDetail,
+    UserFlowBlockDetail,
 )
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -98,6 +99,13 @@ def _detail(event: FleetEvent) -> str:
         )
     if isinstance(detail, UserFieldsDetail):
         return t("events.changed", fields=", ".join(t(f"events.field.{field}") for field in detail.fields))
+    if isinstance(detail, UserFlowBlockDetail):
+        labels = {
+            "blocked": "node_commands.flow_blocked",
+            "pending_node": "node_commands.flow_pending",
+            "agent_too_old": "node_commands.flow_old_agent",
+        }
+        return detail.node_id + ": " + t(labels[detail.status])
     if isinstance(detail, TokenEventDetail):
         return t("events.scope", scope=detail.scope)
     if isinstance(detail, PrivacyEventDetail):

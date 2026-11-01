@@ -8,7 +8,14 @@ import pytest
 
 from meridian.control.client import ControlServiceError, ControlServiceUncertain
 from meridian.control.command_models import NodeCommandOutcome
-from meridian.node_commands import command_exit_code, command_warnings, wait_for_commands, with_command_issue_error
+from meridian.core.client_sessions import UserFlowBlocks
+from meridian.node_commands import (
+    command_exit_code,
+    command_warnings,
+    wait_for_commands,
+    wait_for_flow_blocks,
+    with_command_issue_error,
+)
 from tests.support.node_commands import command_record
 
 
@@ -94,3 +101,56 @@ def test_review_5_2_non_retryable_poll_errors_fail_and_keep_finished_siblings(st
     assert by_node["unreadable"].commands == [unreadable]
     assert client.command.call_count == 2 and command_exit_code(outcomes) == 4
     assert command_warnings(outcomes)[0].retryable is False
+
+
+def _flow_blocks(status: str) -> UserFlowBlocks:
+    node = {
+        "node_id": "main",
+        "credential_generation": 1,
+        "reason": "credentials",
+        "status": status,
+        "required": {"fleet_epoch": 1, "revision": 4, "sha256": "a" * 64},
+    }
+    return UserFlowBlocks.model_validate({"username": "alice", "credential_generation": 2, "nodes": [node]})
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
+
+def test_commit_time_pending_receipts_are_re_read_until_the_node_confirms() -> None:
+    clock = _Clock()
+    reads = iter([_flow_blocks("pending_node"), _flow_blocks("blocked")])
+    result = wait_for_flow_blocks(lambda: next(reads), _flow_blocks("pending_node"), clock=clock, sleep=clock.sleep)
+    assert [node.status for node in result.nodes] == ["blocked"]
+    assert clock.now == 2.0
+
+
+def test_an_unconfirmed_node_stays_pending_after_the_bounded_wait() -> None:
+    clock = _Clock()
+    reads = MagicMock(return_value=_flow_blocks("pending_node"))
+    result = wait_for_flow_blocks(reads, _flow_blocks("pending_node"), timeout=5, clock=clock, sleep=clock.sleep)
+    assert [node.status for node in result.nodes] == ["pending_node"]
+    assert clock.now == 5.0 and reads.call_count == 5
+
+
+@pytest.mark.parametrize(("retryable", "reads"), [(True, 3), (False, 1)], ids=["retryable", "refused"])
+def test_receipt_read_errors_keep_the_last_answer(retryable: bool, reads: int) -> None:
+    clock = _Clock()
+    read = MagicMock(side_effect=ControlServiceError("unreachable", category="system", retryable=retryable))
+    result = wait_for_flow_blocks(read, _flow_blocks("pending_node"), timeout=3, clock=clock, sleep=clock.sleep)
+    assert [node.status for node in result.nodes] == ["pending_node"]
+    assert read.call_count == reads
+
+
+def test_confirmed_receipts_are_never_re_read() -> None:
+    read = MagicMock()
+    assert wait_for_flow_blocks(read, _flow_blocks("blocked")).nodes[0].status == "blocked"
+    read.assert_not_called()

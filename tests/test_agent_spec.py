@@ -55,6 +55,7 @@ def test_core_config_adds_loopback_api_first_in_routing() -> None:
 
     api = next(inbound for inbound in config["inbounds"] if inbound["tag"] == "api")
     assert (api["listen"], api["port"]) == ("127.0.0.1", CORE_API_PORT)
+    assert "RoutingService" in config["api"]["services"]
     assert config["routing"]["rules"][0] == {"type": "field", "inboundTag": ["api"], "outboundTag": "api"}
 
 

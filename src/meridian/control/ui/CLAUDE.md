@@ -15,6 +15,8 @@
 - **Passkeys are a seam** — `PasskeyState` reports `no_domain` on a bare IP and `not_built` otherwise; py_webauthn would add pyOpenSSL, pyasn1, and cbor2 to every CLI install, and attestation is never parsed by hand.
 
 ## What's done well
+- **Connection keys and leaked links have separate actions** — rotation preserves the subscription URL, sends the displayed generation, and locks confirmation and submission; declared people receive the CLI command.
+- **Revocation receipts name their boundary** — show each node's blocked, pending, or old-agent state with the remaining transfers and shared-inbound cut-off effect.
 - **CSP with no script exceptions** — `default-src 'none'`, `script-src 'self'`, `frame-ancestors 'none'`, `no-referrer` on every response; `test_control_ui_assets.py` refuses inline script, style, handlers, HTML sinks, outside URLs, and locale drift.
 - **Every mutating request is same-origin twice** — `SameSite=Strict` plus the `X-Meridian-Request: 1` header `M.api` adds (and matching `Origin`/`Sec-Fetch-Site` when sent).
 - **Assets revalidate by content-hash ETag**; anything holding a secret is `no-store`.
@@ -25,6 +27,8 @@
 - **Bulk expiry validates before reading** — a deferred submit listener cannot guard direct values; clearing expiry requires the explicit No end date choice.
 - **Undo replies can be uncertain** — read the receipt before reporting success, keep its latest state, and never enable a blind retry after a lost reply.
 - **People refreshes keep usable controls** — passive reads never disable selections or the pager; failed page requests restore the last accepted cursor and controls.
+- **Cut-off scope comes from each node's effect** — core restarts reconnect all Xray inbounds and bridges; reset captions name the affected tags and the whole-core fallback.
+- **One node can have several revoked generations** — show the key version and cause beside each receipt; repeated node names alone hide which identity is pending.
 - **Settle a form's disabled state before `M.trackForm()`** — a field disabled after the snapshot reads as edited, and the device editor once asked to discard changes nobody made.
 - **Device caps have three choices** — inherit, unlimited, or 1–100; saving another field preserves an exemption.
 - **Scope the session cookie to `ServiceConfig.public_path`** — a `/` cookie would ride every subscription request; without a path, sign-in is refused (`ui_unconfigured`), and so is a setup link.

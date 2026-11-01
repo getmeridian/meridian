@@ -58,6 +58,7 @@ COMMAND_SECTIONS: dict[str, str] = {
     "client extend": "### meridian client",
     "client devices": "### meridian client",
     "client reissue": "### meridian client",
+    "client rotate-credentials": "### meridian client",
     "client remove": "### meridian client",
     "client enable": "### meridian client",
     "client disable": "### meridian client",

@@ -130,6 +130,7 @@ meridian client devices NAME [--remove ID | --clear] [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
 meridian client reissue NAME [--cut-off] [--yes] [--json]
+meridian client rotate-credentials NAME [--cut-off] [--yes] [--json]
 meridian client remove NAME [--cut-off] [--yes] [--json]
 ```
 
@@ -141,7 +142,7 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 | `--limit SIZE` | none | Traffic limit (`client add`, `client set`): `500MB`, `50GB`, `1.5TB`; `none` or `0` removes it. Units are binary (1 GB = 1024³ bytes), as the control service counts |
 | `--reset PERIOD` | never | When used traffic starts again from zero: `day`, `week`, `month`, or `never`, by calendar day, week, or month |
 | `--expires DATE` | never | When access ends: `YYYY-MM-DD` (the end of that day, UTC), an ISO time such as `2026-12-31T18:00:00+03:00` (a time without an offset is UTC), or `never`. Must be in the future |
-| `--yes`, `-y` | | Confirm `client reissue` or `client remove`; required with `--json` |
+| `--yes`, `-y` | | Confirm `client reissue`, `client rotate-credentials`, or `client remove`; required with `--json` |
 
 **`client add`** — adds one or more people to the topology, applies it, and prints each person's connection page and subscription URL. The page is built from their real subscription, so relays and Hysteria2 appear when present. Names already in the topology or already present in the control service are refused. Names can be in any script (`client add Биба 王小明`): pages and output show them as typed, while the control service, which accepts only Latin letters, digits, `.`, `-`, and `_`, gets a transliterated username (`biba`, `wangxiaoming`). Other client commands accept either form. If a client's subscription link can't be built, the client is still added and the command exits `3`. `--limit`, `--reset`, `--expires`, and `--devices` are carried in the reviewed plan and created with each account in one transaction. A failed apply prints no links; rerun `meridian apply` to finish. Later applies preserve operator edits.
 
@@ -163,7 +164,11 @@ First reported traffic and the last reporting node come from accepted traffic gr
 
 **`client extend`** — adds 1–3650 whole days after the later of now and the current expiry; a person without expiry gets now plus that duration. `--days N` is required. The calculation and enforcement share one service transaction, so concurrent extensions both count. An expired person can connect again, while operator disable and traffic limits still apply. JSON returns the effective status and expiry in `data.client`.
 
-**`client enable` / `client disable`** — resume or suspend a client immediately. A disable lasts until you run `client enable`; applies (including redeploys and `client add`, `node add`, `relay add`) leave a client's status alone.
+**`client enable` / `client disable`** — resume or suspend access. New connections are blocked after each node applies the change. A disable lasts until `client enable`; reviewed applies preserve it.
+
+**`client rotate-credentials`** — Use `meridian client rotate-credentials NAME --yes` when connection credentials need replacing. It generates a new VLESS UUID and Hysteria2 auth while keeping the subscription token, page URL, device registrations, status, limits, expiry, traffic, notes, tags, and language. Apps receive the keys on their next subscription refresh; ask the person to refresh now. Old identities lose new streams as each node applies the change. A leaked subscription URL requires `client reissue`, which issues a new URL and clears device registrations.
+
+The web panel offers **Rotate connection keys** for people added there. Declared people use the CLI, following the same ownership rule as reissue. CLI JSON requires `--yes` and returns `client-rotate-credentials`, including the generation and per-node `flow_blocks`. Optional `--cut-off` also ends existing flows with the disclosed shared-inbound reset or node-wide core restart.
 
 **`client reissue`** — replaces a client's links after a leak. The control service issues a new subscription ID and new keys, so the old subscription URL, connection page, and links stop working. Meridian prints the new subscription URL, which also opens the new connection page. Status, limits, and expiry stay as set. Asks for confirmation unless `--yes`, and refuses names that aren't your clients.
 
@@ -175,7 +180,9 @@ First reported traffic and the last reporting node come from accepted traffic gr
 
 Service-owned edits (`client enable`, `disable`, `set`, `reset-traffic`, and device removals) also accept people added in the web panel. An exact service username wins; a case or display-name match must identify one person, otherwise use the exact username shown by `client list`. Removal, reissue, and connection-page publication remain tied to declared clients.
 
-Existing VLESS sessions can outlive credential revocation. **`--cut-off`**, with `client remove` or `client reissue`, waits for each affected node to apply the revision without the old credentials, then resets its affected inbounds. Every open session on those inbounds ends, including other people's; they reconnect for a moment. If the inbound API fails, Xray restarts and all its sessions on that node end. The flag is opt-in and recommended after a leak. JSON reports each node under `data.cut_off`: `done`, `core_restart`, `failed`, or `timed_out`. Meridian waits up to five minutes; failed cut-offs exit `4`, timeouts `3`. The web panel offers the same choice when removing a person added there.
+Disable, expiry, quota suspension, removal, and credential replacement block new TCP streams and UDP associations for the affected identity, including new streams on an already authenticated Hysteria2 QUIC or VLESS mux connection. Other people keep their sessions. The person view and `GET /api/users/{username}/flow-blocks` report each node: `blocked`, `pending_node`, or `agent_too_old`. Pending nodes can keep serving their previous configuration until they receive and apply the change; this includes control-service outages. Update an old agent with `meridian apply`. Events record the node and outcome without addresses or device data.
+
+A TCP flow dispatched before revocation, a Hysteria2 UDP association, or a VLESS XUDP association may continue until it ends. The pinned core has no per-user close operation. **`--cut-off`** on `client remove`, `client reissue`, or `client rotate-credentials` waits for the credential change to apply. The review lists each node: a core restart reconnects everyone using any Xray inbound or bridge on that node; an inbound reset reconnects users of the listed inbounds. If a reset fails, the fallback core restart reconnects every inbound and bridge on that node. VLESS nodes use a core restart; Hysteria2-only nodes reset the affected inbounds. JSON reports `done`, `core_restart`, `failed`, or `timed_out` under `data.cut_off`. The wait is up to five minutes; failures exit `4`, timeouts `3`. The web panel offers the same choice for removal, reissue, and rotation of service-owned people.
 
 Private metadata: `client set NAME --note TEXT --tag TAG` edits only the supplied fields. A note holds up to 500 plain-text characters, with newlines; `--note ""` clears it. A tag holds 1–16 Latin letters, digits, or underscores, saved in uppercase; `--tag none` clears it. `client show` includes both fields, and `client list --tag TAG` filters its tag column (`none` selects untagged people). Reads and edits require people/admin scope. The web panel edits the same private fields; applies preserve them and encrypted snapshots carry them. See [Private notes and tags](/en/client-management/#private-notes-and-tags).
 
@@ -314,6 +321,8 @@ meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 **`node list`** — lists nodes with their agent's live status, version, and traffic. If the control service is unreachable, configured nodes are shown as `unknown` and the command exits `3`.
 
 **`node restart`** — sends a signed command to the node agent and waits for readiness. Default and `--core` restart Xray (`netcore`); `--all` restarts every running unit managed by the held node document, one at a time. Active connections drop while their unit restarts. `--core` and `--all` are exclusive; `--json` requires `--yes`. JSON preserves each command and the per-node outcome in `data.nodes[]`: `done`, `failed`, or `timed_out`. Failed restarts exit `4`; a five-minute timeout exits `3`. The Servers view in the web panel has a **Restart Xray** button with the same reconnect disclosure and results.
+
+Core restarts, inbound resets, and their fallback restarts require the held document to be applied and the installed `core.json` to match its rendered credentials exactly. An unapplied or stale configuration returns a retryable failure before restarting or resetting the core. Apply the fleet, then submit a new command; repeating a command ID returns its saved result.
 
 **`node remove`** — removes an exit or routing gateway from your topology. It lists every resource that will be deleted (the node's record and document, its agent and Xray, firewall rules, client endpoints), asks for confirmation, and applies exactly that review; the server stays in your saved servers. It refuses for the control server (use `meridian teardown`), while relays still route to the exit (remove them first or pass `--force`), while a routing gateway enters the fleet through it, and when the result would break the topology (for example an empty egress pool or the default egress). Routing rules scoped to a removed gateway are dropped with it.
 

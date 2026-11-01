@@ -12,12 +12,14 @@ from meridian.control.command_models import (
     CutOffPlan,
     NodeCommandRecord,
     ResetInboundCreate,
+    RestartUnitCreate,
     UserCutOffMutation,
 )
 from meridian.control.commands import CommandLedger
 from meridian.control.errors import ServiceError
 from meridian.control.models import NodeSpec, UserRecord
 from meridian.control.store import Store
+from meridian.core.agent_protocol import CommandEffect
 from meridian.core.agent_types import NodeStateRef
 
 
@@ -58,7 +60,12 @@ class CutOffLedger:
                     tags &= carried
                 # Inactive people can still have sessions from before rmu removed them.
                 if tags:
-                    nodes.append(CutOffNode(node_id=row["node_id"], inbound_tags=sorted(tags)))
+                    effect: CommandEffect = (
+                        "core_restart"
+                        if any(inbound.protocol == "vless" and inbound.tag in tags for inbound in spec.managed_inbounds)
+                        else "inbound_reset"
+                    )
+                    nodes.append(CutOffNode(node_id=row["node_id"], inbound_tags=sorted(tags), effect=effect))
             return CutOffPlan(nodes=nodes)
 
     def change(self, username: str, mutate: Callable[[str], UserRecord | None]) -> UserCutOffMutation:
@@ -91,6 +98,18 @@ class CutOffLedger:
             wanted = NodeStateRef(
                 fleet_epoch=self._store.fleet_epoch, revision=row["revision"], sha256=row["doc_sha256"]
             )
+            if node.effect == "core_restart":
+                core = next((unit for unit in self._commands.targets(node.node_id).units if unit.core), None)
+                if core is None:
+                    raise ServiceError(
+                        "conflict", "VLESS cut-off needs a managed Xray unit. Apply the node configuration first.", 409
+                    )
+                pending.commands.append(
+                    self._commands.enqueue(
+                        node.node_id, RestartUnitCreate(resource_id=core.resource_id, wait_for=wanted)
+                    )
+                )
+                continue
             for tag in node.inbound_tags:
                 pending.commands.append(
                     self._commands.enqueue(node.node_id, ResetInboundCreate(inbound_tag=tag, wait_for=wanted))

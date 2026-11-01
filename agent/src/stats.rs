@@ -292,6 +292,7 @@ pub fn parse_statsquery(stdout: &str) -> Result<BTreeMap<String, Totals>, String
         let ["user", user, "traffic", direction] = parts[..] else {
             continue;
         };
+        let user = crate::xray_identity::person_id(user);
         if !is_user_id(user) {
             continue;
         }
@@ -390,6 +391,21 @@ mod tests {
             parse_statsquery(r#"{"stat":[{"name":"user>>>u>>>traffic>>>uplink","value":"-1"}]}"#)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn retired_and_current_credential_generations_count_toward_one_person() {
+        let old = crate::xray_identity::email("u-a", "old-credential");
+        let new = crate::xray_identity::email("u-a", "new-credential");
+        let response = serde_json::json!({"stat": [
+            {"name": format!("user>>>{old}>>>traffic>>>uplink"), "value": "10"},
+            {"name": format!("user>>>{new}>>>traffic>>>uplink"), "value": "20"},
+            {"name": format!("user>>>{old}>>>traffic>>>downlink"), "value": "30"},
+        ]});
+        let counters = parse_statsquery(&response.to_string()).unwrap();
+        assert_eq!(counters.len(), 1);
+        assert_eq!(counters["u-a"].uplink, 30);
+        assert_eq!(counters["u-a"].downlink, 30);
     }
 
     #[test]

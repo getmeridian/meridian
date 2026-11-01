@@ -138,11 +138,13 @@ ROUTE_SAMPLES = {
     "import_users": ("/api/import/users", {"users": []}),
     "get_user": ("/api/users/alice", None),
     "user_connections": ("/api/users/alice/connections", None),
+    "user_flow_blocks": ("/api/users/alice/flow-blocks", None),
     "user_usage": ("/api/users/alice/usage", None),
     "put_user": ("/api/users/bob", {}),
     "update_user": ("/api/users/alice", {"status": "disabled"}),
     "patch_user": ("/api/users", {"username": "alice", "status": "disabled"}),
     "reissue_user": ("/api/users/alice/reissue", {}),
+    "rotate_credentials": ("/api/users/alice/rotate-credentials", {"expected_generation": 1}),
     "cut_off_scope": ("/api/users/alice/cut-off", None),
     "reset_user_traffic": ("/api/users/alice/reset-traffic", {}),
     "extend_user": ("/api/users/alice/extend", {"days": 7}),
@@ -429,12 +431,26 @@ def _declare(fleet: Fleet, status: str) -> None:
 
 
 @pytest.mark.parametrize("status", ["proposed", "approved", "failed", "applied"])
-@pytest.mark.parametrize(("method", "path"), [("POST", "/api/users/alice/reissue"), ("DELETE", "/api/users/alice")])
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("POST", "/api/users/alice/reissue"),
+        ("DELETE", "/api/users/alice"),
+        ("POST", "/api/users/alice/rotate-credentials"),
+    ],
+)
 def test_people_cannot_remove_or_reissue_declared_people(fleet: Fleet, status: str, method: str, path: str) -> None:
     before = fleet.service.put_user("alice")
     _declare(fleet, status)
     token = _mint(fleet, "people")["token"]
-    code, answer = _request(fleet.url + path, method, {} if method == "POST" else None, token)
+    body = (
+        {"expected_generation": before.credential_generation}
+        if path.endswith("rotate-credentials")
+        else {}
+        if method == "POST"
+        else None
+    )
+    code, answer = _request(fleet.url + path, method, body, token)
     if status == "proposed":
         assert code == 200
     else:
@@ -461,6 +477,16 @@ def test_extend_api_requires_one_bounded_integer(fleet: Fleet, days: Any) -> Non
     original = fleet.service.put_user("alice")
     status, answer = _request(fleet.url + "/api/users/alice/extend", "POST", {"days": days}, ADMIN_TOKEN)
     assert (status, answer["error"]["code"]) == (400, "invalid_request")
+    assert fleet.service.get_user("alice") == original
+
+
+@pytest.mark.parametrize("generation", [0, -1, 1.5, "1", None, True, 2**53])
+def test_rotation_requires_a_bounded_integer_generation(fleet: Fleet, generation: Any) -> None:
+    original = fleet.service.put_user("alice")
+    code, answer = _request(
+        fleet.url + "/api/users/alice/rotate-credentials", "POST", {"expected_generation": generation}, ADMIN_TOKEN
+    )
+    assert (code, answer["error"]["code"]) == (400, "invalid_request")
     assert fleet.service.get_user("alice") == original
 
 
