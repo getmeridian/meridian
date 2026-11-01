@@ -21,6 +21,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Settle a form's disabled state before `M.trackForm()`** — a field disabled after the snapshot reads as edited, and the device editor once asked to discard changes nobody made.
 - **Device caps have three choices** — inherit, unlimited, or 1–100; saving another field preserves an exemption.
 - **Scope the session cookie to `ServiceConfig.public_path`** — a `/` cookie would ride every subscription request; without a path, sign-in is refused (`ui_unconfigured`), and so is a setup link.
 - **Guess limits are per bucket, never per source** — every browser arrives as nginx's 127.0.0.1, so `login_limits.py` keeps separate in-memory buckets for sign-in, setup links, and each session's re-checks; one shared bucket let guesses lock out a signed-in owner. Never trust a forwarded-address header.

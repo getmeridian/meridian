@@ -84,10 +84,11 @@
       h("p", { class: "form-error", role: "alert" }),
       h("div", { class: "row-actions" },
         h("button", { class: "btn btn-primary btn-sm", type: "submit" }, M.t("action.save"))));
-    M.trackForm(form);
     function sync() { limit.disabled = mode.value !== "limited"; }
     mode.addEventListener("change", sync);
+    // Settle the disabled state before the draft snapshot, or inherit/unlimited read as edited on load.
     sync();
+    M.trackForm(form);
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var value = limit.value.trim();

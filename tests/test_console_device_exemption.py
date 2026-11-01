@@ -33,3 +33,8 @@ def test_explicit_choices_send_zero_for_exempt_and_null_for_inherit(old: int, mo
     result = scenario(old, mode)
     patches = [item for item in result["requests"] if item["method"] == "PATCH"]
     assert patches == [{"method": "PATCH", "path": "api/users/example", "body": {"device_limit": cap}}]
+
+
+@pytest.mark.parametrize("cap", [None, 0, 5], ids=["inherit", "unlimited", "custom"])
+def test_an_untouched_device_editor_never_reads_as_unsaved(cap: int | None) -> None:
+    assert scenario(cap)["dirtyAtLoad"] is False

@@ -113,6 +113,12 @@ if (mode === 'person-schedules') {
     field.dispatchEvent(new w.Event(field.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));
   }
   await new Promise(resolve => setTimeout(resolve, 350));
+  if (data.expiryDate) {
+    const date = view().querySelector('input[type="date"]');
+    date.value = data.expiryDate;
+    date.dispatchEvent(new w.Event('input', { bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 350));
+  }
   report.shown = view().textContent;
   if (data.submit) {
     const form = view().querySelector('.access-status + form');
@@ -134,6 +140,7 @@ if (mode === 'person-devices') {
   M.mount(view(), card);
   await settle();
   report.shown = card.textContent;
+  report.dirtyAtLoad = M.hasUnsavedEdits(card);
   if (data.action === 'cap') {
     const input = card.querySelector('input[type="number"]');
     const mode = card.querySelector('select[name="device_mode"]');

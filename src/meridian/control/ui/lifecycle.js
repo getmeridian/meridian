@@ -161,9 +161,12 @@
       if (mode.value !== "first_use") mode.value = expiry.never.checked ? "never" : "fixed";
       sync();
     });
-    expiry.date.addEventListener("input", function () {
-      if (mode.value !== "first_use") mode.value = expiry.never.checked ? "never" : "fixed";
-      sync();
+    // Typed dates, time edits, and the +1/+3 month presets (which dispatch input on the date) refresh the preview.
+    [expiry.date, expiry.time].forEach(function (input) {
+      input.addEventListener("input", function () {
+        if (mode.value !== "first_use") mode.value = expiry.never.checked ? "never" : "fixed";
+        update();
+      });
     });
     [duration, renewal, interval, capMode, cap, anchor, limits.strategy].forEach(function (input) {
       input.addEventListener(input.tagName === "SELECT" ? "change" : "input", update);

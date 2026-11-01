@@ -102,7 +102,7 @@
     var accessForm = screen.accessSlot.querySelector("form");
     var changedAccess = !previous || previous.expire_at !== user.expire_at || previous.traffic_limit_bytes !== user.traffic_limit_bytes
       || previous.traffic_limit_strategy !== user.traffic_limit_strategy || previous.language !== user.language
-      || !M.sameLifecycle(previous, user);
+      || !M.sameLifecycle(previous, user) || JSON.stringify(previous.schedule) !== JSON.stringify(user.schedule);
     if (!accessForm || editable(accessForm) && (changedAccess || accessForm === savedForm)) {
       M.mount(screen.accessSlot, accessCard(user, screen));
     } else {

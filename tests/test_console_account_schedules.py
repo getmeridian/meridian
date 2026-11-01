@@ -121,3 +121,16 @@ def test_preview_renders_browser_zone_beside_the_exact_utc_instant(monkeypatch: 
     )
     assert zone in result["shown"] and "2027-03-14T07:00:00Z" in result["shown"]
     assert result["writes"] == []
+
+
+def test_typing_a_fixed_expiry_after_choosing_it_clears_the_error_and_refreshes_the_preview() -> None:
+    result = run_console(
+        "person-schedules",
+        data={
+            "user": {"expire_at": None},
+            "edits": {"expiry_mode": "fixed"},
+            "expiryDate": "2027-06-01",
+        },
+    )
+    assert result["error"] == ""
+    assert any(event.get("body", {}).get("expire_at", "").startswith("2027-06-01") for event in result["previews"])
