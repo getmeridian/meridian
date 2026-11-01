@@ -44,3 +44,38 @@ def test_people_bulk_flow_uses_the_frozen_hash_and_keeps_selection_and_rows(peop
         assert "p-a" in result["dialog"] and result["undos"] == 0
     else:
         assert result["undos"] == 1 and result["undone"]
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_people_refresh_keeps_controls_and_recovers_failed_pagination(people_service, locale):
+    from meridian.control.models import UserImport, UserImportBatch
+
+    seed(people_service)
+    people_service.import_users(
+        UserImportBatch(
+            users=[
+                UserImport(
+                    username=f"p-refresh-{index:03d}",
+                    uuid=f"00000000-0000-4000-8000-{index + 700:012d}",
+                    sub_token=f"sample-refresh-token-{index:012d}",
+                    tag="GROUP_A",
+                )
+                for index in range(100)
+            ]
+        )
+    )
+    query = PeopleQuery(tag="GROUP_A")
+    first = people_service.people.query(query)
+    second = people_service.people.query(PeopleQuery(tag="GROUP_A", cursor=first.next_cursor))
+    result = run_console(
+        "people-bulk-refresh",
+        locale,
+        {"refresh": True, "page": first.model_dump(mode="json"), "nextPage": second.model_dump(mode="json")},
+    )
+    assert result["passiveControls"] and result["passiveFocus"]
+    assert result["failedRefreshControls"] and result["failedRefreshFocus"]
+    assert result["failedNextControls"] and result["failedPreviousControls"]
+    assert result["nextPage"] == [person.username for person in second.users]
+    assert result["returnedPage"] == [person.username for person in first.users]
+    assert result["sameRows"] and result["selected"] == 1
+    assert result["stored"] == [] and not result["outside"]

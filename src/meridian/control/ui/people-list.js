@@ -43,6 +43,7 @@
   M.renderPeople = function (view) {
     var state = readFilters(), entries = new Map(), ordered = [], selected = new Set(), matching = false;
     var cursor = null, previous = [], page = null, searchTimer, stop, lastSelected = null, ready = false;
+    var pageCursor = null, pagePrevious = [], pageQuery = null;
     var controls = {}, counters = {}, errors = {};
     var search = h("input", { type: "search", name: "q", class: "search", maxlength: "256", placeholder: M.t("people.search"),
       "aria-label": M.t("people.search"), autocomplete: "off" });
@@ -222,19 +223,29 @@
     }
     stop = M.liveView(view, { status: status, interval: 30000,
       load: function (passive) {
-        previousButton.disabled = nextButton.disabled = true;
-        ready = false; selectionChanged();
-        var key = JSON.stringify(query());
+        var key = JSON.stringify(query()), requestedCursor = cursor;
+        if (!passive || !page) {
+          previousButton.disabled = nextButton.disabled = true;
+          ready = false; selectionChanged();
+        }
         var params = new URLSearchParams();
         Object.entries(query()).forEach(function (item) { if (item[1] !== null) params.set(item[0], item[0] === "never" ? item[1] ? "1" : "0" : String(item[1])); });
-        if (cursor) params.set("cursor", cursor);
+        if (requestedCursor) params.set("cursor", requestedCursor);
         return M.api("GET", "api/people?" + params.toString(), undefined, { passive: passive }).catch(function (error) {
-          if (!cursor || error.code !== "invalid_request") throw error;
-          cursor = null; previous = []; params.delete("cursor");
+          if (!requestedCursor || error.code !== "invalid_request" || key !== JSON.stringify(query()) || cursor !== requestedCursor) throw error;
+          cursor = requestedCursor = null; previous = []; params.delete("cursor");
           return M.api("GET", "api/people?" + params.toString(), undefined, { passive: passive });
-        }).then(function (result) { return { page: result, query: key, cursor: cursor }; });
+        }).then(function (result) { return { page: result, query: key, cursor: requestedCursor }; }).catch(function (error) {
+          if (key === JSON.stringify(query()) && cursor === requestedCursor) {
+            if (pageQuery === key) { cursor = pageCursor; previous = pagePrevious.slice(); }
+            ready = !!page;
+            previousButton.disabled = !previous.length; nextButton.disabled = !page || !page.next_cursor;
+            selectionChanged();
+          }
+          throw error;
+        });
       }, accept: function (result) { return result.query === JSON.stringify(query()) && result.cursor === cursor; },
-      draw: function (result) { draw(result.page); }, empty: function () { loading.remove(); } });
+      draw: function (result) { pageCursor = result.cursor; pagePrevious = previous.slice(); pageQuery = result.query; draw(result.page); }, empty: function () { loading.remove(); } });
     return function () { clearTimeout(searchTimer); stop(); };
   };
 })();
