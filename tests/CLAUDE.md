@@ -34,6 +34,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - **Don't restate registries** — a test that copies a constant, catalog, or schema list fails on every legitimate edit; assert behaviour or let the contract drift check do it.
 - **Every new admin handler needs a runnable `ROUTE_SAMPLES` entry** so the token-scope matrix exercises its permissions.
 - **Pin every clock a scenario reads** — the service, the ledger, the registry, and settings each have one; tests dated near "today" failed when the real date arrived.
+- **Migration replays pin receipt time before the replay** — a real receipt later than a fixed replay correctly keeps the newer activity evidence.
 - **Migration tests assert the stored version equals `SCHEMA_VERSION`**, and older-schema fixtures drop later columns as well as tables before rewinding, or the migration fails spuriously.
 - **Console DOM tests take `needs_console_dom`** — legs without jsdom fail with a bare exit 1 otherwise; the 3.12 leg sets `MERIDIAN_TEST_CONSOLE`, so a lost install fails instead of skipping. Scenarios make the document visible, because hidden screens defer their requests.
 - **Help text goes through `unstyle()`** — CI's 3.14 leg renders `--help` in colour, splitting options into styled runs.

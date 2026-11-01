@@ -354,10 +354,11 @@ def test_refused_growth_rolls_back_node_totals_and_activity_with_user_accounting
 
 @pytest.mark.parametrize("old_version", [11, 12], ids=["from-eleven", "from-twelve"])
 def test_schema_thirteen_backfills_retained_node_evidence_once_and_marks_the_accounting_start(
-    tmp_path: Path, old_version: int
+    tmp_path: Path, old_version: int, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from datetime import datetime
 
+    monkeypatch.setattr("meridian.control.service.utc_now", lambda: "2026-11-01T11:00:00Z")
     path = tmp_path / "control.db"
     service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
     service.put_user("alice")
