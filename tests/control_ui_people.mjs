@@ -19,6 +19,7 @@ w.fetch = (url, options) => {
   let body;
   if (url === 'auth/state') body = { configured: true, owner_exists: true, signed_in: true };
   else if (url === 'ui/api/fleet') body = { servers: [], declared_users: [], display_names: data.names || {} };
+  else if (url === 'api/users' && data.failUsers) return Promise.resolve({ ok: false, status: 500, headers: { get: () => null }, text: () => Promise.resolve('{}') });
   else if (url === 'api/users') body = { users: data.people };
   else throw new Error('Unexpected request: ' + url);
   return Promise.resolve({ ok: true, status: 200, headers: { get: () => null }, text: () => Promise.resolve(JSON.stringify(body)) });
@@ -55,6 +56,7 @@ report.sameRows = [...view().querySelectorAll('a.row-link')].every(el => rows.ge
 report.sameInput = view().querySelector('input[type="search"]') === input;
 report.focusKept = w.document.activeElement === input;
 report.selects = Object.fromEntries([...view().querySelectorAll('select[name]')].map(el => [el.name, [...el.options].map(option => ({ value: option.value, text: option.textContent }))]));
+report.filtersOpen = !!view().querySelector('details.people-filter-card')?.open;
 report.errors = [...view().querySelectorAll('.field-error')].map(el => el.textContent).filter(Boolean);
 report.route = M.route();
 if (mode === 'people-triage-reload') {

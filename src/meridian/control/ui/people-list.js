@@ -42,7 +42,7 @@
   function hidden(node, value) { if (node.hidden !== value) node.hidden = value; }
 
   M.renderPeople = function (view) {
-    var state = readFilters(), entries = new Map(), ordered = [], dirtyOrder = true, searchTimer;
+    var state = readFilters(), entries = new Map(), ordered = [], dirtyOrder = true, loaded = false, searchTimer;
     var collator = new Intl.Collator(M.i18n.locale(), { numeric: true, sensitivity: "base" });
     var search = h("input", { type: "search", name: "q", class: "search", maxlength: "256",
       placeholder: M.t("people.search"), "aria-label": M.t("people.search"), autocomplete: "off" });
@@ -64,8 +64,8 @@
     var statusField = select("status", [""].concat(STATUSES), function (key) {
       return key ? M.t("status." + key) : M.t("people.any_status");
     });
-    var tagField = select("tag", ["", "none"], function (key) {
-      return M.t(key ? "people.no_tag" : "people.any_tag");
+    var tagField = select("tag", ["", "none"].concat(state.tag && state.tag !== "none" ? [state.tag] : []), function (key) {
+      return key === "" ? M.t("people.any_tag") : key === "none" ? M.t("people.no_tag") : key;
     });
     var attentionField = select("attention", ["", "all"].concat(REASONS), function (key) {
       return key ? M.t(key === "all" ? "people.attention" : "attention.reason." + key) : M.t("people.any_attention");
@@ -128,7 +128,7 @@
         changed(false);
       });
     });
-    var filters = h("details", { class: "card people-filter-card", open: FACETS.some(function (key) { return !!state[key]; }) },
+    var filters = h("details", { class: "card people-filter-card", open: FACETS.some(function (key) { return !!state[key]; }) || state.sort !== "name" || state.order !== defaultOrder(state.sort) },
       h("summary", { text: M.t("people.filters") }),
       h("div", { class: "people-filters" }, statusField, tagField, expiresField, quotaField, neverField, attentionField),
       h("div", { class: "people-sort" }, sortField, orderField, clear));
@@ -194,15 +194,18 @@
       return collator.compare(a.name, b.name) || collator.compare(a.user.username, b.user.username);
     }
     function setOptions(input, values, counts, label) {
-      values.forEach(function (key) {
+      values.forEach(function (key, index) {
         var option = Array.from(input.options).find(function (item) { return item.value === key; });
-        if (!option) { option = h("option", { value: key }); input.appendChild(option); }
+        if (!option) option = h("option", { value: key });
+        if (input.options[index] !== option) input.insertBefore(option, input.options[index] || null);
         text(option, M.t("people.option_count", { name: label(key), count: M.count(counts.get(key) || 0) }));
       });
       Array.from(input.options).forEach(function (option) { if (values.indexOf(option.value) < 0) option.remove(); });
       input.value = state[input.name];
     }
     function draw() {
+      // Before the first list arrives there is nothing to count; "No people yet" would be a lie.
+      if (!loaded) return;
       if (dirtyOrder) {
         ordered = Array.from(entries.values()).sort(compare);
         var focus = document.activeElement;
@@ -270,7 +273,7 @@
           else entries.set(user.username, makeEntry(user));
         });
         entries.forEach(function (entry, name) { if (!seen.has(name)) { entry.row.remove(); entries.delete(name); } });
-        loading.remove(); dirtyOrder = true; draw();
+        loading.remove(); loaded = true; dirtyOrder = true; draw();
       },
       empty: function () { loading.remove(); },
     });
