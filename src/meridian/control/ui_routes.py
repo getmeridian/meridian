@@ -32,13 +32,13 @@ from pydantic import BaseModel
 from meridian.control.errors import ServiceError
 from meridian.control.models import USERNAME_PATTERN, OwnerStatus, SetupLinkGrant, SetupLinkRequest, TokenScope
 from meridian.control.owner import ABSOLUTE_SECONDS, OwnerSession
+from meridian.control.passkey_models import AuthenticationCompletion, PasskeyName, RegistrationCompletion
 from meridian.control.person_expiry import expiry_preview
 from meridian.control.service import ControlService
 from meridian.control.tokens import ROOT, Caller
 from meridian.control.ui_models import (
     AuthState,
     LoginRequest,
-    PasskeyState,
     PasswordChange,
     SetupCompletion,
     SetupLinkCheck,
@@ -66,7 +66,6 @@ SECURITY_HEADERS = {
 }
 _ASSET = re.compile(r"(?:locales/)?[a-z0-9-]+\.(?:js|css|svg|json)")
 _TYPES = {".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".json": "application/json"}
-_IP_HOST = re.compile(r"^\[?[0-9a-fA-F:.]+\]?$")
 
 
 @dataclass
@@ -151,14 +150,6 @@ def owner_session(request: UiRequest) -> OwnerSession:
     return session
 
 
-def passkey_state(headers: Message) -> PasskeyState:
-    """Passkeys need a domain: a WebAuthn RP ID can never be an IP address."""
-    host = _hostname(headers.get("Host", ""))
-    if not host or _IP_HOST.match(host) or "." not in host:
-        return PasskeyState(reason="no_domain")
-    return PasskeyState(reason="not_built")
-
-
 def _hostname(netloc: str) -> str:
     host = netloc.rsplit("@", 1)[-1]
     if host.startswith("["):
@@ -170,9 +161,9 @@ def _hostname(netloc: str) -> str:
 
 
 def _send_json(request: UiRequest, body: BaseModel | dict[str, Any], *, cookie: str | None = None) -> None:
-    data = (body.model_dump_json() if isinstance(body, BaseModel) else json.dumps(body, ensure_ascii=False)).encode(
-        "utf-8"
-    )
+    data = (
+        body.model_dump_json(by_alias=True) if isinstance(body, BaseModel) else json.dumps(body, ensure_ascii=False)
+    ).encode("utf-8")
     headers = dict(SECURITY_HEADERS)
     if cookie is not None:
         headers["Set-Cookie"] = cookie
@@ -243,7 +234,7 @@ def auth_state(request: UiRequest, _match: re.Match[str]) -> None:
             totp_enabled=status.totp_enabled,
             signed_in=session is not None,
             configured=bool(ui.public_path),
-            passkeys=passkey_state(request.headers),
+            passkeys=ui.service.passkeys.state(),
             session_expires_at=session.expires_at if session else None,
         ),
     )
@@ -326,6 +317,64 @@ def disable_totp(request: UiRequest, _match: re.Match[str]) -> None:
     _send_json(request, {"totp_enabled": False})
 
 
+# -- passkeys -------------------------------------------------------------------------------
+
+
+def list_passkeys(request: UiRequest, _match: re.Match[str]) -> None:
+    owner_session(request)
+    _send_json(request, request.ui.service.passkeys.list_passkeys())
+
+
+def begin_passkey_registration(request: UiRequest, _match: re.Match[str]) -> None:
+    session = owner_session(request)
+    _require_configured(request.ui)
+    _send_json(request, request.ui.service.passkeys.begin_registration(session))
+
+
+def finish_passkey_registration(request: UiRequest, _match: re.Match[str]) -> None:
+    session = owner_session(request)
+    body: RegistrationCompletion = _body(request, RegistrationCompletion)
+    _send_json(request, request.ui.service.passkeys.finish_registration(session, body))
+
+
+def begin_passkey_login(request: UiRequest, _match: re.Match[str]) -> None:
+    require_same_origin(request)
+    _require_configured(request.ui)
+    _send_json(request, request.ui.service.passkeys.begin_authentication())
+
+
+def finish_passkey_login(request: UiRequest, _match: re.Match[str]) -> None:
+    require_same_origin(request)
+    _require_configured(request.ui)
+    body: AuthenticationCompletion = _body(request, AuthenticationCompletion)
+    session = request.ui.service.passkeys.finish_authentication(body.challenge_id, body.credential)
+    _send_json(request, {"signed_in": True}, cookie=_session_cookie(request.ui, session.token))
+
+
+def begin_passkey_confirmation(request: UiRequest, _match: re.Match[str]) -> None:
+    session = owner_session(request)
+    _send_json(request, request.ui.service.passkeys.begin_authentication(session=session))
+
+
+def finish_passkey_confirmation(request: UiRequest, _match: re.Match[str]) -> None:
+    session = owner_session(request)
+    body: AuthenticationCompletion = _body(request, AuthenticationCompletion)
+    request.ui.service.passkeys.finish_authentication(body.challenge_id, body.credential, session=session)
+    _send_json(request, {"confirmed": True})
+
+
+def rename_passkey(request: UiRequest, match: re.Match[str]) -> None:
+    session = owner_session(request)
+    body: PasskeyName = _body(request, PasskeyName)
+    _send_json(request, request.ui.service.passkeys.rename(session, match[1], body.name))
+
+
+def remove_passkey(request: UiRequest, match: re.Match[str]) -> None:
+    session = owner_session(request)
+    request.ui.service.passkeys.remove(session, match[1])
+    _send_json(request, {"removed": True})
+
+
 # -- views and the deployer's owner routes (behind `/api` scope checks) -------------------------
 
 
@@ -367,6 +416,15 @@ UI_ROUTES: list[tuple[str, re.Pattern[str], TokenScope | None, UiHandler]] = [
     ("POST", re.compile(r"/auth/totp/begin"), None, begin_totp),
     ("POST", re.compile(r"/auth/totp/enable"), None, enable_totp),
     ("POST", re.compile(r"/auth/totp/disable"), None, disable_totp),
+    ("GET", re.compile(r"/auth/passkeys"), None, list_passkeys),
+    ("POST", re.compile(r"/auth/passkeys/register/begin"), None, begin_passkey_registration),
+    ("POST", re.compile(r"/auth/passkeys/register/finish"), None, finish_passkey_registration),
+    ("POST", re.compile(r"/auth/passkeys/login/begin"), None, begin_passkey_login),
+    ("POST", re.compile(r"/auth/passkeys/login/finish"), None, finish_passkey_login),
+    ("POST", re.compile(r"/auth/passkeys/confirm/begin"), None, begin_passkey_confirmation),
+    ("POST", re.compile(r"/auth/passkeys/confirm/finish"), None, finish_passkey_confirmation),
+    ("PATCH", re.compile(r"/auth/passkeys/([A-Za-z0-9_-]{1,1366})"), None, rename_passkey),
+    ("DELETE", re.compile(r"/auth/passkeys/([A-Za-z0-9_-]{1,1366})"), None, remove_passkey),
     ("GET", re.compile(r"/ui/api/fleet"), "read", fleet),
     # Share links carry the subscription token, which connects as the person: admin, like `_visible`.
     ("GET", re.compile(rf"/ui/api/people/{_USERNAME}/share"), "admin", share),

@@ -54,14 +54,14 @@ def _console(cluster: ClusterConfig, *, setup_link: bool) -> None:
         if grant.purpose == "reset":
             err_console.print(
                 "              [dim]Works once, for 15 minutes. It sets a new password, turns the sign-in[/dim]\n"
-                "              [dim]code off, and signs out every device.[/dim]"
+                "              [dim]code off, removes every passkey, and signs out every device.[/dim]"
             )
         else:
             err_console.print(
                 "              [dim]Works once, for 15 minutes. Open it to choose the owner's password.[/dim]"
             )
     else:
-        code = "with a sign-in code" if owner.totp_enabled else "password only"
+        code = "with a sign-in code" if owner.totp_enabled else "sign-in code off"
         err_console.print(f"  Owner       set up ({code})")
         err_console.print("  [dim]Lost the password? A fresh setup link: meridian panel --setup-link[/dim]")
     err_console.print()

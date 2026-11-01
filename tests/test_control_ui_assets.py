@@ -136,7 +136,15 @@ def test_every_value_the_service_sends_has_a_label(prefix: str, values: tuple[st
 
 def test_every_refusal_the_sign_in_routes_raise_has_a_message() -> None:
     codes = set()
-    for module in ("owner.py", "ui_routes.py", "login_limits.py", "tokens.py", "server.py"):
+    for module in (
+        "owner.py",
+        "ui_routes.py",
+        "login_limits.py",
+        "tokens.py",
+        "server.py",
+        "passkeys.py",
+        "webauthn.py",
+    ):
         source = (SRC / module).read_text(encoding="utf-8")
         codes |= set(re.findall(r'(?:ServiceError|super\(\)\.__init__)\(\s*"([a-z_]+)"', source))
     assert codes and sorted(code for code in codes if f"error.{code}" not in ENGLISH) == []

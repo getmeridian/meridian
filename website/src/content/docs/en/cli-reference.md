@@ -584,7 +584,7 @@ meridian panel [--setup-link]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--setup-link` | | Print a reset link even though the panel has an owner: it sets a new password, turns the sign-in code off, and signs out every device |
+| `--setup-link` | | Print a reset link even though the panel has an owner: it sets a new password, turns the sign-in code off, removes every passkey, and signs out every device |
 
 The setup link works once, for 15 minutes; open it to choose the owner's password. Once the panel has an owner, `panel` prints the address and whether a sign-in code is on. Treat both the address and a setup link like passwords. In the web panel you manage people, notices, language, privacy, and API tokens; servers, revisions, and topology settings are read-only there. See [Web panel](/en/client-management/#web-panel).
 

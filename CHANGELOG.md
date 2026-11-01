@@ -23,6 +23,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
   explicit JSON confirmation, and receipt recovery after an uncertain reply.
 - People selection by keyboard or across all matching pages, with bounded
   server reads, preserved rows, bulk reviews, receipts, and undo in the console.
+- Owner passkeys on reviewed HTTPS domains, with local ES256/Ed25519 verification,
+  named keys in Settings, sign-in and step-up, and unchanged root-only recovery.
+  Removing a key signs out other sessions; bare-IP panels keep password/TOTP (#95).
 - Account anniversary resets, durations from first traffic, and automatic
   expiry renewal with optional caps. API, CLI, panel, connection pages, and
   refill headers share UTC dates; migration keeps rolling-month anchors.

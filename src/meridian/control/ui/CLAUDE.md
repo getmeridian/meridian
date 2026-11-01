@@ -12,7 +12,7 @@
 - **Person drafts live only in memory** — changed forms guard navigation and dismissal with Leave/Stay, and visible reads refresh passively without replacing edits.
 - **People triage lives in the fragment** — validated filters and sorting survive reloads and person navigation; rows stay mounted, and facet counts apply the other active filters and search.
 - **Same locale approach as the PWA** — `locales/{en,ru,fa,zh}.json`, English fallback, `fa` sets `dir="rtl"`, numbers and sizes bidi-isolated.
-- **Passkeys are a seam** — `PasskeyState` reports `no_domain` on a bare IP and `not_built` otherwise; py_webauthn would add pyOpenSSL, pyasn1, and cbor2 to every CLI install, and attestation is never parsed by hand.
+- **Passkeys verify locally** — reviewed `public_url` fixes RP/origin; required user verification, none attestation, bounded CBOR, and existing cryptography verify ES256/Ed25519 without identity lookup or a new dependency. Passkeys satisfy session step-up; add/rename/remove require it, and removal ends other sessions.
 
 ## What's done well
 - **Connection keys and leaked links have separate actions** — rotation preserves the subscription URL, sends the displayed generation, and locks confirmation and submission; declared people receive the CLI command.
@@ -29,6 +29,7 @@
 - **People refreshes keep usable controls** — passive reads never disable selections or the pager; failed page requests restore the last accepted cursor and controls.
 - **Cut-off scope comes from each node's effect** — core restarts reconnect all Xray inbounds and bridges; reset captions name the affected tags and the whole-core fallback.
 - **One node can have several revoked generations** — show the key version and cause beside each receipt; repeated node names alone hide which identity is pending.
+- **Challenges bind purpose, owner handle, session, and reviewed origin** — consume once before verification; five-minute expiry and a global cap bound memory, while root recovery clears keys and changes the handle.
 - **Settle a form's disabled state before `M.trackForm()`** — a field disabled after the snapshot reads as edited, and the device editor once asked to discard changes nobody made.
 - **Device caps have three choices** — inherit, unlimited, or 1–100; saving another field preserves an exemption.
 - **Scope the session cookie to `ServiceConfig.public_path`** — a `/` cookie would ride every subscription request; without a path, sign-in is refused (`ui_unconfigured`), and so is a setup link.

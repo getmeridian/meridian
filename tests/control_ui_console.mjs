@@ -135,7 +135,7 @@ w.fetch = (url, options) => {
     return { ...reply, text: async () => JSON.stringify(peoplePage((body.users || []).map(user => ({ ...user, display_name: data?.fleet?.display_names?.[user.username] || user.username, declared: (data?.fleet?.declared_users || []).includes(user.username) })))) };
   });
 };
-for (const script of ['core.js', 'drafts.js', 'qr-export.js', 'people.js', 'people-bulk.js', 'people-bulk-fields.js', 'people-list.js', 'expiry.js', 'lifecycle.js', 'person-connections.js', 'fleet.js']) {
+for (const script of ['core.js', 'drafts.js', 'passkeys.js', 'qr-export.js', 'people.js', 'people-bulk.js', 'people-bulk-fields.js', 'people-list.js', 'expiry.js', 'lifecycle.js', 'person-connections.js', 'fleet.js']) {
   w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 }
 const M = w.M;

@@ -55,6 +55,7 @@ from meridian.control.node_documents import RetiredUsers, with_users
 from meridian.control.node_health import project_runtime
 from meridian.control.notices import NoticeLedger
 from meridian.control.owner import OwnerAuth
+from meridian.control.passkeys import PasskeyRegistry
 from meridian.control.people_bulk import BulkLedger
 from meridian.control.people_query import PeopleQueryEngine
 from meridian.control.period_usage import reset_period
@@ -131,6 +132,9 @@ class ControlService:
         self.revisions = RevisionLedger(self._store, self.tokens, fleet_id, clock=clock)
         self.backups = BackupLedger(self._store, clock=clock)
         self.owner = OwnerAuth(self._store, clock=clock)
+        self.passkeys = PasskeyRegistry(
+            self._store, self.owner, public_url=lambda: self.settings().public_url, clock=clock
+        )
         self.devices = DeviceLedger(self._store, clock=clock)
         self.notices = NoticeLedger(self._store, self.events, read_user=self.get_user, clock=clock)
         self.languages = LanguageLedger(self._store, self.events)

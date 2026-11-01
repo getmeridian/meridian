@@ -270,6 +270,12 @@ Client accounts (keys, status, limits, traffic) live in the control service's da
 
 The control service includes a built-in web panel (also called the management panel or owner console) where you can manage people from any browser, including your phone. `meridian panel` prints its address and, the first time, a one-time setup link where you choose the owner's password. You can add a sign-in code from an authenticator app afterwards, in **Settings**.
 
+**Passkeys:** when the panel has a reviewed HTTPS domain, open **Settings → Passkeys → Add passkey**, choose a name, and unlock the key on your device. You can save up to ten keys, rename them, and see when each was added and last used. The sign-in screen offers **Sign in with a passkey** once a key is saved. A PIN, fingerprint, or face check is required; a saved passkey can also confirm a sensitive change. Adding, renaming, and removing keys require identity confirmation within five minutes.
+
+Passkeys use the domain from your reviewed server settings, never a request header. Browsers do not allow them on a bare IP address: use your password and optional authenticator code there. A domain change needs a passkey for the new domain. Requests expire after five minutes and work once. The service keeps the credential ID, public key, counter, chosen name, and times; it stores no device identity or address and makes no external request.
+
+Removing a passkey prevents new sign-ins and signs out every other browser session. Your password and sign-in code remain available. If all methods are lost, run `meridian panel --setup-link` on the managing machine: the single-use root-issued recovery link replaces the password, disables TOTP, removes every passkey, and ends every session. Owner credentials, including passkeys, are excluded from snapshots; a restored service needs a fresh setup link.
+
 | Change in the web panel | Shown read-only (change with `meridian`) |
 |---|---|
 | **People**: add, share a link and QR code, enable or disable, set expiry, traffic limit and reset period, device cap, language, private note and tag, reset traffic, clear devices, issue a new link, remove (with optional session cut-off) | **Servers**: every exit, relay, and gateway, whether its agent is online and up to date, its version, traffic, monthly allowance, and payment date; **Restart Xray** on a node |
@@ -278,7 +284,7 @@ The control service includes a built-in web panel (also called the management pa
 
 Changes in the web panel and in the CLI are the same changes: `meridian client list` shows people added in the web panel too, and applies never undo a status, limit, or expiry set in either. People you added with `meridian client add` stay yours on the CLI: the web panel can change their limits and status, but removing them or issuing a new link prints the `meridian client` command instead, because those people belong to the reviewed topology. Every person, including those added in the web panel, gets a connection page at their subscription URL.
 
-The web panel never holds SSH keys, so a stolen session can't change your servers. Every sign-in expires after 30 minutes idle and 12 hours at most, and creating a token asks for your password again.
+The web panel never holds SSH keys, so a stolen session can't change your servers. Every sign-in expires after 30 minutes idle and 12 hours at most, and creating a token requires recent password/TOTP or passkey confirmation.
 
 Changed person and password forms ask **Leave** or **Stay** before navigation, browser back, sign-out, or dialog dismissal. Reverting the fields removes the prompt; saving clears only that form's edits. Drafts stay in memory and are never saved in browser storage. Person status and usage refresh every 30 seconds while visible, preserving edited inputs and focus. Passive refresh does not extend the owner session's idle timeout.
 

@@ -22,7 +22,7 @@ from meridian.control.owner import CONFIRM_SECONDS, IDLE_SECONDS
 from meridian.control.server import ControlServer
 from meridian.control.service import ControlService
 from meridian.control.tokens import ROOT
-from meridian.control.ui_routes import CONTENT_SECURITY_POLICY, SESSION_COOKIE, UI_DIR, passkey_state
+from meridian.control.ui_routes import CONTENT_SECURITY_POLICY, SESSION_COOKIE, UI_DIR
 from tests.support.control_service import write_privacy
 from tests.support.node_commands import command_node_spec
 
@@ -202,6 +202,81 @@ def test_the_owner_can_manage_device_slots_with_csrf_but_no_new_credential(
 
 
 # -- setup links ------------------------------------------------------------------------------
+
+
+def test_passkeys_use_the_reviewed_domain_instead_of_the_request_host(fleet: Fleet) -> None:
+    fleet.service.put_settings(
+        ServiceSettings(profile_title="Meridian", public_url="https://console.example.test/connect")
+    )
+    state = fleet.call("GET", "/auth/state", headers={"Host": "198.51.100.10"}).body["passkeys"]
+    assert state["available"] is True
+    assert state["reason"] == "ready"
+
+
+def test_the_owner_can_begin_passkey_registration_over_http(fleet: Fleet) -> None:
+    fleet.service.put_settings(
+        ServiceSettings(profile_title="Meridian", public_url="https://console.example.test/connect")
+    )
+    fleet.set_up()
+    reply = fleet.ui("POST", "/auth/passkeys/register/begin", {})
+    assert reply.status == 200, reply.body
+    assert reply.body["public_key"]["rp"]["id"] == "console.example.test"
+    assert reply.body["public_key"]["authenticatorSelection"]["userVerification"] == "required"
+
+
+def test_verified_passkeys_register_confirm_and_sign_in_over_the_same_cookie_boundary(fleet: Fleet) -> None:
+    from tests.support.passkeys import ORIGIN, Authenticator
+
+    fleet.service.put_settings(ServiceSettings(profile_title="Meridian", public_url=f"{ORIGIN}/connect"))
+    fleet.set_up()
+    assert fleet.call("POST", "/auth/passkeys/register/begin", {}, session=True).status == 403
+    begin = fleet.ui("POST", "/auth/passkeys/register/begin", {}).body
+    authenticator = Authenticator()
+    registration = authenticator.registration(begin["public_key"])
+    saved = fleet.ui(
+        "POST",
+        "/auth/passkeys/register/finish",
+        {
+            "challenge_id": begin["challenge_id"],
+            "name": "Desk key",
+            "credential": registration.to_data(),
+        },
+    )
+    assert saved.status == 200, saved.body
+    assert saved.headers["Content-Security-Policy"] == CONTENT_SECURITY_POLICY
+    assert set(saved.body) == {"id", "rp_id", "name", "created_at", "last_used_at"}
+    assert fleet.ui("GET", "/auth/passkeys").body["passkeys"] == [saved.body]
+
+    fleet.clock.now += CONFIRM_SECONDS + 1
+    assert fleet.ui("PATCH", f"/auth/passkeys/{authenticator.id}", {"name": "Travel key"}).status == 403
+    confirmation = fleet.ui("POST", "/auth/passkeys/confirm/begin", {}).body
+    assert (
+        fleet.ui(
+            "POST",
+            "/auth/passkeys/confirm/finish",
+            {
+                "challenge_id": confirmation["challenge_id"],
+                "credential": authenticator.assertion(confirmation["public_key"]).to_data(),
+            },
+        ).status
+        == 200
+    )
+    assert fleet.ui("PATCH", f"/auth/passkeys/{authenticator.id}", {"name": "Travel key"}).body["name"] == "Travel key"
+    assert fleet.ui("POST", "/api/tokens", {"name": "Integration", "scope": "read"}).status == 200
+
+    fleet.ui("POST", "/auth/logout", {})
+    begin = fleet.call("POST", "/auth/passkeys/login/begin", {}, headers=UI).body
+    assertion = {
+        "challenge_id": begin["challenge_id"],
+        "credential": authenticator.assertion(begin["public_key"], count=7).to_data(),
+    }
+    signed_in = fleet.call("POST", "/auth/passkeys/login/finish", assertion, headers=UI)
+    assert signed_in.status == 200, signed_in.body
+    assert "SameSite=Strict" in signed_in.headers["Set-Cookie"]
+    assert f"Path={PUBLIC_PATH}/" in signed_in.headers["Set-Cookie"]
+    fleet.cookie = _cookie_value(signed_in)
+    assert fleet.ui("GET", "/api/users").status == 200
+    assert fleet.call("POST", "/auth/passkeys/login/finish", assertion, headers=UI).status == 410
 
 
 def test_the_console_can_mint_a_people_token_after_step_up(fleet: Fleet) -> None:
@@ -556,15 +631,14 @@ def test_share_links_need_admin_and_every_person_has_a_page(fleet: Fleet) -> Non
         ("198.51.100.7", "no_domain"),
         ("[2001:db8::1]", "no_domain"),
         ("localhost:8443", "no_domain"),
-        ("console.example.com", "not_built"),
+        ("console.example.test", "ready"),
     ],
     ids=str,
 )
-def test_passkeys_are_never_offered_on_an_ip_address(host: str, reason: str) -> None:
-    headers = Message()
-    headers["Host"] = host
-    state = passkey_state(headers)
-    assert not state.available and state.reason == reason
+def test_passkeys_are_never_offered_on_an_ip_address(fleet: Fleet, host: str, reason: str) -> None:
+    fleet.service.put_settings(ServiceSettings(profile_title="Meridian", public_url=f"https://{host}/connect"))
+    state = fleet.service.passkeys.state()
+    assert state.available == (reason == "ready") and state.reason == reason
 
 
 # -- static files ----------------------------------------------------------------------------------
