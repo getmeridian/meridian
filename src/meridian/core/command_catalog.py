@@ -151,6 +151,27 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
     "client.preview": CommandOutput(
         data_schema="subscription-preview", outcomes=[_ok("format preview read"), *_FAILURES], stability="preview"
     ),
+    **{
+        f"client.bulk.{action}": CommandOutput(
+            data_schema="client-bulk",
+            outcomes=[_ok("review or durable receipt returned"), *_FAILURES],
+            stability="stable",
+        )
+        for action in (
+            "extend",
+            "expiry",
+            "quota",
+            "reset-traffic",
+            "enable",
+            "disable",
+            "tag",
+            "devices",
+            "renewal",
+            "delete",
+            "undo",
+            "receipt",
+        )
+    },
     "client.list": CommandOutput(
         data_schema="client-list", outcomes=[_ok("client list was collected"), *_FAILURES], stability="stable"
     ),

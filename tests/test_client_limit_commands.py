@@ -19,7 +19,7 @@ from meridian.commands.client_limits import format_expiry, format_usage, run_res
 from meridian.compiler import compile_topology
 from meridian.console import set_json_mode
 from meridian.control.client import ControlClient
-from meridian.control.models import UserUpdate
+from meridian.control.models import RevisionProposal, RevisionResult, UserUpdate
 from meridian.core.clients import build_client_record
 from meridian.core.schema import schema_model
 from meridian.handoff import HandoffLinks
@@ -86,6 +86,14 @@ def _fleet(tmp_path: Path, *, json_mode: bool = False) -> Iterator[SimpleNamespa
             )
             client = stack.enter_context(ControlClient(url, ADMIN_TOKEN))
             client.put_user("alice")
+            assert cluster.topology_intent is not None
+            revision = client.propose_revision(
+                RevisionProposal(
+                    intent=cluster.topology_intent.model_dump(mode="json"), plan_hash="a" * 64, review_hash="b" * 64
+                )
+            )
+            client.approve_revision(revision.number)
+            client.record_revision_result(revision.number, RevisionResult(status="applied"))
             stack.enter_context(patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster))
             yield SimpleNamespace(cluster=cluster, create=client.put_user, client=client)
     finally:

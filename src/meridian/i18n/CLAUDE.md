@@ -1,6 +1,7 @@
 # i18n — CLI message catalog
 
 ## Design decisions
+- **Bulk text matches across surfaces** — selection, before/after, irreversibility, stale people, and undo have native en/ru/fa/zh labels.
 - Locale types and native language names come from core.languages; CLI detection never sets the operator's subscription language, whose fixed status catalog lives in control/formats/status_remarks.py.
 
 **Flat JSON per locale** — `locales/<code>.json` maps dotted keys to text with `{name}` placeholders; English is the source and the fallback for a missing key. Locales match the website: en, ru, fa, zh.
@@ -21,6 +22,7 @@
 - `tests/test_i18n.py` enforces key order/parity, identical placeholders, no reply-word collisions, and that every literal key used in code exists.
 
 ## Pitfalls
+- **Bulk reply errors name the operation** — the same receipt recovery handles commit and undo, so text must not assume a commit.
 - Server allowance text must disclose accepted upload/download coverage and excluded overhead, host downloads, and relay forwarding in every locale; unmeasured servers never display a zero usage figure.
 
 - Never make a reply word equal a value the user types at a choice prompt (`exit`, `relay`, `gateway`, `control`); navigation words are matched first.

@@ -70,6 +70,8 @@ from meridian.core.errors import MeridianError
 from meridian.core.fleet_events import FleetEventPage, FleetEventQuery
 from meridian.core.languages import LanguageSettings, LanguageState
 from meridian.core.notices import NoticeState, NoticeWrite
+from meridian.core.people_bulk import BulkCommitRequest, BulkPreview, BulkPreviewRequest, BulkReceipt, BulkUndoRequest
+from meridian.core.people_query import PeoplePage, PeopleQuery
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 
@@ -267,6 +269,32 @@ class ControlClient:
             return UserRecord.model_validate(self._call("GET", f"api/users/{_segment(username)}"))
         except ControlServiceNotFound:
             return None
+
+    def query_people(self, query: PeopleQuery) -> PeoplePage:
+        params = {
+            key: str(int(value)) if isinstance(value, bool) else value
+            for key, value in query.model_dump().items()
+            if value is not None
+        }
+        return PeoplePage.model_validate(self._call("GET", "api/people?" + urlencode(params)))
+
+    def preview_bulk(self, request: BulkPreviewRequest) -> BulkPreview:
+        return BulkPreview.model_validate(
+            self._request(
+                "POST", "api/people/bulk/preview", request.model_dump(mode="json"), mutation_method="GET"
+            ).json()
+        )
+
+    def commit_bulk(self, request: BulkCommitRequest) -> BulkReceipt:
+        return BulkReceipt.model_validate(self._call("POST", "api/people/bulk/commit", request.model_dump(mode="json")))
+
+    def bulk_receipt(self, receipt_id: str) -> BulkReceipt:
+        return BulkReceipt.model_validate(self._call("GET", "api/people/bulk/receipts/" + _segment(receipt_id)))
+
+    def undo_bulk(self, receipt_id: str) -> BulkReceipt:
+        return BulkReceipt.model_validate(
+            self._call("POST", "api/people/bulk/undo", BulkUndoRequest(receipt_id=receipt_id).model_dump())
+        )
 
     def list_users(self) -> list[UserRecord]:
         return [UserRecord.model_validate(item) for item in self._call("GET", "api/users")["users"]]

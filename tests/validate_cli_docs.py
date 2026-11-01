@@ -36,6 +36,23 @@ COMMAND_SECTIONS: dict[str, str] = {
     "client preview": "### meridian client",
     "client usage": "### meridian client",
     "client list": "### meridian client",
+    **{
+        f"client bulk {action}": "### meridian client"
+        for action in (
+            "extend",
+            "expiry",
+            "quota",
+            "reset-traffic",
+            "enable",
+            "disable",
+            "tag",
+            "devices",
+            "renewal",
+            "delete",
+            "undo",
+            "receipt",
+        )
+    },
     "client set": "### meridian client",
     "client reset-traffic": "### meridian client",
     "client extend": "### meridian client",

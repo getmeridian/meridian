@@ -61,6 +61,7 @@ from meridian.control.models import (
 from meridian.control.openapi import openapi_document
 from meridian.control.operations_api import read_attention, read_events, read_history_days
 from meridian.control.owner import OwnerSession
+from meridian.control.people_routes import PEOPLE_OWNER_ROUTES
 from meridian.control.route_catalog import api_route_for
 from meridian.control.route_table import Route, control_routes
 from meridian.control.route_types import ApiRoute
@@ -679,6 +680,7 @@ OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
         ui_routes.expiry_preview,
     }
     | DELIVERY_OWNER_ROUTES
+    | PEOPLE_OWNER_ROUTES
 )
 
 

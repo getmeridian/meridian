@@ -26,10 +26,8 @@ def qr_data_uri(text: str) -> str:
 
 def applied_intent(service: ControlService) -> tuple[int | None, dict[str, Any]]:
     """The newest applied revision's number and intent, or (None, {}) before the first."""
-    for summary in service.revisions.list_revisions().revisions:
-        if summary.status == "applied":
-            return summary.number, service.revisions.get(summary.number).intent
-    return None, {}
+    view = service.people.intent()
+    return view.revision, view.intent
 
 
 def declared_users(intent: dict[str, Any]) -> list[str]:
@@ -47,14 +45,7 @@ def is_declared(service: ControlService, username: str) -> bool:
     A merely proposed revision declares no one: a `propose` token must not lock the
     owner out of their own people.
     """
-    for summary in service.revisions.list_revisions().revisions:
-        if summary.status == "proposed":
-            continue
-        if username in declared_users(service.revisions.get(summary.number).intent):
-            return True
-        if summary.status == "applied":
-            return False
-    return False
+    return username in service.people.intent().declared
 
 
 def fleet_view(service: ControlService) -> FleetView:

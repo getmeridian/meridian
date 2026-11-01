@@ -199,6 +199,22 @@
           "message": {
             "title": "Message",
             "type": "string"
+          },
+          "subjects": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 50000,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subjects"
           }
         },
         "required": [
@@ -622,6 +638,988 @@
           "mode"
         ],
         "title": "BinaryPinResource",
+        "type": "object"
+      },
+      "BulkAction-Input": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "extend",
+              "expiry",
+              "quota",
+              "reset-traffic",
+              "enable",
+              "disable",
+              "tag",
+              "devices",
+              "renewal",
+              "delete"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Days"
+          },
+          "device_limit": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Device Limit"
+          },
+          "expire_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expire At"
+          },
+          "months": {
+            "anyOf": [
+              {
+                "maximum": 120,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Months"
+          },
+          "renewal_interval_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Days"
+          },
+          "renewal_interval_months": {
+            "anyOf": [
+              {
+                "maximum": 120,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Months"
+          },
+          "renewal_limit": {
+            "anyOf": [
+              {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Limit"
+          },
+          "tag": {
+            "default": "",
+            "maxLength": 16,
+            "title": "Tag",
+            "type": "string"
+          },
+          "traffic_limit_bytes": {
+            "anyOf": [
+              {
+                "maximum": 9223372036854775807,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Traffic Limit Bytes"
+          },
+          "traffic_limit_strategy": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_reset",
+                  "day",
+                  "week",
+                  "month",
+                  "month_rolling"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Traffic Limit Strategy"
+          },
+          "traffic_reset_anchor_day": {
+            "anyOf": [
+              {
+                "maximum": 31,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Traffic Reset Anchor Day"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "BulkAction",
+        "type": "object"
+      },
+      "BulkAction-Output": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "extend",
+              "expiry",
+              "quota",
+              "reset-traffic",
+              "enable",
+              "disable",
+              "tag",
+              "devices",
+              "renewal",
+              "delete"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Days"
+          },
+          "device_limit": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Device Limit"
+          },
+          "expire_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expire At"
+          },
+          "months": {
+            "anyOf": [
+              {
+                "maximum": 120,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Months"
+          },
+          "renewal_interval_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Days"
+          },
+          "renewal_interval_months": {
+            "anyOf": [
+              {
+                "maximum": 120,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Months"
+          },
+          "renewal_limit": {
+            "anyOf": [
+              {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Limit"
+          },
+          "tag": {
+            "default": "",
+            "pattern": "^[A-Z0-9_]{0,16}$",
+            "title": "Tag",
+            "type": "string"
+          },
+          "traffic_limit_bytes": {
+            "anyOf": [
+              {
+                "maximum": 9223372036854775807,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Traffic Limit Bytes"
+          },
+          "traffic_limit_strategy": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_reset",
+                  "day",
+                  "week",
+                  "month",
+                  "month_rolling"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Traffic Limit Strategy"
+          },
+          "traffic_reset_anchor_day": {
+            "anyOf": [
+              {
+                "maximum": 31,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Traffic Reset Anchor Day"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "BulkAction",
+        "type": "object"
+      },
+      "BulkCommitRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "preview_hash": {
+            "description": "Lowercase hex SHA-256 digest.",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Preview Hash",
+            "type": "string"
+          },
+          "preview_id": {
+            "pattern": "^[0-9a-f]{32}$",
+            "title": "Preview Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "preview_id",
+          "preview_hash"
+        ],
+        "title": "BulkCommitRequest",
+        "type": "object"
+      },
+      "BulkCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "changed": {
+            "minimum": 0,
+            "title": "Changed",
+            "type": "integer"
+          },
+          "cli_required": {
+            "minimum": 0,
+            "title": "Cli Required",
+            "type": "integer"
+          },
+          "targeted": {
+            "minimum": 0,
+            "title": "Targeted",
+            "type": "integer"
+          },
+          "unchanged": {
+            "minimum": 0,
+            "title": "Unchanged",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "targeted",
+          "changed",
+          "unchanged",
+          "cli_required"
+        ],
+        "title": "BulkCounts",
+        "type": "object"
+      },
+      "BulkEventDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "enum": [
+                  "extend",
+                  "expiry",
+                  "quota",
+                  "reset-traffic",
+                  "enable",
+                  "disable",
+                  "tag",
+                  "devices",
+                  "renewal",
+                  "delete"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "undo",
+                "type": "string"
+              }
+            ],
+            "title": "Action"
+          },
+          "changed": {
+            "minimum": 0,
+            "title": "Changed",
+            "type": "integer"
+          },
+          "cli_required": {
+            "minimum": 0,
+            "title": "Cli Required",
+            "type": "integer"
+          },
+          "targeted": {
+            "minimum": 0,
+            "title": "Targeted",
+            "type": "integer"
+          },
+          "unchanged": {
+            "minimum": 0,
+            "title": "Unchanged",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "action",
+          "targeted",
+          "changed",
+          "unchanged",
+          "cli_required"
+        ],
+        "title": "BulkEventDetail",
+        "type": "object"
+      },
+      "BulkFields": {
+        "additionalProperties": false,
+        "properties": {
+          "activation_duration_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whole UTC days from first traffic.",
+            "title": "Activation Duration Days"
+          },
+          "device_limit": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Limit"
+          },
+          "expire_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expire At"
+          },
+          "period_traffic": {
+            "$ref": "#/components/schemas/PeriodTraffic"
+          },
+          "renewal_anchor_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Original expiry of the current renewal series.",
+            "title": "Renewal Anchor At"
+          },
+          "renewal_interval_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Days"
+          },
+          "renewal_interval_months": {
+            "anyOf": [
+              {
+                "maximum": 120,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Months"
+          },
+          "renewal_limit": {
+            "anyOf": [
+              {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Renewals in this series; null means unlimited.",
+            "title": "Renewal Limit"
+          },
+          "renewals_completed": {
+            "default": 0,
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Renewals Completed",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "disabled",
+              "limited",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tag": {
+            "pattern": "^[A-Z0-9_]{0,16}$",
+            "title": "Tag",
+            "type": "string"
+          },
+          "traffic_limit_bytes": {
+            "title": "Traffic Limit Bytes",
+            "type": "integer"
+          },
+          "traffic_limit_strategy": {
+            "enum": [
+              "no_reset",
+              "day",
+              "week",
+              "month",
+              "month_rolling"
+            ],
+            "title": "Traffic Limit Strategy",
+            "type": "string"
+          },
+          "traffic_reset_anchor_day": {
+            "anyOf": [
+              {
+                "maximum": 31,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UTC month day; null uses creation day.",
+            "title": "Traffic Reset Anchor Day"
+          },
+          "traffic_reset_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Traffic Reset At"
+          },
+          "used_traffic_bytes": {
+            "title": "Used Traffic Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "expire_at",
+          "traffic_limit_bytes",
+          "traffic_limit_strategy",
+          "device_limit",
+          "tag",
+          "traffic_reset_at",
+          "used_traffic_bytes",
+          "period_traffic"
+        ],
+        "title": "BulkFields",
+        "type": "object"
+      },
+      "BulkPersonChange": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BulkFields"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "before": {
+            "$ref": "#/components/schemas/BulkFields"
+          },
+          "changes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "cli_command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cli Command"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "changed",
+              "unchanged",
+              "cli_required"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "row_version": {
+            "minimum": 1,
+            "title": "Row Version",
+            "type": "integer"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "enum": [
+                "irreversible",
+                "period_reset",
+                "topology_delete",
+                "disabled",
+                "expiry_blocks_enable",
+                "quota_blocks_enable",
+                "no_change"
+              ],
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "username",
+          "display_name",
+          "row_version",
+          "before",
+          "after",
+          "changes",
+          "outcome"
+        ],
+        "title": "BulkPersonChange",
+        "type": "object"
+      },
+      "BulkPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/BulkAction-Output"
+          },
+          "changed_nodes": {
+            "minimum": 0,
+            "title": "Changed Nodes",
+            "type": "integer"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/BulkCounts"
+          },
+          "created_at": {
+            "description": "RFC 3339 timestamp in UTC, ending in Z.",
+            "maxLength": 40,
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "description": "RFC 3339 timestamp in UTC, ending in Z.",
+            "maxLength": 40,
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{32}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "people": {
+            "items": {
+              "$ref": "#/components/schemas/BulkPersonChange"
+            },
+            "title": "People",
+            "type": "array"
+          },
+          "preview_hash": {
+            "description": "Lowercase hex SHA-256 digest.",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Preview Hash",
+            "type": "string"
+          },
+          "reversible": {
+            "title": "Reversible",
+            "type": "boolean"
+          },
+          "warnings": {
+            "items": {
+              "enum": [
+                "irreversible",
+                "period_reset",
+                "topology_delete",
+                "disabled",
+                "expiry_blocks_enable",
+                "quota_blocks_enable",
+                "no_change"
+              ],
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "preview_hash",
+          "created_at",
+          "expires_at",
+          "action",
+          "people",
+          "counts",
+          "changed_nodes",
+          "reversible"
+        ],
+        "title": "BulkPreview",
+        "type": "object"
+      },
+      "BulkPreviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/BulkAction-Input"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeopleQuery"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "usernames": {
+            "anyOf": [
+              {
+                "items": {
+                  "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
+                  "type": "string"
+                },
+                "maxItems": 50000,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Usernames"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "BulkPreviewRequest",
+        "type": "object"
+      },
+      "BulkReceipt": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/BulkAction-Output"
+          },
+          "changed_nodes": {
+            "minimum": 0,
+            "title": "Changed Nodes",
+            "type": "integer"
+          },
+          "committed_at": {
+            "description": "RFC 3339 timestamp in UTC, ending in Z.",
+            "maxLength": 40,
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+            "title": "Committed At",
+            "type": "string"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/BulkCounts"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{32}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "people": {
+            "items": {
+              "$ref": "#/components/schemas/BulkPersonChange"
+            },
+            "title": "People",
+            "type": "array"
+          },
+          "preview_hash": {
+            "description": "Lowercase hex SHA-256 digest.",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Preview Hash",
+            "type": "string"
+          },
+          "undo_people": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BulkPersonChange"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Undo People"
+          },
+          "undo_until": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undo Until"
+          },
+          "undone_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Undone At"
+          }
+        },
+        "required": [
+          "id",
+          "preview_hash",
+          "action",
+          "committed_at",
+          "counts",
+          "people",
+          "changed_nodes",
+          "undo_until"
+        ],
+        "title": "BulkReceipt",
+        "type": "object"
+      },
+      "BulkUndoRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "receipt_id": {
+            "pattern": "^[0-9a-f]{32}$",
+            "title": "Receipt Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "receipt_id"
+        ],
+        "title": "BulkUndoRequest",
         "type": "object"
       },
       "ClientConnection": {
@@ -1559,6 +2557,9 @@
           "detail": {
             "anyOf": [
               {
+                "$ref": "#/components/schemas/BulkEventDetail"
+              },
+              {
                 "$ref": "#/components/schemas/EmptyEventDetail"
               },
               {
@@ -1594,6 +2595,7 @@
           },
           "kind": {
             "enum": [
+              "people.bulk",
               "user.created",
               "user.updated",
               "user.enabled",
@@ -3280,6 +4282,588 @@
           }
         },
         "title": "OwnerContact",
+        "type": "object"
+      },
+      "PeopleFacets": {
+        "additionalProperties": false,
+        "properties": {
+          "attention": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Attention",
+            "type": "object"
+          },
+          "expires": {
+            "default": 0,
+            "title": "Expires",
+            "type": "integer"
+          },
+          "lifecycle": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Lifecycle",
+            "type": "object"
+          },
+          "never": {
+            "default": 0,
+            "title": "Never",
+            "type": "integer"
+          },
+          "quota": {
+            "default": 0,
+            "title": "Quota",
+            "type": "integer"
+          },
+          "status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Status",
+            "type": "object"
+          },
+          "tag": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Tag",
+            "type": "object"
+          }
+        },
+        "title": "PeopleFacets",
+        "type": "object"
+      },
+      "PeoplePage": {
+        "additionalProperties": false,
+        "properties": {
+          "facets": {
+            "$ref": "#/components/schemas/PeopleFacets"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "observed_at": {
+            "description": "RFC 3339 timestamp in UTC, ending in Z.",
+            "maxLength": 40,
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+            "title": "Observed At",
+            "type": "string"
+          },
+          "population": {
+            "minimum": 0,
+            "title": "Population",
+            "type": "integer"
+          },
+          "total": {
+            "description": "Matching people in this page sequence.",
+            "minimum": 0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/PeoplePerson"
+            },
+            "title": "Users",
+            "type": "array"
+          }
+        },
+        "required": [
+          "users",
+          "total",
+          "population",
+          "facets",
+          "next_cursor",
+          "observed_at"
+        ],
+        "title": "PeoplePage",
+        "type": "object"
+      },
+      "PeoplePerson": {
+        "additionalProperties": false,
+        "description": "List evidence without connection credentials or private notes.",
+        "properties": {
+          "activation_duration_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whole UTC days from first traffic.",
+            "title": "Activation Duration Days"
+          },
+          "attention_reasons": {
+            "items": {
+              "enum": [
+                "expiring",
+                "quota",
+                "unused",
+                "stopped"
+              ],
+              "type": "string"
+            },
+            "title": "Attention Reasons",
+            "type": "array"
+          },
+          "created_at": {
+            "description": "RFC 3339 timestamp in UTC, ending in Z.",
+            "maxLength": 40,
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+            "title": "Created At",
+            "type": "string"
+          },
+          "declared": {
+            "title": "Declared",
+            "type": "boolean"
+          },
+          "device_limit": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Limit"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "expire_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expire At"
+          },
+          "first_traffic_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "When the service first accepted traffic growth; unknown for historical use.",
+            "title": "First Traffic At"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "ru",
+                  "fa",
+                  "zh"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Language"
+          },
+          "last_traffic_node": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The node whose latest accepted growth set the user's last traffic time.",
+            "title": "Last Traffic Node"
+          },
+          "lifetime_traffic_bytes": {
+            "minimum": 0,
+            "title": "Lifetime Traffic Bytes",
+            "type": "integer"
+          },
+          "never_used": {
+            "title": "Never Used",
+            "type": "boolean"
+          },
+          "online_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online At"
+          },
+          "period_traffic": {
+            "$ref": "#/components/schemas/PeriodTraffic"
+          },
+          "quota_used_percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quota Used Percent"
+          },
+          "renewal_anchor_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Original expiry of the current renewal series.",
+            "title": "Renewal Anchor At"
+          },
+          "renewal_interval_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Days"
+          },
+          "renewal_interval_months": {
+            "anyOf": [
+              {
+                "maximum": 120,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Months"
+          },
+          "renewal_limit": {
+            "anyOf": [
+              {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Renewals in this series; null means unlimited.",
+            "title": "Renewal Limit"
+          },
+          "renewals_completed": {
+            "default": 0,
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Renewals Completed",
+            "type": "integer"
+          },
+          "row_version": {
+            "minimum": 1,
+            "title": "Row Version",
+            "type": "integer"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountSchedulePreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "active",
+              "disabled",
+              "expired",
+              "limited"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tag": {
+            "pattern": "^[A-Z0-9_]{0,16}$",
+            "title": "Tag",
+            "type": "string"
+          },
+          "traffic_limit_bytes": {
+            "minimum": 0,
+            "title": "Traffic Limit Bytes",
+            "type": "integer"
+          },
+          "traffic_limit_strategy": {
+            "enum": [
+              "no_reset",
+              "day",
+              "week",
+              "month",
+              "month_rolling"
+            ],
+            "title": "Traffic Limit Strategy",
+            "type": "string"
+          },
+          "traffic_reset_anchor_day": {
+            "anyOf": [
+              {
+                "maximum": 31,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UTC month day; null uses creation day.",
+            "title": "Traffic Reset Anchor Day"
+          },
+          "traffic_reset_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Traffic Reset At"
+          },
+          "used_traffic_bytes": {
+            "minimum": 0,
+            "title": "Used Traffic Bytes",
+            "type": "integer"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "user_id",
+          "display_name",
+          "declared",
+          "row_version",
+          "status",
+          "created_at",
+          "expire_at",
+          "traffic_limit_bytes",
+          "traffic_limit_strategy",
+          "traffic_reset_at",
+          "used_traffic_bytes",
+          "lifetime_traffic_bytes",
+          "period_traffic",
+          "online_at",
+          "never_used",
+          "quota_used_percent",
+          "attention_reasons",
+          "device_limit",
+          "tag",
+          "schedule"
+        ],
+        "title": "PeoplePerson",
+        "type": "object"
+      },
+      "PeopleQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "attention": {
+            "default": "",
+            "enum": [
+              "",
+              "all",
+              "expiring",
+              "quota",
+              "unused",
+              "stopped"
+            ],
+            "title": "Attention",
+            "type": "string"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cursor"
+          },
+          "expires": {
+            "anyOf": [
+              {
+                "maximum": 365,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expires"
+          },
+          "lifecycle": {
+            "default": "",
+            "enum": [
+              "",
+              "pending",
+              "renewing",
+              "fixed",
+              "unlimited"
+            ],
+            "title": "Lifecycle",
+            "type": "string"
+          },
+          "limit": {
+            "default": 100,
+            "maximum": 500,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "never": {
+            "default": false,
+            "title": "Never",
+            "type": "boolean"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "q": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Q",
+            "type": "string"
+          },
+          "quota": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Quota"
+          },
+          "sort": {
+            "default": "name",
+            "enum": [
+              "name",
+              "usage",
+              "expiry",
+              "activity"
+            ],
+            "title": "Sort",
+            "type": "string"
+          },
+          "status": {
+            "default": "",
+            "enum": [
+              "",
+              "active",
+              "disabled",
+              "expired",
+              "limited"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tag": {
+            "default": "",
+            "maxLength": 16,
+            "title": "Tag",
+            "type": "string"
+          }
+        },
+        "title": "PeopleQuery",
         "type": "object"
       },
       "PeriodTraffic": {
@@ -10154,6 +11738,757 @@
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "read",
+          "people"
+        ]
+      }
+    },
+    "/api/people": {
+      "get": {
+        "description": "Requires people scope, or a scope that covers it. Case-folded username/display-name search; missing dates sort last. Cursors exclude later insertions and expire after 15 minutes.",
+        "operationId": "query_people",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 256,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "",
+              "enum": [
+                "",
+                "active",
+                "disabled",
+                "expired",
+                "limited"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 16,
+              "title": "Tag",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "expires",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 365,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Expires"
+            }
+          },
+          {
+            "in": "query",
+            "name": "quota",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 100,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Quota"
+            }
+          },
+          {
+            "in": "query",
+            "name": "never",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Never",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "attention",
+            "required": false,
+            "schema": {
+              "default": "",
+              "enum": [
+                "",
+                "all",
+                "expiring",
+                "quota",
+                "unused",
+                "stopped"
+              ],
+              "title": "Attention",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lifecycle",
+            "required": false,
+            "schema": {
+              "default": "",
+              "enum": [
+                "",
+                "pending",
+                "renewing",
+                "fixed",
+                "unlimited"
+              ],
+              "title": "Lifecycle",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "name",
+              "enum": [
+                "name",
+                "usage",
+                "expiry",
+                "activity"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Order"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeoplePage"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Find people with shared filters, stable cursor pages, and contextual counts.",
+        "tags": [
+          "people"
+        ],
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "people"
+        ]
+      }
+    },
+    "/api/people/bulk/commit": {
+      "post": {
+        "description": "Requires people scope, or a scope that covers it. Requires the preview ID and hash. Any changed person or enforcement result refuses the entire operation. A retry returns the same receipt.",
+        "operationId": "commit_people_bulk",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkCommitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkReceipt"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "preview_expired",
+              "preview_mismatch",
+              "stale_people"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Commit the frozen review atomically and return a durable receipt.",
+        "tags": [
+          "people"
+        ],
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "people"
+        ]
+      }
+    },
+    "/api/people/bulk/preview": {
+      "post": {
+        "description": "Requires people scope, or a scope that covers it. Previews write no database rows or events. They expire after 10 minutes or a service restart. Declared deletions return exact reviewed CLI commands.",
+        "operationId": "preview_people_bulk",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkPreview"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Freeze a bulk selection and review every before/after without writing.",
+        "tags": [
+          "people"
+        ],
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "people"
+        ]
+      }
+    },
+    "/api/people/bulk/receipts/{receipt_id}": {
+      "get": {
+        "description": "Requires people scope, or a scope that covers it.",
+        "operationId": "people_bulk_receipt",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{32}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkReceipt"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Read a completed bulk receipt without notes or credentials.",
+        "tags": [
+          "people"
+        ],
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "people"
+        ]
+      }
+    },
+    "/api/people/bulk/undo": {
+      "post": {
+        "description": "Requires people scope, or a scope that covers it. Undo lasts 10 minutes, survives service restarts, and is single-use. Reset and delete cannot be undone.",
+        "operationId": "undo_people_bulk",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUndoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkReceipt"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "stale_people",
+              "undo_refused"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Undo reversible field changes while every person is unchanged.",
+        "tags": [
+          "people"
+        ],
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
           "people"
         ]
       }

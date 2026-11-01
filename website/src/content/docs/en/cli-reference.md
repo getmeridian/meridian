@@ -181,6 +181,44 @@ Private metadata: `client set NAME --note TEXT --tag TAG` edits only the supplie
 
 `client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` explains selection and omissions without credentials. User-Agent is limited to 512 Unicode characters; Accept to 256, both one line and transient. `--suffix` forces one of the existing format URL suffixes. JSON returns `subscription-preview`; the API is the read-scoped `POST /api/subscription/preview`.
 
+#### Reviewed bulk changes
+
+`client list` shows the first 100 matches. `--limit 1–500` sets page size; `--cursor VALUE` continues the same query. JSON adds `total`, contextual `facets`, and optional `next_cursor`; summary counts describe the returned page. `client bulk ACTION` uses the same query, freezes a preview, shows a table, confirms, and commits atomically. `--dry-run` returns the preview only; JSON commit and undo require `--yes`. Exact `--person USERNAME` selection cannot be combined with filters. Read receipts with `client bulk receipt ID`; undo unchanged reversible fields with `client bulk undo ID`. A lost commit reply is resolved by reading the receipt.
+
+A lost commit or undo reply is checked by reading the receipt; undo is confirmed only when the receipt records that it was undone. The console keeps that updated receipt and reads it again when you reopen it. `client bulk undo ID --dry-run` checks that the receipt is reversible, has not been undone, and is still within its undo window without sending a write; the final undo also checks live people and inbound capacity.
+
+JSON facet counts stay integers for every valid tag, including tags such as `TOKEN` or `API_KEY`.
+
+Bulk previews show the enforced state before the action, including expiry and refills already due. An action that changes no fields is counted as unchanged. Commit checks that state again for every selected person, including deletions; if a limit or schedule has changed, the refusal names the people to preview again. Refills use the commit time, and undo preserves enforcement that was already due before review.
+
+Undo writes the original choices, then enforces expiry and quota rules just like commit. Lifecycle events distinguish enabling access from restoring it after a limit change. Before composing node documents, undo checks the current managed inbound capacity; a refusal leaves the people and receipt unchanged.
+
+| Command | Reviewed change |
+|---|---|
+| `meridian client bulk extend --days 7` | Extend expiry or pending duration |
+| `meridian client bulk expiry --expires never` | Set or clear expiry |
+| `meridian client bulk quota --limit 50GB --reset month --reset-day 15` | Set or clear quota and reset strategy |
+| `meridian client bulk reset-traffic` | Reset period traffic (irreversible) |
+| `meridian client bulk enable` | Enable with effective status |
+| `meridian client bulk disable` | Disable |
+| `meridian client bulk tag --set-tag none` | Set or clear tag |
+| `meridian client bulk devices --devices unlimited` | Set device cap |
+| `meridian client bulk renewal --renew-days 30 --renewals 5` | Set or clear renewal |
+| `meridian client bulk delete` | Delete service-only people; declared people return commands |
+| `meridian client bulk undo ID` | Undo reversible fields within ten minutes |
+| `meridian client bulk receipt ID` | Read a durable receipt |
+
+Shared filters: `--search TEXT`, `--status STATUS`, `--tag TAG`, `--expiring-within DAYS`, `--quota-at-least PERCENT`, `--never-used`, `--attention`, `--attention-reason REASON`, `--lifecycle STATE`, `--sort name|usage|expiry|activity`, `--order asc|desc`. Use either `--attention` (any default reason) or `--attention-reason`. Lifecycle choices: `pending`, `renewing`, `fixed`, `unlimited`. Names sort by case-folded display name, then exact username. See [client management](/en/client-management/) for review and privacy rules.
+
+`meridian client bulk extend --months 1 --person sample-a --dry-run --json`
+
+`meridian client bulk renewal --renew-months 1`
+
+`meridian client bulk renewal --no-renew`
+
+`meridian client bulk disable --tag TRIAL_7 --yes --json`
+
+
 ### meridian privacy
 
 Choose what the control service stores. Both device limits and daily history default to off; applying the fleet never changes these settings. See [Privacy](/en/privacy/) for the disclosures and seizure consequences.

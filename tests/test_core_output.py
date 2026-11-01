@@ -259,3 +259,16 @@ def test_reveal_keeps_only_named_link_keys_verbatim() -> None:
     assert "adminsecret" not in revealed["panel_url"]
     assert revealed["api_token"] == "[redacted]"
     assert "s1" not in default["subscription_url"] and "u1" not in default["connection_page_url"]
+
+
+def test_revealed_facet_counts_keep_their_types_without_revealing_string_credentials() -> None:
+    payload = {
+        "data": {
+            "facets": {"tag": {"TOKEN": 2, "API_KEY": 0}, "api_token": "sample-secret"},
+            "neighbor": {"TOKEN": 3, "api_token": "other-secret"},
+        }
+    }
+    result = redact(payload, reveal=frozenset({"data.facets"}))
+    assert result["data"]["facets"]["tag"] == {"TOKEN": 2, "API_KEY": 0}
+    assert result["data"]["facets"]["api_token"] == REDACTED
+    assert result["data"]["neighbor"] == {"TOKEN": REDACTED, "api_token": REDACTED}

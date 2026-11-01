@@ -57,11 +57,13 @@ This prints the personal URL, plus status, traffic, expiry, and when the client 
 meridian client list
 ```
 
-In the web panel, open **People → Filters** to combine status, tag (including no tag), expiry within 1–365 days, quota at or above 1–100%, never used, and attention or a specific reason. Expiry covers now through the chosen future boundary; already expired accounts use the status filter. The never-used filter includes new accounts of any age. Each count respects your search and the other filters. Sort by name, period usage, expiry, or last activity, in either order; unknown dates stay last. Search, filters, and order live in the URL fragment, so reloading, sharing the link, or returning from a person preserves the view. No filter data is sent or saved on the server. The list is filtered locally; rows keep their identity while you type. The API supplies read-only `never_used`, exact floored `quota_used_percent` (null for unlimited), and default `attention_reasons`.
+People, `client list`, and bulk selection use one server query: username/display-name search, status, tag, expiry within 1–365 days, quota share at or above 1–100%, never used, attention reason, and lifecycle (`pending`, `renewing`, `fixed`, `unlimited`). Counts respect search and the other filters. Sort by name, period usage, expiry, or last activity; missing dates stay last. The console shows 100 rows per page and preserves row identity during refresh. Filters and order stay in the URL fragment. Query parameters are sent to the service, never saved as request history. Cursor pages exclude people inserted after the first page and expire after 15 minutes; returning to the first page starts a fresh view.
+
+Background refreshes keep selection, bulk actions, pagination, and keyboard focus available. A failed refresh keeps the current rows and controls usable; failed Next or Previous requests retain the last loaded page so the pager can retry.
+
+A lost commit or undo reply is checked by reading the receipt; undo is confirmed only when the receipt records that it was undone. The console keeps that updated receipt and reads it again when you reopen it. `client bulk undo ID --dry-run` checks that the receipt is reversible, has not been undone, and is still within its undo window without sending a write; the final undo also checks live people and inbound capacity.
 
 A separate **Stopped using** reason (`stopped`) flags a person who previously used the service but has no accepted traffic for more than three days. **Never used** (`unused`) remains a separate reason. `stopped_days` is an independent API threshold from 1–365 days, default 3; `unused_days` keeps its existing bounds and default. Period resets do not erase this evidence, and daily history can stay off. Imported use with no known last traffic time is not guessed to have stopped.
-
-Shows every client with status, traffic, expiry, and last seen.
 
 ## Private notes and tags
 
@@ -298,6 +300,11 @@ Read tokens never see anyone's keys or subscription ID. Choose **People** for a 
 
 | People endpoint | Action |
 |---|---|
+| `GET /api/people` | Find people and return cursor pages and contextual counts |
+| `POST /api/people/bulk/preview` | Freeze exact usernames or a query without account or receipt writes |
+| `POST /api/people/bulk/commit` | Commit preview_id and preview_hash atomically; name stale people |
+| `GET /api/people/bulk/receipts/{receipt_id}` | Read a receipt without notes or credentials |
+| `POST /api/people/bulk/undo` | Undo unchanged reversible fields once within ten minutes |
 | `POST /api/users/preview` | Preview creation or an edit’s UTC schedule dates without saving; people/admin or owner session |
 | `POST /api/users` | Create a person with `username`, `status`, `expire_at`, `traffic_limit_bytes`, `traffic_limit_strategy`, and `device_limit` in one transaction |
 | `PATCH /api/users/{username}` | Change the status, expiry, traffic limit or reset strategy, or device cap; omitted fields keep their values |
@@ -378,3 +385,15 @@ Two apps earn one inert extra entry at the end of their subscription, in the per
 Response headers are redacted: URLs are replaced, and encoded profile titles and notices show only their `base64:` prefix. The preview returns no body, URIs, keys, private notes, or tags. User-Agent is bounded to 512 Unicode characters and Accept to 256, each one line. Inputs are transient: they are neither stored nor echoed, never register a device, and trigger no backup write.
 
 `POST /api/subscription/preview` needs read scope or the owner session. Send `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`; omitted headers default to empty strings. Settings in the web panel has the same form. No HWID or device-header input is accepted. For API-managed endpoints, `enabled: false` excludes the saved endpoint from subscriptions and appears as `disabled_endpoint`; true is the default and is omitted from serialized endpoints. A reviewed endpoint apply restores topology-defined delivery.
+
+## Review changes for many people
+
+Use Tab and Space to select rows; Shift+Space extends the selection on the current page. **Select all matching** includes other pages. Changing filters clears selection. Choose an action, review each person's before/after and warnings in pages of 100, and inspect the count of changed node documents. A preview freezes exact people and row versions for ten minutes; new matches are excluded. Any changed person, enforcement result, or node specification refuses the whole commit. Stale people are named. Every change and receipt lands in one transaction, with one document composition for the batch.
+
+For bulk expiry changes, choose **No end date** to clear the expiry. When that choice is unchecked, the date and time must be valid, in the future, and before 2099; a blank or invalid value stops the preview and never clears anyone's expiry.
+
+Extend by whole days or calendar months from the later of now and expiry, with short months clamped. Pending first-use durations grow without activation; calendar months add the days between the preview's UTC date and that date after the selected months. Set or clear expiry, quota and reset strategy, tag, device cap (inherit/unlimited/N), or renewal; enable, disable, reset period traffic, or delete. Omitted fields preserve values; reset strategy and renewal cap can be edited independently. The existing node contract permits 10,000 active people per managed inbound; previews reject changes that exceed it.
+
+Durable receipts retain action, parameters, counts, and per-person outcomes. Reversible fields can be undone once within ten minutes, even after a service restart, only while people and the reviewed enforcement outcome remain unchanged. Traffic reset, deletion, and schedule changes that reset traffic are irreversible and disclosed before commit. Resets preserve lifetime totals. Receipts contain no private notes, credentials, client addresses, or device identifiers. Events contain the action and counts plus the existing content-free per-person events. People declared in `topology_intent.access.users` may receive service-owned edits; their deletion returns the exact `meridian client remove USERNAME` command for a separate topology review and never deletes them in the service batch.
+
+`GET /api/people` requires people/admin or an owner session. It returns `users`, `total`, `population`, contextual `facets`, and `next_cursor`. Query keys: `q`, `status`, `tag`, `expires`, `quota`, `never` (0/1), `attention`, `lifecycle`, `sort`, `order`, `limit` (1–500), `cursor`. Keep filters and order when continuing a cursor. The plain `GET /api/users` route remains available. Query responses omit credentials and private notes; CLI JSON retains its existing note view through the authorized per-person read.

@@ -3,6 +3,8 @@
 Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `formats/CLAUDE.md`.
 
 ## Design decisions
+- **People queries share SQL predicates** — cursor pages use monotonic identities, contextual counts, and the same selection across surfaces.
+- **Bulk reviews freeze names and versions** — previews stay in bounded memory; one transaction stores the receipt and composes documents.
 - **Person routes have one catalog** — `person_route_catalog.py` owns account declarations; `route_metadata.py` keeps shared refusals and credential annotations.
 - **Service owns users, deployer owns topology** — the reconciler PUTs node specs, endpoints, and users over the admin API; the service composes each node's whole document (`node_documents.py`), signs it, and serves it to that node's agent. Client-IP forwarding is not ported yet, so `--client-ips` is hidden.
 - **Stdlib HTTP on loopback** — `ThreadingHTTPServer` behind nginx's secret path (stripped, so routes are `/api`, `/agent/v1`, `/sub`); a thread per long-poll is cheap at Meridian's fleet sizes, and `control/` never imports the deployer. `route_catalog.py` declares every `/api` operation (scopes, models, errors, credential marker) and drives dispatch, authorization, and `openapi.py`; `route_table.py` owns matching.
@@ -28,6 +30,10 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - A proposal whose intent contains a secret-shaped key or value, or a malformed `access` block, is refused and never stored.
 
 ## Pitfalls
+- **Undo shares bulk enforcement** — restore requested choices before judging status, and check managed inbound capacity before composing.
+- **Bulk before is enforced** — project both sides from one account clock, re-check every target before writing, and catch up due resets before schedule edits.
+- **Bulk after stays reviewed** — re-check the projected result at commit; a newly due action schedule needs a fresh review.
+- **Bulk applies use canonical enforcement** — write validated requested fields before enforcing, or quota restoration emits the wrong event and cap edits lose their renewal interval.
 - **Schedules share directional baselines** — renewal and rolling resets clear both directions and carried period use; imports initialize the same projection before enforcement, preserving lifetime totals.
 - **First use means accepted traffic** — subscription and page reads never activate; renewal progress, period offsets, and effective status change in the traffic transaction before new growth.
 - **Renewal anchors survive short months** — expiry or interval edits start a new series, cap edits keep progress, and missed renewals consume the cap with one period reset.

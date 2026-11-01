@@ -15,6 +15,14 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b9
 
 #### Added
+- Server-side people queries with contextual counts, row versions, and stable
+  cursor pages without notes or credentials.
+- Bulk previews freeze targets and versions, commit atomically, retain durable
+  receipts, and offer guarded ten-minute undo for reversible fields.
+- Reviewed `client bulk` actions with shared list filters, preview tables,
+  explicit JSON confirmation, and receipt recovery after an uncertain reply.
+- People selection by keyboard or across all matching pages, with bounded
+  server reads, preserved rows, bulk reviews, receipts, and undo in the console.
 - Account anniversary resets, durations from first traffic, and automatic
   expiry renewal with optional caps. API, CLI, panel, connection pages, and
   refill headers share UTC dates; migration keeps rolling-month anchors.
@@ -24,6 +32,12 @@ newest first; the last is what 4.0 changes compared with 3.x.
   the fleet default. Remnawave migration keeps device caps, including zero.
 
 #### Fixed
+- Bulk expiry validates dates before preview, so blank or invalid input never clears expiry; clearing it requires the explicit No end date choice.
+- CLI and console reconcile lost undo replies through receipts, retain the updated console receipt, and reject unavailable undo dry runs.
+- People background refreshes preserve selection controls and keyboard focus; failed refreshes and page requests keep actions and pagination usable.
+- Client-list JSON preserves integer facet counts for secret-shaped tags such as TOKEN and API_KEY.
+- Bulk undo emits the same lifecycle events as commit and refuses an over-capacity managed inbound without changing people or the receipt.
+- Bulk reviews compare enforced account states, refuse named stale targets even for deletion, preserve due refills, and count no-op actions as unchanged.
 - **The People screen filters by status, tag, upcoming expiry, quota share, never-used accounts, and attention**, with facet counts and sorting by name, usage, expiry, or last activity. The fragment retains the view across reloads, and searching keeps existing rows and focus (#95).
 - **People attention distinguishes never-used accounts from people who stopped using the service**, using the stored last traffic time and separate bounded thresholds. Period resets and disabled daily history preserve that evidence (#95).
 - **Connection pages show used and allowed device slots when limits are enabled**, with localized guidance for full slots and apps that cannot report a device. Only counts are revealed, and the page never saves them (#95).

@@ -56,6 +56,7 @@ from meridian.control.models import (
     TrafficDailySummary,
     TrafficSummary,
 )
+from meridian.control.people_route_catalog import PEOPLE_ROUTES
 from meridian.control.person_route_catalog import PERSON_ROUTES
 from meridian.control.route_metadata import (
     CONFLICT,
@@ -273,6 +274,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         description="Other query options are ignored. Daily history must be enabled by the operator.",
     ),
     *PERSON_ROUTES,
+    *PEOPLE_ROUTES,
     route(
         "GET",
         "/api/endpoints/{endpoint_id}",

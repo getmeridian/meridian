@@ -13,6 +13,7 @@ from meridian.core.agent_types import MAX_SAFE_INTEGER
 from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.fleet_events import (
     MAX_EVENTS,
+    BulkEventDetail,
     FleetEvent,
     NodeEventDetail,
     PrivacyEventDetail,
@@ -87,6 +88,14 @@ def run_events(*, since: str = "0", limit: str = "100") -> None:
 
 def _detail(event: FleetEvent) -> str:
     detail = event.detail
+    if isinstance(detail, BulkEventDetail):
+        return t(
+            "events.bulk",
+            action=t(f"bulk.action.{detail.action}"),
+            changed=detail.changed,
+            targeted=detail.targeted,
+            cli_required=detail.cli_required,
+        )
     if isinstance(detail, UserFieldsDetail):
         return t("events.changed", fields=", ".join(t(f"events.field.{field}") for field in detail.fields))
     if isinstance(detail, TokenEventDetail):

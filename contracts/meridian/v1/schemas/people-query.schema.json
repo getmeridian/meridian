@@ -1,0 +1,136 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "attention": {
+      "default": "",
+      "enum": [
+        "",
+        "all",
+        "expiring",
+        "quota",
+        "unused",
+        "stopped"
+      ],
+      "title": "Attention",
+      "type": "string"
+    },
+    "cursor": {
+      "anyOf": [
+        {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cursor"
+    },
+    "expires": {
+      "anyOf": [
+        {
+          "maximum": 365,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expires"
+    },
+    "lifecycle": {
+      "default": "",
+      "enum": [
+        "",
+        "pending",
+        "renewing",
+        "fixed",
+        "unlimited"
+      ],
+      "title": "Lifecycle",
+      "type": "string"
+    },
+    "limit": {
+      "default": 100,
+      "maximum": 500,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+    },
+    "never": {
+      "default": false,
+      "title": "Never",
+      "type": "boolean"
+    },
+    "order": {
+      "anyOf": [
+        {
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Order"
+    },
+    "q": {
+      "default": "",
+      "maxLength": 256,
+      "title": "Q",
+      "type": "string"
+    },
+    "quota": {
+      "anyOf": [
+        {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Quota"
+    },
+    "sort": {
+      "default": "name",
+      "enum": [
+        "name",
+        "usage",
+        "expiry",
+        "activity"
+      ],
+      "title": "Sort",
+      "type": "string"
+    },
+    "status": {
+      "default": "",
+      "enum": [
+        "",
+        "active",
+        "disabled",
+        "expired",
+        "limited"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "tag": {
+      "default": "",
+      "maxLength": 16,
+      "title": "Tag",
+      "type": "string"
+    }
+  },
+  "title": "PeopleQuery",
+  "type": "object"
+}

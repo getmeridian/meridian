@@ -73,6 +73,8 @@
     return { bytes: Number(bytes) };
   }
 
+  M.parseQuotaBytes = quotaBytes;
+
   /* Limits as a form block, shared by "add" and the person screen. With a person, `value()`
    * holds only what was edited, so saving another field never rewrites the limit. */
   M.limitFields = function (user) {

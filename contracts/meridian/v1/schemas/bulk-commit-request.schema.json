@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "preview_hash": {
+      "description": "Lowercase hex SHA-256 digest.",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Preview Hash",
+      "type": "string"
+    },
+    "preview_id": {
+      "pattern": "^[0-9a-f]{32}$",
+      "title": "Preview Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "preview_id",
+    "preview_hash"
+  ],
+  "title": "BulkCommitRequest",
+  "type": "object"
+}

@@ -93,7 +93,7 @@
         invalid.focus(); invalid.reportValidity();
       }, true);
     });
-    return { nodes: nodes, date: date, time: time, never: never, value: value,
+    return { nodes: nodes, date: date, time: time, never: never, value: value, validate: validate,
       change: function () { var chosen = value(); return chosen === initial ? {} : { expire_at: chosen }; } };
   };
 })();

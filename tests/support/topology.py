@@ -103,6 +103,24 @@ def panel_mock(**return_values: Any) -> MagicMock:
     panel.recent_usage.return_value = None
     for method, value in return_values.items():
         getattr(panel, method).return_value = value
+    from types import SimpleNamespace
+
+    from meridian.core.people_query import PeopleFacets
+
+    def query_users(_query: Any, **_options: Any) -> tuple[Any, Any]:
+        users = panel.list_users.return_value
+        page = SimpleNamespace(
+            users=[
+                SimpleNamespace(username=user.username, display_name=user.username, declared=True, attention_reasons=[])
+                for user in users
+            ],
+            total=len(users),
+            next_cursor=None,
+            facets=PeopleFacets(),
+        )
+        return page, users
+
+    panel.query_users.side_effect = query_users
     return panel
 
 

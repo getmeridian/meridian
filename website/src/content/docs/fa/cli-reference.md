@@ -181,6 +181,44 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 `client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` انتخاب قالب و حذف گزینه‌ها را بدون اطلاعات محرمانه توضیح می‌دهد. User-Agent حداکثر ۵۱۲ نویسهٔ Unicode و Accept حداکثر ۲۵۶ نویسه دارند؛ هرکدام یک خط و موقت‌اند. `--suffix` یکی از پسوندهای فعلی نشانی قالب را تحمیل می‌کند. JSON خروجی `subscription-preview` دارد؛ API، `POST /api/subscription/preview` با دسترسی read است.
 
+#### تغییر گروهی پس از بازبینی
+
+`client list` نخستین ۱۰۰ فرد مطابق را نشان می‌دهد. `--limit 1–500` اندازه صفحه و `--cursor VALUE` ادامه همان پرس‌وجو است. JSON شامل `total`، شمارش‌های `facets` و `next_cursor` اختیاری است؛ خلاصه برای صفحه برگشتی است. `client bulk ACTION` همان پرس‌وجو را با پیش‌نمایش ثابت، جدول، تأیید و ثبت اتمی اجرا می‌کند. `--dry-run` تنها پیش‌نمایش است؛ ثبت و برگشت در JSON به `--yes` نیاز دارند. `--person USERNAME` با فیلتر ترکیب نمی‌شود. رسید را با `client bulk receipt ID` بخوانید و با `client bulk undo ID` برگردانید. گم شدن پاسخ ثبت با خواندن رسید پیگیری می‌شود.
+
+اگر پاسخ ثبت یا برگشت گم شود، نتیجه با خواندن رسید بررسی می‌شود؛ برگشت فقط وقتی تأیید می‌شود که رسید انجام آن را ثبت کرده باشد. پنل رسید به‌روز را نگه می‌دارد و هنگام باز کردن دوباره، آن را از سرویس می‌خواند. `client bulk undo ID --dry-run` بدون ارسال تغییر، بررسی می‌کند که عملیات قابل برگشت است، قبلاً برگشت داده نشده و مهلتش پایان نیافته است؛ اجرای نهایی، وضعیت فعلی افراد و ظرفیت ورودی را نیز بررسی می‌کند.
+
+شمارش‌های فیلتر در JSON برای همهٔ برچسب‌های معتبر، از جمله `TOKEN` و `API_KEY`، عدد صحیح می‌مانند.
+
+پیش‌نمایش گروهی وضعیت اعمال‌شدهٔ محدودیت‌ها را پیش از تغییر نشان می‌دهد، از جمله انقضا و بازنشانی‌هایی که زمانشان رسیده است. عملی که هیچ فیلدی را تغییر ندهد، بدون تغییر شمرده می‌شود. هنگام ثبت، وضعیت همهٔ افراد انتخاب‌شده، حتی برای حذف، دوباره بررسی می‌شود؛ اگر محدودیت یا زمان‌بندی تغییر کرده باشد، پیام رد نام افرادی را می‌آورد که به پیش‌نمایش تازه نیاز دارند. بازنشانی‌ها بر اساس زمان ثبت انجام می‌شوند و برگشت، محدودیت‌های اعمال‌شده پیش از بازبینی را حفظ می‌کند.
+
+برگشت، انتخاب‌های اولیه را ثبت می‌کند و سپس مانند ثبت تغییر، قواعد انقضا و سهمیه را اعمال می‌کند. رویدادها فعال‌سازی دسترسی توسط مدیر را از بازگشت دسترسی پس از تغییر محدودیت جدا می‌کنند. پیش از ساخت پیکربندی گره‌ها، ظرفیت فعلی ورودی‌های مدیریت‌شده بررسی می‌شود؛ در صورت رد، افراد و رسید بدون تغییر می‌مانند.
+
+| فرمان | تغییر بازبینی‌شده |
+|---|---|
+| `meridian client bulk extend --days 7` | تمدید اعتبار یا مدت انتظار |
+| `meridian client bulk expiry --expires never` | تنظیم یا پاک کردن پایان اعتبار |
+| `meridian client bulk quota --limit 50GB --reset month --reset-day 15` | تنظیم یا پاک کردن سهمیه و روش بازنشانی |
+| `meridian client bulk reset-traffic` | بازنشانی ترافیک دوره (برگشت‌ناپذیر) |
+| `meridian client bulk enable` | فعال‌سازی با وضعیت مؤثر |
+| `meridian client bulk disable` | غیرفعال‌سازی |
+| `meridian client bulk tag --set-tag none` | تنظیم یا پاک کردن برچسب |
+| `meridian client bulk devices --devices unlimited` | تنظیم سقف دستگاه |
+| `meridian client bulk renewal --renew-days 30 --renewals 5` | تنظیم یا لغو تمدید |
+| `meridian client bulk delete` | حذف افراد سرویس؛ فرمان برای افراد اعلام‌شده |
+| `meridian client bulk undo ID` | برگشت فیلدها تا ده دقیقه |
+| `meridian client bulk receipt ID` | خواندن رسید ماندگار |
+
+فیلترهای مشترک: `--search TEXT`، `--status STATUS`، `--tag TAG`، `--expiring-within DAYS`، `--quota-at-least PERCENT`، `--never-used`، `--attention`، `--attention-reason REASON`، `--lifecycle STATE`، `--sort name|usage|expiry|activity` و `--order asc|desc`. از `--attention` (هر دلیل) یا `--attention-reason` استفاده کنید. حالت‌ها: `pending`، `renewing`، `fixed`، `unlimited`. نام نمایشی بدون تفاوت حروف بزرگ و کوچک و سپس نام کاربری دقیق ترتیب را تعیین می‌کند. قواعد در [مدیریت کلاینت‌ها](/fa/client-management/) آمده است.
+
+`meridian client bulk extend --months 1 --person sample-a --dry-run --json`
+
+`meridian client bulk renewal --renew-months 1`
+
+`meridian client bulk renewal --no-renew`
+
+`meridian client bulk disable --tag TRIAL_7 --yes --json`
+
+
 ### meridian privacy
 
 اطلاعاتی را که سرویس کنترل نگه می‌دارد انتخاب کنید. محدودیت دستگاه و تاریخچهٔ روزانه به‌صورت پیش‌فرض خاموش‌اند؛ اعمال تنظیمات سرورها این انتخاب‌ها را تغییر نمی‌دهد. توضیح افشای اطلاعات و پیامد تصرف سرور را در [حریم خصوصی](/fa/privacy/) بخوانید.

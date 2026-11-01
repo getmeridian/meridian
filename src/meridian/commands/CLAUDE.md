@@ -1,6 +1,7 @@
 # commands — One module per subcommand
 
 ## Design decisions
+**Bulk reviews** — `client bulk` and `client list` use the service query; commit only the returned ID/hash, and read the receipt after an uncertain reply.
 **Client registration** — `cli_client.py` owns the client group so lifecycle options do not grow `cli_groups.py`.
 **One file per command** — `cli.py` registers top-level commands and the root callback, `cli_groups.py` the sub-apps (a group may live in its own `cli_*.py`); both parse flags and defer to the command module.
 **Commands edit intent** — fleet commands load `cluster.yml` with `load_topology_cluster()`, edit `topology_intent`, and apply it through `_helpers.apply_reviewed_intent()` with the exact review hash; removals let reviewed retirement delete what vanished. Never mutate panel or server state beside the compiled plan; the exceptions are operator-owned service data (client status, limits, devices, expiry, notes, tags, language, privacy, notices, fleet language), which applies never touch.
@@ -19,6 +20,7 @@
 - `client remove|reissue --cut-off` discloses every affected node and other people's reconnects before confirming, and keeps typed per-node outcomes and new links even on failure.
 
 ## Pitfalls
+- **Undo dry runs check the receipt** — reject irreversible, already-undone, or expired receipts; uncertain undo succeeds only after reading its recorded completion.
 - **`console.fail()` always exits** (user 2, system 3, bug 1) — entry points convert library `MeridianError`s with `fail(exc)`, or the user sees a traceback.
 - **Catch control-service errors inside the command's `error_context`** — it supplies JSON metadata but catches nothing; a non-retryable poll error is a failed outcome, not a timeout.
 - **A local save failure after a remote change exits 3** and says remote state changed.

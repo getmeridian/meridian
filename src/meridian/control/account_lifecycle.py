@@ -127,6 +127,7 @@ def enforce_user_schedules(
     read_user: Callable[[str], UserRecord],
     reset_traffic: Callable[[UserRecord, str], None],
     events: EventLedger,
+    event_now: str | None = None,
 ) -> list[str]:
     """Activate and catch up once in the caller's transaction, then judge all remaining reasons."""
     moment = datetime.fromisoformat(now)
@@ -148,7 +149,7 @@ def enforce_user_schedules(
                 ),
             )
             updated = read_user(user.username)
-            events.user_updated(user, updated, actor="system", now=now)
+            events.user_updated(user, updated, actor="system", now=event_now or now)
             changed.append(user.username)
             user = updated
         start = period_start(user.traffic_limit_strategy, moment, user.traffic_reset_anchor_day)
@@ -157,11 +158,11 @@ def enforce_user_schedules(
         )
         if preview.renewals_due or period_due:
             reset_traffic(user, now)
-            events.append("user.traffic_reset", user.username, actor="system", now=now)
+            events.append("user.traffic_reset", user.username, actor="system", now=event_now or now)
             user = read_user(user.username)
         status = enforced_status(user, now)
         if status != user.status:
-            events.enforcement(user.username, user.status, status, now)
+            events.enforcement(user.username, user.status, status, event_now or now)
             store.db.execute("UPDATE users SET status = ? WHERE username = ?", (status, user.username))
             if user.username not in changed:
                 changed.append(user.username)

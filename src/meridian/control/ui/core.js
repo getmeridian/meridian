@@ -111,8 +111,10 @@
         try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
         if (response.ok) return data;
         var error = (data && data.error) || {};
-        throw new ApiError(response.status, error.code || "http_" + response.status, error.message || "",
+        var failure = new ApiError(response.status, error.code || "http_" + response.status, error.message || "",
           Number(response.headers.get("Retry-After")) || 0, writing && response.status >= 500);
+        failure.subjects = Array.isArray(error.subjects) ? error.subjects : [];
+        throw failure;
       });
     }).catch(function (error) {
       if (error instanceof ApiError) throw error;
@@ -398,6 +400,7 @@
     document.addEventListener("visibilitychange", visibility);
     age();
     refresh(false);
+    stop.refresh = refresh;
     return stop;
   };
 

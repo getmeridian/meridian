@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "receipt_id": {
+      "pattern": "^[0-9a-f]{32}$",
+      "title": "Receipt Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "receipt_id"
+  ],
+  "title": "BulkUndoRequest",
+  "type": "object"
+}

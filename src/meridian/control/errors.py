@@ -14,11 +14,14 @@ class ServiceError(Exception):
     even when the refusal is not retryable as it stands (an agent too old or too new).
     """
 
-    def __init__(self, code: str, message: str, status: int, *, retry_after: int | None = None) -> None:
+    def __init__(
+        self, code: str, message: str, status: int, *, retry_after: int | None = None, subjects: list[str] | None = None
+    ) -> None:
         super().__init__(message)
         self.code = code
         self.status = status
         self.retry_after = retry_after
+        self.subjects = subjects
 
 
 def agent_error(code: str, message: str, *, retry_after: int | None = None) -> ServiceError:

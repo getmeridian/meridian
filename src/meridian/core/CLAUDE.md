@@ -1,6 +1,8 @@
 # core — Meridian API contracts
 
 ## Design decisions
+- **People queries have one typed request** — paging controls never change which people match a selection.
+- **Bulk contracts separate selection from mutation** — before/after fields and receipts omit credentials and private notes.
 - **One account clock** — `account_schedule.py` computes UTC activation, anniversary refills, and clamped renewal catch-up; billing shares `calendar.monthly_period()`.
 - **No CLI globals** — core never imports Typer, Rich, console, config, or command modules (tested); the CLI and the control service are adapters. Constants live in `core/defaults.py`.
 - **Envelope first** — JSON clients get one stable `meridian.output/v1` shape with command data under `data`; `schema_envelopes.py` builds command envelopes from the catalog, and `schema.py` composes contract families from their owning modules.
@@ -23,6 +25,8 @@
 - Commands build typed, redacted results before any envelope or rendering, and reporter primitives emit typed events without choosing a renderer.
 
 ## Pitfalls
+- **Revealed metadata keeps scalar types** — secret-shaped tag keys must not replace facet counts with redaction strings; container reveals still mask string credentials.
+- **Bulk action schemas retain parameter types** — use post-init checks and a model schema hook, or a dict-returning serializer hides them behind an after-validator.
 - **Device cap zero is unlimited** — only null inherits the fleet cap; never resolve a cap by truthiness.
 - **Never emit raw SSH commands, panel tokens, private keys, database URLs, or subscription secrets.**
 - **`redact_string()` is the only secret masker** (SSH debug logs included) — teach it a new secret form instead of adding a local regex.

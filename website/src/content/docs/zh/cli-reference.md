@@ -181,6 +181,44 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 `client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` 解释格式选择及省略原因，不泄露凭据。User-Agent 最多 512 个 Unicode 字符，Accept 最多 256 个字符，均为单行临时输入。`--suffix` 强制使用现有格式 URL 后缀。JSON 返回 `subscription-preview`；API 为需要 read 权限的 `POST /api/subscription/preview`。
 
+#### 经审核的批量更改
+
+`client list` 返回前 100 个匹配人员。`--limit 1–500` 设置页面大小，`--cursor VALUE` 继续同一查询。JSON 新增 `total`、`facets` 与可选的 `next_cursor`，摘要针对返回页面。`client bulk ACTION` 使用相同查询，随后冻结预览、显示表格、确认并原子提交。`--dry-run` 仅预览，JSON 提交和撤销需要 `--yes`。精确 `--person USERNAME` 不能与筛选合用。使用 `client bulk receipt ID` 读回执，使用 `client bulk undo ID` 撤销。提交回复丢失时读取回执确认结果。
+
+提交或撤销回复丢失时，会读取回执核实结果；只有回执记录已撤销时，才会报告撤销成功。控制台保留更新后的回执，并在重新打开时再次读取。`client bulk undo ID --dry-run` 不发送写入请求，只检查操作是否可撤销、尚未撤销且仍在撤销期限内；最终撤销还会检查人员当前状态和入站容量。
+
+JSON 筛选计数对所有有效标签均保持整数，包括 `TOKEN` 和 `API_KEY`。
+
+批量预览以已执行到期和流量重置规则后的状态为更改前状态。操作未改变任何字段时计为未更改。提交时会重新检查所有选定人员，包括删除目标；限制或计划发生变化时，拒绝消息会列出需要重新预览的人员。流量重置使用提交时间，撤销会保留预览前已经到期的规则结果。
+
+撤销先写入原始设置，再按提交时相同的规则执行到期和配额限制。事件会区分手动启用访问与调整限制后恢复访问。生成节点配置前，撤销会检查当前受管理入站的容量；拒绝时，人员记录和回执均保持原状。
+
+| 命令 | 审核的更改 |
+|---|---|
+| `meridian client bulk extend --days 7` | 延长有效期或待使用时长 |
+| `meridian client bulk expiry --expires never` | 设置或清除到期时间 |
+| `meridian client bulk quota --limit 50GB --reset month --reset-day 15` | 设置或清除配额与重置策略 |
+| `meridian client bulk reset-traffic` | 重置周期流量（不可逆） |
+| `meridian client bulk enable` | 按有效状态启用 |
+| `meridian client bulk disable` | 停用 |
+| `meridian client bulk tag --set-tag none` | 设置或清除标签 |
+| `meridian client bulk devices --devices unlimited` | 设置设备限制 |
+| `meridian client bulk renewal --renew-days 30 --renewals 5` | 设置或清除续期 |
+| `meridian client bulk delete` | 删除服务人员，为声明人员返回命令 |
+| `meridian client bulk undo ID` | 十分钟内撤销可逆字段 |
+| `meridian client bulk receipt ID` | 读取持久回执 |
+
+共享筛选：`--search TEXT`、`--status STATUS`、`--tag TAG`、`--expiring-within DAYS`、`--quota-at-least PERCENT`、`--never-used`、`--attention`、`--attention-reason REASON`、`--lifecycle STATE`、`--sort name|usage|expiry|activity` 与 `--order asc|desc`。`--attention` 匹配任何原因，不能与 `--attention-reason` 同用。周期状态：`pending`、`renewing`、`fixed`、`unlimited`。先按忽略大小写的显示名称，再按完整用户名排序。规则见[客户端管理](/zh/client-management/)。
+
+`meridian client bulk extend --months 1 --person sample-a --dry-run --json`
+
+`meridian client bulk renewal --renew-months 1`
+
+`meridian client bulk renewal --no-renew`
+
+`meridian client bulk disable --tag TRIAL_7 --yes --json`
+
+
 ### meridian privacy
 
 选择控制服务保存哪些信息。设备限制和每日历史默认均关闭；应用服务器组配置不会改变这些设置。[隐私](/zh/privacy/)说明每个级别保存什么，以及服务器被夺取后的后果。

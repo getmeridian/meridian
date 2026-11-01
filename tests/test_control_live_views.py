@@ -51,7 +51,9 @@ def test_poll_errors_back_off_and_cap_the_delay() -> None:
 def test_a_superseded_poll_cannot_overwrite_newer_state_or_mark_it_stale(screen: str) -> None:
     result = run_console("live-race", data={"screen": screen})
     assert result["afterOld"] == result["afterNew"]
-    assert result["stale"] is False and result["fleetTitle"] == "New fleet"
+    assert result["stale"] is False
+    if screen == "servers":
+        assert result["fleetTitle"] == "New fleet"
 
 
 @pytest.mark.parametrize("mode", ["deadline-fetch", "deadline-body"])

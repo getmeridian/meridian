@@ -48,6 +48,7 @@ def drop_token_expiry_schema(db: sqlite3.Connection) -> None:
 
 def drop_person_metadata_schema(db: sqlite3.Connection) -> None:
     """Older fixtures must not retain the operator metadata added in schema step 15."""
+    drop_people_query_schema(db)
     columns = {column[1] for column in db.execute("PRAGMA table_info(users)")}
     for column in ("note", "tag", "language"):
         if column in columns:
@@ -57,6 +58,7 @@ def drop_person_metadata_schema(db: sqlite3.Connection) -> None:
 
 def drop_period_usage_schema(db: sqlite3.Connection) -> None:
     """Remove directional baselines before rewinding to a combined-only period schema."""
+    drop_people_query_schema(db)
     columns = {column[1] for column in db.execute("PRAGMA table_info(users)")}
     for column in ("traffic_upload_offset_bytes", "traffic_download_offset_bytes", "traffic_period_carried_bytes"):
         if column in columns:
@@ -66,6 +68,7 @@ def drop_period_usage_schema(db: sqlite3.Connection) -> None:
 
 def drop_account_schedule_schema(db: sqlite3.Connection) -> None:
     """Rewind schema step 19 without retaining its account schedule columns."""
+    drop_people_query_schema(db)
     columns = {column[1] for column in db.execute("PRAGMA table_info(users)")}
     for column in AccountLifecycleState.model_fields:
         if column in columns:
@@ -108,3 +111,13 @@ def bootstrap_context(**fields: object) -> ProvisionContext:
         config=ServiceConfig(fleet_id=FLEET_ID, admin_token_sha256="a" * 64),
     )
     return ctx
+
+
+def drop_people_query_schema(db: sqlite3.Connection) -> None:
+    """Rewound fixtures drop later people indices, triggers, and receipt tables."""
+    for kind, name in db.execute(
+        "SELECT type, name FROM sqlite_master WHERE name LIKE 'people_%' AND type IN ('index', 'trigger')"
+    ).fetchall():
+        db.execute(f"DROP {kind.upper()} {name}")
+    db.execute("DROP TABLE IF EXISTS bulk_receipts")
+    db.execute("DROP TABLE IF EXISTS people_versions")

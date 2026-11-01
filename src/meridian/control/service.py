@@ -56,6 +56,8 @@ from meridian.control.node_documents import with_users
 from meridian.control.node_health import project_runtime
 from meridian.control.notices import NoticeLedger
 from meridian.control.owner import OwnerAuth
+from meridian.control.people_bulk import BulkLedger
+from meridian.control.people_query import PeopleQueryEngine
 from meridian.control.period_usage import reset_period
 from meridian.control.person_connections import read_connections
 from meridian.control.privacy import PrivacyLedger, read_privacy
@@ -129,6 +131,17 @@ class ControlService:
         self.devices = DeviceLedger(self._store, clock=clock)
         self.notices = NoticeLedger(self._store, self.events, read_user=self.get_user, clock=clock)
         self.languages = LanguageLedger(self._store, self.events)
+        self.people = PeopleQueryEngine(self._store, clock=clock)
+        self.bulk = BulkLedger(
+            self._store,
+            self.people,
+            self.events,
+            self.traffic,
+            read_user=self._require_user,
+            read_users=self.list_users,
+            compose=self._compose_all,
+            clock=clock,
+        )
         self.pages = ConnectionPages(self._store, self)
         with self._transaction():
             # Documents signed by an earlier signing certificate are signed again.

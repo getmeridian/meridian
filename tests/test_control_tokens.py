@@ -128,6 +128,11 @@ ROUTE_SAMPLES = {
     "attention": ("/api/attention", None),
     "server_usage": ("/api/servers", None),
     "daily_traffic": ("/api/traffic/daily", None),
+    "query_people": ("/api/people", None),
+    "preview_people_bulk": ("/api/people/bulk/preview", {"action": {"action": "disable"}, "usernames": ["alice"]}),
+    "commit_people_bulk": ("/api/people/bulk/commit", {"preview_id": "a" * 32, "preview_hash": "b" * 64}),
+    "people_bulk_receipt": ("/api/people/bulk/receipts/" + "a" * 32, None),
+    "undo_people_bulk": ("/api/people/bulk/undo", {"receipt_id": "a" * 32}),
     "list_users": ("/api/users", None),
     "create_user": ("/api/users", {"username": "bob", "traffic_limit_bytes": 1000}),
     "import_users": ("/api/import/users", {"users": []}),
@@ -220,7 +225,7 @@ def test_people_access_is_declared_only_on_user_routes() -> None:
             continue
         requirements = (needed,) if isinstance(needed, str) else needed
         manages_people = (
-            pattern.pattern.startswith("/api/users") and handler.__name__ != "cut_off_scope"
+            pattern.pattern.startswith(("/api/users", "/api/people")) and handler.__name__ != "cut_off_scope"
         ) or handler.__name__ == "openapi"
         assert any(scope_covers("people", scope) for scope in requirements) == manages_people
         assert all(scope_covers("admin", scope) for scope in requirements)
@@ -381,7 +386,7 @@ def test_people_reads_credentials_and_edits_people_without_fleet_access(fleet: F
     )
     assert status == 200 and (updated["status"], updated["traffic_limit_bytes"]) == ("disabled", 1000)
     for method, path, body, _needed in SCOPE_MATRIX:
-        if path.startswith("/api/users") or path == "/api/openapi.json":
+        if path.startswith(("/api/users", "/api/people")) or path == "/api/openapi.json":
             continue
         status, answer = _request(fleet.url + path.format(victim="0123456789ab"), method, body, token)
         assert (status, answer["error"]["code"]) == (403, "insufficient_scope"), path

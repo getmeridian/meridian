@@ -15,10 +15,12 @@ from meridian.control.models import TokenScope, UserStatus
 from meridian.core.agent_protocol import CommandEffect, CommandKind, CommandResultStatus
 from meridian.core.agent_types import MAX_SAFE_INTEGER, CommandId, Timestamp
 from meridian.core.models import CoreModel
+from meridian.core.people_bulk import BulkActionName
 
 MAX_EVENTS = 2000
 EVENT_RETENTION_DAYS = 180
 FleetEventKind = Literal[
+    "people.bulk",
     "user.created",
     "user.updated",
     "user.enabled",
@@ -110,8 +112,17 @@ class TokenEventDetail(CoreModel):
     scope: TokenScope
 
 
+class BulkEventDetail(CoreModel):
+    action: BulkActionName | Literal["undo"]
+    targeted: int = Field(ge=0)
+    changed: int = Field(ge=0)
+    unchanged: int = Field(ge=0)
+    cli_required: int = Field(ge=0)
+
+
 EventDetail: TypeAlias = (
-    EmptyEventDetail
+    BulkEventDetail
+    | EmptyEventDetail
     | UserFieldsDetail
     | UserStateDetail
     | NodeEventDetail
@@ -121,6 +132,7 @@ EventDetail: TypeAlias = (
     | CommandResultDetail
 )
 _DETAIL_TYPES: dict[FleetEventKind, type[CoreModel]] = {
+    "people.bulk": BulkEventDetail,
     "user.created": EmptyEventDetail,
     "user.enabled": EmptyEventDetail,
     "user.disabled": EmptyEventDetail,
