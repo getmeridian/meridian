@@ -114,6 +114,26 @@ def test_tls_check_asks_for_the_certificate_as_a_client_would(host: str, sni: st
     assert sni in command
 
 
+@pytest.mark.parametrize(
+    ("host", "flag", "verdict"),
+    [
+        ("198.51.100.1", "-checkip 198.51.100.1", "IP 198.51.100.1 does NOT match certificate"),
+        ("vpn.example.com", "-checkhost vpn.example.com", "Hostname vpn.example.com does NOT match certificate"),
+    ],
+    ids=["ip", "hostname"],
+)
+def test_tls_check_fails_a_current_certificate_for_another_name(host: str, flag: str, verdict: str) -> None:
+    """Dates alone passed while a panel domain's certificate served the server's IP (#110)."""
+    conn = _conn("openssl", stdout=f"notAfter=Dec 30 00:00:00 2099 GMT\n{verdict}")
+
+    result = check_tls_certificate(conn, host)
+
+    assert result.status == "failed"
+    assert f"does not name {host}" in result.detail
+    (command,) = [c for c in conn.calls if "s_client" in c]
+    assert flag in command
+
+
 def _dates(issued: datetime, lifetime: timedelta) -> str:
     stamp = "%b %d %H:%M:%S %Y GMT"
     return f"notBefore={issued.strftime(stamp)}\nnotAfter={(issued + lifetime).strftime(stamp)}\n"

@@ -12,6 +12,7 @@ import shlex
 import time
 
 from meridian.config import ACME_SERVER
+from meridian.core.inputs import is_ip
 from meridian.host_runtime import certificate_directory
 from meridian.provision.ensure import resolve_ctx
 from meridian.provision.steps import ProvisionContext, StepResult
@@ -78,6 +79,19 @@ def _stale_shortlived_policy(domain_info: str) -> bool:
         return True
 
     return next_renew_time > int(time.time()) + _SHORTLIVED_IP_CERT_MAX_NEXT_RENEW_SECONDS
+
+
+def certificate_inspection_command(hostname: str) -> str:
+    """Print the installed certificate's names; exit 1 when it expires within a day."""
+    path = shlex.quote(f"{certificate_directory(hostname)}/fullchain.pem")
+    return f"openssl x509 -in {path} -noout -checkend 86400 -ext subjectAltName 2>/dev/null"
+
+
+def certificate_names_host(inspection: str, hostname: str) -> bool:
+    """Whether ``certificate_inspection_command`` output certifies ``hostname``."""
+    san = f"IP Address:{hostname}" if is_ip(hostname) else f"DNS:{hostname}"
+    # Whole entries only: as a substring, 198.51.100.1 matched a certificate for 198.51.100.10.
+    return san in {entry.strip() for entry in inspection.replace("\n", ",").split(",")}
 
 
 # ---------------------------------------------------------------------------

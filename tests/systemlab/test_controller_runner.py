@@ -11,6 +11,7 @@ _RUNNER = _ROOT / "tests/systemlab/scripts/controller-run.sh"
 _STAGES = (
     "00-bootstrap.sh",
     "05-single-deploy.sh",
+    "07-panel-domain.sh",
     "10-deploy.sh",
     "20-subscriptions.sh",
     "25-golden.sh",

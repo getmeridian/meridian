@@ -35,6 +35,14 @@ pytestmark = pytest.mark.skipif(shutil.which("sed") is None, reason="needs sed")
         ("ips 198.51.100.1 198.51.100.2, at 198.51.100.3.", "ips <ip> <ip>, at <ip>."),
         ("198-51-100-7.sslip.io and 198-51-100-8", "<host> and <ip>"),
         (
+            "Subject Alternative Name: DNS:198-51-100-7.sslip.io  critical IP Address:198.51.100.7",
+            "Subject Alternative Name: DNS:<host>  critical IP Address:<ip>",
+        ),
+        (
+            "Le_Domain='198-51-100-7.sslip.io' /etc/ssl/meridian/certs/0123456789abcdef/fullchain.pem",
+            "Le_Domain='<host>' /etc/ssl/meridian/certs/<path>/fullchain.pem",
+        ),
+        (
             "hysteria2://u@h:443?obfs-password=S1&fm=%7B%22password%22%3A%22S1%22%7D#Name",
             "hysteria2://u@h:443?obfs-password=<p>&fm=<p>#Name",
         ),
@@ -48,6 +56,8 @@ pytestmark = pytest.mark.skipif(shutil.which("sed") is None, reason="needs sed")
         "secret-path",
         "adjacent-ips",
         "dashed-ip",
+        "certificate-sans",
+        "acme-entries",
         "salamander-link",
         "salamander-config",
         "case-and-tlds",

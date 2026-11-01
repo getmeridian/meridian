@@ -8,7 +8,7 @@ export PYTHONPATH=/workspace${PYTHONPATH:+:$PYTHONPATH}
 SCRIPT_DIR=${SYSTEMLAB_SCRIPT_DIR:-/workspace/tests/systemlab/scripts}
 # Debugging: SYSTEMLAB_STAGES picks stages; SYSTEMLAB_KEEP=1 skips cleanup and keeps this
 # container up so one stage can rerun with `docker compose exec controller bash .../stages/NN-*.sh`.
-STAGES=${SYSTEMLAB_STAGES:-05-single-deploy.sh 10-deploy.sh 20-subscriptions.sh 25-golden.sh 30-resilience.sh 40-removal.sh}
+STAGES=${SYSTEMLAB_STAGES:-05-single-deploy.sh 07-panel-domain.sh 10-deploy.sh 20-subscriptions.sh 25-golden.sh 30-resilience.sh 40-removal.sh}
 KEEP=${SYSTEMLAB_KEEP:-}
 
 keep_alive() {

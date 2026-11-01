@@ -13,6 +13,8 @@
 - **Execution failure is not negative evidence** — a timeout, SSH drop, or missing tool returns skipped, never failed; agent findings need a fresh report.
 - **Protocol shape controls checks** — never require TCP/443 or HTTPS from a UDP-only Hysteria2 endpoint.
 - **Probe Meridian's certificate as clients ask for it** — an IP goes with no SNI (an IP SNI reaches the camouflage site, so `check` long judged Google's certificate), and expiry warns relative to lifetime.
+- **A certificate check verifies the name, and `check` reads every managed name on a port** — dates alone, on the first route only, passed while a panel domain's certificate served the server's IP (#110).
+- **Validating TLS probes trust `SSL_CERT_FILE` before certifi**, as httpx does — the system lab's private CA reaches Python only through it.
 - **Inspection is not validation** — unverified TLS may collect a certificate, but a pass needs trust, lifetime, and hostname checks; trust comes from `certifi.where()`, because uv's Pythons miss the macOS roots.
 - **Neighbour targets must resolve into the scanned subnet, and scans cover at least a /24** — CDN names point elsewhere, and a VPS's `/32` alone found nothing.
 - **Relay legs run curl on the hop, never Python**, and next-hop probes use bash `/dev/tcp` under `timeout`, never `nc` (absent on minimal images).

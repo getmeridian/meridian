@@ -35,6 +35,11 @@ That's it. On success you'll see `PASS: N  FAIL: 0` and the VM will be gone.
 Set `MERIDIAN_TEST_SSH_KEY=/path/to/custom.pub` to override the default
 `~/.ssh/id_ed25519.pub` upload.
 
+A checkout installs the node agent it built: run `make agent` first, or point
+`MERIDIAN_AGENT_BINARY` at a `netagent-x86_64-unknown-linux-musl` build. `up`
+refuses before provisioning when neither exists. Run `make real-lab TOPO=domain`
+for the panel-domain topology (see below).
+
 ## Topologies
 
 Topology files live in `tests/realvm/topologies/*.yml`.
@@ -42,6 +47,7 @@ Topology files live in `tests/realvm/topologies/*.yml`.
 | Name | VMs | What it validates |
 |---|---|---|
 | `single` | 1 | Baseline — LE issuer, optional nmap, SSH, fleet status, client CRUD, declarative plan, subscription HTTP 200 |
+| `domain` | 1 | Web panel on its own domain beside an exit on the IP (#110) — both certificates served and kept apart, `test`/`check`/`plan` clean, then exit paths moved onto the domain and the IP certificate retired |
 | (future) `chain-2hop` | 2 | Domestic relay → foreign exit (tests chain correctness) |
 | (future) `chain-3hop` | 3 | Full chain — client → ingress → middle → exit |
 | (future) `dual-ip` | 1 | Node with 2 Primary IPs (ingress IP ≠ egress IP) |
@@ -53,8 +59,25 @@ Run a non-default topology:
 make real-lab TOPO=single
 ```
 
-Only `single` has an automated verifier today. Definitions without one are
-rejected before provider access, so they cannot create paid resources.
+`single` and `domain` have automated verifiers today. Definitions without one
+are rejected before provider access, so they cannot create paid resources.
+
+### The `domain` topology
+
+Needs real DNS for the panel's domain. By default the verifier uses
+`<ip-with-dashes>.sslip.io` (`203-0-113-10.sslip.io` resolves to `203.0.113.10`),
+so any VM gets a name with no setup. To use your own name instead, set
+`REALVM_PANEL_DOMAIN=panel.example.org`; the verifier waits up to
+`REALVM_DNS_WAIT` seconds (default 120) for it to resolve to the new VM, so
+create the A record once the run prints the VM's address.
+
+**Rate limits make a run inconclusive.** sslip.io is not on the Public Suffix
+List, so every sslip.io name shares Let's Encrypt's per-domain limits with the
+whole world. When issuance fails with `rateLimited`, the verifier exits **75**
+(and the orchestrator says so) instead of 1: the run proved nothing about
+Meridian. Retry later, or set `REALVM_PANEL_DOMAIN` to a name you own. Exit
+codes: 0 passed, 1 a claim failed, 2 refused or could not continue, 75
+inconclusive.
 
 ## Verification
 
@@ -69,7 +92,8 @@ Tier alpha runs by default with no user involvement.
 - `meridian plan` exits 0 or 2 (converged or changes pending — both OK)
 - Subscription URL returns HTTP 200
 
-Domain/CDN and interactive mobile checks remain planned. Environment variables
+The `domain` topology's claims are listed in `topologies/domain.yml`.
+CDN and interactive mobile checks remain planned. Environment variables
 do not enable those tiers until their orchestrator paths and verifiers exist.
 
 ## Exploratory labs
@@ -131,7 +155,7 @@ care if you have multiple ongoing runs (unlikely in practice).
 
 ## What gets created (Hetzner)
 
-Per run, for topology=single:
+Per run, for topology=single (`domain` creates the same, named `meridian-realvm-domain-exit-1-<fleet-id>`):
 
 - 1 SSH key: `meridian-realvm-<fleet-id>` (public-key material from your
   `~/.ssh/id_ed25519.pub` or `MERIDIAN_TEST_SSH_KEY`)
@@ -163,6 +187,10 @@ you've likely tripped LE's IP-cert rate limit (~5 shortlived issuances per
 /32 IPv4 per 7 days) because Hetzner re-assigned the same Primary IPv4 from
 its pool. `acme.sh` falls back to self-signed, the assertion fails. Fix:
 destroy the fleet and re-run — a fresh VM usually gets a different IP.
+
+**Exit 75 from `up domain`** — Let's Encrypt rate-limited the panel's name (see
+"The `domain` topology" above); not a product failure. Retry later or use your
+own domain.
 
 **Stuck with orphan VMs after a crash** — `make real-lab-orphans` to list,
 `make real-lab-down` to destroy.

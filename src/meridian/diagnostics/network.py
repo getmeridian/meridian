@@ -6,6 +6,7 @@ import base64
 import hashlib
 import ipaddress
 import json
+import os
 import subprocess
 import sys
 
@@ -295,8 +296,9 @@ def _tls_probe(
         "alpn": alpn or [],
         "tls_version": tls_version,
         # uv's standalone Pythons look for system roots at a Linux path that macOS lacks,
-        # so every certificate failed to verify; certifi is the bundle httpx trusts too.
-        "cafile": certifi.where() if verify else "",
+        # so every certificate failed to verify; certifi is the bundle httpx trusts too,
+        # and like httpx an explicit SSL_CERT_FILE (a private CA, the system lab's) wins.
+        "cafile": (os.environ.get("SSL_CERT_FILE") or certifi.where()) if verify else "",
     }
     return run_json_helper(_TLS_HELPER, request, timeout=deadline)
 

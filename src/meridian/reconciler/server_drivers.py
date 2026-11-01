@@ -23,7 +23,7 @@ from meridian.provision.baseline import build_server_baseline_checks, build_serv
 from meridian.provision.ensure import ensure_file_content, ensure_ufw_rule, ufw_rule_present
 from meridian.provision.nginx import InstallNginx
 from meridian.provision.steps import ProvisionContext
-from meridian.provision.tls import IssueTLSCert
+from meridian.provision.tls import IssueTLSCert, certificate_inspection_command, certificate_names_host
 from meridian.reconciler import server_retirement as retirement
 from meridian.reconciler.resources import (
     ResourceAction,
@@ -304,14 +304,9 @@ class CertificateDriver(retirement.CertificateRetirement):
                 projection={"certificate": ""},
                 satisfied=set(),
             )
-        result = conn.run(
-            f"openssl x509 -in {shlex.quote(certificate_path)} -noout -checkend 86400 -ext subjectAltName 2>/dev/null",
-            timeout=15,
-        )
+        result = conn.run(certificate_inspection_command(payload.hostname), timeout=15)
         valid = assertion_matches(action.resource.logical_id, result, "certificate validation")
-        san = f"IP Address:{payload.hostname}" if is_ip(payload.hostname) else f"DNS:{payload.hostname}"
-        # Whole entries only: as a substring, 198.51.100.1 matched a certificate for 198.51.100.10.
-        named = san in {entry.strip() for entry in result.stdout.replace("\n", ",").split(",")}
+        named = certificate_names_host(result.stdout, payload.hostname)
         matches = valid and named
         mismatches = [] if valid else ["the certificate expires within a day"]
         if not named:

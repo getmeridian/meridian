@@ -6,6 +6,9 @@ is a separate command (`make real-lab-orphans`).
 
 Local-only. Never imported from CI workflows.
 
+Exit codes of `up`: 0 passed, 1 findings, 2 refused or setup error, 75 inconclusive (a Let's
+Encrypt rate limit stopped issuance, so the run proved nothing either way).
+
 Usage:
     python -m tests.realvm.orchestrator up <topology_name>
     python -m tests.realvm.orchestrator down           # destroys all harness-tagged VMs
@@ -22,7 +25,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import yaml
 
@@ -41,8 +44,28 @@ SUPPORTED_TOPOLOGIES = {
         "client_add_list_remove_roundtrip",
         "declarative_plan",
         "subscription_url_200",
-    )
+    ),
+    "domain": (
+        "panel_certificate_names_domain",
+        "ip_certificate_without_sni",
+        "acme_entries_use_separate_files",
+        "connection_test_ip_paths",
+        "health_check_ip_paths",
+        "plan_converged_ip_paths",
+        "exit_paths_moved_to_domain",
+        "panel_certificate_survives_move",
+        "connection_test_domain_paths",
+        "health_check_domain_paths",
+        "plan_converged_domain_paths",
+        "ip_certificate_retired",
+    ),
 }
+# Node roles each topology must declare, in order.
+TOPOLOGY_ROLES = {"single": ["exit"], "domain": ["exit"]}
+# Verifier script per topology, under verify/.
+VERIFIERS = {"single": "single.sh", "domain": "domain.sh"}
+# A verifier that reached no verdict (a Let's Encrypt rate limit); see tests/realvm/domain_support.py.
+INCONCLUSIVE_EXIT = 75
 
 
 @dataclass
@@ -160,13 +183,31 @@ def require_supported_topology(topology: Topology) -> None:
             f"Supported: {', '.join(sorted(SUPPORTED_TOPOLOGIES))}"
         )
     roles = [str(node.get("role", "")) for node in topology.nodes]
-    if topology.name == "single" and roles != ["exit"]:
-        _fail("Topology 'single' must define exactly one exit node; refusing to provision.")
+    if roles != TOPOLOGY_ROLES[topology.name]:
+        _fail(f"Topology {topology.name!r} must define exactly one exit node; refusing to provision.")
     if set(topology.verify) != {"tier_alpha"}:
-        _fail("Topology 'single' may declare only the implemented tier_alpha verifier; refusing to provision.")
+        _fail(
+            f"Topology {topology.name!r} may declare only the implemented tier_alpha verifier; refusing to provision."
+        )
     configured_checks = tuple(topology.verify.get("tier_alpha", []))
     if configured_checks != expected_checks:
-        _fail("Topology 'single' verification manifest does not match the implemented verifier; refusing to provision.")
+        _fail(
+            f"Topology {topology.name!r} verification manifest does not match the implemented verifier; "
+            "refusing to provision."
+        )
+
+
+def require_agent_build() -> None:
+    """Refuse before provisioning when this checkout has no node agent build to install."""
+    from meridian.control_artifacts import require_agent_build as check
+    from meridian.core.errors import MeridianError
+
+    try:
+        check()
+    except MeridianError as exc:
+        _fail(
+            f"{exc} {exc.hint}\nA checkout deploys the agent it builds: set MERIDIAN_AGENT_BINARY or run `make agent`."
+        )
 
 
 # --------------------------------------------------------------------------
@@ -295,9 +336,8 @@ def destroy_all_orphans(provider: CloudProvider, *, execute: bool = False) -> No
 def run_verification(topology: Topology, instances: list[VMInstance]) -> int:
     """Run tier α verification on the provisioned fleet. Returns exit code
     (0=all passed, non-zero=failures)."""
-    # For single-node topology, verification runs against instance[0].
-    # Multi-node topologies override this.
-    if topology.name != "single":
+    # Single-VM topologies verify against instance[0]; multi-node ones need their own wiring.
+    if topology.name not in VERIFIERS:
         print(f"  ✗ Verification for {topology.name} is not implemented; refusing to report success.")
         return 2
 
@@ -309,7 +349,7 @@ def run_verification(topology: Topology, instances: list[VMInstance]) -> int:
 
     # Invoke the shell verify script — keeps Meridian CLI invocation logic
     # in shell (matches systemlab/controller-run.sh which developers know).
-    verify_sh = Path(__file__).parent / "verify" / "single.sh"
+    verify_sh = Path(__file__).parent / "verify" / VERIFIERS[topology.name]
     if not verify_sh.exists():
         print(f"  ✗ verify script not found: {verify_sh}")
         return 2
@@ -328,6 +368,8 @@ def run_verification(topology: Topology, instances: list[VMInstance]) -> int:
         "MERIDIAN_HOME": str(meridian_home),
     }
     result = subprocess.run(["bash", str(verify_sh)], env=env)
+    if result.returncode == INCONCLUSIVE_EXIT:
+        print(f"\n  ? Inconclusive: {topology.name} reached no verdict (see above); this is not a product failure.")
     return result.returncode
 
 
@@ -336,7 +378,7 @@ def run_verification(topology: Topology, instances: list[VMInstance]) -> int:
 # --------------------------------------------------------------------------
 
 
-def _fail(msg: str) -> None:
+def _fail(msg: str) -> NoReturn:
     print(f"\n  ✗ {msg}\n", file=sys.stderr)
     sys.exit(2)
 
@@ -344,6 +386,7 @@ def _fail(msg: str) -> None:
 def cmd_up(args: argparse.Namespace) -> int:
     topology = load_topology(args.topology)
     require_supported_topology(topology)
+    require_agent_build()
     provider = make_provider(topology.provider)
     confirm_cost(provider, topology, hours=0.5)
 

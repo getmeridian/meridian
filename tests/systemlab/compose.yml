@@ -43,6 +43,9 @@ services:
     networks:
       labnet:
         ipv4_address: 172.30.0.11
+        # The panel-domain stage's control name (#110); Pebble issues without DNS.
+        aliases:
+          - panel.lab.test
     tmpfs:
       - /run
       - /run/lock

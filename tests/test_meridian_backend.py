@@ -196,6 +196,79 @@ def test_control_service_readiness_requires_the_url_on_its_domain(host: str, obs
     assert bool(conn.calls) is observed  # only a matching URL goes on to read the attestation
 
 
+@pytest.mark.parametrize(
+    ("served", "rc", "pinged"),
+    [
+        (f"X509v3 Subject Alternative Name:\n    DNS:{PANEL}", 0, True),
+        (f"X509v3 Subject Alternative Name:\n    IP Address:{ADDRESS}", 0, False),
+        (f"X509v3 Subject Alternative Name:\n    DNS:{PANEL}", 1, False),
+    ],
+    ids=["names-the-panel", "an-ip-certificate-replaced-it", "expires-within-a-day"],
+)
+def test_control_service_readiness_requires_a_current_certificate_for_its_name(
+    served: str, rc: int, pinged: bool, monkeypatch
+) -> None:
+    """An exit's IP certificate once overwrote the panel domain's, and readiness never looked (#110)."""
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+
+    from meridian.cluster import ClusterConfig
+    from meridian.host_runtime import certificate_directory
+    from meridian.reconciler.resources import build_resource_actions
+    from meridian.servers import ServerEntry
+    from meridian.setup import control_service
+    from tests.support.mock_connection import MockConnection
+
+    plan = compile_topology(_with_control_domain(_intent()))
+    action = next(item for item in build_resource_actions(plan, 1) if item.resource.logical_id == "control:service")
+    payload = action.resource.payload
+    cluster = ClusterConfig()
+    cluster.panel.server_ip, cluster.panel.api_token, cluster.panel.secret_path = ADDRESS, "token", "secret"
+    cluster.panel.url = f"https://{PANEL}/secret"
+    conn = MockConnection()
+    conn.when(control_service._ATTESTATION_PATH, stdout=control_service.service_attestation(payload, plan))
+    conn.when(f"openssl x509 -in {certificate_directory(PANEL)}/fullchain.pem", stdout=served, rc=rc)
+    pings: list[bool] = []
+    client = SimpleNamespace(ping=lambda: pings.append(True) or True)
+    monkeypatch.setattr(control_service, "control_client", lambda _cluster: nullcontext(client))
+
+    ready = control_service.control_service_ready(
+        action, plan, cluster, ServerEntry(host=ADDRESS, user="root", id="srv-a"), conn
+    )
+
+    assert ready is pinged
+    assert bool(pings) is pinged
+
+
+def test_setup_verification_validates_each_published_tls_endpoint_once(monkeypatch) -> None:
+    """Valid subscriptions once hid a certificate every XHTTP client refused (#110)."""
+    from meridian.compiler.models import DeploymentContract, DeploymentTarget
+    from meridian.setup import control_service
+
+    contract = DeploymentContract(
+        server_targets={"srv-a": DeploymentTarget(host=ADDRESS, user="root", port=22)},
+        runtime_pins={"remnawave_node_image": "remnawave/node:3.4.2"},
+        renderer_contract="test-v1",
+    )
+    plan = compile_topology(_domain_intent()).model_copy(update={"deployment_contract": contract})
+    dialed: list[tuple[str, str, int]] = []
+    verdicts = {DOMAIN: "certificate verify failed: IP address mismatch"}
+
+    def validate(ip: str, name: str, *, port: int, timeout: float) -> str | None:
+        dialed.append((ip, name, port))
+        return verdicts.get(name, "")
+
+    monkeypatch.setattr(control_service, "certificate_validation_error", validate)
+
+    errors = control_service.endpoint_certificate_errors(plan)
+
+    # XHTTP and WSS share the domain and port: one handshake, dialing the server, not a CDN.
+    assert dialed == [(ADDRESS, DOMAIN, 443)]
+    assert len(errors) == 1 and f"({DOMAIN}): certificate verify failed" in errors[0]
+    verdicts[DOMAIN] = None  # unavailable evidence is never a failure
+    assert control_service.endpoint_certificate_errors(plan) == []
+
+
 def test_control_bootstrap_refuses_before_provisioning_without_an_agent_build(tmp_home, monkeypatch) -> None:
     """A wheel install carries no agent: finding out at the first agent left a service with no nodes."""
     from meridian.cluster import ClusterConfig
@@ -252,6 +325,48 @@ def test_control_bootstrap_scopes_the_console_to_the_secret_path(tmp_home, monke
         )
 
     assert captured[0].public_path == "/0123abcd"
+
+
+@pytest.mark.parametrize("answers", [[False, False, True], [False] * 40], ids=["answers-after-reload", "never"])
+def test_control_bootstrap_waits_for_the_service_to_answer(tmp_home, monkeypatch, answers: list[bool]) -> None:
+    """nginx's reload returns before old workers stop serving the self-signed certificate, so the
+    observation right after a fresh install failed until a resume (the system lab's retry hid it)."""
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+
+    import meridian.provision as provision
+    from meridian.cluster import ClusterConfig
+    from meridian.reconciler.resources import ResourceReconcileError
+    from meridian.servers import ServerEntry
+    from meridian.setup import control_service
+    from tests.support.mock_connection import MockConnection
+
+    agent = tmp_home / "netagent"
+    agent.write_bytes(b"\x7fELF-agent")
+    monkeypatch.setenv("MERIDIAN_AGENT_BINARY", str(agent))
+    monkeypatch.setattr(provision, "Provisioner", lambda _steps: SimpleNamespace(run=lambda *_a, **_k: []))
+    monkeypatch.setattr("meridian.health.time.sleep", lambda _seconds: None)
+    clock = iter(range(0, 10_000, 2))
+    monkeypatch.setattr("meridian.health.time.monotonic", lambda: next(clock))
+    pending = iter(answers)
+    client = SimpleNamespace(ping=lambda: next(pending))
+    monkeypatch.setattr(control_service, "control_client", lambda _cluster: nullcontext(client))
+    plan = compile_topology(_intent())
+    payload = next(item.payload for item in plan.resources if isinstance(item.payload, ControlServicePayload))
+    entry = ServerEntry(host=ADDRESS, user="root", id="srv-a")
+
+    def bootstrap() -> None:
+        control_service.bootstrap_control_service(
+            payload, plan, ClusterConfig(), entry, MockConnection(),
+            harden=False, reality_port=10443, reality_sni="a.example",
+        )  # fmt: skip
+
+    if answers[-1]:
+        bootstrap()
+        assert next(pending, None) is None  # it stopped asking once the service answered
+    else:
+        with pytest.raises(ResourceReconcileError, match=f"control service on {ADDRESS} did not answer"):
+            bootstrap()
 
 
 def _control_only_fleet():

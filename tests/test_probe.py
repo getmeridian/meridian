@@ -669,3 +669,19 @@ def test_probe_help_documents_automation_controls() -> None:
     assert "--json" in output
     assert "--timeout" in output
     assert "--sni" in output
+
+
+@pytest.mark.parametrize("override", ["/etc/ssl/certs/ca-certificates.crt", ""], ids=["ssl-cert-file", "certifi"])
+def test_certificate_validation_trusts_ssl_cert_file_like_httpx(monkeypatch: pytest.MonkeyPatch, override: str) -> None:
+    """The system lab trusts its private CA through SSL_CERT_FILE; certifi alone refused it."""
+    import certifi
+
+    from meridian.diagnostics import network
+
+    requests: list[dict[str, object]] = []
+    monkeypatch.setenv("SSL_CERT_FILE", override)
+    monkeypatch.setattr(network, "run_json_helper", lambda _script, request, timeout: requests.append(request))
+
+    network.certificate_validation_error("198.51.100.1", "198.51.100.1")
+
+    assert requests[0]["cafile"] == (override or certifi.where())

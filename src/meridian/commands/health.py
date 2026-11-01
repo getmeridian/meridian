@@ -329,16 +329,18 @@ def _server_report(
             checks.append(check_from_result(f"internal:{port_number}", f"Internal {port_number} ({purpose})", result))
         default_host = (node.domain or node.sni) if node is not None else ""
         for port_number in deployment.public_tls_ports:
-            # Meridian's own certificate first: a Reality port otherwise answers with the camouflage site's.
-            routes = sorted(
-                (item for item in deployment.https_routes if item.port == port_number),
-                key=lambda item: item.kind == "camouflage",
-            )
-            route = routes[0] if routes else None
-            host = (route.tls_sni or route.host_header) if route is not None else default_host
-            result = check_tls_certificate(conn, host or entry.host, port=port_number)
-            tls_label = "Camouflage site TLS" if route is not None and route.kind == "camouflage" else "TLS certificate"
-            checks.append(check_from_result(f"tls:{port_number}", f"{tls_label} on {port_number}", result))
+            # Every name Meridian certifies on the port: a panel domain and the server's IP share 443, and
+            # checking only the first missed a swapped certificate (#110). Without one, the camouflage site's.
+            routes = [item for item in deployment.https_routes if item.port == port_number]
+            managed = [item for item in routes if item.kind != "camouflage"]
+            camouflage = not managed and bool(routes)
+            hosts = sorted({item.tls_sni or item.host_header or entry.host for item in managed or routes[:1]})
+            for host in hosts or [default_host or entry.host]:
+                result = check_tls_certificate(conn, host, port=port_number)
+                tls_label = "Camouflage site TLS" if camouflage else "TLS certificate"
+                check_id = f"tls:{port_number}" if len(hosts) <= 1 else f"tls:{port_number}:{host}"
+                check_name = f"{tls_label} on {port_number}" + (f" ({host})" if len(hosts) > 1 else "")
+                checks.append(check_from_result(check_id, check_name, result))
         if not conn.local_mode:
             # Deployer-vantage throughput: only meaningful (and only run) from another machine.
             checks.extend(job() for job in blocking_jobs(entry.host, deployment, differential=False))

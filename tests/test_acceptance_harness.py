@@ -175,19 +175,37 @@ def test_systemlab_preflight_distinguishes_container_dns_failure(tmp_path: Path)
     assert any(call.startswith("run ") for call in docker_calls)
 
 
-def test_realvm_single_manifest_matches_implemented_checks() -> None:
-    topology_path = _ROOT / "tests/realvm/topologies/single.yml"
-    verify_path = _ROOT / "tests/realvm/verify/single.sh"
+@pytest.mark.parametrize("name", sorted(orchestrator.SUPPORTED_TOPOLOGIES))
+def test_realvm_manifest_matches_implemented_checks(name: str) -> None:
+    topology_path = _ROOT / f"tests/realvm/topologies/{name}.yml"
+    verify_path = _ROOT / "tests/realvm/verify" / orchestrator.VERIFIERS[name]
     topology = yaml.safe_load(topology_path.read_text(encoding="utf-8"))
     assert set(topology["verify"]) == {"tier_alpha"}
     declared = tuple(topology["verify"]["tier_alpha"])
     implemented = tuple(re.findall(r"^# VERIFY: ([a-z0-9_]+)$", verify_path.read_text(encoding="utf-8"), re.MULTILINE))
 
     assert declared == implemented
-    assert declared == orchestrator.SUPPORTED_TOPOLOGIES["single"]
+    assert declared == orchestrator.SUPPORTED_TOPOLOGIES[name]
     assert "reality_xray_handshake" not in declared
     assert "bogus_uuid_rejected" not in declared
-    orchestrator.require_supported_topology(orchestrator.load_topology("single"))
+    orchestrator.require_supported_topology(orchestrator.load_topology(name))
+
+
+@pytest.mark.parametrize("name", sorted(orchestrator.SUPPORTED_TOPOLOGIES))
+def test_realvm_verifier_is_valid_bash(name: str) -> None:
+    verify_path = _ROOT / "tests/realvm/verify" / orchestrator.VERIFIERS[name]
+
+    subprocess.run(["bash", "-n", str(verify_path)], check=True)
+
+
+def test_realvm_domain_manifest_drift_is_refused_before_provider_access() -> None:
+    topology = orchestrator.load_topology("domain")
+    topology.verify = {"tier_alpha": ["panel_certificate_names_domain"]}
+
+    with pytest.raises(SystemExit) as exc_info:
+        orchestrator.require_supported_topology(topology)
+
+    assert exc_info.value.code == 2
 
 
 def test_realvm_rejects_unsupported_topology_before_provider_access(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -215,3 +233,23 @@ def test_realvm_rejects_unsupported_topology_before_provider_access(monkeypatch:
     assert exc_info.value.code == 2
     assert provider_accessed is False
     assert orchestrator.run_verification(unsupported, []) == 2
+
+
+def test_realvm_refuses_a_checkout_without_an_agent_build_before_provider_access(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from meridian.core.errors import LocalStateError
+
+    def no_agent() -> None:
+        raise LocalStateError("The node agent binary is missing.", hint="Run `make agent`.")
+
+    def unexpected_provider_access(_name: str) -> None:
+        raise AssertionError("the provider was reached")
+
+    monkeypatch.setattr("meridian.control_artifacts.require_agent_build", no_agent)
+    monkeypatch.setattr(orchestrator, "make_provider", unexpected_provider_access)
+
+    with pytest.raises(SystemExit) as exc_info:
+        orchestrator.cmd_up(Namespace(topology="domain", keep=False))
+
+    assert exc_info.value.code == 2

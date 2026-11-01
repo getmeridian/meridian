@@ -17,6 +17,7 @@ from collections.abc import Callable, Mapping
 from meridian.cluster import ClusterConfig
 from meridian.compiler.models import (
     AgentRuntimePayload,
+    ClientEndpointPayload,
     ControlServicePayload,
     ControlUserPayload,
     NodeWorkloadPayload,
@@ -33,12 +34,15 @@ from meridian.core.defaults import DEFAULT_SNI
 from meridian.core.errors import ProvisioningError
 from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
+from meridian.diagnostics.network import certificate_validation_error
+from meridian.health import ReadinessTimeout, poll_until_ready
 from meridian.host_runtime import CONTROL_SERVICE_STATE_DIR
 from meridian.provision.ensure import ensure_file_content
+from meridian.provision.tls import certificate_inspection_command, certificate_names_host
 from meridian.reconciler.control_service_driver import xray_subscription_is_valid
 from meridian.reconciler.meridian_drivers import MeridianDriverContext, build_meridian_drivers
 from meridian.reconciler.resources import ResourceAction, ResourceDrivers, ResourceReconcileError
-from meridian.reconciler.server_evidence import file_content_or_absent
+from meridian.reconciler.server_evidence import assertion_matches, file_content_or_absent
 from meridian.reconciler.workloads import LocalRealityKeyFactory, WorkloadStateManager
 from meridian.servers import ServerEntry
 from meridian.ssh import ServerConnection
@@ -195,6 +199,16 @@ def bootstrap_control_service(
     )
     if not written.ok:
         raise ResourceReconcileError(f"Could not attest the control service: {written.detail}")
+    # nginx's reload returns while old workers still serve the bootstrap's self-signed certificate,
+    # so the observation right after this failed nearly every fresh install until a resume.
+    try:
+        with control_client(cluster) as client:
+            poll_until_ready(client.ping, timeout=60, interval=2, description="control service")
+    except ReadinessTimeout as exc:
+        raise ResourceReconcileError(
+            f"The control service on {entry.host} did not answer after installing: {exc}.",
+            hint=f"Run: meridian check {entry.host}",
+        ) from exc
 
 
 def bootstrap_reviewed_control_service(
@@ -245,6 +259,13 @@ def control_service_ready(
     attestation = file_content_or_absent(action.resource.logical_id, read, "control-service attestation")
     if attestation is None or attestation.strip() != service_attestation(payload, plan):
         return False
+    # The certificate nginx serves the service with must still name it: an exit's IP certificate
+    # once overwrote a panel domain's, and nothing noticed until the CLI's TLS check failed.
+    hostname = payload.public_hostname or entry.host
+    inspection = connection.run(certificate_inspection_command(hostname), timeout=15)
+    current = assertion_matches(action.resource.logical_id, inspection, "control-service certificate")
+    if not current or not certificate_names_host(inspection.stdout, hostname):
+        return False
     with control_client(cluster) as client:
         return client.ping()
 
@@ -269,7 +290,41 @@ def verify_control_service(plan: ResourcePlan, cluster: ClusterConfig) -> tuple[
             if not xray_subscription_is_valid(_Document(urls.get(item.payload.username, "sub"), document)):
                 raise ResourceReconcileError(f"Canonical subscription for {item.payload.username!r} is invalid.")
             urls[item.payload.username] = cluster.panel.subscription_url(user.sub_token)
+    invalid = endpoint_certificate_errors(plan)
+    if invalid:
+        raise ResourceReconcileError(
+            "A published endpoint serves a certificate clients will refuse: " + "; ".join(invalid),
+            hint="Run `meridian apply` to reinstall it, then `meridian test` to check every endpoint.",
+        )
     return version, len(nodes), urls
+
+
+def endpoint_certificate_errors(plan: ResourcePlan) -> list[str]:
+    """Validate each published XHTTP/WebSocket endpoint's certificate as its clients will.
+
+    Subscriptions could all be valid while a swapped certificate refused every TLS client
+    (#110). Each server is dialed directly with the endpoint's SNI (none for an IP), so a
+    CDN-fronted name checks the origin's own certificate. Unavailable evidence is skipped.
+    """
+    targets = plan.deployment_contract.server_targets
+    checked: set[tuple[str, str, int]] = set()
+    errors: list[str] = []
+    for item in plan.resources:
+        endpoint = item.payload
+        if not isinstance(endpoint, ClientEndpointPayload) or endpoint.protocol not in {"xhttp", "wss"}:
+            continue
+        target = targets.get(endpoint.address_server_ref)
+        if target is None:
+            continue
+        identity = endpoint.sni or target.host
+        key = (target.host, identity, endpoint.public_port)
+        if key in checked:
+            continue
+        checked.add(key)
+        error = certificate_validation_error(target.host, identity, port=endpoint.public_port, timeout=10)
+        if error:
+            errors.append(f"{endpoint.remark} ({identity}): {error}")
+    return errors
 
 
 class _Document:
