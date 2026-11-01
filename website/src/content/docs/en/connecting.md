@@ -17,6 +17,8 @@ To set up a phone from a computer, open the link on the computer and scan the QR
 
 Keep the link to yourself. It is your personal access, and anyone who has it can connect as you.
 
+If the owner enables device limits, Your account shows used / allowed device slots. When full, new devices get a limit notice on subscription refresh. Apps that do not report a device are not counted. Only counts appear; they are not saved in your browser.
+
 ## Language
 
 Your saved page choice comes first, then your account's language, then the owner's default. With automatic language, connection and support pages follow your browser and fall back to English when needed.

@@ -39,6 +39,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - **Node baselines and revision numbers outlive node deletion; a person's totals do not** — a re-added node would otherwise count twice and refuse every document as older, while a late report must not recreate a removed person.
 - **Validate expiry and quota bounds inside the write** — years from 2099 read as "never", and quotas stop at SQLite's int64 maximum.
 - **An app without a valid `x-hwid` is served and counted nowhere**, and browsers never register a device; refusing it would lock out apps without HWID support.
+- **Subscriber device capacity is counts only** — `/info` reads used/allowed slots under the subscription lock, only at a countable opt-in level; it never selects device details or registers a browser.
 - **Secrets never ride a snapshot** — strip the secrets table, sessions, enrollment tokens, nonces, and owner tables through `strip_unsnapshotted()`, then VACUUM; device and history rows ride only while their level is on.
 - **Background tasks log no exception text** — they keep fixed error codes in memory and warn at most once per five minutes.
 - **Notes and tags stay private** — never in events or subscription output; a metadata-only edit makes no event or new node document.

@@ -27,6 +27,7 @@ from meridian.control.formats.xray_json import xray_json_document
 from meridian.control.models import ClientEndpoint
 from meridian.control.periods import next_period_start
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
+from meridian.core.device_slots import DeviceSlots
 from meridian.core.notices import RenderedNotice
 from meridian.core.owner_contact import OwnerContact
 from meridian.core.subscription_preview import StaleClient
@@ -74,6 +75,7 @@ def render_subscription(
     owner_contact: OwnerContact | None = None,
     notice: RenderedNotice | None = None,
     stale_client: StaleClient | None = None,
+    device_slots: DeviceSlots | None = None,
 ) -> SubscriptionResponse:
     """Render *document* for *user*; a suspended user's entries are status placeholders.
 
@@ -93,6 +95,8 @@ def render_subscription(
         )
         if notice is not None:
             info["notice"] = notice.to_data()
+        if device_slots is not None:
+            info["user"]["deviceSlots"] = device_slots.to_data()
         return SubscriptionResponse(200, JSON_TYPE, _json(info), dict(COMMON_HEADERS) | _refill_headers(user, moment))
     headers = subscription_headers(
         user,

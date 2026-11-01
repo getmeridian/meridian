@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+from meridian.control.device_slots import read_device_slots
 from meridian.control.devices import DeviceLedger, HeaderReader, browser_request
 from meridian.control.formats.entries import SubscriptionUser
 from meridian.control.formats.selector import explain_format
@@ -51,6 +52,7 @@ def serve_subscription(
         bodies = [item[0] for item in store.db.execute("SELECT body FROM endpoints").fetchall()]
         settings = read_settings()
         privacy = read_privacy()
+        slots = read_device_slots(store, record, privacy) if document == "browser" else None
         notice = read_notice(record)
         language = resolve_language(read_language().language, record.language)
         # The connection page's account check (`/info`) is never an app fetching its configs.
@@ -69,6 +71,7 @@ def serve_subscription(
         client_routing=settings.client_routing,
         owner_contact=settings.owner_contact,
         notice=notice,
+        device_slots=slots,
         now=datetime.fromtimestamp(clock(), UTC),
         placeholder_remarks=DEVICE_LIMIT_REMARKS if "x-hwid-limit" in hwid_flags else None,
         extra_headers=hwid_flags,

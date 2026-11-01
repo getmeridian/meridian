@@ -73,6 +73,7 @@ from meridian.core.command_inputs import (
 )
 from meridian.core.contexts import ContextListResult, ContextSummary
 from meridian.core.deploy import DeployPlan, DeployPorts, DeployRequest, DeployResult
+from meridian.core.device_slots import DeviceSlots
 from meridian.core.events import EVENT_TYPES
 from meridian.core.fleet import FleetInventory, FleetStatus, NodeListResult, RelayListResult
 from meridian.core.fleet_document import FleetExportResult, FleetImportResult, IntentChange
@@ -653,6 +654,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "client-status": ClientStatusResult,
     "client-limits": ClientLimitsResult,
     "client-devices": ClientDevicesResult,
+    "device-slots": DeviceSlots,
     "client-name-request": ClientNameRequest,
     "server-add-request": ServerAddRequest,
     "server-remove-request": ServerRemoveRequest,

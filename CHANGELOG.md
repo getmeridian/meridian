@@ -15,6 +15,7 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b9
 
 #### Fixed
+- **Connection pages show used and allowed device slots when limits are enabled**, with localized guidance for full slots and apps that cannot report a device. Only counts are revealed, and the page never saves them (#95).
 - **Reissuing a link in the web panel offers the same session cut-off choice as removal**, reviews affected nodes, and shows each node’s outcome while retaining the new link (#95).
 - **Subscription traffic reports upload and download for the current period**, shared with the API and web panel. Manual and scheduled resets keep both directions and lifetime totals consistent; imports and older periods keep unclassified use with an explicit disclosure (#95).
 - **A web panel on its own domain keeps its certificate** when the same server
