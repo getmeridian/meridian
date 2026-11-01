@@ -18,6 +18,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - **Encrypted snapshots** — `snapshot.py` seals an age file to every device key and the recovery key, repeating the header inside because age has no associated data; `restore.py` stages it under the next epoch with a new CA and every document signed again. `blobs.py` mirrors pinned binaries for nodes that cannot reach GitHub.
 - **Connection pages at subscriptions** — a browser at `/sub/<token>` gets the page, apps get their format, `/info` stays JSON (`subscription_serving.py`, `connection_pages.py`); shared assets live at token-free `/sub/~pwa/` (`~` is outside the token alphabet).
 - **Derived reads write nothing** — attention and the previews read one view under the store lock and store no request data; `events.py` appends typed facts inside each mutation's transaction.
+- **Stopped-use attention is aggregate evidence** — its own bounded day threshold compares last accepted traffic, including after a period reset; unknown activity stays unknown.
 
 ## What's done well
 - A revision is signed only when the resources' hash or the signing certificate changes, so repeated applies never wake agents.

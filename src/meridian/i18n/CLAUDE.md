@@ -16,6 +16,7 @@
 - Notice preview, expiry, confirmation, clearing, and content-free timeline labels exist in all four CLI locales; operator text remains verbatim.
 - Owner-contact reviews, clearing, validation, and read-only console guidance have matching four-locale keys; operator-supplied instructions stay verbatim.
 - Private note/tag labels, bounds, clearing guidance, and scope disclosures have matching English, Russian, Persian, and Chinese catalog entries.
+- **Activity labels distinguish never used from stopped using** — both reasons have native four-language text; machine reason codes remain stable English.
 
 - `tests/test_i18n.py` enforces key order/parity, identical placeholders, no reply-word collisions, and that every literal key used in code exists.
 

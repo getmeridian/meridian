@@ -308,6 +308,13 @@
             "title": "Quota Percent",
             "type": "integer"
           },
+          "stopped_days": {
+            "default": 3,
+            "maximum": 365,
+            "minimum": 1,
+            "title": "Stopped Days",
+            "type": "integer"
+          },
           "unused_days": {
             "default": 3,
             "maximum": 365,
@@ -3204,7 +3211,8 @@
               "enum": [
                 "expiring",
                 "quota",
-                "unused"
+                "unused",
+                "stopped"
               ],
               "type": "string"
             },
@@ -6678,6 +6686,18 @@
               "maximum": 365,
               "minimum": 1,
               "title": "Unused Days",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stopped_days",
+            "required": false,
+            "schema": {
+              "default": 3,
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Stopped Days",
               "type": "integer"
             }
           },

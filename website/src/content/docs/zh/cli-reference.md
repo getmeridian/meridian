@@ -138,7 +138,7 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 **`client list`** — 列出客户端及其状态、流量、到期时间和最后在线时间，包括在网页面板中添加的用户（JSON 中为 `declared: false`）。带 `--json`，返回 `data.summary` 计数和 `data.clients[]`。
 
-`client list --attention` 仅显示七天内到期（包含当前时刻）、已用流量达到限额的 80%，或创建超过三天且从未记录过流量的用户。原因列说明每行；JSON 包含 `clients[].attention_reasons`，汇总数量仅统计筛选后的用户。导入的历史流量即使日期未知，以及重置过的流量周期，都不会被误判为从未使用。
+`client list --attention` 仅显示七天内到期（包含当前时刻）、已用流量达到限额的 80%，或创建超过三天且从未记录过流量的用户。原因列说明每行；JSON 包含 `clients[].attention_reasons`，汇总数量仅统计筛选后的用户。导入的历史流量即使日期未知，以及重置过的流量周期，都不会被误判为从未使用。 另一个原因 **已停止使用**（`stopped`）会标记曾使用服务、但超过三天没有新流量的用户。**尚未使用**（`unused`）仍是独立原因。API 参数 `stopped_days` 可独立设置为 1–365 天，默认 3 天；`unused_days` 的范围和默认值保持不变。周期重置不会抹去这些证据，且无需启用每日历史。导入用量缺少最后活动时间时，不会猜测用户已停止使用。
 
 `GET /api/attention` 需要 `read` 权限，也允许已登录的所有者访问。返回 `observed_at`、`thresholds`、含用户名和原因的 `people[]`，以及含节点 ID 和原因的 `nodes[]`。节点问题包括离线或尚未联系服务的 agent、配置应用失败，以及报告为 `degraded` 或 `unhealthy` 的健康状态。可选参数为 `expiry_days`（1–30，默认 7）、`quota_percent`（1–100，默认 80）和 `unused_days`（1–365，默认 3）。关注列表直接计算，不保存警告标记、会话、地址或设备数据。
 

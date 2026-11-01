@@ -71,7 +71,8 @@
             "enum": [
               "expiring",
               "quota",
-              "unused"
+              "unused",
+              "stopped"
             ],
             "type": "string"
           },

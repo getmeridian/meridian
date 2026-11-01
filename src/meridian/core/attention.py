@@ -15,8 +15,9 @@ from meridian.core.server_allowances import ServerUsage
 
 MAX_EXPIRY_DAYS = 30
 MAX_UNUSED_DAYS = 365
+MAX_STOPPED_DAYS = MAX_UNUSED_DAYS
 MAX_PAYMENT_DAYS = 30
-PersonAttentionReason = Literal["expiring", "quota", "unused"]
+PersonAttentionReason = Literal["expiring", "quota", "unused", "stopped"]
 NodeAttentionReason = Literal["offline", "apply_failed", "unhealthy"]
 ServerAttentionReason = Literal["allowance_near", "allowance_exceeded", "payment_due", "payment_overdue"]
 
@@ -25,6 +26,7 @@ class AttentionThresholds(CoreModel):
     expiry_days: int = Field(default=7, ge=1, le=MAX_EXPIRY_DAYS)
     quota_percent: int = Field(default=80, ge=1, le=100)
     unused_days: int = Field(default=3, ge=1, le=MAX_UNUSED_DAYS)
+    stopped_days: int = Field(default=3, ge=1, le=MAX_STOPPED_DAYS)
     allowance_percent: int = Field(default=80, ge=1, le=100)
     allowance_exceeded_percent: int = Field(default=100, ge=1, le=100)
     payment_days: int = Field(default=7, ge=1, le=MAX_PAYMENT_DAYS)
@@ -66,6 +68,34 @@ class AttentionList(CoreModel):
     servers: list[ServerAttention] = Field(default_factory=list)
 
 
+def is_never_used(user: UserRecord) -> bool:
+    """No known lifetime traffic or aggregate activity, including undated imported use."""
+    return user.first_traffic_at is None and user.online_at is None and user.lifetime_traffic_bytes == 0
+
+
+def person_reasons(user: UserRecord, thresholds: AttentionThresholds, moment: datetime) -> list[PersonAttentionReason]:
+    """Disjoint never-used and stopped-use findings from default aggregate evidence."""
+    reasons: list[PersonAttentionReason] = []
+    if user.expire_at is not None and moment <= datetime.fromisoformat(user.expire_at) <= moment + timedelta(
+        days=thresholds.expiry_days
+    ):
+        reasons.append("expiring")
+    if (
+        user.traffic_limit_bytes > 0
+        and user.used_traffic_bytes * 100 >= user.traffic_limit_bytes * thresholds.quota_percent
+    ):
+        reasons.append("quota")
+    if is_never_used(user) and moment - datetime.fromisoformat(user.created_at) > timedelta(
+        days=thresholds.unused_days
+    ):
+        reasons.append("unused")
+    if user.online_at is not None and moment - datetime.fromisoformat(user.online_at) > timedelta(
+        days=thresholds.stopped_days
+    ):
+        reasons.append("stopped")
+    return reasons
+
+
 def derive_attention(
     users: Sequence[UserRecord],
     nodes: Sequence[NodeStatus],
@@ -78,23 +108,7 @@ def derive_attention(
     moment = datetime.fromisoformat(now)
     people: list[PersonAttention] = []
     for user in users:
-        reasons: list[PersonAttentionReason] = []
-        if user.expire_at is not None and moment <= datetime.fromisoformat(user.expire_at) <= moment + timedelta(
-            days=thresholds.expiry_days
-        ):
-            reasons.append("expiring")
-        if (
-            user.traffic_limit_bytes > 0
-            and user.used_traffic_bytes * 100 >= user.traffic_limit_bytes * thresholds.quota_percent
-        ):
-            reasons.append("quota")
-        if (
-            user.first_traffic_at is None
-            and user.online_at is None
-            and user.lifetime_traffic_bytes == 0
-            and moment - datetime.fromisoformat(user.created_at) > timedelta(days=thresholds.unused_days)
-        ):
-            reasons.append("unused")
+        reasons = person_reasons(user, thresholds, moment)
         if reasons:
             people.append(PersonAttention(username=user.username, reasons=reasons))
     attention_nodes: list[NodeAttention] = []

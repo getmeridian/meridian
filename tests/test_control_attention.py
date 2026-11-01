@@ -45,6 +45,7 @@ def _person(
     used: int = 0,
     age: float = 0,
     carried: int = 0,
+    last_used: str = NOW,
 ) -> None:
     user = service.create_user(UserCreate(username=name, expire_at=expires, traffic_limit_bytes=limit))
     created = (datetime.fromisoformat(NOW) - timedelta(days=age)).isoformat().replace("+00:00", "Z")
@@ -59,11 +60,11 @@ def _person(
                     "type": "stats",
                     "counter_epoch": "5b0c8a52-6c1d-4e8b-9a7f-2b5d4c3e1f00",
                     "seq": service._db.total_changes,
-                    "collected_at": NOW,
+                    "collected_at": last_used,
                     "users": [{"user_id": user.user_id, "uplink_bytes": used, "downlink_bytes": 0}],
                 }
             ),
-            now=NOW,
+            now=last_used,
         )
 
 
@@ -120,6 +121,51 @@ def test_a_reset_and_history_off_do_not_turn_previously_used_people_into_unused_
     service.reset_user_traffic("alice")
     assert service.privacy().usage_history == "off"
     assert service.attention(now=NOW).people == []
+
+
+@pytest.mark.parametrize(
+    ("last_used", "expected"),
+    [
+        ("2026-10-28T12:00:00Z", ["stopped"]),
+        ("2026-10-29T12:00:00Z", []),
+        ("2026-10-29T11:59:59.5Z", ["stopped"]),
+        (NOW, []),
+    ],
+    ids=["four-days", "exactly-three-days", "fraction-past-threshold", "current"],
+)
+def test_previously_used_people_without_recent_traffic_are_separate_from_never_used(
+    service: ControlService, last_used: str, expected: list[str]
+) -> None:
+    _person(service, "sample", used=80, age=10, last_used=last_used)
+    service.reset_user_traffic("sample")
+    before = service._db.total_changes
+    result = service.attention(now=NOW)
+    assert service._db.total_changes == before
+    assert [(person.username, person.reasons) for person in result.people] == (
+        [("sample", expected)] if expected else []
+    )
+    assert service.privacy().usage_history == "off"
+
+
+def test_stopped_threshold_is_independent_and_api_reads_remain_secret_free(
+    service: ControlService, tmp_path: Path
+) -> None:
+    _person(service, "stopped", used=80, age=10, last_used="2026-10-28T12:00:00Z")
+    _person(service, "never", age=4)
+    with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN) as admin:
+        reader = admin.create_token("reader", "read")
+        headers = {"Authorization": f"Bearer {reader.token}"}
+        response = httpx.get(url + "/api/attention?stopped_days=3", headers=headers)
+        assert response.status_code == 200
+        assert {item["username"]: item["reasons"] for item in response.json()["people"]} == {
+            "stopped": ["stopped"],
+            "never": ["unused"],
+        }
+        response = httpx.get(url + "/api/attention?stopped_days=5", headers=headers)
+        assert response.json()["people"] == [{"username": "never", "reasons": ["unused"]}]
+        assert not any(user.sub_token in response.text or user.uuid in response.text for user in service.list_users())
+        for query in ("stopped_days=0", "stopped_days=366", "stopped_days=bad", "stopped_days=3&stopped_days=4"):
+            assert httpx.get(url + "/api/attention?" + query, headers=headers).status_code == 400
 
 
 def test_node_attention_uses_liveness_apply_failures_and_nonhealthy_reported_health(service: ControlService) -> None:
@@ -191,6 +237,7 @@ def test_client_list_attention_filters_console_people_and_adds_reasons(
 
     _person(service, "alice", limit=100, used=80)
     _person(service, "console", age=4)
+    _person(service, "stopped", age=10, used=10, last_used="2026-10-28T12:00:00Z")
     _person(service, "fresh")
     monkeypatch.setattr(i18n, "_requested", None)
     monkeypatch.setattr(i18n, "_current", "en")
@@ -206,13 +253,15 @@ def test_client_list_attention_filters_console_people_and_adds_reasons(
             assert result.exit_code == 0, result.output
             if json_mode:
                 data = json.loads(result.stdout)["data"]
-                assert data["summary"]["clients"] == 2
+                assert data["summary"]["clients"] == 3
                 people = {person["username"]: person for person in data["clients"]}
                 assert people["alice"]["attention_reasons"] == ["quota"]
                 assert people["console"]["attention_reasons"] == ["unused"]
+                assert people["stopped"]["attention_reasons"] == ["stopped"]
                 assert people["console"]["declared"] is False and "fresh" not in people
             else:
                 assert "Reason" in result.output and "Near quota" in result.output and "Never used" in result.output
+                assert "Stopped using" in result.output
                 assert "fresh" not in result.output
         finally:
             set_json_mode(False)

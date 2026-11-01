@@ -106,7 +106,9 @@ def client_show_cmd(
 @client_app.command("list")
 def client_list_cmd(
     _json: Json = False,
-    attention: bool = typer.Option(False, "--attention", help="Only people expiring soon, near quota, or never used"),
+    attention: bool = typer.Option(
+        False, "--attention", help="Only people expiring soon, near quota, never used, or without recent traffic"
+    ),
     tag: str | None = typer.Option(None, "--tag", metavar="TAG", help="Only people with this tag; none for untagged"),
 ) -> None:
     """List managed access clients with status and traffic"""

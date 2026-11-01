@@ -57,6 +57,8 @@ This prints the personal URL, plus status, traffic, expiry, and when the client 
 meridian client list
 ```
 
+A separate **Stopped using** reason (`stopped`) flags a person who previously used the service but has no accepted traffic for more than three days. **Never used** (`unused`) remains a separate reason. `stopped_days` is an independent API threshold from 1–365 days, default 3; `unused_days` keeps its existing bounds and default. Period resets do not erase this evidence, and daily history can stay off. Imported use with no known last traffic time is not guessed to have stopped.
+
 Shows every client with status, traffic, expiry, and last seen.
 
 ## Private notes and tags

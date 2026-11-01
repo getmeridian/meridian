@@ -532,5 +532,9 @@
   "language.auto": "跟随每个人的浏览器语言",
   "language.person": "页面和应用语言",
   "language.person_default": "使用全局默认值",
-  "language.person_hint": "每个人仍可在自己的页面上切换语言。"
+  "language.person_hint": "每个人仍可在自己的页面上切换语言。",
+  "attention.reason.expiring": "即将到期",
+  "attention.reason.quota": "接近流量限额",
+  "attention.reason.unused": "尚未使用",
+  "attention.reason.stopped": "已停止使用"
 }

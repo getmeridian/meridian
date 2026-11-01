@@ -532,5 +532,9 @@
   "language.auto": "По языку браузера пользователя",
   "language.person": "Язык страницы и сообщений",
   "language.person_default": "По умолчанию для всех",
-  "language.person_hint": "Пользователь всё равно сможет переключить язык на своей странице."
+  "language.person_hint": "Пользователь всё равно сможет переключить язык на своей странице.",
+  "attention.reason.expiring": "Скоро истекает срок",
+  "attention.reason.quota": "Лимит почти исчерпан",
+  "attention.reason.unused": "Ещё не пользовался",
+  "attention.reason.stopped": "Давно нет трафика"
 }

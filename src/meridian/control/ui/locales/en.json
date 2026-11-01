@@ -532,5 +532,9 @@
   "language.auto": "Follow each person's browser",
   "language.person": "Page and app language",
   "language.person_default": "Follow fleet default",
-  "language.person_hint": "The person can still switch languages on their page."
+  "language.person_hint": "The person can still switch languages on their page.",
+  "attention.reason.expiring": "Expires soon",
+  "attention.reason.quota": "Near quota",
+  "attention.reason.unused": "Never used",
+  "attention.reason.stopped": "Stopped using"
 }

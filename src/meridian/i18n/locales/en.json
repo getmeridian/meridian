@@ -223,6 +223,7 @@
   "attention.reason.expiring": "Expires soon",
   "attention.reason.quota": "Near quota",
   "attention.reason.unused": "Never used",
+  "attention.reason.stopped": "Stopped using",
   "client.label.last_traffic_node": "Last reporting node",
   "fleet.label.node": "Node",
   "fleet.label.active": "active",
