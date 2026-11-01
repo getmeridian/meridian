@@ -427,6 +427,7 @@ if (mode === 'person-mutation') {
   M.confirm = () => Promise.resolve(true);
   M.askToLeave = () => { events.push({ asked: true }); return Promise.resolve(true); };
   M.confirmCutOffRemoval = () => Promise.resolve({ cut_off: false });
+  M.confirmCutOffReissue = () => Promise.resolve({ cut_off: false });
   const action = data.action || 'toggle';
   if (data.editBeforeRemove) {
     const note = view().querySelector('textarea');

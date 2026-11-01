@@ -16,6 +16,7 @@
 - **Every mutating request is same-origin twice** — `SameSite=Strict` plus the `X-Meridian-Request: 1` header `M.api` adds (and matching `Origin`/`Sec-Fetch-Site` when sent).
 - **Assets revalidate by content-hash ETag**; anything holding a secret is `no-store`.
 - Restart and cut-off actions disclose reconnects and affected nodes before confirming, and repeated clicks cannot queue duplicates.
+- **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
 - **Scope the session cookie to `ServiceConfig.public_path`** — a `/` cookie would ride every subscription request; without a path, sign-in is refused (`ui_unconfigured`), and so is a setup link.

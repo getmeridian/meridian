@@ -5,7 +5,9 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(new URL('../website/package.json', import.meta.url));
 const { JSDOM } = require('jsdom');
-const [ui, mode, locale = 'en'] = process.argv.slice(2);
+const [ui, requestedMode, locale = 'en'] = process.argv.slice(2);
+const reissuing = requestedMode.startsWith('reissue-');
+const mode = reissuing ? requestedMode.slice('reissue-'.length) : requestedMode;
 const dom = new JSDOM('<!doctype html><body><div id="view"></div></body>', {
   url: 'https://198.51.100.1/console/', runScripts: 'outside-only', pretendToBeVisual: true,
 });
@@ -38,7 +40,11 @@ w.fetch = (url, options) => {
   }
   if (url === 'api/users/person-a' && options.method === 'GET') return Promise.resolve(reply(user));
   if (url === 'ui/api/people/person-a/share') return Promise.resolve(reply({ subscription_url: '', declared: mode === 'declared' }));
-  if (url === 'api/users/person-a/cut-off') return Promise.resolve(reply({ nodes: [{ node_id: 'main', inbound_tags: ['vless-reality'] }] }));
+  if (url === 'api/users/person-a/cut-off') return Promise.resolve(reply({ nodes: mode === 'no-nodes' ? [] : [{ node_id: 'main', inbound_tags: ['vless-reality'] }] }));
+  if (url === 'api/users/person-a/reissue' && options.method === 'POST') {
+    writes.push({ body: JSON.parse(options.body), csrf: options.headers['X-Meridian-Request'] });
+    return Promise.resolve(reply(writes.at(-1).body.cut_off ? { user, commands: [record] } : user));
+  }
   if (options.method === 'DELETE') {
     writes.push({ body: JSON.parse(options.body), csrf: options.headers['X-Meridian-Request'] });
     return Promise.resolve(reply({ user: null, commands: writes.at(-1).body.cut_off ? [record] : [] }));
@@ -71,20 +77,22 @@ if (restarting) M.renderServers(view); else M.renderPerson(view, 'person-a');
 await settle();
 const report = { requests, writes };
 report.serverText = view.querySelector('.server')?.textContent || '';
-const remove = view.querySelector(restarting ? '.server .row-actions button' : '.card-danger button.btn-danger');
+const remove = view.querySelector(restarting ? '.server .row-actions button' : reissuing ? '.card-danger > .danger-row:first-of-type > button' : '.card-danger button.btn-danger');
 if (mode === 'declared') {
   report.hasRemove = !!remove;
+  report.declaredText = view.querySelector('.card-danger').textContent;
 } else {
   remove.click();
-  if (restarting) remove.click();
+  if (restarting || reissuing) remove.click();
   await settle();
   report.writesBeforeConfirm = writes.length;
   const dialog = w.document.querySelector('dialog');
   report.disclosure = dialog.textContent;
   if (!restarting) {
     const opt = dialog.querySelector('input[name="cut-off"]');
-    report.defaultOn = opt.checked;
-    opt.checked = mode !== 'default' && mode !== 'cancel';
+    report.defaultOn = opt ? opt.checked : null;
+    report.choiceDisabled = opt ? opt.disabled : null;
+    if (opt) opt.checked = !opt.disabled && mode !== 'default' && mode !== 'cancel';
   }
   const buttons = dialog.querySelector('.actions').children;
   buttons[mode === 'cancel' || mode === 'restart-cancel' ? 0 : 1].click();

@@ -25,10 +25,15 @@ needs_console_dom = pytest.mark.skipif(
 
 def run_console(mode: str, locale: str = "en", data: Any = None) -> dict[str, Any]:
     runner = (
-        "control_ui_showcase.mjs"
-        if mode.startswith("showcase-")
-        else ("control_ui_person.mjs" if mode.startswith("person-") else "control_ui_console.mjs")
+        "control_ui_commands.mjs"
+        if mode.startswith("command-")
+        else (
+            "control_ui_showcase.mjs"
+            if mode.startswith("showcase-")
+            else ("control_ui_person.mjs" if mode.startswith("person-") else "control_ui_console.mjs")
+        )
     )
+    mode = mode.removeprefix("command-")
     result = subprocess.run(
         ["node", str(ROOT / "tests" / runner), str(UI_DIR), mode, locale, json.dumps(data)],
         cwd=ROOT,

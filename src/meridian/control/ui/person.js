@@ -59,8 +59,9 @@
   function act(screen, work, toastKey) {
     if (!current(screen)) return Promise.resolve();
     var label = M.displayName(screen.username);
-    return work().then(function (user) {
-      completed(screen, user, toastKey, label);
+    return work().then(function (result) {
+      completed(screen, result.user || result, toastKey, label);
+      if (current(screen) && result.commands) M.showCommandResults(result.commands);
     }, function (e) { failed(label, e); });
   }
 
@@ -281,10 +282,15 @@
           h("p", { class: "muted small", text: M.t(declared ? "person.reissue_declared" : "person.reissue_text") }),
           declared ? M.command("meridian client reissue " + name) : null),
         declared ? null : h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
-          M.confirm(M.t("person.reissue_title"), M.t("person.reissue_confirm"), M.t("person.reissue"), true)
-            .then(function (ok) {
-              if (ok) act(screen, function () { return M.api("POST", path(name, "/reissue"), {}); }, "person.reissued_toast");
-            });
+          if (screen.reissuing || !current(screen)) return;
+          screen.reissuing = true;
+          M.confirmCutOffReissue(name).then(function (choice) {
+            if (!choice || !current(screen)) return;
+            return act(screen, function () {
+              return M.api("POST", path(name, "/reissue"), { cut_off: choice.cut_off });
+            }, "person.reissued_toast");
+          }, function (e) { failed(M.displayName(name), e); })
+            .finally(function () { screen.reissuing = false; });
         } }, M.t("person.reissue"))),
       h("div", { class: "danger-row" },
         h("div", {}, h("p", { class: "strong", text: M.t("person.remove") }),
