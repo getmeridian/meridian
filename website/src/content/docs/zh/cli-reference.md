@@ -185,6 +185,8 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 `client list` 返回前 100 个匹配人员。`--limit 1–500` 设置页面大小，`--cursor VALUE` 继续同一查询。JSON 新增 `total`、`facets` 与可选的 `next_cursor`，摘要针对返回页面。`client bulk ACTION` 使用相同查询，随后冻结预览、显示表格、确认并原子提交。`--dry-run` 仅预览，JSON 提交和撤销需要 `--yes`。精确 `--person USERNAME` 不能与筛选合用。使用 `client bulk receipt ID` 读回执，使用 `client bulk undo ID` 撤销。提交回复丢失时读取回执确认结果。
 
+批量预览以已执行到期和流量重置规则后的状态为更改前状态。操作未改变任何字段时计为未更改。提交时会重新检查所有选定人员，包括删除目标；限制或计划发生变化时，拒绝消息会列出需要重新预览的人员。流量重置使用提交时间，撤销会保留预览前已经到期的规则结果。
+
 | 命令 | 审核的更改 |
 |---|---|
 | `meridian client bulk extend --days 7` | 延长有效期或待使用时长 |

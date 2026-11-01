@@ -30,6 +30,8 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - A proposal whose intent contains a secret-shaped key or value, or a malformed `access` block, is refused and never stored.
 
 ## Pitfalls
+- **Bulk before is enforced** — project both sides from one account clock, re-check every target before writing, and catch up due resets before schedule edits.
+- **Bulk after stays reviewed** — re-check the projected result at commit; a newly due action schedule needs a fresh review.
 - **Bulk applies use canonical enforcement** — write validated requested fields before enforcing, or quota restoration emits the wrong event and cap edits lose their renewal interval.
 - **Schedules share directional baselines** — renewal and rolling resets clear both directions and carried period use; imports initialize the same projection before enforcement, preserving lifetime totals.
 - **First use means accepted traffic** — subscription and page reads never activate; renewal progress, period offsets, and effective status change in the traffic transaction before new growth.

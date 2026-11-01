@@ -139,7 +139,9 @@ class BulkLedger:
             deleted: set[str] = set()
             reversible = request.action.action not in ("delete", "reset-traffic")
             for name in names:
-                user = self.read_user(name)
+                baseline = project_effect(self.read_user(name), now)
+                user = baseline.user
+                effects[name] = baseline
                 version = self.people.row_version(name)
                 assert version is not None
                 versions[name] = version
@@ -238,6 +240,34 @@ class BulkLedger:
                 subjects=stale,
             )
 
+    def _enforce(self, users: list[UserRecord], now: str) -> None:
+        enforce_user_schedules(
+            self.store,
+            users,
+            now,
+            read_user=self.read_user,
+            reset_traffic=lambda person, moment: reset_period(self.store, person, moment),
+            events=self.events,
+        )
+
+    def _apply_effect(self, user: UserRecord, effect: BulkEffect, now: str, *, reset: bool = False) -> UserRecord:
+        requested = effect.requested or effect.user
+        save_user_fields(self.store, requested, BULK_WRITABLE_FIELDS)
+        self.events.user_updated(user, requested, now=now)
+        if reset:
+            reset_period(self.store, user, now)
+            self.events.append("user.traffic_reset", user.username, now=now)
+        self._enforce([self.read_user(user.username)], now)
+        actual = self.read_user(user.username)
+        if BulkFields.from_user(actual) != BulkFields.from_user(effect.user):
+            raise ServiceError(
+                "stale_people",
+                f"{user.username} changed during enforcement. Preview again.",
+                409,
+                subjects=[user.username],
+            )
+        return actual
+
     def commit(self, request: BulkCommitRequest) -> BulkReceipt:
         request = BulkCommitRequest.model_validate(request.model_dump())
         with self.store.transaction():
@@ -261,15 +291,22 @@ class BulkLedger:
             if self._nodes() != frozen.nodes:
                 raise ServiceError("stale_people", "The managed nodes changed since review. Preview again.", 409)
             declared = self.people.intent().declared
-            stale = []
-            for person in review.people:
-                if review.action.action == "delete":
-                    if (person.cli_command is not None) != (person.username in declared):
-                        stale.append(person.username)
-                elif (
-                    BulkFields.from_user(project_effect(frozen.effects[person.username].user, now).user) != person.after
-                ):
-                    stale.append(person.username)
+            users = {person.username: self.read_user(person.username) for person in review.people}
+            baselines = {name: project_effect(user, now) for name, user in users.items()}
+            stale = [
+                person.username
+                for person in review.people
+                if BulkFields.from_user(baselines[person.username].user) != person.before
+                or (
+                    review.action.action == "delete"
+                    and (person.cli_command is not None) != (person.username in declared)
+                )
+                or (
+                    review.action.action != "delete"
+                    and BulkFields.from_user(project_effect(frozen.effects[person.username].user, now).user)
+                    != person.after
+                )
+            ]
             if stale:
                 raise ServiceError(
                     "stale_people",
@@ -277,54 +314,66 @@ class BulkLedger:
                     409,
                     subjects=stale,
                 )
-            self._changed_nodes(frozen.effects, {person.username for person in review.people if person.after is None})
+            effects = {}
+            for person in review.people:
+                if person.after is None:
+                    continue
+                if person.outcome == "changed":
+                    frozen_effect = frozen.effects[person.username]
+                    requested = frozen_effect.requested or frozen_effect.user
+                    effect = project_effect(requested, now, reset=review.action.action == "reset-traffic")
+                    effect.requested = requested
+                    effects[person.username] = effect
+                else:
+                    effects[person.username] = baselines[person.username]
+            changed_nodes = self._changed_nodes(
+                effects, {person.username for person in review.people if person.after is None}
+            )
+            baseline_changed = any(
+                BulkFields.from_user(user) != BulkFields.from_user(baselines[name].user) for name, user in users.items()
+            )
+            # Catch up the reviewed baseline before an expiry or interval edit can hide a due reset.
+            self._enforce(list(users.values()), now)
             outcomes = []
             for person in review.people:
                 if person.outcome != "changed":
                     outcomes.append(person)
                     continue
                 user = self.read_user(person.username)
-                effect = frozen.effects.get(person.username)
-                if effect is None:
+                if person.after is None:
                     self.traffic.forget_user(user.user_id)
                     self.store.db.execute("DELETE FROM users WHERE user_id = ?", (user.user_id,))
                     self.events.append("user.removed", user.username, now=now)
                     after = None
                 else:
-                    requested = effect.requested or effect.user
-                    save_user_fields(self.store, requested, BULK_WRITABLE_FIELDS)
-                    self.events.user_updated(user, requested, now=now)
-                    if review.action.action == "reset-traffic":
-                        reset_period(self.store, user, review.created_at)
-                        self.events.append("user.traffic_reset", user.username, now=now)
-                    enforce_user_schedules(
-                        self.store,
-                        [self.read_user(user.username)],
-                        review.created_at,
-                        read_user=self.read_user,
-                        reset_traffic=lambda person, moment: reset_period(self.store, person, moment),
-                        events=self.events,
-                        event_now=now,
+                    actual = self._apply_effect(
+                        user, effects[person.username], now, reset=review.action.action == "reset-traffic"
                     )
-                    actual = self.read_user(user.username)
                     after = BulkFields.from_user(actual)
-                    if after != person.after:
-                        raise ServiceError(
-                            "stale_people", f"{user.username} changed during enforcement. Preview again.", 409
-                        )
-                outcomes.append(BulkPersonChange.model_validate({**person.model_dump(), "after": after}))
-            if review.counts.changed:
+                fields = changed_fields(person.before, after)
+                outcomes.append(
+                    BulkPersonChange.model_validate(
+                        {
+                            **person.model_dump(),
+                            "after": after,
+                            "changes": fields,
+                            "outcome": "changed" if fields else "unchanged",
+                        }
+                    )
+                )
+            committed_counts = counts(outcomes)
+            if committed_counts.changed or baseline_changed:
                 self.compose()
             receipt = BulkReceipt(
                 id=review.id,
                 preview_hash=review.preview_hash,
                 action=review.action,
                 committed_at=now,
-                counts=review.counts,
+                counts=committed_counts,
                 people=outcomes,
-                changed_nodes=review.changed_nodes,
+                changed_nodes=changed_nodes,
                 undo_until=format_timestamp(self.clock() + UNDO_SECONDS)
-                if review.reversible and review.counts.changed
+                if review.reversible and committed_counts.changed
                 else None,
             )
             versions = {
