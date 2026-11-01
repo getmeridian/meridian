@@ -1,5 +1,6 @@
 """CLI token review, explicit permissions, expiry, and producing-output boundaries."""
 
+import io
 import json
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -11,6 +12,8 @@ from typer.testing import CliRunner
 from meridian.cli import app
 from meridian.console import set_json_mode, set_quiet_mode
 from meridian.control.client import ControlClient
+from meridian.control.models import TokenCreate
+from meridian.control.tokens import ROOT
 from tests.support.control_service import ADMIN_TOKEN
 from tests.support.text import unstyle
 from tests.support.token_service import Fleet, serve_tokens
@@ -104,3 +107,66 @@ def test_no_expiry_is_an_explicit_choice_and_revocation_uses_the_public_id(fleet
     revoked = runner.invoke(app, ["token", "revoke", token["id"], "--yes", "--json"])
     assert revoked.exit_code == 0, revoked.output
     assert json.loads(revoked.stdout)["data"]["revoked_at"] is not None
+
+
+@pytest.mark.parametrize("command", ["create", "revoke"])
+@pytest.mark.parametrize("terminal", ["declined", "unavailable"])
+def test_declined_or_non_tty_token_mutations_exit_one_without_changing_tokens(
+    fleet: Fleet, monkeypatch: pytest.MonkeyPatch, command: str, terminal: str
+) -> None:
+    from meridian import console
+
+    def tty(*args: object, **kwargs: object) -> io.StringIO:
+        if terminal == "unavailable":
+            raise OSError("No terminal")
+        return io.StringIO("n\n")
+
+    monkeypatch.setattr(console, "open", tty, raising=False)
+    if command == "create":
+        arguments = ["token", "create", "Reader", "--capability", "people.read"]
+    else:
+        issued = fleet.service.tokens.issue(TokenCreate(name="Reader", capabilities=["people.read"]), issuer=ROOT)
+        arguments = ["token", "revoke", issued.id]
+    before = fleet.service.tokens.list_tokens()
+    result = CliRunner().invoke(app, arguments)
+    assert result.exit_code == 1, result.output
+    assert fleet.service.tokens.list_tokens() == before
+
+
+@pytest.mark.parametrize("scope", [None, "read"])
+def test_issuance_uses_the_reviewed_expiry_after_waiting_for_confirmation(
+    fleet: Fleet, monkeypatch: pytest.MonkeyPatch, scope: str | None
+) -> None:
+    from meridian.commands import token
+
+    def confirm(*args: object, **kwargs: object) -> bool:
+        fleet.clock.now += 60
+        return True
+
+    monkeypatch.setattr(token, "confirm", confirm)
+    expiry = fleet.clock.now + 30 * 86400
+    grants = ["--scope", scope] if scope else ["--capability", "people.read"]
+    result = CliRunner().invoke(app, ["token", "create", "Reader", *grants, "--expires-days", "30"])
+    assert result.exit_code == 0, result.output
+    issued = fleet.service.tokens.list_tokens().tokens[0]
+    from datetime import datetime
+
+    assert datetime.fromisoformat(issued.expires_at).timestamp() == expiry
+    assert issued.scope == scope
+
+
+def test_a_review_that_expires_during_confirmation_refuses_issuance(
+    fleet: Fleet, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from meridian.commands import token
+
+    def confirm(*args: object, **kwargs: object) -> bool:
+        fleet.clock.now += 86400 + 1
+        return True
+
+    monkeypatch.setattr(token, "confirm", confirm)
+    result = CliRunner().invoke(
+        app, ["token", "create", "Reader", "--capability", "people.read", "--expires-days", "1"]
+    )
+    assert result.exit_code == 2, result.output
+    assert fleet.service.tokens.list_tokens().tokens == []

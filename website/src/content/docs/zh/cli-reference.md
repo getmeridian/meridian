@@ -587,6 +587,8 @@ meridian token revoke TOKEN_ID [--yes] [--json]
 
 选择一个 --scope 预设，或重复 --capability。默认有效期为 90 天；不过期必须明确使用 --never-expires。--dry-run 不签发令牌，JSON 修改需要 --yes。JSON 的 data.preview 保留权限预览，只有签发输出中的 data.issued.token 显示秘密。
 
+拒绝创建或撤销，或在没有终端且没有 --yes 的情况下执行，都会以代码 1 退出，不修改任何令牌。创建使用服务预览中显示的确切到期时间，等待确认不会延长有效期。若该时间已过，请获取新的预览。
+
 ### meridian panel
 
 显示网页面板的地址；在面板还没有所有者时，同时显示一次性设置链接。

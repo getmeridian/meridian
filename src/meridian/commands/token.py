@@ -4,6 +4,7 @@ import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+import typer
 from pydantic import ValidationError
 from rich.markup import escape
 
@@ -132,8 +133,17 @@ def run_create(
                 issued = None
                 if not is_json_mode():
                     show_preview(preview)
-                if not dry_run and (yes or confirm(t("token.confirm_create"))):
-                    issued = client.issue_token(request)
+                if not dry_run:
+                    if not yes and not confirm(t("token.confirm_create")):
+                        raise typer.Exit(1)
+                    reviewed = TokenCreate(
+                        name=request.name,
+                        scope=request.scope,
+                        capabilities=request.capabilities,
+                        expires_at=preview.expires_at,
+                        never_expires=preview.expires_at is None,
+                    )
+                    issued = client.issue_token(reviewed)
                 result = TokenCreateResult(preview=preview, issued=issued)
         except ControlServiceError as exc:
             fail(exc)
@@ -156,7 +166,7 @@ def run_revoke(token_id: str, *, yes: bool) -> None:
                 fail(t("token.confirm_json"), hint_type="user")
             with token_client() as client:
                 if not yes and not confirm(t("token.confirm_revoke", name=isolate(token_id))):
-                    return
+                    raise typer.Exit(1)
                 result = client.revoke_token(token_id)
         except ControlServiceError as exc:
             fail(exc)

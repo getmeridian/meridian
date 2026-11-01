@@ -587,6 +587,8 @@ meridian token revoke TOKEN_ID [--yes] [--json]
 
 Use one preset or repeat --capability. New tokens default to 90 days; --never-expires is explicit. --dry-run creates no token. --yes is required for JSON mutations. Creation JSON keeps the review under data.preview and reveals only data.issued.token in the producing output.
 
+Declining creation or revocation, or running either without a terminal and without --yes, exits 1 and changes no token. Creation uses the exact expiry shown in the service preview; waiting at confirmation never extends it. If that instant has passed, request a new preview.
+
 ### meridian panel
 
 Show the web panel's address, and a one-time setup link while it has no owner.
