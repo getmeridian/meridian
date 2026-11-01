@@ -1,6 +1,6 @@
 [package]
 name = "meridian-agent"
-version = "0.2.14"
+version = "0.2.15"
 edition = "2024"
 description = "Meridian node agent (netagent): applies signed desired state from the control service."
 license = "MIT"

@@ -348,7 +348,8 @@
       "description": "Revoked identities cannot dispatch new flows, or their sessions ended in a core restart.\n\nCovers newly dispatched TCP streams and UDP associations, including an\nauthenticated QUIC or mux connection. Already dispatched flows and XUDP\nassociations may continue. Sent only with `user_flow_blocking` negotiated.\nAuthentication still applies if routing fails; the agent reports pending\nand retries the guard without requesting an inbound reset. Revocation rules\nlive only in the running core; restarting it clears their need.",
       "properties": {
         "document": {
-          "$ref": "#/$defs/NodeStateRef"
+          "$ref": "#/$defs/NodeStateRef",
+          "description": "The applied document covered by fresh runtime evidence, which may precede unrelated service revisions."
         },
         "error": {
           "anyOf": [

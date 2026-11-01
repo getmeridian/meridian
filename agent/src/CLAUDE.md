@@ -16,8 +16,8 @@
 - **Secrets stay out of logs and reports** — no token, key, service URL (`Client::scrub`), user UUID, or sensitive content; messages are trimmed.
 - **Atomic writes everywhere** — private temp sibling, fsync, mode and owner, rename, directory fsync (`fsutil::write_atomic`).
 ## Pitfalls
-- **Write live credentials before changing accounts** — a restart overlapping apply must load the new keys; verify the core invocation around the write and reconcile an uncertain instance.
-- **Every core command checks the applied document and exact config bytes** — restarts and reset fallbacks must not reload revoked credentials from stale core.json; failed preconditions are retryable.
+- **Every core change uses held credentials** — commands check the applied document and exact core.json; live updates publish the new file before accounts, compare invocations, and reconcile an uncertain instance.
+- **Reports inspect the running guard** — cached apply errors cannot prove current blocking; compare live rules and the core invocation without mutating them.
 - **IPIfNonMatch needs an unmatched first pass** — an active-user catch-all suppresses DNS and bypasses private/country blocks and IP egress; install only revoked-identity blocks.
 - **Guard retries preserve earlier blocks** — save intent before removing authentication, clear blocks for active identities before adding accounts, and retry the complete graph after a failed replacement.
 - **Removing a password leaves authenticated QUIC and mux sessions usable** — block new dispatched streams before `rmu`; existing TCP/UDP associations survive. VLESS's accepted flows also outlive an inbound reset, so its explicit cut-off must restart the core; Hysteria2's reset closes QUIC.

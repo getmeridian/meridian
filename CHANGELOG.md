@@ -44,6 +44,7 @@ newest first; the last is what 4.0 changes compared with 3.x.
 - Client-list JSON preserves integer facet counts for secret-shaped tags such as TOKEN and API_KEY.
 - Bulk undo emits the same lifecycle events as commit and refuses an over-capacity managed inbound without changing people or the receipt.
 - Bulk reviews compare enforced account states, refuse named stale targets even for deletion, preserve due refills, and count no-op actions as unchanged.
+- Report fresh core evidence after command, fallback, and systemd restarts; completed restarts no longer retain stale pending guard errors or claim that temporary rules are required (#95).
 - Track the actual revoked credential generation and cause per node, clear restored keys, and show distinct receipts in all console languages; private fingerprints stay off the wire (#95).
 - Keep revoked credentials out of concurrent core restarts during apply, with current-file writes before live account changes and invocation checks (#95).
 - Refuse core restarts and inbound resets until the held revision and on-disk credentials agree; return retryable command results for pending application (#95).

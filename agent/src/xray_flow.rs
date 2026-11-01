@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 use crate::apply::Engine;
 use crate::compose::{self, UsersRef};
 use crate::fsutil;
-use crate::model::{Resource, ResourceError, Spec};
+use crate::model::{Resource, ResourceError, Spec, XrayConfigSpec};
 use crate::xray_identity;
 use crate::xray_revocations::{LIMIT_MESSAGE, Revocation, Revocations, core_invocation, lost};
 use crate::xray_revocations::{active_identities, clients};
@@ -91,6 +91,20 @@ fn listed(routing: &Value) -> Listed {
             )
         })
         .collect()
+}
+
+struct FlowContext<'a> {
+    config: &'a XrayConfigSpec,
+    binary: String,
+    composed: Value,
+}
+
+fn flow_error(message: String) -> ResourceError {
+    ResourceError {
+        code: "xray_api_failed".into(),
+        message,
+        retryable: true,
+    }
 }
 
 impl Engine<'_> {
@@ -259,20 +273,22 @@ impl Engine<'_> {
         result
     }
 
-    pub(crate) fn flow_guard_result(
+    fn flow_context<'a>(
         &self,
-        resources: &[Resource],
+        resources: &'a [Resource],
         statuses: &HashMap<String, &'static str>,
-    ) -> Option<ResourceError> {
-        let config = resources.iter().find_map(|resource| match &resource.spec {
+    ) -> Result<Option<FlowContext<'a>>, ResourceError> {
+        let Some(config) = resources.iter().find_map(|resource| match &resource.spec {
             Spec::XrayConfig(config) => Some(config),
             _ => None,
-        })?;
+        }) else {
+            return Ok(None);
+        };
         if tags(resources).is_empty() {
-            return None;
+            return Ok(None);
         }
         if !xray_identity::enabled(&config.config) {
-            return Some(ResourceError {
+            return Err(ResourceError {
                 code: "unsupported".into(),
                 message: "Apply the fleet to enable Xray's RoutingService.".into(),
                 retryable: false,
@@ -308,14 +324,81 @@ impl Engine<'_> {
             if installed != compose::render(&composed) {
                 return Err("The installed Xray credentials differ from the held document.".into());
             }
-            self.guard_live_users(&binary, &config.api_address, &composed, resources, None)
-                .map_err(|failure| failure.message)
+            Ok(FlowContext {
+                config,
+                binary,
+                composed,
+            })
         })();
-        result.err().map(|message| ResourceError {
-            code: "xray_api_failed".into(),
-            message,
-            retryable: true,
-        })
+        result.map(Some).map_err(flow_error)
+    }
+
+    pub(crate) fn flow_guard_result(
+        &self,
+        resources: &[Resource],
+        statuses: &HashMap<String, &'static str>,
+    ) -> Option<ResourceError> {
+        let result = self.flow_context(resources, statuses).and_then(|context| {
+            let Some(context) = context else {
+                return Ok(());
+            };
+            self.guard_live_users(
+                &context.binary,
+                &context.config.api_address,
+                &context.composed,
+                resources,
+                None,
+            )
+            .map_err(|failure| flow_error(failure.message))
+        });
+        result.err()
+    }
+
+    /// Read-only evidence: a fresh core needs no blocks for sessions it already dropped.
+    pub(crate) fn flow_guard_observation(
+        &self,
+        resources: &[Resource],
+        statuses: &HashMap<String, &'static str>,
+    ) -> Option<ResourceError> {
+        let result = self.flow_context(resources, statuses).and_then(|context| {
+            let Some(context) = context else {
+                return Ok(());
+            };
+            let result = (|| {
+                let invocation = core_invocation(self.exec)?;
+                let path = self
+                    .cache_dir
+                    .parent()
+                    .ok_or("The core revocation retry directory is unavailable.")?
+                    .join("flow-revocations.json");
+                let mut revoked = Revocations::load(&path)?;
+                revoked.for_invocation(&invocation);
+                let current = self.live_rules(&context.binary, &context.config.api_address)?;
+                let existing: Vec<_> = current
+                    .iter()
+                    .map(|(tag, _)| Revocation::from_rule_tag(tag))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .flatten()
+                    .collect();
+                revoked.add(existing, &context.composed)?;
+                if revoked.overflow {
+                    return Err(LIMIT_MESSAGE.into());
+                }
+                let desired = guarded(&context.composed, &revoked.identities)?;
+                if current != listed(&desired["routing"]) {
+                    return Err("The running core has not confirmed its revocation rules.".into());
+                }
+                if core_invocation(self.exec)? != invocation {
+                    return Err(
+                        "The core restarted while revocation evidence was being read.".into(),
+                    );
+                }
+                Ok(())
+            })();
+            result.map_err(flow_error)
+        });
+        result.err()
     }
 }
 

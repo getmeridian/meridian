@@ -355,7 +355,9 @@ class UserFlowBlocking(AgentModel):
     live only in the running core; restarting it clears their need.
     """
 
-    document: NodeStateRef
+    document: NodeStateRef = Field(
+        description="The applied document covered by fresh runtime evidence, which may precede unrelated service revisions."
+    )
     status: Literal["ready", "pending"]
     error: ResourceError | None
 
