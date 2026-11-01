@@ -45,8 +45,10 @@ def subscription_info(user: SubscriptionUser, links: list[str], subscription_url
         "ssConfLinks": {},
         "subscriptionUrl": subscription_url,
     }
-    if user.schedule is not None:
-        info["user"]["accountSchedule"] = user.schedule.to_data()
+    schedule = user.schedule
+    # A named extension only when it says something: the frozen Remnawave answers have no such key.
+    if schedule is not None and (schedule.activation_pending or schedule.renewal_enabled or schedule.next_reset_at):
+        info["user"]["accountSchedule"] = schedule.to_data()
     return info
 
 

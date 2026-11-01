@@ -1,5 +1,6 @@
 """Account schedules use accepted traffic and catch up without losing new traffic."""
 
+import json
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -402,3 +403,24 @@ def test_a_replacing_import_keeps_the_first_use_the_service_already_counted(sche
     first_use = service.get_user("example").first_traffic_at
     service.import_users(UserImportBatch(users=[item], replace=True))
     assert service.get_user("example").first_traffic_at == first_use
+
+
+@pytest.mark.parametrize(
+    ("strategy", "renewal", "carried"),
+    [("no_reset", None, False), ("month", None, True), ("no_reset", 7, True)],
+    ids=["nothing-to-say", "next-reset", "renewal"],
+)
+def test_info_names_a_schedule_only_when_it_has_something_to_say(
+    scheduled, strategy: str, renewal: int | None, carried: bool
+) -> None:
+    service, _clock = scheduled
+    person = service.create_user(
+        UserCreate(
+            username="example",
+            traffic_limit_strategy=strategy,
+            expire_at="2027-03-01T00:00:00Z" if renewal else None,
+            renewal_interval_days=renewal,
+        )
+    )
+    info = json.loads(service.subscription(person.sub_token, "info").body)["user"]
+    assert ("accountSchedule" in info) is carried
