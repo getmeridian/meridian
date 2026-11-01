@@ -335,8 +335,12 @@ def _expected(capture: Capture) -> Response:
     if golden.format == "json":
         info = json.loads(body)
         if isinstance(info, dict) and info.get("isFound") and "user" in info:
-            # Named info extension: shared directional period counters; this corpus has zero use.
-            info["user"].update(trafficUploadBytes="0", trafficDownloadBytes="0", trafficUnattributedBytes="0")
+            # Named info extension: directional period counters, volatile like the other traffic fields.
+            info["user"].update(
+                trafficUploadBytes="<volatile>",
+                trafficDownloadBytes="<volatile>",
+                trafficUnattributedBytes="<volatile>",
+            )
             body = json.dumps(info)
     return Response(golden.status, golden.format, golden.encoding, headers, body)
 

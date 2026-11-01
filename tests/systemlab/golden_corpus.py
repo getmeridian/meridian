@@ -101,7 +101,7 @@ _FIELD_PATTERNS = (
 _USERINFO_COUNTERS = re.compile(r"\b(upload|download)=\d+")
 # Traffic counters and days left in the browser's subscription-info JSON change with time.
 _VOLATILE_FIELDS = re.compile(
-    r'"(?P<key>daysLeft|trafficUsed|trafficUsedBytes|lifetimeTrafficUsed|lifetimeTrafficUsedBytes)":'
+    r'"(?P<key>daysLeft|trafficUsed|trafficUsedBytes|lifetimeTrafficUsed|lifetimeTrafficUsedBytes|trafficUploadBytes|trafficDownloadBytes|trafficUnattributedBytes)":'
     r'(?:"[^"]*"|-?\d+(?:\.\d+)?)'
 )
 
