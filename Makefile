@@ -1,4 +1,4 @@
-.PHONY: help install sync test lint format check typecheck validate dead-code ci system-lab-preflight system-lab-agent system-lab system-lab-fast \
+.PHONY: help install sync test lint format check typecheck validate dead-code ci feedback-check system-lab-preflight system-lab-agent system-lab system-lab-fast \
        templates dead-code ai-docs build publish clean hooks agent
 
 ## —— Setup ——————————————————————————————————————————————
@@ -50,6 +50,9 @@ dead-code: ## Report dead / test-only code and unused params (warnings, never fa
 ## —— CI (runs everything) ———————————————————————————————
 
 ci: check typecheck templates validate dead-code ## Run full CI locally
+
+feedback-check: ## Test, type-check and build the standalone Telegram feedback bot
+	cd feedback-bot && npm ci --ignore-scripts && npm run check
 
 system-lab-preflight: ## Check Compose, daemon registry access, and container DNS
 	bash tests/systemlab/scripts/preflight.sh

@@ -15,6 +15,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b9
 
 #### Added
+- Independent Telegram-native feedback bot using `@grammyjs/tgcloud`, with a
+  private maintainer inbox, replies, Done buttons, English/Russian guidance,
+  90-day database retention and an explicit manual deployment workflow.
 - Account anniversary resets, durations from first traffic, and automatic
   expiry renewal with optional caps. API, CLI, panel, connection pages, and
   refill headers share UTC dates; migration keeps rolling-month anchors.

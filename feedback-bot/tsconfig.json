@@ -1,0 +1,4 @@
+{
+  "extends": "@grammyjs/tgcloud/tsconfig.json",
+  "include": ["src"]
+}

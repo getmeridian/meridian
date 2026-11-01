@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": ["@grammyjs/tgcloud/sdk", "node"] },
+  "include": ["src", "test"]
+}

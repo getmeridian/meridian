@@ -1,0 +1,25 @@
+{
+  "name": "meridian-feedback-bot",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --project tsconfig.test.json",
+    "test": "tsx --experimental-vm-modules --test test/*.test.ts",
+    "build": "node scripts/configure.mjs && npm run typecheck && tgcloud-grammy build",
+    "check": "node scripts/configure.mjs --example && npm run typecheck && tgcloud-grammy build && npm run test",
+    "deploy": "npm run build && tgcloud push"
+  },
+  "dependencies": {
+    "grammy": "1.46.0"
+  },
+  "devDependencies": {
+    "@grammyjs/tgcloud": "0.4.0",
+    "@tgcloud/cli": "0.2.0",
+    "@types/node": "24.10.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3"
+  }
+}

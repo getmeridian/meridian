@@ -24,6 +24,7 @@ Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
 - **Plan and apply:** every fleet is a reviewed `topology_intent` in `cluster.yml`; `meridian plan` / `apply` compile it and reconcile resource drivers.
 - **Control service (#95):** `meridian serve` (`ctld`) keeps users, traffic, revisions, and operator-owned privacy in SQLite (device limits and daily history default off), serves subscriptions and the owner's web console, and signs documents that each server's Rust agent (`netagent`) pulls over HTTPS; every change pulls an encrypted snapshot to the deployer (`meridian backup`, `restore`). `meridian migrate` moves a Remnawave fleet from an earlier beta onto it in place, keeping every link.
 - **Website:** Astro, with docs on Starlight (every page also served as Markdown for agents).
+- **Project feedback bot:** independent TypeScript/grammY service in `feedback-bot/`, hosted by Telegram Serverless; private maintainer inbox, replies, Done, and 90-day database retention. Never installed on users' servers.
 - **Connection pages:** `ctld` serves every person's subscription URL as browser HTML or app configs, including console invitees; branding and exit countries travel through its settings, and shared PWA assets come from the installed package.
 - **Page language:** the service owns an automatic browser default or an explicit en/ru/fa/zh default, with nullable person overrides; a person's saved page choice wins, and automatic native status remarks stay English.
 - **Real-VM harness:** optional, local-only, in `tests/realvm/`.
@@ -85,6 +86,7 @@ website/CLAUDE.md                       — Astro + Starlight docs, agent endpoi
 └── src/styles/CLAUDE.md                — token system, warm light-first palette
 
 video/CLAUDE.md                         — Remotion setup walkthrough from recorded, sanitized footage
+feedback-bot/CLAUDE.md                  — native Telegram feedback service and deployment
 ```
 
 ## How to update CLAUDE.md

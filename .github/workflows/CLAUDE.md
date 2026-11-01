@@ -2,6 +2,8 @@
 
 ## Design decisions
 
+**Feedback bot is separate** — `feedback-bot.yml` checks its isolated Node package on relevant PRs/pushes, deploys only by manual dispatch from main, and runs a daily 90-day retention purge. Its Serverless CLI credential is `MERIDIAN_FEEDBACK_TGCLOUD_TOKEN`; the owner inbox is a repository variable. No bot code or token enters fleet provisioning, the Python wheel, or website runtime.
+
 **Two-stage pipeline** — CI validates on every push/PR. Release triggers only on CI success on main via `workflow_run`. Prevents accidental releases from failed builds.
 
 **CI jobs**: Python Tests (3.11–3.14 matrix), Lint (plus the never-failing dead-code report as PR annotations), Type Check, Validate (PWA rendering + app metadata + VERSION + CHANGELOG + public CLI docs), Shell (shellcheck), Agent (cargo fmt, clippy, and tests, with uv for the real-service round trip; then `make agent` and a wheel built with both musl builds, checked by `verify_package_assets.py --agent-only`), System Lab (multi-node Docker deploy of this checkout's wheel and the runner-arch agent `make system-lab-agent` builds), Website Build.

@@ -1,0 +1,6 @@
+node_modules/
+tgcloud/
+.tgcloud/
+config.local.json
+src/lib/config.generated.ts
+*.tsbuildinfo

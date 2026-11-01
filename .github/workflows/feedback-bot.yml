@@ -1,0 +1,111 @@
+name: Feedback Bot
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ["feedback-bot/**", ".github/workflows/feedback-bot.yml"]
+  push:
+    branches: [main]
+    paths: ["feedback-bot/**", ".github/workflows/feedback-bot.yml"]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Operation (deployment only runs from main)
+        type: choice
+        options: [deploy, cleanup]
+        default: deploy
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: feedback-bot
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: feedback-bot/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+
+  deploy:
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'deploy' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-latest
+    concurrency:
+      group: feedback-bot-production
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: feedback-bot
+    env:
+      TGCLOUD_TOKEN: ${{ secrets.MERIDIAN_FEEDBACK_TGCLOUD_TOKEN }}
+      FEEDBACK_INBOX_CHAT_ID: ${{ vars.MERIDIAN_FEEDBACK_INBOX_CHAT_ID }}
+      FEEDBACK_ADMIN_IDS: ${{ vars.MERIDIAN_FEEDBACK_INBOX_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: feedback-bot/package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: Require the Serverless CLI credential
+        run: test -n "$TGCLOUD_TOKEN"
+      - name: Build production configuration
+        run: npm run build
+      - name: Synchronize deployment state
+        run: npx --no-install tgcloud fetch
+      - name: Apply additive database migrations before activating new handlers
+        run: |
+          npx --no-install tgcloud migrate --local --safe
+          migration_plan=$(mktemp)
+          npx --no-install tgcloud migrate --local --dry-run > "$migration_plan"
+          cat "$migration_plan"
+          grep -Fq 'No schema changes. Database is in sync' "$migration_plan"
+      - name: Deploy atomically
+        run: npx --no-install tgcloud push
+
+  cleanup:
+    if: (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.action == 'cleanup')) && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: feedback-bot-production
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: feedback-bot
+    env:
+      TGCLOUD_TOKEN: ${{ secrets.MERIDIAN_FEEDBACK_TGCLOUD_TOKEN }}
+      FEEDBACK_INBOX_CHAT_ID: ${{ vars.MERIDIAN_FEEDBACK_INBOX_CHAT_ID }}
+      FEEDBACK_ADMIN_IDS: ${{ vars.MERIDIAN_FEEDBACK_INBOX_CHAT_ID }}
+    steps:
+      - name: Skip maintenance until configured
+        if: env.TGCLOUD_TOKEN == '' || env.FEEDBACK_INBOX_CHAT_ID == ''
+        working-directory: .
+        run: echo 'Feedback bot is not configured; no maintenance performed.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@v5
+        if: env.TGCLOUD_TOKEN != '' && env.FEEDBACK_INBOX_CHAT_ID != ''
+      - uses: actions/setup-node@v6
+        if: env.TGCLOUD_TOKEN != '' && env.FEEDBACK_INBOX_CHAT_ID != ''
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: feedback-bot/package-lock.json
+      - run: npm ci --ignore-scripts
+        if: env.TGCLOUD_TOKEN != '' && env.FEEDBACK_INBOX_CHAT_ID != ''
+      - name: Purge expired records without sending messages or deploying code
+        if: env.TGCLOUD_TOKEN != '' && env.FEEDBACK_INBOX_CHAT_ID != ''
+        run: |
+          npm run build
+          context=$(node --input-type=module -e 'console.log(JSON.stringify({initData:{user:{id:Number(process.env.FEEDBACK_INBOX_CHAT_ID)}}}))')
+          npx --no-install tgcloud run endpoints/cleanup '{}' --ctx "$context"
