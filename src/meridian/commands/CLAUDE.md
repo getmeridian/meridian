@@ -34,6 +34,7 @@
 - **Never save intent from a declined or dry-run review**; omitted options preserve saved values.
 - **Role names are server names** — `server set` accepts the exit, gateway, and relay IDs `fleet status` prints, since labs whose saved names are IPs had no other handle.
 - **Topology-owned removal and reissue never touch console-only people** — and `client reissue` clears device registrations and makes the new subscription URL the page URL at once.
+- **Flow-block receipts read at commit time are always pending** — re-read them briefly (`node_commands.wait_for_flow_blocks()`) before reporting, since the agent confirms within seconds of applying.
 - **`client enable` reports the status the service answers** (`expired`/`limited` when those still hold), never the requested one.
 - **Removals refuse the control server and its dependents before review**; `node remove --force` only extends the edit to relay chains into that exit.
 - **`forget_unreachable_servers()` forgets in memory only** — the confirmed apply saves it, or a declined import leaves bindings forgotten on disk.

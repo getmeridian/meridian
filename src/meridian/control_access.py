@@ -41,7 +41,7 @@ from meridian.core.account_schedule import LIFECYCLE_FIELDS, AccountLifecycleSta
 from meridian.core.attention import AttentionList
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientLimitChange
-from meridian.core.client_sessions import CredentialRotationRequest
+from meridian.core.client_sessions import CredentialRotationRequest, UserFlowBlocks
 from meridian.core.clients import ClientConnections
 from meridian.core.fleet import FleetTopology
 from meridian.core.languages import LanguageSettings, LanguageState
@@ -88,6 +88,9 @@ class ServiceAccessPanel:
 
     def rotate_credentials(self, username: str, request: CredentialRotationRequest) -> UserCredentialRotation:
         return self._client.rotate_credentials(username, request)
+
+    def user_flow_blocks(self, username: str) -> UserFlowBlocks:
+        return self._client.user_flow_blocks(username)
 
     def list_users(self) -> list[User]:
         return [self._user(record) for record in _translated(self._client.list_users)]

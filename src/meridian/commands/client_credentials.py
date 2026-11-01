@@ -15,7 +15,13 @@ from meridian.core.client_sessions import CredentialRotationRequest
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.i18n import isolate, t
-from meridian.node_commands import command_exit_code, command_warnings, cut_off_scope, wait_commands
+from meridian.node_commands import (
+    command_exit_code,
+    command_warnings,
+    cut_off_scope,
+    wait_commands,
+    wait_for_flow_blocks,
+)
 from meridian.renderers import emit_json
 
 
@@ -55,6 +61,7 @@ def run_rotate_credentials(name: str, *, yes: bool = False, cut_off: bool = Fals
                 if not yes and not confirm(text):
                     raise typer.Exit(1)
                 rotated = panel.rotate_credentials(name, request)
+                flow_blocks = wait_for_flow_blocks(lambda: panel.user_flow_blocks(name), rotated.flow_blocks)
         except ControlServiceCredentialsChanged as exc:
             if is_json_mode():
                 fail(exc)
@@ -70,7 +77,7 @@ def run_rotate_credentials(name: str, *, yes: bool = False, cut_off: bool = Fals
                 status=rotated.user.status,
                 credential_generation=rotated.user.credential_generation,
             ),
-            flow_blocks=rotated.flow_blocks,
+            flow_blocks=flow_blocks,
             cut_off=outcomes,
         )
         if is_json_mode():
@@ -95,7 +102,7 @@ def run_rotate_credentials(name: str, *, yes: bool = False, cut_off: bool = Fals
                 "pending_node": "node_commands.flow_pending",
                 "agent_too_old": "node_commands.flow_old_agent",
             }
-            for node in rotated.flow_blocks.nodes:
+            for node in flow_blocks.nodes:
                 message = isolate(node.node_id) + ": " + t(labels[node.status])
                 (ok if node.status == "blocked" else warn)(message)
         if code:

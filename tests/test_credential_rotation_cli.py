@@ -97,3 +97,28 @@ def test_human_rotation_escapes_a_display_name_once(scene, tmp_home):
     text = unstyle(result.output)
     assert "Group [work]" in text
     assert "\\[" not in text
+
+
+def test_cli_rotation_reports_the_node_confirmation_not_the_commit_time_answer(scene, tmp_home):
+    cluster, panel, changed = scene
+    receipt = {
+        "node_id": "main",
+        "credential_generation": 1,
+        "reason": "credentials",
+        "required": {"fleet_epoch": 1, "revision": 4, "sha256": "a" * 64},
+    }
+    pending = UserFlowBlocks.model_validate(
+        {"username": "alice", "credential_generation": 2, "nodes": [{**receipt, "status": "pending_node"}]}
+    )
+    panel.rotate_credentials.return_value = UserCredentialRotation(user=changed.user, flow_blocks=pending)
+    panel.user_flow_blocks.return_value = UserFlowBlocks.model_validate(
+        {"username": "alice", "credential_generation": 2, "nodes": [{**receipt, "status": "blocked"}]}
+    )
+    with (
+        patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
+        patch("meridian.control_access.ServiceAccessPanel", return_value=panel),
+    ):
+        result = CliRunner().invoke(app, ["client", "rotate-credentials", "alice", "--yes", "--json"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["data"]["flow_blocks"]["nodes"][0]["status"] == "blocked"
+    panel.user_flow_blocks.assert_called_with("alice")
