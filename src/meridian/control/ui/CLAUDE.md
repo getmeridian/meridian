@@ -25,6 +25,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Empty WebAuthn owner handles are null** — zero-length ArrayBuffers are truthy; never encode them as empty strings.
 - **Recoverable refusals precede challenge consumption** — check recent identity and key capacity in the write transaction before taking a registration proof; confirmation checks session liveness first.
 - **Challenge capacity belongs to its caller** — anonymous login evicts only its oldest bounded requests; registration and confirmation keep one challenge per kind and live session, so anonymous traffic never blocks an owner.
 - **Bulk expiry validates before reading** — a deferred submit listener cannot guard direct values; clearing expiry requires the explicit No end date choice.

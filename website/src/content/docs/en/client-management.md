@@ -278,6 +278,8 @@ During many simultaneous sign-in attempts, the oldest anonymous passkey prompts 
 
 If identity confirmation expires during the device prompt, confirm again; the panel retries the completed request while its five-minute challenge remains valid. A request refused because another key filled the list can also be retried after freeing a slot, within the same deadline.
 
+Passkeys also work for sign-in and identity confirmation when the authenticator returns no account identifier.
+
 Removing a passkey prevents new sign-ins and signs out every other browser session. Your password and sign-in code remain available. If all methods are lost, run `meridian panel --setup-link` on the managing machine: the single-use root-issued recovery link replaces the password, disables TOTP, removes every passkey, and ends every session. Owner credentials, including passkeys, are excluded from snapshots; a restored service needs a fresh setup link.
 
 | Change in the web panel | Shown read-only (change with `meridian`) |

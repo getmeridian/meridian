@@ -45,6 +45,14 @@ def test_passkeys_confirm_identity_without_a_password() -> None:
     ]
 
 
+@pytest.mark.parametrize("mode", ["passkey-login", "passkey-confirm"])
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_empty_browser_owner_handles_are_sent_as_null(mode: str, locale: str) -> None:
+    result = run_console(mode, locale, data={"emptyHandle": True})
+    assert result.get("signedIn") or result.get("confirmed")
+    assert result["requests"][-1]["body"]["credential"]["response"]["userHandle"] is None
+
+
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 def test_settings_adds_a_named_passkey_with_user_verification_and_no_attestation(locale: str) -> None:
     result = run_console("passkey-settings", locale, data={"name": "Travel key"})

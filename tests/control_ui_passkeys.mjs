@@ -22,7 +22,7 @@ const credential = {
     attestationObject: new w.Uint8Array([4, 5, 6]).buffer,
     authenticatorData: new w.Uint8Array([7, 8, 9]).buffer,
     signature: new w.Uint8Array([10, 11, 12]).buffer,
-    userHandle: new w.Uint8Array(Buffer.alloc(32, 3)).buffer },
+    userHandle: data.emptyHandle ? new w.ArrayBuffer(0) : new w.Uint8Array(Buffer.alloc(32, 3)).buffer },
 };
 Object.defineProperty(w, 'isSecureContext', { value: true });
 w.PublicKeyCredential = data.unsupported ? undefined : function () {};

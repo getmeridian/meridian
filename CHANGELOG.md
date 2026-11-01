@@ -44,6 +44,7 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Accept authenticator responses with an empty owner handle in the console.
 - Preserve passkey registration proofs through a renewed identity check or a
   full-key-list refusal, and check session liveness before consuming confirmation proofs.
 - Anonymous passkey requests cannot exhaust owner registration or confirmation;

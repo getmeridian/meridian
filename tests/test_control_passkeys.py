@@ -436,11 +436,12 @@ def test_friendly_names_are_bounded_plain_text(name: str) -> None:
         PasskeyName(name=name)
 
 
-def test_wrong_owner_handle_is_refused(service: ControlService, session: OwnerSession) -> None:
+@pytest.mark.parametrize("handle", [b64(b"x" * 32), b64(b"x")], ids=["wrong-owner", "malformed-length"])
+def test_wrong_owner_handle_is_refused(service: ControlService, session: OwnerSession, handle: str) -> None:
     authenticator = Authenticator()
     register(service, session, authenticator)
     begin = service.passkeys.begin_authentication()
-    authenticator.user_handle = b64(b"x" * 32)
+    authenticator.user_handle = handle
     with pytest.raises(ServiceError) as refused:
         service.passkeys.finish_authentication(begin.challenge_id, authenticator.assertion(begin.public_key.to_data()))
     assert refused.value.code == "passkey_invalid"

@@ -37,7 +37,8 @@
     else {
       response.authenticatorData = encoded(credential.response.authenticatorData);
       response.signature = encoded(credential.response.signature);
-      response.userHandle = credential.response.userHandle ? encoded(credential.response.userHandle) : null;
+      var userHandle = credential.response.userHandle;
+      response.userHandle = userHandle && userHandle.byteLength > 0 ? encoded(userHandle) : null;
     }
     return { type: "public-key", id: encoded(credential.rawId), rawId: encoded(credential.rawId), response: response };
   }
