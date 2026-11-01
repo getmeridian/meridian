@@ -29,6 +29,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - **People triage facts are derived reads** — records expose never-used, exact quota percentage, and default attention reasons from shared predicates; no filter flags or request data are stored.
 
 ## What's done well
+- **Flow events record real transitions** — repeated hellos, reports, and unrelated revisions leave a confirmed receipt and its event history unchanged.
 - A revision is signed only when the resources' hash or the signing certificate changes, so repeated applies never wake agents.
 - A token's public ID finds its row, so its hash is compared once in constant time (against a dummy when none matches); a refused CSR rolls back and never burns the enrollment token.
 - A proposal whose intent contains a secret-shaped key or value, or a malformed `access` block, is refused and never stored.
@@ -44,7 +45,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - **Renewal anchors survive short months** — expiry or interval edits start a new series, cap edits keep progress, and missed renewals consume the cap with one period reset.
 - **Every write checks the whole schedule** — the renewal start, expiry, and count must agree, a cap needs an interval, and durations or renewals that would cross 2099 are refused at write time; an imported mismatched start once moved expiry backwards on renewal.
 - **Delivery reads the calculated expiry** (`effective_expiry()`) — the stored one lags a due renewal until enforcement runs, which once sent an old `expire=` beside the new refill date.
-- **A blocked receipt needs fresh evidence from this epoch and document** — restore, re-enable, or an unavailable report must never imply that old flows stopped; the core cannot close an individual TCP or UDP association without address tracking.
+- **A blocked receipt needs fresh received evidence** — compare applied revisions with the revocation in the same epoch; hellos never renew report age, and the core cannot close an individual TCP/UDP association without address tracking.
 - **Classify every route in the catalog** — internal routes need a reason, and credential markers must cover conditionally visible people records, endpoint passwords, and snapshots.
 - **Decode the path before routing** — `ControlClient` percent-encodes IDs, so an undecoded `%3A` made every endpoint PUT 404.
 - **Answer like nginx everywhere** — `HEAD` as `GET`, nginx's error pages, the unknown-subscription answer for any miss under `/sub/`, and small bodies before authentication; anything else names the backend to a scanner.

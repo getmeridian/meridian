@@ -29,7 +29,9 @@ class UserFlowBlockNode(CoreModel):
     credential_generation: CredentialGeneration
     reason: FlowBlockReason
     status: FlowBlockStatus
-    required: NodeStateRef
+    required: NodeStateRef = Field(
+        description="The revocation revision; fresh applied revisions at or after it in the same epoch also cover it."
+    )
     inbound_tags: list[InboundTag] = Field(default_factory=list, max_length=64)
 
 

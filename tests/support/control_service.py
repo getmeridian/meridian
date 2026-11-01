@@ -82,8 +82,10 @@ def drop_flow_blocks_schema(db: sqlite3.Connection) -> None:
     if "credential_generation" in columns:
         db.execute("ALTER TABLE users DROP COLUMN credential_generation")
     db.execute("DROP TABLE IF EXISTS user_flow_blocks")
-    if "agent_capabilities" in {column[1] for column in db.execute("PRAGMA table_info(nodes)")}:
-        db.execute("ALTER TABLE nodes DROP COLUMN agent_capabilities")
+    columns = {column[1] for column in db.execute("PRAGMA table_info(nodes)")}
+    for column in ("agent_capabilities", "report_seen_at"):
+        if column in columns:
+            db.execute(f"ALTER TABLE nodes DROP COLUMN {column}")
 
 
 def drop_operations_schema(db: sqlite3.Connection) -> None:

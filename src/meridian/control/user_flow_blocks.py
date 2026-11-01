@@ -10,7 +10,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from meridian.control.events import EventLedger
-from meridian.control.models import AGENT_SEEN_SECONDS, UserRecord
+from meridian.control.flow_block_evidence import FlowBlockEvidence
+from meridian.control.models import UserRecord
 from meridian.control.store import Store
 from meridian.control.times import format_timestamp
 from meridian.core.agent_protocol import Capability, ObservedStateReport
@@ -140,8 +141,8 @@ class FlowBlockLedger:
             remaining = {
                 tag: fingerprint
                 for tag, fingerprint in identities.items()
-                if (credential := new.get(tag, {}).get(receipt["user_id"])) is None
-                or credential_identity(credential) != fingerprint
+                if (active_credential := new.get(tag, {}).get(receipt["user_id"])) is None
+                or credential_identity(active_credential) != fingerprint
             }
             key = (receipt["user_id"], node_id, receipt["credential_generation"])
             if not remaining:
@@ -154,98 +155,87 @@ class FlowBlockLedger:
                     " WHERE user_id = ? AND node_id = ? AND credential_generation = ?",
                     (json.dumps(sorted(remaining)), json.dumps(remaining, sort_keys=True), *key),
                 )
+        node = self._store.row("SELECT * FROM nodes WHERE node_id = ?", (node_id,))
+        assert node is not None
+        evidence = FlowBlockEvidence.from_node(node, fleet_epoch=self._store.fleet_epoch, now=self._clock())
+        for receipt in self._rows(node_id):
+            if receipt["fleet_epoch"] != required.fleet_epoch:
+                self._store.db.execute(
+                    "UPDATE user_flow_blocks SET fleet_epoch = ?, revision = ?, sha256 = ?, changed_at = ?"
+                    " WHERE user_id = ? AND node_id = ? AND credential_generation = ?",
+                    (
+                        required.fleet_epoch,
+                        required.revision,
+                        required.sha256,
+                        format_timestamp(self._clock()),
+                        receipt["user_id"],
+                        node_id,
+                        receipt["credential_generation"],
+                    ),
+                )
+                self._set_status(receipt, evidence.status(required))
         self._prune()
 
     def hello(self, node_id: str, capabilities: list[Capability]) -> None:
+        before = self._store.row("SELECT * FROM nodes WHERE node_id = ?", (node_id,))
+        if before is None:
+            return
+        old = json.loads(before["agent_capabilities"]) if before["agent_capabilities"] is not None else []
         self._store.db.execute(
             "UPDATE nodes SET agent_capabilities = ? WHERE node_id = ?", (json.dumps(capabilities), node_id)
         )
-        status: FlowBlockStatus = "pending_node" if "user_flow_blocking" in capabilities else "agent_too_old"
+        node = self._store.row("SELECT * FROM nodes WHERE node_id = ?", (node_id,))
+        assert node is not None
+        evidence = FlowBlockEvidence.from_node(node, fleet_epoch=self._store.fleet_epoch, now=self._clock())
         for row in self._rows(node_id):
+            status = evidence.status(self._required(row))
+            if "user_flow_blocking" in capabilities and "user_flow_blocking" not in old:
+                status = "pending_node"
             self._set_status(row, status)
 
     def report(self, node_id: str, report: ObservedStateReport) -> None:
         node = self._store.row("SELECT * FROM nodes WHERE node_id = ?", (node_id,))
         if node is None:
             return
-        capabilities = json.loads(node["agent_capabilities"]) if node["agent_capabilities"] is not None else None
-        guard = report.user_flow_blocking
-        current = (
-            NodeStateRef(fleet_epoch=self._store.fleet_epoch, revision=node["revision"], sha256=node["doc_sha256"])
-            if node["revision"]
-            else None
-        )
-        ready = (
-            capabilities is not None
-            and "user_flow_blocking" in capabilities
-            and guard is not None
-            and guard.status == "ready"
-            and guard.document == current
-            and report.applied == current
-            and all(resource.status == "applied" for resource in report.resources)
+        evidence = FlowBlockEvidence.from_node(
+            node, fleet_epoch=self._store.fleet_epoch, now=self._clock(), report=report
         )
         for row in self._rows(node_id):
-            required = NodeStateRef(fleet_epoch=row["fleet_epoch"], revision=row["revision"], sha256=row["sha256"])
-            status: FlowBlockStatus = "pending_node"
-            if capabilities is not None and "user_flow_blocking" not in capabilities:
-                status = "agent_too_old"
-            elif (
-                ready
-                and current is not None
-                and (
-                    current.fleet_epoch > required.fleet_epoch
-                    or current.fleet_epoch == required.fleet_epoch
-                    and current.revision >= required.revision
-                )
-            ):
-                status = "blocked"
-            self._set_status(row, status)
+            self._set_status(row, evidence.status(self._required(row)))
         self._prune()
 
     def read(self, user: UserRecord) -> UserFlowBlocks:
         with self._store.lock:
             nodes: list[UserFlowBlockNode] = []
+            evidence_by_node: dict[str, FlowBlockEvidence] = {}
             for row in self._store.rows(
-                "SELECT b.*, n.last_seen_at, n.agent_capabilities, n.report,"
-                " n.revision AS node_revision, n.doc_sha256 AS node_sha256 FROM user_flow_blocks b"
-                " JOIN nodes n ON n.node_id = b.node_id WHERE b.user_id = ?"
-                " ORDER BY b.node_id, b.credential_generation",
+                "SELECT * FROM user_flow_blocks WHERE user_id = ? ORDER BY node_id, credential_generation",
                 (user.user_id,),
             ):
-                status: FlowBlockStatus = row["status"]
-                if row["agent_capabilities"] is not None and "user_flow_blocking" not in json.loads(
-                    row["agent_capabilities"]
-                ):
-                    status = "agent_too_old"
-                elif status == "blocked":
-                    seen = datetime.fromisoformat(row["last_seen_at"]).timestamp() if row["last_seen_at"] else 0
-                    report = json.loads(row["report"]) if row["report"] else {}
-                    guard = report.get("user_flow_blocking") or {}
-                    current = {
-                        "fleet_epoch": self._store.fleet_epoch,
-                        "revision": row["node_revision"],
-                        "sha256": row["node_sha256"],
-                    }
-                    if (
-                        not 0 <= self._clock() - seen < AGENT_SEEN_SECONDS
-                        or report.get("applied") != current
-                        or guard.get("document") != current
-                        or guard.get("status") != "ready"
-                    ):
-                        status = "pending_node"
+                node_id = row["node_id"]
+                if node_id not in evidence_by_node:
+                    node = self._store.row("SELECT * FROM nodes WHERE node_id = ?", (node_id,))
+                    if node is None:
+                        continue
+                    evidence_by_node[node_id] = FlowBlockEvidence.from_node(
+                        node, fleet_epoch=self._store.fleet_epoch, now=self._clock()
+                    )
+                required = self._required(row)
                 nodes.append(
                     UserFlowBlockNode(
-                        node_id=row["node_id"],
+                        node_id=node_id,
                         credential_generation=row["credential_generation"],
                         reason=row["reason"],
-                        status=status,
-                        required=NodeStateRef(
-                            fleet_epoch=row["fleet_epoch"], revision=row["revision"], sha256=row["sha256"]
-                        ),
+                        status=evidence_by_node[node_id].status(required),
+                        required=required,
                         inbound_tags=json.loads(row["inbound_tags"]),
                     )
                 )
             return UserFlowBlocks(username=user.username, credential_generation=user.credential_generation, nodes=nodes)
+
+    @staticmethod
+    def _required(row: sqlite3.Row) -> NodeStateRef:
+        return NodeStateRef(fleet_epoch=row["fleet_epoch"], revision=row["revision"], sha256=row["sha256"])
 
     def _rows(self, node_id: str) -> list[sqlite3.Row]:
         return self._store.rows(

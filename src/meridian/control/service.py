@@ -344,13 +344,14 @@ class ControlService:
         with self._transaction():
             self._db.execute(
                 "UPDATE nodes SET applied_revision = ?, applied_sha256 = ?, last_seen_at = ?, agent_version = ?,"
-                " report = ? WHERE node_id = ?",
+                " report = ?, report_seen_at = ? WHERE node_id = ?",
                 (
                     applied.revision if applied else None,
                     applied.sha256 if applied else None,
                     utc_now(),
                     report.versions.agent,
                     json.dumps(raw),
+                    format_timestamp(self._clock()),
                     node_id,
                 ),
             )

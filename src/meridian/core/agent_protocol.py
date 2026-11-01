@@ -356,7 +356,8 @@ class UserFlowBlocking(AgentModel):
     """
 
     document: NodeStateRef = Field(
-        description="The applied document covered by fresh runtime evidence, which may precede unrelated service revisions."
+        description="The applied document covered by fresh runtime evidence, "
+        "which may precede unrelated service revisions."
     )
     status: Literal["ready", "pending"]
     error: ResourceError | None

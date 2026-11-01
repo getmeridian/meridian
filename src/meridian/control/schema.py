@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS nodes (
     last_seen_at TEXT,
     agent_version TEXT,
     agent_capabilities TEXT,
-    report TEXT
+    report TEXT,
+    report_seen_at TEXT
 );
 CREATE TABLE IF NOT EXISTS users (
     username TEXT PRIMARY KEY,
@@ -129,6 +130,7 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (
         "ALTER TABLE users ADD COLUMN credential_generation INTEGER NOT NULL DEFAULT 1",
         "ALTER TABLE nodes ADD COLUMN agent_capabilities TEXT",
+        "ALTER TABLE nodes ADD COLUMN report_seen_at TEXT",
         FLOW_BLOCKS_TABLE,
     ),
 )

@@ -199,6 +199,9 @@ Revocation receipts show the old key generation and the reason on each node. Sep
 
 A node confirms revocation from fresh checks of its running core, bound to its applied document. A core restart closes the old sessions, so a fresh core needs no temporary revocation rules and clears an earlier pending guard status.
 
+
+A fresh report confirms a receipt when its applied revision is at or after the revocation revision in the same fleet epoch. Unrelated revisions and agent hellos preserve that evidence. Hellos do not refresh the age of the last runtime report; stale reports stay pending, and flow events are emitted only when a receipt changes status.
+
 ## Rotate connection keys keeping the link
 
 Use `meridian client rotate-credentials NAME --yes` when connection credentials need replacing. It generates a new VLESS UUID and Hysteria2 auth while keeping the subscription token, page URL, device registrations, status, limits, expiry, traffic, notes, tags, and language. Apps receive the keys on their next subscription refresh; ask the person to refresh now. Old identities lose new streams as each node applies the change. A leaked subscription URL requires `client reissue`, which issues a new URL and clears device registrations.

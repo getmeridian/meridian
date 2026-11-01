@@ -7591,7 +7591,8 @@
             "type": "string"
           },
           "required": {
-            "$ref": "#/components/schemas/NodeStateRef"
+            "$ref": "#/components/schemas/NodeStateRef",
+            "description": "The revocation revision; fresh applied revisions at or after it in the same epoch also cover it."
           },
           "status": {
             "enum": [
