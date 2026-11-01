@@ -113,6 +113,7 @@ def share_view(service: ControlService, username: str) -> ShareView:
             for connection in connection_view.connections
         ],
         formats=connection_view.formats,
+        flow_blocks=service.user_flow_blocks(username),
     )
 
 

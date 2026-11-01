@@ -181,7 +181,7 @@ meridian client disable alice
 meridian client enable alice
 ```
 
-`disable` cuts the client off immediately; `enable` lets them back in with the same links.
+A disable blocks new connections after each node applies the change; `enable` restores the same links. The person view shows which nodes have confirmed blocking.
 
 A disable lasts until `client enable`: apply, redeploys, and fleet changes leave it alone.
 
@@ -203,7 +203,9 @@ With `--json`, pass `--yes`. The new links appear only in that command's output.
 
 `meridian client remove NAME` removes the client permanently: their links stop working and their connection page stops responding. A fleet keeps at least one client.
 
-Existing VLESS sessions can outlive credential revocation. **`--cut-off`**, with `client remove` or `client reissue`, waits for each affected node to apply the revision without the old credentials, then resets its affected inbounds. Every open session on those inbounds ends, including other people's; they reconnect for a moment. If the inbound API fails, Xray restarts and all its sessions on that node end. The flag is opt-in and recommended after a leak. JSON reports each node under `data.cut_off`: `done`, `core_restart`, `failed`, or `timed_out`. Meridian waits up to five minutes; failed cut-offs exit `4`, timeouts `3`. The web panel offers the same choice when reissuing or removing a person.
+Disable, expiry, quota suspension, removal, and credential replacement block new TCP streams and UDP associations for the affected identity, including new streams on an already authenticated Hysteria2 QUIC or VLESS mux connection. Other people keep their sessions. The person view and `GET /api/users/{username}/flow-blocks` report each node: `blocked`, `pending_node`, or `agent_too_old`. Pending nodes can keep serving their previous configuration until they receive and apply the change; this includes control-service outages. Update an old agent with `meridian apply`. Events record the node and outcome without addresses or device data.
+
+A TCP flow dispatched before revocation, an existing Hysteria2 UDP association, or a reusable VLESS XUDP association may keep carrying traffic until it ends. The pinned core has no per-user close operation. **`--cut-off`**, with `client remove` or `client reissue`, waits for the credential change to apply. An affected VLESS inbound requires an Xray restart, ending every Xray session on that node; Hysteria2-only cut-offs reset the affected inbounds, with a core restart if the API fails. Other people reconnect too. The preview identifies nodes requiring a core restart. JSON reports `done`, `core_restart`, `failed`, or `timed_out` under `data.cut_off`. The wait is up to five minutes; failures exit `4`, timeouts `3`. The web panel offers the cut-off choice when removing a person added there.
 
 ## Subscription links
 
@@ -279,6 +281,7 @@ The operation tables below are checked against the contract. A read token sees:
 | Endpoint | Returns |
 |---|---|
 | `GET /api/users/{username}` | One person's status, traffic used and limit, reset period, and expiry |
+| `GET /api/users/{username}/flow-blocks` | Per-node evidence for blocking new flows; no connection addresses or device data |
 | `GET /api/users` | Every person |
 | `GET /api/traffic` | Traffic totals per person |
 | `GET /api/health` | The service's version |

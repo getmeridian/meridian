@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 from pydantic import Field, RootModel
 
 from meridian.control.models import UserRecord
-from meridian.core.agent_protocol import AgentCommand, Capability, CommandResult, CommandResultStatus
+from meridian.core.agent_protocol import AgentCommand, Capability, CommandEffect, CommandResult, CommandResultStatus
 from meridian.core.agent_types import InboundTag, NodeId, NodeStateRef, ResourceId
 from meridian.core.models import CoreModel
 
@@ -77,6 +77,9 @@ class NodeCommandTargets(CoreModel):
 class CutOffNode(CoreModel):
     node_id: NodeId
     inbound_tags: list[InboundTag]
+    effect: CommandEffect = Field(
+        default="inbound_reset", description="VLESS needs a core restart to close accepted flows."
+    )
 
 
 class CutOffPlan(CoreModel):

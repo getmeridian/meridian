@@ -14,8 +14,8 @@ use crate::commands::CommandState;
 use crate::fetch::{Client, HttpError, load_roots};
 use crate::identity::Identity;
 use crate::model::{
-    NodeStateRef, PROTOCOL, PollRequest, PollResponse, Resource, ResourceObservation, Spec,
-    StatsAck,
+    NodeStateRef, PROTOCOL, PollRequest, PollResponse, Resource, ResourceError,
+    ResourceObservation, Spec, StatsAck,
 };
 use crate::session::{self, Session};
 use crate::state::State;
@@ -103,6 +103,7 @@ pub struct Agent<'a> {
     opts: Options,
     resources: Vec<Resource>,
     observations: Vec<ResourceObservation>,
+    flow_error: Option<ResourceError>,
     command_state: CommandState,
 }
 
@@ -174,6 +175,7 @@ impl<'a> Agent<'a> {
             opts,
             resources: Vec::new(),
             observations: Vec::new(),
+            flow_error: None,
             command_state,
         };
         if let Some(identity) = identity {
@@ -453,6 +455,7 @@ impl<'a> Agent<'a> {
             &now_rfc3339(),
         );
         self.observations = pass.observations;
+        self.flow_error = pass.flow_error;
         if pass.converged {
             if self.state.applied.as_ref() != Some(&target) {
                 info!(
@@ -572,6 +575,15 @@ impl<'a> Agent<'a> {
             })
         })?;
         let response: PollResponse = typed(body, "poll_result")?;
+        if response.desired.is_none()
+            && self
+                .flow_error
+                .as_ref()
+                .is_some_and(|error| error.retryable)
+        {
+            self.apply_held().map_err(HttpError::Protocol)?;
+            self.report_logged();
+        }
         let after = Duration::from_secs(response.poll_after_seconds.min(3600));
         let outcome = match response
             .desired

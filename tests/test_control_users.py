@@ -222,6 +222,9 @@ def test_a_version_one_database_gains_user_limits(tmp_path: Path) -> None:
     db.executescript(
         """
         CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        CREATE TABLE nodes (node_id TEXT PRIMARY KEY, spec TEXT, spec_sha256 TEXT, revision INTEGER,
+            document TEXT, doc_sha256 TEXT, applied_revision INTEGER, applied_sha256 TEXT,
+            last_seen_at TEXT, agent_version TEXT, report TEXT);
         CREATE TABLE users (username TEXT PRIMARY KEY, user_id TEXT NOT NULL UNIQUE, uuid TEXT NOT NULL UNIQUE,
             sub_token TEXT NOT NULL UNIQUE, status TEXT NOT NULL, created_at TEXT NOT NULL);
         """

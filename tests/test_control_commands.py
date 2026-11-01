@@ -384,10 +384,10 @@ def test_review_3_1_cli_removal_does_not_drop_resets_when_the_node_revision_chan
                 exit_code = exc.exit_code
         result = json.loads(capsys.readouterr().out)
         assert exit_code == 0, json.dumps(result)
-        assert queued_during_retirement == [2], "both resets must already be committed when retirement returns"
+        assert queued_during_retirement == [1], "the core restart must be committed when retirement returns"
         assert reads == [], "atomic deletion must not read a revision then issue a separate reset"
         commands = result["data"]["cut_off"][0]["commands"]
-        assert {record["command"]["inbound_tag"] for record in commands} == {TAG, "vless-xhttp"}
+        assert [record["command"]["kind"] for record in commands] == ["restart_unit"]
         assert all(record["wait_for"] is not None for record in commands)
     finally:
         set_json_mode(False)
@@ -583,6 +583,9 @@ def test_schema_fourteen_keeps_token_expiry_accounting_and_events_from_schema_th
     with sqlite3.connect(path) as db:
         db.execute("DROP TABLE commands")
         db.execute("DROP TABLE agent_command_capabilities")
+        db.execute("DROP TABLE user_flow_blocks")
+        db.execute("ALTER TABLE users DROP COLUMN credential_generation")
+        db.execute("ALTER TABLE nodes DROP COLUMN agent_capabilities")
         drop_person_metadata_schema(db)
         db.execute("UPDATE meta SET value = '13' WHERE key = 'schema_version'")
     migrated = ControlService(path, fleet_id=FLEET_ID, version="4.0.0", clock=clock)
@@ -614,7 +617,7 @@ def test_cut_off_is_atomic_and_waits_for_the_revision_without_the_old_credential
     assert status == 200, changed
     commands = changed["commands"]
     assert len(commands) == 1 and commands[0]["status"] == "waiting"
-    assert commands[0]["node_id"] == "main" and commands[0]["command"]["inbound_tag"] == TAG
+    assert commands[0]["node_id"] == "main" and commands[0]["command"]["kind"] == "restart_unit"
     assert all(value not in json.dumps(commands) for value in (user.username, user.user_id, user.uuid, user.sub_token))
     after = poll(http, token, have={key: before[key] for key in ("fleet_epoch", "revision", "sha256")})
     assert after["commands"] == [] and after["desired"]["revision"] > before["revision"]
@@ -651,7 +654,10 @@ def test_cut_off_scope_lists_managed_inbounds_and_excludes_nodes_without_them(
     status, plan = ask(f"{http}/api/users/person-a/cut-off")
     assert status == 200
     assert plan == {
-        "nodes": [{"node_id": "another", "inbound_tags": [TAG]}, {"node_id": "main", "inbound_tags": [TAG]}]
+        "nodes": [
+            {"node_id": "another", "inbound_tags": [TAG], "effect": "core_restart"},
+            {"node_id": "main", "inbound_tags": [TAG], "effect": "core_restart"},
+        ]
     }
 
 

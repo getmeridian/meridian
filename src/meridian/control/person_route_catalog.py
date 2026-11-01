@@ -36,6 +36,7 @@ from meridian.control.route_types import ApiRoute, ErrorResponse, route
 from meridian.core.account_schedule import AccountSchedulePreview
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientExtendRequest
+from meridian.core.client_sessions import UserFlowBlocks
 from meridian.core.clients import ClientConnections
 
 PERSON_ROUTES: tuple[ApiRoute, ...] = (
@@ -121,6 +122,18 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         query_model=HistoryQuery,
         refusals=(NOT_FOUND, HISTORY_OFF),
         description="Other query options are ignored. Daily history must be enabled by the operator.",
+    ),
+    route(
+        "GET",
+        "/api/users/{username}/flow-blocks",
+        ("read", "people"),
+        "user_flow_blocks",
+        None,
+        UserFlowBlocks,
+        "Read per-node evidence that a person's new flows are blocked.",
+        credentials=False,
+        refusals=(NOT_FOUND,),
+        description="Blocked covers new TCP streams and UDP associations. Already dispatched flows may continue.",
     ),
     route(
         "PUT",

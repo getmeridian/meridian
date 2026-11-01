@@ -740,5 +740,6 @@
   "bulk.status.expired": "Срок истёк",
   "events.kind.people.bulk": "Групповое изменение людей",
   "events.bulk": "{action}: изменено {changed} из {targeted}; нужна команда CLI: {cli_required}.",
-  "bulk.action.undo": "Отменить изменения полей"
+  "bulk.action.undo": "Отменить изменения полей",
+  "node_commands.cut_off_core_scope": "Чтобы закрыть сессии VLESS, на этих серверах нужно перезапустить Xray: {nodes}. Все сессии Xray на них завершатся."
 }

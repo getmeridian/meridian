@@ -83,10 +83,12 @@
       return M.dialog(M.t(reissue ? "person.reissue_title" : "person.remove_title", { name: M.displayName(name) }), function (close) {
         var opt = h("input", { type: "checkbox", name: "cut-off", disabled: !plan.nodes.length });
         var scope = plan.nodes.map(function (node) { return node.node_id; }).join(", ");
+        var cores = plan.nodes.filter(function (node) { return node.effect === "core_restart"; }).map(function (node) { return node.node_id; }).join(", ");
         return [h("p", { class: "muted", text: M.t(reissue ? "person.reissue_confirm" : "person.remove_confirm") }),
           h("label", { class: "check-row" }, opt, " ", M.t("commands.cut_off_label")),
           h("p", { class: "hint", text: M.t("commands.cut_off_help") }),
           h("p", { class: "muted small", text: scope ? M.t("commands.scope", { nodes: "\u2068" + scope + "\u2069" }) : M.t("commands.no_inbounds") }),
+          cores ? h("p", { class: "hint", text: M.t("commands.core_scope", { nodes: "\u2068" + cores + "\u2069" }) }) : null,
           h("div", { class: "actions" },
             h("button", { class: "btn btn-ghost", type: "button", onclick: function () { close(); } }, M.t("action.cancel")),
             h("button", { class: "btn btn-danger", type: "button", onclick: function () { close({ cut_off: opt.checked }); } }, M.t(reissue ? "person.reissue" : "person.remove")))];

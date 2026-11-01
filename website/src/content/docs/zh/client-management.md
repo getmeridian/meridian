@@ -183,7 +183,7 @@ meridian client disable alice
 meridian client enable alice
 ```
 
-`disable` 会立即暂停该客户端的访问；`enable` 则允许他们继续使用原有链接连接。
+`disable` 在每个节点应用变更后阻止新连接；`enable` 用原有链接恢复访问。用户详情页显示哪些节点已确认阻止新连接。
 
 禁用会持续到执行 `client enable`：应用、重新部署和集群变更都不会改动它。
 
@@ -205,7 +205,9 @@ meridian client reissue alice
 
 `meridian client remove NAME` 永久删除客户端：他们的链接停止工作，他们的连接页面不再可用。集群至少保持一个客户端。
 
-已建立的 VLESS 会话可能在凭证撤销后继续存在。`client remove` 或 `client reissue` 的 **`--cut-off`** 会等待每个受影响节点应用不含旧凭证的版本，再重置相关入站。这些入站上的所有会话都会终止，包括其他用户的会话；他们会短暂重连。若入站 API 失败，会重启 Xray 并终止该节点上的所有 Xray 会话。此选项需主动启用，建议在链接泄露时使用。JSON 在 `data.cut_off` 中报告各节点的 `done`、`core_restart`、`failed` 或 `timed_out` 状态。最多等待五分钟；失败退出码为 `4`，超时为 `3`。重新签发或删除用户时，网页面板也提供此选项。
+禁用、到期、达到流量上限、删除用户及更换连接凭据，会阻止已撤销身份的新 TCP 数据流和 UDP 会话，包括已认证的 Hysteria2 QUIC 连接或 VLESS mux 连接上的新数据流。其他用户的会话保持连接。用户详情页和 `GET /api/users/{username}/flow-blocks` 按节点返回 `blocked`、`pending_node` 或 `agent_too_old`。尚未确认的节点在收到并应用变更前可能继续使用旧配置；控制服务不可用时也如此。使用 `meridian apply` 更新旧节点 agent。事件只记录节点和结果，不记录连接地址或设备数据。
+
+撤销前已建立的 TCP 数据流、现有 Hysteria2 UDP 会话，以及可复用的 VLESS XUDP 会话，可能继续传输直到结束。固定版本的核心没有关闭单个用户会话的接口。`client remove` 或 `client reissue` 的 **`--cut-off`** 等待凭据变更应用后执行终止操作。涉及 VLESS 入站时会重启 Xray，结束该节点上的全部 Xray 会话；仅涉及 Hysteria2 时重置相关入站，API 失败则重启核心。其他用户也会重连。确认前会显示哪些节点需要重启核心。JSON 在 `data.cut_off` 下返回 `done`、`core_restart`、`failed` 或 `timed_out`。最多等待五分钟；失败退出码为 `4`，超时为 `3`。删除在网页面板中添加的用户时，面板提供相同选项。
 
 ## 订阅链接
 
@@ -281,6 +283,7 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 | 端点 | 返回 |
 |---|---|
 | `GET /api/users/{username}` | 某个用户的状态、已用流量和限额、重置周期以及到期时间 |
+| `GET /api/users/{username}/flow-blocks` | 按节点返回阻止新数据流的结果；不含连接地址或设备数据 |
 | `GET /api/users` | 所有用户 |
 | `GET /api/traffic` | 每个用户的流量总计 |
 | `GET /api/health` | 服务的版本 |

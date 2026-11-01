@@ -3,6 +3,16 @@
     "CutOffNode": {
       "additionalProperties": false,
       "properties": {
+        "effect": {
+          "default": "inbound_reset",
+          "description": "VLESS needs a core restart to close accepted flows.",
+          "enum": [
+            "inbound_reset",
+            "core_restart"
+          ],
+          "title": "Effect",
+          "type": "string"
+        },
         "inbound_tags": {
           "items": {
             "description": "Xray inbound tag.",

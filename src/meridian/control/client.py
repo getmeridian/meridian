@@ -65,6 +65,7 @@ from meridian.core.account_schedule import AccountSchedulePreview
 from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientExtendRequest
+from meridian.core.client_sessions import UserFlowBlocks
 from meridian.core.clients import ClientConnections
 from meridian.core.errors import MeridianError
 from meridian.core.fleet_events import FleetEventPage, FleetEventQuery
@@ -169,6 +170,9 @@ class ControlClient:
 
     def cut_off_scope(self, username: str) -> CutOffPlan:
         return CutOffPlan.model_validate(self._call("GET", f"api/users/{quote(username, safe='')}/cut-off"))
+
+    def user_flow_blocks(self, username: str) -> UserFlowBlocks:
+        return UserFlowBlocks.model_validate(self._call("GET", f"api/users/{quote(username, safe='')}/flow-blocks"))
 
     def reissue_user_with_cut_off(self, username: str) -> UserCutOffMutation:
         return UserCutOffMutation.model_validate(

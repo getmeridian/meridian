@@ -97,6 +97,11 @@ pub struct FakeExec {
     pub added: Mutex<Vec<Value>>,
     /// What `xray api adi` received: inbounds rebuilt with all their users.
     pub rebuilt: Mutex<Vec<Value>>,
+    pub routing: Mutex<Value>,
+    pub routing_writes: Mutex<Vec<Value>>,
+    pub routing_down: Mutex<bool>,
+    pub hysteria_adds: Mutex<Vec<Vec<u8>>>,
+    pub hysteria_down: Mutex<bool>,
     /// Users the fake running Xray holds, by email, after API calls.
     pub live_users: Mutex<BTreeSet<String>>,
     /// Open VLESS sessions outlive rmu; rmi closes just its inbound, a core restart closes all.
@@ -224,6 +229,24 @@ impl Exec for FakeExec {
                 }
             }
             "journalctl" => ok("starting\nfailed to listen on 0.0.0.0:443: address in use\n"),
+            "curl" => {
+                if *self.hysteria_down.lock().unwrap() {
+                    return fail("", "secret-canary");
+                }
+                let flag = |name: &str| args.windows(2).find(|pair| pair[0] == name).unwrap()[1];
+                let request = flag("--data-binary").strip_prefix('@').unwrap();
+                assert_eq!(std::fs::metadata(request)?.mode() & 0o777, 0o600);
+                self.hysteria_adds
+                    .lock()
+                    .unwrap()
+                    .push(std::fs::read(request)?);
+                std::fs::write(
+                    flag("--dump-header"),
+                    "HTTP/2 200\r\n\r\ngrpc-status: 0\r\n",
+                )?;
+                std::fs::write(flag("--output"), [0, 0, 0, 0, 0])?;
+                ok("")
+            }
             _ if args.first() == Some(&"api") => self.xray_api(args),
             _ if args.first() == Some(&"run") => {
                 if let Some((_, dir)) = env.iter().find(|(k, _)| *k == "XRAY_LOCATION_ASSET") {
@@ -312,6 +335,23 @@ impl FakeExec {
         }
         let mut live = self.live_users.lock().unwrap();
         match args[1] {
+            "lsrules" => {
+                let routing = self.routing.lock().unwrap();
+                let rules: Vec<Value> = routing.get("rules").and_then(Value::as_array).into_iter().flatten()
+                    .map(|rule| json!({"ruleTag": rule.get("ruleTag").and_then(Value::as_str).unwrap_or_default(),
+                        "tag": rule.get("outboundTag").and_then(Value::as_str).unwrap_or_default()})).collect();
+                ok(&json!({"rules": rules}).to_string())
+            }
+            "adrules" => {
+                if *self.routing_down.lock().unwrap() {
+                    return fail("", "secret-canary");
+                }
+                let body: Value = serde_json::from_slice(&std::fs::read(args[3])?).unwrap();
+                assert_eq!(std::fs::metadata(args[3])?.mode() & 0o777, 0o600);
+                *self.routing.lock().unwrap() = body["routing"].clone();
+                self.routing_writes.lock().unwrap().push(body);
+                ok("{}")
+            }
             "rmu" => {
                 assert!(args[3].starts_with("-tag="));
                 let emails = &args[4..];

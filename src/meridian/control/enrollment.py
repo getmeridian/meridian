@@ -73,6 +73,7 @@ SERVICE_CAPABILITIES: tuple[Capability, ...] = (
     "xray_config",
     "xray_users",
     "hysteria2_users",
+    "user_flow_blocking",
     "binary_pins",
     "traffic_stats",
     "blob_fetch",

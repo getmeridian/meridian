@@ -73,6 +73,7 @@ from meridian.control.subscriptions import SubscriptionResponse
 from meridian.control.times import format_timestamp, utc_now
 from meridian.control.tokens import TokenRegistry
 from meridian.control.traffic import TrafficLedger
+from meridian.control.user_flow_blocks import FlowBlockLedger
 from meridian.control.user_import import import_users
 from meridian.control.user_lifecycle import extend_user_expiry, insert_user
 from meridian.control.user_updates import update_user
@@ -84,6 +85,7 @@ from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.client_devices import DevicesRemoved
+from meridian.core.client_sessions import UserFlowBlocks
 from meridian.core.clients import ClientConnections
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
@@ -124,6 +126,7 @@ class ControlService:
         self.authority = NodeAuthority(self._store, fleet_id, clock=clock)
         self.commands = CommandLedger(self._store, self.authority, clock=clock, events=self.events)
         self.cutoffs = CutOffLedger(self._store, self.commands)
+        self.flow_blocks = FlowBlockLedger(self._store, self.events, clock=clock)
         self.tokens = TokenRegistry(self._store, clock=clock, events=self.events)
         self.revisions = RevisionLedger(self._store, self.tokens, fleet_id, clock=clock)
         self.backups = BackupLedger(self._store, clock=clock)
@@ -238,7 +241,7 @@ class ControlService:
             self._ensure_node(node_id)
         return self.authority.grant_enrollment(node_id)
 
-    def node_seen(self, node_id: str, agent_version: str) -> None:
+    def node_seen(self, node_id: str, agent_version: str, *, capabilities: list[Capability] | None = None) -> None:
         """Record a hello: the agent is alive and runs `agent_version`."""
         with self._transaction():
             self._ensure_node(node_id)
@@ -246,6 +249,8 @@ class ControlService:
                 "UPDATE nodes SET last_seen_at = ?, agent_version = ? WHERE node_id = ?",
                 (utc_now(), agent_version, node_id),
             )
+            if capabilities is not None:
+                self.flow_blocks.hello(node_id, capabilities)
 
     def node_status(self, node_id: str) -> NodeStatus:
         row = self._node(node_id)
@@ -350,6 +355,7 @@ class ControlService:
                 ),
             )
             self.commands.release_ready(node_id, applied)
+            self.flow_blocks.report(node_id, report)
         return {"type": "report_ack", "applied_revision": applied.revision if applied else None}
 
     # -- users and endpoints -----------------------------------------------------------
@@ -413,8 +419,8 @@ class ControlService:
             user = self._require_user(username)
             self.devices.remove(user.user_id)
             self._db.execute(
-                "UPDATE users SET uuid = ?, sub_token = ? WHERE username = ?",
-                (str(uuid_module.uuid4()), secrets.token_urlsafe(18), username),
+                "UPDATE users SET uuid = ?, sub_token = ?, credential_generation = ? WHERE username = ?",
+                (str(uuid_module.uuid4()), secrets.token_urlsafe(18), user.credential_generation + 1, username),
             )
             self.events.append("user.reissued", username)
             self._compose_all()
@@ -486,6 +492,10 @@ class ControlService:
     def user_connections(self, username: str) -> ClientConnections:
         return read_connections(self._store, self, username)
 
+    def user_flow_blocks(self, username: str) -> UserFlowBlocks:
+        with self._lock:
+            return self.flow_blocks.read(self._require_user(username))
+
     def attention(self, thresholds: AttentionThresholds | None = None, *, now: str | None = None) -> AttentionList:
         return read_attention(
             self._store, self.list_users, self.list_nodes, thresholds or AttentionThresholds(), now or utc_now()
@@ -506,7 +516,7 @@ class ControlService:
                 self.traffic.forget_user(user.user_id)
                 self.events.append("user.removed", username)
             self._db.execute("DELETE FROM users WHERE username = ?", (username,))
-            self._compose_all()
+            self._compose_all(retired=user)
 
     def _require_user(self, username: str) -> UserRecord:
         user = self.get_user(username)
@@ -572,12 +582,12 @@ class ControlService:
 
     # -- composition -------------------------------------------------------------------
 
-    def _compose_all(self) -> None:
+    def _compose_all(self, *, retired: UserRecord | None = None) -> None:
         for (node_id,) in self._db.execute("SELECT node_id FROM nodes WHERE spec IS NOT NULL").fetchall():
-            self._compose(str(node_id))
+            self._compose(str(node_id), retired=retired)
         self.cutoffs.finish()
 
-    def _compose(self, node_id: str) -> None:
+    def _compose(self, node_id: str, *, retired: UserRecord | None = None) -> None:
         """Sign a new revision when the node's resources changed, and wake its poll."""
         row = self._node(node_id)
         if row is None or not row["spec"]:
@@ -606,6 +616,14 @@ class ControlService:
         self._db.execute(
             "UPDATE nodes SET revision = ?, document = ?, doc_sha256 = ? WHERE node_id = ?",
             (revision, json.dumps(document, ensure_ascii=False), resources_sha, node_id),
+        )
+        self.flow_blocks.changed_document(
+            node_id,
+            held["resources"] if held else [],
+            resources,
+            NodeStateRef(fleet_epoch=self.fleet_epoch, revision=revision, sha256=resources_sha),
+            self.list_users(),
+            retired,
         )
         self._changed.notify_all()
 

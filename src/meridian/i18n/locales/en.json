@@ -740,5 +740,6 @@
   "bulk.status.expired": "Expired",
   "events.kind.people.bulk": "Bulk people change",
   "events.bulk": "{action}: {changed} of {targeted} people changed; {cli_required} require CLI.",
-  "bulk.action.undo": "Undo field changes"
+  "bulk.action.undo": "Undo field changes",
+  "node_commands.cut_off_core_scope": "These nodes need an Xray restart to close VLESS sessions: {nodes}. Every Xray session on them will end."
 }

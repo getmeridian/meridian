@@ -31,7 +31,10 @@ pub mod timeutil;
 mod unit;
 pub mod verify;
 pub mod xray;
+mod xray_flow;
 mod xray_health;
+mod xray_hysteria;
+pub mod xray_identity;
 
 /// The build version (`build.rs`), reported as `agent_version` and `versions.agent`.
 pub const VERSION: &str = env!("NETAGENT_VERSION");

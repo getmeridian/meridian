@@ -2007,7 +2007,7 @@
               }
             ],
             "default": null,
-            "description": "For a successful reset_inbound: whether the inbound API reset or a fallback core restart ended its sessions. Null for other outcomes. Sent only by sessions negotiating command kinds.",
+            "description": "For a successful reset_inbound: inbound_reset or core_restart. Null for other wire results. Admin records also mark a succeeded revision-gated core restart as core_restart. Sent only by sessions negotiating command kinds.",
             "title": "Effect"
           },
           "error": {
@@ -2142,6 +2142,16 @@
       "CutOffNode": {
         "additionalProperties": false,
         "properties": {
+          "effect": {
+            "default": "inbound_reset",
+            "description": "VLESS needs a core restart to close accepted flows.",
+            "enum": [
+              "inbound_reset",
+              "core_restart"
+            ],
+            "title": "Effect",
+            "type": "string"
+          },
           "inbound_tags": {
             "items": {
               "description": "Xray inbound tag.",
@@ -2582,6 +2592,9 @@
               },
               {
                 "$ref": "#/components/schemas/CommandResultDetail"
+              },
+              {
+                "$ref": "#/components/schemas/UserFlowBlockDetail"
               }
             ],
             "title": "Detail"
@@ -2606,6 +2619,7 @@
               "user.expired",
               "user.limited",
               "user.restored",
+              "user.flow_blocking",
               "node.offline",
               "node.online",
               "node.apply_failed",
@@ -3316,6 +3330,7 @@
                 "xray_config",
                 "xray_users",
                 "hysteria2_users",
+                "user_flow_blocking",
                 "realm_forwarders",
                 "firewall_rules",
                 "binary_pins",
@@ -5564,7 +5579,7 @@
       },
       "ResetInboundCommand": {
         "additionalProperties": false,
-        "description": "Remove and re-add one Xray inbound through gRPC to end open sessions after an urgent cut-off.",
+        "description": "Remove and re-add one managed inbound. Hysteria2 sessions close; accepted VLESS TCP flows may survive.\n\nAn urgent VLESS cut-off uses a revision-gated restart_unit of the core instead.",
         "properties": {
           "command_id": {
             "description": "Idempotency key of a command: a lowercase UUID chosen by the service, never reused.",
@@ -7448,6 +7463,132 @@
         "title": "UserFieldsDetail",
         "type": "object"
       },
+      "UserFlowBlockDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "credential_generation": {
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "title": "Credential Generation",
+            "type": "integer"
+          },
+          "node_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Node Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "blocked",
+              "pending_node",
+              "agent_too_old"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "credential_generation",
+          "status"
+        ],
+        "title": "UserFlowBlockDetail",
+        "type": "object"
+      },
+      "UserFlowBlockNode": {
+        "additionalProperties": false,
+        "properties": {
+          "credential_generation": {
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "title": "Credential Generation",
+            "type": "integer"
+          },
+          "inbound_tags": {
+            "items": {
+              "description": "Xray inbound tag.",
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Inbound Tags",
+            "type": "array"
+          },
+          "node_id": {
+            "description": "Node identifier: the server's lowercase topology ID, unique within the fleet.",
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "title": "Node Id",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "disabled",
+              "expired",
+              "limited",
+              "removed",
+              "credentials",
+              "access_changed"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "required": {
+            "$ref": "#/components/schemas/NodeStateRef"
+          },
+          "status": {
+            "enum": [
+              "blocked",
+              "pending_node",
+              "agent_too_old"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "credential_generation",
+          "reason",
+          "status",
+          "required"
+        ],
+        "title": "UserFlowBlockNode",
+        "type": "object"
+      },
+      "UserFlowBlocks": {
+        "additionalProperties": false,
+        "description": "A blocked result covers new streams and UDP associations, not already dispatched flows.",
+        "properties": {
+          "credential_generation": {
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "title": "Credential Generation",
+            "type": "integer"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/UserFlowBlockNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "credential_generation"
+        ],
+        "title": "UserFlowBlocks",
+        "type": "object"
+      },
       "UserImport": {
         "additionalProperties": false,
         "description": "One user carried over from another control plane (`meridian migrate`), credentials and usage included.\n\nThe UUID and subscription token keep every link the user already has working.\n`used_traffic_bytes` is the use of the current traffic period and counts toward\nthe limit; `lifetime_traffic_bytes` (never below it) is everything ever counted.\n`traffic_reset_at` is when the source last reset the period, if it knows.",
@@ -8018,6 +8159,13 @@
             "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
             "title": "Created At",
             "type": "string"
+          },
+          "credential_generation": {
+            "default": 1,
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "title": "Credential Generation",
+            "type": "integer"
           },
           "device_limit": {
             "anyOf": [
@@ -15541,6 +15689,103 @@
         "x-meridian-credentials": true,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
+          "people"
+        ]
+      }
+    },
+    "/api/users/{username}/flow-blocks": {
+      "get": {
+        "description": "Requires read or people scope, or a scope that covers it. Blocked covers new TCP streams and UDP associations. Already dispatched flows may continue.",
+        "operationId": "user_flow_blocks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "username",
+            "required": true,
+            "schema": {
+              "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserFlowBlocks"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Read per-node evidence that a person's new flows are blocked.",
+        "tags": [
+          "users"
+        ],
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "read",
           "people"
         ]
       }

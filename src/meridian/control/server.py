@@ -441,6 +441,9 @@ class _Handler(BaseHTTPRequestHandler):
     def cut_off_scope(self, match: re.Match[str]) -> Any:
         return self._service.cutoffs.scope(match[1])
 
+    def user_flow_blocks(self, match: re.Match[str]) -> Any:
+        return self._service.user_flow_blocks(match[1])
+
     def _cut_off_requested(self) -> bool:
         body = self._body()
         request = UserCutOffRequest.model_validate_json(body) if body else UserCutOffRequest()
@@ -573,7 +576,7 @@ class _Handler(BaseHTTPRequestHandler):
         if not isinstance(raw, dict):
             raise agent_error("invalid_request", "The body is not a JSON object.")
         request, welcome = service.authority.hello(raw)
-        service.node_seen(request.node_id, request.agent_version)
+        service.node_seen(request.node_id, request.agent_version, capabilities=welcome.capabilities)
         return welcome
 
     def agent_renew(self, _match: re.Match[str]) -> Any:
@@ -597,6 +600,8 @@ class _Handler(BaseHTTPRequestHandler):
         service, session = self._session()
         body, raw = self._raw()
         report = ObservedStateReport.model_validate_json(body)
+        if report.user_flow_blocking is not None and "user_flow_blocking" not in session.capabilities:
+            raise agent_error("invalid_request", "The user flow blocking capability was not negotiated.")
         return service.report(session.node_id, report, raw)
 
     def agent_stats(self, _match: re.Match[str]) -> Any:

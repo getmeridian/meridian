@@ -163,7 +163,7 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 **`client extend`** — 从当前时间和原到期时间中较晚者起增加 1–3650 个完整日；未设到期时间则从现在起算。必须提供 `--days N`。计算和限制检查在同一个服务事务中完成，因此并发的延长操作都会累加。已到期用户可以恢复访问，但管理者的禁用设置和流量限额仍然有效。JSON 在 `data.client` 中返回实际状态和到期时间。
 
-**`client enable` / `client disable`** — 立即恢复或暂停客户端。禁用持续到你运行 `client enable`；应用（包括重新部署和 `client add`、`node add`、`relay add`）保持客户端的状态不变。
+**`client enable` / `client disable`** — 恢复或暂停访问。每个节点应用变更后会阻止新连接。禁用持续到执行 `client enable`；应用配置不会撤销禁用。
 
 **`client reissue`** — 在链接泄露后替换客户端的链接。控制服务生成新的订阅 ID 和新的密钥，因此旧的订阅 URL、连接页面和链接全部失效。Meridian 打印新的订阅 URL，它同时打开新的连接页面。状态、限额和到期时间保持不变。除非 `--yes`，否则要求确认；不属于你的客户端的名称会被拒绝。
 
@@ -175,7 +175,9 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 修改服务中用户设置的命令（`client enable`、`disable`、`set`、`reset-traffic` 以及删除设备注册）也适用于网页面板添加的用户。精确匹配的服务用户名优先；忽略大小写或按显示名称匹配时必须只对应一个用户。若有歧义，请使用 `client list` 中显示的精确用户名。删除用户、重新签发凭据和发布连接页面仍仅适用于拓扑中声明的用户。
 
-已建立的 VLESS 会话可能在凭证撤销后继续存在。`client remove` 或 `client reissue` 的 **`--cut-off`** 会等待每个受影响节点应用不含旧凭证的版本，再重置相关入站。这些入站上的所有会话都会终止，包括其他用户的会话；他们会短暂重连。若入站 API 失败，会重启 Xray 并终止该节点上的所有 Xray 会话。此选项需主动启用，建议在链接泄露时使用。JSON 在 `data.cut_off` 中报告各节点的 `done`、`core_restart`、`failed` 或 `timed_out` 状态。最多等待五分钟；失败退出码为 `4`，超时为 `3`。删除在网页面板中添加的用户时，网页面板也提供此选项。
+禁用、到期、达到流量上限、删除用户及更换连接凭据，会阻止已撤销身份的新 TCP 数据流和 UDP 会话，包括已认证的 Hysteria2 QUIC 连接或 VLESS mux 连接上的新数据流。其他用户的会话保持连接。用户详情页和 `GET /api/users/{username}/flow-blocks` 按节点返回 `blocked`、`pending_node` 或 `agent_too_old`。尚未确认的节点在收到并应用变更前可能继续使用旧配置；控制服务不可用时也如此。使用 `meridian apply` 更新旧节点 agent。事件只记录节点和结果，不记录连接地址或设备数据。
+
+撤销前已建立的 TCP 数据流、现有 Hysteria2 UDP 会话，以及可复用的 VLESS XUDP 会话，可能继续传输直到结束。固定版本的核心没有关闭单个用户会话的接口。`client remove` 或 `client reissue` 的 **`--cut-off`** 等待凭据变更应用后执行终止操作。涉及 VLESS 入站时会重启 Xray，结束该节点上的全部 Xray 会话；仅涉及 Hysteria2 时重置相关入站，API 失败则重启核心。其他用户也会重连。确认前会显示哪些节点需要重启核心。JSON 在 `data.cut_off` 下返回 `done`、`core_restart`、`failed` 或 `timed_out`。最多等待五分钟；失败退出码为 `4`，超时为 `3`。删除在网页面板中添加的用户时，面板提供相同选项。
 
 私人字段：`client set NAME --note TEXT --tag TAG` 只更改指定的字段。备注最多 500 个纯文本字符，支持换行；`--note ""` 清除备注。标签使用 1–16 个拉丁字母、数字或下划线，保存为大写；`--tag none` 清除标签。`client show` 显示这两个字段，`client list --tag TAG` 筛选标签列（`none` 选择没有标签的人）。读取和编辑需要 people/admin 权限。网页面板编辑相同字段；应用配置保留它们，加密快照保存它们。参见[私人备注和标签](/zh/client-management/#私人备注和标签)。
 

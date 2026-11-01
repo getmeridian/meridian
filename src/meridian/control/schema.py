@@ -16,8 +16,9 @@ from meridian.control.server_allowances import ALLOWANCE_PERIODS_TABLE
 from meridian.control.store import Store
 from meridian.control.tokens import API_TOKENS_TABLE_V4
 from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPOCH_BASELINES
+from meridian.control.user_flow_blocks import FLOW_BLOCKS_TABLE
 
-SCHEMA_VERSION = 20
+SCHEMA_VERSION = 21
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS secrets (name TEXT PRIMARY KEY, value BLOB NOT NULL);
@@ -32,11 +33,13 @@ CREATE TABLE IF NOT EXISTS nodes (
     applied_sha256 TEXT,
     last_seen_at TEXT,
     agent_version TEXT,
+    agent_capabilities TEXT,
     report TEXT
 );
 CREATE TABLE IF NOT EXISTS users (
     username TEXT PRIMARY KEY,
     user_id TEXT NOT NULL UNIQUE,
+    credential_generation INTEGER NOT NULL DEFAULT 1,
     uuid TEXT NOT NULL UNIQUE,
     sub_token TEXT NOT NULL UNIQUE,
     status TEXT NOT NULL,
@@ -67,6 +70,7 @@ CREATE TABLE IF NOT EXISTS endpoints (endpoint_id TEXT PRIMARY KEY, body TEXT NO
 SCHEMA += "\n".join(PRIVACY_TABLES) + "\n" + DEVICES_TABLE + ";\n"
 SCHEMA += ";\n".join(COMMAND_TABLES) + ";\n"
 SCHEMA += ALLOWANCE_PERIODS_TABLE + ";\n"
+SCHEMA += FLOW_BLOCKS_TABLE + ";\n"
 # Statements that bring a database from version N to N + 1 (index N - 1).
 _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (
@@ -121,6 +125,12 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     ),
     # 19 -> 20: shared people queries, monotonic row versions, and reviewed receipts.
     PEOPLE_SCHEMA,
+    # 20 -> 21: credential generations and per-node flow-block receipts.
+    (
+        "ALTER TABLE users ADD COLUMN credential_generation INTEGER NOT NULL DEFAULT 1",
+        "ALTER TABLE nodes ADD COLUMN agent_capabilities TEXT",
+        FLOW_BLOCKS_TABLE,
+    ),
 )
 
 

@@ -342,6 +342,40 @@
       ],
       "title": "ResourceObservation",
       "type": "object"
+    },
+    "UserFlowBlocking": {
+      "additionalProperties": false,
+      "description": "Runtime routing denies identities absent from this document's managed inbound user sets.\n\nCovers newly dispatched TCP streams and UDP associations, including an\nauthenticated QUIC or mux connection. Already dispatched flows and XUDP\nassociations may continue. Sent only with `user_flow_blocking` negotiated.\nAuthentication still applies if routing fails; the agent reports pending\nand retries the guard without requesting an inbound reset.",
+      "properties": {
+        "document": {
+          "$ref": "#/$defs/NodeStateRef"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "ready",
+            "pending"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "document",
+        "status",
+        "error"
+      ],
+      "title": "UserFlowBlocking",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -408,6 +442,18 @@
       "title": "Type",
       "type": "string"
     },
+    "user_flow_blocking": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UserFlowBlocking"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Runtime user flow guard; omitted unless its capability was negotiated."
+    },
     "versions": {
       "$ref": "#/$defs/NodeVersions"
     }
@@ -421,7 +467,8 @@
     "resources",
     "health",
     "versions",
-    "observed_at"
+    "observed_at",
+    "user_flow_blocking"
   ],
   "title": "ObservedStateReport",
   "type": "object"

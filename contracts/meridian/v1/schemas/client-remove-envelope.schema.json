@@ -69,7 +69,7 @@
             }
           ],
           "default": null,
-          "description": "For a successful reset_inbound: whether the inbound API reset or a fallback core restart ended its sessions. Null for other outcomes. Sent only by sessions negotiating command kinds.",
+          "description": "For a successful reset_inbound: inbound_reset or core_restart. Null for other wire results. Admin records also mark a succeeded revision-gated core restart as core_restart. Sent only by sessions negotiating command kinds.",
           "title": "Effect"
         },
         "error": {
@@ -508,7 +508,7 @@
     },
     "ResetInboundCommand": {
       "additionalProperties": false,
-      "description": "Remove and re-add one Xray inbound through gRPC to end open sessions after an urgent cut-off.",
+      "description": "Remove and re-add one managed inbound. Hysteria2 sessions close; accepted VLESS TCP flows may survive.\n\nAn urgent VLESS cut-off uses a revision-gated restart_unit of the core instead.",
       "properties": {
         "command_id": {
           "description": "Idempotency key of a command: a lowercase UUID chosen by the service, never reused.",

@@ -13,7 +13,11 @@ def cut_off_disclosure(plan: CutOffPlan) -> str:
     nodes = ", ".join(node.node_id for node in plan.nodes)
     if nodes:
         nodes = isolate(nodes)
-    return t("node_commands.cut_off_scope", nodes=nodes) if nodes else t("node_commands.no_inbounds")
+    if not nodes:
+        return t("node_commands.no_inbounds")
+    text = t("node_commands.cut_off_scope", nodes=nodes)
+    core_nodes = ", ".join(node.node_id for node in plan.nodes if node.effect == "core_restart")
+    return text + "\n" + t("node_commands.cut_off_core_scope", nodes=isolate(core_nodes)) if core_nodes else text
 
 
 def print_command_results(outcomes: Sequence[NodeCommandOutcome]) -> None:

@@ -43,6 +43,15 @@ newest first; the last is what 4.0 changes compared with 3.x.
 - **Connection pages show used and allowed device slots when limits are enabled**, with localized guidance for full slots and apps that cannot report a device. Only counts are revealed, and the page never saves them (#95).
 - **Reissuing a link in the web panel offers the same session cut-off choice as removal**, reviews affected nodes, and shows each node’s outcome while retaining the new link (#95).
 - **Subscription traffic reports upload and download for the current period**, shared with the API and web panel. Manual and scheduled resets keep both directions and lifetime totals consistent; imports and older periods keep unclassified use with an explicit disclosure (#95).
+- **Revoked people cannot open new streams on live Hysteria2 or VLESS mux connections**
+  once their node applies the change (#95). Disable, expiry, quota suspension,
+  removal, and credential replacement now use authenticated identities in live
+  routing; other people's sessions stay connected. The person view and events
+  distinguish confirmed blocking, pending nodes, and agents that need an update.
+  Earlier TCP transfers and UDP associations can continue; `--cut-off` still
+  uses a core restart for VLESS (its inbound reset leaves accepted flows alive)
+  and an inbound reset for Hysteria2. Hysteria2 credential additions now
+  use its typed user API instead of resetting the inbound on updated nodes.
 - **A web panel on its own domain keeps its certificate** when the same server
   also runs an exit (#110). The panel's domain certificate was installed where
   the server's IP certificate lives, so an exit's IP certificate replaced it,

@@ -30,6 +30,7 @@ from meridian.core.agent_types import (
 )
 from meridian.core.client_devices import ClientDevicesResult, DeviceCap
 from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES, LimitStrategy, UserCreationSettings
+from meridian.core.client_sessions import CredentialGeneration
 from meridian.core.connection_pages import ConnectionPageSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import ServerReferenceValue, validate_ip_address_value
@@ -206,6 +207,7 @@ class UserRecord(UserTrafficEvidence, AccountLifecycleState):
 
     username: str
     user_id: str
+    credential_generation: CredentialGeneration = 1
     uuid: str
     sub_token: str
     status: UserStatus

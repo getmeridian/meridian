@@ -407,7 +407,7 @@
   "i18n.unavailable": "无法加载语言文件，请从此服务器重试。",
   "commands.title": "节点命令结果",
   "commands.cut_off_label": "立即终止现有会话",
-  "commands.cut_off_help": "链接泄露时建议启用。相关入站的所有会话都会终止，包括其他用户的会话；他们会短暂重连。若入站 API 失败，会重启 Xray 并终止该节点上的所有 Xray 会话。",
+  "commands.cut_off_help": "凭据变更应用后结束现有会话。VLESS 节点重启 Xray，关闭全部 Xray 会话；仅使用 Hysteria2 的节点重置相关入站。其他用户也会重连。",
   "commands.scope": "受影响的节点：{nodes}",
   "commands.no_inbounds": "没有需要重置的受管入站。",
   "commands.waiting": "等待访问设置生效",
@@ -722,5 +722,11 @@
   "bulk.status.active": "已启用",
   "bulk.status.disabled": "已停用",
   "bulk.status.limited": "配额已耗尽",
-  "bulk.status.expired": "已过期"
+  "bulk.status.expired": "已过期",
+  "person.flow_title": "已撤销凭据的访问状态",
+  "person.flow_text": "节点确认变更后会阻止新数据流。此前开始的传输和 UDP 会话可能继续。要立即结束它们，请在删除用户或重新签发链接时使用 --cut-off；同一入站上的其他用户也会重新连接。",
+  "person.flow_blocked": "已阻止新数据流",
+  "person.flow_pending_node": "等待节点确认",
+  "person.flow_agent_too_old": "需要更新节点 agent",
+  "commands.core_scope": "以下节点的 VLESS 会话需要重启 Xray 才能关闭：{nodes}。这些节点上的全部 Xray 会话都会结束。"
 }

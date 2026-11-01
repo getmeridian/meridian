@@ -333,7 +333,7 @@
             }
           ],
           "default": null,
-          "description": "For a successful reset_inbound: whether the inbound API reset or a fallback core restart ended its sessions. Null for other outcomes. Sent only by sessions negotiating command kinds.",
+          "description": "For a successful reset_inbound: inbound_reset or core_restart. Null for other wire results. Admin records also mark a succeeded revision-gated core restart as core_restart. Sent only by sessions negotiating command kinds.",
           "title": "Effect"
         },
         "error": {
@@ -1028,6 +1028,7 @@
               "xray_config",
               "xray_users",
               "hysteria2_users",
+              "user_flow_blocking",
               "realm_forwarders",
               "firewall_rules",
               "binary_pins",
@@ -1580,6 +1581,18 @@
           "title": "Type",
           "type": "string"
         },
+        "user_flow_blocking": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UserFlowBlocking"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Runtime user flow guard; omitted unless its capability was negotiated."
+        },
         "versions": {
           "$ref": "#/$defs/NodeVersions"
         }
@@ -1593,7 +1606,8 @@
         "resources",
         "health",
         "versions",
-        "observed_at"
+        "observed_at",
+        "user_flow_blocking"
       ],
       "title": "ObservedStateReport",
       "type": "object"
@@ -2098,7 +2112,7 @@
     },
     "ResetInboundCommand": {
       "additionalProperties": false,
-      "description": "Remove and re-add one Xray inbound through gRPC to end open sessions after an urgent cut-off.",
+      "description": "Remove and re-add one managed inbound. Hysteria2 sessions close; accepted VLESS TCP flows may survive.\n\nAn urgent VLESS cut-off uses a revision-gated restart_unit of the core instead.",
       "properties": {
         "command_id": {
           "description": "Idempotency key of a command: a lowercase UUID chosen by the service, never reused.",
@@ -2534,6 +2548,40 @@
         "restart_on"
       ],
       "title": "SystemdUnitResource",
+      "type": "object"
+    },
+    "UserFlowBlocking": {
+      "additionalProperties": false,
+      "description": "Runtime routing denies identities absent from this document's managed inbound user sets.\n\nCovers newly dispatched TCP streams and UDP associations, including an\nauthenticated QUIC or mux connection. Already dispatched flows and XUDP\nassociations may continue. Sent only with `user_flow_blocking` negotiated.\nAuthentication still applies if routing fails; the agent reports pending\nand retries the guard without requesting an inbound reset.",
+      "properties": {
+        "document": {
+          "$ref": "#/$defs/NodeStateRef"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "ready",
+            "pending"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "document",
+        "status",
+        "error"
+      ],
+      "title": "UserFlowBlocking",
       "type": "object"
     },
     "UserTraffic": {

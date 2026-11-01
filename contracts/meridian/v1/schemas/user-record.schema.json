@@ -175,6 +175,13 @@
       "title": "Created At",
       "type": "string"
     },
+    "credential_generation": {
+      "default": 1,
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "title": "Credential Generation",
+      "type": "integer"
+    },
     "device_limit": {
       "anyOf": [
         {

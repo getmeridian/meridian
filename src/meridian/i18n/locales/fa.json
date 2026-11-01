@@ -740,5 +740,6 @@
   "bulk.status.expired": "منقضی",
   "events.kind.people.bulk": "تغییر گروهی افراد",
   "events.bulk": "{action}: تغییر {changed} نفر از {targeted}؛ نیازمند CLI: {cli_required}.",
-  "bulk.action.undo": "برگرداندن تغییر فیلدها"
+  "bulk.action.undo": "برگرداندن تغییر فیلدها",
+  "node_commands.cut_off_core_scope": "برای پایان نشست‌های VLESS، Xray باید در این سرورها دوباره راه‌اندازی شود: {nodes}. همهٔ نشست‌های Xray آن‌ها پایان می‌یابد."
 }

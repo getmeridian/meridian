@@ -138,6 +138,7 @@ ROUTE_SAMPLES = {
     "import_users": ("/api/import/users", {"users": []}),
     "get_user": ("/api/users/alice", None),
     "user_connections": ("/api/users/alice/connections", None),
+    "user_flow_blocks": ("/api/users/alice/flow-blocks", None),
     "user_usage": ("/api/users/alice/usage", None),
     "put_user": ("/api/users/bob", {}),
     "update_user": ("/api/users/alice", {"status": "disabled"}),

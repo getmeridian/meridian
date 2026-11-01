@@ -407,7 +407,7 @@
   "i18n.unavailable": "Language files could not be loaded. Retry from this server.",
   "commands.title": "Node command results",
   "commands.cut_off_label": "End open sessions now",
-  "commands.cut_off_help": "Recommended after a leaked link. This closes every open session on affected inbounds, including other people's. They reconnect for a moment. If the inbound API fails, Xray restarts and all its sessions on that node close.",
+  "commands.cut_off_help": "Ends existing sessions after the credential change applies. VLESS nodes restart Xray and close every Xray session; Hysteria2-only nodes reset the affected inbounds. Other people reconnect.",
   "commands.scope": "Affected nodes: {nodes}",
   "commands.no_inbounds": "There are no managed inbounds to reset.",
   "commands.waiting": "Waiting for access changes to apply",
@@ -722,5 +722,11 @@
   "bulk.status.active": "Active",
   "bulk.status.disabled": "Disabled",
   "bulk.status.limited": "Quota reached",
-  "bulk.status.expired": "Expired"
+  "bulk.status.expired": "Expired",
+  "person.flow_title": "Access with revoked credentials",
+  "person.flow_text": "New streams are blocked when a node confirms the change. Transfers and UDP sessions started earlier may continue. Use --cut-off with removal or reissue to end them; other people on the affected inbounds reconnect.",
+  "person.flow_blocked": "New streams blocked",
+  "person.flow_pending_node": "Waiting for node",
+  "person.flow_agent_too_old": "Agent update required",
+  "commands.core_scope": "VLESS requires a core restart on: {nodes}. Every Xray session on these nodes ends."
 }

@@ -574,5 +574,13 @@ if (mode === 'person-period-traffic') {
   report.note = card.querySelector('p.muted')?.textContent || '';
 }
 
+if (mode === 'person-flow-blocks') {
+  const card = view().querySelector('.flow-block-status');
+  report.found = !!card;
+  report.text = card?.textContent || '';
+  report.states = [...(card?.querySelectorAll('[data-flow-state]') || [])].map(node => node.dataset.flowState);
+  report.writes = writes;
+}
+
 dom.window.close();
 process.stdout.write(JSON.stringify(report));

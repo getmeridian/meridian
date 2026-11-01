@@ -67,7 +67,7 @@
         }
       ],
       "default": null,
-      "description": "For a successful reset_inbound: whether the inbound API reset or a fallback core restart ended its sessions. Null for other outcomes. Sent only by sessions negotiating command kinds.",
+      "description": "For a successful reset_inbound: inbound_reset or core_restart. Null for other wire results. Admin records also mark a succeeded revision-gated core restart as core_restart. Sent only by sessions negotiating command kinds.",
       "title": "Effect"
     },
     "error": {

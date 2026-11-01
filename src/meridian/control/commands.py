@@ -199,6 +199,16 @@ class CommandLedger:
                     raise agent_error(
                         "invalid_request", "A successful inbound reset must disclose whether the core restarted."
                     )
+                # Older agents already implement restart_unit but send no reset effect.
+                # A revision-gated restart of this core is the explicit VLESS cut-off.
+                if (
+                    current.command.kind == "restart_unit"
+                    and current.wait_for is not None
+                    and result.status == "succeeded"
+                ):
+                    core = next((unit for unit in self.targets(node_id).units if unit.core), None)
+                    if core is not None and core.resource_id == current.command.resource_id:
+                        result = result.model_copy(update={"effect": "core_restart"})
                 if result.error is not None:
                     known = [
                         str(value)

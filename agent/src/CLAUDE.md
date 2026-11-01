@@ -10,6 +10,7 @@
 **Traffic counted once** — `stats.rs` folds `statsquery -reset` into `traffic.json` (0600) and saves each new sequence number before sending; users who left keep their totals in `retired`.
 **Host behind traits** — `Exec`/`Fetch` fake host I/O and `--root` redirects paths for tests; writes stay under `/etc/netagent/` and `/usr/local/lib/netagent/`, and units match `net[a-z0-9-]*.service`, never `netagent.service`.
 **Reports stay apart** — `agent/reporting.rs` builds and sends observations; the polling loop owns their cadence.
+**Generation identities gate new flows** — RoutingService uses credential-derived emails and a current-document guard; full routing replacement keeps API, bridge, and balancer rules, and no revoked-identity list accumulates. Generation mode adds Hysteria2 accounts through bounded loopback HTTP/2 with baseline curl.
 
 ## What's done well
 - **Signed commands run only through negotiated kinds** — `commands.rs` verifies signature, epoch, and expiry first; `command_host.rs` restarts only held, installed units and resets only managed inbounds.
@@ -18,6 +19,7 @@
 - **Atomic writes everywhere** — private temp sibling, fsync, mode and owner, rename, directory fsync (`fsutil::write_atomic`).
 
 ## Pitfalls
+- **Removing a password leaves authenticated QUIC and mux sessions usable** — block new dispatched streams before `rmu`; existing TCP/UDP associations survive. VLESS's accepted flows also outlive an inbound reset, so its explicit cut-off must restart the core; Hysteria2's reset closes QUIC.
 - **Expiry gates only the start of a command** — keep results and executed IDs beyond the service's redelivery window, or clock rounding repeats an action.
 - **Serde unit variants ignore extra fields even with `deny_unknown_fields`** — use empty struct variants so signed extras are rejected.
 - **Re-check in Rust whatever reaches a path, an argument, or a socket** — tags, user IDs, the API address, and reserved file names, though Python checked them; serde reads an absent `Option` as `null`.

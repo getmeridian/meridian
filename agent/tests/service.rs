@@ -197,8 +197,8 @@ fn the_rust_agent_enrolls_applies_and_counts_traffic_against_the_python_service(
         .unwrap();
     let finished = service.ask(&format!("command-result {id}"));
     assert_eq!(finished["status"], "succeeded");
-    assert_eq!(finished["result"]["effect"], "inbound_reset");
-    assert_eq!(exec.count("systemctl restart netcore.service"), 0);
+    assert_eq!(finished["result"]["effect"], "core_restart");
+    assert_eq!(exec.count("systemctl restart netcore.service"), 1);
 
     let removed = service.ask("remove-cut-off person-a");
     agent.poll_once().unwrap(); // the revision without the old credentials must apply first

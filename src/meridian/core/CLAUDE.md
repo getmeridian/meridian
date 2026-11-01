@@ -19,6 +19,7 @@
 - **Subscription vocabulary** — `subscription_formats.py` owns document and suffix names; `subscription_preview.py` bounds transient headers and explains selection without credentials.
 
 ## What's done well
+- **Flow-block evidence is capability-gated and revision-bound** — account generations and node outcomes carry no connection or device data.
 - **Defaults stay off the wire** — new intent and settings fields omit their defaults (routing `ru-split`, the six-hour refresh, empty mappings), so existing plans and payloads keep their hashes.
 - **Command kinds are hello capabilities**, and a reset result discloses its effect without carrying a user identifier.
 - No barrel re-exports in `__init__.py`; consumers import specific submodules.

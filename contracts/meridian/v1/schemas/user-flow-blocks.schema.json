@@ -1,0 +1,128 @@
+{
+  "$defs": {
+    "NodeStateRef": {
+      "additionalProperties": false,
+      "description": "Points at one desired-state document by epoch, revision, and content hash.",
+      "properties": {
+        "fleet_epoch": {
+          "description": "Fleet epoch. A restore of the control service bumps it. An agent remembers the highest epoch it accepted and refuses desired state and commands from an older one (a resurrected old control server).",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Fleet Epoch",
+          "type": "integer"
+        },
+        "revision": {
+          "description": "Desired-state revision for one node. Ordering is (fleet_epoch, revision): within an epoch revisions only grow; a higher epoch wins even with a lower revision.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "sha256": {
+          "description": "The document's `sha256` (hash of its `resources`).",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fleet_epoch",
+        "revision",
+        "sha256"
+      ],
+      "title": "NodeStateRef",
+      "type": "object"
+    },
+    "UserFlowBlockNode": {
+      "additionalProperties": false,
+      "properties": {
+        "credential_generation": {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Credential Generation",
+          "type": "integer"
+        },
+        "inbound_tags": {
+          "items": {
+            "description": "Xray inbound tag.",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Inbound Tags",
+          "type": "array"
+        },
+        "node_id": {
+          "description": "Node identifier: the server's lowercase topology ID, unique within the fleet.",
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Node Id",
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "disabled",
+            "expired",
+            "limited",
+            "removed",
+            "credentials",
+            "access_changed"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "required": {
+          "$ref": "#/$defs/NodeStateRef"
+        },
+        "status": {
+          "enum": [
+            "blocked",
+            "pending_node",
+            "agent_too_old"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "credential_generation",
+        "reason",
+        "status",
+        "required"
+      ],
+      "title": "UserFlowBlockNode",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A blocked result covers new streams and UDP associations, not already dispatched flows.",
+  "properties": {
+    "credential_generation": {
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "title": "Credential Generation",
+      "type": "integer"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/UserFlowBlockNode"
+      },
+      "title": "Nodes",
+      "type": "array"
+    },
+    "username": {
+      "title": "Username",
+      "type": "string"
+    }
+  },
+  "required": [
+    "username",
+    "credential_generation"
+  ],
+  "title": "UserFlowBlocks",
+  "type": "object"
+}

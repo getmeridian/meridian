@@ -1,6 +1,8 @@
 //! The apply engine against a temporary host root, a fake systemctl/xray, and a fake fetcher.
 
 mod common;
+#[path = "apply/flow_blocking.rs"]
+mod flow_blocking;
 #[path = "apply/readiness.rs"]
 mod readiness;
 #[path = "apply/uptime.rs"]

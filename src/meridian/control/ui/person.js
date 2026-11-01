@@ -48,7 +48,7 @@
     if (!current(screen)) return;
     screen.version++;
     draw(screen, user, screen.share, savedForm);
-    if (toastKey === "person.reissued_toast") {
+    if (["person.reissued_toast", "person.enabled_toast", "person.disabled_toast", "person.saved_toast", "person.reset_toast"].indexOf(toastKey) >= 0) {
       var version = screen.version;
       M.api("GET", "ui/api/people/" + encodeURIComponent(screen.username) + "/share").then(function (share) {
         if (current(screen) && screen.version === version) draw(screen, screen.user, share);
@@ -83,8 +83,9 @@
       screen.head = h("div", { class: "page-head" });
       screen.shareSlot = h("div"); screen.usageSlot = h("div", { class: "card-slot" });
       screen.accessSlot = h("div", { class: "card-slot" }); screen.metadataSlot = h("div"); screen.dangerSlot = h("div");
+      screen.flowSlot = h("div");
       M.mount(screen.view, [back(), screen.head, screen.liveStatus, screen.shareSlot,
-        h("div", { class: "cards" }, screen.usageSlot, screen.accessSlot), screen.metadataSlot,
+        h("div", { class: "cards" }, screen.usageSlot, screen.accessSlot), screen.flowSlot, screen.metadataSlot,
         M.personHistory(name), M.devicesCard(user, function (changed) {
           if (!current(screen)) return;
           screen.version++;
@@ -92,6 +93,7 @@
         }), screen.dangerSlot]);
     }
     M.mount(screen.head, heading(user));
+    M.mount(screen.flowSlot, flowCard(share.flow_blocks));
     M.mount(screen.usageSlot, usageCard(user, screen));
     if (!oldShare || JSON.stringify(oldShare) !== JSON.stringify(share)) {
       var disclosure = screen.shareSlot.querySelector("details");
@@ -169,6 +171,19 @@
           if (ok) act(screen, function () { return M.api("POST", path(name, "/reset-traffic"), {}); }, "person.reset_toast");
         });
       } }, M.t("person.reset_traffic")));
+  }
+
+  function flowCard(state) {
+    if (!state || !state.nodes || !state.nodes.length) return null;
+    var labels = { blocked: M.t("person.flow_blocked"), pending_node: M.t("person.flow_pending_node"),
+      agent_too_old: M.t("person.flow_agent_too_old") };
+    return h("section", { class: "card flow-block-status", "aria-live": "polite" },
+      h("h2", { text: M.t("person.flow_title") }),
+      h("p", { class: "muted small", text: M.t("person.flow_text") }),
+      h("dl", { class: "facts" }, state.nodes.map(function (node) {
+        return [h("dt", {}, h("bdi", { text: node.node_id })),
+          h("dd", { "data-flow-state": node.status, text: labels[node.status] || labels.pending_node })];
+      })));
   }
 
   function accessCard(user, screen) {

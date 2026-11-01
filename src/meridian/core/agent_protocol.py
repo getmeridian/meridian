@@ -62,6 +62,7 @@ Capability = Literal[
     "xray_config",
     "xray_users",
     "hysteria2_users",
+    "user_flow_blocking",
     "realm_forwarders",
     "firewall_rules",
     "binary_pins",
@@ -264,7 +265,10 @@ class ReportCommand(_CommandBase):
 
 
 class ResetInboundCommand(_CommandBase):
-    """Remove and re-add one Xray inbound through gRPC to end open sessions after an urgent cut-off."""
+    """Remove and re-add one managed inbound. Hysteria2 sessions close; accepted VLESS TCP flows may survive.
+
+    An urgent VLESS cut-off uses a revision-gated restart_unit of the core instead.
+    """
 
     kind: Literal["reset_inbound"] = "reset_inbound"
     inbound_tag: InboundTag
@@ -340,6 +344,27 @@ class ResourceError(AgentModel):
     retryable: bool = Field(description="True when the agent will retry on its own.")
 
 
+class UserFlowBlocking(AgentModel):
+    """Runtime routing denies identities absent from this document's managed inbound user sets.
+
+    Covers newly dispatched TCP streams and UDP associations, including an
+    authenticated QUIC or mux connection. Already dispatched flows and XUDP
+    associations may continue. Sent only with `user_flow_blocking` negotiated.
+    Authentication still applies if routing fails; the agent reports pending
+    and retries the guard without requesting an inbound reset.
+    """
+
+    document: NodeStateRef
+    status: Literal["ready", "pending"]
+    error: ResourceError | None
+
+    @model_validator(mode="after")
+    def pending_has_error(self) -> UserFlowBlocking:
+        if (self.error is not None) != (self.status == "pending"):
+            raise ValueError("An error is required only for a pending user flow guard.")
+        return self
+
+
 class ResourceObservation(AgentModel):
     """Observed state of one resource of the held document.
 
@@ -407,6 +432,9 @@ class ObservedStateReport(AgentModel):
     health: NodeHealth
     versions: NodeVersions
     observed_at: Timestamp
+    user_flow_blocking: UserFlowBlocking | None = Field(
+        default=None, description="Runtime user flow guard; omitted unless its capability was negotiated."
+    )
 
 
 class ReportAck(AgentModel):
@@ -468,8 +496,9 @@ class CommandResult(AgentModel):
     finished_at: Timestamp
     effect: CommandEffect | None = Field(
         default=None,
-        description="For a successful reset_inbound: whether the inbound API reset or a fallback core restart "
-        "ended its sessions. Null for other outcomes. Sent only by sessions negotiating command kinds.",
+        description="For a successful reset_inbound: inbound_reset or core_restart. Null for other wire results. "
+        "Admin records also mark a succeeded revision-gated core restart as core_restart. "
+        "Sent only by sessions negotiating command kinds.",
     )
 
     @model_validator(mode="after")

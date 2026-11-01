@@ -27,8 +27,10 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - Idempotency dual-path: `tests/provision/CLAUDE.md`.
 
 ## Pitfalls
+- **Bulk and flow migrations stay ordered** — schema 20 owns people queries; schema 21 owns generations and receipts, and older fixtures rewind both.
 - **Terminal test readers use poll or selectors** — full suites allocate descriptors above select's fixed limit, breaking pexpect and pipe-key reads.
 - **People-query fixtures use real service pages** — DOM scenarios receive backend replies; rewound databases drop people indices and triggers before removing columns.
+- **Pinned Xray blocks private targets in freedom by default** — loopback session tests need an explicit final allow, or a target refusal can masquerade as successful revocation.
 - **`tmp_home` must patch both** the env var and `meridian.config` attributes; patch `meridian.config.NAME`, never a module's copy.
 - **The suite isolates the cache and drops `FORCE_COLOR`** — throttled banners would otherwise make output depend on test order, and Rich would turn plain-text assertions into ANSI escapes.
 - **Reset JSON mode after each CLI invocation** — a leaked JSON mode made a later confirmation require `--yes`; read JSON from stdout apart from backup notices.

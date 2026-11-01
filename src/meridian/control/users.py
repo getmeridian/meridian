@@ -14,6 +14,7 @@ from meridian.core.traffic import period_usage, quota_percent
 USER_FIELDS = (
     "username",
     "user_id",
+    "credential_generation",
     "uuid",
     "sub_token",
     "status",

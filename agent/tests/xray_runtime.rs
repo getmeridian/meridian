@@ -1,0 +1,317 @@
+//! Driven by pytest's loopback core/client fixture when MERIDIAN_TEST_XRAY is available.
+
+mod common;
+
+use std::io::{Read, Write};
+use std::net::TcpStream;
+use std::path::Path;
+use std::path::PathBuf;
+use std::process::{Child, Command, Stdio};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
+use common::{FakeExec, FakeFetch, parse};
+use meridian_agent::apply::Engine;
+use meridian_agent::model::ResourceObservation;
+use meridian_agent::state::LedgerEntry;
+use meridian_agent::system::{CmdOutput, Exec, RealExec};
+use serde_json::Value;
+
+struct CoreExec {
+    host: FakeExec,
+    root: PathBuf,
+    process: Mutex<Option<Child>>,
+}
+
+impl Drop for CoreExec {
+    fn drop(&mut self) {
+        if let Some(mut child) = self.process.lock().unwrap().take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
+impl Exec for CoreExec {
+    fn run(
+        &self,
+        program: &str,
+        args: &[&str],
+        env: &[(&str, &str)],
+    ) -> std::io::Result<CmdOutput> {
+        if program == "systemctl" || program == "journalctl" {
+            let output = self.host.run(program, args, env)?;
+            if program == "systemctl"
+                && matches!(args.first(), Some(&"start") | Some(&"restart"))
+                && output.success
+            {
+                let mut process = self.process.lock().unwrap();
+                if let Some(mut child) = process.take() {
+                    child.kill()?;
+                    child.wait()?;
+                }
+                let child = Command::new(self.root.join("usr/local/lib/netagent/netcore"))
+                    .args(["run", "-c"])
+                    .arg(self.root.join("etc/netagent/core.json"))
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn()?;
+                self.host
+                    .main_pids
+                    .lock()
+                    .unwrap()
+                    .insert("netcore.service".into(), child.id());
+                *process = Some(child);
+            }
+            return Ok(output);
+        }
+        self.host.calls.lock().unwrap().push(format!(
+            "{} {}",
+            Path::new(program).file_name().unwrap().to_string_lossy(),
+            args.join(" ")
+        ));
+        RealExec.run(program, args, env)
+    }
+}
+
+fn socks(port: u16, target: u16) -> std::io::Result<TcpStream> {
+    let mut stream = TcpStream::connect(("127.0.0.1", port))?;
+    stream.set_read_timeout(Some(Duration::from_secs(2)))?;
+    stream.set_write_timeout(Some(Duration::from_secs(2)))?;
+    stream.write_all(&[5, 1, 0])?;
+    let mut hello = [0; 2];
+    stream.read_exact(&mut hello)?;
+    if hello != [5, 0] {
+        return Err(std::io::Error::other("SOCKS greeting refused"));
+    }
+    let mut request = vec![5, 1, 0, 1, 127, 0, 0, 1];
+    request.extend_from_slice(&target.to_be_bytes());
+    stream.write_all(&request)?;
+    let mut response = [0; 10];
+    stream.read_exact(&mut response)?;
+    if response[1] != 0 {
+        return Err(std::io::Error::other("SOCKS target refused"));
+    }
+    Ok(stream)
+}
+
+fn exchange(stream: &mut TcpStream) -> bool {
+    let mut response = [0; 5];
+    stream.write_all(b"probe").is_ok()
+        && stream.read_exact(&mut response).is_ok()
+        && response == *b"probe"
+}
+
+fn probe(port: u16, target: u16) -> bool {
+    socks(port, target).is_ok_and(|mut stream| exchange(&mut stream))
+}
+
+fn warm(port: u16, target: u16) {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !probe(port, target) {
+        assert!(
+            Instant::now() < deadline,
+            "client could not reach the loopback target"
+        );
+        std::thread::sleep(Duration::from_millis(25));
+    }
+}
+
+#[test]
+fn removing_or_rotating_only_blocks_the_old_identitys_new_streams() {
+    let Ok(file) = std::env::var("MERIDIAN_FLOW_FIXTURE") else {
+        return;
+    };
+    let fixture: Value = serde_json::from_slice(&std::fs::read(file).unwrap()).unwrap();
+    let get = |key: &str| fixture[key].as_str().unwrap();
+    let binary = get("binary");
+    let api = format!("--server={}", get("api"));
+    let port = |key: &str| fixture[key].as_u64().unwrap() as u16;
+    let target = port("target");
+    let before: Vec<Value> = serde_json::from_value(fixture["before"].clone()).unwrap();
+    let after: Vec<Value> = serde_json::from_value(fixture["after"].clone()).unwrap();
+    let fetch = FakeFetch::default().with(
+        "https://assets.example.org/xray",
+        std::fs::read(binary).unwrap(),
+    );
+    let exec = CoreExec {
+        host: FakeExec::default(),
+        root: get("root").into(),
+        process: Mutex::new(None),
+    };
+    let engine = Engine {
+        root: get("root").into(),
+        cache_dir: Path::new(get("root")).join("cache"),
+        exec: &exec,
+        fetch: &fetch,
+        settle: Duration::ZERO,
+        allow_http: false,
+    };
+    let mut ledger: Vec<LedgerEntry> = Vec::new();
+    let mut observations: Vec<ResourceObservation> = Vec::new();
+    let initial = engine.apply(
+        &parse(&before),
+        &mut ledger,
+        &observations,
+        "2026-11-01T12:00:00Z",
+    );
+    assert!(
+        initial.converged && initial.flow_error.is_none(),
+        "{initial:?}"
+    );
+    observations = initial.observations;
+    eprintln!("warm initial sessions");
+    warm(port("client_a"), target);
+    warm(port("client_b"), target);
+
+    // Reproduce the pinned core defect itself: password removal does not revoke
+    // the authenticated QUIC/mux connection's ability to dispatch new streams.
+    let tag = format!("-tag={}", get("tag"));
+    let removed = RealExec
+        .run(binary, &["api", "rmu", &api, &tag, get("email_a")], &[])
+        .unwrap();
+    assert!(
+        removed.success && removed.stdout.contains("Removed 1 user(s)"),
+        "{}",
+        removed.stderr
+    );
+    assert!(
+        probe(port("client_a"), target),
+        "the pinned runtime no longer reproduces the defect; revisit this test"
+    );
+    if get("tag") == "hy2" {
+        engine
+            .add_hysteria_user(get("api"), get("tag"), get("email_a"), get("credential_a"))
+            .unwrap();
+    } else {
+        let restored = RealExec
+            .run(binary, &["api", "adu", &api, get("restore")], &[])
+            .unwrap();
+        assert!(restored.success && restored.stdout.contains("Added 1 user(s)"));
+    }
+    warm(port("client_a"), target);
+    warm(port("client_b"), target);
+    let mut transfer_a = socks(port("client_a"), target).unwrap();
+    let mut transfer_b = socks(port("client_b"), target).unwrap();
+    assert!(exchange(&mut transfer_a) && exchange(&mut transfer_b));
+    exec.host.clear();
+    let changed = engine.apply(
+        &parse(&after),
+        &mut ledger,
+        &observations,
+        "2026-11-01T12:00:01Z",
+    );
+    assert!(
+        changed.converged && changed.flow_error.is_none(),
+        "{changed:?}"
+    );
+    observations = changed.observations;
+    assert!(
+        !probe(port("client_a"), target),
+        "revoked identity opened another stream on its live session"
+    );
+    assert!(
+        probe(port("client_b"), target),
+        "another person's new stream was blocked"
+    );
+    assert!(
+        exchange(&mut transfer_a),
+        "the documented in-flight transfer boundary changed"
+    );
+    assert!(
+        exchange(&mut transfer_b),
+        "another person's transfer was interrupted"
+    );
+    assert!(
+        exec.host
+            .calls()
+            .iter()
+            .all(|call| !call.contains(" api rmi ") && !call.contains("systemctl restart"))
+    );
+    if fixture["rotation"].as_bool().unwrap() {
+        warm(port("client_new"), target);
+    }
+
+    // An agent restart has no blacklist to recover. Repair from the current
+    // document, even if the core lost all runtime rules while QUIC stayed alive.
+    assert!(
+        RealExec
+            .run(binary, &["api", "adrules", &api, get("base_routing")], &[])
+            .unwrap()
+            .success
+    );
+    assert!(probe(port("client_a"), target));
+    let repaired = engine.apply(
+        &parse(&after),
+        &mut ledger,
+        &observations,
+        "2026-11-01T12:00:02Z",
+    );
+    assert!(
+        repaired.converged && repaired.flow_error.is_none(),
+        "{repaired:?}"
+    );
+    assert!(!probe(port("client_a"), target));
+    assert!(probe(port("client_b"), target) && exchange(&mut transfer_b));
+    if !fixture["rotation"].as_bool().unwrap() {
+        let restored = engine.apply(
+            &parse(&before),
+            &mut ledger,
+            &repaired.observations,
+            "2026-11-01T12:00:03Z",
+        );
+        assert!(
+            restored.converged && restored.flow_error.is_none(),
+            "{restored:?}"
+        );
+        warm(port("client_a"), target);
+        assert!(exchange(&mut transfer_b));
+    }
+    // The retained explicit reset is the all-sessions path, including in-flight
+    // traffic belonging to the other person on this same inbound.
+    let config: Value = serde_json::from_slice(
+        &std::fs::read(Path::new(get("root")).join("etc/netagent/core.json")).unwrap(),
+    )
+    .unwrap();
+    let reset = Path::new(get("root")).join("reset.json");
+    std::fs::write(
+        &reset,
+        serde_json::to_vec(&serde_json::json!({"inbounds": [config["inbounds"][0]]})).unwrap(),
+    )
+    .unwrap();
+    if get("tag") == "hy2" {
+        assert!(
+            RealExec
+                .run(binary, &["api", "rmi", &api, get("tag")], &[])
+                .unwrap()
+                .success
+        );
+        assert!(
+            RealExec
+                .run(binary, &["api", "adi", &api, reset.to_str().unwrap()], &[])
+                .unwrap()
+                .success
+        );
+        assert!(!exchange(&mut transfer_a) && !exchange(&mut transfer_b));
+    } else {
+        // The pinned listener does not own accepted VLESS connections. A reset
+        // cannot implement a hard cut-off; the service must request restart_unit.
+        assert!(
+            RealExec
+                .run(binary, &["api", "rmi", &api, get("tag")], &[])
+                .unwrap()
+                .success
+        );
+        assert!(exchange(&mut transfer_a) && exchange(&mut transfer_b));
+        assert!(
+            exec.run("systemctl", &["restart", "netcore.service"], &[])
+                .unwrap()
+                .success
+        );
+        assert!(
+            !exchange(&mut transfer_a) && !exchange(&mut transfer_b),
+            "core restart left an in-flight transfer alive"
+        );
+        warm(port("client_b"), target);
+    }
+}

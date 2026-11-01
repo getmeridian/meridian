@@ -740,5 +740,6 @@
   "bulk.status.expired": "已过期",
   "events.kind.people.bulk": "人员批量更改",
   "events.bulk": "{action}：已更改 {targeted} 人中的 {changed} 人；{cli_required} 人需运行命令。",
-  "bulk.action.undo": "撤销字段更改"
+  "bulk.action.undo": "撤销字段更改",
+  "node_commands.cut_off_core_scope": "以下节点需重启 Xray 才能关闭 VLESS 会话：{nodes}。这些节点上的全部 Xray 会话都会结束。"
 }

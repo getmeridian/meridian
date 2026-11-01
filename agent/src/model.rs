@@ -115,6 +115,15 @@ pub struct ObservedStateReport {
     pub health: NodeHealth,
     pub versions: NodeVersions,
     pub observed_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_flow_blocking: Option<UserFlowBlocking>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct UserFlowBlocking {
+    pub document: NodeStateRef,
+    pub status: &'static str,
+    pub error: Option<ResourceError>,
 }
 
 #[derive(Deserialize, Debug)]
