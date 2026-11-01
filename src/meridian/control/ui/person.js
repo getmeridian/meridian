@@ -177,11 +177,23 @@
     if (!state || !state.nodes || !state.nodes.length) return null;
     var labels = { blocked: M.t("person.flow_blocked"), pending_node: M.t("person.flow_pending_node"),
       agent_too_old: M.t("person.flow_agent_too_old") };
+    var reasons = {
+      credentials: M.t("person.flow_reason_credentials"), disabled: M.t("person.flow_reason_disabled"),
+      expired: M.t("person.flow_reason_expired"), limited: M.t("person.flow_reason_limited"),
+      removed: M.t("person.flow_reason_removed"), access_changed: M.t("person.flow_reason_access_changed")
+    };
     return h("section", { class: "card flow-block-status", "aria-live": "polite" },
       h("h2", { text: M.t("person.flow_title") }),
       h("p", { class: "muted small", text: M.t("person.flow_text") }),
       h("dl", { class: "facts" }, state.nodes.map(function (node) {
-        return [h("dt", {}, h("bdi", { text: node.node_id })),
+        var generation = Number.isSafeInteger(node.credential_generation) ?
+          h("span", { class: "muted small", "data-flow-generation": node.credential_generation,
+            text: " · " + M.t("person.flow_generation", {
+              generation: new Intl.NumberFormat(M.i18n.locale()).format(node.credential_generation)
+            }) }) : null;
+        var reason = reasons[node.reason] ?
+          h("span", { class: "muted small", "data-flow-reason": node.reason, text: " · " + reasons[node.reason] }) : null;
+        return [h("dt", {}, h("bdi", { text: node.node_id }), generation, reason),
           h("dd", { "data-flow-state": node.status, text: labels[node.status] || labels.pending_node })];
       })));
   }

@@ -11,7 +11,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - **Command routes stay apart** — `command_routes.py` composes signed-command operations with the same shared not-found contract; the catalog keeps their order and dispatch metadata.
 - **One SQLite file, migrated forward** — `store.Store` shares one connection, lock, and change condition among the ledgers, each owning its tables; `SCHEMA_VERSION` plus `_MIGRATIONS` move it forward, and a database from a newer Meridian is refused, never downgraded.
 - **Schema steps stay self-contained** — `schema.py` owns table creation and forward migrations; the service delegates under its initialization transaction.
-- **Flow-block receipts follow documents** — lost identities record one generation and required revision per person/node in the same transaction; new agents confirm blocking, older ones report unable, and absent nodes stay pending.
+- **Flow-block receipts follow identities** — each node/generation keeps private per-inbound key fingerprints and the required revision; a restored key clears only matching receipts, and newer receipts retire older confirmed ones.
 - **VLESS hard cuts restart the core** — accepted TCP/mux flows survive listener resets; queue one revision-gated core restart per affected node, preserving older agents' restart capability and disclosing all-node reconnects.
 - **Connection-key rotation keeps delivery identity** — compare the current credential generation inside the write, preserve the subscription token and devices, and share replacement logic with reissue; imports advance the generation only when a connection key changes.
 - **Scoped API tokens** — one revocable token per device or agent (`tokens.py`): `read` < `propose` < `approve` < `admin`, plus a separate `people` capability for user reads and edits. Whatever applying does is `admin`. Lower scopes see user credentials blank, because those credentials connect as the user. The config's admin token is the unlisted root.
@@ -38,6 +38,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - **Bulk before is enforced** — project both sides from one account clock, re-check every target before writing, and catch up due resets before schedule edits.
 - **Bulk after stays reviewed** — re-check the projected result at commit; a newly due action schedule needs a fresh review.
 - **Bulk applies use canonical enforcement** — write validated requested fields before enforcing, or quota restoration emits the wrong event and cap edits lose their renewal interval.
+- **Credential text matters to Hysteria2** — imported UUID case changes its auth even when VLESS treats the UUID as equal; advance the generation on the actual stored key change.
 - **Schedules share directional baselines** — renewal and rolling resets clear both directions and carried period use; imports initialize the same projection before enforcement, preserving lifetime totals.
 - **First use means accepted traffic** — subscription and page reads never activate; renewal progress, period offsets, and effective status change in the traffic transaction before new growth.
 - **Renewal anchors survive short months** — expiry or interval edits start a new series, cap edits keep progress, and missed renewals consume the cap with one period reset.

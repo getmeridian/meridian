@@ -735,5 +735,12 @@
   "person.rotate_title": "کلیدهای اتصال تغییر کنند؟",
   "person.rotate_confirm": "کلیدهای اتصال با حفظ همین نشانی اشتراک جایگزین شوند؟ برنامه‌ها باید اشتراک را تازه کنند. اگر خود نشانی فاش شده، پیوند جدید صادر کنید.",
   "person.rotated_toast": "کلیدهای اتصال تغییر کردند؛ نشانی اشتراک همان است.",
-  "error.credentials_changed": "کلیدهای اتصال تغییر کرده‌اند. اطلاعات فرد را تازه کنید و دوباره تلاش کنید."
+  "error.credentials_changed": "کلیدهای اتصال تغییر کرده‌اند. اطلاعات فرد را تازه کنید و دوباره تلاش کنید.",
+  "person.flow_generation": "کلید نسخهٔ {generation}",
+  "person.flow_reason_credentials": "کلیدها تعویض شده‌اند",
+  "person.flow_reason_disabled": "دسترسی غیرفعال شده",
+  "person.flow_reason_expired": "دسترسی منقضی شده",
+  "person.flow_reason_limited": "سهمیهٔ ترافیک تمام شده",
+  "person.flow_reason_removed": "شخص حذف شده",
+  "person.flow_reason_access_changed": "دسترسی تغییر کرده"
 }

@@ -2,6 +2,7 @@
 
 ## Design decisions
 **Reviewed bulk people** — client and CLI guides describe server paging, shared filters, frozen targets, atomic commit, receipts, undo, declared deletion commands, and privacy in all four locales.
+**Revocation receipts** — client guides explain per-generation causes, private key fingerprints, restored-key clearing, and confirmed-history cleanup in every locale.
 **Core command safety** — CLI guides describe shared applied-document/config checks, retryable refusals, and new-command retries in every locale.
 **Live revocation** — client guides explain identity-only blocks, preserved DNS/IP routing, restart and re-enable cleanup, and the bounded-rule recovery request in every locale.
 **Account schedules** — client and CLI guides document UTC anniversaries, first-traffic durations, capped renewal catch-up, previews, pending extension, and preservation; connecting guides explain first use and the page's dates in every locale.

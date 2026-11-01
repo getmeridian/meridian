@@ -735,5 +735,12 @@
   "person.rotate_title": "Rotate connection keys?",
   "person.rotate_confirm": "Replace connection keys while keeping this subscription URL? Apps must refresh their subscription. Use a new link if this URL leaked.",
   "person.rotated_toast": "Connection keys changed; the subscription URL is unchanged.",
-  "error.credentials_changed": "The connection keys changed. Refresh this person and try again."
+  "error.credentials_changed": "The connection keys changed. Refresh this person and try again.",
+  "person.flow_generation": "Key generation {generation}",
+  "person.flow_reason_credentials": "Keys replaced",
+  "person.flow_reason_disabled": "Access disabled",
+  "person.flow_reason_expired": "Access expired",
+  "person.flow_reason_limited": "Traffic quota reached",
+  "person.flow_reason_removed": "Person removed",
+  "person.flow_reason_access_changed": "Access changed"
 }

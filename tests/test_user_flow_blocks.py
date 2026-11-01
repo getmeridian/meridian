@@ -202,3 +202,103 @@ def test_schema_nineteen_gains_one_generation_and_receipts_step(tmp_path: Path):
         assert restored._store.meta("schema_version") == str(SCHEMA_VERSION)
     finally:
         restored.close()
+
+
+@pytest.mark.parametrize("action", ["rotate", "disabled", "expired", "limited"])
+def test_later_revocations_record_the_generation_and_reason_actually_removed(service: ControlService, action):
+    service.put_user("alice")
+    service.rotate_credentials("alice", expected_generation=1)
+    if action == "rotate":
+        service.rotate_credentials("alice", expected_generation=2)
+        reason = "credentials"
+    elif action == "disabled":
+        service.update_user("alice", UserUpdate(status="disabled"))
+        reason = action
+    elif action == "expired":
+        service.update_user("alice", UserUpdate(expire_at="2026-11-01T12:01:00Z"))
+        service.enforce("2026-11-01T12:02:00Z")
+        reason = action
+    else:
+        user = service.update_user("alice", UserUpdate(traffic_limit_bytes=100))
+        service.record_stats(
+            "main",
+            StatsReport(
+                counter_epoch=FLEET_ID,
+                seq=1,
+                collected_at=NOW,
+                users=[UserTraffic(user_id=user.user_id, uplink_bytes=100, downlink_bytes=0)],
+            ),
+            now=NOW,
+        )
+        reason = action
+    receipts = service.user_flow_blocks("alice").nodes
+    assert any(receipt.credential_generation == 2 and receipt.reason == reason for receipt in receipts), receipts
+
+
+def test_reenable_clears_only_the_returning_generation_receipt(service: ControlService):
+    service.put_user("alice")
+    service.rotate_credentials("alice", expected_generation=1)
+    service.rotate_credentials("alice", expected_generation=2)
+    service.update_user("alice", UserUpdate(status="disabled"))
+    before = service.user_flow_blocks("alice").nodes
+    assert {receipt.credential_generation for receipt in before} == {1, 2, 3}
+    service.update_user("alice", UserUpdate(status="active"))
+    after = service.user_flow_blocks("alice").nodes
+    assert {receipt.credential_generation for receipt in after} == {1, 2}
+    assert all(receipt.reason == "credentials" for receipt in after)
+
+
+def test_restoring_an_older_connection_key_clears_that_identity_receipt(service: ControlService):
+    from meridian.control.models import UserImport, UserImportBatch
+
+    before = service.put_user("alice")
+    rotated = service.rotate_credentials("alice", expected_generation=1).user
+    service.import_users(
+        UserImportBatch(
+            users=[
+                UserImport(
+                    username="alice",
+                    uuid=before.uuid,
+                    sub_token=rotated.sub_token,
+                )
+            ],
+            replace=True,
+        )
+    )
+    current = service.get_user("alice")
+    assert current.uuid == before.uuid and current.credential_generation == 3
+    receipts = service.user_flow_blocks("alice").nodes
+    assert all(receipt.credential_generation != 1 for receipt in receipts)
+    assert any(receipt.credential_generation == 2 for receipt in receipts)
+
+
+def test_an_imported_hysteria_key_case_change_advances_the_generation(service: ControlService):
+    from meridian.control.models import UserImport, UserImportBatch
+
+    before = service.put_user("alice")
+    service.import_users(
+        UserImportBatch(
+            users=[UserImport(username="alice", uuid=before.uuid.upper(), sub_token=before.sub_token)], replace=True
+        )
+    )
+    after = service.get_user("alice")
+    assert after.uuid == before.uuid.upper()
+    assert after.credential_generation == before.credential_generation + 1
+    receipts = service.user_flow_blocks("alice").nodes
+    assert receipts[0].credential_generation == before.credential_generation
+    assert receipts[0].inbound_tags == ["hy2"]
+
+
+def test_receipt_fingerprints_stay_out_of_public_results_and_events(service: ControlService):
+    import hashlib
+
+    before = service.put_user("alice")
+    service.rotate_credentials("alice", expected_generation=1)
+    encoded = json.dumps(
+        {
+            "receipts": service.user_flow_blocks("alice").to_data(),
+            "events": [event.to_data() for event in service.events.list().events],
+        }
+    )
+    assert before.uuid not in encoded
+    assert hashlib.sha256(before.uuid.encode()).hexdigest() not in encoded

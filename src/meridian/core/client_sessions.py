@@ -38,4 +38,7 @@ class UserFlowBlocks(CoreModel):
 
     username: str
     credential_generation: CredentialGeneration
-    nodes: list[UserFlowBlockNode] = Field(default_factory=list)
+    nodes: list[UserFlowBlockNode] = Field(
+        default_factory=list,
+        description="One receipt per revoked credential generation and node; fingerprints stay private.",
+    )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from collections.abc import Callable
@@ -24,13 +25,18 @@ FLOW_BLOCKS_TABLE = """CREATE TABLE IF NOT EXISTS user_flow_blocks (
     credential_generation INTEGER NOT NULL,
     reason TEXT NOT NULL,
     inbound_tags TEXT NOT NULL,
+    identities TEXT NOT NULL,
     fleet_epoch INTEGER NOT NULL,
     revision INTEGER NOT NULL,
     sha256 TEXT NOT NULL,
     status TEXT NOT NULL,
     changed_at TEXT NOT NULL,
-    PRIMARY KEY (user_id, node_id)
+    PRIMARY KEY (user_id, node_id, credential_generation)
 )"""
+
+
+def credential_identity(credential: str) -> str:
+    return hashlib.sha256(credential.encode()).hexdigest()
 
 
 def carried(resources: list[dict[str, Any]]) -> dict[str, dict[str, str]]:
@@ -66,14 +72,14 @@ class FlowBlockLedger:
         old, new = carried(before), carried(after)
         kinds = {r["inbound_tag"]: r["kind"] for r in before if r["kind"] in {"xray_users", "hysteria2_users"}}
         gone: set[str] = set()
-        lost_tags: dict[str, list[str]] = {}
+        lost_identities: dict[str, dict[str, str]] = {}
         credentials_changed: set[str] = set()
         for tag, entries in old.items():
             for user_id, credential in entries.items():
                 replacement = new.get(tag, {}).get(user_id)
                 if replacement != credential:
                     gone.add(user_id)
-                    lost_tags.setdefault(user_id, []).append(tag)
+                    lost_identities.setdefault(user_id, {})[tag] = credential_identity(credential)
                     if replacement is not None:
                         credentials_changed.add(user_id)
                     current = directory.get(user_id)
@@ -81,6 +87,7 @@ class FlowBlockLedger:
                         current.uuid.lower() if kinds[tag] == "xray_users" else current.uuid
                     ):
                         credentials_changed.add(user_id)
+
         for user_id in sorted(gone):
             user = directory.get(user_id)
             if user is None:
@@ -98,17 +105,15 @@ class FlowBlockLedger:
             elif user_id in credentials_changed:
                 reason = "credentials"
             previous = self._store.row(
-                "SELECT * FROM user_flow_blocks WHERE user_id = ? AND node_id = ?", (user_id, node_id)
+                "SELECT * FROM user_flow_blocks WHERE user_id = ? AND node_id = ? AND credential_generation = ?",
+                (user_id, node_id, generation),
             )
-            scope = set(lost_tags[user_id])
-            if previous is not None:
-                scope.update(json.loads(previous["inbound_tags"]))
-                if previous["credential_generation"] < generation:
-                    generation, reason = previous["credential_generation"], previous["reason"]
+            identities = json.loads(previous["identities"]) if previous is not None else {}
+            identities.update(lost_identities[user_id])
             self._store.db.execute(
-                "INSERT INTO user_flow_blocks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                " ON CONFLICT(user_id, node_id) DO UPDATE SET credential_generation = excluded.credential_generation,"
-                " reason = excluded.reason, inbound_tags = excluded.inbound_tags,"
+                "INSERT INTO user_flow_blocks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                " ON CONFLICT(user_id, node_id, credential_generation) DO UPDATE SET username = excluded.username,"
+                " reason = excluded.reason, inbound_tags = excluded.inbound_tags, identities = excluded.identities,"
                 " fleet_epoch = excluded.fleet_epoch, revision = excluded.revision,"
                 " sha256 = excluded.sha256, status = excluded.status, changed_at = excluded.changed_at",
                 (
@@ -117,7 +122,8 @@ class FlowBlockLedger:
                     user.username,
                     generation,
                     reason,
-                    json.dumps(sorted(scope)),
+                    json.dumps(sorted(identities)),
+                    json.dumps(identities, sort_keys=True),
                     required.fleet_epoch,
                     required.revision,
                     required.sha256,
@@ -125,26 +131,29 @@ class FlowBlockLedger:
                     format_timestamp(self._clock()),
                 ),
             )
-            self._event(user.username, node_id, generation, "pending_node")
-        # Restoring the same generation deliberately permits it again. Rotated generations remain revoked.
-        for user in users:
-            if user.status == "active" and user.user_id not in gone:
-                receipt = self._store.row(
-                    "SELECT * FROM user_flow_blocks WHERE user_id = ? AND node_id = ?", (user.user_id, node_id)
+            if previous is None or previous["status"] != "pending_node":
+                self._event(user.username, node_id, generation, "pending_node")
+        # An explicitly restored key is active even if its numeric generation
+        # advanced through imports. Compare the identity, not just the generation.
+        for receipt in self._rows(node_id):
+            identities = json.loads(receipt["identities"])
+            remaining = {
+                tag: fingerprint
+                for tag, fingerprint in identities.items()
+                if (credential := new.get(tag, {}).get(receipt["user_id"])) is None
+                or credential_identity(credential) != fingerprint
+            }
+            key = (receipt["user_id"], node_id, receipt["credential_generation"])
+            if not remaining:
+                self._store.db.execute(
+                    "DELETE FROM user_flow_blocks WHERE user_id = ? AND node_id = ? AND credential_generation = ?", key
                 )
-                if receipt is not None and receipt["credential_generation"] == user.credential_generation:
-                    remaining = [
-                        tag for tag in json.loads(receipt["inbound_tags"]) if user.user_id not in new.get(tag, {})
-                    ]
-                    if not remaining:
-                        self._store.db.execute(
-                            "DELETE FROM user_flow_blocks WHERE user_id = ? AND node_id = ?", (user.user_id, node_id)
-                        )
-                    else:
-                        self._store.db.execute(
-                            "UPDATE user_flow_blocks SET inbound_tags = ? WHERE user_id = ? AND node_id = ?",
-                            (json.dumps(remaining), user.user_id, node_id),
-                        )
+            elif remaining != identities:
+                self._store.db.execute(
+                    "UPDATE user_flow_blocks SET inbound_tags = ?, identities = ?"
+                    " WHERE user_id = ? AND node_id = ? AND credential_generation = ?",
+                    (json.dumps(sorted(remaining)), json.dumps(remaining, sort_keys=True), *key),
+                )
         self._prune()
 
     def hello(self, node_id: str, capabilities: list[Capability]) -> None:
@@ -199,7 +208,8 @@ class FlowBlockLedger:
             for row in self._store.rows(
                 "SELECT b.*, n.last_seen_at, n.agent_capabilities, n.report,"
                 " n.revision AS node_revision, n.doc_sha256 AS node_sha256 FROM user_flow_blocks b"
-                " JOIN nodes n ON n.node_id = b.node_id WHERE b.user_id = ? ORDER BY b.node_id",
+                " JOIN nodes n ON n.node_id = b.node_id WHERE b.user_id = ?"
+                " ORDER BY b.node_id, b.credential_generation",
                 (user.user_id,),
             ):
                 status: FlowBlockStatus = row["status"]
@@ -238,14 +248,17 @@ class FlowBlockLedger:
             return UserFlowBlocks(username=user.username, credential_generation=user.credential_generation, nodes=nodes)
 
     def _rows(self, node_id: str) -> list[sqlite3.Row]:
-        return self._store.rows("SELECT * FROM user_flow_blocks WHERE node_id = ?", (node_id,))
+        return self._store.rows(
+            "SELECT * FROM user_flow_blocks WHERE node_id = ? ORDER BY credential_generation", (node_id,)
+        )
 
     def _set_status(self, row: sqlite3.Row, status: FlowBlockStatus) -> None:
         if row["status"] == status:
             return
         self._store.db.execute(
-            "UPDATE user_flow_blocks SET status = ?, changed_at = ? WHERE user_id = ? AND node_id = ?",
-            (status, format_timestamp(self._clock()), row["user_id"], row["node_id"]),
+            "UPDATE user_flow_blocks SET status = ?, changed_at = ?"
+            " WHERE user_id = ? AND node_id = ? AND credential_generation = ?",
+            (status, format_timestamp(self._clock()), row["user_id"], row["node_id"], row["credential_generation"]),
         )
         self._event(row["username"], row["node_id"], row["credential_generation"], status)
 
@@ -258,6 +271,11 @@ class FlowBlockLedger:
         )
 
     def _prune(self) -> None:
+        self._store.db.execute(
+            "DELETE FROM user_flow_blocks AS old WHERE old.status = 'blocked' AND EXISTS"
+            " (SELECT 1 FROM user_flow_blocks newer WHERE newer.user_id = old.user_id"
+            " AND newer.node_id = old.node_id AND newer.credential_generation > old.credential_generation)"
+        )
         cutoff = (datetime.fromtimestamp(self._clock(), UTC) - timedelta(days=EVENT_RETENTION_DAYS)).isoformat()
         self._store.db.execute(
             "DELETE FROM user_flow_blocks WHERE user_id NOT IN (SELECT user_id FROM users)"

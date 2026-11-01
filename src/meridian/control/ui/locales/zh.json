@@ -735,5 +735,12 @@
   "person.rotate_title": "更换连接密钥？",
   "person.rotate_confirm": "保留此订阅 URL 并更换连接密钥？应用需刷新订阅。若此 URL 已泄露，请重新签发链接。",
   "person.rotated_toast": "连接密钥已更换；订阅 URL 未改变。",
-  "error.credentials_changed": "连接密钥已改变。刷新用户信息后重试。"
+  "error.credentials_changed": "连接密钥已改变。刷新用户信息后重试。",
+  "person.flow_generation": "凭据版本 {generation}",
+  "person.flow_reason_credentials": "凭据已更换",
+  "person.flow_reason_disabled": "访问已禁用",
+  "person.flow_reason_expired": "访问已到期",
+  "person.flow_reason_limited": "流量额度已用尽",
+  "person.flow_reason_removed": "用户已删除",
+  "person.flow_reason_access_changed": "访问权限已更改"
 }

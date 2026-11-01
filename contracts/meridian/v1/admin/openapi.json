@@ -7624,6 +7624,7 @@
             "type": "integer"
           },
           "nodes": {
+            "description": "One receipt per revoked credential generation and node; fingerprints stay private.",
             "items": {
               "$ref": "#/components/schemas/UserFlowBlockNode"
             },

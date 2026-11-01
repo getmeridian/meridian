@@ -606,6 +606,8 @@ if (mode === 'person-flow-blocks') {
   report.found = !!card;
   report.text = card?.textContent || '';
   report.states = [...(card?.querySelectorAll('[data-flow-state]') || [])].map(node => node.dataset.flowState);
+  report.generations = [...(card?.querySelectorAll('[data-flow-generation]') || [])].map(node => node.dataset.flowGeneration);
+  report.reasons = [...(card?.querySelectorAll('[data-flow-reason]') || [])].map(node => node.dataset.flowReason);
   report.writes = writes;
 }
 

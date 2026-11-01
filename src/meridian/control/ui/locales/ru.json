@@ -735,5 +735,12 @@
   "person.rotate_title": "Сменить ключи подключения?",
   "person.rotate_confirm": "Заменить ключи подключения, сохранив ссылку на подписку? Приложениям нужно обновить подписку. Если утекла сама ссылка, перевыпустите её.",
   "person.rotated_toast": "Ключи подключения заменены; ссылка на подписку осталась прежней.",
-  "error.credentials_changed": "Ключи подключения изменились. Обновите данные пользователя и попробуйте ещё раз."
+  "error.credentials_changed": "Ключи подключения изменились. Обновите данные пользователя и попробуйте ещё раз.",
+  "person.flow_generation": "Ключи версии {generation}",
+  "person.flow_reason_credentials": "Ключи заменены",
+  "person.flow_reason_disabled": "Доступ отключён",
+  "person.flow_reason_expired": "Срок доступа истёк",
+  "person.flow_reason_limited": "Исчерпан лимит трафика",
+  "person.flow_reason_removed": "Пользователь удалён",
+  "person.flow_reason_access_changed": "Права доступа изменены"
 }

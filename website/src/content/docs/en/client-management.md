@@ -193,6 +193,9 @@ One Xray run retains at most 4096 credential/inbound block rules. At the limit, 
 
 The agent writes the new credentials to `core.json` before changing live accounts. A restart during apply then loads the current keys; if the core instance changes around the write, the agent reconciles it before confirming the change.
 
+
+Revocation receipts show the old key generation and the reason on each node. Separate pending generations remain visible; restoring the same key clears its matching receipt, even when an import advanced the counter. Private key fingerprints stay in the service database and never appear in the API, events, or console. Older confirmed receipts are discarded when a newer receipt exists.
+
 ## Rotate connection keys keeping the link
 
 Use `meridian client rotate-credentials NAME --yes` when connection credentials need replacing. It generates a new VLESS UUID and Hysteria2 auth while keeping the subscription token, page URL, device registrations, status, limits, expiry, traffic, notes, tags, and language. Apps receive the keys on their next subscription refresh; ask the person to refresh now. Old identities lose new streams as each node applies the change. A leaked subscription URL requires `client reissue`, which issues a new URL and clears device registrations.
