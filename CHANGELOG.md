@@ -44,6 +44,7 @@ newest first; the last is what 4.0 changes compared with 3.x.
 - Client-list JSON preserves integer facet counts for secret-shaped tags such as TOKEN and API_KEY.
 - Bulk undo emits the same lifecycle events as commit and refuses an over-capacity managed inbound without changing people or the receipt.
 - Bulk reviews compare enforced account states, refuse named stale targets even for deletion, preserve due refills, and count no-op actions as unchanged.
+- Refuse core restarts and inbound resets until the held revision and on-disk credentials agree; return retryable command results for pending application (#95).
 - Preserve Xray's DNS and IP routing while blocking revoked identities. Live
   blocks survive retries, clear on core restart or credential re-enable, and
   never deny active credentials after an install failure. A bounded retry

@@ -220,7 +220,12 @@ impl Agent<'_> {
                     } else {
                         CommandStatus::Failed
                     };
-                    CommandResult::failure(&id, status, failure.code, &failure.message, now)
+                    let mut result =
+                        CommandResult::failure(&id, status, failure.code, &failure.message, now);
+                    if let Some(error) = &mut result.error {
+                        error.retryable = failure.retryable;
+                    }
+                    result
                 }
                 None => CommandResult::new(&id, CommandStatus::Expired, now),
             };
@@ -303,12 +308,12 @@ impl Agent<'_> {
                         "This node has no held document from the command's epoch.",
                     ));
                 }
-                if matches!(action, CommandAction::ResetInbound { .. })
+                if crate::command_core::touches_core(action, &self.resources)
                     && self.state.applied != self.state.held_ref()
                 {
                     return Err(Failure::new(
-                        "validation_failed",
-                        "Apply the held credential revision before resetting an inbound.",
+                        "apply_pending",
+                        "Apply the held document before restarting or resetting the core.",
                     ));
                 }
                 // Fold traffic before a reset can discard counters; a service outage never postpones a cut-off.

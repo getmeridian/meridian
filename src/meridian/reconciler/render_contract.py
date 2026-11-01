@@ -7,10 +7,10 @@ from meridian.compiler.models import COMPILER_VERSION, canonical_hash
 _RENDERER_MANIFEST = {
     "schema": "meridian.renderer-contract/v1",
     "compiler": COMPILER_VERSION,
-    "agent-runtime": "revoked-identities-v7",
+    "agent-runtime": "core-command-preflight-v8",
     "agent-spec": "routing-service-v2",
     "control-subscriptions": "account-schedules-v3",
-    "control-commands": "vless-cut-off-core-v4",
+    "control-commands": "core-command-preflight-v5",
     "pwa": "account-schedules-v3",
     "control-service": "bulk-session-close-v15",
     "control-api": "bulk-session-close-v15",

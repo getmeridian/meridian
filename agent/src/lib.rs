@@ -11,6 +11,7 @@ pub mod agent;
 pub mod apply;
 mod backoff;
 pub mod bootstrap;
+mod command_core;
 mod command_host;
 pub mod commands;
 pub mod compose;

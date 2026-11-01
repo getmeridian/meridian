@@ -1,5 +1,4 @@
 # agent/src — netagent runtime: identity, apply, Xray, traffic, commands
-
 ## Design decisions
 **Identity under the fleet CA** — `identity.rs` generates the Ed25519 node key on the node and sends only a CSR (no OpenSSL); `identity.json` (0600) keeps key and certificates together. The service certificate must chain to the CA pinned by `ca_sha256`, be a non-CA, and name the fleet.
 **Sessions** — `session.rs` signs a fresh `NodeProof` per hello and keeps times on the service's clock; a 401 re-hellos once, `credential_revoked` stops until a new bootstrap token appears, and `unsupported_protocol` backs off for the service's retry time. Only WebPKI TLS is verified: a pin would break at every renewal of 443's short-lived IP certificate, and the CA-pinned service certificate already authenticates every document. `NETAGENT_TLS_CA_FILE` may name one private CA (the system lab's Pebble).
@@ -11,14 +10,13 @@
 **Host behind traits** — `Exec`/`Fetch` fake host I/O and `--root` redirects paths for tests; writes stay under `/etc/netagent/` and `/usr/local/lib/netagent/`, and units match `net[a-z0-9-]*.service`, never `netagent.service`.
 **Reports stay apart** — `agent/reporting.rs` builds and sends observations; the polling loop owns their cadence.
 **Revoked identities gate new streams** — block only old credential-derived emails before reviewed routing; core.json contains no revocations, while bounded retry intent follows one systemd InvocationID and clears on restart.
-
 ## What's done well
 - **Signed commands run only through negotiated kinds** — `commands.rs` verifies signature, epoch, and expiry first; `command_host.rs` restarts only held, installed units and resets only managed inbounds.
 - **Durable command results** — `commands.json` (0600, bounded) saves an interrupted outcome before execution and the result before sending, so a redelivery replays the result, never the action.
 - **Secrets stay out of logs and reports** — no token, key, service URL (`Client::scrub`), user UUID, or sensitive content; messages are trimmed.
 - **Atomic writes everywhere** — private temp sibling, fsync, mode and owner, rename, directory fsync (`fsutil::write_atomic`).
-
 ## Pitfalls
+- **Every core command checks the applied document and exact config bytes** — restarts and reset fallbacks must not reload revoked credentials from stale core.json; failed preconditions are retryable.
 - **Re-enable clears live blocks before adding accounts** — use rule removal independently of rule installation, and keep the document pending if matching blocks remain.
 - **IPIfNonMatch needs an unmatched first pass** — an active-user catch-all suppresses DNS and bypasses private/country blocks and IP egress; install only revoked-identity blocks.
 - **Guard retries preserve earlier blocks** — save retry intent before removing authentication, and retry the complete graph with all revocations after a failed replacement.
