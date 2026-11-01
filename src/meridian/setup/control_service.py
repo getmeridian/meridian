@@ -35,10 +35,11 @@ from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
 from meridian.host_runtime import CONTROL_SERVICE_STATE_DIR
 from meridian.provision.ensure import ensure_file_content
+from meridian.provision.tls import certificate_inspection_command, certificate_names_host
 from meridian.reconciler.control_service_driver import xray_subscription_is_valid
 from meridian.reconciler.meridian_drivers import MeridianDriverContext, build_meridian_drivers
 from meridian.reconciler.resources import ResourceAction, ResourceDrivers, ResourceReconcileError
-from meridian.reconciler.server_evidence import file_content_or_absent
+from meridian.reconciler.server_evidence import assertion_matches, file_content_or_absent
 from meridian.reconciler.workloads import LocalRealityKeyFactory, WorkloadStateManager
 from meridian.servers import ServerEntry
 from meridian.ssh import ServerConnection
@@ -244,6 +245,13 @@ def control_service_ready(
     read = connection.get_text(_ATTESTATION_PATH, timeout=15)
     attestation = file_content_or_absent(action.resource.logical_id, read, "control-service attestation")
     if attestation is None or attestation.strip() != service_attestation(payload, plan):
+        return False
+    # The certificate nginx serves the service with must still name it: an exit's IP certificate
+    # once overwrote a panel domain's, and nothing noticed until the CLI's TLS check failed.
+    hostname = payload.public_hostname or entry.host
+    inspection = connection.run(certificate_inspection_command(hostname), timeout=15)
+    current = assertion_matches(action.resource.logical_id, inspection, "control-service certificate")
+    if not current or not certificate_names_host(inspection.stdout, hostname):
         return False
     with control_client(cluster) as client:
         return client.ping()

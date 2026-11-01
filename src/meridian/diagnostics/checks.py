@@ -116,11 +116,14 @@ def check_tls_certificate(conn: ServerConnection, host: str, *, port: int = 443)
     IP SNI reaches the Reality camouflage site (so the check once judged its certificate),
     and a control server without an exit rejects it.
     """
-    server_name = "-noservername" if _is_ip_address(host) else f"-servername {shlex.quote(host)}"
+    is_ip = _is_ip_address(host)
+    server_name = "-noservername" if is_ip else f"-servername {shlex.quote(host)}"
+    # Dates alone passed a certificate for another name: a panel domain's once served its IP (#110).
+    name_check = f"{'-checkip' if is_ip else '-checkhost'} {shlex.quote(host)}"
     result = conn.run(
         "command -v openssl >/dev/null 2>&1 || exit 127; "
         f"echo | openssl s_client -connect 127.0.0.1:{shlex.quote(str(port))} {server_name} 2>/dev/null"
-        " | openssl x509 -noout -dates 2>/dev/null",
+        f" | openssl x509 -noout -dates {name_check} 2>/dev/null",
         timeout=15,
     )
 
@@ -140,6 +143,13 @@ def check_tls_certificate(conn: ServerConnection, host: str, *, port: int = 443)
         )
 
     raw = result.stdout.strip()
+    if "does NOT match certificate" in raw:
+        return CheckResult(
+            name="tls_certificate",
+            status="failed",
+            detail=f"Port {port} serves a certificate that does not name {host}",
+            remediation="Run `meridian apply` to reinstall the certificate for this name",
+        )
     dates = dict(line.split("=", 1) for line in raw.splitlines() if "=" in line)
     if "notAfter" not in dates:
         return CheckResult(

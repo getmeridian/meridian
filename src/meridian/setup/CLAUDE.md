@@ -21,5 +21,5 @@
 - **The fleet document never sets what it hides** — it writes names for `srv-*` IDs and drops transport paths; import refuses a `path:` key, and every value read before validation guards its own shape.
 - **Preserve every intent field through `SetupDraft.from_intent()`/`to_intent()`** and when the wizard re-asks roles (relay ports, egress overrides, server metadata), or review drops them silently.
 - **Do not skip stages** — presentation adapters call `SetupDraftService`; remote checkpoints live in typed cluster state, not `setup.json`.
-- **Readiness separates confirmed drift from unavailable evidence.**
+- **Readiness separates confirmed drift from unavailable evidence**, and control-service readiness requires a current certificate naming the service (its domain, else the IP): an exit's IP certificate once replaced a panel domain's while readiness only read the attestation.
 - **Apply refuses Meridian 2.x/3.x leftovers and non-apt systems before persisting intent** (`legacy_guard.py`) — V4 takes over 443, so an old deployment must be torn down explicitly, never replaced silently.

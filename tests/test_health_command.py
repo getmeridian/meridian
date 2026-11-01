@@ -189,6 +189,23 @@ def test_tls_check_reads_meridians_certificate_before_the_camouflage_sites(fleet
     assert "TLS certificate on 443" in [check.name for check in checks]
 
 
+def test_tls_check_reads_every_name_meridian_certifies_on_a_port(fleet: SimpleNamespace) -> None:
+    """A panel domain and the server's IP share 443; checking only the first missed a swapped certificate."""
+    fleet.deployment.https_routes = (
+        VerificationHttpsRoute(kind="camouflage", port=443, tls_sni="www.example.com"),
+        VerificationHttpsRoute(kind="managed", port=443, tls_sni="panel.example.com", host_header="panel.example.com"),
+        VerificationHttpsRoute(kind="managed", port=443, tls_sni="198.51.100.10", host_header="198.51.100.10"),
+    )
+    with patch.object(health, "health_report", wraps=health.health_report) as report:
+        mocks = _run(fleet, "exit-a")
+
+    assert [call.args[1] for call in mocks.tls.call_args_list] == ["198.51.100.10", "panel.example.com"]
+    _title, _scope, checks = report.call_args.args
+    assert {"TLS certificate on 443 (198.51.100.10)", "TLS certificate on 443 (panel.example.com)"} <= {
+        check.name for check in checks
+    }
+
+
 def test_remote_check_measures_data_flow_from_the_deployer_without_the_differential(fleet: SimpleNamespace) -> None:
     mocks = _run(fleet, "exit-a")
 

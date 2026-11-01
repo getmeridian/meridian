@@ -196,6 +196,50 @@ def test_control_service_readiness_requires_the_url_on_its_domain(host: str, obs
     assert bool(conn.calls) is observed  # only a matching URL goes on to read the attestation
 
 
+@pytest.mark.parametrize(
+    ("served", "rc", "pinged"),
+    [
+        (f"X509v3 Subject Alternative Name:\n    DNS:{PANEL}", 0, True),
+        (f"X509v3 Subject Alternative Name:\n    IP Address:{ADDRESS}", 0, False),
+        (f"X509v3 Subject Alternative Name:\n    DNS:{PANEL}", 1, False),
+    ],
+    ids=["names-the-panel", "an-ip-certificate-replaced-it", "expires-within-a-day"],
+)
+def test_control_service_readiness_requires_a_current_certificate_for_its_name(
+    served: str, rc: int, pinged: bool, monkeypatch
+) -> None:
+    """An exit's IP certificate once overwrote the panel domain's, and readiness never looked (#110)."""
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+
+    from meridian.cluster import ClusterConfig
+    from meridian.host_runtime import certificate_directory
+    from meridian.reconciler.resources import build_resource_actions
+    from meridian.servers import ServerEntry
+    from meridian.setup import control_service
+    from tests.support.mock_connection import MockConnection
+
+    plan = compile_topology(_with_control_domain(_intent()))
+    action = next(item for item in build_resource_actions(plan, 1) if item.resource.logical_id == "control:service")
+    payload = action.resource.payload
+    cluster = ClusterConfig()
+    cluster.panel.server_ip, cluster.panel.api_token, cluster.panel.secret_path = ADDRESS, "token", "secret"
+    cluster.panel.url = f"https://{PANEL}/secret"
+    conn = MockConnection()
+    conn.when(control_service._ATTESTATION_PATH, stdout=control_service.service_attestation(payload, plan))
+    conn.when(f"openssl x509 -in {certificate_directory(PANEL)}/fullchain.pem", stdout=served, rc=rc)
+    pings: list[bool] = []
+    client = SimpleNamespace(ping=lambda: pings.append(True) or True)
+    monkeypatch.setattr(control_service, "control_client", lambda _cluster: nullcontext(client))
+
+    ready = control_service.control_service_ready(
+        action, plan, cluster, ServerEntry(host=ADDRESS, user="root", id="srv-a"), conn
+    )
+
+    assert ready is pinged
+    assert bool(pings) is pinged
+
+
 def test_control_bootstrap_refuses_before_provisioning_without_an_agent_build(tmp_home, monkeypatch) -> None:
     """A wheel install carries no agent: finding out at the first agent left a service with no nodes."""
     from meridian.cluster import ClusterConfig
