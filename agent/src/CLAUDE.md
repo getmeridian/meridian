@@ -9,6 +9,7 @@
 **Users without restarts** — `xray.rs` composes users into the config and checks it with `run -test`; when only users changed and the unit is active, VLESS users apply live through `xray api`, and Hysteria2 additions rebuild only that inbound (dropping just its sessions). Anything else restarts.
 **Traffic counted once** — `stats.rs` folds `statsquery -reset` into `traffic.json` (0600) and saves each new sequence number before sending; users who left keep their totals in `retired`.
 **Host behind traits** — `Exec`/`Fetch` fake host I/O and `--root` redirects paths for tests; writes stay under `/etc/netagent/` and `/usr/local/lib/netagent/`, and units match `net[a-z0-9-]*.service`, never `netagent.service`.
+**Reports stay apart** — `agent/reporting.rs` builds and sends observations; the polling loop owns their cadence.
 
 ## What's done well
 - **Signed commands run only through negotiated kinds** — `commands.rs` verifies signature, epoch, and expiry first; `command_host.rs` restarts only held, installed units and resets only managed inbounds.

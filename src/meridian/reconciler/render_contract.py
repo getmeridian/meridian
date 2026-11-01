@@ -7,7 +7,7 @@ from meridian.compiler.models import COMPILER_VERSION, canonical_hash
 _RENDERER_MANIFEST = {
     "schema": "meridian.renderer-contract/v1",
     "compiler": COMPILER_VERSION,
-    "agent-runtime": "signed-commands-v4",
+    "agent-runtime": "session-control-modules-v5",
     "agent-spec": "service-blob-v1",
     "control-subscriptions": "account-schedules-v3",
     "control-commands": "node-restart-console-v3",
