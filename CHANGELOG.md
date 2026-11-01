@@ -44,6 +44,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Preserve passkey registration proofs through a renewed identity check or a
+  full-key-list refusal, and check session liveness before consuming confirmation proofs.
 - Anonymous passkey requests cannot exhaust owner registration or confirmation;
   full login pools replace their oldest requests, and service retry delays reach HTTP headers.
 - Keep every bulk-deleted person in per-node flow-block receipts without rotating connection keys or subscription URLs (#95).

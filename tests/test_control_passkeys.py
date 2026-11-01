@@ -199,16 +199,59 @@ def test_passkey_management_always_requires_recent_identity(
     assert refused.value.code == "reauth_required"
 
 
+def test_registration_keeps_its_proof_when_step_up_lapses_during_the_prompt(
+    service: ControlService, session: OwnerSession, clock: Clock
+) -> None:
+    clock.now += CONFIRM_SECONDS - 1
+    begin = service.passkeys.begin_registration(session)
+    request = RegistrationCompletion(
+        challenge_id=begin.challenge_id,
+        name="Travel key",
+        credential=Authenticator().registration(begin.public_key.to_data()),
+    )
+    clock.now += 2
+    with pytest.raises(ServiceError) as stale:
+        service.passkeys.finish_registration(session, request)
+    assert stale.value.code == "reauth_required"
+    assert service.passkeys.list_passkeys().passkeys == []
+    service.owner.confirm(session, PASSWORD, "")
+    assert service.passkeys.finish_registration(session, request).name == "Travel key"
+    with pytest.raises(ServiceError) as replay:
+        service.passkeys.finish_registration(session, request)
+    assert replay.value.code == "passkey_expired"
+
+
+def test_registration_keeps_its_proof_until_a_full_key_list_has_room(
+    service: ControlService, session: OwnerSession
+) -> None:
+    for _ in range(MAX_PASSKEYS - 1):
+        register(service, session, Authenticator())
+    begin = service.passkeys.begin_registration(session)
+    request = RegistrationCompletion(
+        challenge_id=begin.challenge_id,
+        name="Travel key",
+        credential=Authenticator().registration(begin.public_key.to_data()),
+    )
+    other = service.owner.login(PASSWORD, "")
+    last_key = register(service, other, Authenticator())
+    with pytest.raises(ServiceError) as full:
+        service.passkeys.finish_registration(session, request)
+    assert full.value.code == "passkey_limit"
+    service.passkeys.remove(session, last_key)
+    assert service.passkeys.finish_registration(session, request).name == "Travel key"
+
+
 def test_an_ended_session_cannot_finish_passkey_confirmation(service: ControlService, session: OwnerSession) -> None:
     authenticator = Authenticator()
     register(service, session, authenticator)
     begin = service.passkeys.begin_authentication(session=session)
     service.owner.logout(session)
-    with pytest.raises(ServiceError) as refused:
-        service.passkeys.finish_authentication(
-            begin.challenge_id, authenticator.assertion(begin.public_key.to_data()), session=session
-        )
-    assert refused.value.code == "unauthenticated"
+    for _ in range(2):
+        with pytest.raises(ServiceError) as refused:
+            service.passkeys.finish_authentication(
+                begin.challenge_id, authenticator.assertion(begin.public_key.to_data()), session=session
+            )
+        assert refused.value.code == "unauthenticated"
     assert service.passkeys.list_passkeys().passkeys[0].last_used_at is None
 
 

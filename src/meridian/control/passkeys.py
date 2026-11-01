@@ -88,10 +88,7 @@ class PasskeyRegistry:
         with self._store.transaction():
             self._owner.hold_recent(session)
             rp = self._rp()
-            if len(self.list_passkeys().passkeys) >= MAX_PASSKEYS:
-                raise ServiceError(
-                    "passkey_limit", "Remove a passkey before adding another; at most ten can be saved.", 409
-                )
+            self._hold_registration_room()
             handle = self._user_handle(create=True)
             credentials = self._credentials(rp)
             challenge_id, value = self._challenge("register", rp, handle, credentials, session)
@@ -107,17 +104,14 @@ class PasskeyRegistry:
             )
 
     def finish_registration(self, session: OwnerSession, request: RegistrationCompletion) -> PasskeyRecord:
-        challenge = self._take_challenge(request.challenge_id, "register", session)
         with self._store.transaction():
             self._owner.hold_recent(session)
+            self._hold_registration_room()
+            challenge = self._take_challenge(request.challenge_id, "register", session)
             self._hold_context(challenge)
             verified = verify_registration(request.credential, challenge=challenge.value, rp=challenge.rp)
             if self._row(verified.credential_id) is not None:
                 raise ServiceError("passkey_exists", "This passkey is already saved. Use a different passkey.", 409)
-            if len(self.list_passkeys().passkeys) >= MAX_PASSKEYS:
-                raise ServiceError(
-                    "passkey_limit", "Remove a passkey before adding another; at most ten can be saved.", 409
-                )
             now = int(self._clock())
             self._store.db.execute(
                 "INSERT INTO ui_passkeys (credential_id, public_key, algorithm, sign_count, rp_id, name, created_at)"
@@ -159,10 +153,10 @@ class PasskeyRegistry:
     def finish_authentication(
         self, challenge_id: str, credential: AssertionCredential, *, session: OwnerSession | None = None
     ) -> OwnerSession:
-        challenge = self._take_challenge(challenge_id, "confirm" if session is not None else "login", session)
         with self._store.transaction():
             if session is not None:
                 self._owner.hold_live(session)
+            challenge = self._take_challenge(challenge_id, "confirm" if session is not None else "login", session)
             self._hold_context(challenge)
             row = self._row(credential.id)
             if row is None or credential.id not in challenge.credential_ids or row["rp_id"] != challenge.rp.id:
@@ -205,6 +199,12 @@ class PasskeyRegistry:
             self._store.db.execute("DELETE FROM ui_passkeys WHERE credential_id = ?", (credential_id,))
             # A lost key may already have opened a session; retain only the verified browser removing it.
             self._store.db.execute("DELETE FROM ui_sessions WHERE session_id != ?", (session.session_id,))
+
+    def _hold_registration_room(self) -> None:
+        if len(self.list_passkeys().passkeys) >= MAX_PASSKEYS:
+            raise ServiceError(
+                "passkey_limit", "Remove a passkey before adding another; at most ten can be saved.", 409
+            )
 
     def _rp(self) -> RelyingParty:
         rp = relying_party(self._public_url())
