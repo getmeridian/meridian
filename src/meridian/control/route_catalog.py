@@ -17,16 +17,11 @@ from meridian.control.api_models import (
     NoticeQuery,
     OpenApiDocument,
     SnapshotResponse,
-    UserDeleteResponse,
-    UserList,
-    UserReissueResponse,
 )
 from meridian.control.command_models import (
-    CutOffPlan,
     NodeCommandRecord,
     NodeCommandRequest,
     NodeCommandTargets,
-    UserCutOffRequest,
 )
 from meridian.control.models import (
     ApplyFenceState,
@@ -60,41 +55,20 @@ from meridian.control.models import (
     TokenRecord,
     TrafficDailySummary,
     TrafficSummary,
-    UserCreate,
-    UserDevices,
-    UserImportBatch,
-    UserImportResult,
-    UserPatch,
-    UserRecord,
-    UserUpdate,
-    UserUsage,
 )
-from meridian.control.route_types import WRITE, ApiRoute, BodyScope, ErrorResponse, route
+from meridian.control.person_route_catalog import PERSON_ROUTES
+from meridian.control.route_metadata import (
+    CONFLICT,
+    HISTORY_OFF,
+    NOT_FOUND,
+)
+from meridian.control.route_types import WRITE, ApiRoute, ErrorResponse, route
 from meridian.core.attention import AttentionList, AttentionThresholds
-from meridian.core.client_devices import DevicesRemoved
-from meridian.core.client_limits import ClientExtendRequest
-from meridian.core.clients import ClientConnections
 from meridian.core.fleet_events import FleetEventPage
 from meridian.core.languages import LanguageSettings, LanguageState
 from meridian.core.notices import NoticeState, NoticeWrite
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
-
-NOT_FOUND = ErrorResponse(404, ("not_found",))
-CONFLICT = ErrorResponse(409, ("conflict",))
-HISTORY_OFF = ErrorResponse(409, ("history_off",))
-CUT_OFF_ERRORS = ErrorResponse(409, ("declared_user", "conflict", "command_queue_full"))
-CUT_OFF_SCOPE = (BodyScope("cut_off", True, "admin"),)
-
-
-USER_CREDENTIALS = (
-    "User UUIDs and subscription tokens are blank unless the caller has people or admin scope; "
-    "private notes and tags follow the same rule."
-)
-DECLARED_USER = (
-    "People tokens cannot remove or reissue a person declared by an approved, applied, or failed fleet revision; "
-    "use the meridian CLI."
-)
 
 API_ROUTES: tuple[ApiRoute, ...] = (
     route(
@@ -298,203 +272,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         refusals=(HISTORY_OFF,),
         description="Other query options are ignored. Daily history must be enabled by the operator.",
     ),
-    route(
-        "GET",
-        "/api/users",
-        ("read", "people"),
-        "list_users",
-        None,
-        UserList,
-        "List all people and their account state.",
-        credentials=True,
-        description=USER_CREDENTIALS,
-    ),
-    route(
-        "POST",
-        "/api/users",
-        "people",
-        "create_user",
-        UserCreate,
-        UserRecord,
-        "Create a person with their first limits.",
-        credentials=True,
-        refusals=(ErrorResponse(409, ("user_exists",)),),
-    ),
-    route(
-        "POST",
-        "/api/import/users",
-        "admin",
-        "import_users",
-        UserImportBatch,
-        UserImportResult,
-        "Import credentials, account settings, and usage atomically.",
-        credentials=False,
-        refusals=(CONFLICT,),
-    ),
-    route(
-        "GET",
-        "/api/users/{username}",
-        ("read", "people"),
-        "get_user",
-        None,
-        UserRecord,
-        "Read one person's account state.",
-        credentials=True,
-        refusals=(NOT_FOUND,),
-        description=USER_CREDENTIALS,
-    ),
-    route(
-        "GET",
-        "/api/users/{username}/connections",
-        "people",
-        "user_connections",
-        None,
-        ClientConnections,
-        "List one person's individual connections and explicit format URLs.",
-        credentials=True,
-        refusals=(NOT_FOUND,),
-        description="Each connection URI and format URL connects as the person.",
-    ),
-    route(
-        "GET",
-        "/api/users/{username}/usage",
-        ("read", "people"),
-        "user_usage",
-        None,
-        UserUsage,
-        "Read one person's retained daily usage.",
-        credentials=False,
-        query_model=HistoryQuery,
-        refusals=(NOT_FOUND, HISTORY_OFF),
-        description="Other query options are ignored. Daily history must be enabled by the operator.",
-    ),
-    route(
-        "PUT",
-        "/api/users/{username}",
-        "people",
-        "put_user",
-        None,
-        UserRecord,
-        "Ensure a person exists, preserving existing settings.",
-        credentials=True,
-        description="No request body is read. A missing person starts active with default limits.",
-    ),
-    route(
-        "PATCH",
-        "/api/users",
-        "people",
-        "patch_user",
-        UserPatch,
-        UserRecord,
-        "Edit a person named in the request body.",
-        credentials=True,
-        refusals=(NOT_FOUND,),
-    ),
-    route(
-        "PATCH",
-        "/api/users/{username}",
-        "people",
-        "update_user",
-        UserUpdate,
-        UserRecord,
-        "Edit only the supplied account fields.",
-        credentials=True,
-        refusals=(NOT_FOUND,),
-    ),
-    route(
-        "POST",
-        "/api/users/{username}/reissue",
-        "people",
-        "reissue_user",
-        UserCutOffRequest,
-        UserReissueResponse,
-        "Replace a person's connection credentials.",
-        credentials=True,
-        body_required=False,
-        body_scopes=CUT_OFF_SCOPE,
-        refusals=(NOT_FOUND, CUT_OFF_ERRORS),
-        description=DECLARED_USER,
-    ),
-    route(
-        "GET",
-        "/api/users/{username}/cut-off",
-        "read",
-        "cut_off_scope",
-        None,
-        CutOffPlan,
-        "List inbounds affected by a session cut-off.",
-        credentials=False,
-        refusals=(NOT_FOUND,),
-    ),
-    route(
-        "POST",
-        "/api/users/{username}/reset-traffic",
-        "people",
-        "reset_user_traffic",
-        None,
-        UserRecord,
-        "Reset a person's current-period traffic use.",
-        credentials=True,
-        refusals=(NOT_FOUND,),
-    ),
-    route(
-        "POST",
-        "/api/users/{username}/extend",
-        "people",
-        "extend_user",
-        ClientExtendRequest,
-        UserRecord,
-        "Extend expiry from the later of now and current expiry.",
-        credentials=True,
-        refusals=(NOT_FOUND,),
-    ),
-    route(
-        "GET",
-        "/api/users/{username}/devices",
-        ("read", "people"),
-        "user_devices",
-        None,
-        UserDevices,
-        "Read registrations allowed by the privacy level.",
-        credentials=False,
-        refusals=(NOT_FOUND,),
-    ),
-    route(
-        "DELETE",
-        "/api/users/{username}/devices/{device_key}",
-        "people",
-        "delete_user_device",
-        None,
-        DevicesRemoved,
-        "Remove one device registration.",
-        credentials=False,
-        refusals=(NOT_FOUND,),
-    ),
-    route(
-        "DELETE",
-        "/api/users/{username}/devices",
-        "people",
-        "clear_user_devices",
-        None,
-        DevicesRemoved,
-        "Clear all device registrations for a person.",
-        credentials=False,
-        refusals=(NOT_FOUND,),
-    ),
-    route(
-        "DELETE",
-        "/api/users/{username}",
-        "people",
-        "delete_user",
-        UserCutOffRequest,
-        UserDeleteResponse,
-        "Remove a person and optionally queue session cut-offs.",
-        credentials=False,
-        body_required=False,
-        body_scopes=CUT_OFF_SCOPE,
-        refusals=(NOT_FOUND, CUT_OFF_ERRORS),
-        description=DECLARED_USER,
-    ),
+    *PERSON_ROUTES,
     route(
         "GET",
         "/api/endpoints/{endpoint_id}",
