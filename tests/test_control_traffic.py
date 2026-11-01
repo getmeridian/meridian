@@ -358,9 +358,14 @@ def test_schema_thirteen_backfills_retained_node_evidence_once_and_marks_the_acc
 ) -> None:
     from datetime import datetime
 
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: "2026-11-01T11:00:00Z")
+    moment = "2026-11-01T11:00:00Z"
+    monkeypatch.setattr("meridian.control.service.utc_now", lambda: moment)
+
+    def clock() -> float:
+        return datetime.fromisoformat(moment).timestamp()
+
     path = tmp_path / "control.db"
-    service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
+    service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0", clock=clock)
     service.put_user("alice")
     for index in range(KEPT_EPOCHS + 2):
         service.record_stats("main", _report(service, f"{index:08x}-6c1d-4e8b-9a7f-2b5d4c3e1f00", 1, alice=(4, 6)))
@@ -372,7 +377,7 @@ def test_schema_thirteen_backfills_retained_node_evidence_once_and_marks_the_acc
         db.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(old_version),))
     since = None
     for _ in range(2):
-        service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
+        service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0", clock=clock)
         assert service.traffic.node_totals() == {"main": KEPT_EPOCHS * 10}
         row = service._store.row("SELECT * FROM node_traffic_totals WHERE node_id = 'main'")
         assert datetime.fromisoformat(row["counting_since"]).tzinfo is not None
@@ -383,7 +388,7 @@ def test_schema_thirteen_backfills_retained_node_evidence_once_and_marks_the_acc
         assert service.get_user("alice").lifetime_traffic_bytes == (KEPT_EPOCHS + 2) * 10
         assert service._store.meta("schema_version") == str(SCHEMA_VERSION)
         service.close()
-    service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
+    service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0", clock=clock)
     try:
         epoch = f"{KEPT_EPOCHS + 1:08x}-6c1d-4e8b-9a7f-2b5d4c3e1f00"
         service.record_stats("main", _report(service, epoch, 2, alice=(5, 6)), now="2026-11-01T12:00:00Z")

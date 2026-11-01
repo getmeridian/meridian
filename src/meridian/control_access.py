@@ -16,6 +16,8 @@ from functools import partial
 from typing import Self, TypeVar
 
 from meridian.cluster import ClusterConfig
+from meridian.control.access_limits import limit_update
+from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.client import (
     ControlClient,
     ControlServiceAuthError,
@@ -25,7 +27,6 @@ from meridian.control.client import (
 )
 from meridian.control.command_models import NodeCommandRecord
 from meridian.control.models import (
-    LimitStrategy,
     PrivacySettings,
     PrivacyState,
     PrivacyUpdateResult,
@@ -35,9 +36,10 @@ from meridian.control.models import (
     UserUpdate,
     UserUsage,
 )
+from meridian.core.account_schedule import LIFECYCLE_FIELDS, AccountLifecycleState, AccountSchedulePreview
 from meridian.core.attention import AttentionList
 from meridian.core.client_devices import DevicesRemoved
-from meridian.core.client_limits import ClientLimitChange, TrafficReset
+from meridian.core.client_limits import ClientLimitChange
 from meridian.core.clients import ClientConnections
 from meridian.core.fleet import FleetTopology
 from meridian.core.languages import LanguageSettings, LanguageState
@@ -57,12 +59,6 @@ from meridian.remnawave import (
 )
 
 T = TypeVar("T")
-_RESET_STRATEGIES: dict[TrafficReset, LimitStrategy] = {
-    "never": "no_reset",
-    "day": "day",
-    "week": "week",
-    "month": "month",
-}
 
 
 class ServiceAccessPanel:
@@ -145,23 +141,16 @@ class ServiceAccessPanel:
 
     def update_user_limits(self, user_id: str, change: ClientLimitChange) -> User:
         """Set the limits the change names; the service lifts `limited`/`expired` once they allow the user."""
-        fields: dict[str, object] = {}
-        if change.traffic_limit_bytes is not None:
-            fields["traffic_limit_bytes"] = change.traffic_limit_bytes
-        if change.traffic_reset is not None:
-            fields["traffic_limit_strategy"] = _RESET_STRATEGIES[change.traffic_reset]
-        if change.sets_expiry:
-            fields["expire_at"] = change.expires_at  # None clears the expiry
-        if change.sets_devices:
-            fields["device_limit"] = change.device_limit
-        if change.sets_language:
-            fields["language"] = change.language
-        for field in ("note", "tag"):
-            if getattr(change, field) is not None:
-                fields[field] = getattr(change, field)
         username = self._username(user_id)
-        update = UserUpdate.model_validate(fields)
-        return self._user(_translated(lambda: self._client.update_user(username, update)))
+        return self._user(_translated(lambda: self._client.update_user(username, limit_update(change))))
+
+    def preview_user_limits(self, user_id: str, change: ClientLimitChange) -> AccountSchedulePreview:
+        update = limit_update(change)
+        fields = update.model_dump(
+            include=update.model_fields_set & {*LIFECYCLE_FIELDS, "expire_at", "traffic_limit_strategy"}
+        )
+        request = UserSchedulePreviewRequest.model_validate({"username": self._username(user_id), **fields})
+        return _translated(lambda: self._client.preview_user_schedule(request))
 
     def reset_user_traffic(self, user_id: str) -> User:
         username = self._username(user_id)
@@ -223,6 +212,8 @@ class ServiceAccessPanel:
             description=record.note,
             tag=record.tag,
             language=record.language,
+            schedule=record.schedule,
+            **record.model_dump(include=set(AccountLifecycleState.model_fields)),
         )
 
 

@@ -115,6 +115,28 @@ The app’s `Subscription-Userinfo` header, `/info`, the API’s `period_traffic
 
 Apply, redeploys, and fleet changes never change a client's limits or expiry.
 
+## Account schedules
+
+Renewals and anniversary resets clear both period upload and download, including imported use with an unknown direction. Lifetime traffic stays intact.
+
+`--reset month` resets on the first day of each UTC month. `--reset month_rolling` resets on the account’s monthly anniversary: its stored UTC anchor day defaults to the creation day. Set it with `--reset-day 1–31`, or use `default` to return to the creation day. Day 31 becomes February 28 or 29, then March 31. After downtime, the service resets once before counting new reported traffic. Remnawave migration keeps `MONTH_ROLLING` and the original creation-day anchor; a missing creation date is refused.
+
+`--duration N` gives 1–3650 days from first use, with each day lasting 24 hours in UTC. Only the first accepted traffic reported by an agent activates it; opening the connection page or fetching a subscription never does. Before activation, the CLI, panel, and page say “valid for 30 days from first use”; afterwards they show the actual expiry. Choose a duration or `--expires`, not both. Setting a duration on an already-used account uses its recorded first traffic; if that historical time is unknown, set a fixed expiry. `--duration none` clears the duration while keeping an existing activated expiry. Extending an unused account adds days to its pending duration without activating it.
+
+```bash
+meridian client add example --duration 30 --limit 50GiB --reset month_rolling --reset-day 31
+meridian client set example --renew-months 1 --renewals 3 --dry-run --json
+meridian client set example --renew-months 1 --renewals 3 --yes --json
+meridian client set example --renew-days 7 --renewals unlimited --yes
+meridian client set example --no-renew --yes
+```
+
+Automatic renewal uses `--renew-days N` (1–3650 UTC days) or `--renew-months N` (1–120 calendar months). It advances from the original expiry, retaining its UTC time and original month day through short months. `--renewals N` caps the series at 1–10000 renewals; `unlimited` removes the cap. Every missed boundary counts toward the cap; downtime is caught up in one transaction and resets period traffic once, preserving lifetime traffic. A disabled account still follows its schedule and stays disabled. A limited account becomes active only when expiry and quota allow it. Pending accounts wait for first use. The CLI, panel, and page show the next reset, next renewal, and renewals left.
+
+`client set --dry-run` reads a service-calculated date preview and saves nothing. JSON returns `data.schedule_preview` with `applied: false`. Schedule edits require `--yes` in JSON mode; interactive edits show the dates before confirmation. `--no-renew` turns renewal off. Changing the expiry, duration, or renewal interval starts a new series; editing only the cap preserves the completed count. A manual extension after activation also starts a new series. The panel’s expiry and limit editors offer the same choices, with browser-local dates and exact UTC. These fields survive fleet documents, import batches, encrypted backup and restore; later applies preserve operator edits.
+
+`POST /api/users/preview` requires people/admin scope or the authenticated owner session. Omit `username` to preview creation; include it to preview an edit. Requests use typed `traffic_reset_anchor_day`, `activation_duration_days`, `renewal_interval_days`, `renewal_interval_months`, `renewal_limit`, `expire_at`, and `traffic_limit_strategy`. The same settings travel in `POST /api/users` and `PATCH /api/users/{username}`. Omitted fields preserve values; explicit null clears a choice. Read-only `renewals_completed`, `renewal_anchor_at`, and `schedule` describe progress and computed dates. Previews store no account changes, device data, or request details.
+
 ## Limit devices
 
 Device limits are **off by default**: Meridian reads and stores no device information. Choose `private` or `full` in **Settings → Privacy** when you need a cap. The privacy level and each person's cap live in the control service; applies leave them alone.
@@ -276,6 +298,7 @@ Read tokens never see anyone's keys or subscription ID. Choose **People** for a 
 
 | People endpoint | Action |
 |---|---|
+| `POST /api/users/preview` | Preview creation or an edit’s UTC schedule dates without saving; people/admin or owner session |
 | `POST /api/users` | Create a person with `username`, `status`, `expire_at`, `traffic_limit_bytes`, `traffic_limit_strategy`, and `device_limit` in one transaction |
 | `PATCH /api/users/{username}` | Change the status, expiry, traffic limit or reset strategy, or device cap; omitted fields keep their values |
 | `POST /api/users/{username}/reset-traffic` | Reset used traffic |

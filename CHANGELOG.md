@@ -15,6 +15,11 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b9
 
 #### Added
+- Account anniversary resets, durations from first traffic, and automatic
+  expiry renewal with optional caps. API, CLI, panel, connection pages, and
+  refill headers share UTC dates; migration keeps rolling-month anchors.
+  Renewal and rolling resets clear both period directions and carried use,
+  preserving lifetime traffic.
 - Per-person unlimited device caps in the API, CLI, and panel, distinct from
   the fleet default. Remnawave migration keeps device caps, including zero.
 

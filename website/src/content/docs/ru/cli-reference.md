@@ -100,17 +100,30 @@ meridian apply [--yes] [--forget-unreachable] [--json]
 
 ### meridian client
 
+Параметры ниже доступны в `client add` и `client set`. Начальные настройки применяются только при создании аккаунта; последующие применения не отменяют изменений оператора. `client show` возвращает типизированные поля и рассчитанный сервером `schedule` в JSON. `client set --dry-run` возвращает `data.schedule_preview` и `applied: false`; для сохранения расписания в JSON нужен `--yes`. `client extend --days N` добавляет дни к ожидающему сроку с первого использования, не активируя аккаунт; после активации продлевает дату окончания и начинает новую серию автопродлений.
+
+| Параметр | Значение |
+| --- | --- |
+| `--reset-day N\|default` | День сброса от 1 до 31; default — день создания |
+| `--duration DAYS\|none` | От 1 до 3650 дней с первого трафика; none убирает длительность |
+| `--renew-days DAYS` | Продлевать каждые 1–3650 дней UTC |
+| `--renew-months MONTHS` | Продлевать каждые 1–120 календарных месяцев |
+| `--renewals N\|unlimited` | От 1 до 10000 продлений; unlimited снимает лимит |
+| `--no-renew` | Выключить автопродление |
+| `--dry-run` | Рассчитать даты без сохранения |
+| `--yes` | Подтвердить изменение расписания |
+
 `--devices unlimited` (или `0`) снимает с пользователя ограничение числа устройств. `--devices default` возвращает общий лимит из настроек серверов. В панели это два отдельных варианта. В API `device_limit: 0` означает отсутствие лимита, а `null` — общий лимит. Настройки конфиденциальности сохраняют силу. При миграции с Remnawave персональные лимиты, включая ноль, сохраняются; записи об устройствах не переносятся.
 
 Управление доступом пользователей.
 
 ```
-meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
+meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--json]
 meridian client show NAME [--connections] [--json]
 meridian client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX] [--json]
 meridian client usage NAME [--days N] [--json]
 meridian client list [--attention] [--tag TAG|none] [--json]
-meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]

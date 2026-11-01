@@ -53,6 +53,13 @@ UserEventField = Literal[
     "traffic_reset_at",
     "lifetime_traffic_bytes",
     "language",
+    "traffic_reset_anchor_day",
+    "activation_duration_days",
+    "renewal_interval_days",
+    "renewal_interval_months",
+    "renewal_limit",
+    "renewals_completed",
+    "renewal_anchor_at",
 ]
 _NAME_PATTERN = r"^[^\x00-\x1f\x7f]+$"
 
@@ -62,7 +69,7 @@ class EmptyEventDetail(CoreModel):
 
 
 class UserFieldsDetail(CoreModel):
-    fields: list[UserEventField] = Field(min_length=1, max_length=10, description="Changed field names, never values.")
+    fields: list[UserEventField] = Field(min_length=1, max_length=17, description="Changed field names, never values.")
 
     @model_validator(mode="after")
     def unique_fields(self) -> UserFieldsDetail:

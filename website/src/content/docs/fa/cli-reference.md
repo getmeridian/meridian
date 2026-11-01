@@ -100,17 +100,30 @@ JSON `data` شامل `plan_hash`، `generation` و `actions[]` با `status: "co
 
 ### meridian client
 
+گزینه‌های زیر با `client add` و `client set` کار می‌کنند. تنظیمات اولیه فقط هنگام ایجاد حساب اعمال می‌شوند و اعمال بعدی تغییرات مدیر را حفظ می‌کنند. `client show` فیلدهای نوع‌دار و `schedule` محاسبه‌شدهٔ سرویس را در JSON می‌دهد. `client set --dry-run` مقدار `data.schedule_preview` و `applied: false` می‌دهد؛ تغییر زمان‌بندی در JSON به `--yes` نیاز دارد. `client extend --days N` روزها را به مدتِ در انتظار اولین استفاده اضافه می‌کند و حساب را فعال نمی‌کند؛ پس از فعال‌سازی تاریخ پایان را تمدید و سری جدیدی از تمدیدها آغاز می‌کند.
+
+| گزینه | کاربرد |
+| --- | --- |
+| `--reset-day N\|default` | روز بازنشانی ۱–۳۱؛ default روز ایجاد را به کار می‌برد |
+| `--duration DAYS\|none` | ۱–۳۶۵۰ روز از اولین ترافیک؛ none مدت را پاک می‌کند |
+| `--renew-days DAYS` | تمدید هر ۱–۳۶۵۰ روز UTC |
+| `--renew-months MONTHS` | تمدید هر ۱–۱۲۰ ماه تقویمی |
+| `--renewals N\|unlimited` | ۱–۱۰۰۰۰ تمدید؛ unlimited سقف را حذف می‌کند |
+| `--no-renew` | خاموش کردن تمدید خودکار |
+| `--dry-run` | پیش‌نمایش تاریخ‌ها بدون ذخیره |
+| `--yes` | تأیید تغییر زمان‌بندی |
+
 با `--devices unlimited` (یا `0`) فرد را از سقف عمومی دستگاه‌ها معاف کنید. `--devices default` سقف پیش‌فرض سرورها را به کار می‌برد؛ در پنل این دو گزینه جدا هستند. در API مقدار `device_limit: 0` یعنی نامحدود و `null` یعنی استفاده از پیش‌فرض. سطح حریم خصوصی همچنان اعمال می‌شود. مهاجرت از Remnawave سقف‌های افراد، از جمله صفر، را حفظ می‌کند اما سوابق دستگاه‌ها را منتقل نمی‌کند.
 
 افرادی را که متصل می‌شوند مدیریت کنید.
 
 ```
-meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
+meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--json]
 meridian client show NAME [--connections] [--json]
 meridian client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX] [--json]
 meridian client usage NAME [--days N] [--json]
 meridian client list [--attention] [--tag TAG|none] [--json]
-meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]

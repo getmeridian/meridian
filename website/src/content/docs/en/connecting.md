@@ -5,6 +5,9 @@ description: You received a Meridian link. Install an app, add the connection, a
 
 Someone who runs a Meridian server sent you a link. This page is for you: you need no command line and no server knowledge.
 
+
+An account may be valid for a number of days from first use. Opening this page or refreshing the subscription does not start that time: it starts when the server’s agent first reports your traffic. Before then the account remains ready to connect; afterwards the account panel shows the actual expiry, in your browser’s time zone with UTC. If automatic renewal is configured, the panel also shows the next renewal, next traffic reset, and renewals left.
+
 ## Open the link
 
 Open the link on the device you want to connect. It leads to your **connection page**, which recognizes your device and walks you through three steps:

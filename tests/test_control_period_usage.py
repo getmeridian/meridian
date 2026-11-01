@@ -13,7 +13,7 @@ import pytest
 from meridian.control.models import UserImport, UserImportBatch, UserUpdate
 from meridian.control.service import SCHEMA_VERSION, ControlService
 from meridian.core.agent_protocol import StatsReport, UserTraffic
-from tests.support.control_service import FLEET_ID
+from tests.support.control_service import FLEET_ID, drop_period_usage_schema
 
 NOW = "2026-11-01T12:00:00Z"
 EPOCH = "6a1f0c2e-3b4d-4e5f-8a9b-0c1d2e3f4a5b"
@@ -129,10 +129,7 @@ def test_schema_seventeen_keeps_the_period_and_only_preserves_a_provable_split(
     service.close()
     database = tmp_path / "control.db"
     with sqlite3.connect(database) as db:
-        columns = {row[1] for row in db.execute("PRAGMA table_info(users)")}
-        for column in ("traffic_upload_offset_bytes", "traffic_download_offset_bytes", "traffic_period_carried_bytes"):
-            if column in columns:
-                db.execute(f"ALTER TABLE users DROP COLUMN {column}")
+        drop_period_usage_schema(db)
         db.execute("UPDATE meta SET value = '17' WHERE key = 'schema_version'")
     for _ in range(2):
         migrated = ControlService(database, fleet_id=FLEET_ID, version="4.0.0")

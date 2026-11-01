@@ -1,6 +1,7 @@
 # control/ui — The owner's web console
 
 ## Design decisions
+- **Account dates come from the service** — lifecycle forms preview the shared UTC calculator, show browser time beside UTC, and send only edited choices.
 - **Served by the service, under the secret path** — `ui_routes.py` serves `index.html` at `/` and assets at `/ui/<name>`; the API lives in the same process, so there is no CORS, no build step, and no outside request (system fonts, local icons, QR codes as SVG data URIs from `segno`).
 - **Vanilla JS on one namespace** — `boot.js` sets theme and direction before paint; `core.js` owns `M.h` (the only DOM builder), `M.api`, dialogs, and formatting; each screen file adds `M.screens.*`; `app.js` runs the state machine (setup link → no owner → sign in → shell).
 - **Owner sign-in** — one owner: a scrypt password (`passwords.py`) and an optional TOTP code. `owner.py` stores sessions only as SHA-256 with idle and absolute limits, and mints single-use setup links that only the root token can request (`meridian panel`). Passive read polls (`X-Meridian-Passive`) don't extend idle time; writes always re-check session liveness in their transaction.

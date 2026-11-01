@@ -55,6 +55,13 @@ _USER_FIELDS: tuple[UserEventField, ...] = (
     "traffic_reset_at",
     "lifetime_traffic_bytes",
     "language",
+    "traffic_reset_anchor_day",
+    "activation_duration_days",
+    "renewal_interval_days",
+    "renewal_interval_months",
+    "renewal_limit",
+    "renewals_completed",
+    "renewal_anchor_at",
 )
 
 
@@ -146,18 +153,27 @@ class EventLedger:
     def _cutoff(now: str) -> str:
         return (datetime.fromisoformat(now) - timedelta(days=EVENT_RETENTION_DAYS)).isoformat()
 
-    def user_updated(self, before: UserRecord, after: UserRecord) -> None:
+    def user_updated(
+        self, before: UserRecord, after: UserRecord, *, actor: str | None = None, now: str | None = None
+    ) -> None:
         """Operator changes name fields only; credential replacement is summarized without values."""
         fields = [field for field in _USER_FIELDS if getattr(before, field) != getattr(after, field)]
         if (before.uuid, before.sub_token) != (after.uuid, after.sub_token):
             fields.append("credentials")
         if before.status != after.status:
             if after.status in ("active", "disabled"):
-                self.append("user.enabled" if after.status == "active" else "user.disabled", after.username)
+                self.append(
+                    "user.enabled" if after.status == "active" else "user.disabled",
+                    after.username,
+                    actor=actor,
+                    now=now,
+                )
             else:
                 fields.append("status")
         if fields:
-            self.append("user.updated", after.username, detail=UserFieldsDetail(fields=sorted(fields)))
+            self.append(
+                "user.updated", after.username, detail=UserFieldsDetail(fields=sorted(fields)), actor=actor, now=now
+            )
 
     def enforcement(self, username: str, previous: UserStatus, status: UserStatus, now: str) -> None:
         kinds: dict[UserStatus, FleetEventKind] = {

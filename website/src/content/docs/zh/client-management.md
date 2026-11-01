@@ -115,6 +115,28 @@ meridian client reset-traffic alice
 
 应用、重新部署和服务器变更都不会改动客户端的限额和到期时间。
 
+## 账户有效期与自动续期
+
+自动续期和每月指定日的流量重置都会同时清零本期上传、下载计数（包括导入时方向未知的流量），累计流量保持不变。
+
+`--reset month` 在每个 UTC 月的第一天重置流量。`--reset month_rolling` 使用账户保存的每月指定日，默认是创建日。用 `--reset-day 1–31` 设置，或用 `default` 恢复创建日。指定 31 日时，二月使用 28 或 29 日，三月恢复 31 日。停机后，服务会在计入新报告的流量前补齐重置，并只清零一次。Remnawave 迁移会保留 `MONTH_ROLLING` 和原创建日；缺少创建日期时会拒绝迁移，不会猜测。
+
+`--duration N` 设置首次使用后 1–3650 天的有效期，每天为 24 个 UTC 小时。只有节点代理首次报告并被接受的流量会开始计时；打开连接页面或获取订阅不会开始计时。激活前，CLI、面板和页面显示“首次使用后有效 30 天”；激活后显示真实到期时间。有效天数与 `--expires` 二选一。对已使用账户设置有效期时，使用已记录的首次流量时间；历史时间未知时须设置固定到期时间。`--duration none` 清除有效天数并保留已激活的到期时间。延长尚未使用的账户只增加待激活天数，不会激活账户。
+
+```bash
+meridian client add example --duration 30 --limit 50GiB --reset month_rolling --reset-day 31
+meridian client set example --renew-months 1 --renewals 3 --dry-run --json
+meridian client set example --renew-months 1 --renewals 3 --yes --json
+meridian client set example --renew-days 7 --renewals unlimited --yes
+meridian client set example --no-renew --yes
+```
+
+使用 `--renew-days N`（1–3650 个 UTC 天）或 `--renew-months N`（1–120 个日历月）配置自动续期。日期从原到期时间向前推进，在短月后仍保留原 UTC 时间与月日期。`--renewals N` 将每轮续期限制为 1–10000 次；`unlimited` 移除上限。停机期间每个错过的续期日都会计入次数，服务在一个事务中补齐续期，本期流量只清零一次，累计流量保留。已停用账户继续按时续期，但保持停用。受限账户仅在有效期和流量额度允许时恢复有效。待激活账户会等待首次使用。CLI、面板和页面显示下次流量重置、下次续期和剩余续期次数。
+
+`client set --dry-run` 获取服务计算的日期且不保存。JSON 在 `data.schedule_preview` 中返回结果，并标明 `applied: false`。JSON 模式修改时间安排须添加 `--yes`；交互模式会在确认前显示日期。`--no-renew` 关闭自动续期。修改到期时间、有效天数或续期间隔会开始新一轮续期；仅修改次数上限会保留已完成次数。激活后的手动延长也会开始新一轮续期。面板编辑器提供相同选项，日期按浏览器时区显示并附准确 UTC 时间。服务器配置文件、批量导入、加密备份及恢复均保留这些字段；后续 apply 不会覆盖管理员修改。
+
+`POST /api/users/preview` 需要 people/admin 权限或已认证的所有者会话。不传 `username` 可预览创建账户，传入则预览修改。请求使用类型明确的 `traffic_reset_anchor_day`、`activation_duration_days`、`renewal_interval_days`、`renewal_interval_months`、`renewal_limit`、`expire_at` 和 `traffic_limit_strategy`。`POST /api/users` 与 `PATCH /api/users/{username}` 使用相同设置。省略字段保留原值，显式 null 清除选项。只读字段 `renewals_completed`、`renewal_anchor_at` 和 `schedule` 描述已完成次数与计算日期。预览不保存账户修改、设备数据或请求详情。
+
 ## 限制设备数量
 
 设备限制**默认关闭**：Meridian 不读取或存储设备信息。需要上限时，在 **Settings → Privacy** 中选择 `private` 或 `full`。隐私级别和每个人的设备上限保存在控制服务中，应用配置不会改动它们。
@@ -276,6 +298,7 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 
 | 用户 API 端点 | 操作 |
 |---|---|
+| `POST /api/users/preview` | 预览创建或修改账户的 UTC 日期，不保存；需要 people/admin 或所有者会话 |
 | `POST /api/users` | 在一个事务中创建用户，同时设置 `username`、`status`、`expire_at`、`traffic_limit_bytes`、`traffic_limit_strategy` 和 `device_limit` |
 | `PATCH /api/users/{username}` | 修改状态、到期时间、流量限额或重置策略、设备上限；未发送的字段保持原值 |
 | `POST /api/users/{username}/reset-traffic` | 重置已用流量 |

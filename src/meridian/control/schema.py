@@ -16,7 +16,7 @@ from meridian.control.store import Store
 from meridian.control.tokens import API_TOKENS_TABLE_V4
 from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPOCH_BASELINES
 
-SCHEMA_VERSION = 18
+SCHEMA_VERSION = 19
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS secrets (name TEXT PRIMARY KEY, value BLOB NOT NULL);
@@ -52,7 +52,14 @@ CREATE TABLE IF NOT EXISTS users (
     device_limit INTEGER,
     note TEXT NOT NULL DEFAULT '',
     tag TEXT NOT NULL DEFAULT '',
-    language TEXT
+    language TEXT,
+    traffic_reset_anchor_day INTEGER CHECK (traffic_reset_anchor_day BETWEEN 1 AND 31),
+    activation_duration_days INTEGER CHECK (activation_duration_days BETWEEN 1 AND 3650),
+    renewal_interval_days INTEGER CHECK (renewal_interval_days BETWEEN 1 AND 3650),
+    renewal_interval_months INTEGER CHECK (renewal_interval_months BETWEEN 1 AND 120),
+    renewal_limit INTEGER CHECK (renewal_limit BETWEEN 1 AND 10000),
+    renewals_completed INTEGER NOT NULL DEFAULT 0,
+    renewal_anchor_at TEXT
 );
 CREATE TABLE IF NOT EXISTS endpoints (endpoint_id TEXT PRIMARY KEY, body TEXT NOT NULL);
 """
@@ -97,6 +104,20 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     # 16 -> 17: optional operator-owned subscription language per person.
     ("ALTER TABLE users ADD COLUMN language TEXT",),
     DIRECTIONAL_PERIOD_MIGRATION,
+    # 18 -> 19: operator-owned account schedules and durable renewal progress.
+    (
+        "ALTER TABLE users ADD COLUMN traffic_reset_anchor_day INTEGER"
+        " CHECK (traffic_reset_anchor_day BETWEEN 1 AND 31)",
+        "ALTER TABLE users ADD COLUMN activation_duration_days INTEGER"
+        " CHECK (activation_duration_days BETWEEN 1 AND 3650)",
+        "ALTER TABLE users ADD COLUMN renewal_interval_days INTEGER CHECK (renewal_interval_days BETWEEN 1 AND 3650)",
+        "ALTER TABLE users ADD COLUMN renewal_interval_months INTEGER"
+        " CHECK (renewal_interval_months BETWEEN 1 AND 120)",
+        "ALTER TABLE users ADD COLUMN renewal_limit INTEGER CHECK (renewal_limit BETWEEN 1 AND 10000)",
+        "ALTER TABLE users ADD COLUMN renewals_completed INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN renewal_anchor_at TEXT",
+        "UPDATE users SET traffic_reset_anchor_day = CAST(strftime('%d', created_at) AS INTEGER)",
+    ),
 )
 
 

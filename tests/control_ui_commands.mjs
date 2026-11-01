@@ -57,7 +57,7 @@ w.fetch = (url, options) => {
   }
   throw new Error('unexpected request: ' + url);
 };
-for (const script of ['core.js', 'drafts.js', 'qr-export.js', 'commands.js', 'people.js', 'expiry.js', 'person-connections.js', 'person.js', 'fleet.js']) {
+for (const script of ['core.js', 'drafts.js', 'qr-export.js', 'commands.js', 'people.js', 'expiry.js', 'lifecycle.js', 'person-connections.js', 'person.js', 'fleet.js']) {
   w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 }
 const M = w.M;

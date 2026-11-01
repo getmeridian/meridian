@@ -1,9 +1,130 @@
 {
   "$defs": {
+    "AccountSchedulePreview": {
+      "additionalProperties": false,
+      "description": "Effective dates after catch-up; calculating them never writes or activates an account.",
+      "properties": {
+        "activation_duration_days": {
+          "anyOf": [
+            {
+              "maximum": 3650,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Activation Duration Days"
+        },
+        "activation_pending": {
+          "title": "Activation Pending",
+          "type": "boolean"
+        },
+        "expire_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Expire At"
+        },
+        "next_renewal_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Renewal At"
+        },
+        "next_reset_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Reset At"
+        },
+        "renewal_enabled": {
+          "title": "Renewal Enabled",
+          "type": "boolean"
+        },
+        "renewals_completed": {
+          "minimum": 0,
+          "title": "Renewals Completed",
+          "type": "integer"
+        },
+        "renewals_due": {
+          "description": "Missed renewals applied together with one traffic reset.",
+          "minimum": 0,
+          "title": "Renewals Due",
+          "type": "integer"
+        },
+        "renewals_left": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Null for unlimited renewals or when renewal is off.",
+          "title": "Renewals Left"
+        }
+      },
+      "required": [
+        "activation_pending",
+        "activation_duration_days",
+        "expire_at",
+        "next_reset_at",
+        "renewal_enabled",
+        "next_renewal_at",
+        "renewals_left",
+        "renewals_due",
+        "renewals_completed"
+      ],
+      "title": "AccountSchedulePreview",
+      "type": "object"
+    },
     "ClientRecord": {
       "additionalProperties": false,
       "description": "Redacted client metadata suitable for list views.",
       "properties": {
+        "activation_duration_days": {
+          "anyOf": [
+            {
+              "maximum": 3650,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whole UTC days from first traffic.",
+          "title": "Activation Duration Days"
+        },
         "attention_reasons": {
           "description": "Derived reasons when client list --attention was requested; never stored.",
           "items": {
@@ -114,6 +235,83 @@
           "title": "Note",
           "type": "string"
         },
+        "renewal_anchor_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Original expiry of the current renewal series.",
+          "title": "Renewal Anchor At"
+        },
+        "renewal_interval_days": {
+          "anyOf": [
+            {
+              "maximum": 3650,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Renewal Interval Days"
+        },
+        "renewal_interval_months": {
+          "anyOf": [
+            {
+              "maximum": 120,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Renewal Interval Months"
+        },
+        "renewal_limit": {
+          "anyOf": [
+            {
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Renewals in this series; null means unlimited.",
+          "title": "Renewal Limit"
+        },
+        "renewals_completed": {
+          "default": 0,
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Renewals Completed",
+          "type": "integer"
+        },
+        "schedule": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AccountSchedulePreview"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "status": {
           "title": "Status",
           "type": "string"
@@ -131,9 +329,24 @@
           "type": "integer"
         },
         "traffic_reset": {
-          "description": "When used traffic starts again from zero: never, day, week, month, or the panel-only month_rolling (monthly from the day the client was created).",
+          "description": "When used traffic resets: never, day, week, month, or month_rolling on the stored UTC anchor day.",
           "title": "Traffic Reset",
           "type": "string"
+        },
+        "traffic_reset_anchor_day": {
+          "anyOf": [
+            {
+              "maximum": 31,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "UTC month day; null uses creation day.",
+          "title": "Traffic Reset Anchor Day"
         },
         "traffic_used_bytes": {
           "title": "Traffic Used Bytes",
@@ -162,8 +375,24 @@
   "additionalProperties": false,
   "description": "Result for changing a client's limits or resetting their traffic: the client as the panel now has it.",
   "properties": {
+    "applied": {
+      "default": true,
+      "title": "Applied",
+      "type": "boolean"
+    },
     "client": {
       "$ref": "#/$defs/ClientRecord"
+    },
+    "schedule_preview": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AccountSchedulePreview"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [

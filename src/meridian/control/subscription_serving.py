@@ -93,5 +93,7 @@ def subscription_user(record: UserRecord, language: FleetLanguage) -> Subscripti
         limit_bytes=record.traffic_limit_bytes,
         lifetime_used_bytes=record.lifetime_traffic_bytes,
         limit_strategy=record.traffic_limit_strategy,
+        reset_anchor_day=record.traffic_reset_anchor_day,
+        schedule=record.schedule,
         language=language_or_english(language),
     )

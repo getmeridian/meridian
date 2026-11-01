@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.api_models import (
     HistoryQuery,
     UserDeleteResponse,
@@ -32,6 +33,7 @@ from meridian.control.route_metadata import (
     USER_CREDENTIALS,
 )
 from meridian.control.route_types import ApiRoute, ErrorResponse, route
+from meridian.core.account_schedule import AccountSchedulePreview
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientExtendRequest
 from meridian.core.clients import ClientConnections
@@ -69,6 +71,19 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         "Import credentials, account settings, and usage atomically.",
         credentials=False,
         refusals=(CONFLICT,),
+    ),
+    route(
+        "POST",
+        "/api/users/preview",
+        "people",
+        "preview_user_schedule",
+        UserSchedulePreviewRequest,
+        AccountSchedulePreview,
+        "Preview account schedule dates without changing anything.",
+        # All /api routes authenticate through _Handler._authorize(scope). This flag only marks response credentials.
+        credentials=False,
+        refusals=(NOT_FOUND,),
+        description="Requires a people-capable API token or an authenticated owner session. Returns dates only.",
     ),
     route(
         "GET",

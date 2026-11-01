@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Literal
 
 import typer
+from pydantic import ValidationError
 from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
@@ -78,11 +79,32 @@ def run_add(
     reset: str | None = None,
     expires: str | None = None,
     devices: str | None = None,
+    reset_day: str | None = None,
+    duration: str | None = None,
+    renew_days: str | None = None,
+    renew_months: str | None = None,
+    renewals: str | None = None,
+    no_renew: bool = False,
 ) -> None:
     """Add one or more clients to the fleet, optionally with traffic limits and an expiry."""
     operation = OperationContext()
     with error_context("client.add", timer=operation.timer):
-        limits = parse_limit_options(limit=limit, reset=reset, expires=expires, devices=devices)
+        limits = parse_limit_options(
+            limit=limit,
+            reset=reset,
+            expires=expires,
+            devices=devices,
+            reset_day=reset_day,
+            duration=duration,
+            renew_days=renew_days,
+            renew_months=renew_months,
+            renewals=renewals,
+            no_renew=no_renew,
+        )
+        try:
+            limits.for_creation()
+        except ValidationError:
+            fail(t("lifecycle.invalid_creation"), hint_type="user")
         seen: set[str] = set()
         for name in names:
             if name.strip().casefold() in seen:

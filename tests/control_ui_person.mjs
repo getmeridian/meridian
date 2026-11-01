@@ -12,6 +12,7 @@ const dom = new JSDOM('<!doctype html><body><div id="app"></div></body>', {
   runScripts: 'outside-only', pretendToBeVisual: true,
 });
 const w = dom.window;
+if (mode === 'person-schedules') w.Date.now = () => Date.parse('2027-01-31T12:00:00Z');
 const catalog = JSON.parse(fs.readFileSync(path.join(ui, 'locales', locale + '.json')));
 const events = [], writes = [], pending = [];
 const report = {};
@@ -45,6 +46,11 @@ w.fetch = (url, options = {}) => {
   const event = { url, method: options.method, headers: options.headers };
   if (options.body !== undefined) event.body = JSON.parse(options.body);
   events.push(event);
+  if (url === 'api/users/preview') return Promise.resolve(reply(data.schedulePreview || {
+    activation_pending: false, activation_duration_days: null, expire_at: '2031-12-31T10:20:30Z',
+    next_reset_at: '2027-02-28T00:00:00Z', renewal_enabled: false, next_renewal_at: null,
+    renewals_left: null, renewals_due: 0, renewals_completed: 0,
+  }));
   if (options.method !== 'GET') {
     writes.push({ url, method: options.method, body: JSON.parse(options.body || '{}') });
     return new Promise(resolve => pending.push(resolve));
@@ -87,6 +93,7 @@ load('auth.js');
 load('people.js');
 load('people-list.js');
 load('expiry.js');
+if (fs.existsSync(path.join(ui, 'lifecycle.js'))) load('lifecycle.js');
 load('person-connections.js');
 if (mode === 'person-device-race' || mode === 'person-devices') load('devices.js');
 load('person.js');
@@ -97,6 +104,25 @@ await settle();
 await settle();
 const view = () => w.document.getElementById('view');
 const button = key => [...view().querySelectorAll('button')].find(el => el.textContent.includes(M.t(key)));
+
+if (mode === 'person-schedules') {
+  for (const [name, value] of Object.entries(data.edits || {})) {
+    const field = view().querySelector('[name="' + name + '"]');
+    if (!field) continue;
+    field.value = value;
+    field.dispatchEvent(new w.Event(field.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));
+  }
+  await new Promise(resolve => setTimeout(resolve, 350));
+  report.shown = view().textContent;
+  if (data.submit) {
+    const form = view().querySelector('.access-status + form');
+    form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+    await settle();
+  }
+  report.writes = writes;
+  report.previews = events.filter(event => event.url === 'api/users/preview');
+  report.error = view().querySelector('.lifecycle-error')?.textContent || '';
+}
 
 if (mode === 'person-devices') {
   events.splice(0);
@@ -317,7 +343,9 @@ if (mode === 'person-device-race') {
   M.askToLeave = () => Promise.resolve(true);
   if (data.action === 'clear') button('devices.clear').click();
   else {
-    const cap = view().querySelector('input[type="number"]');
+    const mode = view().querySelector('[name="device_mode"]');
+    mode.value = 'limited'; mode.dispatchEvent(new w.Event('change', { bubbles: true }));
+    const cap = mode.form.querySelector('input[type="number"]');
     cap.value = '5'; cap.dispatchEvent(new w.Event('input', { bubbles: true }));
     cap.form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
   }

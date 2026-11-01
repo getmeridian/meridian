@@ -13,6 +13,7 @@ import re
 import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from meridian.control.models import SUB_TOKEN_PATTERN, LimitStrategy, UserImport, UserImportBatch, UserStatus
 from meridian.core.client_limits import NEVER_EXPIRES_YEAR
@@ -33,8 +34,7 @@ _STRATEGIES: dict[str, LimitStrategy] = {
     "DAY": "day",
     "WEEK": "week",
     "MONTH": "month",
-    # The service resets on calendar boundaries only; the closest is the calendar month.
-    "MONTH_ROLLING": "month",
+    "MONTH_ROLLING": "month_rolling",
 }
 _TIMESTAMP = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d+)?(?:Z|\+00:00)$")
 
@@ -100,6 +100,13 @@ def _import(user: User, *, note: str, tag: str) -> UserImport:
             hint="Upgrade Meridian, or change the user in the panel, then migrate.",
             category="user",
         )
+    created = _timestamp(user.created_at)
+    if strategy == "month_rolling" and created is None:
+        raise MigrationError(
+            f"User {user.username!r} has no creation date for their rolling monthly reset.",
+            hint="Check the creation date in the panel, then migrate.",
+            category="user",
+        )
     try:
         return UserImport(
             username=user.username,
@@ -116,6 +123,7 @@ def _import(user: User, *, note: str, tag: str) -> UserImport:
             note=note,
             tag=tag,
             device_limit=user.hwid_device_limit,
+            traffic_reset_anchor_day=datetime.fromisoformat(created).astimezone(UTC).day if created else None,
         )
     except ValueError as exc:
         raise MigrationError(
@@ -127,8 +135,6 @@ def _import(user: User, *, note: str, tag: str) -> UserImport:
 
 def _dropped(user: User) -> list[str]:
     dropped: list[str] = []
-    if user.traffic_limit_strategy.upper() == "MONTH_ROLLING":
-        dropped.append("monthly reset on the user's own day becomes the calendar month (1st, UTC)")
     for label, value in (
         ("email", user.email),
         ("Telegram ID", user.telegram_id),

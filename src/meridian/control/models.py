@@ -11,6 +11,7 @@ from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import BeforeValidator, Field, field_validator, model_validator
 
+from meridian.core.account_schedule import AccountLifecycleSettings, AccountLifecycleState, AccountSchedulePreview
 from meridian.core.agent_desired import AgentResource
 from meridian.core.agent_protocol import NodeHealth, NodeVersions
 from meridian.core.agent_types import (
@@ -195,7 +196,7 @@ class UserDevices(ClientDevicesResult):
     level: DeviceLimitLevel
 
 
-class UserRecord(UserTrafficEvidence):
+class UserRecord(UserTrafficEvidence, AccountLifecycleState):
     """One access user as the service stores it.
 
     The operator sets `active` or `disabled`; the service's enforcement turns an
@@ -242,9 +243,12 @@ class UserRecord(UserTrafficEvidence):
     language: Language | None = Field(
         default=None, description="Starting connection/support page and app status language; null follows the fleet."
     )
+    schedule: AccountSchedulePreview | None = Field(
+        default=None, description="Read-only UTC dates from the shared calculator."
+    )
 
 
-class UserUpdate(CoreModel):
+class UserUpdate(AccountLifecycleSettings):
     """A partial change: omitted fields keep their value; null clears expiry or selects the default device cap."""
 
     status: Literal["active", "disabled"] | None = None
@@ -281,7 +285,7 @@ class UserPatch(UserUpdate):
         return UserUpdate.model_validate(self.model_dump(include=self.model_fields_set - {"username"}))
 
 
-class UserImport(CoreModel):
+class UserImport(AccountLifecycleState):
     """One user carried over from another control plane (`meridian migrate`), credentials and usage included.
 
     The UUID and subscription token keep every link the user already has working.
@@ -302,6 +306,7 @@ class UserImport(CoreModel):
     lifetime_traffic_bytes: Count = 0
     traffic_reset_at: Timestamp | None = None
     created_at: Timestamp | None = None
+    first_traffic_at: Timestamp | None = None
     note: PrivateNote = Field(default="", repr=False)
     tag: PersonTag = Field(default="", repr=False)
 

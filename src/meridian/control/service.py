@@ -21,6 +21,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from meridian.control.account_lifecycle import enforce_user_schedules, preview_user_schedule
+from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.attention import read_attention
 from meridian.control.background_health import BackgroundHealth
 from meridian.control.backups import BackupLedger
@@ -54,8 +56,7 @@ from meridian.control.node_documents import with_users
 from meridian.control.node_health import project_runtime
 from meridian.control.notices import NoticeLedger
 from meridian.control.owner import OwnerAuth
-from meridian.control.period_usage import import_period, reset_period
-from meridian.control.periods import period_start
+from meridian.control.period_usage import reset_period
 from meridian.control.person_connections import read_connections
 from meridian.control.privacy import PrivacyLedger, read_privacy
 from meridian.control.revisions import RevisionLedger
@@ -67,14 +68,14 @@ from meridian.control.store import Store
 from meridian.control.subscription_preview import preview_subscription
 from meridian.control.subscription_serving import serve_subscription
 from meridian.control.subscriptions import SubscriptionResponse
-from meridian.control.times import utc_now
+from meridian.control.times import format_timestamp, utc_now
 from meridian.control.tokens import TokenRegistry
 from meridian.control.traffic import TrafficLedger
-from meridian.control.user_expiry import require_finite_user_expiry
+from meridian.control.user_import import import_users
 from meridian.control.user_lifecycle import extend_user_expiry, insert_user
-from meridian.control.user_policy import enforced_status, period_began, whole_seconds
 from meridian.control.user_updates import update_user
 from meridian.control.users import USER_SELECT, user_record
+from meridian.core.account_schedule import AccountSchedulePreview
 from meridian.core.agent_desired import DesiredNodeState
 from meridian.core.agent_protocol import Capability, ObservedStateReport, PollRequest, StatsAck, StatsReport
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
@@ -170,6 +171,9 @@ class ControlService:
             read_privacy=self.privacy,
             clock=self._clock,
         )
+
+    def preview_user_schedule(self, request: UserSchedulePreviewRequest) -> AccountSchedulePreview:
+        return preview_user_schedule(self._store, request, now=format_timestamp(self._clock()), read_user=self.get_user)
 
     def server_usage(self, *, now: str | None = None) -> ServerUsageList:
         return read_server_usage(self._store, now or utc_now())
@@ -366,77 +370,16 @@ class ControlService:
         self.events.append("user.created", create.username)
 
     def import_users(self, batch: UserImportBatch) -> UserImportResult:
-        """Create users with the credentials, status, limits, and usage another control plane gave them.
-
-        All or nothing, and idempotent: a user that already exists with the same UUID and
-        token is left as it is (the first import wins); one with other credentials, or
-        credentials another user holds, refuses the whole batch. With `replace` the batch
-        overwrites users that exist (the source still serves and changed them since).
-        """
-        created: list[str] = []
-        unchanged: list[str] = []
-        replaced: list[str] = []
-        with self._transaction():
-            now = utc_now()
-            for item in batch.users:
-                # Kept as given: Hysteria2 authenticates with the exact string (VLESS parses it either way).
-                uuid, sub_token = item.uuid, item.sub_token
-                existing = self.get_user(item.username)
-                if existing is not None and not batch.replace:
-                    if (existing.uuid.lower(), existing.sub_token) != (uuid.lower(), sub_token):
-                        raise ServiceError(
-                            "conflict", f"User {item.username!r} already exists with other credentials.", 409
-                        )
-                    unchanged.append(item.username)
-                    continue
-                holder = self._db.execute(
-                    "SELECT username FROM users WHERE (lower(uuid) = ? OR sub_token = ?) AND username != ?",
-                    (uuid.lower(), sub_token, item.username),
-                ).fetchone()
-                if holder is not None:
-                    raise ServiceError(
-                        "conflict", f"User {item.username!r} has credentials that {holder[0]!r} already holds.", 409
-                    )
-                # Carried use counts as lifetime traffic; the offset leaves exactly the period's use toward the limit.
-                carried = max(item.lifetime_traffic_bytes, item.used_traffic_bytes)
-                values = (
-                    uuid,
-                    sub_token,
-                    item.status,
-                    whole_seconds(item.created_at) or now,
-                    whole_seconds(require_finite_user_expiry(item.expire_at)),
-                    item.traffic_limit_bytes,
-                    item.traffic_limit_strategy,
-                    period_began(item, now),
-                    carried,
-                    item.note,
-                    item.tag,
-                    item.device_limit,
-                )
-                if existing is None:
-                    self._db.execute(
-                        "INSERT INTO users (uuid, sub_token, status, created_at, expire_at, traffic_limit_bytes,"
-                        " traffic_limit_strategy, traffic_reset_at, traffic_carried_bytes, note, tag, device_limit,"
-                        " username, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        (*values, item.username, f"u{secrets.token_hex(8)}"),
-                    )
-                    import_period(self._store, item.username, item.used_traffic_bytes)
-                    created.append(item.username)
-                    self.events.append("user.created", item.username)
-                    continue
-                # What the ledger already counted stays counted, beside the newly carried use.
-                self._db.execute(
-                    "UPDATE users SET uuid = ?, sub_token = ?, status = ?, created_at = ?, expire_at = ?,"
-                    " traffic_limit_bytes = ?, traffic_limit_strategy = ?, traffic_reset_at = ?,"
-                    " traffic_carried_bytes = ?, note = ?, tag = ?, device_limit = ? WHERE username = ?",
-                    (*values, item.username),
-                )
-                import_period(self._store, item.username, item.used_traffic_bytes)
-                replaced.append(item.username)
-                self.events.user_updated(existing, self._require_user(item.username))
-            self._enforce(now)
-            self._compose_all()
-        return UserImportResult(created=created, unchanged=unchanged, replaced=replaced)
+        """Keep credentials, limits, schedules, and usage in one idempotent transaction."""
+        return import_users(
+            self._store,
+            batch,
+            read_user=self.get_user,
+            now=utc_now,
+            enforce=self._enforce,
+            compose=self._compose_all,
+            events=self.events,
+        )
 
     def update_user(self, username: str, update: UserUpdate) -> UserRecord:
         """Apply the operator's change; extending an expiry or raising a limit makes the user active again."""
@@ -560,21 +503,14 @@ class ControlService:
 
     def _enforce(self, now: str) -> list[str]:
         advance_server_periods(self._store, now)
-        changed: list[str] = []
-        for user in self.list_users():
-            start = period_start(user.traffic_limit_strategy, datetime.fromisoformat(now))
-            if start is not None and (
-                user.traffic_reset_at is None or datetime.fromisoformat(user.traffic_reset_at) < start
-            ):
-                self._reset_traffic(user, now)
-                self.events.append("user.traffic_reset", user.username, actor="system", now=now)
-                user = self._require_user(user.username)
-            status = enforced_status(user, now)
-            if status != user.status:
-                self.events.enforcement(user.username, user.status, status, now)
-                self._db.execute("UPDATE users SET status = ? WHERE username = ?", (status, user.username))
-                changed.append(user.username)
-        return changed
+        return enforce_user_schedules(
+            self._store,
+            self.list_users(),
+            now,
+            read_user=self._require_user,
+            reset_traffic=self._reset_traffic,
+            events=self.events,
+        )
 
     def _reset_traffic(self, user: UserRecord, now: str) -> None:
         reset_period(self._store, user, now)

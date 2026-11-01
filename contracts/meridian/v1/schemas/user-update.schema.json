@@ -2,6 +2,21 @@
   "additionalProperties": false,
   "description": "A partial change: omitted fields keep their value; null clears expiry or selects the default device cap.",
   "properties": {
+    "activation_duration_days": {
+      "anyOf": [
+        {
+          "maximum": 3650,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Whole UTC days from first traffic.",
+      "title": "Activation Duration Days"
+    },
     "device_limit": {
       "anyOf": [
         {
@@ -56,6 +71,49 @@
       "title": "Note",
       "type": "string"
     },
+    "renewal_interval_days": {
+      "anyOf": [
+        {
+          "maximum": 3650,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Renewal Interval Days"
+    },
+    "renewal_interval_months": {
+      "anyOf": [
+        {
+          "maximum": 120,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Renewal Interval Months"
+    },
+    "renewal_limit": {
+      "anyOf": [
+        {
+          "maximum": 10000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Renewals in this series; null means unlimited.",
+      "title": "Renewal Limit"
+    },
     "status": {
       "anyOf": [
         {
@@ -99,7 +157,8 @@
             "no_reset",
             "day",
             "week",
-            "month"
+            "month",
+            "month_rolling"
           ],
           "type": "string"
         },
@@ -109,6 +168,21 @@
       ],
       "default": null,
       "title": "Traffic Limit Strategy"
+    },
+    "traffic_reset_anchor_day": {
+      "anyOf": [
+        {
+          "maximum": 31,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "UTC month day; null uses creation day.",
+      "title": "Traffic Reset Anchor Day"
     }
   },
   "title": "UserUpdate",

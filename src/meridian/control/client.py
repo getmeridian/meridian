@@ -9,6 +9,7 @@ from urllib.parse import quote, urlencode
 
 import httpx
 
+from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.command_models import (
     CommandRequest,
     CutOffPlan,
@@ -60,6 +61,7 @@ from meridian.control.models import (
     UserUpdate,
     UserUsage,
 )
+from meridian.core.account_schedule import AccountSchedulePreview
 from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientExtendRequest
@@ -211,6 +213,13 @@ class ControlClient:
     def preview_subscription(self, request: SubscriptionPreviewRequest) -> SubscriptionPreview:
         return SubscriptionPreview.model_validate(
             self._request("POST", "api/subscription/preview", request.to_data(), mutation_method="GET").json()
+        )
+
+    def preview_user_schedule(self, request: UserSchedulePreviewRequest) -> AccountSchedulePreview:
+        return AccountSchedulePreview.model_validate(
+            self._request(
+                "POST", "api/users/preview", request.model_dump(include=request.model_fields_set), mutation_method="GET"
+            ).json()
         )
 
     def set_privacy(self, settings: PrivacySettings) -> PrivacyUpdateResult:

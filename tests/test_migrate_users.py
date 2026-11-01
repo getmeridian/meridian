@@ -24,6 +24,7 @@ def _user(username: str = "alice", **changes: object) -> User:
         "expire_at": REMNAWAVE_NEVER,
         "traffic_limit_strategy": "NO_RESET",
         "description": ACCESS_USER_DESCRIPTION,
+        "created_at": "2026-01-31T12:00:00.000Z",
         **changes,
     }
     return User(**fields)  # type: ignore[arg-type]
@@ -89,10 +90,9 @@ def test_only_intent_users_move_and_the_rest_is_named() -> None:
 @pytest.mark.parametrize(
     ("changes", "note"),
     [
-        ({"traffic_limit_strategy": "MONTH_ROLLING"}, "monthly reset on the user's own day becomes the calendar month"),
         ({"telegram_id": "1000001"}, "Telegram ID"),
     ],
-    ids=["month-rolling", "telegram"],
+    ids=["telegram"],
 )
 def test_what_the_service_cannot_hold_is_reported(changes: dict[str, object], note: str) -> None:
     carried = carry_users([_user(**changes)], ["alice"])
@@ -100,10 +100,12 @@ def test_what_the_service_cannot_hold_is_reported(changes: dict[str, object], no
     assert any(item.startswith(note) for item in carried.notes["alice"])
 
 
-def test_a_rolling_month_imports_as_the_calendar_month() -> None:
+def test_a_rolling_month_imports_with_its_original_anchor() -> None:
     carried = carry_users([_user(traffic_limit_strategy="MONTH_ROLLING")], ["alice"])
 
-    assert carried.batch.users[0].traffic_limit_strategy == "month"
+    assert carried.batch.users[0].traffic_limit_strategy == "month_rolling"
+    assert carried.batch.users[0].traffic_reset_anchor_day == 31
+    assert carried.notes == {}
 
 
 def test_meridians_own_description_and_tag_are_not_reported() -> None:

@@ -101,7 +101,8 @@
     }
     var accessForm = screen.accessSlot.querySelector("form");
     var changedAccess = !previous || previous.expire_at !== user.expire_at || previous.traffic_limit_bytes !== user.traffic_limit_bytes
-      || previous.traffic_limit_strategy !== user.traffic_limit_strategy || previous.language !== user.language;
+      || previous.traffic_limit_strategy !== user.traffic_limit_strategy || previous.language !== user.language
+      || !M.sameLifecycle(previous, user);
     if (!accessForm || editable(accessForm) && (changedAccess || accessForm === savedForm)) {
       M.mount(screen.accessSlot, accessCard(user, screen));
     } else {
@@ -149,7 +150,7 @@
     var name = user.username;
     return h("section", { class: "card" },
       h("h2", { text: M.t("person.traffic") }),
-      M.usage(user),
+      M.usage(user), M.scheduleFacts(user.schedule),
       h("dl", { class: "facts" },
         user.period_traffic ? [
           h("dt", { text: M.t("usage.up") }), h("dd", { text: M.bytes(user.period_traffic.upload_bytes) }),
@@ -174,6 +175,7 @@
     var name = user.username;
     var expiry = M.expiryFields(user.expire_at, name);
     var limits = M.limitFields(user);
+    var lifecycle = M.lifecycleFields(user, expiry, limits);
     var initialLanguage = user.language || "default";
     var language = h("select", { name: "language" },
       h("option", { value: "default", text: M.t("language.person_default") }),
@@ -182,7 +184,7 @@
       }));
     language.value = initialLanguage;
     var form = h("form", { class: "stack", novalidate: true },
-      expiry.nodes,
+      lifecycle.nodes,
       limits.nodes,
       M.field(M.t("language.person"), language, M.t("language.person_hint")),
       h("p", { class: "form-error", role: "alert" }),
@@ -192,7 +194,7 @@
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var change = limits.value();
-      Object.assign(change, expiry.change());
+      Object.assign(change, lifecycle.change());
       if (language.value !== initialLanguage) change.language = language.value === "default" ? null : language.value;
       if (!Object.keys(change).length) {
         M.resetDraft(form);

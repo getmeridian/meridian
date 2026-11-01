@@ -100,17 +100,30 @@ JSON `data` 包含 `plan_hash`、`generation` 和 `actions[]` 带 `status: "conv
 
 ### meridian client
 
+以下时间安排选项适用于 `client add` 和 `client set`。初始设置仅在创建时应用，后续 apply 会保留管理员修改。`client show` 的 JSON 包含类型明确的字段和服务计算的 `schedule`。`client set --dry-run` 返回 `data.schedule_preview` 与 `applied: false`；JSON 模式保存时间安排需添加 `--yes`。`client extend --days N` 对待激活账户只增加有效天数，不开始计时；激活后延长到期时间，并开始新一轮续期。
+
+| 选项 | 含义 |
+| --- | --- |
+| `--reset-day N\|default` | 每月指定日 1–31；default 使用创建日 |
+| `--duration DAYS\|none` | 首次产生流量后 1–3650 天；none 清除有效期 |
+| `--renew-days DAYS` | 每 1–3650 个 UTC 天续期 |
+| `--renew-months MONTHS` | 每 1–120 个日历月续期 |
+| `--renewals N\|unlimited` | 1–10000 次续期；unlimited 移除上限 |
+| `--no-renew` | 关闭自动续期 |
+| `--dry-run` | 预览日期，不保存 |
+| `--yes` | 确认时间安排修改 |
+
 使用 `--devices unlimited`（或 `0`）可让此人不受默认设备上限约束。`--devices default` 则恢复服务器默认上限；面板中提供两个独立选项。API 中 `device_limit: 0` 表示不限，`null` 表示继承默认值。隐私级别仍然生效。Remnawave 迁移会保留每人的设备上限，包括零，但不会导入设备登记记录。
 
 管理连接的人。
 
 ```
-meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
+meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--json]
 meridian client show NAME [--connections] [--json]
 meridian client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX] [--json]
 meridian client usage NAME [--days N] [--json]
 meridian client list [--attention] [--tag TAG|none] [--json]
-meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
 meridian client devices NAME [--remove ID | --clear] [--json]

@@ -14,6 +14,7 @@
 - **Steps are monkeypatchable module names in `flow.py`** — tests run the whole flow, a resume, and the no-op with fakes, and prove the service publishes what the panel did.
 
 ## Pitfalls
+- **Keep rolling-month creation anchors** — a missing source creation date is refused, never replaced with a calendar reset.
 - **Persist the service token before install** — a re-run after a crash must reuse it, or the installed service refuses the import.
 - **Forget panel-side kinds at cut-over** — nothing answers for them afterwards, so the commit would refuse them.
 - **Node containers go before the apply, uncommitted ones included** — the agent's core binds the same ports.

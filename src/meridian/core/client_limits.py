@@ -14,23 +14,28 @@ from datetime import UTC, date, datetime, time
 from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, SerializerFunctionWrapHandler, field_validator, model_serializer, model_validator
 
+from meridian.core.account_schedule import FINITE_EXPIRY_YEAR as NEVER_EXPIRES_YEAR
+from meridian.core.account_schedule import (
+    LIFECYCLE_FIELDS,
+    AccountLifecycleSettings,
+    calendar_expiry,
+)
 from meridian.core.agent_types import Timestamp
-from meridian.core.calendar import month_date, shift_month
 from meridian.core.client_devices import DeviceCap
+from meridian.core.client_schedule_options import ClientScheduleError, parse_schedule_options
 from meridian.core.errors import MeridianError
 from meridian.core.languages import Language, parse_person_language
 from meridian.core.models import CoreModel
 from meridian.core.person_metadata import PersonTag, PrivateNote, parse_note_option, parse_tag_option
 
-TrafficReset = Literal["never", "day", "week", "month"]
-TRAFFIC_RESETS: tuple[TrafficReset, ...] = ("never", "day", "week", "month")
-LimitStrategy = Literal["no_reset", "day", "week", "month"]
+TrafficReset = Literal["never", "day", "week", "month", "month_rolling"]
+TRAFFIC_RESETS: tuple[TrafficReset, ...] = ("never", "day", "week", "month", "month_rolling")
+LimitStrategy = Literal["no_reset", "day", "week", "month", "month_rolling"]
 
 # Remnawave needs an expiry on every user, so Meridian stores "never" there as a far-future date;
 # any expiry from this year on reads back as "never", and operators cannot type one.
-NEVER_EXPIRES_YEAR = 2099
 
 _UNITS = {"b": 1, "kb": 1024, "mb": 1024**2, "gb": 1024**3, "tb": 1024**4}
 # The control service keeps limits in a SQLite INTEGER: a signed 64-bit value.
@@ -49,7 +54,7 @@ class ClientLimitError(MeridianError):
         super().__init__(message, hint=hint, category="user")
 
 
-class UserCreationSettings(CoreModel):
+class UserCreationSettings(AccountLifecycleSettings):
     """First service-owned settings, applied only when an access account is created."""
 
     status: Literal["active", "disabled"] = "active"
@@ -57,6 +62,24 @@ class UserCreationSettings(CoreModel):
     traffic_limit_bytes: int = Field(default=0, ge=0, le=MAX_TRAFFIC_LIMIT_BYTES)
     traffic_limit_strategy: LimitStrategy = "no_reset"
     device_limit: DeviceCap | None = None
+
+    @model_serializer(mode="wrap")
+    def omit_unused_schedules(self, handler: SerializerFunctionWrapHandler) -> dict[str, object]:
+        values: dict[str, object] = handler(self)
+        for field in LIFECYCLE_FIELDS:
+            if values.get(field) is None:
+                values.pop(field, None)
+        return values
+
+    @model_validator(mode="after")
+    def valid_initial_schedule(self) -> UserCreationSettings:
+        if self.activation_duration_days is not None and self.expire_at is not None:
+            raise ValueError("Choose a fixed expiry or a duration from first use.")
+        if self.renewal_enabled and self.expire_at is None and self.activation_duration_days is None:
+            raise ValueError("Automatic renewal needs a fixed expiry or a duration from first use.")
+        if self.renewal_limit is not None and not self.renewal_enabled:
+            raise ValueError("Set a renewal interval before limiting renewals.")
+        return self
 
 
 class ClientExtendRequest(CoreModel):
@@ -93,15 +116,13 @@ def preview_calendar_expiry(
     moment = (now or datetime.now(UTC)).astimezone(UTC)
     current_moment = _parse_moment(current) if current else None
     base = max(moment, current_moment or moment).replace(microsecond=0)
-    year, month = shift_month(base.year, base.month, request.months)
-    day = month_date(year, month, base.day)
-    renewed = base.replace(year=day.year, month=day.month, day=day.day)
+    renewed = calendar_expiry(base, request.months)
     expire_at = parse_expiry(renewed.isoformat(), now=moment)
     assert expire_at is not None
     return CalendarExpiryPreview(base_at=base.strftime(_TIMESTAMP_FORMAT), expire_at=expire_at, months=request.months)
 
 
-class ClientLimitChange(CoreModel):
+class ClientLimitChange(AccountLifecycleSettings):
     """A partial change to one client's limits; omitted fields keep their value.
 
     `expires_at: null` (set explicitly) means the client never expires.
@@ -118,6 +139,12 @@ class ClientLimitChange(CoreModel):
     )
     tag: PersonTag | None = Field(default=None, repr=False, description="Omitted keeps the private tag; empty clears.")
     language: Language | None = Field(default=None, description="Explicit null uses the fleet's subscription language.")
+
+    @model_validator(mode="after")
+    def one_expiry_mode(self) -> ClientLimitChange:
+        if self.activation_duration_days is not None and self.expires_at is not None:
+            raise ValueError("Choose a fixed expiry or a duration from first use.")
+        return self
 
     @property
     def is_empty(self) -> bool:
@@ -142,6 +169,7 @@ class ClientLimitChange(CoreModel):
         if reset is not None and reset != "never":
             strategy = reset
         return UserCreationSettings(
+            **self.model_dump(include=set(LIFECYCLE_FIELDS)),
             expire_at=self.expires_at,
             traffic_limit_bytes=self.traffic_limit_bytes or 0,
             traffic_limit_strategy=strategy,
@@ -158,10 +186,23 @@ def build_limit_change(
     note: str | None = None,
     tag: str | None = None,
     language: str | None = None,
+    reset_day: str | None = None,
+    duration: str | None = None,
+    renew_days: str | None = None,
+    renew_months: str | None = None,
+    renewals: str | None = None,
+    no_renew: bool = False,
     now: datetime | None = None,
 ) -> ClientLimitChange:
     """Parse the `--limit`, `--reset`, and `--expires` values that were given into one change."""
-    fields: dict[str, object] = {}
+    fields = parse_schedule_options(
+        reset_day=reset_day,
+        duration=duration,
+        renew_days=renew_days,
+        renew_months=renew_months,
+        renewals=renewals,
+        no_renew=no_renew,
+    )
     if limit is not None:
         fields["traffic_limit_bytes"] = parse_traffic_limit(limit)
     if reset is not None:
@@ -176,6 +217,8 @@ def build_limit_change(
         fields["tag"] = parse_tag_option(tag)
     if language is not None:
         fields["language"] = parse_person_language(language)
+    if fields.get("activation_duration_days") is not None and fields.get("expires_at") is not None:
+        raise ClientScheduleError("expiry_mode")
     return ClientLimitChange(**fields)  # type: ignore[arg-type]
 
 
@@ -230,8 +273,8 @@ def parse_traffic_reset(text: str) -> TrafficReset:
         if value == period:
             return period
     raise ClientLimitError(
-        f"Reset period '{text}' is not one of day, week, month, never",
-        hint="Use --reset day, week, month, or never (calendar periods).",
+        f"Reset period '{text}' is not one of day, week, month, month_rolling, never",
+        hint="Use --reset day, week, month, month_rolling (anniversary), or never.",
     )
 
 
@@ -269,7 +312,7 @@ def canonical_expiry(raw: str) -> str:
 
 
 def traffic_reset_from_strategy(raw: str) -> str:
-    """A panel's reset strategy in Meridian's words: never, day, week, month (or month_rolling, panel-only)."""
+    """A reset strategy in Meridian's words, including anniversary months."""
     value = raw.strip().lower()
     return "never" if value in ("", "no_reset") else value
 

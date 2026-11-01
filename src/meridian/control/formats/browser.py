@@ -21,7 +21,7 @@ _UNITS = ("B", "KiB", "MiB", "GiB", "TiB", "PiB")
 def subscription_info(user: SubscriptionUser, links: list[str], subscription_url: str, now: datetime) -> dict[str, Any]:
     expires = user.expires_at or NEVER_EXPIRES
     traffic = user.traffic
-    return {
+    info: dict[str, Any] = {
         "isFound": True,
         "user": {
             "shortUuid": user.short_id,
@@ -45,6 +45,9 @@ def subscription_info(user: SubscriptionUser, links: list[str], subscription_url
         "ssConfLinks": {},
         "subscriptionUrl": subscription_url,
     }
+    if user.schedule is not None:
+        info["user"]["accountSchedule"] = user.schedule.to_data()
+    return info
 
 
 def not_found() -> dict[str, Any]:

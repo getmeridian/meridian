@@ -62,7 +62,7 @@ TrafficResetPeriod = Annotated[
     typer.Option(
         "--reset",
         metavar="PERIOD",
-        help="When used traffic starts again from zero: day, week, month, or never",
+        help="When used traffic starts again from zero: day, week, month, month_rolling (anniversary), or never",
         show_default=False,
     ),
 ]
@@ -84,6 +84,49 @@ DeviceLimit = Annotated[
         show_default=False,
     ),
 ]
+ResetAnchorDay = Annotated[
+    str | None,
+    typer.Option(
+        "--reset-day",
+        metavar="N|default",
+        help="Anniversary reset day, 1–31; default uses the creation day",
+        show_default=False,
+    ),
+]
+ActivationDuration = Annotated[
+    str | None,
+    typer.Option(
+        "--duration",
+        metavar="DAYS|none",
+        help="Valid for 1–3650 days from first traffic; none clears the duration",
+        show_default=False,
+    ),
+]
+RenewalDays = Annotated[
+    str | None,
+    typer.Option(
+        "--renew-days",
+        metavar="DAYS",
+        help="Renew expiry every 1–3650 UTC days and reset period traffic",
+        show_default=False,
+    ),
+]
+RenewalCalendarMonths = Annotated[
+    str | None,
+    typer.Option(
+        "--renew-months",
+        metavar="MONTHS",
+        help="Renew expiry every 1–120 calendar months, preserving its original day",
+        show_default=False,
+    ),
+]
+RenewalCap = Annotated[
+    str | None,
+    typer.Option(
+        "--renewals", metavar="N|unlimited", help="Renewal cap, 1–10000; unlimited removes the cap", show_default=False
+    ),
+]
+NoRenewal = Annotated[bool, typer.Option("--no-renew", help="Turn automatic renewal off")]
 
 
 def enable_json_output(ctx: typer.Context, value: object) -> object:

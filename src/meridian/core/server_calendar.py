@@ -2,24 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 
-from meridian.core.calendar import month_date, shift_month
+from meridian.core.calendar import month_date, monthly_period, shift_month
 from meridian.core.server_allowances import PaymentRepeat
 
 
 def server_period(reset_day: int, now: datetime) -> tuple[datetime, datetime]:
     """The UTC month containing now, clamping the reset to the last day of a short month."""
-    moment = now.astimezone(UTC)
-    start_day = month_date(moment.year, moment.month, reset_day)
-    start = datetime(start_day.year, start_day.month, start_day.day, tzinfo=UTC)
-    if moment < start:
-        year, month = shift_month(moment.year, moment.month, -1)
-        start_day = month_date(year, month, reset_day)
-        start = datetime(start_day.year, start_day.month, start_day.day, tzinfo=UTC)
-    year, month = shift_month(start.year, start.month, 1)
-    end_day = month_date(year, month, reset_day)
-    return start, datetime(end_day.year, end_day.month, end_day.day, tzinfo=UTC)
+    return monthly_period(reset_day, now)
 
 
 def next_payment_date(anchor: date | None, repeat: PaymentRepeat | None, today: date) -> date | None:

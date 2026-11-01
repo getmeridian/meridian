@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from meridian.control.models import UserRecord
+from meridian.core.account_schedule import AccountLifecycleState, calculate_schedule
 from meridian.core.attention import AttentionThresholds, person_reasons
 from meridian.core.person_activity import is_never_used
 from meridian.core.traffic import period_usage, quota_percent
@@ -25,7 +26,7 @@ USER_FIELDS = (
     "note",
     "tag",
     "language",
-)
+) + tuple(AccountLifecycleState.model_fields)
 # Lifetime includes the ledger and imported use; the offset leaves the current period's growth.
 USER_SELECT = (
     "SELECT "
@@ -60,5 +61,6 @@ def user_record(row: Any, *, now: datetime) -> UserRecord:
             "never_used": is_never_used(record),
             "quota_used_percent": quota_percent(record.used_traffic_bytes, record.traffic_limit_bytes),
             "attention_reasons": person_reasons(record, AttentionThresholds(), now),
+            "schedule": calculate_schedule(record, now),
         }
     )

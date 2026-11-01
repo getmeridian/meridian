@@ -42,6 +42,7 @@
   };
 
   M.expiryText = function (user) {
+    if (!user.expire_at && user.activation_duration_days) return M.firstUseText(user.activation_duration_days);
     if (!user.expire_at) return M.t("people.no_expiry");
     var past = new Date(user.expire_at).getTime() <= Date.now();
     return M.t(past ? "people.expired_on" : "people.expires", { when: M.ago(user.expire_at) });
@@ -87,8 +88,8 @@
     unit.value = "GiB";
     var gb = h("input", { type: "text", maxlength: "64", inputmode: "decimal", autocomplete: "off",
       value: user ? M.gbText(user.traffic_limit_bytes) : "" });
-    var strategy = h("select", {},
-      ["no_reset", "day", "week", "month"].map(function (s) {
+    var strategy = h("select", { name: "traffic_limit_strategy" },
+      ["no_reset", "day", "week", "month", "month_rolling"].map(function (s) {
         return h("option", { value: s, selected: user ? user.traffic_limit_strategy === s : s === "month",
           text: M.t("reset." + s) });
       }));
@@ -147,9 +148,10 @@
         autocomplete: "off", autocapitalize: "off", spellcheck: "false" });
       var expiry = M.expiryFields();
       var limits = M.limitFields(null);
+      var lifecycle = M.lifecycleFields(null, expiry, limits);
       var form = h("form", { class: "stack", novalidate: true },
         M.field(M.t("people.name"), name, M.t("people.name_hint")),
-        expiry.nodes,
+        lifecycle.nodes,
         limits.nodes,
         h("p", { class: "form-error", role: "alert" }),
         h("div", { class: "actions" },
@@ -167,7 +169,7 @@
         // One request with the settings: create-then-PATCH left an unlimited person when the PATCH failed.
         var body = limits.value();
         body.username = username;
-        body.expire_at = expiry.value();
+        Object.assign(body, lifecycle.change());
         M.saveDraft(form, function () { return M.api("POST", "api/users", body); }).then(function () {
           close();
           M.toast(M.t("people.added_toast", { name: username }));

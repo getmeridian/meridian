@@ -1,0 +1,128 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "activation_duration_days": {
+      "anyOf": [
+        {
+          "maximum": 3650,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Whole UTC days from first traffic.",
+      "title": "Activation Duration Days"
+    },
+    "expire_at": {
+      "anyOf": [
+        {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expire At"
+    },
+    "renewal_interval_days": {
+      "anyOf": [
+        {
+          "maximum": 3650,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Renewal Interval Days"
+    },
+    "renewal_interval_months": {
+      "anyOf": [
+        {
+          "maximum": 120,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Renewal Interval Months"
+    },
+    "renewal_limit": {
+      "anyOf": [
+        {
+          "maximum": 10000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Renewals in this series; null means unlimited.",
+      "title": "Renewal Limit"
+    },
+    "traffic_limit_strategy": {
+      "anyOf": [
+        {
+          "enum": [
+            "no_reset",
+            "day",
+            "week",
+            "month",
+            "month_rolling"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Traffic Limit Strategy"
+    },
+    "traffic_reset_anchor_day": {
+      "anyOf": [
+        {
+          "maximum": 31,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "UTC month day; null uses creation day.",
+      "title": "Traffic Reset Anchor Day"
+    },
+    "username": {
+      "anyOf": [
+        {
+          "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Null previews a new account.",
+      "title": "Username"
+    }
+  },
+  "title": "UserSchedulePreviewRequest",
+  "type": "object"
+}

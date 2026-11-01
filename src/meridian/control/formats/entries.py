@@ -9,6 +9,7 @@ from typing import Literal
 from meridian.compiler.names import fingerprint_label
 from meridian.control.formats.status_remarks import STATUS_REMARKS
 from meridian.control.models import ENDPOINT_REMARK_MAX_LENGTH, ClientEndpoint, LimitStrategy
+from meridian.core.account_schedule import AccountSchedulePreview
 from meridian.core.languages import DEFAULT_LANGUAGE, Language
 from meridian.core.traffic import PeriodTraffic, period_usage
 
@@ -49,6 +50,8 @@ class SubscriptionUser:
     limit_bytes: int = 0
     lifetime_used_bytes: int = 0
     limit_strategy: LimitStrategy = "no_reset"
+    reset_anchor_day: int | None = None
+    schedule: AccountSchedulePreview | None = None
     language: Language = DEFAULT_LANGUAGE
     period_traffic: PeriodTraffic | None = None
 

@@ -22,6 +22,7 @@ from meridian.commands.client_handoff import (
 from meridian.console import err_console, error_context, fail, is_json_mode, ok
 from meridian.control_access import AccessPanel, access_panel
 from meridian.core.client_limits import ClientExtendRequest, ClientLimitChange, ClientLimitError, build_limit_change
+from meridian.core.client_schedule_options import ClientScheduleError
 from meridian.core.clients import (
     ClientDetail,
     ClientRecord,
@@ -54,12 +55,32 @@ def parse_limit_options(
     note: str | None = None,
     tag: str | None = None,
     language: str | None = None,
+    reset_day: str | None = None,
+    duration: str | None = None,
+    renew_days: str | None = None,
+    renew_months: str | None = None,
+    renewals: str | None = None,
+    no_renew: bool = False,
 ) -> ClientLimitChange:
     """The change `--limit`, `--reset`, and `--expires` ask for; a bad value exits 2 before any connection."""
     try:
         return build_limit_change(
-            limit=limit, reset=reset, expires=expires, devices=devices, note=note, tag=tag, language=language
+            limit=limit,
+            reset=reset,
+            expires=expires,
+            devices=devices,
+            note=note,
+            tag=tag,
+            language=language,
+            reset_day=reset_day,
+            duration=duration,
+            renew_days=renew_days,
+            renew_months=renew_months,
+            renewals=renewals,
+            no_renew=no_renew,
         )
+    except ClientScheduleError as exc:
+        fail(t(f"lifecycle.invalid_{exc.field}"), hint_type="user")
     except LanguageError:
         fail(t("language.invalid_person"), hint_type="user")
     except PersonMetadataError as exc:
@@ -87,10 +108,12 @@ def format_usage(record: ClientRecord) -> str:
 
 def print_client_usage(record: ClientRecord) -> None:
     """Status, traffic, expiry, and last-seen lines, aligned in the current language."""
+    from meridian.commands.client_schedule import account_expiry
+
     rows = [
         (t("client.label.status"), format_status(record.status)),
         (t("client.label.traffic"), escape(format_usage(record))),
-        (t("client.label.expires"), escape(format_expiry(record.expires_at))),
+        (t("client.label.expires"), escape(account_expiry(record))),
         (
             t("client.label.devices"),
             t("client.device_unlimited")
@@ -104,6 +127,28 @@ def print_client_usage(record: ClientRecord) -> None:
         rows.insert(2, (t("client.label.lifetime"), escape(format_traffic(record.lifetime_traffic_bytes))))
         if record.traffic_reset_at:
             rows.insert(3, (t("client.label.period_started"), escape(record.traffic_reset_at)))
+    if record.traffic_reset == "month_rolling" and record.traffic_reset_anchor_day is not None:
+        rows.append((t("lifecycle.reset_day"), str(record.traffic_reset_anchor_day)))
+    if record.schedule is not None:
+        if record.schedule.next_reset_at:
+            rows.append((t("lifecycle.next_reset"), escape(format_expiry(record.schedule.next_reset_at))))
+        if record.schedule.renewal_enabled:
+            upcoming = (
+                format_expiry(record.schedule.next_renewal_at)
+                if record.schedule.next_renewal_at
+                else t("lifecycle.waiting_first_use")
+                if record.schedule.activation_pending
+                else t("lifecycle.no_renewals_left")
+            )
+            rows.append((t("lifecycle.next_renewal"), escape(upcoming)))
+            rows.append(
+                (
+                    t("lifecycle.renewals_left"),
+                    str(record.schedule.renewals_left)
+                    if record.schedule.renewals_left is not None
+                    else t("lifecycle.unlimited_renewals"),
+                )
+            )
     last_seen = t("client.label.last_seen")
     if record.last_seen:
         rows.append((last_seen, escape(record.last_seen)))
@@ -132,12 +177,32 @@ def run_set(
     note: str | None = None,
     tag: str | None = None,
     language: str | None = None,
+    reset_day: str | None = None,
+    duration: str | None = None,
+    renew_days: str | None = None,
+    renew_months: str | None = None,
+    renewals: str | None = None,
+    no_renew: bool = False,
+    dry_run: bool = False,
+    yes: bool = False,
 ) -> None:
     """Change a client's traffic limit, reset period, or expiry."""
     operation = OperationContext()
     with error_context("client.set", timer=operation.timer):
         change = parse_limit_options(
-            limit=limit, reset=reset, expires=expires, devices=devices, note=note, tag=tag, language=language
+            limit=limit,
+            reset=reset,
+            expires=expires,
+            devices=devices,
+            note=note,
+            tag=tag,
+            language=language,
+            reset_day=reset_day,
+            duration=duration,
+            renew_days=renew_days,
+            renew_months=renew_months,
+            renewals=renewals,
+            no_renew=no_renew,
         )
         if change.is_empty:
             fail(
@@ -152,6 +217,9 @@ def run_set(
             verb="edit",
             mutate=lambda panel, user: panel.update_user_limits(user.id, change),
             done_key="client.settings_updated",
+            limit_change=change,
+            dry_run=dry_run,
+            yes=yes,
         )
 
 
@@ -195,6 +263,9 @@ def _mutate(
     verb: str,
     mutate: Callable[[AccessPanel, User], User],
     done_key: str,
+    limit_change: ClientLimitChange | None = None,
+    dry_run: bool = False,
+    yes: bool = False,
 ) -> None:
     cluster = load_topology_cluster()
     # Validate before opening access, preserving the typed name until the service's exact-name check.
@@ -212,6 +283,13 @@ def _mutate(
                 hint_type="system",
             )
         try:
+            if limit_change is not None:
+                from meridian.commands.client_schedule import review_limit_schedule
+
+                if not review_limit_schedule(
+                    panel, user, limit_change, operation, declared=declared, dry_run=dry_run, yes=yes
+                ):
+                    return
             updated = mutate(panel, user)
         except RemnawaveError as exc:
             fail(

@@ -18,6 +18,7 @@ Server-hosted PWA; Meridian's only connection-page implementation.
 **App help** — the collapsed **Not connecting?** panel holds generic app tips (a red ping is not a failure, refresh, update on launch, clock) and fetches nothing.
 
 ## What's done well
+- **Account schedule cache stays anonymous** — only duration, activation state, future dates, and renewals left join the account projection; malformed optional dates never block setup.
 - **SW scope and privacy** — the worker caches only content-versioned shared assets; person pages, config, account checks, and probes always use the network. Old `/pwa/sw.js` URLs serve a retirement worker that clears Meridian caches and unregisters.
 - **One clock threshold** — `CLOCK_WARN_MS` mirrors `core.defaults.CLOCK_DRIFT_WARN_SECONDS`, and the page says connections *can* fail.
 - **Connection remarks stay verbatim** — translate protocol hints only, and show entries in subscription order.

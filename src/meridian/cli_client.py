@@ -5,7 +5,21 @@ from __future__ import annotations
 import typer
 
 from meridian.cli_client_preview import client_preview_cmd
-from meridian.cli_options import CutOff, DeviceLimit, Expires, Json, TrafficLimit, TrafficResetPeriod, Yes
+from meridian.cli_options import (
+    ActivationDuration,
+    CutOff,
+    DeviceLimit,
+    Expires,
+    Json,
+    NoRenewal,
+    RenewalCalendarMonths,
+    RenewalCap,
+    RenewalDays,
+    ResetAnchorDay,
+    TrafficLimit,
+    TrafficResetPeriod,
+    Yes,
+)
 
 client_app = typer.Typer(
     help="Manage who can connect: add, show, list, limit, reissue, enable, disable, remove", no_args_is_help=True
@@ -20,6 +34,12 @@ def client_add(
     reset: TrafficResetPeriod = None,
     expires: Expires = None,
     devices: DeviceLimit = None,
+    reset_day: ResetAnchorDay = None,
+    duration: ActivationDuration = None,
+    renew_days: RenewalDays = None,
+    renew_months: RenewalCalendarMonths = None,
+    renewals: RenewalCap = None,
+    no_renew: NoRenewal = False,
     _json: Json = False,
     # Adding never asks; accepted so scripts can pass --yes to every mutating command.
     _yes: bool = typer.Option(False, "--yes", "-y", hidden=True),
@@ -35,7 +55,19 @@ def client_add(
     """
     from meridian.commands.client import run_add
 
-    run_add(names, limit=limit, reset=reset, expires=expires, devices=devices)
+    run_add(
+        names,
+        limit=limit,
+        reset=reset,
+        expires=expires,
+        devices=devices,
+        reset_day=reset_day,
+        duration=duration,
+        renew_days=renew_days,
+        renew_months=renew_months,
+        renewals=renewals,
+        no_renew=no_renew,
+    )
 
 
 @client_app.command("show")
@@ -59,7 +91,9 @@ def client_show_cmd(
 @client_app.command("list")
 def client_list_cmd(
     _json: Json = False,
-    attention: bool = typer.Option(False, "--attention", help="Only people expiring soon, near quota, never used, or without recent traffic"),
+    attention: bool = typer.Option(
+        False, "--attention", help="Only people expiring soon, near quota, never used, or without recent traffic"
+    ),
     tag: str | None = typer.Option(None, "--tag", metavar="TAG", help="Only people with this tag; none for untagged"),
 ) -> None:
     """List managed access clients with status and traffic"""
@@ -87,6 +121,12 @@ def client_set_cmd(
     reset: TrafficResetPeriod = None,
     expires: Expires = None,
     devices: DeviceLimit = None,
+    reset_day: ResetAnchorDay = None,
+    duration: ActivationDuration = None,
+    renew_days: RenewalDays = None,
+    renew_months: RenewalCalendarMonths = None,
+    renewals: RenewalCap = None,
+    no_renew: NoRenewal = False,
     note: str | None = typer.Option(
         None, "--note", metavar="TEXT", help='Private note, up to 500 characters; "" clears'
     ),
@@ -96,6 +136,8 @@ def client_set_cmd(
     language: str | None = typer.Option(
         None, "--language", metavar="LANGUAGE", help="Page and app language: en, ru, fa, zh; default follows the fleet"
     ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview schedule dates without saving"),
+    yes: Yes = False,
     _json: Json = False,
 ) -> None:
     """Change a client's traffic limit, reset period, or expiry
@@ -110,7 +152,24 @@ def client_set_cmd(
     """
     from meridian.commands.client_limits import run_set
 
-    run_set(name, limit=limit, reset=reset, expires=expires, devices=devices, note=note, tag=tag, language=language)
+    run_set(
+        name,
+        limit=limit,
+        reset=reset,
+        expires=expires,
+        devices=devices,
+        note=note,
+        tag=tag,
+        language=language,
+        reset_day=reset_day,
+        duration=duration,
+        renew_days=renew_days,
+        renew_months=renew_months,
+        renewals=renewals,
+        no_renew=no_renew,
+        dry_run=dry_run,
+        yes=yes,
+    )
 
 
 @client_app.command("devices", rich_help_panel="Device limits")

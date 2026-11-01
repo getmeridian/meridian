@@ -17,6 +17,7 @@
 - **Renderer stamps track what each piece deploys** — bump `render_contract.py` whenever deployed bytes or commands change, and every stamp the change reaches (control service, API, subscription, PWA, console); a missed stamp leaves servers running old bytes after an apply.
 
 ## Pitfalls
+- **Account schedules are creation-only inputs** — existing duration, reset anchor, renewal interval, cap, and progress remain the operator's on every apply.
 - **Reviewed settings carry only what the topology owns** — never the service-owned fleet language, person overrides, or notices.
 - **Access users are partly operator-owned** — the user driver only creates and observes existence; first limits ride atomic creation, and later applies never rewrite status, notes, tags, limits, expiry, or quotas (rewriting them undid `client disable`).
 - **A user retirement with a saved cut-off deletes credentials and queues resets atomically**; a 404 after a lost reply means the deletion already committed.

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from meridian.control.models import UserImport, UserRecord, UserStatus
 from meridian.control.periods import period_start
@@ -20,7 +20,7 @@ def enforced_status(user: UserRecord, now: str) -> UserStatus:
 
 def whole_seconds(timestamp: str | None) -> str | None:
     """A protocol timestamp without its fraction, as the service writes every time."""
-    return f"{timestamp[:19]}Z" if timestamp else None
+    return datetime.fromisoformat(timestamp).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ") if timestamp else None
 
 
 def period_began(item: UserImport, now: str) -> str | None:
@@ -31,7 +31,8 @@ def period_began(item: UserImport, now: str) -> str | None:
     on from the import with the use the source counted, until its next boundary.
     """
     reset_at = whole_seconds(item.traffic_reset_at)
-    start = period_start(item.traffic_limit_strategy, datetime.fromisoformat(now))
+    anchor = item.traffic_reset_anchor_day or datetime.fromisoformat(item.created_at or now).astimezone(UTC).day
+    start = period_start(item.traffic_limit_strategy, datetime.fromisoformat(now), anchor)
     if start is None:
         return reset_at
     if reset_at is not None and datetime.fromisoformat(reset_at) >= start:

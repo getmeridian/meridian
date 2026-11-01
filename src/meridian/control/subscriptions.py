@@ -179,7 +179,11 @@ def subscription_url(public_url: str, short_id: str) -> str:
 
 
 def _refill_headers(user: SubscriptionUser, now: datetime) -> dict[str, str]:
-    next_start = next_period_start(user.limit_strategy, now)
+    if user.schedule is not None:
+        reset_at = user.schedule.next_reset_at
+        next_start = datetime.fromisoformat(reset_at) if reset_at else None
+    else:
+        next_start = next_period_start(user.limit_strategy, now, user.reset_anchor_day)
     return {"subscription-refill-date": str(int(next_start.timestamp()))} if next_start is not None else {}
 
 
