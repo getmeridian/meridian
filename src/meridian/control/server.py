@@ -36,7 +36,6 @@ from meridian.control.delivery_routes import DELIVERY_OWNER_ROUTES
 from meridian.control.enrollment import Session
 from meridian.control.errors import ServiceError, agent_error
 from meridian.control.http_errors import api_error_response, error_page, validation_message
-from meridian.control.login_limits import LockedOut
 from meridian.control.models import (
     ApplyFenceSwap,
     ClientEndpoint,
@@ -291,11 +290,9 @@ class _Handler(BaseHTTPRequestHandler):
         else:
             body = api_error_response(exc).to_data()
         data = json.dumps(body, ensure_ascii=False).encode("utf-8")
-        # The contract mirrors `retry_after_seconds` in the HTTP header; a locked-out sign-in says when to retry.
-        if agent and retry_after is not None:
+        # Explicit service delays and the agent contract also travel in HTTP.
+        if retry_after is not None and (agent or exc.retry_after is not None):
             headers = {"Retry-After": str(retry_after)}
-        elif isinstance(exc, LockedOut):
-            headers = {"Retry-After": str(exc.retry_after)}
         else:
             headers = None
         self._send(exc.status, "application/json", data, headers)

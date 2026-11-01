@@ -25,6 +25,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Challenge capacity belongs to its caller** — anonymous login evicts only its oldest bounded requests; registration and confirmation keep one challenge per kind and live session, so anonymous traffic never blocks an owner.
 - **Bulk expiry validates before reading** — a deferred submit listener cannot guard direct values; clearing expiry requires the explicit No end date choice.
 - **Undo replies can be uncertain** — read the receipt before reporting success, keep its latest state, and never enable a blind retry after a lost reply.
 - **People refreshes keep usable controls** — passive reads never disable selections or the pager; failed page requests restore the last accepted cursor and controls.

@@ -11,7 +11,7 @@ from pydantic import ValidationError
 from meridian.control import passwords
 from meridian.control.errors import ServiceError
 from meridian.control.models import ServiceSettings
-from meridian.control.owner import ABSOLUTE_SECONDS, CONFIRM_SECONDS, OwnerSession
+from meridian.control.owner import ABSOLUTE_SECONDS, CONFIRM_SECONDS, MAX_SESSIONS, OwnerSession
 from meridian.control.passkey_models import PasskeyName, RegistrationCompletion
 from meridian.control.passkeys import CHALLENGE_SECONDS, MAX_CHALLENGES, MAX_PASSKEYS
 from meridian.control.service import ControlService
@@ -239,18 +239,20 @@ def test_registration_is_bound_to_its_session(service: ControlService, session: 
     assert service.passkeys.list_passkeys().passkeys == []
 
 
-def test_challenges_are_bounded_and_expire_without_evicting_valid_proofs(
+def test_anonymous_challenges_evict_only_the_oldest_login_and_expire(
     service: ControlService, session: OwnerSession, clock: Clock
 ) -> None:
     authenticator = Authenticator()
     register(service, session, authenticator)
-    first = service.passkeys.begin_authentication()
-    for _ in range(MAX_CHALLENGES - 1):
-        service.passkeys.begin_authentication()
-    with pytest.raises(ServiceError) as full:
-        service.passkeys.begin_authentication()
-    assert full.value.status == 429
-    service.passkeys.finish_authentication(first.challenge_id, authenticator.assertion(first.public_key.to_data()))
+    requests = [service.passkeys.begin_authentication() for _ in range(MAX_CHALLENGES + 1)]
+    with pytest.raises(ServiceError) as evicted:
+        service.passkeys.finish_authentication(
+            requests[0].challenge_id, authenticator.assertion(requests[0].public_key.to_data())
+        )
+    assert evicted.value.code == "passkey_expired"
+    service.passkeys.finish_authentication(
+        requests[1].challenge_id, authenticator.assertion(requests[1].public_key.to_data())
+    )
     expired = service.passkeys.begin_authentication()
     clock.now += CHALLENGE_SECONDS
     with pytest.raises(ServiceError) as refused:
@@ -259,6 +261,70 @@ def test_challenges_are_bounded_and_expire_without_evicting_valid_proofs(
         )
     assert refused.value.code == "passkey_expired"
     assert service.passkeys.begin_authentication().challenge_id
+
+
+def test_anonymous_login_flood_never_blocks_or_evicts_owner_proofs(
+    service: ControlService, session: OwnerSession
+) -> None:
+    authenticator = Authenticator()
+    register(service, session, authenticator)
+    registration = service.passkeys.begin_registration(session)
+    confirmation = service.passkeys.begin_authentication(session=session)
+    other = service.owner.login(PASSWORD, "")
+    for _ in range(MAX_CHALLENGES * 2):
+        login = service.passkeys.begin_authentication()
+    assert service.passkeys.begin_registration(other).challenge_id
+    assert service.passkeys.begin_authentication(session=other).challenge_id
+    assert len(service.passkeys._challenges) <= MAX_CHALLENGES + MAX_SESSIONS * 2
+    service.passkeys.finish_registration(
+        session,
+        RegistrationCompletion(
+            challenge_id=registration.challenge_id,
+            name="Travel key",
+            credential=Authenticator().registration(registration.public_key.to_data()),
+        ),
+    )
+    assert (
+        service.passkeys.finish_authentication(
+            confirmation.challenge_id, authenticator.assertion(confirmation.public_key.to_data()), session=session
+        ).session_id
+        == session.session_id
+    )
+    assert service.passkeys.finish_authentication(
+        login.challenge_id, authenticator.assertion(login.public_key.to_data(), count=7)
+    ).token
+
+
+def test_owner_challenges_are_bounded_per_live_session_and_kind(service: ControlService, session: OwnerSession) -> None:
+    authenticator = Authenticator()
+    register(service, session, authenticator)
+    for _ in range(MAX_CHALLENGES + 1):
+        current = service.owner.login(PASSWORD, "")
+        replaced = service.passkeys.begin_registration(current)
+        confirmation = service.passkeys.begin_authentication(session=current)
+        registration = service.passkeys.begin_registration(current)
+    assert len(service.passkeys._challenges) <= MAX_SESSIONS * 2
+    with pytest.raises(ServiceError) as old:
+        service.passkeys.finish_registration(
+            current,
+            RegistrationCompletion(
+                challenge_id=replaced.challenge_id,
+                name="Replaced request",
+                credential=Authenticator().registration(replaced.public_key.to_data()),
+            ),
+        )
+    assert old.value.code == "passkey_expired"
+    service.passkeys.finish_registration(
+        current,
+        RegistrationCompletion(
+            challenge_id=registration.challenge_id,
+            name="Current request",
+            credential=Authenticator().registration(registration.public_key.to_data()),
+        ),
+    )
+    service.passkeys.finish_authentication(
+        confirmation.challenge_id, authenticator.assertion(confirmation.public_key.to_data()), session=current
+    )
 
 
 def test_passkeys_are_bounded_and_duplicate_registration_is_refused(

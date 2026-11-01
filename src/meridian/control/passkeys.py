@@ -38,6 +38,7 @@ from meridian.control.webauthn import (
 )
 
 CHALLENGE_SECONDS = 5 * 60
+# Anonymous sign-in requests have their own evicting pool; owner kinds are one per live session.
 MAX_CHALLENGES = 64
 MAX_PASSKEYS = 10
 ChallengeKind = Literal["register", "login", "confirm"]
@@ -253,21 +254,20 @@ class PasskeyRegistry:
         session: OwnerSession | None,
     ) -> tuple[str, bytes]:
         session_id = session.session_id if session is not None else None
+        live_sessions = {item.id for item in self._owner.list_sessions(session).sessions} if session else None
         with self._challenge_lock:
             now = self._clock()
             self._challenges = {
                 key: item
                 for key, item in self._challenges.items()
                 if item.expires_at > now
+                and (live_sessions is None or item.session_id is None or item.session_id in live_sessions)
                 and not (session_id is not None and item.session_id == session_id and item.kind == kind)
             }
-            if len(self._challenges) >= MAX_CHALLENGES:
-                raise ServiceError(
-                    "passkey_busy",
-                    "Too many passkey requests. Try again in five minutes.",
-                    429,
-                    retry_after=CHALLENGE_SECONDS,
-                )
+            if session_id is None:
+                anonymous = [key for key, item in self._challenges.items() if item.session_id is None]
+                for key in anonymous[: max(0, len(anonymous) - MAX_CHALLENGES + 1)]:
+                    del self._challenges[key]
             challenge_id, value = secrets.token_urlsafe(32), secrets.token_bytes(32)
             self._challenges[challenge_id] = Challenge(
                 value, kind, rp, handle, session_id, credentials, now + CHALLENGE_SECONDS

@@ -37,6 +37,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - A proposal whose intent contains a secret-shaped key or value, or a malformed `access` block, is refused and never stored.
 
 ## Pitfalls
+- **Retry delays cross every HTTP surface** — emit Retry-After whenever a ServiceError supplies it, including anonymous authentication refusals.
 - **Redaction preserves supplied fields** — copy only changed values, or omitted bulk action parameters become supplied nulls and invalidate the review.
 - **Bulk grants keep legacy boundaries** — query and batch grants stay separate from reads and credential imports; their tag-bearing views also require private metadata permission.
 - **Bulk deletion carries every retired identity** — compose once with all removed records so each node queues the same receipts as a single deletion, without rotating keys.

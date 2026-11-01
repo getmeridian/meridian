@@ -274,6 +274,8 @@ The control service includes a built-in web panel (also called the management pa
 
 Passkeys use the domain from your reviewed server settings, never a request header. Browsers do not allow them on a bare IP address: use your password and optional authenticator code there. A domain change needs a passkey for the new domain. Requests expire after five minutes and work once. The service keeps the credential ID, public key, counter, chosen name, and times; it stores no device identity or address and makes no external request.
 
+During many simultaneous sign-in attempts, the oldest anonymous passkey prompts may expire; start sign-in again. Registration and identity confirmation in a signed-in session remain available. Each session keeps its own current request for each purpose.
+
 Removing a passkey prevents new sign-ins and signs out every other browser session. Your password and sign-in code remain available. If all methods are lost, run `meridian panel --setup-link` on the managing machine: the single-use root-issued recovery link replaces the password, disables TOTP, removes every passkey, and ends every session. Owner credentials, including passkeys, are excluded from snapshots; a restored service needs a fresh setup link.
 
 | Change in the web panel | Shown read-only (change with `meridian`) |
