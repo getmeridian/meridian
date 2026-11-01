@@ -327,6 +327,48 @@ def test_control_bootstrap_scopes_the_console_to_the_secret_path(tmp_home, monke
     assert captured[0].public_path == "/0123abcd"
 
 
+@pytest.mark.parametrize("answers", [[False, False, True], [False] * 40], ids=["answers-after-reload", "never"])
+def test_control_bootstrap_waits_for_the_service_to_answer(tmp_home, monkeypatch, answers: list[bool]) -> None:
+    """nginx's reload returns before old workers stop serving the self-signed certificate, so the
+    observation right after a fresh install failed until a resume (the system lab's retry hid it)."""
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+
+    import meridian.provision as provision
+    from meridian.cluster import ClusterConfig
+    from meridian.reconciler.resources import ResourceReconcileError
+    from meridian.servers import ServerEntry
+    from meridian.setup import control_service
+    from tests.support.mock_connection import MockConnection
+
+    agent = tmp_home / "netagent"
+    agent.write_bytes(b"\x7fELF-agent")
+    monkeypatch.setenv("MERIDIAN_AGENT_BINARY", str(agent))
+    monkeypatch.setattr(provision, "Provisioner", lambda _steps: SimpleNamespace(run=lambda *_a, **_k: []))
+    monkeypatch.setattr("meridian.health.time.sleep", lambda _seconds: None)
+    clock = iter(range(0, 10_000, 2))
+    monkeypatch.setattr("meridian.health.time.monotonic", lambda: next(clock))
+    pending = iter(answers)
+    client = SimpleNamespace(ping=lambda: next(pending))
+    monkeypatch.setattr(control_service, "control_client", lambda _cluster: nullcontext(client))
+    plan = compile_topology(_intent())
+    payload = next(item.payload for item in plan.resources if isinstance(item.payload, ControlServicePayload))
+    entry = ServerEntry(host=ADDRESS, user="root", id="srv-a")
+
+    def bootstrap() -> None:
+        control_service.bootstrap_control_service(
+            payload, plan, ClusterConfig(), entry, MockConnection(),
+            harden=False, reality_port=10443, reality_sni="a.example",
+        )  # fmt: skip
+
+    if answers[-1]:
+        bootstrap()
+        assert next(pending, None) is None  # it stopped asking once the service answered
+    else:
+        with pytest.raises(ResourceReconcileError, match=f"control service on {ADDRESS} did not answer"):
+            bootstrap()
+
+
 def _control_only_fleet():
     """The control server runs only the service: exit `de` behind a relay and a routing gateway."""
     relay = TransparentRelayIntent(id="r1", hop_server_refs=["srv-r"], exit_ref="de", protocol_path_ref="de-reality")

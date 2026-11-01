@@ -35,6 +35,7 @@ from meridian.core.errors import ProvisioningError
 from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
 from meridian.diagnostics.network import certificate_validation_error
+from meridian.health import ReadinessTimeout, poll_until_ready
 from meridian.host_runtime import CONTROL_SERVICE_STATE_DIR
 from meridian.provision.ensure import ensure_file_content
 from meridian.provision.tls import certificate_inspection_command, certificate_names_host
@@ -198,6 +199,16 @@ def bootstrap_control_service(
     )
     if not written.ok:
         raise ResourceReconcileError(f"Could not attest the control service: {written.detail}")
+    # nginx's reload returns while old workers still serve the bootstrap's self-signed certificate,
+    # so the observation right after this failed nearly every fresh install until a resume.
+    try:
+        with control_client(cluster) as client:
+            poll_until_ready(client.ping, timeout=60, interval=2, description="control service")
+    except ReadinessTimeout as exc:
+        raise ResourceReconcileError(
+            f"The control service on {entry.host} did not answer after installing: {exc}.",
+            hint=f"Run: meridian check {entry.host}",
+        ) from exc
 
 
 def bootstrap_reviewed_control_service(

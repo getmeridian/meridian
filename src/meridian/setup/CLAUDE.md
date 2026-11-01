@@ -16,6 +16,7 @@
 - **Control bootstrap values come from the exit on the control server** — the first exit in plan order changed whenever an earlier-sorting exit was added, re-running the bootstrap with another server's ports.
 - **A self-steal exit bootstraps with the default SNI** — the operator's own name would point the server at itself.
 - **Review keeps a control-service fleet on its backend** — intent files omit the default, so `review` reads it from the committed intent.
+- **The bootstrap waits until the service answers** — nginx's reload returns while old workers still serve the self-signed certificate, so the observation right after a fresh install failed until a resume.
 - **The bootstrap needs an agent build first** — `require_agent_build()` refuses before provisioning, or a source install leaves a running service with no nodes.
 - **Never add credential-shaped fields to `SetupDraft`.**
 - **The fleet document never sets what it hides** — it writes names for `srv-*` IDs and drops transport paths; import refuses a `path:` key, and every value read before validation guards its own shape.
