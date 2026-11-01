@@ -29,6 +29,7 @@
 ## Pitfalls
 - **Revealed metadata keeps scalar types** — secret-shaped tag keys must not replace facet counts with redaction strings; container reveals still mask string credentials.
 - **Bulk action schemas retain parameter types** — use post-init checks and a model schema hook, or a dict-returning serializer hides them behind an after-validator.
+- **Ready includes a core restart** — revocation evidence describes old identities losing new streams, not a claim that the fresh core needs or holds block rules.
 - **Device cap zero is unlimited** — only null inherits the fleet cap; never resolve a cap by truthiness.
 - **Never emit raw SSH commands, panel tokens, private keys, database URLs, or subscription secrets.**
 - **`redact_string()` is the only secret masker** (SSH debug logs included) — teach it a new secret form instead of adding a local regex.

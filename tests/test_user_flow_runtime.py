@@ -119,9 +119,13 @@ def start(stack, binary, config, tmp_path, name):
 
 
 @pytest.mark.parametrize("protocol", ["hysteria2", "vless-mux"])
-@pytest.mark.parametrize("rotation", [False, True], ids=["remove", "rotate"])
+@pytest.mark.parametrize(
+    "rotation,guard_failure",
+    [(False, False), (True, False), (True, True)],
+    ids=["remove", "rotate", "failed-guard-rotation"],
+)
 def test_live_sessions_lose_only_the_revoked_identitys_new_streams(
-    xray_binary, runtime_driver, tmp_path, protocol, rotation
+    xray_binary, runtime_driver, tmp_path, protocol, rotation, guard_failure
 ):
     api, inbound_port = port(), port(socket.SOCK_DGRAM if protocol == "hysteria2" else socket.SOCK_STREAM)
     client_ports = [port() for _ in range(3)]
@@ -304,6 +308,7 @@ def test_live_sessions_lose_only_the_revoked_identitys_new_streams(
                     "client_b": client_ports[1],
                     "client_new": client_ports[2],
                     "rotation": rotation,
+                    "guard_failure": guard_failure,
                 }
             )
         )

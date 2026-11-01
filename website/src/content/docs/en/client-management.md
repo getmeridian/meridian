@@ -185,6 +185,11 @@ A disable blocks new connections after each node applies the change; `enable` re
 
 A disable lasts until `client enable`: apply, redeploys, and fleet changes leave it alone.
 
+
+Live rules block only the revoked credential on its inbound. Active credentials still follow normal DNS, private and country IP blocks, and IP egress rules. Re-enabling the same credential removes its block; a newly rotated credential never matches an older block. Restarting Xray ends old sessions and discards their temporary rules and pending retries.
+
+One Xray run retains at most 4096 credential/inbound block rules. At the limit, credentials are still removed, but the node stays pending and asks you to restart Xray. This bounds retained state and never blocks active credentials.
+
 ## Rotate connection keys keeping the link
 
 Use `meridian client rotate-credentials NAME --yes` when connection credentials need replacing. It generates a new VLESS UUID and Hysteria2 auth while keeping the subscription token, page URL, device registrations, status, limits, expiry, traffic, notes, tags, and language. Apps receive the keys on their next subscription refresh; ask the person to refresh now. Old identities lose new streams as each node applies the change. A leaked subscription URL requires `client reissue`, which issues a new URL and clears device registrations.

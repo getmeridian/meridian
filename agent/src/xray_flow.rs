@@ -1,11 +1,7 @@
-//! Runtime routing for authenticated flows, including streams on an existing QUIC or mux session.
-//!
-//! AddRule replaces or appends; it cannot prepend. Send the reviewed routing graph
-//! with revocations first. Eligible identities get copies of its rules, followed
-//! by a managed-inbound denial and the original rules for API and bridge traffic.
-//! The denial makes old-generation tombstones unnecessary after reconciliation.
+//! Block only revoked identities, ahead of the reviewed routing rules.
+//! An active-user catch-all would suppress Xray's IPIfNonMatch DNS pass.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::Path;
 
@@ -16,21 +12,13 @@ use crate::compose::{self, UsersRef};
 use crate::fsutil;
 use crate::model::{Resource, ResourceError, Spec};
 use crate::xray_identity;
+use crate::xray_revocations::{LIMIT_MESSAGE, Revocation, Revocations, core_invocation, lost};
+use crate::xray_revocations::{active_identities, clients};
 
-fn clients(config: &Value, tag: &str) -> BTreeSet<String> {
-    config
-        .get("inbounds")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .find(|inbound| inbound.get("tag").and_then(Value::as_str) == Some(tag))
-        .and_then(|inbound| inbound.pointer("/settings/clients"))
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(|client| client.get("email").and_then(Value::as_str))
-        .map(str::to_string)
-        .collect()
+pub(crate) struct GuardFailure {
+    pub message: String,
+    /// Authentication waits for durable retry intent and removal of active identity blocks.
+    pub can_apply_authentication: bool,
 }
 
 fn tags(resources: &[Resource]) -> Vec<String> {
@@ -44,7 +32,10 @@ fn tags(resources: &[Resource]) -> Vec<String> {
         .collect()
 }
 
-fn guarded(config: &Value, tags: &[String], previous: Option<&Value>) -> Result<Value, String> {
+fn guarded(config: &Value, revoked: &BTreeSet<Revocation>) -> Result<Value, String> {
+    if revoked.is_empty() {
+        return Ok(config.clone());
+    }
     let mut routing = config
         .get("routing")
         .cloned()
@@ -54,13 +45,6 @@ fn guarded(config: &Value, tags: &[String], previous: Option<&Value>) -> Result<
         .and_then(Value::as_array)
         .ok_or("The routing rules are invalid.")?
         .clone();
-    let default = config
-        .get("outbounds")
-        .and_then(Value::as_array)
-        .and_then(|outbounds| outbounds.first())
-        .and_then(|outbound| outbound.get("tag"))
-        .and_then(Value::as_str)
-        .ok_or("The default outbound needs a tag for the user flow guard.")?;
     let blocked = config
         .get("outbounds")
         .and_then(Value::as_array)
@@ -69,76 +53,16 @@ fn guarded(config: &Value, tags: &[String], previous: Option<&Value>) -> Result<
         .find(|outbound| outbound.get("protocol").and_then(Value::as_str) == Some("blackhole"))
         .and_then(|outbound| outbound.get("tag"))
         .and_then(Value::as_str)
-        .ok_or("The user flow guard needs a block outbound.")?;
-    let mut revoked = Vec::new();
-    let mut allowed = Vec::new();
-    for tag in tags {
-        let active = clients(config, tag);
-        if let Some(previous) = previous {
-            let mut people: BTreeMap<String, Vec<String>> = BTreeMap::new();
-            for email in clients(previous, tag).difference(&active) {
-                people
-                    .entry(xray_identity::person_id(email).to_string())
-                    .or_default()
-                    .push(email.clone());
-            }
-            for (person, emails) in people {
-                let key = crate::jcs::sha256_hex(format!("{person}/{tag}").as_bytes());
-                revoked.push(json!({"type": "field", "user": emails, "inboundTag": [tag],
-                    "outboundTag": blocked, "ruleTag": format!("meridian-block-{}", &key[..24])}));
-            }
-        }
-        if active.is_empty() {
-            continue;
-        }
-        for (index, original) in base.iter().enumerate() {
-            if original
-                .get("inboundTag")
-                .and_then(Value::as_array)
-                .is_some_and(|inbounds| !inbounds.iter().any(|inbound| inbound == tag))
-            {
-                continue;
-            }
-            let users: Vec<_> = active
-                .iter()
-                .filter(|email| {
-                    original
-                        .get("user")
-                        .and_then(Value::as_array)
-                        .is_none_or(|users| {
-                            users.iter().any(|user| {
-                                user.as_str().is_some_and(|user| {
-                                    user.eq_ignore_ascii_case(email)
-                                        || user
-                                            .eq_ignore_ascii_case(xray_identity::person_id(email))
-                                })
-                            })
-                        })
-                })
-                .cloned()
-                .collect();
-            if users.is_empty() {
-                continue;
-            }
-            let mut rule = original.clone();
-            rule["user"] = json!(users);
-            rule["inboundTag"] = json!([tag]);
-            let key = crate::jcs::sha256_hex(format!("{tag}/{index}").as_bytes());
-            rule["ruleTag"] = json!(format!("meridian-allow-{}", &key[..24]));
-            allowed.push(rule);
-        }
-        allowed.push(json!({"type": "field", "user": active, "inboundTag": [tag], "outboundTag": default,
-            "ruleTag": format!("meridian-default-{}", &crate::jcs::sha256_hex(tag.as_bytes())[..24])}));
-    }
-    // Its content hash makes ListRule a check of this exact eligible-user graph.
-    let digest =
-        crate::jcs::sha256_hex(&serde_json::to_vec(&json!([&allowed, &base, tags])).unwrap());
-    let mut rules = revoked;
-    rules.extend(allowed);
-    rules.push(
-        json!({"type": "field", "inboundTag": tags, "outboundTag": blocked,
-        "ruleTag": format!("meridian-guard-{}", &digest[..32])}),
-    );
+        .ok_or("Blocking revoked identities needs a blackhole outbound.")?;
+    let mut rules: Vec<Value> = revoked
+        .iter()
+        .map(|identity| {
+            json!({
+                "type": "field", "user": [&identity.email], "inboundTag": [&identity.tag],
+                "outboundTag": blocked, "ruleTag": identity.rule_tag(),
+            })
+        })
+        .collect();
     rules.extend(base);
     routing["rules"] = json!(rules);
     let mut result = config.clone();
@@ -146,7 +70,9 @@ fn guarded(config: &Value, tags: &[String], previous: Option<&Value>) -> Result<
     Ok(result)
 }
 
-fn listed(routing: &Value) -> Vec<(String, String)> {
+type Listed = Vec<(String, String)>;
+
+fn listed(routing: &Value) -> Listed {
     routing
         .get("rules")
         .and_then(Value::as_array)
@@ -168,37 +94,17 @@ fn listed(routing: &Value) -> Vec<(String, String)> {
 }
 
 impl Engine<'_> {
-    pub(crate) fn guard_live_users(
-        &self,
-        binary: &str,
-        api: &str,
-        composed: &Value,
-        resources: &[Resource],
-        previous: Option<&Value>,
-    ) -> Result<(), String> {
-        if !xray_identity::enabled(composed) {
-            return Ok(());
-        }
-        let tags = tags(resources);
-        let desired = guarded(composed, &tags, previous)?;
-        let fallback = previous.and_then(|config| guarded(config, &tags, None).ok());
-        self.install_guard(binary, api, &desired, fallback.as_ref().unwrap_or(composed))
-    }
-
-    fn install_guard(
-        &self,
-        binary: &str,
-        api: &str,
-        desired: &Value,
-        fallback: &Value,
-    ) -> Result<(), String> {
+    fn live_rules(&self, binary: &str, api: &str) -> Result<Listed, String> {
         let server = format!("--server={api}");
         let output = self
             .xray_api(binary, &["api", "lsrules", &server])
             .map_err(|_| "The Xray routing API is unavailable.")?;
         let response: Value = serde_json::from_str(&output)
             .map_err(|_| "The Xray routing API returned invalid rules.")?;
-        let current: Vec<_> = response
+        if response.get("rules").is_some_and(|rules| !rules.is_array()) {
+            return Err("The Xray routing API returned invalid rules.".into());
+        }
+        Ok(response
             .get("rules")
             .and_then(Value::as_array)
             .into_iter()
@@ -215,11 +121,106 @@ impl Engine<'_> {
                         .to_string(),
                 )
             })
-            .collect();
-        if current == listed(&desired["routing"]) {
+            .collect())
+    }
+
+    pub(crate) fn guard_live_users(
+        &self,
+        binary: &str,
+        api: &str,
+        composed: &Value,
+        resources: &[Resource],
+        previous: Option<&Value>,
+    ) -> Result<(), GuardFailure> {
+        if !xray_identity::enabled(composed) {
             return Ok(());
         }
-        fs::create_dir_all(&self.cache_dir).map_err(|_| "Cannot prepare the user flow guard.")?;
+
+        let mut can_apply_authentication = false;
+        let result = (|| {
+            let invocation = core_invocation(self.exec)?;
+            let path = self
+                .cache_dir
+                .parent()
+                .ok_or("The core revocation retry directory is unavailable.")?
+                .join("flow-revocations.json");
+            let before = Revocations::load(&path)?;
+            let mut revoked = before.clone();
+            revoked.for_invocation(&invocation);
+            let tags = tags(resources);
+            let additions = previous.is_some_and(|before| {
+                tags.iter()
+                    .any(|tag| !clients(composed, tag).is_subset(&clients(before, tag)))
+            });
+            let removed = previous
+                .map(|previous| lost(composed, &tags, previous))
+                .unwrap_or_default();
+            // Removals may proceed when listing is down, after saving their retry
+            // intent. Additions wait until no live block can match their identity.
+            if !additions {
+                revoked.add(removed.clone(), &json!({}))?;
+                revoked.save_if_changed(&path, &before)?;
+                can_apply_authentication = true;
+            }
+            let mut current = self.live_rules(binary, api)?;
+            let existing: Vec<_> = current
+                .iter()
+                .map(|(tag, _)| Revocation::from_rule_tag(tag))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .flatten()
+                .collect();
+            let saved = revoked.clone();
+            revoked.add(existing.clone(), &json!({}))?;
+            revoked.save_if_changed(&path, &saved)?;
+            let active = active_identities(composed, existing.iter());
+            if !active.is_empty() {
+                can_apply_authentication = false;
+                let names: Vec<_> = active.iter().map(Revocation::rule_tag).collect();
+                let server = format!("--server={api}");
+                for chunk in names.chunks(32) {
+                    let mut args = vec!["api", "rmrules", server.as_str()];
+                    args.extend(chunk.iter().map(String::as_str));
+                    self.xray_api(binary, &args).map_err(
+                        |_| "The routing API could not remove a block for a re-enabled identity.",
+                    )?;
+                }
+                current = self.live_rules(binary, api)?;
+                let remaining: Vec<_> = current
+                    .iter()
+                    .map(|(tag, _)| Revocation::from_rule_tag(tag))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .flatten()
+                    .collect();
+                if !active_identities(composed, remaining.iter()).is_empty() {
+                    return Err("The core still holds a block for a re-enabled identity.".into());
+                }
+            }
+            let saved = revoked.clone();
+            revoked.add(removed, composed)?;
+            revoked.save_if_changed(&path, &saved)?;
+            can_apply_authentication = true;
+            let desired = guarded(composed, &revoked.identities)?;
+            if current != listed(&desired["routing"]) {
+                self.install_guard(binary, api, &desired)?;
+            }
+            if core_invocation(self.exec)? != invocation {
+                return Err("The core restarted while revocation rules were being checked.".into());
+            }
+            if revoked.overflow {
+                return Err(LIMIT_MESSAGE.into());
+            }
+            Ok(())
+        })();
+        result.map_err(|message| GuardFailure {
+            message,
+            can_apply_authentication,
+        })
+    }
+
+    fn install_guard(&self, binary: &str, api: &str, desired: &Value) -> Result<(), String> {
+        fs::create_dir_all(&self.cache_dir).map_err(|_| "Cannot prepare the revocation rules.")?;
         let path = self.cache_dir.join("flow-routing.json");
         let file = path.to_string_lossy().into_owned();
         let asset = Path::new(binary)
@@ -227,34 +228,35 @@ impl Engine<'_> {
             .unwrap_or(Path::new("/"))
             .to_string_lossy();
         let env = [("XRAY_LOCATION_ASSET", asset.as_ref())];
+        let server = format!("--server={api}");
         let result = (|| {
             fsutil::write_atomic(&path, &compose::render(desired), 0o600, None)
-                .map_err(|_| "Cannot prepare the user flow guard.")?;
+                .map_err(|_| "Cannot prepare the revocation rules.")?;
             let tested = self
                 .exec
                 .run(binary, &["run", "-test", "-c", &file], &env)
-                .map_err(|_| "The user flow guard could not be checked.")?;
+                .map_err(|_| "The revocation rules could not be checked.")?;
             if !tested.success {
-                return Err("Xray rejected the user flow guard.");
+                return Err("Xray rejected the revocation rules.".into());
             }
-            let installed = self
-                .exec
-                .run(binary, &["api", "adrules", &server, &file], &env)
-                .is_ok_and(|output| output.success);
-            if !installed {
-                // ReloadRules can clear the old rules before failing. Restore a complete,
-                // validated graph, including API and balancers, without undoing user removal.
-                if fsutil::write_atomic(&path, &compose::render(fallback), 0o600, None).is_ok() {
-                    let _ = self
-                        .exec
-                        .run(binary, &["api", "adrules", &server, &file], &env);
+            // AddRule cannot prepend. Its replacement may clear rules before failing,
+            // so retry the same complete graph, including every existing revocation.
+            for _ in 0..2 {
+                if self
+                    .exec
+                    .run(binary, &["api", "adrules", &server, &file], &env)
+                    .is_ok_and(|output| output.success)
+                    && self
+                        .live_rules(binary, api)
+                        .is_ok_and(|rules| rules == listed(&desired["routing"]))
+                {
+                    return Ok(());
                 }
-                return Err("The Xray routing API could not install the user flow guard.");
             }
-            Ok(())
+            Err("The Xray routing API could not install the revocation rules.".into())
         })();
         let _ = fs::remove_file(&path);
-        result.map_err(str::to_string)
+        result
     }
 
     pub(crate) fn flow_guard_result(
@@ -277,8 +279,18 @@ impl Engine<'_> {
             });
         }
         let result = (|| {
-            if statuses.get(&config.id) != Some(&"applied") {
-                return Err("The node has not applied its Xray configuration.".to_string());
+            for resource in resources {
+                let relevant = match &resource.spec {
+                    Spec::XrayConfig(_) | Spec::XrayUsers(_) | Spec::Hysteria2Users(_) => true,
+                    Spec::BinaryPin(pin) => {
+                        matches!(pin.name.as_str(), "xray" | "geoip" | "geosite")
+                    }
+                    Spec::Unit(unit) => unit.name == crate::xray_health::CORE_UNIT,
+                    _ => false,
+                };
+                if relevant && statuses.get(&resource.id) != Some(&"applied") {
+                    return Err("The node has not applied its Xray resources.".to_string());
+                }
             }
             let (binary, _) = crate::xray_health::api(&self.root, resources)
                 .ok_or("The node's Xray API is not installed.")?;
@@ -291,7 +303,13 @@ impl Engine<'_> {
                 })
                 .collect();
             let composed = compose::compose(&config.config, &users)?;
+            let installed = fs::read(fsutil::host_path(&self.root, &config.path))
+                .map_err(|_| "The composed Xray configuration is not installed.")?;
+            if installed != compose::render(&composed) {
+                return Err("The installed Xray credentials differ from the held document.".into());
+            }
             self.guard_live_users(&binary, &config.api_address, &composed, resources, None)
+                .map_err(|failure| failure.message)
         })();
         result.err().map(|message| ResourceError {
             code: "xray_api_failed".into(),
@@ -308,15 +326,19 @@ mod tests {
     #[test]
     fn a_revocation_precedes_every_rule_and_keeps_balancers_and_api_routes() {
         let before = json!({"api": {"services": ["RoutingService"]},
-            "inbounds": [{"tag": "hy2", "settings": {"clients": [{"email": "u-a.c123"}, {"email": "u-b.c456"}]}}],
+            "inbounds": [{"tag": "hy2", "settings": {"clients": [{"email": "u-a.c11111111111111111111111111111111"}, {"email": "u-b.c22222222222222222222222222222222"}]}}],
             "outbounds": [{"tag": "direct"}, {"tag": "block", "protocol": "blackhole"}],
             "routing": {"balancers": [{"tag": "pool", "selector": ["exit-"]}], "rules": [
                 {"type": "field", "inboundTag": ["api"], "outboundTag": "api"},
                 {"type": "field", "network": "tcp", "balancerTag": "pool"}]}});
         let mut after = before.clone();
-        after["inbounds"][0]["settings"]["clients"] = json!([{"email": "u-b.c456"}]);
-        let config = guarded(&after, &["hy2".into()], Some(&before)).unwrap();
-        assert_eq!(config["routing"]["rules"][0]["user"], json!(["u-a.c123"]));
+        after["inbounds"][0]["settings"]["clients"] =
+            json!([{"email": "u-b.c22222222222222222222222222222222"}]);
+        let config = guarded(&after, &lost(&after, &["hy2".into()], &before)).unwrap();
+        assert_eq!(
+            config["routing"]["rules"][0]["user"],
+            json!(["u-a.c11111111111111111111111111111111"])
+        );
         assert_eq!(config["routing"]["rules"][0]["outboundTag"], "block");
         assert_eq!(
             config["routing"]["balancers"],
@@ -327,10 +349,46 @@ mod tests {
             &rules[rules.len() - 2..],
             before["routing"]["rules"].as_array().unwrap()
         );
-        let rebuilt = guarded(&after, &["hy2".into()], None).unwrap();
+        let rebuilt = guarded(&after, &BTreeSet::new()).unwrap();
         assert!(
-            !rebuilt.to_string().contains("u-a.c123"),
+            !rebuilt
+                .to_string()
+                .contains("u-a.c11111111111111111111111111111111"),
             "revoked generations must not accumulate"
+        );
+    }
+    #[test]
+    fn active_users_leave_domain_requests_unmatched_for_ip_if_non_match() {
+        let old = xray_identity::email("u-a", "old-key");
+        let active = xray_identity::email("u-b", "active-key");
+        let before = json!({
+            "api": {"services": ["RoutingService"]},
+            "inbounds": [{"tag": "hy2", "settings": {"clients": [
+                {"email": old}, {"email": active}
+            ]}}],
+            "outbounds": [{"tag": "direct", "protocol": "freedom"},
+                {"tag": "block", "protocol": "blackhole"}],
+            "routing": {"domainStrategy": "IPIfNonMatch", "rules": [
+                {"type": "field", "ip": ["geoip:private"], "outboundTag": "block"},
+                {"type": "field", "ip": ["198.51.100.0/24"], "outboundTag": "direct"}
+            ]}
+        });
+        let mut after = before.clone();
+        after["inbounds"][0]["settings"]["clients"] = json!([{"email": active}]);
+        let result = guarded(&after, &lost(&after, &["hy2".into()], &before)).unwrap();
+        let rules = result["routing"]["rules"].as_array().unwrap();
+        assert_eq!(
+            rules.len(),
+            3,
+            "an active-user rule prevents the DNS routing pass"
+        );
+        assert_eq!(&rules[1..], before["routing"]["rules"].as_array().unwrap());
+        assert!(
+            rules[0]["user"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|user| user != &active)
         );
     }
 }

@@ -388,7 +388,7 @@ pub(crate) fn check_tag(tag: &str) -> Result<(), String> {
 }
 
 /// `UserId` in `meridian.core.agent_types`.
-fn check_user_id(user_id: &str) -> Result<(), String> {
+pub(crate) fn check_user_id(user_id: &str) -> Result<(), String> {
     let allowed = |b: u8| b.is_ascii_lowercase() || b.is_ascii_digit();
     let mut bytes = user_id.bytes();
     let first = bytes.next().is_some_and(allowed);

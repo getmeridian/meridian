@@ -304,21 +304,24 @@ impl Engine<'_> {
             let before = current
                 .as_ref()
                 .and_then(|bytes| serde_json::from_slice::<Value>(bytes).ok());
-            if self
-                .guard_live_users(
-                    &binary,
-                    &spec.api_address,
-                    &composed,
-                    resources,
-                    before.as_ref(),
-                )
-                .is_err()
-            {
-                info!(
-                    "user flow guard pending; applying authentication changes and retrying the guard"
-                );
+            match self.guard_live_users(
+                &binary,
+                &spec.api_address,
+                &composed,
+                resources,
+                before.as_ref(),
+            ) {
+                Err(failure) if !failure.can_apply_authentication => {
+                    let _ = fs::remove_file(&tmp);
+                    return Err(Failure::new("flow_guard_pending", failure.message));
+                }
+                Err(_) => {
+                    info!("revocation rules pending; applying authentication changes and retrying")
+                }
+                Ok(()) => {}
             }
         }
+
         let live_done = match live {
             Some(changes) => match self.apply_live(&binary, &spec.api_address, &changes) {
                 Ok(()) => true,

@@ -6,11 +6,11 @@
 **Verify the wire, then type it** — `verify.rs` checks floats, signature, fleet and node IDs, and the hash over the parsed `Value`; only then do resources become typed `Spec`s. Nothing applies before credentials exist.
 **State is fail-closed** — `run` holds a flock on `run.lock` for its lifetime (never unlink it); `state.json` (0600) holds the epoch floor, held document, and resource ledger, and malformed state or identity stops the agent.
 **Apply engine** — `apply.rs` retires vanished ledger entries dependents-first, then applies in order and repairs drift, on start, per new document, and every 300 s.
-**Users without restarts** — `xray.rs` composes users into the config and checks it with `run -test`; when only users changed and the unit is active, VLESS users apply live through `xray api`, and Hysteria2 additions rebuild only that inbound (dropping just its sessions). Anything else restarts.
+**Users without restarts** — `xray.rs` composes users into the config and checks it with `run -test`; when only users changed and the unit is active, VLESS users apply live through `xray api`, and generation-mode Hysteria2 additions use its typed account API; legacy configurations rebuild that inbound. Anything else restarts.
 **Traffic counted once** — `stats.rs` folds `statsquery -reset` into `traffic.json` (0600) and saves each new sequence number before sending; users who left keep their totals in `retired`.
 **Host behind traits** — `Exec`/`Fetch` fake host I/O and `--root` redirects paths for tests; writes stay under `/etc/netagent/` and `/usr/local/lib/netagent/`, and units match `net[a-z0-9-]*.service`, never `netagent.service`.
 **Reports stay apart** — `agent/reporting.rs` builds and sends observations; the polling loop owns their cadence.
-**Generation identities gate new flows** — RoutingService uses credential-derived emails and a current-document guard; full routing replacement keeps API, bridge, and balancer rules, and no revoked-identity list accumulates. Generation mode adds Hysteria2 accounts through bounded loopback HTTP/2 with baseline curl.
+**Revoked identities gate new streams** — block only old credential-derived emails before reviewed routing; core.json contains no revocations, while bounded retry intent follows one systemd InvocationID and clears on restart.
 
 ## What's done well
 - **Signed commands run only through negotiated kinds** — `commands.rs` verifies signature, epoch, and expiry first; `command_host.rs` restarts only held, installed units and resets only managed inbounds.
@@ -19,6 +19,9 @@
 - **Atomic writes everywhere** — private temp sibling, fsync, mode and owner, rename, directory fsync (`fsutil::write_atomic`).
 
 ## Pitfalls
+- **Re-enable clears live blocks before adding accounts** — use rule removal independently of rule installation, and keep the document pending if matching blocks remain.
+- **IPIfNonMatch needs an unmatched first pass** — an active-user catch-all suppresses DNS and bypasses private/country blocks and IP egress; install only revoked-identity blocks.
+- **Guard retries preserve earlier blocks** — save retry intent before removing authentication, and retry the complete graph with all revocations after a failed replacement.
 - **Removing a password leaves authenticated QUIC and mux sessions usable** — block new dispatched streams before `rmu`; existing TCP/UDP associations survive. VLESS's accepted flows also outlive an inbound reset, so its explicit cut-off must restart the core; Hysteria2's reset closes QUIC.
 - **Expiry gates only the start of a command** — keep results and executed IDs beyond the service's redelivery window, or clock rounding repeats an action.
 - **Serde unit variants ignore extra fields even with `deny_unknown_fields`** — use empty struct variants so signed extras are rejected.

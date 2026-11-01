@@ -125,3 +125,239 @@ fn a_failed_rule_add_still_removes_authentication_and_retries_without_a_restart(
             .any(|call| call.contains(" api adrules "))
     );
 }
+
+#[test]
+fn a_removal_installs_its_revocation_rules_only_once() {
+    let mut host = Host::new(fetcher());
+    host.apply(&guarded_document(
+        &[("u-a", UUID_A, ""), ("u-b", UUID_B, "")],
+        &[("u-a", UUID_A), ("u-b", UUID_B)],
+    ));
+    host.exec.clear();
+    let doc = guarded_document(&[("u-b", UUID_B, "")], &[("u-b", UUID_B)]);
+    let pass = host.apply(&doc);
+    assert!(pass.converged && pass.flow_error.is_none(), "{pass:?}");
+    assert_eq!(
+        host.exec
+            .calls()
+            .iter()
+            .filter(|call| call.contains(" api adrules "))
+            .count(),
+        1,
+        "the end-of-apply check must keep the installed revocation rules",
+    );
+    host.exec.clear();
+    assert!(host.apply(&doc).flow_error.is_none());
+    assert!(
+        !host
+            .exec
+            .calls()
+            .iter()
+            .any(|call| call.contains(" api adrules "))
+    );
+}
+
+#[test]
+fn later_revocations_keep_the_earlier_identity_blocked() {
+    let mut host = Host::new(fetcher());
+    let third = "5f0c8a52-6c1d-4e8b-9a7f-2b5d4c3e1f00";
+    host.apply(&guarded_document(
+        &[("u-a", UUID_A, ""), ("u-b", UUID_B, ""), ("u-c", third, "")],
+        &[],
+    ));
+    host.apply(&guarded_document(
+        &[("u-b", UUID_B, ""), ("u-c", third, "")],
+        &[],
+    ));
+    let pass = host.apply(&guarded_document(&[("u-c", third, "")], &[]));
+    assert!(pass.flow_error.is_none());
+    let routing = host.exec.routing.lock().unwrap();
+    for email in [
+        meridian_agent::xray_identity::email("u-a", UUID_A),
+        meridian_agent::xray_identity::email("u-b", UUID_B),
+    ] {
+        assert!(
+            routing["rules"].as_array().unwrap().iter().any(|rule| {
+                rule["outboundTag"] == "block"
+                    && rule["user"]
+                        .as_array()
+                        .is_some_and(|users| users.contains(&json!(email)))
+            }),
+            "the running core lost an earlier revoked identity",
+        );
+    }
+}
+
+#[test]
+fn readding_an_identity_removes_only_its_revocation_rule() {
+    let mut host = Host::new(fetcher());
+    let before = guarded_document(&[("u-a", UUID_A, ""), ("u-b", UUID_B, "")], &[]);
+    host.apply(&before);
+    host.apply(&guarded_document(&[("u-b", UUID_B, "")], &[]));
+    let pass = host.apply(&before);
+    assert!(pass.converged && pass.flow_error.is_none());
+    let routing = host.exec.routing.lock().unwrap();
+    assert!(routing["rules"].as_array().unwrap().iter().all(|rule| {
+        !rule["ruleTag"]
+            .as_str()
+            .unwrap_or("")
+            .starts_with("meridian-revoked-")
+    }));
+}
+
+#[test]
+fn a_core_restart_clears_revocations_and_needs_no_guard_install() {
+    use meridian_agent::system::Exec;
+    let mut host = Host::new(fetcher());
+    host.apply(&guarded_document(
+        &[("u-a", UUID_A, ""), ("u-b", UUID_B, "")],
+        &[],
+    ));
+    let doc = guarded_document(&[("u-b", UUID_B, "")], &[]);
+    host.apply(&doc);
+    assert!(
+        !String::from_utf8(host.read("/etc/netagent/core.json"))
+            .unwrap()
+            .contains("meridian-revoked-")
+    );
+    host.exec
+        .run("systemctl", &["restart", "netcore.service"], &[])
+        .unwrap();
+    host.exec.clear();
+    let pass = host.apply(&doc);
+    assert!(pass.converged && pass.flow_error.is_none());
+    assert!(
+        !host
+            .exec
+            .calls()
+            .iter()
+            .any(|call| call.contains(" api adrules "))
+    );
+    let journal: Value = serde_json::from_slice(
+        &std::fs::read(host.state.path().join("flow-revocations.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(journal["identities"], json!([]));
+}
+
+#[test]
+fn a_partial_rule_failure_retries_the_same_graph_with_every_revocation() {
+    let mut host = Host::new(fetcher());
+    let third = "5f0c8a52-6c1d-4e8b-9a7f-2b5d4c3e1f00";
+    host.apply(&guarded_document(
+        &[("u-a", UUID_A, ""), ("u-b", UUID_B, ""), ("u-c", third, "")],
+        &[],
+    ));
+    host.apply(&guarded_document(
+        &[("u-b", UUID_B, ""), ("u-c", third, "")],
+        &[],
+    ));
+    host.exec.routing_writes.lock().unwrap().clear();
+    *host.exec.routing_failures.lock().unwrap() = 1;
+    let pass = host.apply(&guarded_document(&[("u-c", third, "")], &[]));
+    assert!(pass.converged && pass.flow_error.is_none(), "{pass:?}");
+    let writes = host.exec.routing_writes.lock().unwrap();
+    assert_eq!(writes.len(), 2);
+    for write in writes.iter() {
+        for email in [
+            meridian_agent::xray_identity::email("u-a", UUID_A),
+            meridian_agent::xray_identity::email("u-b", UUID_B),
+        ] {
+            assert!(
+                write["routing"]["rules"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|rule| {
+                        rule["user"]
+                            .as_array()
+                            .is_some_and(|users| users.contains(&json!(email)))
+                            && rule["outboundTag"] == "block"
+                    })
+            );
+        }
+    }
+}
+
+#[test]
+fn an_unsaved_retry_intent_refuses_authentication_changes_without_a_restart() {
+    let mut host = Host::new(fetcher());
+    host.apply(&guarded_document(
+        &[("u-a", UUID_A, ""), ("u-b", UUID_B, "")],
+        &[],
+    ));
+    std::fs::write(
+        host.state.path().join("flow-revocations.json"),
+        b"secret-canary",
+    )
+    .unwrap();
+    host.exec.clear();
+    let pass = host.apply(&guarded_document(&[("u-b", UUID_B, "")], &[]));
+    assert!(!pass.converged && pass.flow_error.is_some());
+    assert!(
+        host.exec
+            .calls()
+            .iter()
+            .all(|call| !call.contains(" api rmu ") && !call.contains("systemctl restart"))
+    );
+    assert_eq!(clients(&host, 0).as_array().unwrap().len(), 2);
+}
+
+#[test]
+fn reenable_uses_rule_removal_when_rule_installation_is_unavailable() {
+    let mut host = Host::new(fetcher());
+    let before = guarded_document(&[("u-a", UUID_A, ""), ("u-b", UUID_B, "")], &[]);
+    host.apply(&before);
+    host.apply(&guarded_document(&[("u-b", UUID_B, "")], &[]));
+    *host.exec.routing_down.lock().unwrap() = true;
+    host.exec.clear();
+    let pass = host.apply(&before);
+    assert!(pass.converged && pass.flow_error.is_none(), "{pass:?}");
+    assert!(
+        host.exec
+            .calls()
+            .iter()
+            .any(|call| call.contains(" api rmrules "))
+    );
+    assert!(
+        !host
+            .exec
+            .calls()
+            .iter()
+            .any(|call| call.contains("systemctl restart"))
+    );
+    let email = meridian_agent::xray_identity::email("u-a", UUID_A);
+    assert!(
+        host.exec.routing.lock().unwrap()["rules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|rule| {
+                !rule["user"]
+                    .as_array()
+                    .is_some_and(|users| users.contains(&json!(email)))
+            })
+    );
+}
+
+#[test]
+fn a_failed_active_rule_removal_keeps_reenable_pending_without_adding_authentication() {
+    let mut host = Host::new(fetcher());
+    let before = guarded_document(&[("u-a", UUID_A, ""), ("u-b", UUID_B, "")], &[]);
+    host.apply(&before);
+    host.apply(&guarded_document(&[("u-b", UUID_B, "")], &[]));
+    *host.exec.rule_removal_down.lock().unwrap() = true;
+    host.exec.clear();
+    let pass = host.apply(&before);
+    assert!(!pass.converged && pass.flow_error.is_some());
+    assert!(
+        host.exec
+            .calls()
+            .iter()
+            .all(|call| !call.contains(" api adu ") && !call.contains("systemctl restart"))
+    );
+    assert_eq!(clients(&host, 0).as_array().unwrap().len(), 1);
+    *host.exec.rule_removal_down.lock().unwrap() = false;
+    let repaired = host.apply(&before);
+    assert!(repaired.converged && repaired.flow_error.is_none());
+}

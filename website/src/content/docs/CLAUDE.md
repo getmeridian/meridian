@@ -2,6 +2,7 @@
 
 ## Design decisions
 **Reviewed bulk people** — client and CLI guides describe server paging, shared filters, frozen targets, atomic commit, receipts, undo, declared deletion commands, and privacy in all four locales.
+**Live revocation** — client guides explain identity-only blocks, preserved DNS/IP routing, restart and re-enable cleanup, and the bounded-rule recovery request in every locale.
 **Account schedules** — client and CLI guides document UTC anniversaries, first-traffic durations, capped renewal catch-up, previews, pending extension, and preservation; connecting guides explain first use and the page's dates in every locale.
 **Connection-key rotation** — client guides distinguish refresh with the same URL from reissue after a leaked link, document generation preconditions, device preservation, declared ownership, and optional hard cut-off in every locale.
 **Session revocation guides** — client management and CLI reference describe per-node new-flow blocking, old-agent and outage limits, surviving TCP/UDP/XUDP associations, and the explicit shared-inbound reset in every locale.

@@ -345,13 +345,14 @@ class ResourceError(AgentModel):
 
 
 class UserFlowBlocking(AgentModel):
-    """Runtime routing denies identities absent from this document's managed inbound user sets.
+    """Revoked identities cannot dispatch new flows, or their sessions ended in a core restart.
 
     Covers newly dispatched TCP streams and UDP associations, including an
     authenticated QUIC or mux connection. Already dispatched flows and XUDP
     associations may continue. Sent only with `user_flow_blocking` negotiated.
     Authentication still applies if routing fails; the agent reports pending
-    and retries the guard without requesting an inbound reset.
+    and retries the guard without requesting an inbound reset. Revocation rules
+    live only in the running core; restarting it clears their need.
     """
 
     document: NodeStateRef

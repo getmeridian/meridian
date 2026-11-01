@@ -39,6 +39,16 @@ impl Exec for CoreExec {
         args: &[&str],
         env: &[(&str, &str)],
     ) -> std::io::Result<CmdOutput> {
+        if args.first() == Some(&"api")
+            && args.get(1) == Some(&"adrules")
+            && *self.host.routing_down.lock().unwrap()
+        {
+            return Ok(CmdOutput {
+                success: false,
+                stdout: String::new(),
+                stderr: "secret-canary".into(),
+            });
+        }
         if program == "systemctl" || program == "journalctl" {
             let output = self.host.run(program, args, env)?;
             if program == "systemctl"
@@ -195,16 +205,42 @@ fn removing_or_rotating_only_blocks_the_old_identitys_new_streams() {
     let mut transfer_b = socks(port("client_b"), target).unwrap();
     assert!(exchange(&mut transfer_a) && exchange(&mut transfer_b));
     exec.host.clear();
-    let changed = engine.apply(
+    let guard_failure = fixture["guard_failure"].as_bool().unwrap_or(false);
+    *exec.host.routing_down.lock().unwrap() = guard_failure;
+    let mut changed = engine.apply(
         &parse(&after),
         &mut ledger,
         &observations,
         "2026-11-01T12:00:01Z",
     );
     assert!(
-        changed.converged && changed.flow_error.is_none(),
+        changed.converged && changed.flow_error.is_some() == guard_failure,
         "{changed:?}"
     );
+    if guard_failure {
+        assert!(
+            probe(port("client_b"), target),
+            "a failed install blocked an active person"
+        );
+        if fixture["rotation"].as_bool().unwrap() {
+            warm(port("client_new"), target);
+        }
+        assert!(
+            probe(port("client_a"), target),
+            "the failed install must remain pending"
+        );
+        *exec.host.routing_down.lock().unwrap() = false;
+        changed = engine.apply(
+            &parse(&after),
+            &mut ledger,
+            &observations,
+            "2026-11-01T12:00:02Z",
+        );
+        assert!(
+            changed.converged && changed.flow_error.is_none(),
+            "{changed:?}"
+        );
+    }
     observations = changed.observations;
     assert!(
         !probe(port("client_a"), target),
@@ -232,8 +268,8 @@ fn removing_or_rotating_only_blocks_the_old_identitys_new_streams() {
         warm(port("client_new"), target);
     }
 
-    // An agent restart has no blacklist to recover. Repair from the current
-    // document, even if the core lost all runtime rules while QUIC stayed alive.
+    // Retry intent repairs missing runtime blocks while the same core still
+    // holds authenticated sessions; rules never travel through core.json.
     assert!(
         RealExec
             .run(binary, &["api", "adrules", &api, get("base_routing")], &[])
@@ -254,6 +290,7 @@ fn removing_or_rotating_only_blocks_the_old_identitys_new_streams() {
     assert!(!probe(port("client_a"), target));
     assert!(probe(port("client_b"), target) && exchange(&mut transfer_b));
     if !fixture["rotation"].as_bool().unwrap() {
+        *exec.host.routing_down.lock().unwrap() = true;
         let restored = engine.apply(
             &parse(&before),
             &mut ledger,
@@ -266,6 +303,7 @@ fn removing_or_rotating_only_blocks_the_old_identitys_new_streams() {
         );
         warm(port("client_a"), target);
         assert!(exchange(&mut transfer_b));
+        *exec.host.routing_down.lock().unwrap() = false;
     }
     // The retained explicit reset is the all-sessions path, including in-flight
     // traffic belonging to the other person on this same inbound.
@@ -314,4 +352,131 @@ fn removing_or_rotating_only_blocks_the_old_identitys_new_streams() {
         );
         warm(port("client_b"), target);
     }
+}
+
+fn address_probe(port: u16, address: &str, target: u16) -> bool {
+    let result = (|| -> std::io::Result<TcpStream> {
+        let mut stream = TcpStream::connect(("127.0.0.1", port))?;
+        stream.set_read_timeout(Some(Duration::from_secs(2)))?;
+        stream.set_write_timeout(Some(Duration::from_secs(2)))?;
+        stream.write_all(&[5, 1, 0])?;
+        let mut hello = [0; 2];
+        stream.read_exact(&mut hello)?;
+        if hello != [5, 0] {
+            return Err(std::io::Error::other("SOCKS greeting refused"));
+        }
+        let mut request = vec![5, 1, 0];
+        if let Ok(ip) = address.parse::<std::net::Ipv4Addr>() {
+            request.push(1);
+            request.extend_from_slice(&ip.octets());
+        } else {
+            request.extend_from_slice(&[3, address.len() as u8]);
+            request.extend_from_slice(address.as_bytes());
+        }
+        request.extend_from_slice(&target.to_be_bytes());
+        stream.write_all(&request)?;
+        let mut response = [0; 10];
+        stream.read_exact(&mut response)?;
+        if response[1] != 0 {
+            return Err(std::io::Error::other("SOCKS destination refused"));
+        }
+        Ok(stream)
+    })();
+    result.is_ok_and(|mut stream| exchange(&mut stream))
+}
+
+#[test]
+fn active_domains_keep_the_dns_routing_pass_after_revocation() {
+    let Ok(file) = std::env::var("MERIDIAN_FLOW_ROUTING_FIXTURE") else {
+        return;
+    };
+    let fixture: Value = serde_json::from_slice(&std::fs::read(file).unwrap()).unwrap();
+    let get = |key: &str| fixture[key].as_str().unwrap();
+    let target = fixture["target"].as_u64().unwrap() as u16;
+    let client = fixture["client"].as_u64().unwrap() as u16;
+    let before: Vec<Value> = serde_json::from_value(fixture["before"].clone()).unwrap();
+    let after: Vec<Value> = serde_json::from_value(fixture["after"].clone()).unwrap();
+    let fetch = FakeFetch::default()
+        .with(
+            "https://assets.example.org/xray",
+            std::fs::read(get("binary")).unwrap(),
+        )
+        .with(
+            "https://assets.example.org/geoip",
+            std::fs::read(get("geoip")).unwrap(),
+        );
+    let exec = CoreExec {
+        host: FakeExec::default(),
+        root: get("root").into(),
+        process: Mutex::new(None),
+    };
+    let engine = Engine {
+        root: get("root").into(),
+        cache_dir: Path::new(get("root")).join("cache"),
+        exec: &exec,
+        fetch: &fetch,
+        settle: Duration::ZERO,
+        allow_http: false,
+    };
+    let mut ledger = Vec::new();
+    let initial = engine.apply(&parse(&before), &mut ledger, &[], "2026-11-01T12:00:00Z");
+    assert!(
+        initial.converged && initial.flow_error.is_none(),
+        "{initial:?}"
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !address_probe(client, "127.0.0.2", target) {
+        assert!(
+            Instant::now() < deadline,
+            "the active client cannot reach the IP egress"
+        );
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    let server = format!("--server={}", get("api"));
+    let permit = RealExec
+        .run(
+            get("binary"),
+            &["api", "adrules", &server, get("allow_private")],
+            &[],
+        )
+        .unwrap();
+    assert!(permit.success);
+    assert!(
+        address_probe(client, "private.example.org", target),
+        "the private-target control cannot connect"
+    );
+    let restore = RealExec
+        .run(
+            get("binary"),
+            &["api", "adrules", &server, get("base_routing")],
+            &[],
+        )
+        .unwrap();
+    assert!(restore.success);
+    assert!(
+        address_probe(client, "egress.example.org", target),
+        "the IP domain control cannot connect"
+    );
+    let applied = engine.apply(
+        &parse(&after),
+        &mut ledger,
+        &initial.observations,
+        "2026-11-01T12:00:01Z",
+    );
+    assert!(
+        applied.converged && applied.flow_error.is_none(),
+        "{applied:?}"
+    );
+    assert!(
+        address_probe(client, "127.0.0.2", target),
+        "the IP egress stopped working"
+    );
+    assert!(
+        !address_probe(client, "private.example.org", target),
+        "the user guard bypasses geoip:private for a domain destination",
+    );
+    assert!(
+        address_probe(client, "egress.example.org", target),
+        "the user guard bypasses an IP egress for a domain destination",
+    );
 }
