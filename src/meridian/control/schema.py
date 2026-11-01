@@ -8,6 +8,7 @@ from meridian.control.devices import DEVICES_TABLE
 from meridian.control.errors import ServiceError
 from meridian.control.events import EVENT_TABLES
 from meridian.control.owner import UI_TABLES
+from meridian.control.period_usage import DIRECTIONAL_PERIOD_MIGRATION
 from meridian.control.privacy import PRIVACY_TABLES
 from meridian.control.revisions import APPLY_FENCE_TABLE, REVISIONS_TABLE
 from meridian.control.server_allowances import ALLOWANCE_PERIODS_TABLE
@@ -15,7 +16,7 @@ from meridian.control.store import Store
 from meridian.control.tokens import API_TOKENS_TABLE_V4
 from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPOCH_BASELINES
 
-SCHEMA_VERSION = 17
+SCHEMA_VERSION = 18
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS secrets (name TEXT PRIMARY KEY, value BLOB NOT NULL);
@@ -43,6 +44,9 @@ CREATE TABLE IF NOT EXISTS users (
     traffic_limit_bytes INTEGER NOT NULL DEFAULT 0,
     traffic_limit_strategy TEXT NOT NULL DEFAULT 'no_reset',
     traffic_offset_bytes INTEGER NOT NULL DEFAULT 0,
+    traffic_upload_offset_bytes INTEGER NOT NULL DEFAULT 0,
+    traffic_download_offset_bytes INTEGER NOT NULL DEFAULT 0,
+    traffic_period_carried_bytes INTEGER NOT NULL DEFAULT 0,
     traffic_reset_at TEXT,
     traffic_carried_bytes INTEGER NOT NULL DEFAULT 0,
     device_limit INTEGER,
@@ -92,6 +96,7 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (ALLOWANCE_PERIODS_TABLE,),
     # 16 -> 17: optional operator-owned subscription language per person.
     ("ALTER TABLE users ADD COLUMN language TEXT",),
+    DIRECTIONAL_PERIOD_MIGRATION,
 )
 
 

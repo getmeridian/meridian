@@ -511,5 +511,11 @@ if (mode === 'person-language' || mode === 'person-live-language') {
   }
 }
 
+if (mode === 'person-period-traffic') {
+  const card = view().querySelector('.cards .card-slot');
+  report.facts = [...card.querySelector('dl').children].map(el => el.textContent);
+  report.note = card.querySelector('p.muted')?.textContent || '';
+}
+
 dom.window.close();
 process.stdout.write(JSON.stringify(report));

@@ -51,6 +51,15 @@ def drop_person_metadata_schema(db: sqlite3.Connection) -> None:
     for column in ("note", "tag", "language"):
         if column in columns:
             db.execute(f"ALTER TABLE users DROP COLUMN {column}")
+    drop_period_usage_schema(db)
+
+
+def drop_period_usage_schema(db: sqlite3.Connection) -> None:
+    """Remove directional baselines before rewinding to a combined-only period schema."""
+    columns = {column[1] for column in db.execute("PRAGMA table_info(users)")}
+    for column in ("traffic_upload_offset_bytes", "traffic_download_offset_bytes", "traffic_period_carried_bytes"):
+        if column in columns:
+            db.execute(f"ALTER TABLE users DROP COLUMN {column}")
 
 
 def drop_operations_schema(db: sqlite3.Connection) -> None:

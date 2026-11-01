@@ -86,6 +86,7 @@ def subscription_user(record: UserRecord, language: FleetLanguage) -> Subscripti
         status=record.status,
         expires_at=datetime.fromisoformat(record.expire_at) if record.expire_at else None,
         used_bytes=record.used_traffic_bytes,
+        period_traffic=record.period_traffic,
         limit_bytes=record.traffic_limit_bytes,
         lifetime_used_bytes=record.lifetime_traffic_bytes,
         limit_strategy=record.traffic_limit_strategy,

@@ -364,5 +364,4 @@ def test_subscription_userinfo_reports_the_users_traffic(service: ControlService
 
     info = service.subscription(alice.sub_token).headers["subscription-userinfo"]
 
-    # Like the panel, the header carries all use as download.
-    assert "upload=0; download=3001" in info
+    assert "upload=1500; download=1501" in info

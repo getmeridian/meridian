@@ -144,6 +144,7 @@
   "person.period_began": "Начало периода",
   "person.since_created": "С момента добавления",
   "person.lifetime": "За всё время",
+  "person.traffic_unattributed": "В полученный трафик включено {bytes} из импорта или прежнего периода без разбивки по направлениям. Следующий сброс обнулит эту часть.",
   "person.last_online": "Последняя активность",
   "person.reset_traffic": "Сбросить трафик",
   "person.reset_title": "Сбросить счётчик трафика?",

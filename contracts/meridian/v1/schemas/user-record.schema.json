@@ -1,4 +1,33 @@
 {
+  "$defs": {
+    "PeriodTraffic": {
+      "additionalProperties": false,
+      "description": "Period counters; legacy traffic with no known direction is included in download.",
+      "properties": {
+        "download_bytes": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Download Bytes",
+          "type": "integer"
+        },
+        "unattributed_bytes": {
+          "default": 0,
+          "description": "Part of download whose direction an import or an older reset did not retain.",
+          "minimum": 0,
+          "title": "Unattributed Bytes",
+          "type": "integer"
+        },
+        "upload_bytes": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Upload Bytes",
+          "type": "integer"
+        }
+      },
+      "title": "PeriodTraffic",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
   "description": "One access user as the service stores it.\n\nThe operator sets `active` or `disabled`; the service's enforcement turns an\nactive user `expired` once `expire_at` passes and `limited` at the traffic limit,\nand back once a change or a new traffic period lifts it.",
   "properties": {
@@ -119,6 +148,9 @@
       "default": null,
       "description": "When an agent last counted the user's traffic.",
       "title": "Online At"
+    },
+    "period_traffic": {
+      "$ref": "#/$defs/PeriodTraffic"
     },
     "status": {
       "enum": [

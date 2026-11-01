@@ -148,12 +148,13 @@ def subscription_headers(
     headers = dict(COMMON_HEADERS)
     headers.update(_refill_headers(user, now or datetime.now(UTC)))
     headers["content-disposition"] = _disposition(user.username)
-    # Upload and download are one total until per-direction counters exist; `expire` 0 is "never".
+    # `expire` 0 is "never"; both directions use the person's shared period projection.
     expire = 0
     if user.expires_at is not None and user.expires_at < NEVER_EXPIRES:
         expire = int(user.expires_at.timestamp())
+    traffic = user.traffic
     headers["subscription-userinfo"] = (
-        f"upload=0; download={user.used_bytes}; total={user.limit_bytes}; expire={expire}"
+        f"upload={traffic.upload_bytes}; download={traffic.download_bytes}; total={user.limit_bytes}; expire={expire}"
     )
     if support_link:
         headers["support-url"] = support_link

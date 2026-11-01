@@ -99,6 +99,8 @@ meridian client set alice --limit none --expires never
 meridian client reset-traffic alice
 ```
 
+应用的 `Subscription-Userinfo` 标头、`/info`、API 的 `period_traffic` 和网页面板共用周期上传与下载计数。手动和定期重置都会清零周期用量，同时保留累计用量。导入数据或旧周期缺少可恢复的方向信息时，每个字节都会保留：未知方向的用量计入下载，在 `unattributed_bytes`（`/info` 中为 `trafficUnattributedBytes`）中列出，面板也会说明，直到下次重置。Meridian 原生记录且从未重置的累计周期会保留已知的方向信息。
+
 `client show` 会显示当前情况：
 
 ```

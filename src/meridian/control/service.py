@@ -54,6 +54,7 @@ from meridian.control.node_documents import with_users
 from meridian.control.node_health import project_runtime
 from meridian.control.notices import NoticeLedger
 from meridian.control.owner import OwnerAuth
+from meridian.control.period_usage import import_period, reset_period
 from meridian.control.periods import period_start
 from meridian.control.person_connections import read_connections
 from meridian.control.privacy import PrivacyLedger, read_privacy
@@ -415,23 +416,21 @@ class ControlService:
                     self._db.execute(
                         "INSERT INTO users (uuid, sub_token, status, created_at, expire_at, traffic_limit_bytes,"
                         " traffic_limit_strategy, traffic_reset_at, traffic_carried_bytes, note, tag,"
-                        " traffic_offset_bytes, username, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        (*values, carried - item.used_traffic_bytes, item.username, f"u{secrets.token_hex(8)}"),
+                        " username, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (*values, item.username, f"u{secrets.token_hex(8)}"),
                     )
+                    import_period(self._store, item.username, item.used_traffic_bytes)
                     created.append(item.username)
                     self.events.append("user.created", item.username)
                     continue
                 # What the ledger already counted stays counted, beside the newly carried use.
-                (old_carried,) = self._db.execute(
-                    "SELECT traffic_carried_bytes FROM users WHERE username = ?", (item.username,)
-                ).fetchone()
-                counted = existing.lifetime_traffic_bytes - old_carried
                 self._db.execute(
                     "UPDATE users SET uuid = ?, sub_token = ?, status = ?, created_at = ?, expire_at = ?,"
                     " traffic_limit_bytes = ?, traffic_limit_strategy = ?, traffic_reset_at = ?,"
-                    " traffic_carried_bytes = ?, note = ?, tag = ?, traffic_offset_bytes = ? WHERE username = ?",
-                    (*values, counted + carried - item.used_traffic_bytes, item.username),
+                    " traffic_carried_bytes = ?, note = ?, tag = ? WHERE username = ?",
+                    (*values, item.username),
                 )
+                import_period(self._store, item.username, item.used_traffic_bytes)
                 replaced.append(item.username)
                 self.events.user_updated(existing, self._require_user(item.username))
             self._enforce(now)
@@ -576,10 +575,7 @@ class ControlService:
         return changed
 
     def _reset_traffic(self, user: UserRecord, now: str) -> None:
-        self._db.execute(
-            "UPDATE users SET traffic_offset_bytes = ?, traffic_reset_at = ? WHERE username = ?",
-            (user.lifetime_traffic_bytes, now, user.username),
-        )
+        reset_period(self._store, user, now)
 
     def put_endpoint(self, endpoint_id: str, endpoint: ClientEndpoint) -> ClientEndpoint:
         with self._transaction():

@@ -150,11 +150,18 @@
       h("h2", { text: M.t("person.traffic") }),
       M.usage(user),
       h("dl", { class: "facts" },
+        user.period_traffic ? [
+          h("dt", { text: M.t("usage.up") }), h("dd", { text: M.bytes(user.period_traffic.upload_bytes) }),
+          h("dt", { text: M.t("usage.down") }), h("dd", { text: M.bytes(user.period_traffic.download_bytes) })
+        ] : null,
         h("dt", { text: M.t("people.reset") }), h("dd", { text: M.t("reset." + user.traffic_limit_strategy) }),
         h("dt", { text: M.t("person.period_began") }),
         h("dd", { text: user.traffic_reset_at ? M.date(user.traffic_reset_at, true) : M.t("person.since_created") }),
         h("dt", { text: M.t("person.lifetime") }), h("dd", { text: M.bytes(user.lifetime_traffic_bytes) }),
         h("dt", { text: M.t("person.last_online") }), h("dd", { text: M.ago(user.online_at) })),
+      user.period_traffic && user.period_traffic.unattributed_bytes ?
+        h("p", { class: "muted small", text: M.t("person.traffic_unattributed", {
+          bytes: M.bytes(user.period_traffic.unattributed_bytes) }) }) : null,
       h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
         M.confirm(M.t("person.reset_title"), M.t("person.reset_text"), M.t("person.reset_traffic")).then(function (ok) {
           if (ok) act(screen, function () { return M.api("POST", path(name, "/reset-traffic"), {}); }, "person.reset_toast");

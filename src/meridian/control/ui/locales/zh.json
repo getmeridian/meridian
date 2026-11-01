@@ -144,6 +144,7 @@
   "person.period_began": "本周期开始",
   "person.since_created": "添加时",
   "person.lifetime": "累计",
+  "person.traffic_unattributed": "下载包含 {bytes} 的导入用量或旧周期用量，其传输方向未被保留。下次重置会清除这部分用量。",
   "person.last_online": "上次在线",
   "person.reset_traffic": "重置流量",
   "person.reset_title": "重置流量？",

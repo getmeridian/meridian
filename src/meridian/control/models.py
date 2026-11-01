@@ -37,7 +37,7 @@ from meridian.core.models import CoreModel
 from meridian.core.person_metadata import PersonTag, PrivateNote
 from meridian.core.server_allowances import ServerAllowanceSpec
 from meridian.core.topology import ClientRoutingPolicy, ProtocolKind, SubscriptionUpdateIntervalHours
-from meridian.core.traffic import NodeTrafficAccounting, UserTrafficEvidence
+from meridian.core.traffic import NodeTrafficAccounting, PeriodTraffic, UserTrafficEvidence
 
 
 class ManagedInbound(CoreModel):
@@ -214,6 +214,7 @@ class UserRecord(UserTrafficEvidence):
     device_limit: int | None = Field(default=None, ge=1, le=100, description="None uses the fleet's default cap.")
     traffic_reset_at: Timestamp | None = Field(default=None, description="When the current traffic period began.")
     used_traffic_bytes: int = Field(default=0, ge=0, description="Traffic since the period began.")
+    period_traffic: PeriodTraffic = Field(default_factory=PeriodTraffic)
     lifetime_traffic_bytes: int = Field(
         default=0, ge=0, description="What agents counted plus what an import carried in from before."
     )

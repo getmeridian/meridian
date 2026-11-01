@@ -33,6 +33,7 @@
 - **Poll only while visible**, keep stale data with retry and backoff, and accept replies through `M.latestOnly()` — the revision diff once showed one request's reply under another's label.
 - **Command polling keeps finished sibling results** and turns terminal read errors into an unavailable result, never a false timeout.
 - **A relay's null usage is "not measured", never zero**; render billing dates as UTC calendar dates.
+- **Period counters come from the person record** — show its upload/download and disclose carried use; the browser never reconstructs a reset from lifetime totals.
 - **Pass literal strings to `M.confirm`** — it creates its own text node; a DOM node displays as an object label instead of the reviewed text.
 - **Token issuance may be uncertain** — lock the dialog throughout; a success without a secret refreshes the list and says the secret cannot be recovered.
 - **Quotas use GiB/TiB with an explicit Unlimited choice**, refusing values beyond JavaScript's exact integer range; a browser's `badInput` must never clear a cap to its default.

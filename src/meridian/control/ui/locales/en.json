@@ -144,6 +144,7 @@
   "person.period_began": "Period began",
   "person.since_created": "When added",
   "person.lifetime": "All time",
+  "person.traffic_unattributed": "Download includes {bytes} from an import or older period whose direction was not retained. The next reset clears this carried use.",
   "person.last_online": "Last online",
   "person.reset_traffic": "Reset traffic",
   "person.reset_title": "Reset traffic?",

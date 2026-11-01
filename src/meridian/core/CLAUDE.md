@@ -37,3 +37,4 @@
 - **Command catalogs list only completed JSON outcomes** — an interruption exits 130 without an envelope; a cooperative cancel is a `cancelled` outcome with exit 5.
 - **Fleet results keep reachability, runtime, and convergence apart** — a live poll never makes an old health report current, and a healthy runtime can still await convergence.
 - **Client detail carries lifetime traffic beside the period** — resetting period use never erases the lifetime figure.
+- **Period directions sum to used traffic** — `PeriodTraffic.unattributed_bytes` names the part of download whose historical direction is unknown, never a third amount to add.

@@ -8,6 +8,36 @@ from meridian.core.agent_types import NodeId, Timestamp
 from meridian.core.models import CoreModel
 
 
+class PeriodTraffic(CoreModel):
+    """Period counters; legacy traffic with no known direction is included in download."""
+
+    upload_bytes: int = Field(default=0, ge=0)
+    download_bytes: int = Field(default=0, ge=0)
+    unattributed_bytes: int = Field(
+        default=0, ge=0, description="Part of download whose direction an import or an older reset did not retain."
+    )
+
+    @property
+    def total_bytes(self) -> int:
+        return self.upload_bytes + self.download_bytes
+
+
+def period_usage(
+    upload_bytes: int,
+    download_bytes: int,
+    *,
+    upload_offset: int = 0,
+    download_offset: int = 0,
+    carried_bytes: int = 0,
+) -> PeriodTraffic:
+    """One period calculation for people records, subscriptions, and connection-page info."""
+    return PeriodTraffic(
+        upload_bytes=max(0, upload_bytes - upload_offset),
+        download_bytes=max(0, download_bytes - download_offset) + carried_bytes,
+        unattributed_bytes=carried_bytes,
+    )
+
+
 class UserTrafficEvidence(CoreModel):
     first_traffic_at: Timestamp | None = Field(
         default=None, description="When the service first accepted traffic growth; unknown for historical use."

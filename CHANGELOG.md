@@ -15,6 +15,7 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b9
 
 #### Fixed
+- **Subscription traffic reports upload and download for the current period**, shared with the API and web panel. Manual and scheduled resets keep both directions and lifetime totals consistent; imports and older periods keep unclassified use with an explicit disclosure (#95).
 - **A web panel on its own domain keeps its certificate** when the same server
   also runs an exit (#110). The panel's domain certificate was installed where
   the server's IP certificate lives, so an exit's IP certificate replaced it,

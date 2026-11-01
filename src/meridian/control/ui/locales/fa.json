@@ -144,6 +144,7 @@
   "person.period_began": "آغاز دوره",
   "person.since_created": "هنگام افزودن",
   "person.lifetime": "از ابتدا",
+  "person.traffic_unattributed": "دانلود شامل {bytes} از داده‌های واردشده یا دورهٔ قبلی است که جهت آن ثبت نشده بود. این مقدار با بازنشانی بعدی صفر می‌شود.",
   "person.last_online": "آخرین حضور",
   "person.reset_traffic": "بازنشانی ترافیک",
   "person.reset_title": "ترافیک بازنشانی شود؟",

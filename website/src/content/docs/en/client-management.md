@@ -99,6 +99,8 @@ A client who reaches the limit shows as `limited`, and one past the expiry as `e
 meridian client reset-traffic alice
 ```
 
+The app’s `Subscription-Userinfo` header, `/info`, the API’s `period_traffic`, and the web panel share the same period upload/download counters. Both manual and scheduled resets clear the period while leaving lifetime totals untouched. Imports and older periods with no recoverable split keep every byte: unclassified use is included in download, exposed as `unattributed_bytes` (`trafficUnattributedBytes` on `/info`), and disclosed in the panel until the next reset. A native lifetime period with no reset keeps its known split.
+
 `client show` prints where they stand:
 
 ```

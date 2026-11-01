@@ -11,6 +11,7 @@
 - Owner contact request/result schemas and inherited presentation fields export their text bounds and allowed URI schemes; default empty contact stays omitted from intent and settings payloads.
 - Administrative person schemas describe private notes and tags with their bounds; generated schemas contain no private values, and lower-scope API records keep these fields as empty strings.
 - **Server billing contracts** — server list/set envelopes, metadata, service settings, and nullable period usage are exported from `core/schema_servers.py`; fleet and attention contracts compose the same server evidence.
+- **People period counters** — administrative records compose `PeriodTraffic`; unattributed historical use is a disclosed subset of download, and both directions sum to period use.
 
 **Generated, checked in** — `scripts/export_contracts.py` is the source of truth. Do not hand-edit files below `contracts/meridian/`.
 
