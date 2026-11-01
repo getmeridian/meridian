@@ -32,6 +32,7 @@ newest first; the last is what 4.0 changes compared with 3.x.
   the fleet default. Remnawave migration keeps device caps, including zero.
 
 #### Fixed
+- Bulk undo emits the same lifecycle events as commit and refuses an over-capacity managed inbound without changing people or the receipt.
 - Bulk reviews compare enforced account states, refuse named stale targets even for deletion, preserve due refills, and count no-op actions as unchanged.
 - **The People screen filters by status, tag, upcoming expiry, quota share, never-used accounts, and attention**, with facet counts and sorting by name, usage, expiry, or last activity. The fragment retains the view across reloads, and searching keeps existing rows and focus (#95).
 - **People attention distinguishes never-used accounts from people who stopped using the service**, using the stored last traffic time and separate bounded thresholds. Period resets and disabled daily history preserve that evidence (#95).

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from meridian.control.account_lifecycle import enforce_user_schedules
-from meridian.control.bulk_effects import BulkEffect, prepare_effect, project_effect
+from meridian.control.bulk_effects import BulkEffect, prepare_effect, prepare_undo, project_effect
 from meridian.control.errors import ServiceError
 from meridian.control.events import EventLedger
 from meridian.control.models import NodeSpec, UserRecord
@@ -408,31 +408,34 @@ class BulkLedger:
             assert row is not None
             versions = {name: (value[0], value[1]) for name, value in json.loads(row[0]).items()}
             self._refuse_stale(versions)
-            outcomes = []
-            for person in receipt.people:
-                if person.outcome != "changed":
-                    continue
-                user = self.read_user(person.username)
-                restored = UserRecord.model_validate(
-                    {**user.model_dump(), **{field: getattr(person.before, field) for field in BULK_WRITABLE_FIELDS}}
-                )
-                effect = project_effect(restored, now)
+            people = [person for person in receipt.people if person.outcome == "changed"]
+            users = {person.username: self.read_user(person.username) for person in people}
+            effects = {}
+            for person in people:
+                user = users[person.username]
+                effect = prepare_undo(user, person.before, receipt.action, now)
                 if effect.reset:
                     raise ServiceError(
                         "undo_refused",
                         f"{person.username}'s schedule now requires a traffic reset. Preview a new change.",
                         409,
                     )
-                if BulkFields.from_user(effect.user) != person.before:
+                if (
+                    BulkFields.from_user(project_effect(user, now).user) != person.after
+                    or BulkFields.from_user(effect.user) != person.before
+                ):
                     raise ServiceError(
                         "stale_people",
                         f"{person.username}'s enforcement changed since review. Preview a new change.",
                         409,
                         subjects=[person.username],
                     )
-                save_user_fields(self.store, effect.user, BULK_WRITABLE_FIELDS)
-                actual = self.read_user(person.username)
-                self.events.user_updated(user, actual, now=now)
+                effects[person.username] = effect
+            self._changed_nodes(effects, set())
+            outcomes = []
+            for person in people:
+                user = users[person.username]
+                actual = self._apply_effect(user, effects[person.username], now)
                 before, after = BulkFields.from_user(user), BulkFields.from_user(actual)
                 outcomes.append(
                     BulkPersonChange(

@@ -187,6 +187,8 @@ Private metadata: `client set NAME --note TEXT --tag TAG` edits only the supplie
 
 Bulk previews show the enforced state before the action, including expiry and refills already due. An action that changes no fields is counted as unchanged. Commit checks that state again for every selected person, including deletions; if a limit or schedule has changed, the refusal names the people to preview again. Refills use the commit time, and undo preserves enforcement that was already due before review.
 
+Undo writes the original choices, then enforces expiry and quota rules just like commit. Lifecycle events distinguish enabling access from restoring it after a limit change. Before composing node documents, undo checks the current managed inbound capacity; a refusal leaves the people and receipt unchanged.
+
 | Command | Reviewed change |
 |---|---|
 | `meridian client bulk extend --days 7` | Extend expiry or pending duration |

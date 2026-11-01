@@ -30,6 +30,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - A proposal whose intent contains a secret-shaped key or value, or a malformed `access` block, is refused and never stored.
 
 ## Pitfalls
+- **Undo shares bulk enforcement** — restore requested choices before judging status, and check managed inbound capacity before composing.
 - **Bulk before is enforced** — project both sides from one account clock, re-check every target before writing, and catch up due resets before schedule edits.
 - **Bulk after stays reviewed** — re-check the projected result at commit; a newly due action schedule needs a fresh review.
 - **Bulk applies use canonical enforcement** — write validated requested fields before enforcing, or quota restoration emits the wrong event and cap edits lose their renewal interval.

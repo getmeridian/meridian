@@ -15,7 +15,7 @@ from meridian.core.account_schedule import (
     period_start,
     timestamp,
 )
-from meridian.core.people_bulk import BulkAction
+from meridian.core.people_bulk import BULK_WRITABLE_FIELDS, BulkAction, BulkFields
 from meridian.core.traffic import PeriodTraffic
 
 
@@ -78,4 +78,18 @@ def prepare_effect(user: UserRecord, action: BulkAction, now: str) -> BulkEffect
     merged = merge_user_update(user, UserUpdate.model_validate(changes), now)
     effect = project_effect(merged, now, reset=action.action == "reset-traffic")
     effect.requested = merged
+    return effect
+
+
+def prepare_undo(user: UserRecord, before: BulkFields, action: BulkAction, now: str) -> BulkEffect:
+    values = {field: getattr(before, field) for field in BULK_WRITABLE_FIELDS}
+    # Only enable/disable changes the operator's status choice; other states belong to enforcement.
+    values["status"] = (
+        ("disabled" if before.status == "disabled" else "active")
+        if action.action in ("enable", "disable")
+        else user.status
+    )
+    requested = UserRecord.model_validate({**user.model_dump(), **values})
+    effect = project_effect(requested, now)
+    effect.requested = requested
     return effect
