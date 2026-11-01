@@ -312,7 +312,7 @@ impl Agent<'_> {
                     && self.state.applied != self.state.held_ref()
                 {
                     return Err(Failure::new(
-                        "apply_pending",
+                        "document_not_applied",
                         "Apply the held document before restarting or resetting the core.",
                     ));
                 }

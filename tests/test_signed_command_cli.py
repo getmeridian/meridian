@@ -157,7 +157,7 @@ def test_reissue_keeps_live_page_links_and_all_cut_off_results(tmp_home, capsys,
 
 
 def test_declining_the_cut_off_confirmation_changes_no_credentials(tmp_home) -> None:
-    scope = CutOffPlan(nodes=[CutOffNode(node_id="main", inbound_tags=["vless-reality"])])
+    scope = CutOffPlan(nodes=[CutOffNode(node_id="main", inbound_tags=["vless-reality"], effect="core_restart")])
     with (
         patch("meridian.commands.client.load_topology_cluster", return_value=cluster()),
         patch("meridian.node_commands.cut_off_scope", return_value=scope),
@@ -166,7 +166,8 @@ def test_declining_the_cut_off_confirmation_changes_no_credentials(tmp_home) -> 
         pytest.raises(typer.Exit),
     ):
         run_reissue("person-a", cut_off=True)
-    assert "main" in confirm.call_args.args[0] and "every open session" in confirm.call_args.args[0]
+    text = confirm.call_args.args[0]
+    assert "main" in text and "inbound" in text and "bridge" in text
     panel.assert_not_called()
 
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import typer
-from rich.markup import escape
 
 from meridian.commands._helpers import load_topology_cluster, require_intent
 from meridian.commands.client_handoff import validate_client_name
@@ -52,7 +51,7 @@ def run_rotate_credentials(name: str, *, yes: bool = False, cut_off: bool = Fals
                 if scope is not None:
                     text += "\n\n" + cut_off_disclosure(scope)
                     if yes and not is_json_mode():
-                        warn(escape(cut_off_disclosure(scope)))
+                        warn(cut_off_disclosure(scope))
                 if not yes and not confirm(text):
                     raise typer.Exit(1)
                 rotated = panel.rotate_credentials(name, request)
@@ -88,8 +87,8 @@ def run_rotate_credentials(name: str, *, yes: bool = False, cut_off: bool = Fals
                 )
             )
         else:
-            ok(escape(t("client.credentials_rotated", name=shown)))
-            ok(escape(t("client.credentials_refresh")))
+            ok(t("client.credentials_rotated", name=shown))
+            ok(t("client.credentials_refresh"))
             print_command_results(outcomes or [])
             labels = {
                 "blocked": "node_commands.flow_blocked",
@@ -98,6 +97,6 @@ def run_rotate_credentials(name: str, *, yes: bool = False, cut_off: bool = Fals
             }
             for node in rotated.flow_blocks.nodes:
                 message = isolate(node.node_id) + ": " + t(labels[node.status])
-                (ok if node.status == "blocked" else warn)(escape(message))
+                (ok if node.status == "blocked" else warn)(message)
         if code:
             raise typer.Exit(code)

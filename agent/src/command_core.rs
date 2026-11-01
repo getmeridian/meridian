@@ -26,7 +26,7 @@ impl Engine<'_> {
         resources: &[Resource],
     ) -> Result<Value, Failure> {
         let invalid = |message: &str| Failure::new("validation_failed", message);
-        let pending = |message: &str| Failure::new("apply_pending", message);
+        let pending = |code, message: &str| Failure::new(code, message);
         let config = resources
             .iter()
             .find_map(|resource| match &resource.spec {
@@ -34,7 +34,10 @@ impl Engine<'_> {
                 _ => None,
             })
             .ok_or_else(|| {
-                pending("This node has no held Xray configuration. Apply the fleet and retry.")
+                pending(
+                    "document_not_applied",
+                    "This node has no held Xray configuration. Apply the fleet and retry.",
+                )
             })?;
         fsutil::check_path(&config.path)
             .map_err(|_| invalid("The Xray config path is not allowed."))?;
@@ -52,10 +55,14 @@ impl Engine<'_> {
             .map_err(|_| invalid("The held Xray configuration cannot be composed."))?;
         let installed =
             std::fs::read(fsutil::host_path(&self.root, &config.path)).map_err(|_| {
-                pending("The held Xray configuration is not installed. Apply the fleet and retry.")
+                pending(
+                    "config_not_installed",
+                    "The held Xray configuration is not installed. Apply the fleet and retry.",
+                )
             })?;
         if installed != compose::render(&composed) {
             return Err(pending(
+                "config_mismatch",
                 "The installed Xray configuration differs from the held document. Apply the fleet and retry.",
             ));
         }

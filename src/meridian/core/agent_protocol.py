@@ -329,6 +329,11 @@ ResourceErrorCode = Literal[
     "reload_failed",
     "service_failed",
     "xray_api_failed",
+    "flow_guard_pending",
+    "apply_pending",
+    "document_not_applied",
+    "config_not_installed",
+    "config_mismatch",
     "rolled_back",
     "timeout",
     "unsupported",
@@ -341,7 +346,10 @@ class ResourceError(AgentModel):
 
     code: ResourceErrorCode
     message: ShortText
-    retryable: bool = Field(description="True when the agent will retry on its own.")
+    retryable: bool = Field(
+        description="True when retrying after the stated condition can succeed; "
+        "resources retry automatically, while commands require a new ID."
+    )
 
 
 class UserFlowBlocking(AgentModel):

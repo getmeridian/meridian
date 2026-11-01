@@ -16,7 +16,7 @@
 - **Secrets stay out of logs and reports** — no token, key, service URL (`Client::scrub`), user UUID, or sensitive content; messages are trimmed.
 - **Atomic writes everywhere** — private temp sibling, fsync, mode and owner, rename, directory fsync (`fsutil::write_atomic`).
 ## Pitfalls
-- **Every core change uses held credentials** — commands check the applied document and exact core.json; live updates publish the new file before accounts, compare invocations, and reconcile an uncertain instance.
+- **Every core change uses held credentials** — commands check the applied document and exact core.json and use exported refusal codes; live updates publish the new file before accounts, compare invocations, and reconcile an uncertain instance.
 - **Reports inspect the running guard** — cached apply errors cannot prove current blocking; compare live rules and the core invocation without mutating them.
 - **IPIfNonMatch needs an unmatched first pass** — an active-user catch-all suppresses DNS and bypasses private/country blocks and IP egress; install only revoked-identity blocks.
 - **Guard retries preserve earlier blocks** — save intent before removing authentication, clear blocks for active identities before adding accounts, and retry the complete graph after a failed replacement.

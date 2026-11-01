@@ -2166,7 +2166,7 @@
         "properties": {
           "effect": {
             "default": "inbound_reset",
-            "description": "VLESS needs a core restart to close accepted flows.",
+            "description": "A core restart reconnects every Xray inbound and bridge on this node; an inbound reset reconnects the listed inbounds, with whole-core fallback on failure.",
             "enum": [
               "inbound_reset",
               "core_restart"
@@ -5720,6 +5720,11 @@
               "reload_failed",
               "service_failed",
               "xray_api_failed",
+              "flow_guard_pending",
+              "apply_pending",
+              "document_not_applied",
+              "config_not_installed",
+              "config_mismatch",
               "rolled_back",
               "timeout",
               "unsupported",
@@ -5735,7 +5740,7 @@
             "type": "string"
           },
           "retryable": {
-            "description": "True when the agent will retry on its own.",
+            "description": "True when retrying after the stated condition can succeed; resources retry automatically, while commands require a new ID.",
             "title": "Retryable",
             "type": "boolean"
           }

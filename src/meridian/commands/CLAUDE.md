@@ -22,6 +22,8 @@
 
 ## Pitfalls
 - **Undo dry runs check the receipt** — reject irreversible, already-undone, or expired receipts; uncertain undo succeeds only after reading its recorded completion.
+- **Escape at the console boundary once** — ok/warn already escape Rich markup; pass translated display names and disclosures unchanged.
+- **Cut-off consent names each node's boundary** — a core restart reaches every Xray inbound and bridge; an inbound reset names its tags and whole-core failure fallback.
 - **`console.fail()` always exits** (user 2, system 3, bug 1) — entry points convert library `MeridianError`s with `fail(exc)`, or the user sees a traceback.
 - **Catch control-service errors inside the command's `error_context`** — it supplies JSON metadata but catches nothing; a non-retryable poll error is a failed outcome, not a timeout.
 - **A local save failure after a remote change exits 3** and says remote state changed.

@@ -79,7 +79,9 @@ class CutOffNode(CoreModel):
     node_id: NodeId
     inbound_tags: list[InboundTag]
     effect: CommandEffect = Field(
-        default="inbound_reset", description="VLESS needs a core restart to close accepted flows."
+        default="inbound_reset",
+        description="A core restart reconnects every Xray inbound and bridge on this node; "
+        "an inbound reset reconnects the listed inbounds, with whole-core fallback on failure.",
     )
 
 

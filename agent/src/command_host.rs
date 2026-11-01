@@ -108,7 +108,13 @@ impl Engine<'_> {
             })?;
         self.restart_for_command(&core.id, resources)
             .map_err(|failure| {
-                if failure.code == "apply_pending" {
+                if matches!(
+                    failure.code,
+                    "apply_pending"
+                        | "document_not_applied"
+                        | "config_not_installed"
+                        | "config_mismatch"
+                ) {
                     return failure;
                 }
                 Failure::new(

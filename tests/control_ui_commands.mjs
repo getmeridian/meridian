@@ -5,7 +5,8 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(new URL('../website/package.json', import.meta.url));
 const { JSDOM } = require('jsdom');
-const [ui, requestedMode, locale = 'en'] = process.argv.slice(2);
+const [ui, requestedMode, locale = 'en', payload] = process.argv.slice(2);
+const data = (payload === '-' ? JSON.parse(fs.readFileSync(0, 'utf8')) : payload ? JSON.parse(payload) : null) || {};
 const reissuing = requestedMode.startsWith('reissue-');
 const mode = reissuing ? requestedMode.slice('reissue-'.length) : requestedMode;
 const dom = new JSDOM('<!doctype html><body><div id="view"></div></body>', {
@@ -40,7 +41,7 @@ w.fetch = (url, options) => {
   }
   if (url === 'api/users/person-a' && options.method === 'GET') return Promise.resolve(reply(user));
   if (url === 'ui/api/people/person-a/share') return Promise.resolve(reply({ subscription_url: '', declared: mode === 'declared' }));
-  if (url === 'api/users/person-a/cut-off') return Promise.resolve(reply({ nodes: mode === 'no-nodes' ? [] : [{ node_id: 'main', inbound_tags: ['vless-reality'] }] }));
+  if (url === 'api/users/person-a/cut-off') return Promise.resolve(reply({ nodes: data.nodes || (mode === 'no-nodes' ? [] : [{ node_id: 'main', effect: 'core_restart', inbound_tags: ['vless-reality'] }]) }));
   if (url === 'api/users/person-a/reissue' && options.method === 'POST') {
     writes.push({ body: JSON.parse(options.body), csrf: options.headers['X-Meridian-Request'] });
     return Promise.resolve(reply(writes.at(-1).body.cut_off ? { user, commands: [record] } : user));

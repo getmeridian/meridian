@@ -182,7 +182,7 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 禁用、到期、达到流量上限、删除用户及更换连接凭据，会阻止已撤销身份的新 TCP 数据流和 UDP 会话，包括已认证的 Hysteria2 QUIC 连接或 VLESS mux 连接上的新数据流。其他用户的会话保持连接。用户详情页和 `GET /api/users/{username}/flow-blocks` 按节点返回 `blocked`、`pending_node` 或 `agent_too_old`。尚未确认的节点在收到并应用变更前可能继续使用旧配置；控制服务不可用时也如此。使用 `meridian apply` 更新旧节点 agent。事件只记录节点和结果，不记录连接地址或设备数据。
 
-撤销前已建立的 TCP 数据流、现有 Hysteria2 UDP 会话，以及可复用的 VLESS XUDP 会话，可能继续传输直到结束。固定版本的核心没有关闭单个用户会话的接口。`client remove` 或 `client reissue` 的 **`--cut-off`** 等待凭据变更应用后执行终止操作。涉及 VLESS 入站时会重启 Xray，结束该节点上的全部 Xray 会话；仅涉及 Hysteria2 时重置相关入站，API 失败则重启核心。其他用户也会重连。确认前会显示哪些节点需要重启核心。JSON 在 `data.cut_off` 下返回 `done`、`core_restart`、`failed` 或 `timed_out`。最多等待五分钟；失败退出码为 `4`，超时为 `3`。删除在网页面板中添加的用户时，面板提供相同选项。
+撤销前开始的 TCP 流、Hysteria2 UDP 会话或 VLESS XUDP 会话，可能继续直到结束。固定版本的核心没有关闭单个用户会话的接口。`client remove`、`client reissue` 和 `client rotate-credentials` 的 **`--cut-off`** 会等待凭据变更应用。确认时会逐个节点说明范围：核心重启会让使用该节点任意 Xray 入站或桥接连接的所有用户重连；入站重置只影响列出的入站。如果重置失败，回退的核心重启会影响该节点所有入站与桥接连接。VLESS 节点使用核心重启；仅使用 Hysteria2 的节点重置相关入站。JSON 在 `data.cut_off` 下返回 `done`、`core_restart`、`failed` 或 `timed_out`。最多等待五分钟；失败退出码为 `4`，超时为 `3`。网页面板为在面板中添加的用户提供相同的删除、重新签发与凭据轮换选择。
 
 私人字段：`client set NAME --note TEXT --tag TAG` 只更改指定的字段。备注最多 500 个纯文本字符，支持换行；`--note ""` 清除备注。标签使用 1–16 个拉丁字母、数字或下划线，保存为大写；`--tag none` 清除标签。`client show` 显示这两个字段，`client list --tag TAG` 筛选标签列（`none` 选择没有标签的人）。读取和编辑需要 people/admin 权限。网页面板编辑相同字段；应用配置保留它们，加密快照保存它们。参见[私人备注和标签](/zh/client-management/#私人备注和标签)。
 
@@ -322,7 +322,7 @@ meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 
 **`node restart`** — 向节点 agent 发送签名命令，并等待服务就绪。默认或 `--core` 重启 Xray（`netcore`）；`--all` 逐一重启当前节点文档管理的所有运行中服务。每个服务重启时，其现有连接都会中断。`--core` 和 `--all` 互斥；`--json` 需要 `--yes`。JSON 在 `data.nodes[]` 中保留各条命令及节点的 `done`、`failed` 或 `timed_out` 结果。失败退出码为 `4`，等待五分钟后超时的退出码为 `3`。网页面板的服务器视图提供 **重启 Xray** 按钮，并展示相同的重连提示和执行结果。
 
-重启核心、重置入站及其回退重启，都要求当前持有的文档已应用，并且磁盘上的 `core.json` 与该文档渲染出的凭据完全一致。文档尚未应用或配置过旧时，会在执行服务器操作前返回可重试的失败。先执行 apply，再提交新命令；重复使用同一命令 ID 会返回已保存的结果。
+重启核心、重置入站及其回退重启，都要求当前持有的文档已应用，并且磁盘上的 `core.json` 与该文档渲染出的凭据完全一致。文档尚未应用或配置过旧时，会在重启或重置核心前返回可重试的失败。先执行 apply，再提交新命令；重复使用同一命令 ID 会返回已保存的结果。
 
 **`node remove`** — 从拓扑中移除一个出口或路由网关。它会列出将被删除的所有资源（节点记录和文档、其 agent 和 Xray、防火墙规则、客户端接入点），请求确认后原样执行该审查计划；服务器本身仍保留在已保存的服务器列表中。控制服务器不能通过此命令移除（请使用 `meridian teardown`）；仍有中继指向该出口时也会拒绝（请先移除中继或传入 `--force`）；有路由网关经由该出口接入集群，或移除后会破坏拓扑（例如导致出口池为空或失去默认出口）时同样会拒绝。绑定到被移除网关的路由规则会一并删除。
 

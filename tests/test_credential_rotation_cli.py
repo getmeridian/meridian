@@ -10,11 +10,21 @@ from typer.testing import CliRunner
 
 from meridian.cli import app
 from meridian.cluster import ClusterConfig, PanelConfig
+from meridian.console import set_json_mode, set_quiet_mode
 from meridian.control.credential_models import UserCredentialRotation
 from meridian.control.models import UserRecord
 from meridian.core.client_sessions import UserFlowBlocks
 from tests.support.text import unstyle
 from tests.support.topology import panel_mock, single_exit_intent
+
+
+@pytest.fixture(autouse=True)
+def clean_json_mode():
+    set_json_mode(False)
+    set_quiet_mode(False)
+    yield
+    set_json_mode(False)
+    set_quiet_mode(False)
 
 
 @pytest.fixture
@@ -73,3 +83,17 @@ def test_cli_rotation_refuses_console_only_people_before_opening_the_service(sce
         result = CliRunner().invoke(app, ["client", "rotate-credentials", "console-person", "--yes", "--json"])
     assert result.exit_code == 2
     access.assert_not_called()
+
+
+def test_human_rotation_escapes_a_display_name_once(scene, tmp_home):
+    cluster, panel, _ = scene
+    cluster.topology_intent.access.display_names["alice"] = "Group [work]"
+    with (
+        patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
+        patch("meridian.control_access.ServiceAccessPanel", return_value=panel),
+    ):
+        result = CliRunner().invoke(app, ["client", "rotate-credentials", "alice", "--yes"])
+    assert result.exit_code == 0, result.output
+    text = unstyle(result.output)
+    assert "Group [work]" in text
+    assert "\\[" not in text

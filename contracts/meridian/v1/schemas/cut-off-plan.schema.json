@@ -5,7 +5,7 @@
       "properties": {
         "effect": {
           "default": "inbound_reset",
-          "description": "VLESS needs a core restart to close accepted flows.",
+          "description": "A core restart reconnects every Xray inbound and bridge on this node; an inbound reset reconnects the listed inbounds, with whole-core fallback on failure.",
           "enum": [
             "inbound_reset",
             "core_restart"

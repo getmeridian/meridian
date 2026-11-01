@@ -29,6 +29,7 @@
 ## Pitfalls
 - **Revealed metadata keeps scalar types** — secret-shaped tag keys must not replace facet counts with redaction strings; container reveals still mask string credentials.
 - **Bulk action schemas retain parameter types** — use post-init checks and a model schema hook, or a dict-returning serializer hides them behind an after-validator.
+- **Agent refusal codes are a shared contract** — export every Rust resource/command code before using it, and localize human command errors by code.
 - **Receipts identify the revoked key** — generations and causes stay distinct, while private per-inbound fingerprints clear a key that becomes active again.
 - **Ready includes a core restart** — revocation evidence describes old identities losing new streams, not a claim that the fresh core needs or holds block rules.
 - **Device cap zero is unlimited** — only null inherits the fleet cap; never resolve a cap by truthiness.

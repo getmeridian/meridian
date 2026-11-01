@@ -25,6 +25,15 @@
     core_restart: "commands.core_restart", failed: "commands.failed", timed_out: "commands.timed_out",
     read_error: "commands.read_error",
   };
+  var ERROR_KEYS = {
+    apply_pending: "commands.error_apply_pending",
+    document_not_applied: "commands.error_document_not_applied",
+    config_not_installed: "commands.error_config_not_installed",
+    config_mismatch: "commands.error_config_mismatch"
+  };
+  function commandError(error) {
+    return ERROR_KEYS[error.code] ? M.t(ERROR_KEYS[error.code]) : error.message;
+  }
   function render(records, timedOut, errors, stoppedError) {
     var nodes = Object.create(null);
     records.forEach(function (record) { (nodes[record.node_id] = nodes[record.node_id] || []).push(record); });
@@ -35,7 +44,7 @@
       }).find(Boolean) : null;
       return h("section", { class: "stack-sm" }, h("p", {}, h("bdi", { class: "mono", text: node }), ": ", M.t(LABELS[status])),
         nodes[node].map(function (record) {
-          return record.result && record.result.error ? h("p", { class: "muted small", text: record.result.error.message }) : null;
+          return record.result && record.result.error ? h("p", { class: "muted small", text: commandError(record.result.error) }) : null;
         }), readError ? h("p", { class: "muted small", text: M.errorText(readError) }) : null);
     }));
   }
@@ -82,13 +91,15 @@
     return M.api("GET", "api/users/" + encodeURIComponent(name) + "/cut-off").then(function (plan) {
       return M.dialog(title, function (close) {
         var opt = h("input", { type: "checkbox", name: "cut-off", disabled: !plan.nodes.length });
-        var scope = plan.nodes.map(function (node) { return node.node_id; }).join(", ");
-        var cores = plan.nodes.filter(function (node) { return node.effect === "core_restart"; }).map(function (node) { return node.node_id; }).join(", ");
         return [h("p", { class: "muted", text: text }),
           h("label", { class: "check-row" }, opt, " ", M.t("commands.cut_off_label")),
           h("p", { class: "hint", text: M.t("commands.cut_off_help") }),
-          h("p", { class: "muted small", text: scope ? M.t("commands.scope", { nodes: "\u2068" + scope + "\u2069" }) : M.t("commands.no_inbounds") }),
-          cores ? h("p", { class: "hint", text: M.t("commands.core_scope", { nodes: "\u2068" + cores + "\u2069" }) }) : null,
+          plan.nodes.length ? h("div", { class: "stack" }, plan.nodes.map(function (node) {
+            var params = { node: "\u2068" + node.node_id + "\u2069",
+              inbounds: "\u2068" + node.inbound_tags.join(", ") + "\u2069" };
+            return h("p", { class: "hint", text: M.t(node.effect === "core_restart" ?
+              "commands.core_scope" : "commands.inbound_scope", params) });
+          })) : h("p", { class: "hint", text: M.t("commands.no_inbounds") }),
           h("div", { class: "actions" },
             h("button", { class: "btn btn-ghost", type: "button", onclick: function () { close(); } }, M.t("action.cancel")),
             h("button", { class: "btn btn-danger", type: "button", onclick: function () { close({ cut_off: opt.checked }); } }, action))];

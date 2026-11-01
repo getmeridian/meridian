@@ -31,8 +31,8 @@ CutOff = Annotated[
     bool,
     typer.Option(
         "--cut-off",
-        help="End every open session on affected inbounds after revocation; other people reconnect. "
-        "If the inbound API fails, restart the core. Opt-in; recommended after a leak.",
+        help="End open sessions after revocation: VLESS restarts every Xray inbound and bridge on each affected node; "
+        "Hysteria2 resets the affected inbounds, with a core restart on failure. Opt-in; recommended after a leak.",
     ),
 ]
 ForgetUnreachable = Annotated[
