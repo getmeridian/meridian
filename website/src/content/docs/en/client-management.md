@@ -525,7 +525,7 @@ Membership is private operator data: `people.private` reveals `profiles` in pers
 
 JSON reviews and fleet exports preserve valid profile IDs and usernames such as `token` and `secret`, including nested grant and creation-setting lists. Credential fields remain redacted.
 
-Usernames such as `token`, `secret`, and `api_key` are also valid in revision proposals and reviewed applies. Their creation settings and display names still undergo the usual secret check.
+Usernames such as `token`, `secret`, and `api_key` are also valid in revision proposals and reviewed applies. Their creation settings and display names still undergo the usual secret check. The username must be declared in `access.users`; its value must be a mapping in `access.creation_settings` or a string in `access.display_names`. Otherwise secret-shaped keys are rejected as usual.
 
 | Operation | Meaning |
 | --- | --- |

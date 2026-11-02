@@ -210,7 +210,7 @@ def test_secret_shaped_usernames_keep_creation_settings_and_display_names_in_rev
         ),
         (
             {"access": {"users": ["token"], "display_names": {"token": {"password": "value"}}}},
-            "access.display_names.token.password",
+            "access.display_names.token",
         ),
         (
             {"access": {"users": ["token"], "creation_settings": {"token": {"nested": [{"secret": "value"}]}}}},
@@ -224,16 +224,28 @@ def test_secret_shaped_usernames_keep_creation_settings_and_display_names_in_rev
         ({"access.creation_settings": {"secret": {}}}, "access.creation_settings.secret"),
         ({"access": {"creation_settings": {"api_key": "value"}}}, "access.creation_settings.api_key"),
         ({"access": {"users": ["alice"], "display_names": {"api_key": "value"}}}, "access.display_names.api_key"),
+        (
+            {"access": {"users": ["token"], "creation_settings": {"token": "value"}}},
+            "access.creation_settings.token",
+        ),
+        (
+            {"access": {"users": ["secret"], "creation_settings": {"secret": []}}},
+            "access.creation_settings.secret",
+        ),
+        ({"access": {"users": ["api_key"], "display_names": {"api_key": 0}}}, "access.display_names.api_key"),
     ],
     ids=[
         "creation-field",
-        "display-name-field",
+        "declared-display-mapping",
         "nested-field",
         "secret-value",
         "nested-map",
         "dotted-map",
         "undeclared-scalars",
         "undeclared-display-name",
+        "declared-creation-scalar",
+        "declared-creation-list",
+        "declared-display-number",
     ],
 )
 def test_username_map_exceptions_still_detect_secret_fields_and_values(intent: dict[str, Any], leak: str):

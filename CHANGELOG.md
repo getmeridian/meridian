@@ -61,6 +61,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   or service access, including dry runs and default membership.
 - Accept usernames such as token, secret, and api_key in revision and apply
   checks while still rejecting secret fields and values in their settings.
+- Reject secret-shaped access-map keys in revisions when their declared username
+  carries a malformed creation-settings or display-name value.
 - Keep plan results when profile evidence is unavailable and allow bootstrap or
   repair without review only for fleets that have never used access profiles.
   Persist profile use before remote writes, refuse unreviewed applies and imports
