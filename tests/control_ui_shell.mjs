@@ -29,10 +29,12 @@ w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
 w.HTMLDialogElement.prototype.close = function () { this.open = false; };
 w.HTMLElement.prototype.scrollIntoView = function () {};
 
-const server = { node_id: 'main', role: 'node', live: true, in_sync: true,
+const server = { node_id: 'main', role: 'node', region: 'DE', live: true, in_sync: true,
   agent_version: '0.2.17', revision: 2, applied_revision: 2, failed: [], errors: [], traffic_bytes: 1024,
   last_seen_at: '2026-11-02T12:00:00Z', runtime_available: true,
-  runtime: { health: { status: 'healthy', checks: [] }, versions: { xray: '26.7.28' } },
+  runtime: { health: { status: 'healthy', memory_available_bytes: 4096, load1_milli: 120,
+    disk_free_bytes: 8192, uptime_seconds: 1000, checks: [{ name: 'xray.uptime', status: 'pass', message: 'up 512 s' }] },
+    versions: { xray: '26.7.28' } },
   capacity: { status: 'not_reported', recent: [], hourly: [] } };
 const fleet = data.fleet || { profile_title: 'Sample VPN', servers: [server], declared_users: [], display_names: {},
   server_usage: [], server_attention: [] };
@@ -164,6 +166,33 @@ if (scenario === 'shell-server-disclosure') {
   report.afterPollOpen = document.querySelector('[data-mode-section="capacity"]')?.open ?? null;
   report.targetServer = document.querySelector('.server-focused')?.dataset.server || null;
   report.moreStayedOpen = document.querySelector('.secondary-actions')?.open === true;
+}
+if (scenario === 'shell-server-facts') {
+  const card = document.querySelector('[data-server="main"]');
+  const hostLabels = ['servers.version', 'servers.memory', 'servers.load', 'servers.disk', 'servers.uptime',
+    'servers.core_uptime', 'servers.core_version'].map(key => M.t(key));
+  const shown = () => [...card.querySelectorAll('dt')].filter(el => !el.closest('details') || el.closest('details').open)
+    .map(el => el.textContent);
+  const hiddenHost = () => hostLabels.every(label => !shown().includes(label));
+  const more = card.querySelector('.secondary-actions');
+  report.hostInitiallyHidden = hiddenHost();
+  report.healthFactsVisible = ['servers.country', 'servers.revision', 'servers.traffic'].every(key => shown().includes(M.t(key)));
+  report.statusChips = card.querySelector('.server-badges').children.length;
+  report.restartInMenu = !!more.querySelector('button');
+  more.open = true;
+  report.hostAvailableInMore = hostLabels.every(label => shown().includes(label));
+  await clickMode('detailed');
+  report.sameCard = card === document.querySelector('[data-server="main"]');
+  report.hostDetailedOutsideMore = hostLabels.every(label => [...card.querySelectorAll('dt')]
+    .some(el => el.textContent === label && !el.closest('.secondary-actions')));
+  more.open = false;
+  await clickMode('simple');
+  report.hostHiddenAgain = hiddenHost();
+  more.open = true;
+  await advance(11000);
+  report.hostMoreAfterPoll = hostLabels.every(label => [...document.querySelectorAll('[data-server="main"] .secondary-actions dt')]
+    .some(el => el.textContent === label));
+  report.moreAfterPollOpen = document.querySelector('[data-server="main"] .secondary-actions')?.open;
 }
 if (scenario === 'shell-settings') {
   report.appearanceCards = [...document.querySelectorAll('#view h2')].filter(el => el.textContent === M.t('settings.appearance')).length;

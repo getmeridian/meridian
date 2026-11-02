@@ -89,6 +89,16 @@ def test_simple_disclosures_keep_capacity_open_across_passive_refresh() -> None:
     assert result["moreStayedOpen"]
 
 
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_simple_server_cards_keep_host_facts_in_more_across_modes_and_refresh(locale: str) -> None:
+    result = run_console("shell-server-facts", locale, {"hash": "#/servers"})
+    assert result["hostInitiallyHidden"] and result["hostHiddenAgain"]
+    assert result["healthFactsVisible"] and result["statusChips"] == 3
+    assert result["hostAvailableInMore"] and result["hostDetailedOutsideMore"]
+    assert result["sameCard"] and result["hostMoreAfterPoll"] and result["moreAfterPollOpen"]
+    assert result["restartInMenu"] and result["writes"] == []
+
+
 def test_settings_moves_appearance_and_discloses_advanced_sections_without_losing_input() -> None:
     result = run_console("shell-settings", data={"hash": "#/settings"})
     assert result["appearanceCards"] == 0

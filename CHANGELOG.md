@@ -17,8 +17,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
 #### Added
 - Console Overview with fleet health, attention links, and quick person sharing;
   browser-local Simple and Detailed views, an account menu for theme and language,
-  desktop header actions, a safe phone action bar, and shared responsive components
-  in all four languages (#95).
+  Simple server cards that put health first, desktop header actions, a safe phone
+  action bar, and shared responsive components in all four languages (#95).
 - Reviewed subscription response rules by app, with bounded literal User-Agent
   and Accept conditions, ordered format/refusal/policy/header actions, and one
   transient matcher test across API, CLI, and console. Private person policies

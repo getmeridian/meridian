@@ -19,6 +19,7 @@
       section.open = detailed || M.hasUnsavedEdits(section);
       section.querySelector(".mode-caption").hidden = detailed;
     });
+    if (M.applyServerMode) M.applyServerMode(root);
   };
 
   M.chooseMode = function (next) {
