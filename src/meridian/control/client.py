@@ -213,9 +213,19 @@ class ControlClient:
     def server_usage(self) -> ServerUsageList:
         return ServerUsageList.model_validate(self._call("GET", "api/servers"))
 
-    def put_settings(self, settings: ServiceSettings, *, expected_access_hash: str | None = None) -> ServiceSettings:
+    def put_settings(
+        self,
+        settings: ServiceSettings,
+        *,
+        expected_access_hash: str | None = None,
+        expected_profile_declarations_hash: str | None = None,
+    ) -> ServiceSettings:
         request = ServiceSettingsWrite.model_validate(
-            {**settings.to_data(), "expected_access_hash": expected_access_hash}
+            {
+                **settings.to_data(),
+                "expected_access_hash": expected_access_hash,
+                "expected_profile_declarations_hash": expected_profile_declarations_hash,
+            }
         )
         return ServiceSettings.model_validate(self._call("PUT", "api/settings", request.to_data()))
 

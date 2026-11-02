@@ -7,6 +7,7 @@ from typing import Annotated
 
 from pydantic import AfterValidator, Field, field_validator
 
+from meridian.core.agent_types import canonical_sha256
 from meridian.core.inputs import TopologyIdValue
 from meridian.core.models import CoreModel
 
@@ -62,6 +63,13 @@ class AccessProfileIntent(CoreModel):
         if len(values) != len(set(values)):
             raise ValueError("List each access grant once.")
         return sorted(values)
+
+
+def profile_declarations_hash(profiles: Sequence[AccessProfileIntent]) -> str:
+    """Fingerprint named grants before topology expands them into authentication inbounds."""
+    return canonical_sha256(
+        [{"id": profile.id, "grants": sorted(profile.grants)} for profile in sorted(profiles, key=lambda row: row.id)]
+    )
 
 
 def access_reasons(memberships: Sequence[str], profiles: Mapping[str, Sequence[str]], inbound_ref: str) -> list[str]:

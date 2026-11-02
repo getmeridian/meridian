@@ -14,6 +14,11 @@ from meridian.control.delivery_settings import (
 from meridian.control.errors import ServiceError
 from meridian.control.models import ServiceSettings
 from meridian.control.page_settings import page_settings, save_page_settings
+from meridian.control.profile_declarations import (
+    check_profile_declarations,
+    read_profile_declarations_hash,
+    save_profile_declarations_hash,
+)
 from meridian.control.server_allowances import save_server_settings, server_settings
 from meridian.control.store import Store
 from meridian.control.times import utc_now
@@ -25,11 +30,20 @@ def save_settings(
     *,
     compose: Callable[[], None] | None = None,
     expected_access_hash: str | None = None,
+    expected_profile_declarations_hash: str | None = None,
 ) -> ServiceSettings:
     with store.transaction():
         if expected_access_hash is not None and expected_access_hash != profile_access_hash(store):
             raise ServiceError("stale_access", "Profile membership changed since review. Preview again.", 409)
+        check_profile_declarations(
+            store,
+            settings,
+            current_profiles=read_access_profiles(store),
+            expected_access_hash=expected_access_hash,
+            expected_profile_declarations_hash=expected_profile_declarations_hash,
+        )
         save_access_profiles(store, settings.access_profiles)
+        save_profile_declarations_hash(store, settings.access_profile_declarations_hash)
         store.set_meta("profile_title", settings.profile_title)
         store.set_meta("public_url", settings.public_url)
         save_update_interval_hours(store, settings.update_interval_hours)
@@ -38,12 +52,13 @@ def save_settings(
         save_server_settings(store, settings.servers, utc_now())
         if compose is not None:
             compose()
-    return settings
+        return read_settings(store)
 
 
 def read_settings(store: Store) -> ServiceSettings:
     return ServiceSettings(
         access_profiles=read_access_profiles(store),
+        access_profile_declarations_hash=read_profile_declarations_hash(store),
         profile_title=store.meta("profile_title") or "Meridian",
         public_url=store.meta("public_url") or "",
         update_interval_hours=update_interval_hours(store),

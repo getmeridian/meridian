@@ -9,6 +9,25 @@
           "title": "Access Hash",
           "type": "string"
         },
+        "declarations_hash": {
+          "anyOf": [
+            {
+              "description": "Lowercase hex SHA-256 digest.",
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Declarations Hash"
+        },
+        "has_non_default_memberships": {
+          "default": false,
+          "title": "Has Non Default Memberships",
+          "type": "boolean"
+        },
         "profiles": {
           "items": {
             "$ref": "#/$defs/AccessProfileSummary"

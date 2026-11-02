@@ -330,8 +330,11 @@ class _Handler(BaseHTTPRequestHandler):
     def put_settings(self, _match: re.Match[str]) -> Any:
         request = self._model(ServiceSettingsWrite)
         return self._service.put_settings(
-            ServiceSettings.model_validate(request.model_dump(exclude={"expected_access_hash"})),
+            ServiceSettings.model_validate(
+                request.model_dump(exclude={"expected_access_hash", "expected_profile_declarations_hash"})
+            ),
             expected_access_hash=request.expected_access_hash,
+            expected_profile_declarations_hash=request.expected_profile_declarations_hash,
         )
 
     def get_privacy(self, _match: re.Match[str]) -> Any:

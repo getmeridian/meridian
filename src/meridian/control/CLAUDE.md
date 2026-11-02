@@ -3,6 +3,7 @@
 Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `formats/CLAUDE.md`.
 
 ## Design decisions
+- **Profile declarations save with settings** — meta keeps their reviewed fingerprint, included in the access hash; unreviewed settings compare it atomically, and bootstrap requires no fingerprint, grants, or non-default memberships.
 - **Profile activation is atomic** — service settings hold the canonical grant map; staged specs carry references, and map or membership changes compose documents with the existing flow-block ledger.
 - **Metrics has its own grant** — cataloged `/metrics` uses `metrics.read` on the existing ingress, with no compatible preset expansion; node series and bounded route-ID/runtime counters expose no person labels.
 - **Capacity stays per node** — `capacity.py` keeps one latest collection, 360 recent ten-second slots, and 168 UTC hourly means/peaks; person privacy settings do not govern these address-free aggregates.

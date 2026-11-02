@@ -860,5 +860,7 @@
   "profiles.topology_hint": "配置授权属于已审核的拓扑。请使用 {command} 编辑。",
   "profiles.unavailable": "已授权，但当前不可用。",
   "error.unknown_profile": "此配置已不可用。请刷新配置列表并重新预览。",
-  "error.stale_access": "预览后配置成员已发生变化。请重新预览访问变更。"
+  "error.stale_access": "预览后配置成员已发生变化。请重新预览访问变更。",
+  "error.stale_profile_declarations": "访问配置的授权声明在应用前已变化。请通过 meridian profile、meridian fleet import 或 meridian apply 重新审核。",
+  "error.profile_review_required": "访问配置修改需要审核。请使用 meridian profile 或 meridian fleet import；已保存的修改请通过 meridian apply 审核。"
 }

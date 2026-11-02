@@ -9,6 +9,7 @@ from pydantic import TypeAdapter
 
 from meridian.control.errors import ServiceError
 from meridian.control.models import ClientEndpoint, UserRecord
+from meridian.control.profile_declarations import read_profile_declarations_hash
 from meridian.control.store import Store
 from meridian.core.access_profiles import DEFAULT_ACCESS_PROFILE, AccessProfileMap, ProfileMembership, may_use_inbound
 from meridian.core.agent_types import canonical_sha256
@@ -84,6 +85,7 @@ def refuse_used_profiles(store: Store, values: dict[str, list[str]]) -> None:
 def profile_access_hash(store: Store) -> str:
     return canonical_sha256(
         {
+            **({"declarations_hash": declarations} if (declarations := read_profile_declarations_hash(store)) else {}),
             "profiles": read_access_profiles(store),
             "memberships": [
                 tuple(row)

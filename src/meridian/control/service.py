@@ -180,9 +180,19 @@ class ControlService:
         """Checks every transaction in the block runs before its write (`Store.conditions`)."""
         return self._store.conditions(*checks)
 
-    def put_settings(self, settings: ServiceSettings, *, expected_access_hash: str | None = None) -> ServiceSettings:
+    def put_settings(
+        self,
+        settings: ServiceSettings,
+        *,
+        expected_access_hash: str | None = None,
+        expected_profile_declarations_hash: str | None = None,
+    ) -> ServiceSettings:
         return save_settings(
-            self._store, settings, compose=self._compose_all, expected_access_hash=expected_access_hash
+            self._store,
+            settings,
+            compose=self._compose_all,
+            expected_access_hash=expected_access_hash,
+            expected_profile_declarations_hash=expected_profile_declarations_hash,
         )
 
     def settings(self) -> ServiceSettings:

@@ -11,7 +11,6 @@ from typer.testing import CliRunner
 from meridian import i18n
 from meridian.cli import app
 from meridian.cluster import ClusterConfig, PanelConfig
-from meridian.commands.profile_review import review_profile_resources
 from meridian.compiler import compile_topology
 from meridian.compiler.errors import TopologyCompileError
 from meridian.console import set_json_mode, set_quiet_mode
@@ -19,6 +18,7 @@ from meridian.core.topology import ControlPlaneIntent, SetupIntent
 from meridian.i18n import t
 from meridian.servers import ServerRegistry
 from meridian.setup.fleet_document import fleet_document
+from meridian.setup.profile_review import review_profile_resources
 from tests.support.control_service import ADMIN_TOKEN
 from tests.support.topology import single_exit_intent
 
@@ -53,7 +53,7 @@ def test_reviewing_resources_without_meridian_settings_never_raises_or_queries_a
     cluster = ClusterConfig(
         panel=PanelConfig(url="https://198.51.100.10/console", api_token=ADMIN_TOKEN), topology_intent=intent
     )
-    with patch("meridian.commands.profile_review.ControlClient") as client:
+    with patch("meridian.setup.profile_review.ControlClient") as client:
         assert review_profile_resources(cluster, plan.resources) is None
     client.assert_not_called()
 
@@ -96,7 +96,7 @@ def test_legacy_profile_commands_fail_with_migration_guidance_before_runtime_or_
         patch("meridian.commands.v4_topology.reviewed_runtime") as apply,
         patch("meridian.setup.runtime.SetupRuntime") as planner,
         patch("meridian.commands.v4_topology.forget_unreachable_servers"),
-        patch("meridian.commands.profile_review.ControlClient") as client,
+        patch("meridian.setup.profile_review.ControlClient") as client,
     ):
         for runtime in (profiles, importer, apply):
             runtime.return_value.review.return_value = review

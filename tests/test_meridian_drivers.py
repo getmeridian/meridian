@@ -113,7 +113,9 @@ class FakeControl:
     def settings(self) -> ServiceSettings:
         return self.current_settings
 
-    def put_settings(self, settings: ServiceSettings) -> ServiceSettings:
+    def put_settings(
+        self, settings: ServiceSettings, *, expected_profile_declarations_hash: str | None = None
+    ) -> ServiceSettings:
         self.current_settings = settings
         return settings
 

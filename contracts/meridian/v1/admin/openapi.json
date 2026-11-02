@@ -53,6 +53,25 @@
             "title": "Access Hash",
             "type": "string"
           },
+          "declarations_hash": {
+            "anyOf": [
+              {
+                "description": "Lowercase hex SHA-256 digest.",
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Declarations Hash"
+          },
+          "has_non_default_memberships": {
+            "default": false,
+            "title": "Has Non Default Memberships",
+            "type": "boolean"
+          },
           "profiles": {
             "items": {
               "$ref": "#/components/schemas/AccessProfileSummary"
@@ -8164,6 +8183,20 @@
       "ServiceSettings": {
         "additionalProperties": false,
         "properties": {
+          "access_profile_declarations_hash": {
+            "anyOf": [
+              {
+                "description": "Lowercase hex SHA-256 digest.",
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Access Profile Declarations Hash"
+          },
           "access_profiles": {
             "maxProperties": 64,
             "patternProperties": {
@@ -8276,6 +8309,20 @@
       "ServiceSettingsWrite": {
         "additionalProperties": false,
         "properties": {
+          "access_profile_declarations_hash": {
+            "anyOf": [
+              {
+                "description": "Lowercase hex SHA-256 digest.",
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Access Profile Declarations Hash"
+          },
           "access_profiles": {
             "maxProperties": 64,
             "patternProperties": {
@@ -8341,6 +8388,20 @@
             ],
             "default": null,
             "title": "Expected Access Hash"
+          },
+          "expected_profile_declarations_hash": {
+            "anyOf": [
+              {
+                "description": "Lowercase hex SHA-256 digest.",
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expected Profile Declarations Hash"
           },
           "owner_contact": {
             "$ref": "#/components/schemas/OwnerContact",
@@ -16270,7 +16331,9 @@
             "description": "Conflict",
             "x-meridian-error-codes": [
               "profile_in_use",
-              "stale_access"
+              "profile_review_required",
+              "stale_access",
+              "stale_profile_declarations"
             ]
           },
           "413": {

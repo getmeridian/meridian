@@ -75,7 +75,7 @@ def test_plan_keeps_compiled_results_when_profile_evidence_is_unavailable(
     with (
         patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
         patch("meridian.setup.runtime.SetupRuntime") as planner,
-        patch("meridian.commands.profile_review.ControlClient") as client,
+        patch("meridian.setup.profile_review.ControlClient") as client,
     ):
         planner.return_value.inspect_intent.return_value = inspection(plan)
         planner.return_value.review.return_value = review(plan)
@@ -137,7 +137,7 @@ def test_apply_without_profiles_can_bootstrap_or_repair_with_unavailable_service
         patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
         patch("meridian.commands.v4_topology.reviewed_runtime") as runtime,
         patch("meridian.commands.v4_topology.forget_unreachable_servers"),
-        patch("meridian.commands.profile_review.ControlClient") as client,
+        patch("meridian.setup.profile_review.ControlClient") as client,
     ):
         runtime.return_value.review.return_value = review(plan)
         runtime.return_value.apply_intent.return_value = ResourceExecutionResult(plan_hash=plan.plan_hash, generation=2)
@@ -184,7 +184,7 @@ def test_apply_refuses_unavailable_profile_review_only_once_profiles_have_been_u
         patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
         patch("meridian.commands.v4_topology.reviewed_runtime") as runtime,
         patch("meridian.commands.v4_topology.forget_unreachable_servers"),
-        patch("meridian.commands.profile_review.ControlClient") as client,
+        patch("meridian.setup.profile_review.ControlClient") as client,
     ):
         runtime.return_value.review.return_value = review(plan)
         client.return_value.__enter__.return_value.settings.side_effect = ControlServiceError(
@@ -231,7 +231,7 @@ def test_fleet_import_uses_the_same_profile_outage_gate(
         patch("meridian.commands.fleet_transfer.reviewed_runtime") as runtime,
         patch("meridian.commands.fleet_transfer.forget_unreachable_servers"),
         patch("meridian.commands.fleet_transfer.apply_reviewed_intent") as apply,
-        patch("meridian.commands.profile_review.ControlClient") as client,
+        patch("meridian.setup.profile_review.ControlClient") as client,
     ):
         runtime.return_value.review.return_value = review(plan)
         apply.return_value = ResourceExecutionResult(plan_hash=plan.plan_hash, generation=2)

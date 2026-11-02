@@ -519,6 +519,10 @@ CLI 无法读取用户时会报告服务访问错误。配置变更导致访问�
 
 `plan` 和 `apply` 会同时审核服务中已有的配置与拟应用的拓扑。移除最后一个配置也必须经过审核和并发变更校验；只要仍有成员，就会被拒绝。
 
+所有应用路径，包括 `setup --intent`、通过 `--restart` 重新设置，以及 `client add`、`fleet contact` 等命令，都会在保存拓扑或写入服务器前，将访问配置 ID 和授权声明与服务核对。已保存但尚未应用的访问配置修改不能随其他命令应用：请使用 `meridian profile` 或 `meridian fleet import` 修改配置，或运行 `meridian apply` 审核已保存的修改。更换协议或中继伪装名称可能改变同一个 `exit:` 或 `gateway:` 授权所包含的连接；这些变化由拓扑命令自身的审核覆盖。
+
+新部署可以通过 `setup --intent` 引入访问配置。只有服务尚无声明指纹、命名访问配置和非 `default` 成员关系时，才允许初始化。如果服务已有访问配置但没有声明指纹，请先运行 `meridian apply` 审核，再使用其他拓扑命令。
+
 Meridian 会记住部署曾使用命名访问配置。保存含有访问配置的拓扑会记录这一事实，删除最后一个配置也不会清除记录。判断服务不可用时是否仍需审核，也会考虑当前的拓扑修改。
 
 如果另一台管理设备的修改导致应用被拒绝，本地拓扑和已忘记服务器的记录会保持原样。应用获准后，即使后续部署步骤失败，Meridian 也会保留访问配置使用记录。
@@ -541,3 +545,5 @@ JSON 审核和部署导出会保留 `token`、`secret` 等有效配置 ID 和用
 | `PATCH /api/users/{username}` | 使用 `people.edit` 设置非空 `profiles` 列表；省略字段会保留成员关系 |
 
 固定分配请向 `POST /api/people/bulk/preview` 发送 `{"usernames":["person"],"action":{"action":"set-profiles","profiles":["limited"]}}`，再提交其 ID 和哈希。配置预览返回 `access_hash`；`PUT /api/settings` 通过 `expected_access_hash` 接收该值，若成员关系已变化则拒绝应用。可选的 `existing_inbounds` 在升级旧节点规格时提供当前节点和标签的引用。预览请求数据不会持久保存。
+
+设置通过 `access_profile_declarations_hash` 保存规范化拓扑访问配置声明的 SHA-256。审核后的写入使用 `expected_access_hash` 设置该值；保持原声明的写入发送 `expected_profile_declarations_hash`，由服务在同一设置事务中校验。删除最后一个访问配置后，仍保留空声明的指纹。`GET /api/access-profiles` 返回 `declarations_hash`，并在存在非默认成员关系时返回 `has_non_default_memberships: true`；读取权限保持不变。未提供任一校验条件时，替换已有指纹或授权映射会被拒绝。

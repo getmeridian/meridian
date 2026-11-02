@@ -784,6 +784,8 @@
   "token.invalid_expiry": "请输入未来的 UTC 时间或 1–3650 个完整天数。",
   "profiles.evidence_unavailable": "无法获取访问配置设置。控制服务中可能仍有访问配置。",
   "profiles.evidence_retry": "恢复控制服务访问后，重试此命令。",
+  "profiles.review_required": "访问配置的授权声明与服务中已审核的配置不同。",
+  "profiles.review_required_hint": "请通过 meridian profile 或 meridian fleet import 修改访问配置，或运行 meridian apply 审核已保存的修改。",
   "profiles.title": "访问配置",
   "profiles.review_title": "预览访问变更",
   "profiles.person": "用户",

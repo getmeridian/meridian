@@ -13,6 +13,7 @@ from meridian.control.access_memberships import (
 from meridian.control.command_models import CutOffNode, CutOffPlan
 from meridian.control.formats.entries import presentation_pairs
 from meridian.control.models import ClientEndpoint, NodeSpec, UserRecord
+from meridian.control.profile_declarations import has_non_default_memberships, read_profile_declarations_hash
 from meridian.control.store import Store
 from meridian.core.access_profile_views import (
     AccessChange,
@@ -89,7 +90,12 @@ class AccessProfileLedger:
                 AccessProfileSummary(id=name, inbound_refs=refs, members=members.get(name, 0))
                 for name, refs in profiles.items()
             ]
-            return AccessProfileCatalog(profiles=entries, access_hash=profile_access_hash(self.store))
+            return AccessProfileCatalog(
+                profiles=entries,
+                access_hash=profile_access_hash(self.store),
+                declarations_hash=read_profile_declarations_hash(self.store),
+                has_non_default_memberships=has_non_default_memberships(self.store),
+            )
 
     def loss_scope(self, lost: Sequence[str]) -> CutOffPlan:
         """Only nodes losing grants; a VLESS cut-off still reconnects every Xray inbound and bridge there."""

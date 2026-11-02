@@ -24,10 +24,8 @@ from meridian.commands._helpers import (
 )
 from meridian.commands.profile_review import (
     export_creation_memberships,
-    profile_review_needed,
     profile_review_paths,
     require_profile_backend,
-    review_profile_access,
 )
 from meridian.console import confirm, err_console, error_context, fail, has_tty, info, is_json_mode, ok, warn
 from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_result
@@ -48,6 +46,7 @@ from meridian.core.validation import CoreInputError
 from meridian.i18n import t
 from meridian.renderers import emit_json
 from meridian.servers import ServerRegistry
+from meridian.setup.profile_review import profile_review_needed, review_profile_access
 
 EXPORT_COMMAND = "fleet.export"
 IMPORT_COMMAND = "fleet.import"

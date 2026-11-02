@@ -37,6 +37,7 @@ from meridian.control.client import (
 from meridian.control.command_models import NodeCommandRecord
 from meridian.control.models import ClientEndpoint, NodeSpec, NodeStatus, ServiceSettings, UserCreate
 from meridian.control_artifacts import AgentBinary
+from meridian.core.access_profiles import profile_declarations_hash
 from meridian.core.agent_protocol import AgentBootstrap
 from meridian.core.agent_types import AGENT_PROTOCOL, canonical_sha256
 from meridian.host_runtime import (
@@ -599,7 +600,13 @@ class ServiceSettingsDriver:
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
         with self.context.client() as client:
             if self.context.access_review_hash is None:
-                client.put_settings(self._settings(action))
+                settings = self._settings(action)
+                client.put_settings(
+                    settings,
+                    expected_profile_declarations_hash=(
+                        settings.access_profile_declarations_hash or profile_declarations_hash([])
+                    ),
+                )
             else:
                 client.put_settings(self._settings(action), expected_access_hash=self.context.access_review_hash)
         return ResourceApplyReceipt(remote_id="settings")
@@ -608,6 +615,14 @@ class ServiceSettingsDriver:
         payload = payload_of(action, ServiceSettingsPayload)
         return ServiceSettings(
             access_profiles=payload.access_profiles,
+            access_profile_declarations_hash=(
+                payload.access_profile_declarations_hash
+                or (
+                    profile_declarations_hash([])
+                    if self.context.cluster.has_used_access_profiles or self.context.access_review_hash is not None
+                    else None
+                )
+            ),
             owner_contact=payload.owner_contact,
             profile_title=payload.profile_title,
             servers=payload.servers,

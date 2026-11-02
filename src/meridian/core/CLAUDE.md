@@ -1,6 +1,7 @@
 # core — Meridian API contracts
 
 ## Design decisions
+- **Profile declaration fingerprints precede expansion** — hash the normalized named grants with `profile_declarations_hash`, so topology can expand unchanged exit or gateway grants without accepting a profile edit.
 - **Access grants and membership have separate owners** — topology compiles named grants; service membership is nonempty and private, with default granting every managed inbound.
 - **Capacity has one projection** — `capacity.py` owns freshness, nullable current evidence, integer derived values, and recent/hourly bounds for service, fleet JSON, and console.
 - **Connection vocabulary stays in core** — session cut-off scopes and protocol names must not import service records, or shared apply contracts cycle through topology.

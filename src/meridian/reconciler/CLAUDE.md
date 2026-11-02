@@ -17,6 +17,7 @@
 - **Renderer stamps track what each piece deploys** — bump `render_contract.py` whenever deployed bytes or commands change, and every stamp the change reaches (control service, API, subscription, PWA, console); a missed stamp leaves servers running old bytes after an apply.
 
 ## Pitfalls
+- **Settings re-check profile declarations** — unreviewed writes carry their declarations fingerprint as a compare-and-swap precondition; reviewed writes replace it under the membership fence, including an empty fingerprint after the last removal.
 - **Membership is creation-only in fleet documents** — exported initial profiles may create a person, but later applies never replace their live memberships.
 - **Account schedules are creation-only inputs** — existing duration, reset anchor, renewal interval, cap, and progress remain the operator's on every apply.
 - **Reviewed settings carry only what the topology owns** — never the service-owned fleet language, person overrides, or notices.

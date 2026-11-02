@@ -78,7 +78,9 @@ meridian plan [--json]
 
 不要手工编辑 `cluster.yml` 中的拓扑。用 `meridian setup`、`deploy`、`client add`、`node add` 或 `relay add` 变更它。
 
-如果无法读取访问配置设置，`plan` 会保留已编译的计划，在 `observation_errors` 中列出不可用的证据，并以代码 `3` 和错误 `MERIDIAN_PLAN_EVIDENCE_UNAVAILABLE` 退出。只有集群从未使用过访问配置时，应用或导入不含访问配置的拓扑才可跳过此审核。应用含访问配置的拓扑时，Meridian 会在任何远程写入之前将 `access_profiles_used: true` 保存到 `cluster.yml`，此后不会清除，即使应用失败或最后一个访问配置已被删除。已保存的拓扑中含有访问配置，也视为使用过。对于这些集群，无法获取审核证据时，应用和导入会以可重试的代码 `3` 退出；请恢复控制服务访问后重试。导入预览始终需要服务的实时证据。
+如果无法读取访问配置设置，`plan` 会保留已编译的计划，在 `observation_errors` 中列出不可用的证据，并以代码 `3` 和错误 `MERIDIAN_PLAN_EVIDENCE_UNAVAILABLE` 退出。只有集群从未使用过访问配置时，应用或导入不含访问配置的拓扑才可跳过此审核。部署应用校验通过后，Meridian 会将 `access_profiles_used: true` 与拓扑一同保存，再写入访问配置资源。后续失败或删除最后一个访问配置都不会清除记录；旧副本被拒绝时，不会保存提议或已忘记服务器的记录。当前或已保存的拓扑含有访问配置，也视为使用过。对于这些集群，无法获取审核证据时，应用和导入会以可重试的代码 `3` 退出；请恢复控制服务访问后重试。导入预览始终需要服务的实时证据。
+
+设置命令（包括 `--restart` 和 `--intent`）及所有应用命令，都会在保存拓扑或写入服务器前，将访问配置 ID 和授权声明与服务核对。存在差异时，请使用 `meridian profile` 或 `meridian fleet import` 修改，或通过 `meridian apply` 审核已保存的修改。协议或中继伪装名称变化可以改变同一个 `exit:`、`gateway:` 授权所涵盖的连接，由相应拓扑命令审核。初始化要求服务尚无声明指纹、命名访问配置和非 `default` 成员关系。已有服务不可用时，新增访问配置声明也会被拒绝。
 
 ### meridian apply
 

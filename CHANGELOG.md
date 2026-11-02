@@ -57,6 +57,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Fence setup and every imperative apply against reviewed profile declarations
+  before local saves or remote writes. Keep topology expansion of unchanged
+  grants working, and re-check the fingerprint atomically with service settings.
 - Save profile history with accepted topology after the fleet fence check,
   preserving local intent and forgotten bindings when a stale copy is refused.
 - Recognize access-profile use in current configuration edits and save it as
@@ -70,8 +73,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
 - Keep plan results when profile evidence is unavailable and allow bootstrap or
   repair without review only for fleets that have never used access profiles.
   Persist profile use before remote writes, refuse unreviewed applies and imports
-  during later outages, and let setup, redeploys, relay edits, and removals apply
-  compiled grants without a late settings refusal.
+  during later outages, and let topology edits expand unchanged grants under
+  their own review.
 - Keep unresolved lost inbounds in cut-off reviews after credential rotation,
   reissue, replacing imports, or re-enabling a person with narrower access.
 - Report typed directory failures when assigning a person's profiles and print

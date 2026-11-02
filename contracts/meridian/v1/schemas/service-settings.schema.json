@@ -117,6 +117,20 @@
   },
   "additionalProperties": false,
   "properties": {
+    "access_profile_declarations_hash": {
+      "anyOf": [
+        {
+          "description": "Lowercase hex SHA-256 digest.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Access Profile Declarations Hash"
+    },
     "access_profiles": {
       "maxProperties": 64,
       "patternProperties": {

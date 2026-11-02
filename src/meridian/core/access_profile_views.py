@@ -45,6 +45,8 @@ class AccessProfileSummary(CoreModel):
 class AccessProfileCatalog(CoreModel):
     profiles: list[AccessProfileSummary]
     access_hash: Sha256Hex
+    declarations_hash: Sha256Hex | None = Field(default=None, exclude_if=lambda value: value is None)
+    has_non_default_memberships: bool = Field(default=False, exclude_if=lambda value: not value)
 
 
 class AccessProfileReviewRequest(CoreModel):

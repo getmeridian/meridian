@@ -9,14 +9,7 @@ from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import forget_unreachable_servers, require_intent, reviewed_runtime
 from meridian.commands.apply_progress import apply_progress
 from meridian.commands.profile_plan import inspect_profile_plan
-from meridian.commands.profile_review import (
-    ProfileReviewUnavailableError,
-    profile_review_needed,
-    profile_review_paths,
-    require_profile_backend,
-    review_profile_access,
-    review_profile_resources,
-)
+from meridian.commands.profile_review import profile_review_paths, require_profile_backend
 from meridian.compiler.models import ServiceSettingsPayload
 from meridian.console import confirm, err_console, fail, ok, warn
 from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_result
@@ -24,6 +17,12 @@ from meridian.core.models import ErrorModel, OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.plan import CompiledPlanDriftResult, CompiledPlanResourceResult, CompiledPlanResult
 from meridian.renderers import emit_json
+from meridian.setup.profile_review import (
+    ProfileReviewUnavailableError,
+    profile_review_needed,
+    review_profile_access,
+    review_profile_resources,
+)
 
 
 def run_v4_apply(

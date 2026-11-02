@@ -517,6 +517,10 @@ Removing a profile still used by people is refused with its membership count. Mo
 
 `plan` and `apply` review profiles held by the service as well as those in the proposed topology. Removing the last profile is reviewed and fenced, and is refused while anyone still belongs to it.
 
+Every apply path, including `setup --intent`, restarting setup, and imperative commands such as `client add` or `fleet contact`, checks declared profile IDs and grants against the service before saving topology or writing to servers. A saved but unapplied profile edit is refused: edit profiles with `meridian profile` or `meridian fleet import`, or run `meridian apply` to review the saved change. Changing protocols or relay camouflage may expand an unchanged `exit:` or `gateway:` grant; the topology command's own review covers that change.
+
+A fresh fleet can introduce profiles through `setup --intent`. Bootstrap is allowed only while the service has no declaration fingerprint, no named profiles, and no non-default memberships. If the service holds profiles without a fingerprint, run `meridian apply` to review them before other topology commands.
+
 Meridian remembers that your fleet has used named profiles. Saving a configuration with profiles records this fact, and removing the last profile does not reset it. Current configuration edits also count when checking whether an outage requires review.
 
 If another managing copy causes an apply to refuse, local topology and forgotten-server records stay unchanged. Once an apply is accepted, Meridian remembers profile use even if a later deployment step fails.
@@ -539,3 +543,5 @@ Usernames such as `token`, `secret`, and `api_key` are also valid in revision pr
 | `PATCH /api/users/{username}` | Set a nonempty `profiles` list with `people.edit`; omitted membership is preserved |
 
 For a frozen assignment, use `POST /api/people/bulk/preview` with `{"usernames":["person"],"action":{"action":"set-profiles","profiles":["limited"]}}`, then commit its ID and hash. The profile preview returns `access_hash`; `PUT /api/settings` accepts it as `expected_access_hash` and refuses membership changes since review. Optional `existing_inbounds` identifies the current node/tag references when upgrading older specs. These previews persist no request data.
+
+Settings carry `access_profile_declarations_hash`, the SHA-256 of normalized intent-level profile declarations. Reviewed writes set it under `expected_access_hash`; writes keeping the same declarations send `expected_profile_declarations_hash`, which the service checks in the settings transaction. Removing the last profile keeps the fingerprint of empty declarations. `GET /api/access-profiles` includes `declarations_hash` and, when true, `has_non_default_memberships`; these reads keep the existing private permissions. Replacing an established fingerprint or grant map without either fence is refused.

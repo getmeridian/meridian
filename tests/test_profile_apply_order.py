@@ -44,8 +44,11 @@ def test_settings_follow_workloads_and_endpoints_and_accounts_follow_settings(bu
             assert settings_position < order[row.logical_id], row.logical_id
 
 
-@pytest.mark.parametrize("adding_profiles", [False, True], ids=["remove-last-profile", "add-first-profile"])
-@pytest.mark.parametrize("access_reviewed", [False, True], ids=["plain-apply", "reviewed-apply"])
+@pytest.mark.parametrize(
+    ("adding_profiles", "access_reviewed"),
+    [(False, True), (True, False), (True, True)],
+    ids=["reviewed-last-removal", "bootstrap-first-profile", "reviewed-first-profile"],
+)
 def test_one_apply_stages_references_and_creates_people_without_invalidating_its_settings_fence(
     tmp_path: Path, adding_profiles: bool, access_reviewed: bool
 ):

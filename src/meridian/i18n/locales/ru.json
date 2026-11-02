@@ -784,6 +784,8 @@
   "token.invalid_expiry": "Укажите будущую дату и время в UTC или целое число дней от 1 до 3650.",
   "profiles.evidence_unavailable": "Настройки профилей доступа недоступны. В сервисе управления могут оставаться профили.",
   "profiles.evidence_retry": "Восстановите доступ к сервису управления и повторите команду.",
+  "profiles.review_required": "Права профилей доступа отличаются от проверенной конфигурации в сервисе управления.",
+  "profiles.review_required_hint": "Измените профили через meridian profile или meridian fleet import либо выполните meridian apply, чтобы проверить сохранённые изменения.",
   "profiles.title": "Профили доступа",
   "profiles.review_title": "Проверка изменений доступа",
   "profiles.person": "Пользователь",

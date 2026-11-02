@@ -117,7 +117,7 @@ def run_change(
             )
             registry = ServerRegistry(config.SERVER_PROFILES_FILE)
             review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(updated), cluster=cluster)
-            from meridian.commands.profile_review import review_profile_access
+            from meridian.setup.profile_review import review_profile_access
 
             access_review = review_profile_access(cluster, review.plan)
         except MeridianError as exc:

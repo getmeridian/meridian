@@ -1,11 +1,11 @@
 """Keep the compiled plan available before the control service has bootstrapped."""
 
 from meridian.cluster import ClusterConfig
-from meridian.commands.profile_review import ProfileReviewUnavailableError
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
 from meridian.reconciler.resource_executor import inspection_generation
 from meridian.reconciler.resources import ResourceInspection, ResourceInspectionResult, build_resource_actions
+from meridian.setup.profile_review import ProfileReviewUnavailableError
 from meridian.setup.runtime import SetupRuntime
 
 

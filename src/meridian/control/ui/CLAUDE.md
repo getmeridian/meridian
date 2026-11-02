@@ -26,6 +26,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Profile declaration refusals name the CLI review** — grants and membership have different fences; translated errors point to profile, fleet import, and apply without calling a declaration race a membership edit.
 - **Capacity gaps stay gaps** — null and stale readings never become zero; chart peak labels use observed peaks, not the axis minimum, and host traffic stays distinct from counted people traffic.
 - **Empty WebAuthn owner handles are null** — zero-length ArrayBuffers are truthy; never encode them as empty strings.
 - **Recoverable refusals precede challenge consumption** — check recent identity and key capacity in the write transaction before taking a registration proof; confirmation checks session liveness first.

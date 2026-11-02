@@ -860,5 +860,7 @@
   "profiles.topology_hint": "Profile grants are reviewed topology. Edit them with {command}.",
   "profiles.unavailable": "Granted, currently unavailable.",
   "error.unknown_profile": "This profile is no longer available. Refresh the profile list and review again.",
-  "error.stale_access": "Profile membership changed since review. Review the access changes again."
+  "error.stale_access": "Profile membership changed since review. Review the access changes again.",
+  "error.stale_profile_declarations": "Access profile declarations changed before apply. Review them with meridian profile, meridian fleet import, or meridian apply.",
+  "error.profile_review_required": "Access profile changes need review. Use meridian profile or meridian fleet import, or meridian apply for a saved change."
 }

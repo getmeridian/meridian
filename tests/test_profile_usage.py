@@ -7,13 +7,13 @@ import pytest
 import yaml
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
-from meridian.commands.profile_review import ProfileReviewUnavailableError, profile_review_needed
 from meridian.core.errors import LocalStateCorruptedError, LocalStateError, ProvisioningError
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import AccessProfileIntent
 from meridian.reconciler.fence import FleetFenceError
 from meridian.reconciler.retirement import forget_server
 from meridian.servers import ServerEntry, ServerRegistry
+from meridian.setup.profile_review import ProfileReviewUnavailableError, profile_review_needed
 from meridian.setup.runtime import SetupRuntime
 from tests.support.mock_connection import MockConnection
 from tests.support.topology import single_exit_intent
@@ -185,6 +185,7 @@ def test_a_refused_profile_apply_does_not_save_forgotten_bindings(tmp_path: Path
         persist=lambda state: state.save(path),
         connection_builder=lambda _entry: MockConnection(),
         fence_factory=lambda *_args: fence,
+        access_review_hash="a" * 64,
     )
     with patch("meridian.setup.runtime.refuse_legacy_deployments"), pytest.raises(FleetFenceError):
         runtime.apply_intent(profile_intent())

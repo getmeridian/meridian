@@ -40,6 +40,7 @@ from meridian.compiler.models import (
     SubscriptionSettingsPayload,
     make_resource,
 )
+from meridian.core.access_profiles import profile_declarations_hash
 from meridian.core.server_allowances import ServerAllowanceSpec
 from meridian.core.topology import SetupIntent
 
@@ -170,6 +171,9 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
                 ServiceSettingsPayload(
                     owner_contact=intent.delivery.owner_contact,
                     access_profiles=access_profiles,
+                    access_profile_declarations_hash=(
+                        profile_declarations_hash(intent.access_profiles) if intent.access_profiles else None
+                    ),
                     servers=_server_settings(intent),
                     profile_title=payload.profile_title,
                     update_interval_hours=payload.update_interval_hours,

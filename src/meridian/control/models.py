@@ -378,6 +378,7 @@ class UserImportResult(CoreModel):
 
 class ServiceSettings(ConnectionPageSettings):
     access_profiles: AccessProfileMap = Field(default_factory=dict, exclude_if=lambda value: not value)
+    access_profile_declarations_hash: Sha256Hex | None = Field(default=None, exclude_if=lambda value: value is None)
     servers: dict[ServerReferenceValue, ServerAllowanceSpec] = Field(
         default_factory=dict, exclude_if=lambda servers: not servers
     )

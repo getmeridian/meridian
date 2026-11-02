@@ -860,5 +860,7 @@
   "profiles.topology_hint": "Права профилей задаются в проверенной конфигурации серверов. Для изменения используйте {command}.",
   "profiles.unavailable": "Доступ разрешён, но подключение сейчас недоступно.",
   "error.unknown_profile": "Этот профиль больше недоступен. Обновите список профилей и проверьте изменения заново.",
-  "error.stale_access": "После проверки профили пользователей изменились. Проверьте изменения доступа заново."
+  "error.stale_access": "После проверки профили пользователей изменились. Проверьте изменения доступа заново.",
+  "error.stale_profile_declarations": "Права профилей изменились до применения. Проверьте их через meridian profile, meridian fleet import или meridian apply.",
+  "error.profile_review_required": "Изменения профилей требуют проверки. Используйте meridian profile или meridian fleet import, а для сохранённых изменений — meridian apply."
 }

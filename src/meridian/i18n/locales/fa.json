@@ -784,6 +784,8 @@
   "token.invalid_expiry": "زمانی در آینده به UTC یا ۱ تا ۳۶۵۰ روز کامل وارد کنید.",
   "profiles.evidence_unavailable": "تنظیمات پروفایل‌های دسترسی در دسترس نیست. ممکن است پروفایل‌ها هنوز در سرویس مدیریت وجود داشته باشند.",
   "profiles.evidence_retry": "دسترسی به سرویس مدیریت را برقرار کنید، سپس این فرمان را دوباره اجرا کنید.",
+  "profiles.review_required": "تعریف دسترسی پروفایل‌ها با پیکربندی بازبینی‌شدهٔ سرویس متفاوت است.",
+  "profiles.review_required_hint": "پروفایل‌ها را با meridian profile یا meridian fleet import تغییر دهید، یا برای بازبینی تغییر ذخیره‌شده meridian apply را اجرا کنید.",
   "profiles.title": "پروفایل‌های دسترسی",
   "profiles.review_title": "بازبینی تغییرات دسترسی",
   "profiles.person": "کاربر",

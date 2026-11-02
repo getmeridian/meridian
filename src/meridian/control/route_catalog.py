@@ -167,7 +167,11 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         "Replace reviewed delivery and server settings.",
         credentials=False,
         capability="fleet.apply",
-        refusals=(ErrorResponse(409, ("profile_in_use", "stale_access")),),
+        refusals=(
+            ErrorResponse(
+                409, ("profile_in_use", "stale_access", "stale_profile_declarations", "profile_review_required")
+            ),
+        ),
     ),
     route(
         "GET",
