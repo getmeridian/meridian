@@ -427,6 +427,8 @@ The `active` column counts people with growth in the last report, with its colle
 
 `GET /api/nodes/NODE` includes durable `traffic_bytes`, the active report window, and the counting start; its contract is `meridian api schema service-node-status`.
 
+`fleet status --json` also returns each node’s current `capacity` (`status`, nullable `sample` and `values`, receipt time, and age). Missing, unavailable, and stale capacity are distinct from measured zero. `GET /api/nodes/{node_id}/capacity?hours=24` uses `fleet.read` for current/recent/hourly evidence, with 1–168 UTC hourly buckets. The console shows CPU, memory, and host bandwidth separately from counted people traffic; [Privacy](/en/privacy/) documents the one-hour memory series, seven-day hourly retention, and gaps.
+
 **`fleet inventory`** — your configured servers, roles, nodes, and relays, with live status when the control service is reachable. It never prints API tokens or secret paths. If live status is unavailable, the configured inventory is still shown, with warnings, and the command exits `3`. Use `plan --json` to decide whether apply has work to do.
 
 **`fleet history`** — every reviewed apply the control service recorded, newest first: its number, time, author (the machine's token name, `root` for the CLI's own token, `owner` for the web panel), status (`proposed`, `approved`, `applied`, or `failed`), and the start of its plan hash. `--json` returns `data.revisions[]`.
@@ -592,6 +594,8 @@ Use one preset or repeat --capability. New tokens default to 90 days; --never-ex
 Declining creation or revocation, or running either without a terminal and without --yes, exits 1 and changes no token. Creation uses the exact expiry shown in the service preview; waiting at confirmation never extends it. If that instant has passed, request a new preview.
 
 Listing, creation, and revocation require a configured Meridian control service. A missing saved service URL or credential exits 2 with deployment guidance; a Remnawave fleet points to `meridian migrate`. The local capability catalog remains available without a fleet.
+
+For scraping, explicitly choose `--capability metrics.read`; it reads Prometheus text through the existing private control ingress and grants no account or configuration changes. Existing compatible presets retain their frozen grants. Review with `--dry-run`, then issue with `--yes`; [client management](/en/client-management/) has the authenticated Prometheus configuration.
 
 ### meridian panel
 

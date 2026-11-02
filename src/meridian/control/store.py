@@ -18,6 +18,7 @@ from typing import Any
 
 class Store:
     def __init__(self, database: Path) -> None:
+        self._database = database
         self.lock = threading.RLock()
         self._local = threading.local()
         self.changed = threading.Condition(self.lock)
@@ -29,6 +30,20 @@ class Store:
     def close(self) -> None:
         with self.lock:
             self.db.close()
+
+    def size_bytes(self) -> int | None:
+        """Physical SQLite footprint; unavailable metadata stays unknown, not zero."""
+        with self.lock:
+            try:
+                total = self._database.stat().st_size
+                for suffix in ("-wal", "-shm"):
+                    try:
+                        total += Path(str(self._database) + suffix).stat().st_size
+                    except FileNotFoundError:
+                        pass
+                return total
+            except OSError:
+                return None
 
     def create(self, schema: str) -> None:
         """Create tables; `executescript()` commits on its own, so never call it inside `transaction()`."""

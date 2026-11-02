@@ -55,6 +55,7 @@
           "binary_pins",
           "agent_upgrade",
           "traffic_stats",
+          "capacity_telemetry",
           "blob_fetch",
           "reconcile",
           "report",

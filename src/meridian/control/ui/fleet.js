@@ -91,10 +91,12 @@
         h("dd", {}, M.t("servers.revisions", {
           applied: M.count(server.applied_revision), current: M.count(server.revision) })),
         h("dt", { text: M.t("servers.traffic") }), h("dd", { text: M.bytes(server.traffic_bytes) }),
-        health ? [
+        health && (!server.capacity || server.capacity.status === "not_reported") ? [
           h("dt", { text: M.t("servers.memory") }), h("dd", { text: M.bytes(health.memory_available_bytes) }),
-          h("dt", { text: M.t("servers.disk") }), h("dd", { text: M.bytes(health.disk_free_bytes) }),
           h("dt", { text: M.t("servers.load") }), h("dd", { dir: "ltr", text: M.count(health.load1_milli / 1000) }),
+        ] : null,
+        health ? [
+          h("dt", { text: M.t("servers.disk") }), h("dd", { text: M.bytes(health.disk_free_bytes) }),
           h("dt", { text: M.t("servers.uptime") }), h("dd", { text: M.uptime(health.uptime_seconds) }),
           coreUptime ? [h("dt", { text: M.t("servers.core_uptime") }),
             h("dd", { text: up ? M.uptime(Number(up[1])) : coreUptime.message })] : null,
@@ -112,6 +114,7 @@
           return h("li", { class: "mono small", text: line });
         })))
         : null,
+      M.serverCapacity(server.capacity),
       usage ? allowanceDetails(usage, attention) : h("p", { class: "muted small", text: M.t("server_allowance.approximate") }),
       h("div", { class: "row-actions" }, h("button", { class: "btn btn-ghost btn-sm", type: "button",
         onclick: function () { M.restartNode(server.node_id); } }, M.t("commands.restart"))));

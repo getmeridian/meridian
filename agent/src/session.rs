@@ -33,6 +33,7 @@ pub const CAPABILITIES: &[&str] = &[
     "user_flow_blocking",
     "binary_pins",
     "traffic_stats",
+    "capacity_telemetry",
     "blob_fetch",
     "reconcile",
     "report",

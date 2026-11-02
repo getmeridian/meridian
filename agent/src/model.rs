@@ -4,6 +4,7 @@
 //! these structs are filled only afterwards. Every outgoing field is always
 //! serialized, `null` included.
 
+use crate::capacity_models::NodeCapacity;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -113,6 +114,8 @@ pub struct ObservedStateReport {
     pub target: Option<NodeStateRef>,
     pub resources: Vec<ResourceObservation>,
     pub health: NodeHealth,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capacity: Option<NodeCapacity>,
     pub versions: NodeVersions,
     pub observed_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]

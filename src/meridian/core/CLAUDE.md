@@ -1,6 +1,7 @@
 # core — Meridian API contracts
 
 ## Design decisions
+- **Capacity has one projection** — `capacity.py` owns freshness, nullable current evidence, integer derived values, and recent/hourly bounds for service, fleet JSON, and console.
 - **People queries have one typed request** — paging controls never change which people match a selection.
 - **Bulk contracts separate selection from mutation** — before/after fields and receipts omit credentials and private notes.
 - **Token grants are independent of presets** — frozen explicit capabilities compose separately from identity and future resource bounds; token schemas and command envelopes live in `schema_tokens.py`.
@@ -20,6 +21,7 @@
 - **Subscription vocabulary** — `subscription_formats.py` owns document and suffix names; `subscription_preview.py` bounds transient headers and explains selection without credentials.
 
 ## What's done well
+- **Capacity preserves missing evidence** — negotiated samples use nullable figures, integer load/rates, and epoch-local host counters without interface or client identities.
 - **Credential rotation composes existing client status and node outcomes** — its request requires an integer generation, its CLI result carries no credential, and stale retries cannot create another generation.
 - **Flow-block evidence is capability-gated and revision-bound** — account generations and node outcomes carry no connection or device data.
 - **Defaults stay off the wire** — new intent and settings fields omit their defaults (routing `ru-split`, the six-hour refresh, empty mappings), so existing plans and payloads keep their hashes.
@@ -28,6 +30,8 @@
 - Commands build typed, redacted results before any envelope or rendering, and reporter primitives emit typed events without choosing a renderer.
 
 ## Pitfalls
+- **Legacy node output omits capacity** — keep the null projection off the wire; control-service nodes carry explicit not-reported/current/stale evidence.
+- **Hourly byte sums cross agent epochs** — keep aggregate bytes as nonnegative integers; the agent's safe-integer ceiling governs individual wire counters, not rollup totals.
 - **Revealed metadata keeps scalar types** — secret-shaped tag keys must not replace facet counts with redaction strings; container reveals still mask string credentials.
 - **Bulk action schemas retain parameter types** — use post-init checks and a model schema hook, or a dict-returning serializer hides them behind an after-validator.
 - **Agent refusal codes are a shared contract** — export every Rust resource/command code before using it, and localize human command errors by code.

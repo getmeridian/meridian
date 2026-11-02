@@ -11,6 +11,7 @@
 - The facade keeps panel details out of commands, provisioning, and reconciliation code.
 
 ## Pitfalls
+- **Legacy nodes have no capacity projection** — only the control adapter fills it; never infer missing host capacity from a panel traffic total.
 - **Users are addressed by numeric `id`** (a string in `User.id`), never by UUID.
 - **3.x answers some calls with an empty 2xx** — 204 for DELETE and bulk host actions, 202 for a node restart; `_request` returns None for them.
 - **Remnawave's "never" is a 2099 date** — every panel user needs an `expireAt`, so migrate reads a year from `NEVER_EXPIRES_YEAR` (2099) on as no expiry; `MONTH_ROLLING` keeps its original creation-day anchor when migrated.

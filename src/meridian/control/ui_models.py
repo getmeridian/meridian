@@ -9,6 +9,7 @@ from pydantic import Field
 from meridian.control.models import NodeRuntime
 from meridian.core.agent_types import OpaqueToken
 from meridian.core.attention import ServerAttention
+from meridian.core.capacity import NodeCapacityView
 from meridian.core.client_sessions import UserFlowBlocks
 from meridian.core.clients import ClientConnection, SubscriptionFormatUrl
 from meridian.core.models import CoreModel
@@ -101,6 +102,7 @@ class ServerView(NodeTrafficEvidence):
     )
     runtime: NodeRuntime | None = None
     runtime_available: bool = False
+    capacity: NodeCapacityView | None = None
 
 
 class FleetView(CoreModel):

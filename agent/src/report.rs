@@ -118,22 +118,42 @@ fn leading_integer(text: &str) -> u64 {
 
 /// "0.52 0.40 ..." → 520, without floats.
 pub fn load_milli(text: &str) -> u64 {
-    let first = text.split_whitespace().next().unwrap_or("");
-    let (whole, frac) = first.split_once('.').unwrap_or((first, ""));
-    let whole: u64 = whole.parse().unwrap_or(0);
+    parse_load_milli(text.split_whitespace().next().unwrap_or("")).unwrap_or(0)
+}
+
+pub(crate) fn parse_load_milli(text: &str) -> Option<u64> {
+    let (whole, frac) = text.split_once('.').unwrap_or((text, ""));
+    if whole.is_empty()
+        || !whole.bytes().all(|b| b.is_ascii_digit())
+        || !frac.bytes().all(|b| b.is_ascii_digit())
+    {
+        return None;
+    }
+    let whole: u64 = whole.parse().ok()?;
     let mut digits: String = frac.chars().take(3).collect();
     while digits.len() < 3 {
         digits.push('0');
     }
-    whole * 1000 + digits.parse::<u64>().unwrap_or(0)
+    whole
+        .checked_mul(1000)?
+        .checked_add(digits.parse::<u64>().ok()?)
+        .filter(|value| *value <= crate::network_capacity::MAX_SAFE_INTEGER)
 }
 
 fn mem_available(text: &str) -> u64 {
+    memory_field(text, "MemAvailable:").unwrap_or(0)
+}
+
+pub(crate) fn memory_field(text: &str, name: &str) -> Option<u64> {
     text.lines()
-        .find_map(|line| line.strip_prefix("MemAvailable:"))
-        .and_then(|rest| rest.split_whitespace().next())
-        .and_then(|kb| kb.parse::<u64>().ok())
-        .map_or(0, |kb| kb * 1024)
+        .find_map(|line| line.strip_prefix(name))
+        .and_then(|rest| {
+            let mut fields = rest.split_whitespace();
+            let kb = fields.next()?.parse::<u64>().ok()?;
+            (fields.next()? == "kB" && fields.next().is_none()).then_some(kb)
+        })
+        .and_then(|kb| kb.checked_mul(1024))
+        .filter(|value| *value <= crate::network_capacity::MAX_SAFE_INTEGER)
 }
 
 #[allow(clippy::unnecessary_cast, clippy::useless_conversion)]

@@ -3,6 +3,7 @@
 use std::path::Path;
 use std::time::{Duration, Instant};
 
+use crate::capacity_models::ProcessCapacity;
 use crate::fsutil::host_path;
 use crate::model::{HealthCheck, Resource, Spec};
 use crate::stats;
@@ -139,6 +140,15 @@ fn process_uptime(
     ticks_per_second: u64,
     now: u64,
 ) -> Option<u64> {
+    let started_ticks = process_start_ticks(stat, pid)?;
+    let boot = boot_stat
+        .lines()
+        .find_map(|line| line.strip_prefix("btime ")?.trim().parse::<u64>().ok())?;
+    let started = boot.checked_add(started_ticks.checked_div(ticks_per_second)?)?;
+    now.checked_sub(started)
+}
+
+fn process_start_ticks(stat: &str, pid: u32) -> Option<u64> {
     let (identity, fields) = stat.rsplit_once(')')?;
     let (reported_pid, _) = identity.split_once('(')?;
     if reported_pid.trim().parse::<u32>().ok()? != pid {
@@ -152,12 +162,48 @@ fn process_uptime(
         return None;
     }
     // State was field 3; skip fields 4 through 21 to reach starttime.
-    let started_ticks = fields.nth(18)?.parse::<u64>().ok()?;
-    let boot = boot_stat
-        .lines()
-        .find_map(|line| line.strip_prefix("btime ")?.trim().parse::<u64>().ok())?;
-    let started = boot.checked_add(started_ticks.checked_div(ticks_per_second)?)?;
-    now.checked_sub(started)
+    fields.nth(18)?.parse::<u64>().ok()
+}
+
+pub(crate) fn process_capacity(
+    root: &Path,
+    exec: &dyn Exec,
+    resources: &[Resource],
+) -> Option<ProcessCapacity> {
+    if !wanted(resources) {
+        return None;
+    }
+    let pid = main_pid(exec, PROBE_TIMEOUT).ok()?;
+    let read = |name: &str| std::fs::read_to_string(host_path(root, name)).ok();
+    let stat_path = format!("/proc/{pid}/stat");
+    let started = process_start_ticks(&read(&stat_path)?, pid)?;
+    // SAFETY: sysconf has no pointer arguments; invalid tick rates remain unavailable.
+    let ticks = u64::try_from(unsafe { libc::sysconf(libc::_SC_CLK_TCK) })
+        .ok()
+        .filter(|ticks| *ticks > 0);
+    let uptime_seconds = read("/proc/uptime")
+        .and_then(|text| {
+            let uptime = text
+                .split_whitespace()
+                .next()?
+                .split('.')
+                .next()?
+                .parse::<u64>()
+                .ok()?;
+            uptime.checked_sub(started.checked_div(ticks?)?)
+        })
+        .filter(|value| *value <= crate::network_capacity::MAX_SAFE_INTEGER);
+    let memory_resident_bytes = read(&format!("/proc/{pid}/status"))
+        .and_then(|text| crate::report::memory_field(&text, "VmRSS:"));
+    if main_pid(exec, PROBE_TIMEOUT).ok()? != pid
+        || process_start_ticks(&read(&stat_path)?, pid)? != started
+    {
+        return None;
+    }
+    Some(ProcessCapacity {
+        uptime_seconds,
+        memory_resident_bytes,
+    })
 }
 
 pub(crate) fn uptime_check(

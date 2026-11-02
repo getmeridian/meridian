@@ -19,6 +19,7 @@ from typing import Annotated, Literal, Union, get_args
 
 from pydantic import Field, RootModel, model_validator
 
+from meridian.core.agent_capacity import NodeCapacity
 from meridian.core.agent_desired import DesiredNodeState, ResourceKind
 from meridian.core.agent_types import (
     AGENT_PROTOCOL,
@@ -68,6 +69,7 @@ Capability = Literal[
     "binary_pins",
     "agent_upgrade",
     "traffic_stats",
+    "capacity_telemetry",
     "blob_fetch",
     CommandKind,
 ]
@@ -444,6 +446,11 @@ class ObservedStateReport(AgentModel):
     health: NodeHealth
     versions: NodeVersions
     observed_at: Timestamp
+    capacity: NodeCapacity | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Address-free capacity; omitted unless capacity_telemetry was negotiated.",
+    )
     user_flow_blocking: UserFlowBlocking | None = Field(
         default=None, description="Runtime user flow guard; omitted unless its capability was negotiated."
     )

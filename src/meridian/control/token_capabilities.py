@@ -18,6 +18,12 @@ from meridian.core.token_models import (
 
 # Human wording belongs to the adapters; API, CLI, and console consume these same labels.
 _LABELS: dict[TokenCapability, tuple[str, str, str, str]] = {
+    "metrics.read": (
+        "Read Prometheus node capacity and service metrics",
+        "Смотреть показатели серверов и сервиса в Prometheus",
+        "خواندن آمار منابع گره‌ها و سرویس در Prometheus",
+        "读取 Prometheus 节点资源和服务指标",
+    ),
     "api.read": (
         "Read the API contract and permission catalog",
         "Читать описание API и список прав",
@@ -240,7 +246,7 @@ def console_capabilities() -> frozenset[TokenCapability]:
     """Keep existing console presets and permit delegation of its own service-owned edits/restarts."""
     return frozenset().union(
         *(legacy_capabilities(scope) for scope in TOKEN_SCOPES if scope != "admin"),
-        {"settings.edit", "commands.restart"},
+        {"settings.edit", "commands.restart", "metrics.read"},
     )
 
 

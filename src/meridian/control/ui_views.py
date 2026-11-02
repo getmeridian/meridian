@@ -79,6 +79,7 @@ def fleet_view(service: ControlService) -> FleetView:
                 traffic_bytes=traffic.get(status.node_id, 0),
                 runtime=status.runtime,
                 runtime_available=status.runtime_available(),
+                capacity=service.capacity.view(status.node_id),
                 **status.traffic_evidence().model_dump(),
             )
         )

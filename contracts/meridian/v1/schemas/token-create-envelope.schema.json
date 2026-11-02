@@ -7,6 +7,7 @@
           "enum": [
             "api.read",
             "fleet.read",
+            "metrics.read",
             "topology.read",
             "fleet.apply",
             "nodes.enroll",
@@ -136,6 +137,7 @@
             "enum": [
               "api.read",
               "fleet.read",
+              "metrics.read",
               "topology.read",
               "fleet.apply",
               "nodes.enroll",
@@ -332,6 +334,7 @@
             "enum": [
               "api.read",
               "fleet.read",
+              "metrics.read",
               "topology.read",
               "fleet.apply",
               "nodes.enroll",

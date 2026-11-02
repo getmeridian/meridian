@@ -15,6 +15,16 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b9
 
 #### Added
+- Authenticated Prometheus metrics on the existing private control ingress with
+  an explicit read-only `metrics.read` grant, node-only capacity/traffic series,
+  route-ID request counters and latency, background health, and SQLite size (#55).
+- Server capacity cards distinguish host traffic from counted people traffic, with
+  nullable current readings, one hour of recent samples, and seven days of bounded
+  SQLite hourly averages and peaks. API and CLI share freshness and zero states (#55).
+- Negotiated node capacity reports with CPU count and load, total/available memory,
+  host network counters and rates, and Xray process uptime/memory. Missing evidence
+  stays unavailable; counter epochs handle interface changes, resets, and wraparound.
+  No client addresses or per-person connection data are collected (#55).
 - Server-side people queries with contextual counts, row versions, and stable
   cursor pages without notes or credentials.
 - Bulk previews freeze targets and versions, commit atomically, retain durable

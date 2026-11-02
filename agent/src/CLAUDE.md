@@ -1,5 +1,6 @@
 # agent/src — netagent runtime: identity, apply, Xray, traffic, commands
 ## Design decisions
+**Capacity is address-free** — negotiated reports sample host CPUs, memory, the default-route interface, and the managed core PID; the pinned core's per-person online maps are never queried.
 **Identity under the fleet CA** — `identity.rs` generates the Ed25519 node key on the node and sends only a CSR (no OpenSSL); `identity.json` (0600) keeps key and certificates together. The service certificate must chain to the CA pinned by `ca_sha256`, be a non-CA, and name the fleet.
 **Sessions** — `session.rs` signs a fresh `NodeProof` per hello and keeps times on the service's clock; a 401 re-hellos once, `credential_revoked` stops until a new bootstrap token appears, and `unsupported_protocol` backs off for the service's retry time. Only WebPKI TLS is verified: a pin would break at every renewal of 443's short-lived IP certificate, and the CA-pinned service certificate already authenticates every document. `NETAGENT_TLS_CA_FILE` may name one private CA (the system lab's Pebble).
 **Verify the wire, then type it** — `verify.rs` checks floats, signature, fleet and node IDs, and the hash over the parsed `Value`; only then do resources become typed `Spec`s. Nothing applies before credentials exist.
@@ -16,6 +17,7 @@
 - **Secrets stay out of logs and reports** — no token, key, service URL (`Client::scrub`), user UUID, or sensitive content; messages are trimmed.
 - **Atomic writes everywhere** — private temp sibling, fsync, mode and owner, rename, directory fsync (`fsutil::write_atomic`).
 ## Pitfalls
+- **Network epochs bound counters** — start at zero on collector restart, interface change, regression, wrap, or the JSON integer ceiling; unavailable or overlong intervals have null rates.
 - **Every core change uses held credentials** — commands check the applied document and exact core.json and use exported refusal codes; live updates publish the new file before accounts, compare invocations, and reconcile an uncertain instance.
 - **Reports inspect the running guard** — cached apply errors cannot prove current blocking; compare live rules and the core invocation without mutating them.
 - **IPIfNonMatch needs an unmatched first pass** — an active-user catch-all suppresses DNS and bypasses private/country blocks and IP egress; install only revoked-identity blocks.

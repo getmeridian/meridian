@@ -47,7 +47,7 @@ w.fetch = (url, options) => {
   }
   return Promise.resolve(reply(usage(days)));
 };
-for (const script of ['core.js', 'fleet.js', 'privacy.js', 'usage.js']) {
+for (const script of ['core.js', 'capacity.js', 'fleet.js', 'privacy.js', 'usage.js']) {
   w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 }
 const M = w.M;

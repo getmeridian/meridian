@@ -58,6 +58,12 @@ def token_request(
         request.add_header("Authorization", f"Bearer {token}")
     try:
         with urllib.request.urlopen(request, timeout=10) as response:
-            return response.status, json.loads(response.read() or b"null")
+            data = response.read()
+            answer = (
+                json.loads(data or b"null")
+                if response.headers.get_content_type() == "application/json"
+                else data.decode()
+            )
+            return response.status, answer
     except urllib.error.HTTPError as exc:
         return exc.code, json.loads(exc.read() or b"null")

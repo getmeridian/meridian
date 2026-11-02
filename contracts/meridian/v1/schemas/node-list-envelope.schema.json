@@ -1,5 +1,265 @@
 {
   "$defs": {
+    "CapacityCurrent": {
+      "additionalProperties": false,
+      "description": "Freshness uses the last accepted collection's service receipt, never a hello or replay.",
+      "properties": {
+        "age_seconds": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Age Seconds"
+        },
+        "received_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Received At"
+        },
+        "sample": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NodeCapacity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "status": {
+          "default": "not_reported",
+          "enum": [
+            "not_reported",
+            "unavailable",
+            "current",
+            "stale"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "values": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CapacityValues"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "CapacityCurrent",
+      "type": "object"
+    },
+    "CapacityValues": {
+      "additionalProperties": false,
+      "description": "Integer figures; load is per CPU, memory pressure is per mille, and rates are bytes/s.",
+      "properties": {
+        "cpu_count": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cpu Count"
+        },
+        "load15_milli": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Load15 Milli"
+        },
+        "load1_milli": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Load1 Milli"
+        },
+        "load5_milli": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Load5 Milli"
+        },
+        "load_per_cpu_milli": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Load Per Cpu Milli"
+        },
+        "memory_available_bytes": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memory Available Bytes"
+        },
+        "memory_total_bytes": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memory Total Bytes"
+        },
+        "memory_used_bytes": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memory Used Bytes"
+        },
+        "memory_used_per_mille": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memory Used Per Mille"
+        },
+        "rx_bytes_per_second": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rx Bytes Per Second"
+        },
+        "tx_bytes_per_second": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tx Bytes Per Second"
+        },
+        "xray_memory_resident_bytes": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Xray Memory Resident Bytes"
+        },
+        "xray_uptime_seconds": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Xray Uptime Seconds"
+        }
+      },
+      "title": "CapacityValues",
+      "type": "object"
+    },
     "EmptyData": {
       "additionalProperties": false,
       "description": "Empty data object used by envelopes without command-specific failure data.",
@@ -111,6 +371,17 @@
           "default": null,
           "description": "People with accepted growth in the last report; null before any report.",
           "title": "Active Users"
+        },
+        "capacity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CapacityCurrent"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "errors": {
           "items": {
@@ -279,6 +550,260 @@
         "message"
       ],
       "title": "HealthCheck",
+      "type": "object"
+    },
+    "InboundConnections": {
+      "additionalProperties": false,
+      "description": "Aggregate only; never derived by enumerating client addresses or identities.",
+      "properties": {
+        "connections": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Connections",
+          "type": "integer"
+        },
+        "inbound_tag": {
+          "description": "Xray inbound tag.",
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Inbound Tag",
+          "type": "string"
+        }
+      },
+      "required": [
+        "inbound_tag",
+        "connections"
+      ],
+      "title": "InboundConnections",
+      "type": "object"
+    },
+    "NetworkCapacity": {
+      "additionalProperties": false,
+      "description": "Host traffic on the default-route interface; includes overhead and non-VPN traffic.\n\nNo interface name, address, or device identifier leaves the host. The first\nsample of an epoch has zero counters and null rates. A missing or overlong\ninterval also has null rates; it must not manufacture a current speed.",
+      "properties": {
+        "counter_epoch": {
+          "description": "Identity of the agent's traffic counter store: a lowercase UUID the agent draws when it creates the store. It changes only when the store is lost, which restarts every cumulative counter from zero.",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Counter Epoch",
+          "type": "string"
+        },
+        "interval_millis": {
+          "anyOf": [
+            {
+              "maximum": 180000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Interval Millis"
+        },
+        "rx_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Rx Bytes",
+          "type": "integer"
+        },
+        "rx_bytes_per_second": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rx Bytes Per Second"
+        },
+        "tx_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Tx Bytes",
+          "type": "integer"
+        },
+        "tx_bytes_per_second": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tx Bytes Per Second"
+        }
+      },
+      "required": [
+        "counter_epoch",
+        "rx_bytes",
+        "tx_bytes",
+        "rx_bytes_per_second",
+        "tx_bytes_per_second",
+        "interval_millis"
+      ],
+      "title": "NetworkCapacity",
+      "type": "object"
+    },
+    "NodeCapacity": {
+      "additionalProperties": false,
+      "description": "One collection, identified independently of delivery retries and wall-clock skew.",
+      "properties": {
+        "collected_at": {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Collected At",
+          "type": "string"
+        },
+        "collection_epoch": {
+          "description": "Identity of the agent's traffic counter store: a lowercase UUID the agent draws when it creates the store. It changes only when the store is lost, which restarts every cumulative counter from zero.",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Collection Epoch",
+          "type": "string"
+        },
+        "cpu_count": {
+          "anyOf": [
+            {
+              "maximum": 65536,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cpu Count"
+        },
+        "inbound_connections": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/InboundConnections"
+              },
+              "maxItems": 1024,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Null on the pinned core, which has no address-free aggregate inbound connection counter.",
+          "title": "Inbound Connections"
+        },
+        "load15_milli": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Load15 Milli"
+        },
+        "load1_milli": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Load1 Milli"
+        },
+        "load5_milli": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Load5 Milli"
+        },
+        "memory_available_bytes": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Memory Available Bytes"
+        },
+        "memory_total_bytes": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Memory Total Bytes"
+        },
+        "network": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NetworkCapacity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sequence": {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "xray": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProcessCapacity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "collection_epoch",
+        "sequence",
+        "collected_at",
+        "cpu_count",
+        "load1_milli",
+        "load5_milli",
+        "load15_milli",
+        "memory_total_bytes",
+        "memory_available_bytes",
+        "network",
+        "xray",
+        "inbound_connections"
+      ],
+      "title": "NodeCapacity",
       "type": "object"
     },
     "NodeHealth": {
@@ -469,6 +994,44 @@
         "kernel"
       ],
       "title": "NodeVersions",
+      "type": "object"
+    },
+    "ProcessCapacity": {
+      "additionalProperties": false,
+      "description": "The managed Xray process; missing, changed, or unreadable evidence is null.",
+      "properties": {
+        "memory_resident_bytes": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Memory Resident Bytes"
+        },
+        "uptime_seconds": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Uptime Seconds"
+        }
+      },
+      "required": [
+        "uptime_seconds",
+        "memory_resident_bytes"
+      ],
+      "title": "ProcessCapacity",
       "type": "object"
     },
     "Summary": {

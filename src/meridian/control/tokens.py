@@ -37,7 +37,7 @@ from meridian.control.models import (
 from meridian.control.store import Store
 from meridian.control.times import format_timestamp, parse_timestamp
 from meridian.core.fleet_events import TokenEventDetail
-from meridian.core.token_models import CapabilityGrant, Permission, TokenCapability, TokenPreview
+from meridian.core.token_models import TOKEN_CAPABILITIES, CapabilityGrant, Permission, TokenCapability, TokenPreview
 
 # `mrd_<id>_<secret>`: the public ID finds the row, so the secret's hash is compared once, in constant time.
 _TOKEN = re.compile(r"mrd_([0-9a-f]{12})_[0-9a-f]{64}")
@@ -76,6 +76,9 @@ class Caller:
     def capabilities(self) -> frozenset[TokenCapability]:
         if self.grant is not None:
             return self.grant.capabilities
+        if self == ROOT or self == WEB_OWNER:
+            # These identities are not issued presets; owner routes and delegation still have their own bounds.
+            return frozenset(TOKEN_CAPABILITIES)
         from meridian.control.token_capabilities import legacy_capabilities
 
         return legacy_capabilities(self.scope) if self.scope is not None else frozenset()

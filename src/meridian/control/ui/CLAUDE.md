@@ -25,6 +25,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Capacity gaps stay gaps** — null and stale readings never become zero; chart peak labels use observed peaks, not the axis minimum, and host traffic stays distinct from counted people traffic.
 - **Empty WebAuthn owner handles are null** — zero-length ArrayBuffers are truthy; never encode them as empty strings.
 - **Recoverable refusals precede challenge consumption** — check recent identity and key capacity in the write transaction before taking a registration proof; confirmation checks session liveness first.
 - **Challenge capacity belongs to its caller** — anonymous login evicts only its oldest bounded requests; registration and confirmation keep one challenge per kind and live session, so anonymous traffic never blocks an owner.

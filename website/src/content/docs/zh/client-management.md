@@ -304,6 +304,14 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 
 操作结果会显示对应人员的姓名。启用已过期或流量额度已用尽的账户时，网页面板会说明仍有哪些条件阻止连接。切换页面后才返回的结果会保留当前页面。
 
+### 服务器资源
+
+**服务器**页面显示逻辑 CPU 数量、每个 CPU 的负载、已用及总内存、主机接收和发送速率，以及 Xray 进程内存与运行时间。展开**最近一天的资源情况**可查看小时平均值和峰值标记。阴影区间没有测量数据；实测零值仍显示为零。主机流量包含开销和其他服务的流量，**计入用户用量的流量**单独显示。资源采集不会改变设备或个人历史设置。
+
+从服务收到并接受新报告起，样本在 180 秒内有效。旧代理显示**未报告**，采集失败显示**不可用**，旧报告显示**已过期**。图表覆盖当前 UTC 小时和此前 23 个区间，并注明网络测量时长。内存保留一小时的近期样本；168 个小时区间在重启后仍保留。保留时间与快照说明见[隐私](/zh/privacy/)。
+
+`GET /api/nodes/{node_id}/capacity?hours=24` 需要 `fleet.read`，并接受一个 1–168 的整数 `hours`。未知或重复的查询选项会被拒绝。`GET /api/nodes/{node_id}` 和 `meridian fleet status --json` 包含相同的当前 `capacity` 数据；历史契约可通过 `meridian api schema node-capacity` 查看。
+
 ### API 令牌
 
 为每个集成签发可单独撤销的令牌。在 **令牌** 中选择具体操作或兼容预设，设置到期时间，然后点击 **预览令牌**。服务会在 **创建令牌** 前显示实际权限和准确到期时间。修改选项后必须重新预览。令牌秘密只显示一次，不写入浏览器存储；响应不确定时会刷新元数据，并说明秘密无法找回。
@@ -328,6 +336,35 @@ meridian token revoke TOKEN_ID --yes --json
 
 新 API、CLI 和面板令牌默认有效期为 **90 天**。`expires_in_days` 接受 1–3650，也可指定未来 UTC 时间 `expires_at`。不过期必须明确选择 `never_expires: true` 或 `--never-expires`，单独的 `null` 会被拒绝。已有到期时间保持不变。兼容 `read`、`propose`、`approve`、`people`、`admin` 预设仅展开一次并保存等效权限，目录更新不会重新扩展已签发令牌。read 保留现有节点及端点访问（包括端点凭证），用户 UUID 和订阅令牌仍为空。自选令牌使用 `scope: null`，每条记录的 `capabilities` 列出实际权限。到期和撤销会使下一次请求返回 `401 unauthenticated`。包含凭证权限的令牌应像密码一样保护。
 
+#### Prometheus 指标
+
+通过现有控制入口使用专用 **`metrics.read`** 令牌抓取指标。在面板的令牌审阅中明确选择该权限，或使用下面的 CLI 命令。兼容预设（包括 `admin`）保留已冻结的权限，不会自动获得此权限。它只能读取节点汇总及服务运行指标，不能读取或修改账户。未列入令牌列表的根凭据可以签发抓取令牌。
+
+```bash
+meridian token create "Metrics scraper" --capability metrics.read --expires-days 90 --dry-run --json
+meridian token create "Metrics scraper" --capability metrics.read --expires-days 90 --yes --json
+```
+
+签发 JSON 仅在 `data.issued.token` 中显示一次性秘密。仅将该值保存到 Prometheus 可读取的文件中，例如 `/etc/prometheus/meridian.token`。将 `CONTROL_PATH` 替换为 `meridian panel` 显示的私有面板路径，并使用控制服务器地址。HTTPS 使用现有 443 端口，请保持证书验证。
+
+```yaml
+scrape_configs:
+  - job_name: meridian
+    scheme: https
+    metrics_path: /CONTROL_PATH/metrics
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/meridian.token
+    static_configs:
+      - targets: ["198.51.100.10:443"]
+```
+
+`/metrics` 相对于私有控制路径，需要 bearer token，支持 GET/HEAD，并返回带有 `Cache-Control: no-store` 的 Prometheus 0.0.4 文本。不会新增监听端口。节点标签仅包含拓扑 ID 和固定状态；服务标签使用固定路由 ID、响应状态类别、延迟区间和任务名称。不导出人员、地址、设备、URL、私有路径或凭据。
+
+文本包含 CPU、负载和内存，按计数周期记录的主机接收/发送计数与速率，Xray 内存和运行时间，以及现有账本中的每个节点用户流量总量。主机流量包括协议开销和其他服务。`meridian_node_capacity_status` 区分最新、过期、不可用和未报告状态；缺失或过期的数值会被省略。重置开始新计数周期；首个样本或未测量区间的速率不发布。请求计数和延迟直方图保存在有限内存中，重启后重置。任务启动、健康、错误和成功时间区分未运行与失败。`meridian_control_sqlite_bytes` 包含数据库、WAL 和共享内存文件。
+
 #### OpenAPI 契约
 
 通过 `GET /api/openapi.json` 或生成文件 `contracts/meridian/v1/admin/openapi.json` 读取 **OpenAPI 3.1**。发送 `Authorization: Bearer <token>`。必须拥有全部 `x-meridian-capabilities`；请求体条件由 `x-meridian-conditional-capabilities` 描述，凭证/私人字段及自我批准条件在 `x-meridian-extra-capabilities` 中。`x-meridian-scopes` 和 `x-meridian-capability-grants` 描述兼容预设。`x-meridian-credentials: true` 表示响应可能包含凭证，请保密且不要记录。agent 注册与协议、订阅、页面和面板认证使用独立接口。
@@ -337,6 +374,7 @@ meridian token revoke TOKEN_ID --yes --json
 | `GET /api/users/{username}/flow-blocks` | 按节点返回阻止新数据流的结果；不含连接地址或设备数据 |
 | `GET /api/users` | 所有用户 |
 | `GET /api/traffic` | 每个用户的流量总计 |
+| `GET /api/nodes/{node_id}/capacity` | 当前服务器资源及有限的近期/小时历史；`fleet.read`，`hours=1..168` |
 | `GET /api/health` | 服务的版本 |
 | `GET /api/openapi.json` | 管理 API 契约 |
 | `GET /api/events` | 有数量上限的本地事件分页 |

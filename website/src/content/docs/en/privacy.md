@@ -7,6 +7,18 @@ Meridian starts with **device limits off** and **usage history off**. You opt in
 
 The control service already holds people's accounts and connection credentials, lifetime traffic totals, and last seen. Someone who takes it can read that state. These settings decide which device details and daily records are added to it.
 
+## Server capacity
+
+Node agents report CPU count and load, total and available memory, host network counters and rates, and Xray process uptime and resident memory. These are server aggregates, independent of device limits and personal usage history. No client addresses, device details, interface identifiers, or per-person connections are collected. The pinned core cannot supply safe aggregate connection counts, so those stay unavailable.
+
+Host network traffic includes protocol overhead and other services; it differs from traffic counted for people. Counters start at zero in each counter epoch and restart after agent restarts, interface changes, resets, wraparound, or the exact-integer ceiling. The first sample has no rate. Failed collection is unavailable, older agents are “not reported,” and a measured zero remains zero.
+
+The service keeps one hour of recent observations in memory, at most one point per 10-second bucket (360 points per node). Agents normally report once a minute. SQLite retains the current UTC hour and the preceding 167 hourly buckets: integer averages and peaks, and network bytes only across adjacent received samples in the same counter epoch. Unmeasured intervals are gaps; zero means a measured zero. Old hourly buckets are pruned every 30 seconds. The latest sample stays while the node exists; deleting a node removes its capacity data.
+
+The Servers screen shows current capacity and the latest 24 UTC hourly buckets, including the incomplete current hour, with measured network duration. A sample becomes stale after 180 seconds without an accepted collection; hellos, polls, and duplicate reports do not refresh it. Recent memory series clear on service restart; hourly rollups survive. Server aggregates ride encrypted snapshots at every privacy level, and restored current samples remain stale until new evidence arrives. A seized service reveals how busy each server was; these series name no people or connections.
+
+A separately issued `metrics.read` token can scrape node capacity, durable node traffic totals, and service request counts/latency, task health, and SQLite size through the existing private control ingress. Labels never contain people, client addresses, devices, URLs, credentials, or secret paths; request observations retain only fixed route IDs and aggregate counters in memory. Compatible presets do not gain this grant. Prometheus keeps its own copies and retention: revocation stops new scrapes but does not remove existing copies. Pages and the console make no external requests. See [API tokens and scraping](/en/client-management/) for setup.
+
 ## Device limits
 
 | Level | What Meridian keeps | What you see |
