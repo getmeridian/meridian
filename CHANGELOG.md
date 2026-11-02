@@ -15,12 +15,11 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b11
 
 #### Added
-- Console Overview with fleet health, attention links, direct server payment
-  details, and quick person sharing; browser-local Simple and Detailed views,
-  an account menu for theme and language, and server cards that put health first.
-  Disclosures stay available in both views. Shared responsive components provide
-  desktop header actions, a safe phone bar, 44 px controls, compact server
-  guidance, and isolated figures in all four languages (#95).
+- The web panel opens on an Overview: fleet health, what needs attention (expiring,
+  near or over quota, disabled, servers or payments due), and quick Add person and
+  Share actions. A Simple/Detailed switch, remembered per browser, keeps everyday
+  screens calm and shows revisions, tokens, and full server facts on demand; theme
+  and language move into an account menu (#95).
 - Reviewed subscription response rules by app, with bounded literal User-Agent
   and Accept conditions, ordered format/refusal/policy/header actions, and one
   transient matcher test across API, CLI, and console. Private person policies
@@ -36,16 +35,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
   people in the same batch are still deleted atomically (#95).
 
 #### Fixed
-- The public console demo shows People, access profiles, client routing, and
-  reviewed bulk changes from current service recordings. Person edits catch up
-  UTC resets and first-use expiry before reviews and refuse schedules beyond 2098
-  or unknown first use; bulk undo restores the reviewed
-  enforced state and leaves unchanged people alone. Inactive shares and repeated
-  key changes retain revocation receipts; token reviews and issuance enforce
-  owner delegation and request validation. Declared people's key rotation stays
-  in the CLI; monthly refill dates keep their UTC boundaries in direct console
-  and connection-page reads. Unsupported security
-  and server actions display a translated demo notice (#95).
+- The public panel demo works end to end again: People, access profiles, client
+  routing, bulk changes with undo, and token reviews follow a real service's rules,
+  and actions a demo cannot perform say so (#95).
 - `meridian plan` before upgrading a fleet from an earlier beta no longer stops as
   inconclusive (exit 3) because access profiles look unavailable: a service that
   answers but predates profiles holds none.
