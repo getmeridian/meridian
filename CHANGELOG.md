@@ -57,6 +57,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Keep snapshot profile history and clear carried unfinished checkpoints when
+  importing fleet files into an empty restore context, even if review fails
+  or the remote restore is declined.
 - Resume profile setup after failures or cancellation before declarations reach
   the service. Record profile use immediately before the settings write, keeping
   later outages protected even when its reply is lost.

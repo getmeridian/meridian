@@ -20,7 +20,8 @@ from meridian.backup.keys import load_device_key
 from meridian.backup.profile_restore import review_restored_profile_access
 from meridian.backup.restore import ControlRestorer, RestoreSource
 from meridian.cli import app
-from meridian.cluster import ClusterConfig
+from meridian.cluster import ClusterConfig, ControlRestore
+from meridian.cluster_persistence import dump_cluster
 from meridian.commands import restore as restore_command
 from meridian.compiler import compile_topology
 from meridian.compiler.models import ServiceSettingsPayload
@@ -54,7 +55,16 @@ def open_snapshot(path: Path) -> Snapshot:
     return decrypt_snapshot(path.read_bytes(), [key.secret])
 
 
-def changed_snapshot(snapshot: Snapshot, *, profiles=None, declarations_hash=None, history=None, generation=None):
+def changed_snapshot(
+    snapshot: Snapshot,
+    *,
+    profiles=None,
+    declarations_hash=None,
+    history=None,
+    generation=None,
+    intent=None,
+    restore=None,
+):
     db = sqlite3.connect(":memory:")
     try:
         db.deserialize(snapshot.database)
@@ -64,11 +74,18 @@ def changed_snapshot(snapshot: Snapshot, *, profiles=None, declarations_hash=Non
             db.execute(
                 "INSERT OR REPLACE INTO meta VALUES ('access_profile_declarations_hash', ?)", (declarations_hash,)
             )
-        if history is not None:
+        if history is not None or intent is not None or restore is not None:
             raw = db.execute("SELECT body FROM backup_state WHERE name = 'deployer_state'").fetchone()[0]
             deposit = json.loads(raw)
             cluster = yaml.safe_load(deposit["cluster_yml"])
-            cluster["access_profiles_used"] = history
+            if history is not None:
+                cluster["access_profiles_used"] = history
+            if intent is not None:
+                cluster["topology_intent"] = intent.to_data()
+            if restore is not None:
+                cluster["control_restore"] = yaml.safe_load(dump_cluster(ClusterConfig(control_restore=restore)))[
+                    "control_restore"
+                ]
             deposit["cluster_yml"] = yaml.safe_dump(cluster)
             if generation is not None:
                 deposit["generation"] = generation
@@ -101,6 +118,60 @@ def test_retained_local_intent_inherits_deposited_profile_history(fleet, generat
     assert restored is cluster
     assert restored.has_used_access_profiles is True
     assert config.CLUSTER_CONFIG.read_bytes() == saved
+
+
+@pytest.mark.parametrize("evidence", ["fingerprint", "legacy-map", "deposited"])
+@pytest.mark.parametrize("carried_step", ["installed", "done"])
+@pytest.mark.parametrize("stop", ["declined", "review-failed"])
+def test_empty_context_keeps_derived_snapshot_state_after_restore_is_declined_or_refused(
+    fleet, new_server: NewServer, monkeypatch: pytest.MonkeyPatch, evidence: str, carried_step: str, stop: str
+):
+    cluster, path = fleet
+    intent = cluster.topology_intent
+    profiles = {}
+    declarations = profile_declarations_hash([])
+    if evidence == "legacy-map":
+        intent = local_profile_intent(intent)
+        profiles = next(
+            row.payload.access_profiles
+            for row in compile_topology(intent).resources
+            if isinstance(row.payload, ServiceSettingsPayload)
+        )
+        declarations = None
+    elif evidence == "deposited":
+        declarations = None
+    carried = ControlRestore(step=carried_step, snapshot="carried.snapshot", to_server_ref="srv-missing")
+    snapshot = changed_snapshot(
+        open_snapshot(path),
+        profiles=profiles,
+        declarations_hash=declarations,
+        history=evidence == "deposited",
+        intent=intent,
+        restore=carried,
+    )
+    target = ServerRegistry(config.SERVER_PROFILES_FILE).find("srv-b")
+    assert target is not None
+    config.CLUSTER_CONFIG.unlink()
+    config.SERVER_PROFILES_FILE.unlink()
+    monkeypatch.setattr(restore_command, "_open_snapshot", lambda *_args, **_kwargs: RestoreSource(path, snapshot))
+    monkeypatch.setattr(restore_command, "confirm", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(restore_command, "has_tty", lambda: True)
+    monkeypatch.setattr(restore_steps, "service_answers", lambda *_args: stop == "review-failed")
+    monkeypatch.setattr(restore_steps, "ssh_answers", lambda *_args: False)
+    monkeypatch.setattr("meridian.commands.resolve.resolve_server", lambda *_args, **_kwargs: target)
+    monkeypatch.setattr("meridian.commands.server.register_server", lambda *_args, **_kwargs: target)
+
+    reply = CliRunner().invoke(app, ["restore", "--to", "198.51.100.13"])
+
+    assert reply.exit_code == (1 if stop == "declined" else 2), reply.output
+    if stop == "review-failed":
+        assert "old control service still answers" in reply.output
+    saved = ClusterConfig.load()
+    assert saved.access_profiles_used is True
+    assert saved.topology_intent == intent
+    assert saved.control_restore == (carried if carried_step == "done" else None)
+    assert ServerRegistry(config.SERVER_PROFILES_FILE).find("srv-a") is not None
+    assert new_server.uploads == 0 and new_server.server is None
 
 
 @pytest.mark.parametrize("mismatch", ["legacy-map", "empty-service-fingerprint", "same-map-different-declarations"])

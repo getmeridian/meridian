@@ -87,6 +87,8 @@ Every machine that manages the fleet saves an encrypted snapshot of the control 
 
 Restore keeps your local intent when its committed generation is at least as new as the snapshot's deposited copy. It also keeps the snapshot's record of earlier profile use, even if the last profile has since been removed.
 
+In an empty context, local fleet files are imported before remote-restore confirmation. Meridian saves profile-use history from the authenticated snapshot database and clears any unfinished restore carried from the depositing machine. If review fails or you decline, these corrected local files remain. Finished restore records are retained.
+
 Access profiles must match before the snapshot is staged or the target is contacted. A saved declaration fingerprint compares profile IDs and grants; changes in how an unchanged grant expands remain covered by the topology review. Without a fingerprint, the compiled grant maps must match exactly. A mismatch is refused even with `--force`: choose a matching snapshot, or restore into a new context (`--context NAME`) using the snapshot's matching fleet files, then review the desired saved change with `meridian apply` after restore. Restore checkpoints retain the reviewed declarations, so a resumed restore cannot apply a later profile edit. Older checkpoints without this review need the original snapshot again.
 
 - **Links**: on a bare IP, every subscription URL contains the control server's address, so each link changes; restore prints every client's new link to send. With a domain, links stay the same once you point its DNS record at the new server; the review names the records.

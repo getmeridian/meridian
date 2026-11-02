@@ -199,13 +199,11 @@ def _fleet_state(cluster: ClusterConfig, snapshot: Snapshot | None) -> ClusterCo
         )
     restored = load_deposited_cluster(deposited.cluster_yml, deposited.servers_json, snapshot.header.fleet_id)
     restored.control_restore = finished_restore(restored.control_restore)
-    review_restore_profiles(restored, snapshot.database)
-    write_private(config.CLUSTER_CONFIG, deposited.cluster_yml)
+    profiles = review_restore_profiles(restored, snapshot.database)
+    restored.access_profiles_used = profiles.profiles_used
+    restored.save()
     write_private(config.SERVER_PROFILES_FILE, deposited.servers_json)
     info(f"Restored this fleet's cluster.yml and servers.json from the snapshot into {config.HOME_DISPLAY}")
-    restored = load_cluster()
-    # Snapshots from before deposits dropped it may carry the depositing machine's unfinished restore.
-    restored.control_restore = finished_restore(restored.control_restore)
     return restored
 
 
