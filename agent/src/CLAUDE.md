@@ -28,7 +28,7 @@
 - **Re-check in Rust whatever reaches a path, an argument, or a socket** — tags, user IDs, the API address, and reserved file names, though Python checked them; serde reads an absent `Option` as `null`.
 - **Never send the session token to a `sources` URL** — only the service's own blob route gets the bearer. ureq errors at exactly the body limit, so downloads pass `size + 1` and `HashingWriter` enforces the size.
 - **`xray api adu`/`rmu` exit 0 when a user fails** — check the `Added/Removed N user(s)` line; their input files hold credentials (0600, deleted at once).
-- **`adu` cannot build Hysteria2 users** — Xray's CLI has no hysteria case and a VLESS-shaped account panics its validator, so Hysteria2 rebuilds the inbound; a failed `adi` leaves it gone until the fallback restart.
+- **`adu` cannot build Hysteria2 users** — Xray's CLI has no hysteria case and a VLESS-shaped account panics its validator, so generation-mode configs add through the typed account API and only legacy configs rebuild the inbound; there a failed `adi` leaves it gone until the fallback restart.
 - **A returning user resumes their retired totals** — the service keeps every baseline, so restarting at zero read as a counter regression and refused the whole report.
 - **Fold traffic before dialing the service** — an outage must not leave counters in Xray to die on restart; track collection apart from delivery, and collect before an apply's report.
 - **`statsquery` is protobuf JSON** — int64 values arrive as strings, and zeros and empty lists are omitted.
