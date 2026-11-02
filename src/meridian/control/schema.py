@@ -6,6 +6,7 @@ from meridian.control.access_memberships import MEMBERSHIP_SCHEMA
 from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE
 from meridian.control.capacity import CAPACITY_TABLES
 from meridian.control.commands import COMMAND_TABLES
+from meridian.control.delivery_policy_settings import PERSON_DELIVERY_POLICY_SCHEMA
 from meridian.control.devices import DEVICES_TABLE
 from meridian.control.errors import ServiceError
 from meridian.control.events import EVENT_TABLES
@@ -21,7 +22,7 @@ from meridian.control.tokens import API_TOKENS_TABLE_V4
 from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPOCH_BASELINES
 from meridian.control.user_flow_blocks import FLOW_BLOCKS_TABLE
 
-SCHEMA_VERSION = 24
+SCHEMA_VERSION = 25
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS secrets (name TEXT PRIMARY KEY, value BLOB NOT NULL);
@@ -77,6 +78,7 @@ SCHEMA += ALLOWANCE_PERIODS_TABLE + ";\n"
 SCHEMA += FLOW_BLOCKS_TABLE + ";\n"
 SCHEMA += ";\n".join(PASSKEY_TABLES) + ";\n"
 SCHEMA += ";\n".join(CAPACITY_TABLES) + ";\n"
+SCHEMA += PERSON_DELIVERY_POLICY_SCHEMA[0] + ";\n"
 # Statements that bring a database from version N to N + 1 (index N - 1).
 _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (
@@ -144,6 +146,8 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     CAPACITY_TABLES,
     # 23 -> 24: operator-owned profile membership, defaults, and stale-review triggers.
     MEMBERSHIP_SCHEMA,
+    # 24 -> 25: private person delivery overrides and stale-review row versions.
+    PERSON_DELIVERY_POLICY_SCHEMA,
 )
 
 
@@ -159,5 +163,7 @@ def migrate(store: Store) -> None:
         for statement in PEOPLE_SCHEMA:
             store.db.execute(statement)
         for statement in MEMBERSHIP_SCHEMA:
+            store.db.execute(statement)
+        for statement in PERSON_DELIVERY_POLICY_SCHEMA:
             store.db.execute(statement)
     store.set_meta("schema_version", str(SCHEMA_VERSION))

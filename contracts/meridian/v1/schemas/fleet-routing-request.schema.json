@@ -4,10 +4,9 @@
     "client_routing": {
       "anyOf": [
         {
-          "enum": [
-            "ru-split",
-            "full"
-          ],
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "type": "string"
         },
         {

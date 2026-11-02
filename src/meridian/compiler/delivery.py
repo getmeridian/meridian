@@ -4,133 +4,37 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
-from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
+from meridian.compiler.delivery_rules import mihomo_client_rules, singbox_client_rules, xray_client_rules
+from meridian.compiler.errors import TopologyCompileError
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING
-from meridian.core.topology import ClientRoutingPolicy
+from meridian.core.delivery_policy_ir import DEFAULT_CLIENT_ROUTES as DEFAULT_CLIENT_ROUTES
+from meridian.core.delivery_policy_ir import ClientRoute as ClientRoute
+from meridian.core.delivery_policy_ir import ClientRouteAction as ClientRouteAction
+from meridian.core.delivery_policy_ir import client_routes
+from meridian.core.topology import ClientRoutingPolicy, SetupIntent
 
 _PROBE_URL = "https://www.apple.com/library/test/success.html"
 
 _REGEX_SPECIAL = frozenset("\\.^$|?*+()[]{}")
 
-ClientRouteAction = Literal["direct", "block"]
 
+def validate_delivery_backend(intent: SetupIntent) -> None:
+    if intent.control.backend != "meridian" and (
+        intent.delivery.delivery_policies
+        or intent.delivery.default_policy is not None
+        or intent.delivery.profile_policies
+    ):
+        raise TopologyCompileError(
+            "Named delivery policies need Meridian's control service. Run meridian migrate first."
+        )
 
-@dataclass(frozen=True)
-class ClientRoute:
-    """One client-side rule, rendered into every delivery format that routes.
-
-    Matchers use Xray vocabulary (``geosite:``, ``geoip:``, ``domain:``); a rule
-    matches any listed domain or IP, exactly the network/port pair, or a sniffed
-    protocol. Protocol matchers are currently rendered only for Xray JSON;
-    Mihomo and sing-box keep their existing routing behavior.
-    """
-
-    action: ClientRouteAction
-    domains: tuple[str, ...] = ()
-    ips: tuple[str, ...] = ()
-    network: Literal["", "udp"] = ""
-    port: str = ""
-    protocols: tuple[str, ...] = ()
-    ru_split_only: bool = False
-
-
-# Russian destinations stay off the tunnel: domestic services refuse foreign
-# exits, and under mobile whitelists they are the only thing that opens.
-# Foreign QUIC is refused so apps fall back to TCP with a sniffable TLS name.
-# Recognized BitTorrent peer handshakes leave from the client's own connection.
-# This is best-effort: encrypted peers and UDP DHT/uTP may still use the tunnel.
-DEFAULT_CLIENT_ROUTES: tuple[ClientRoute, ...] = (
-    ClientRoute("direct", domains=("geosite:private",), ips=("geoip:private",)),
-    ClientRoute(
-        "direct", domains=("domain:ru", "domain:su", "domain:xn--p1ai", "geosite:category-ru"), ru_split_only=True
-    ),
-    ClientRoute("direct", ips=("geoip:ru",), ru_split_only=True),
-    ClientRoute("block", network="udp", port="443"),
-    ClientRoute("direct", protocols=("bittorrent",)),
-)
 
 # Route by the sniffed name (IP-only clients and QUIC) without rewriting the destination.
 # enabled also sniffs BitTorrent; destOverride controls domain overrides, not
 # protocol detection. Xray rejects "bittorrent" as a destOverride value.
 ROUTE_ONLY_SNIFFING: dict[str, Any] = {"enabled": True, "destOverride": ["http", "tls", "quic"], "routeOnly": True}
-
-_XRAY_OUTBOUND: dict[ClientRouteAction, str] = {"direct": "DIRECT", "block": "BLOCK"}
-_MIHOMO_TARGET: dict[ClientRouteAction, str] = {"direct": "DIRECT", "block": "REJECT"}
-
-
-def client_routes(policy: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING) -> tuple[ClientRoute, ...]:
-    """Derive both reviewed policies from the one ordered client list.
-
-    Full routing removes only the Russian bypasses. Private/LAN bypasses,
-    QUIC blocking, and the best-effort BitTorrent bypass stay in both policies.
-    """
-    return tuple(route for route in DEFAULT_CLIENT_ROUTES if not route.ru_split_only or policy == "ru-split")
-
-
-def xray_client_rules(routes: tuple[ClientRoute, ...] = DEFAULT_CLIENT_ROUTES) -> list[dict[str, Any]]:
-    """Render client routes as Xray field rules (domains and IPs as separate rules)."""
-    rules: list[dict[str, Any]] = []
-    for route in routes:
-        outbound = _XRAY_OUTBOUND[route.action]
-        if route.domains:
-            rules.append({"type": "field", "domain": list(route.domains), "outboundTag": outbound})
-        if route.ips:
-            rules.append({"type": "field", "ip": list(route.ips), "outboundTag": outbound})
-        if route.network:
-            rules.append({"type": "field", "network": route.network, "port": route.port, "outboundTag": outbound})
-        if route.protocols:
-            rules.append({"type": "field", "protocol": list(route.protocols), "outboundTag": outbound})
-    return rules
-
-
-def mihomo_client_rules(routes: tuple[ClientRoute, ...] = DEFAULT_CLIENT_ROUTES) -> list[str]:
-    """Render client routes as Mihomo rule lines."""
-    rules: list[str] = []
-    for route in routes:
-        target = _MIHOMO_TARGET[route.action]
-        rules.extend(f"{_mihomo_domain(domain)},{target}" for domain in route.domains)
-        # no-resolve keeps names off the local resolver: spoofed answers point at domestic stub IPs.
-        rules.extend(f"{_mihomo_ip(ip)},{target},no-resolve" for ip in route.ips)
-        if route.network:
-            rules.append(f"AND,((NETWORK,{route.network.upper()}),(DST-PORT,{route.port})),{target}")
-    return rules
-
-
-def singbox_client_rules(routes: tuple[ClientRoute, ...] = DEFAULT_CLIENT_ROUTES) -> list[dict[str, Any]]:
-    """Render client routes as sing-box rules, inline matchers only.
-
-    sing-box refuses to start when a remote rule set cannot be fetched, which a
-    mobile whitelist guarantees, so geosite/geoip lists other than private are skipped.
-    """
-    rules: list[dict[str, Any]] = []
-    for route in routes:
-        action: dict[str, Any] = {"outbound": "direct"} if route.action == "direct" else {"action": "reject"}
-        suffixes = [f".{value}" for kind, _, value in (m.partition(":") for m in route.domains) if kind == "domain"]
-        if suffixes:
-            rules.append({"domain_suffix": suffixes, **action})
-        if "geoip:private" in route.ips:
-            rules.append({"ip_is_private": True, **action})
-        if route.network:
-            rules.append({"network": [route.network], "port": [int(route.port)], **action})
-    return rules
-
-
-def _mihomo_domain(matcher: str) -> str:
-    kind, _, value = matcher.partition(":")
-    if kind == "geosite":
-        return f"GEOSITE,{value}"
-    if kind == "domain":
-        return f"DOMAIN-SUFFIX,{value}"
-    raise ValueError(f"Unsupported client domain matcher: {matcher}")
-
-
-def _mihomo_ip(matcher: str) -> str:
-    kind, _, value = matcher.partition(":")
-    if kind == "geoip":
-        return f"GEOIP,{value.upper() if value != 'private' else value}"
-    raise ValueError(f"Unsupported client IP matcher: {matcher}")
 
 
 def xray_json_template(

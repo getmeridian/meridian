@@ -507,6 +507,8 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 使用 `client set person --profile limited --yes` 替换配置列表，为每个需要保留的配置重复 `--profile`。选择 `default` 可恢复完整访问。配置成员变更单独审核，与账户限额、备注及语言分开修改。控制台的访问配置卡显示已授权连接及授权原因，保留未保存的选择，并打开相同的固定预览。批量操作 **设置访问配置** 显示新增和失去的入站访问；提交时若用户或拓扑发生变化，整个操作会被拒绝。
 
+单人和批量访问配置预览、`--dry-run` 与撤销试运行，都会先解析每位用户的有效路由策略。有默认映射的配置若选择不同策略，且用户没有已保存的个人覆盖，预览会拒绝更改。`access.creation_settings` 中的初始成员关系也会在配置验证与编译阶段检查默认策略冲突，在生成计划或应用之前拒绝。
+
 CLI 无法读取用户时会报告服务访问错误。配置变更导致访问丢失的警告，每次审核只显示一次。
 
 批量撤销在预览或写入前都会检查保存的用户版本、授权和节点。访问权限已变更或配置已删除时，会拒绝整个撤销并列出受影响用户，`--dry-run` 也一样。撤销预览显示反向的新增、失去访问及相应的彻底断开范围。API 可向 `POST /api/people/bulk/undo` 发送 `{"receipt_id":"...","dry_run":true}`，获得预计的 `undo_people`，不修改数据库、不记录事件，也不拉取备份。未保存访问前提条件的旧回执需要重新进行批量审核。
@@ -551,3 +553,41 @@ JSON 审核和部署导出会保留 `token`、`secret` 等有效配置 ID 和用
 固定分配请向 `POST /api/people/bulk/preview` 发送 `{"usernames":["person"],"action":{"action":"set-profiles","profiles":["limited"]}}`，再提交其 ID 和哈希。配置预览返回 `access_hash`；`PUT /api/settings` 通过 `expected_access_hash` 接收该值，若成员关系已变化则拒绝应用。可选的 `existing_inbounds` 在升级旧节点规格时提供当前节点和标签的引用。预览请求数据不会持久保存。
 
 设置通过 `access_profile_declarations_hash` 保存规范化拓扑访问配置声明的 SHA-256。审核后的写入使用 `expected_access_hash` 设置该值；保持原声明的写入发送 `expected_profile_declarations_hash`，由服务在同一设置事务中校验。删除最后一个访问配置后，仍保留空声明的指纹。`GET /api/access-profiles` 返回 `declarations_hash`，并在存在非默认成员关系时返回 `has_non_default_memberships: true`；读取权限保持不变。未提供任一校验条件时，替换已有指纹或授权映射会被拒绝。
+
+### 私有个人路由
+
+`meridian client routing person` 显示有效策略。运行 `meridian client routing person work --dry-run --json` 审阅，再通过 `meridian client routing person work --yes --json` 保存个人覆盖；`meridian client routing person --inherit --yes` 清除覆盖。面板的用户卡片使用同一服务审阅，草稿只保存在内存中。个人覆盖优先于访问配置默认，访问配置默认优先于服务器默认。应用配置和重新签发凭证保留覆盖；加密快照保存它，删除用户会移除它。选择会在应用刷新订阅时生效，不修改账户或节点访问权限。
+
+读取需要 `people.read` 与 `people.private`，分配还需要 `people.delivery`。`delivery.read` 用于读取已审阅目录。已签发令牌保留原有固定权限；分配策略需要签发包含新权限的令牌。没有私有权限时覆盖被隐藏，订阅、事件和已审阅配置均不包含覆盖字段。预览不写入数据。确认需要 `review_hash`；覆盖、成员关系或目录改变后须重新预览。
+
+| 操作 | 含义 |
+| --- | --- |
+| `GET /api/delivery-policies` | 已审阅目录与访问配置默认；`delivery.read` |
+| `GET /api/users/{username}/delivery-policy` | 私有覆盖及有效策略；`people.read` 与 `people.private` |
+| `PUT /api/users/{username}/delivery-policy` | `{ "policy": "work", "confirm": false }` 返回预览；确认时提交 `review_hash`；需要 `people.delivery`、`people.read`、`people.private`。显式 `policy: null` 表示继承。 |
+
+| `POST /api/delivery-policies/explain` | 离线首次匹配解释；`delivery.explain`，指定用户时还需 `people.read` 与 `people.private` |
+
+## 预览与解释路由
+
+`meridian client preview person --suffix singbox --json` 与面板订阅预览显示有效策略、选择来源、各格式的有序规则与 DNS，以及省略的功能和原因。可选目的地字段解释当前格式。Xray 预览区分缺少指定出口的单连接配置与指纹配置。规则编号在各格式之间一致：局域网规则最先，其次为自定义规则，最后为内置模式的其余规则。同一编号可能编译为客户端文件中的多条规则。
+
+```bash
+meridian fleet routing set work --dry-run --json
+meridian fleet routing explain chat.example.test:443 --person person --format singbox --json
+meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --network tcp --protocol other --json
+```
+
+`fleet routing explain` 读取服务当前已应用的设置及可选个人私有覆盖，返回首次匹配的规则与动作，例如“此目的地通过出口 west，因为规则 2 匹配”。省略 `--person` 可解释服务器默认策略。`--format` 选择 Xray JSON、Mihomo/Clash、Stash、sing-box 或 Base64。默认假设 TCP 和普通流量；`--protocol bittorrent` 提供模拟的协议检测结果。不发送 DNS、网络或可达性查询。更早的规则需要未知端口或缓存中缺失的固定版本地理数据时，结果显示未知。Xray 使用 `IPIfNonMatch` 先检查域名；最终 TCP/UDP 规则将未匹配的域名送入隧道，路由选择无需本地 DNS 查询。IP 规则匹配以 IP 地址连接的目的地。应用选择与服务器可达性可能改变自动组实际使用的连接。
+
+| 格式 / 应用 | 目的地规则 | DNS | fake-IP | 指定出口 | BitTorrent |
+| --- | --- | --- | --- | --- | --- |
+| Xray JSON 应用 | 全部八类匹配 | DoH、普通 DNS | 省略 | 仅限当前配置 | 尽力检测 |
+| Mihomo / Clash Meta | 全部八类 | DoH、DoT、普通 DNS | 支持 | 仅主连接 | 省略 |
+| Stash | 全部八类 | DoH、DoT、普通 DNS | 原生模式，省略自定义 fake-IP | 仅主连接 | 省略 |
+| sing-box / Hiddify | 内联域名、CIDR、端口、TCP/UDP、私有 IP | DoH、DoT、普通 DNS | 支持 | 仅受支持连接 | 省略 |
+| Base64 链接应用 | 无规则 | 无设置 | 不支持 | 无基于规则的选择 | 不支持 |
+
+服务仅从缓存中读取通过 Meridian 固定哈希验证的 Xray 压缩包，不会因解释路由而开始下载。客户端不会收到远程规则集。Xray 将已配置的公共 DNS 请求通过自动组发送，同时保留局域网 DNS 直连；其他客户端使用可表示的 DNS 设置。不支持的传输不会转换为普通 DNS。原有内置模式的字节内容和默认配置的黄金语料响应保持不变。
+
+`POST /api/delivery-policies/explain` 接受 `destination`、可选 `person`、`format`、`port`、`network`、`protocol`。需要 `delivery.explain`；指定用户时还需要 `people.read` 和 `people.private`。订阅预览中的策略详情或目的地解释需要私有权限，较低权限仅返回原有元数据。连接页面的 `/info` 可包含 `user.deliveryCapabilities`：格式名称、支持标志与省略代码，不含策略名称、个人覆盖、成员关系、目的地或连接详情。页面仅在内存中保留这些新鲜数据。

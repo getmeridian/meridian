@@ -75,12 +75,19 @@ from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientExtendRequest
 from meridian.core.client_sessions import CredentialRotationRequest, UserFlowBlocks
 from meridian.core.clients import ClientConnections
+from meridian.core.delivery_explain import DeliveryExplainRequest, DeliveryExplanation
 from meridian.core.errors import MeridianError
 from meridian.core.fleet_events import FleetEventPage, FleetEventQuery
 from meridian.core.languages import LanguageSettings, LanguageState
 from meridian.core.notices import NoticeState, NoticeWrite
 from meridian.core.people_bulk import BulkCommitRequest, BulkPreview, BulkPreviewRequest, BulkReceipt, BulkUndoRequest
 from meridian.core.people_query import PeoplePage, PeopleQuery
+from meridian.core.person_delivery_policy import (
+    DeliveryPolicyCatalog,
+    PersonDeliveryPolicyReview,
+    PersonDeliveryPolicyState,
+    PersonDeliveryPolicyWrite,
+)
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 from meridian.core.token_models import DEFAULT_TOKEN_DAYS, CapabilityCatalog, TokenCapability, TokenPreview
@@ -119,6 +126,14 @@ class ControlServiceNotFound(ControlServiceError):
 
 class ControlServiceConflict(ControlServiceError):
     """The request lost a race or does not fit the object's state (HTTP 409)."""
+
+
+class ControlServicePolicyError(ControlServiceError):
+    """A named refusal the CLI can translate without inspecting message text."""
+
+    def __init__(self, reason: str, message: str) -> None:
+        self.reason = reason
+        super().__init__(message, category="user")
 
 
 class ControlServiceCredentialsChanged(ControlServiceConflict):
@@ -209,6 +224,31 @@ class ControlClient:
 
     def settings(self) -> ServiceSettings:
         return ServiceSettings.model_validate(self._call("GET", "api/settings"))
+
+    def delivery_policies(self) -> DeliveryPolicyCatalog:
+        return DeliveryPolicyCatalog.model_validate(self._call("GET", "api/delivery-policies"))
+
+    def explain_delivery_policy(self, request: DeliveryExplainRequest) -> DeliveryExplanation:
+        return DeliveryExplanation.model_validate(
+            self._request("POST", "api/delivery-policies/explain", request.to_data(), mutation_method="GET").json()
+        )
+
+    def person_delivery_policy(self, username: str) -> PersonDeliveryPolicyState:
+        return PersonDeliveryPolicyState.model_validate(
+            self._call("GET", f"api/users/{quote(username, safe='')}/delivery-policy")
+        )
+
+    def set_person_delivery_policy(
+        self, username: str, request: PersonDeliveryPolicyWrite
+    ) -> PersonDeliveryPolicyReview:
+        return PersonDeliveryPolicyReview.model_validate(
+            self._request(
+                "PUT",
+                f"api/users/{quote(username, safe='')}/delivery-policy",
+                request.to_data(),
+                mutation_method="PUT" if request.confirm else "GET",
+            ).json()
+        )
 
     def server_usage(self) -> ServerUsageList:
         return ServerUsageList.model_validate(self._call("GET", "api/servers"))
@@ -546,6 +586,15 @@ class ControlClient:
                 category="system",
                 retryable=True,
             ) from exc
+        if response.status_code in (400, 409):
+            reason = _error_body(response).get("code")
+            if reason in {
+                "unknown_delivery_policy",
+                "conflicting_delivery_policies",
+                "stale_delivery_policy",
+                "delivery_policy_in_use",
+            }:
+                raise ControlServicePolicyError(str(reason), _message(response))
         if response.status_code == 404:
             raise ControlServiceNotFound(_message(response), category="user")
         if response.status_code == 409:

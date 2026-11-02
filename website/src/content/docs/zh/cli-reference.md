@@ -233,6 +233,20 @@ JSON 筛选计数对所有有效标签均保持整数，包括 `TOKEN` 和 `API_
 `meridian client bulk disable --tag TRIAL_7 --yes --json`
 
 
+
+```bash
+meridian client routing person
+meridian client routing person work --dry-run --json
+meridian client routing person work --yes --json
+meridian client routing person --inherit --yes
+```
+
+`meridian client routing person` 显示有效策略。运行 `meridian client routing person work --dry-run --json` 审阅，再通过 `meridian client routing person work --yes --json` 保存个人覆盖；`meridian client routing person --inherit --yes` 清除覆盖。面板的用户卡片使用同一服务审阅，草稿只保存在内存中。个人覆盖优先于访问配置默认，访问配置默认优先于服务器默认。应用配置和重新签发凭证保留覆盖；加密快照保存它，删除用户会移除它。选择会在应用刷新订阅时生效，不修改账户或节点访问权限。
+
+读取需要 `people.read` 与 `people.private`，分配还需要 `people.delivery`。`delivery.read` 用于读取已审阅目录。已签发令牌保留原有固定权限；分配策略需要签发包含新权限的令牌。没有私有权限时覆盖被隐藏，订阅、事件和已审阅配置均不包含覆盖字段。预览不写入数据。确认需要 `review_hash`；覆盖、成员关系或目录改变后须重新预览。
+
+
+
 ### meridian privacy
 
 选择控制服务保存哪些信息。设备限制和每日历史默认均关闭；应用服务器组配置不会改变这些设置。[隐私](/zh/privacy/)说明每个级别保存什么，以及服务器被夺取后的后果。
@@ -480,6 +494,31 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 通知由管理者维护，保存在控制服务中。`fleet notice set` 先显示预览，再请求确认；`--until WHEN` 设置到期时间，`--for NAME` 使用真实账户信息，JSON 修改需要 `--yes`。`fleet notice show` 读取通知；`fleet notice clear` 确认清除。参见[客户端管理](/zh/client-management/)。
 
 默认 `auto` 使连接页和帮助页跟随每个人的浏览器语言，应用状态提示保持英语。明确选择 `en`、`ru`、`fa` 或 `zh` 可设置页面的初始语言和应用提示语言。`fleet language` 读取设置，`fleet language CODE --yes --json` 保存设置。`client set NAME --language CODE` 设置用户语言，`--language default` 恢复全局默认值。用户在页面上保存的选择优先，且随时可以切换语言。状态代码保持英文。这些服务设置在经过审核的应用操作和加密备份中保留。
+
+
+#### 预览与解释路由
+
+`meridian client preview person --suffix singbox --json` 与面板订阅预览显示有效策略、选择来源、各格式的有序规则与 DNS，以及省略的功能和原因。可选目的地字段解释当前格式。Xray 预览区分缺少指定出口的单连接配置与指纹配置。规则编号在各格式之间一致：局域网规则最先，其次为自定义规则，最后为内置模式的其余规则。同一编号可能编译为客户端文件中的多条规则。
+
+```bash
+meridian fleet routing set work --dry-run --json
+meridian fleet routing explain chat.example.test:443 --person person --format singbox --json
+meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --network tcp --protocol other --json
+```
+
+`fleet routing explain` 读取服务当前已应用的设置及可选个人私有覆盖，返回首次匹配的规则与动作，例如“此目的地通过出口 west，因为规则 2 匹配”。省略 `--person` 可解释服务器默认策略。`--format` 选择 Xray JSON、Mihomo/Clash、Stash、sing-box 或 Base64。默认假设 TCP 和普通流量；`--protocol bittorrent` 提供模拟的协议检测结果。不发送 DNS、网络或可达性查询。更早的规则需要未知端口或缓存中缺失的固定版本地理数据时，结果显示未知。Xray 使用 `IPIfNonMatch` 先检查域名；最终 TCP/UDP 规则将未匹配的域名送入隧道，路由选择无需本地 DNS 查询。IP 规则匹配以 IP 地址连接的目的地。应用选择与服务器可达性可能改变自动组实际使用的连接。
+
+| 格式 / 应用 | 目的地规则 | DNS | fake-IP | 指定出口 | BitTorrent |
+| --- | --- | --- | --- | --- | --- |
+| Xray JSON 应用 | 全部八类匹配 | DoH、普通 DNS | 省略 | 仅限当前配置 | 尽力检测 |
+| Mihomo / Clash Meta | 全部八类 | DoH、DoT、普通 DNS | 支持 | 仅主连接 | 省略 |
+| Stash | 全部八类 | DoH、DoT、普通 DNS | 原生模式，省略自定义 fake-IP | 仅主连接 | 省略 |
+| sing-box / Hiddify | 内联域名、CIDR、端口、TCP/UDP、私有 IP | DoH、DoT、普通 DNS | 支持 | 仅受支持连接 | 省略 |
+| Base64 链接应用 | 无规则 | 无设置 | 不支持 | 无基于规则的选择 | 不支持 |
+
+服务仅从缓存中读取通过 Meridian 固定哈希验证的 Xray 压缩包，不会因解释路由而开始下载。客户端不会收到远程规则集。Xray 将已配置的公共 DNS 请求通过自动组发送，同时保留局域网 DNS 直连；其他客户端使用可表示的 DNS 设置。不支持的传输不会转换为普通 DNS。原有内置模式的字节内容和默认配置的黄金语料响应保持不变。
+
+`POST /api/delivery-policies/explain` 接受 `destination`、可选 `person`、`format`、`port`、`network`、`protocol`。需要 `delivery.explain`；指定用户时还需要 `people.read` 和 `people.private`。订阅预览中的策略详情或目的地解释需要私有权限，较低权限仅返回原有元数据。连接页面的 `/info` 可包含 `user.deliveryCapabilities`：格式名称、支持标志与省略代码，不含策略名称、个人覆盖、成员关系、目的地或连接详情。页面仅在内存中保留这些新鲜数据。
 
 ### meridian context
 

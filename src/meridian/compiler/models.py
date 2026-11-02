@@ -20,6 +20,7 @@ from meridian.core.access_profiles import AccessProfileMap, InboundReference
 from meridian.core.agent_types import Sha256Hex
 from meridian.core.client_limits import UserCreationSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
+from meridian.core.delivery_policies import DeliveryPolicySettings
 from meridian.core.inputs import (
     IPAddressValue,
     OptionalCountryCodeValue,
@@ -497,7 +498,7 @@ class ControlUserPayload(CoreModel):
     creation_settings: UserCreationSettings | None = Field(default=None, exclude_if=lambda settings: settings is None)
 
 
-class ServiceSettingsPayload(OwnerContactSettings):
+class ServiceSettingsPayload(OwnerContactSettings, DeliveryPolicySettings):
     kind: Literal["service_settings"] = "service_settings"
     profile_title: str
     access_profiles: AccessProfileMap = Field(default_factory=dict, exclude_if=lambda value: not value)

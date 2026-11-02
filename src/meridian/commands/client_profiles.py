@@ -11,7 +11,7 @@ from meridian.commands.client_handoff import resolve_client_mutation_name, resol
 from meridian.commands.client_limits import print_client_usage
 from meridian.commands.profile_review import require_profile_backend
 from meridian.console import confirm, fail, is_json_mode, ok, warn
-from meridian.control.client import ControlClient, ControlServiceUncertain
+from meridian.control.client import ControlClient, ControlServicePolicyError, ControlServiceUncertain
 from meridian.control_access import access_panel
 from meridian.core.clients import ClientLimitsResult, build_client_record, client_metadata_paths
 from meridian.core.errors import MeridianError
@@ -66,6 +66,8 @@ def run_set_profiles(name: str, profiles: list[str], *, dry_run: bool, yes: bool
                         access=client.user_access(name),
                         flow_blocks=blocks,
                     )
+    except ControlServicePolicyError as exc:
+        fail(t(f"delivery.error_{exc.reason}"), hint_type="user")
     except MeridianError as exc:
         fail(exc)
     if is_json_mode():

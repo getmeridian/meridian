@@ -2,6 +2,7 @@
 
 ## Design decisions
 - **Profile declaration fingerprints precede expansion** — hash the normalized named grants with `profile_declarations_hash`, so topology can expand unchanged exit or gateway grants without accepting a profile edit.
+- **Delivery policies are finite** — discriminated matchers, IP-addressed DNS, and bounded catalogs share one person/profile/fleet resolver; conflicting profile defaults refuse.
 - **Access grants and membership have separate owners** — topology compiles named grants; service membership is nonempty and private, with default granting every managed inbound.
 - **Capacity has one projection** — `capacity.py` owns freshness, nullable current evidence, integer derived values, and recent/hourly bounds for service, fleet JSON, and console.
 - **Connection vocabulary stays in core** — session cut-off scopes and protocol names must not import service records, or shared apply contracts cycle through topology.
@@ -25,6 +26,7 @@
 
 ## What's done well
 - **Capacity preserves missing evidence** — negotiated samples use nullable figures, integer load/rates, and epoch-local host counters without interface or client identities.
+- **Explanations never guess past missing evidence** — pure first-match evaluation reports unavailable geodata or ports, and Xray pin identity lives in core for every reader.
 - **Credential rotation composes existing client status and node outcomes** — its request requires an integer generation, its CLI result carries no credential, and stale retries cannot create another generation.
 - **Flow-block evidence is capability-gated and revision-bound** — account generations and node outcomes carry no connection or device data.
 - **Defaults stay off the wire** — new intent and settings fields omit their defaults (routing `ru-split`, the six-hour refresh, empty mappings), so existing plans and payloads keep their hashes.
@@ -33,6 +35,10 @@
 - Commands build typed, redacted results before any envelope or rendering, and reporter primitives emit typed events without choosing a renderer.
 
 ## Pitfalls
+- **Initial memberships resolve delivery defaults** — reject conflicting profile policies while validating topology, before a reviewed plan can promise an account creation that apply refuses.
+- **Geodata decodes lazily** — index list names and decode only what an explanation reads; decoding every pinned list took over 400 MB, and the control service was OOM-killed under its 256 MB limit.
+- **Geosite attributes are literal keys** — `@!cn` selects entries carrying `!cn`; treating it as the absence of `cn` changes the client's match.
+- **Explanations follow the client's name pass** — Xray's `IPIfNonMatch` catch-all ends hostname routing before DNS; an earlier IP rule cannot make a later domain match unknown.
 - **Metadata reveals cover containers** — exact revealed paths preserve nested lists and maps with secret-shaped identifiers; string credential fields and neighbouring branches remain redacted.
 - **Legacy node output omits capacity** — keep the null projection off the wire; control-service nodes carry explicit not-reported/current/stale evidence.
 - **Hourly byte sums cross agent epochs** — keep aggregate bytes as nonnegative integers; the agent's safe-integer ceiling governs individual wire counters, not rollup totals.

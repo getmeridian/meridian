@@ -87,3 +87,82 @@ meridian fleet routing ru-split --yes
 ## DNS 注意事项
 
 在 Xray JSON 订阅中，未命中直连规则的域名会通过 VPN 隧道解析，因此境外域名查询不会泄漏给本地 ISP。使用 `ru-split` 时，Mihomo 仅对直接按 IP 发起的连接匹配俄罗斯 IP 段，不会在本地解析其他域名。如果你的应用带有独立的 DNS 设置，请为隧道流量开启防 DNS 泄漏选项。
+
+
+## 命名策略与 DNS
+
+在导出的服务器配置中编辑 `delivery.delivery_policies`，再通过 `meridian fleet import` 审阅。每项策略包含 `id`、内置 `preset`（`full` 或 `ru-split`）、有序 `rules` 和可选 `dns`。将名称写入 `delivery.default_policy`，或使用 `meridian fleet routing work --dry-run` 和 `meridian fleet routing work --yes` 选择。内置名称不能被替换。现有配置的内置订阅内容保持完全一致。
+
+以下是 `delivery` 部分的示例：
+
+```json
+{
+  "delivery_policies": [{
+    "id": "work",
+    "preset": "full",
+    "rules": [{
+      "match": {"kind": "domain_suffix", "values": ["example.test"]},
+      "action": {"kind": "block"}
+    }],
+    "dns": {
+      "resolvers": [{"transport": "doh", "address": "198.51.100.53", "path": "/dns-query"}],
+      "fake_ip": false
+    }
+  }],
+  "default_policy": "work"
+}
+```
+
+示例 IP 属于文档专用地址，请替换为自己的 DNS 服务器地址。`profile_policies` 将访问配置名称（包括 `default`）映射到策略名称。没有映射的配置使用服务器默认策略；同时属于多个已映射配置的用户，必须获得相同策略。通过 `fleet routing` 选择内置模式会清除命名默认策略。删除可选字段可恢复原有内置行为。
+
+单人和批量访问配置预览、`--dry-run` 与撤销试运行，都会先解析每位用户的有效路由策略。有默认映射的配置若选择不同策略，且用户没有已保存的个人覆盖，预览会拒绝更改。`access.creation_settings` 中的初始成员关系也会在配置验证与编译阶段检查默认策略冲突，在生成计划或应用之前拒绝。
+
+规则可匹配域名后缀、完整域名、ASCII 关键词、固定版本的 `geosite`/`geoip` 列表、CIDR、目标端口或 TCP/UDP。`match.kind` 可选 `domain_suffix`、`domain_full`、`domain_keyword`、`geosite`、`geoip`、`cidr`、`port`、`network`。端口值采用 `{"start": 8443, "end": 8445}`；省略 `end` 表示单个端口。同一匹配中的值是备选项，满足任一项即可；可选 `network` 和 `ports` 条件同时限制整条规则。局域网直连规则最先执行，随后按书写顺序执行自定义规则，再执行内置模式的其余规则。首次匹配决定动作。
+
+Stash 使用 `LAN` 表示私有地址范围，包括带有网络和端口条件的逻辑规则。这些 IP 匹配保留 `no-resolve`。
+
+geosite 属性按固定数据中的完整键名匹配。例如，`@!cn` 只选择带有 `!cn` 属性的条目；没有此属性的条目不会匹配。
+
+动作包括 `{"kind":"proxy"}`（通过 VPN）、`{"kind":"direct"}`（直连）、`{"kind":"block"}`（阻止），以及 `{"kind":"exit","exit":"west"}`（通过已声明的出口）。出口组只包含用户有权使用的连接。如果当前订阅配置没有所需出口，对应目的地会被阻止，不会改用其他出口。Xray 单连接配置及不同 TLS 指纹组保持隔离。BitTorrent 检测仍尽力而为，且仅适用于 Xray。
+
+DNS 使用 `transport: doh | dot | plain`、单播 IP `address` 和可选 `port`，默认端口分别为 443、853、53。DoH 支持受限 `path`，普通 DNS 支持 `protocol: udp | tcp`。加密 DNS 的证书必须对其 IP 有效。需要引导解析的主机名、凭证、任意模板和正则表达式均不接受。Xray 支持 DoH/普通 DNS，省略 DoT 和 fake-IP；Mihomo 与 sing-box 支持三种传输及 fake-IP；Stash 保留原生 DNS 模式并省略 fake-IP。Base64 无法携带路由或 DNS 设置。省略的 DNS 选项不会降级为较弱的传输。
+
+每项策略最多 128 条规则、每个域名/IP 匹配最多 64 个值、最多四个 DNS 服务器；目录最多 64 项策略。单项策略最多 64 KiB，整个目录最多 256 KiB。地理列表名称必须存在于客户端已安装的固定版本文件中。策略不会添加远程规则集下载；sing-box 省略 geosite 和非私有 geoip 匹配。应用更改后刷新订阅。
+
+
+### 私有个人路由
+
+`meridian client routing person` 显示有效策略。运行 `meridian client routing person work --dry-run --json` 审阅，再通过 `meridian client routing person work --yes --json` 保存个人覆盖；`meridian client routing person --inherit --yes` 清除覆盖。面板的用户卡片使用同一服务审阅，草稿只保存在内存中。个人覆盖优先于访问配置默认，访问配置默认优先于服务器默认。应用配置和重新签发凭证保留覆盖；加密快照保存它，删除用户会移除它。选择会在应用刷新订阅时生效，不修改账户或节点访问权限。
+
+读取需要 `people.read` 与 `people.private`，分配还需要 `people.delivery`。`delivery.read` 用于读取已审阅目录。已签发令牌保留原有固定权限；分配策略需要签发包含新权限的令牌。没有私有权限时覆盖被隐藏，订阅、事件和已审阅配置均不包含覆盖字段。预览不写入数据。确认需要 `review_hash`；覆盖、成员关系或目录改变后须重新预览。
+
+| 操作 | 含义 |
+| --- | --- |
+| `GET /api/delivery-policies` | 已审阅目录与访问配置默认；`delivery.read` |
+| `GET /api/users/{username}/delivery-policy` | 私有覆盖及有效策略；`people.read` 与 `people.private` |
+| `PUT /api/users/{username}/delivery-policy` | `{ "policy": "work", "confirm": false }` 返回预览；确认时提交 `review_hash`；需要 `people.delivery`、`people.read`、`people.private`。显式 `policy: null` 表示继承。 |
+
+
+## 预览与解释路由
+
+`meridian client preview person --suffix singbox --json` 与面板订阅预览显示有效策略、选择来源、各格式的有序规则与 DNS，以及省略的功能和原因。可选目的地字段解释当前格式。Xray 预览区分缺少指定出口的单连接配置与指纹配置。规则编号在各格式之间一致：局域网规则最先，其次为自定义规则，最后为内置模式的其余规则。同一编号可能编译为客户端文件中的多条规则。
+
+```bash
+meridian fleet routing set work --dry-run --json
+meridian fleet routing explain chat.example.test:443 --person person --format singbox --json
+meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --network tcp --protocol other --json
+```
+
+`fleet routing explain` 读取服务当前已应用的设置及可选个人私有覆盖，返回首次匹配的规则与动作，例如“此目的地通过出口 west，因为规则 2 匹配”。省略 `--person` 可解释服务器默认策略。`--format` 选择 Xray JSON、Mihomo/Clash、Stash、sing-box 或 Base64。默认假设 TCP 和普通流量；`--protocol bittorrent` 提供模拟的协议检测结果。不发送 DNS、网络或可达性查询。更早的规则需要未知端口或缓存中缺失的固定版本地理数据时，结果显示未知。Xray 使用 `IPIfNonMatch` 先检查域名；最终 TCP/UDP 规则将未匹配的域名送入隧道，路由选择无需本地 DNS 查询。IP 规则匹配以 IP 地址连接的目的地。应用选择与服务器可达性可能改变自动组实际使用的连接。
+
+| 格式 / 应用 | 目的地规则 | DNS | fake-IP | 指定出口 | BitTorrent |
+| --- | --- | --- | --- | --- | --- |
+| Xray JSON 应用 | 全部八类匹配 | DoH、普通 DNS | 省略 | 仅限当前配置 | 尽力检测 |
+| Mihomo / Clash Meta | 全部八类 | DoH、DoT、普通 DNS | 支持 | 仅主连接 | 省略 |
+| Stash | 全部八类 | DoH、DoT、普通 DNS | 原生模式，省略自定义 fake-IP | 仅主连接 | 省略 |
+| sing-box / Hiddify | 内联域名、CIDR、端口、TCP/UDP、私有 IP | DoH、DoT、普通 DNS | 支持 | 仅受支持连接 | 省略 |
+| Base64 链接应用 | 无规则 | 无设置 | 不支持 | 无基于规则的选择 | 不支持 |
+
+服务仅从缓存中读取通过 Meridian 固定哈希验证的 Xray 压缩包，不会因解释路由而开始下载。客户端不会收到远程规则集。Xray 将已配置的公共 DNS 请求通过自动组发送，同时保留局域网 DNS 直连；其他客户端使用可表示的 DNS 设置。不支持的传输不会转换为普通 DNS。原有内置模式的字节内容和默认配置的黄金语料响应保持不变。
+
+`POST /api/delivery-policies/explain` 接受 `destination`、可选 `person`、`format`、`port`、`network`、`protocol`。需要 `delivery.explain`；指定用户时还需要 `people.read` 和 `people.private`。订阅预览中的策略详情或目的地解释需要私有权限，较低权限仅返回原有元数据。连接页面的 `/info` 可包含 `user.deliveryCapabilities`：格式名称、支持标志与省略代码，不含策略名称、个人覆盖、成员关系、目的地或连接详情。页面仅在内存中保留这些新鲜数据。

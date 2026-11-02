@@ -359,6 +359,7 @@ def test_snapshot_round_trip_preserves_membership_and_enforcement(service: Contr
 def test_schema_twenty_three_assigns_default_membership_without_changing_credentials(tmp_path: Path):
     from meridian.core.agent_protocol import ObservedStateReport
     from tests.support.capacity import capacity_report
+    from tests.support.control_service import drop_access_membership_schema
 
     path = tmp_path / "old.db"
     moment = datetime.fromisoformat(NOW).timestamp()
@@ -372,11 +373,7 @@ def test_schema_twenty_three_assigns_default_membership_without_changing_credent
     assert capacity.hourly
     control.close()
     with sqlite3.connect(path) as database:
-        for row in database.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'access_membership_%'"
-        ).fetchall():
-            database.execute(f"DROP TRIGGER {row[0]}")
-        database.execute("DROP TABLE IF EXISTS user_access_memberships")
+        drop_access_membership_schema(database)
         database.execute("UPDATE meta SET value = '23' WHERE key = 'schema_version'")
     restored = ControlService(path, fleet_id=FLEET_ID, version="4.0.0", clock=lambda: moment)
     try:

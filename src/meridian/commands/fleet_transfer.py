@@ -87,6 +87,10 @@ def run_export() -> None:
                 | {
                     f"data.document.access.creation_settings.{name}"
                     for name in document["access"].get("creation_settings", {})
+                }
+                | {
+                    f"data.document.delivery.profile_policies.{name}"
+                    for name in document.get("delivery", {}).get("profile_policies", {})
                 },
             )
             return

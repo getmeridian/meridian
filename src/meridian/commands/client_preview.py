@@ -9,6 +9,8 @@ from rich.table import Table
 
 from meridian.commands._helpers import load_topology_cluster
 from meridian.commands.client_handoff import resolve_client_mutation_name, resolve_client_name
+from meridian.commands.delivery_preview import print_delivery_preview
+from meridian.commands.routing_explain import print_explanation
 from meridian.console import err_console, error_context, fail, is_json_mode
 from meridian.control_access import access_panel
 from meridian.core.output import OperationContext, command_envelope
@@ -64,6 +66,10 @@ def print_preview(result: SubscriptionPreview) -> None:
     if result.stale_client:
         table.add_row(t("preview.stale_client"), t(f"preview.stale_client_{result.stale_client}"))
     err_console.print(table)
+    if result.delivery is not None:
+        print_delivery_preview(result.delivery)
+    if result.explanation is not None:
+        print_explanation(result.explanation)
     entries = Table(box=box.SIMPLE, padding=(0, 1))
     for key in ("preview.entry", "preview.protocol", "preview.result"):
         entries.add_column(t(key))

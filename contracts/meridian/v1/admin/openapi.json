@@ -1943,6 +1943,9 @@
                   "people.batch",
                   "people.private",
                   "people.edit",
+                  "people.delivery",
+                  "delivery.read",
+                  "delivery.explain",
                   "people.credentials",
                   "people.reset",
                   "people.reissue",
@@ -2030,6 +2033,9 @@
               "people.batch",
               "people.private",
               "people.edit",
+              "people.delivery",
+              "delivery.read",
+              "delivery.explain",
               "people.credentials",
               "people.reset",
               "people.reissue",
@@ -2095,6 +2101,9 @@
               "people.batch",
               "people.private",
               "people.edit",
+              "people.delivery",
+              "delivery.read",
+              "delivery.explain",
               "people.credentials",
               "people.reset",
               "people.reissue",
@@ -2592,6 +2601,33 @@
         "title": "CapacityValues",
         "type": "object"
       },
+      "CidrMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "cidr",
+            "title": "Kind",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "maxLength": 49,
+              "minLength": 3,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values"
+        ],
+        "title": "CidrMatch",
+        "type": "object"
+      },
       "ClientConnection": {
         "additionalProperties": false,
         "description": "One canonical subscription entry; URI and QR are credentials, never passive output.",
@@ -2821,6 +2857,22 @@
             "description": "False omits this endpoint from delivery; reviewed endpoint apply restores topology settings.",
             "title": "Enabled",
             "type": "boolean"
+          },
+          "exit_ref": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "title": "Exit Ref"
           },
           "fingerprint": {
             "default": "",
@@ -3217,6 +3269,808 @@
         "title": "DeletedResource",
         "type": "object"
       },
+      "DeliveryAction": {
+        "additionalProperties": false,
+        "properties": {
+          "exit": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Exit"
+          },
+          "kind": {
+            "enum": [
+              "proxy",
+              "direct",
+              "block",
+              "exit"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "DeliveryAction",
+        "type": "object"
+      },
+      "DeliveryDestination": {
+        "additionalProperties": false,
+        "properties": {
+          "host": {
+            "maxLength": 253,
+            "minLength": 1,
+            "title": "Host",
+            "type": "string"
+          },
+          "network": {
+            "default": "tcp",
+            "enum": [
+              "tcp",
+              "udp"
+            ],
+            "title": "Network",
+            "type": "string"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "maximum": 65535,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Port"
+          },
+          "protocol": {
+            "default": "other",
+            "enum": [
+              "other",
+              "bittorrent"
+            ],
+            "title": "Protocol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "host"
+        ],
+        "title": "DeliveryDestination",
+        "type": "object"
+      },
+      "DeliveryDns": {
+        "additionalProperties": false,
+        "properties": {
+          "fake_ip": {
+            "default": false,
+            "title": "Fake Ip",
+            "type": "boolean"
+          },
+          "resolvers": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "doh": "#/components/schemas/DohResolver",
+                  "dot": "#/components/schemas/DotResolver",
+                  "plain": "#/components/schemas/PlainResolver"
+                },
+                "propertyName": "transport"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/DohResolver"
+                },
+                {
+                  "$ref": "#/components/schemas/DotResolver"
+                },
+                {
+                  "$ref": "#/components/schemas/PlainResolver"
+                }
+              ]
+            },
+            "maxItems": 4,
+            "minItems": 1,
+            "title": "Resolvers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "resolvers"
+        ],
+        "title": "DeliveryDns",
+        "type": "object"
+      },
+      "DeliveryExplainRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "destination": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Destination",
+            "type": "string"
+          },
+          "format": {
+            "default": "xray-json",
+            "enum": [
+              "browser",
+              "mihomo",
+              "stash",
+              "singbox",
+              "xray-json",
+              "base64"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "network": {
+            "anyOf": [
+              {
+                "enum": [
+                  "tcp",
+                  "udp"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Network"
+          },
+          "person": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Person"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "maximum": 65535,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Port"
+          },
+          "protocol": {
+            "default": "other",
+            "enum": [
+              "other",
+              "bittorrent"
+            ],
+            "title": "Protocol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "destination"
+        ],
+        "title": "DeliveryExplainRequest",
+        "type": "object"
+      },
+      "DeliveryExplanation": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryAction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destination": {
+            "$ref": "#/components/schemas/DeliveryDestination"
+          },
+          "format": {
+            "enum": [
+              "browser",
+              "mihomo",
+              "stash",
+              "singbox",
+              "xray-json",
+              "base64"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "geodata_available": {
+            "title": "Geodata Available",
+            "type": "boolean"
+          },
+          "omitted": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPolicyOmission"
+            },
+            "maxItems": 512,
+            "title": "Omitted",
+            "type": "array"
+          },
+          "policy": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "title": "Policy",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "rule_matched",
+              "default_proxy",
+              "geodata_unavailable",
+              "port_required",
+              "ip_required",
+              "rules_not_carried",
+              "no_connections",
+              "inactive_person"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "maximum": 133,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Rule"
+          },
+          "status": {
+            "enum": [
+              "matched",
+              "default",
+              "unknown",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "destination",
+          "format",
+          "policy",
+          "status",
+          "action",
+          "reason",
+          "geodata_available"
+        ],
+        "title": "DeliveryExplanation",
+        "type": "object"
+      },
+      "DeliveryFormatCapabilities": {
+        "additionalProperties": false,
+        "properties": {
+          "bittorrent": {
+            "title": "Bittorrent",
+            "type": "boolean"
+          },
+          "dns_transports": {
+            "items": {
+              "enum": [
+                "doh",
+                "dot",
+                "plain"
+              ],
+              "type": "string"
+            },
+            "maxItems": 3,
+            "title": "Dns Transports",
+            "type": "array"
+          },
+          "fake_ip": {
+            "title": "Fake Ip",
+            "type": "boolean"
+          },
+          "format": {
+            "enum": [
+              "browser",
+              "mihomo",
+              "stash",
+              "singbox",
+              "xray-json",
+              "base64"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "local_geodata": {
+            "title": "Local Geodata",
+            "type": "boolean"
+          },
+          "matches": {
+            "items": {
+              "enum": [
+                "domain_suffix",
+                "domain_keyword",
+                "domain_full",
+                "geosite",
+                "geoip",
+                "cidr",
+                "port",
+                "network"
+              ],
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Matches",
+            "type": "array"
+          },
+          "via_exit": {
+            "title": "Via Exit",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "format",
+          "matches",
+          "dns_transports",
+          "fake_ip",
+          "via_exit",
+          "bittorrent",
+          "local_geodata"
+        ],
+        "title": "DeliveryFormatCapabilities",
+        "type": "object"
+      },
+      "DeliveryPolicy": {
+        "additionalProperties": false,
+        "description": "LAN always precedes custom rules; the preset's remaining rules follow them.",
+        "properties": {
+          "dns": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryDns"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "id": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "title": "Id",
+            "type": "string"
+          },
+          "preset": {
+            "default": "full",
+            "enum": [
+              "ru-split",
+              "full"
+            ],
+            "title": "Preset",
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryRule"
+            },
+            "maxItems": 128,
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "DeliveryPolicy",
+        "type": "object"
+      },
+      "DeliveryPolicyCatalog": {
+        "additionalProperties": false,
+        "properties": {
+          "default_policy": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "title": "Default Policy",
+            "type": "string"
+          },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPolicy"
+            },
+            "maxItems": 66,
+            "title": "Policies",
+            "type": "array"
+          },
+          "profile_policies": {
+            "maxProperties": 64,
+            "patternProperties": {
+              "^[a-z0-9][a-z0-9_-]*$": {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 48,
+              "minLength": 1
+            },
+            "title": "Profile Policies",
+            "type": "object"
+          }
+        },
+        "required": [
+          "policies",
+          "default_policy",
+          "profile_policies"
+        ],
+        "title": "DeliveryPolicyCatalog",
+        "type": "object"
+      },
+      "DeliveryPolicyOmission": {
+        "additionalProperties": false,
+        "properties": {
+          "blocked": {
+            "default": false,
+            "title": "Blocked",
+            "type": "boolean"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "enum": [
+                  "xray_individual_profiles",
+                  "xray_fingerprint_profiles"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Context"
+          },
+          "exit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Exit"
+          },
+          "profile_count": {
+            "anyOf": [
+              {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile Count"
+          },
+          "reason": {
+            "enum": [
+              "rules_not_carried",
+              "dns_not_carried",
+              "geosite_not_supported",
+              "geoip_not_supported",
+              "bittorrent_not_supported",
+              "dns_transport_not_supported",
+              "fake_ip_not_supported",
+              "exit_unavailable"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "resolver": {
+            "anyOf": [
+              {
+                "maximum": 4,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Resolver"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Rule"
+          },
+          "values": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "DeliveryPolicyOmission",
+        "type": "object"
+      },
+      "DeliveryPolicyPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "effective": {
+            "$ref": "#/components/schemas/ResolvedDeliveryPolicy"
+          },
+          "formats": {
+            "items": {
+              "$ref": "#/components/schemas/FormatDeliveryPolicy"
+            },
+            "maxItems": 5,
+            "title": "Formats",
+            "type": "array"
+          },
+          "geodata_source": {
+            "title": "Geodata Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "effective",
+          "formats",
+          "geodata_source"
+        ],
+        "title": "DeliveryPolicyPreview",
+        "type": "object"
+      },
+      "DeliveryPortRange": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "anyOf": [
+              {
+                "maximum": 65535,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "End"
+          },
+          "start": {
+            "maximum": 65535,
+            "minimum": 1,
+            "title": "Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "start"
+        ],
+        "title": "DeliveryPortRange",
+        "type": "object"
+      },
+      "DeliveryRoutePreview": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/DeliveryAction"
+          },
+          "domains": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Domains",
+            "type": "array"
+          },
+          "ips": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Ips",
+            "type": "array"
+          },
+          "networks": {
+            "items": {
+              "enum": [
+                "tcp",
+                "udp"
+              ],
+              "type": "string"
+            },
+            "maxItems": 2,
+            "title": "Networks",
+            "type": "array"
+          },
+          "number": {
+            "maximum": 133,
+            "minimum": 1,
+            "title": "Number",
+            "type": "integer"
+          },
+          "origin": {
+            "enum": [
+              "lan",
+              "preset",
+              "rule"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "ports": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPortRange"
+            },
+            "maxItems": 16,
+            "title": "Ports",
+            "type": "array"
+          },
+          "protocols": {
+            "items": {
+              "const": "bittorrent",
+              "type": "string"
+            },
+            "maxItems": 1,
+            "title": "Protocols",
+            "type": "array"
+          },
+          "source_rule": {
+            "anyOf": [
+              {
+                "maximum": 128,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Rule"
+          }
+        },
+        "required": [
+          "number",
+          "origin",
+          "action"
+        ],
+        "title": "DeliveryRoutePreview",
+        "type": "object"
+      },
+      "DeliveryRule": {
+        "additionalProperties": false,
+        "description": "Values are alternatives; network and ports narrow the whole match with AND.",
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/DeliveryAction"
+          },
+          "match": {
+            "discriminator": {
+              "mapping": {
+                "cidr": "#/components/schemas/CidrMatch",
+                "domain_full": "#/components/schemas/DomainFullMatch",
+                "domain_keyword": "#/components/schemas/DomainKeywordMatch",
+                "domain_suffix": "#/components/schemas/DomainSuffixMatch",
+                "geoip": "#/components/schemas/GeoipMatch",
+                "geosite": "#/components/schemas/GeositeMatch",
+                "network": "#/components/schemas/NetworkMatch",
+                "port": "#/components/schemas/PortMatch"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DomainSuffixMatch"
+              },
+              {
+                "$ref": "#/components/schemas/DomainKeywordMatch"
+              },
+              {
+                "$ref": "#/components/schemas/DomainFullMatch"
+              },
+              {
+                "$ref": "#/components/schemas/GeositeMatch"
+              },
+              {
+                "$ref": "#/components/schemas/GeoipMatch"
+              },
+              {
+                "$ref": "#/components/schemas/CidrMatch"
+              },
+              {
+                "$ref": "#/components/schemas/PortMatch"
+              },
+              {
+                "$ref": "#/components/schemas/NetworkMatch"
+              }
+            ],
+            "title": "Match"
+          },
+          "network": {
+            "anyOf": [
+              {
+                "enum": [
+                  "tcp",
+                  "udp"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Network"
+          },
+          "ports": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPortRange"
+            },
+            "maxItems": 16,
+            "title": "Ports",
+            "type": "array"
+          }
+        },
+        "required": [
+          "match",
+          "action"
+        ],
+        "title": "DeliveryRule",
+        "type": "object"
+      },
       "DeployerStateDeposit": {
         "additionalProperties": false,
         "description": "The deployer's own fleet files, kept so a snapshot alone can rebuild the fleet.\n\n`cluster_yml` carries no admin token (a restore mints a new one); `servers_json` is the\nserver shelf as the deployer saved it.",
@@ -3375,6 +4229,153 @@
           "deleted"
         ],
         "title": "DevicesRemoved",
+        "type": "object"
+      },
+      "DohResolver": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "maxLength": 45,
+            "minLength": 3,
+            "title": "Address",
+            "type": "string"
+          },
+          "path": {
+            "default": "/dns-query",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "port": {
+            "default": 443,
+            "maximum": 65535,
+            "minimum": 1,
+            "title": "Port",
+            "type": "integer"
+          },
+          "transport": {
+            "const": "doh",
+            "title": "Transport",
+            "type": "string"
+          }
+        },
+        "required": [
+          "transport",
+          "address"
+        ],
+        "title": "DohResolver",
+        "type": "object"
+      },
+      "DomainFullMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "domain_full",
+            "title": "Kind",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "maxLength": 253,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values"
+        ],
+        "title": "DomainFullMatch",
+        "type": "object"
+      },
+      "DomainKeywordMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "domain_keyword",
+            "title": "Kind",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "maxLength": 80,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9._-]+$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values"
+        ],
+        "title": "DomainKeywordMatch",
+        "type": "object"
+      },
+      "DomainSuffixMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "domain_suffix",
+            "title": "Kind",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "maxLength": 253,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values"
+        ],
+        "title": "DomainSuffixMatch",
+        "type": "object"
+      },
+      "DotResolver": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "maxLength": 45,
+            "minLength": 3,
+            "title": "Address",
+            "type": "string"
+          },
+          "port": {
+            "default": 853,
+            "maximum": 65535,
+            "minimum": 1,
+            "title": "Port",
+            "type": "integer"
+          },
+          "transport": {
+            "const": "dot",
+            "title": "Transport",
+            "type": "string"
+          }
+        },
+        "required": [
+          "transport",
+          "address"
+        ],
+        "title": "DotResolver",
         "type": "object"
       },
       "EmptyEventDetail": {
@@ -3721,6 +4722,82 @@
         "title": "FleetEventsQuery",
         "type": "object"
       },
+      "FormatDeliveryPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "capabilities": {
+            "$ref": "#/components/schemas/DeliveryFormatCapabilities"
+          },
+          "dns": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryDns"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dns_source": {
+            "enum": [
+              "preset",
+              "custom",
+              "omitted"
+            ],
+            "title": "Dns Source",
+            "type": "string"
+          },
+          "final_action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryAction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "format": {
+            "enum": [
+              "browser",
+              "mihomo",
+              "stash",
+              "singbox",
+              "xray-json",
+              "base64"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "omitted": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPolicyOmission"
+            },
+            "maxItems": 512,
+            "title": "Omitted",
+            "type": "array"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryRoutePreview"
+            },
+            "maxItems": 133,
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "format",
+          "capabilities",
+          "rules",
+          "final_action",
+          "dns",
+          "dns_source",
+          "omitted"
+        ],
+        "title": "FormatDeliveryPolicy",
+        "type": "object"
+      },
       "FormatRule": {
         "additionalProperties": false,
         "properties": {
@@ -3782,6 +4859,60 @@
           "rule"
         ],
         "title": "FormatRule",
+        "type": "object"
+      },
+      "GeoipMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "geoip",
+            "title": "Kind",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values"
+        ],
+        "title": "GeoipMatch",
+        "type": "object"
+      },
+      "GeositeMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "geosite",
+            "title": "Kind",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values"
+        ],
+        "title": "GeositeMatch",
         "type": "object"
       },
       "GrantedConnection": {
@@ -4048,6 +5179,9 @@
                 "people.batch",
                 "people.private",
                 "people.edit",
+                "people.delivery",
+                "delivery.read",
+                "delivery.explain",
                 "people.credentials",
                 "people.reset",
                 "people.reissue",
@@ -4341,6 +5475,35 @@
           "interval_millis"
         ],
         "title": "NetworkCapacity",
+        "type": "object"
+      },
+      "NetworkMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "network",
+            "title": "Kind",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "enum": [
+                "tcp",
+                "udp"
+              ],
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values"
+        ],
+        "title": "NetworkMatch",
         "type": "object"
       },
       "NginxArtifactResource": {
@@ -5778,6 +6941,9 @@
                   "people.batch",
                   "people.private",
                   "people.edit",
+                  "people.delivery",
+                  "delivery.read",
+                  "delivery.explain",
                   "people.credentials",
                   "people.reset",
                   "people.reissue",
@@ -6587,6 +7753,177 @@
         "title": "PersonAttention",
         "type": "object"
       },
+      "PersonDeliveryPolicyReview": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {
+            "$ref": "#/components/schemas/PersonDeliveryPolicyState"
+          },
+          "before": {
+            "$ref": "#/components/schemas/PersonDeliveryPolicyState"
+          },
+          "confirmed": {
+            "default": false,
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "review_hash": {
+            "description": "Lowercase hex SHA-256 digest.",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Review Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "before",
+          "after",
+          "review_hash"
+        ],
+        "title": "PersonDeliveryPolicyReview",
+        "type": "object"
+      },
+      "PersonDeliveryPolicyState": {
+        "additionalProperties": false,
+        "properties": {
+          "effective": {
+            "$ref": "#/components/schemas/ResolvedDeliveryPolicy"
+          },
+          "override": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override"
+          },
+          "username": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "override",
+          "effective"
+        ],
+        "title": "PersonDeliveryPolicyState",
+        "type": "object"
+      },
+      "PersonDeliveryPolicyWrite": {
+        "additionalProperties": false,
+        "description": "Explicit null inherits; confirm needs the hash returned by the no-write preview.",
+        "properties": {
+          "confirm": {
+            "default": false,
+            "title": "Confirm",
+            "type": "boolean"
+          },
+          "policy": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy"
+          },
+          "review_hash": {
+            "anyOf": [
+              {
+                "description": "Lowercase hex SHA-256 digest.",
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Review Hash"
+          }
+        },
+        "required": [
+          "policy"
+        ],
+        "title": "PersonDeliveryPolicyWrite",
+        "type": "object"
+      },
+      "PlainResolver": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "maxLength": 45,
+            "minLength": 3,
+            "title": "Address",
+            "type": "string"
+          },
+          "port": {
+            "default": 53,
+            "maximum": 65535,
+            "minimum": 1,
+            "title": "Port",
+            "type": "integer"
+          },
+          "protocol": {
+            "default": "udp",
+            "enum": [
+              "tcp",
+              "udp"
+            ],
+            "title": "Protocol",
+            "type": "string"
+          },
+          "transport": {
+            "const": "plain",
+            "title": "Transport",
+            "type": "string"
+          }
+        },
+        "required": [
+          "transport",
+          "address"
+        ],
+        "title": "PlainResolver",
+        "type": "object"
+      },
+      "PortMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "port",
+            "title": "Kind",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPortRange"
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values"
+        ],
+        "title": "PortMatch",
+        "type": "object"
+      },
       "PreviewEntry": {
         "additionalProperties": false,
         "properties": {
@@ -7367,6 +8704,45 @@
           "inbound_tag"
         ],
         "title": "ResetInboundCreate",
+        "type": "object"
+      },
+      "ResolvedDeliveryPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "built_in": {
+            "title": "Built In",
+            "type": "boolean"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/DeliveryPolicy"
+          },
+          "profiles": {
+            "items": {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Profiles",
+            "type": "array"
+          },
+          "source": {
+            "enum": [
+              "fleet",
+              "profile",
+              "person"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "policy",
+          "built_in",
+          "source"
+        ],
+        "title": "ResolvedDeliveryPolicy",
         "type": "object"
       },
       "ResourceError": {
@@ -8239,6 +9615,29 @@
             "title": "Color",
             "type": "string"
           },
+          "default_policy": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Default Policy"
+          },
+          "delivery_policies": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPolicy"
+            },
+            "maxItems": 64,
+            "title": "Delivery Policies",
+            "type": "array"
+          },
           "exit_countries": {
             "items": {
               "maxLength": 2,
@@ -8252,6 +9651,23 @@
           "owner_contact": {
             "$ref": "#/components/schemas/OwnerContact",
             "description": "Optional public owner contact, chosen through reviewed delivery intent."
+          },
+          "profile_policies": {
+            "maxProperties": 64,
+            "patternProperties": {
+              "^[a-z0-9][a-z0-9_-]*$": {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 48,
+              "minLength": 1
+            },
+            "title": "Profile Policies",
+            "type": "object"
           },
           "profile_title": {
             "maxLength": 100,
@@ -8365,6 +9781,29 @@
             "title": "Color",
             "type": "string"
           },
+          "default_policy": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Default Policy"
+          },
+          "delivery_policies": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPolicy"
+            },
+            "maxItems": 64,
+            "title": "Delivery Policies",
+            "type": "array"
+          },
           "exit_countries": {
             "items": {
               "maxLength": 2,
@@ -8406,6 +9845,23 @@
           "owner_contact": {
             "$ref": "#/components/schemas/OwnerContact",
             "description": "Optional public owner contact, chosen through reviewed delivery intent."
+          },
+          "profile_policies": {
+            "maxProperties": 64,
+            "patternProperties": {
+              "^[a-z0-9][a-z0-9_-]*$": {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 48,
+              "minLength": 1
+            },
+            "title": "Profile Policies",
+            "type": "object"
           },
           "profile_title": {
             "maxLength": 100,
@@ -8520,6 +9976,28 @@
       "SubscriptionPreview": {
         "additionalProperties": false,
         "properties": {
+          "delivery": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryPolicyPreview"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryExplanation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "format": {
             "enum": [
               "browser",
@@ -8658,6 +10136,20 @@
             "title": "Accept",
             "type": "string"
           },
+          "destination": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Destination"
+          },
           "suffix": {
             "default": "",
             "enum": [
@@ -8793,6 +10285,9 @@
                     "people.batch",
                     "people.private",
                     "people.edit",
+                    "people.delivery",
+                    "delivery.read",
+                    "delivery.explain",
                     "people.credentials",
                     "people.reset",
                     "people.reissue",
@@ -8818,7 +10313,7 @@
                   ],
                   "type": "string"
                 },
-                "maxItems": 33,
+                "maxItems": 36,
                 "minItems": 1,
                 "type": "array"
               },
@@ -8916,6 +10411,9 @@
                 "people.batch",
                 "people.private",
                 "people.edit",
+                "people.delivery",
+                "delivery.read",
+                "delivery.explain",
                 "people.credentials",
                 "people.reset",
                 "people.reissue",
@@ -9012,6 +10510,9 @@
                 "people.batch",
                 "people.private",
                 "people.edit",
+                "people.delivery",
+                "delivery.read",
+                "delivery.explain",
                 "people.credentials",
                 "people.reset",
                 "people.reissue",
@@ -9107,6 +10608,9 @@
                 "people.batch",
                 "people.private",
                 "people.edit",
+                "people.delivery",
+                "delivery.read",
+                "delivery.explain",
                 "people.credentials",
                 "people.reset",
                 "people.reissue",
@@ -10380,6 +11884,22 @@
             "minimum": 1,
             "title": "Credential Generation",
             "type": "integer"
+          },
+          "delivery_policy": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Private operator-owned client policy override; null follows profile/fleet defaults.",
+            "title": "Delivery Policy"
           },
           "device_limit": {
             "anyOf": [
@@ -12427,6 +13947,213 @@
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "admin"
+        ]
+      }
+    },
+    "/api/delivery-policies": {
+      "get": {
+        "description": "Requires delivery.read capabilities. Compatible presets: read or people, including scopes that cover them.",
+        "operationId": "delivery_policy_catalog",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPolicyCatalog"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Read the reviewed client policy catalog and profile defaults.",
+        "tags": [
+          "delivery-policies"
+        ],
+        "x-meridian-capabilities": [
+          "delivery.read"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "read",
+          "people"
+        ]
+      }
+    },
+    "/api/delivery-policies/explain": {
+      "post": {
+        "description": "Requires delivery.explain capabilities. Compatible presets: read or people, including scopes that cover them.",
+        "operationId": "explain_delivery_policy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryExplainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryExplanation"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Explain the first matching client rule without DNS or network requests.",
+        "tags": [
+          "delivery-policies"
+        ],
+        "x-meridian-capabilities": [
+          "delivery.explain"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-credentials": false,
+        "x-meridian-extra-capabilities": {
+          "person": "people.read",
+          "private_policy": "people.private"
+        },
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "read",
+          "people"
         ]
       }
     },
@@ -14938,6 +16665,7 @@
             },
             "description": "Conflict",
             "x-meridian-error-codes": [
+              "conflicting_delivery_policies",
               "preview_expired",
               "preview_mismatch",
               "stale_people"
@@ -14993,7 +16721,7 @@
     },
     "/api/people/bulk/preview": {
       "post": {
-        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Previews write no database rows or events. They expire after 10 minutes or a service restart. Declared deletions return exact reviewed CLI commands.",
+        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Previews write no database rows or events. They expire after 10 minutes or a service restart. Declared deletions return exact reviewed CLI commands. Profile choices resolve each person's delivery policy before returning a review.",
         "operationId": "preview_people_bulk",
         "requestBody": {
           "content": {
@@ -15067,6 +16795,19 @@
             "description": "Not Found",
             "x-meridian-error-codes": [
               "not_found"
+            ]
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "conflicting_delivery_policies"
             ]
           },
           "413": {
@@ -15220,7 +16961,7 @@
     },
     "/api/people/bulk/undo": {
       "post": {
-        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Undo lasts 10 minutes, survives service restarts, and is single-use. Reset and delete cannot be undone. dry_run=true checks people, grants, nodes, and restored profiles without writing, returning undo_people.",
+        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Undo lasts 10 minutes, survives service restarts, and is single-use. Reset and delete cannot be undone. dry_run=true checks people, grants, nodes, restored profiles, and delivery defaults without writing, returning undo_people.",
         "operationId": "undo_people_bulk",
         "requestBody": {
           "content": {
@@ -15306,6 +17047,7 @@
             },
             "description": "Conflict",
             "x-meridian-error-codes": [
+              "conflicting_delivery_policies",
               "stale_people",
               "undo_refused"
             ]
@@ -16330,6 +18072,8 @@
             },
             "description": "Conflict",
             "x-meridian-error-codes": [
+              "conflicting_delivery_policies",
+              "delivery_policy_in_use",
               "profile_in_use",
               "profile_review_required",
               "stale_access",
@@ -17182,7 +18926,7 @@
     },
     "/api/users": {
       "get": {
-        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them. User UUIDs and subscription tokens need people.credentials; private notes, tags, and profiles need people.private. These fields are otherwise blank, including in mutation responses. People and admin presets include both. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them. User UUIDs and subscription tokens need people.credentials; private notes, tags, profiles, and delivery-policy overrides need people.private. These fields are otherwise blank, including in mutation responses. People and admin presets include both. This response can contain credentials; keep it private and do not log it.",
         "operationId": "list_users",
         "responses": {
           "200": {
@@ -17811,7 +19555,7 @@
         ]
       },
       "get": {
-        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them. User UUIDs and subscription tokens need people.credentials; private notes, tags, and profiles need people.private. These fields are otherwise blank, including in mutation responses. People and admin presets include both. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them. User UUIDs and subscription tokens need people.credentials; private notes, tags, profiles, and delivery-policy overrides need people.private. These fields are otherwise blank, including in mutation responses. People and admin presets include both. This response can contain credentials; keep it private and do not log it.",
         "operationId": "get_user",
         "parameters": [
           {
@@ -18432,6 +20176,258 @@
           "users"
         ],
         "x-meridian-capabilities": [
+          "people.read",
+          "people.private"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "people"
+        ]
+      }
+    },
+    "/api/users/{username}/delivery-policy": {
+      "get": {
+        "description": "Requires people.read and people.private capabilities. Compatible presets: people, including scopes that cover them.",
+        "operationId": "person_delivery_policy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "username",
+            "required": true,
+            "schema": {
+              "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDeliveryPolicyState"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Read a person's private routing override and effective policy.",
+        "tags": [
+          "users"
+        ],
+        "x-meridian-capabilities": [
+          "people.read",
+          "people.private"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "people"
+        ]
+      },
+      "put": {
+        "description": "Requires people.delivery and people.read and people.private capabilities. Compatible presets: people, including scopes that cover them. Explicit null follows profile/fleet defaults. confirm=false writes nothing; confirm=true requires the preview's review_hash and refuses changed membership, catalog, or override.",
+        "operationId": "set_person_delivery_policy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "username",
+            "required": true,
+            "schema": {
+              "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonDeliveryPolicyWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDeliveryPolicyReview"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request",
+              "unknown_delivery_policy"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "conflicting_delivery_policies",
+              "stale_delivery_policy"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Preview or confirm a private client routing override without changing node access.",
+        "tags": [
+          "users"
+        ],
+        "x-meridian-capabilities": [
+          "people.delivery",
           "people.read",
           "people.private"
         ],
@@ -19607,6 +21603,8 @@
       "commands.restart",
       "commands.run",
       "console.read",
+      "delivery.explain",
+      "delivery.read",
       "fleet.apply",
       "fleet.read",
       "nodes.enroll",
@@ -19614,6 +21612,7 @@
       "people.batch",
       "people.bulk",
       "people.credentials",
+      "people.delivery",
       "people.devices",
       "people.edit",
       "people.private",
@@ -19636,6 +21635,8 @@
       "api.read",
       "commands.read",
       "console.read",
+      "delivery.explain",
+      "delivery.read",
       "fleet.read",
       "people.read",
       "revisions.approve",
@@ -19645,8 +21646,11 @@
     ],
     "people": [
       "api.read",
+      "delivery.explain",
+      "delivery.read",
       "people.batch",
       "people.credentials",
+      "people.delivery",
       "people.devices",
       "people.edit",
       "people.private",
@@ -19660,6 +21664,8 @@
       "api.read",
       "commands.read",
       "console.read",
+      "delivery.explain",
+      "delivery.read",
       "fleet.read",
       "people.read",
       "revisions.propose",
@@ -19670,6 +21676,8 @@
       "api.read",
       "commands.read",
       "console.read",
+      "delivery.explain",
+      "delivery.read",
       "fleet.read",
       "people.read",
       "revisions.read",

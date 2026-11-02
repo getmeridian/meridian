@@ -2,6 +2,8 @@
 
 ## Design decisions
 **Profile review logic lives in setup** — commands present gains and losses; the shared apply runtime checks declaration fingerprints for setup and every imperative path before any remote write.
+**Person policy inheritance is explicit** — `client routing --inherit` clears the private override without reserving a policy name.
+**Routing selects reviewed names** — `fleet routing` keeps preset shorthand and selects named policies from intent; a preset selection clears the named fleet default.
 **Profile reviews include people** — `profile`, `plan`, `apply`, and fleet import review effective gains/losses and fence the service membership hash; assignment uses the existing bulk receipt.
 **Bulk reviews** — `client bulk` and `client list` use the service query; commit only the returned ID/hash, and read the receipt after an uncertain reply.
 **Token issuance** — `token` reviews the same typed permissions and expiry as the console; mutations require JSON `--yes`, and only the producing create envelope reveals `data.issued.token`.
@@ -19,6 +21,7 @@
 **Retired spellings** — `cli.RENAMED`/`RENAMED_OPTIONS` refuse old commands and flags with exit 2 and the new spelling; `cli.RETIRED` refuses a command removed without a successor (`studio`) and points to where the work moved.
 
 ## What's done well
+- **Routing explanations use the service** — cached pinned data and current assignments match console previews; preset shorthand retains its original JSON command.
 - **Connection-key rotation follows reissue ownership** — the CLI targets declared people and uses a service generation precondition; the API and console rotate service-owned people, keeping links and registrations.
 - `fleet upgrade` reads each relay's running Realm (a failed upgrade leaves the saved pin ahead), applies the unchanged intent, then runs `check`.
 - `client remove|reissue --cut-off` discloses every affected node and other people's reconnects before confirming, and keeps typed per-node outcomes and new links even on failure.
@@ -29,6 +32,7 @@
 - **Restore profile checks precede target access** — validate the snapshot before resolving or registering its target, and never give changed live declarations an automatic review after installation.
 - **Assignment guards cover both entry points** — single-person and bulk profile assignment require the Meridian backend before directory or service access, even for default membership.
 - **Profile outages keep their uncertainty** — plan retains unavailable evidence; apply and fleet import may skip an unavailable review only before profiles have ever been used.
+- **Profile conflicts use delivery messages** — single, bulk, and undo reviews translate named service policy refusals through the same four-language catalog as person routing.
 - **Profile lookups may translate errors** — catch MeridianError around the directory adapter as well as API calls; the shared preview table owns the revocation warning.
 - **Legacy profile requests stop before I/O** — require the Meridian backend for profile commands and edits; resource reviews without service settings return no profile review instead of querying a legacy panel.
 - **Undo previews are inverse changes** — read the service-validated undo_people before confirmation, including dry runs, so gained/lost access and hard cut-off warnings describe the undo.
@@ -49,6 +53,7 @@
 - **A new public command needs a `_HELP_LAYOUT` entry, a `rich_help_panel`, and a `core.command_catalog.COMMAND_OUTPUTS` entry** (`test_cli_catalog.py`); hidden `serve` and `dev` stay out of the catalog.
 - **Never save intent from a declined or dry-run review**; omitted options preserve saved values.
 - **Role names are server names** — `server set` accepts the exit, gateway, and relay IDs `fleet status` prints, since labs whose saved names are IPs had no other handle.
+- **Profile removal refuses a mapped delivery default first** — intent validation would raise a pydantic error that `profile remove` cannot render; name `delivery.profile_policies` and `fleet import` instead.
 - **Topology-owned removal and reissue never touch console-only people** — and `client reissue` clears device registrations and makes the new subscription URL the page URL at once.
 - **Flow-block receipts read at commit time are always pending** — re-read them briefly (`node_commands.wait_for_flow_blocks()`) before reporting, since the agent confirms within seconds of applying.
 - **`client enable` reports the status the service answers** (`expired`/`limited` when those still hold), never the requested one.

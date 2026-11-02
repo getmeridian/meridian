@@ -148,8 +148,16 @@ def drop_people_query_schema(db: sqlite3.Connection) -> None:
     drop_flow_blocks_schema(db)
 
 
+def drop_person_delivery_policy_schema(db: sqlite3.Connection) -> None:
+    """Rewind the self-contained override step before dropping people row versions."""
+    for name in ("insert", "update", "delete"):
+        db.execute(f"DROP TRIGGER IF EXISTS person_delivery_policy_{name}")
+    db.execute("DROP TABLE IF EXISTS person_delivery_policies")
+
+
 def drop_access_membership_schema(db: sqlite3.Connection) -> None:
     """Rewind the self-contained membership step before dropping people row versions."""
+    drop_person_delivery_policy_schema(db)
     for name in ("default", "insert", "delete"):
         db.execute(f"DROP TRIGGER IF EXISTS access_membership_{name}")
     db.execute("DROP TABLE IF EXISTS user_access_memberships")

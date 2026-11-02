@@ -1,6 +1,7 @@
 # control/formats — Subscription documents for every client app
 
 ## Design decisions
+- **Exit rules bind to each delivered profile** — unavailable exits block, per-exit groups retain eligible fingerprints, and named Mihomo policies never fetch geodata.
 - **Subscriptions follow the golden corpus** — `formats/` renders Base64, Xray JSON, Mihomo, Stash, sing-box, and `/info` status JSON by filling `compiler/delivery.py`'s templates; `formats/selector.py` picks by suffix, then Accept, then User-Agent. `tests/test_control_subscription_corpus.py` diffs every corpus request, each deliberate fix a named row (plain Clash/Stash get Meridian's Mihomo, Hiddify sing-box, an empty User-Agent Base64; no panel security headers). WSS, which no capture holds, follows Remnawave 3.4.5's generators field for field (`test_wss_entries_match_remnawave_generators`).
 - **Xray JSON deliberately extends the corpus** — it is a list: "Automatic" stays first, followed by one shared-routing profile per primary endpoint and the existing isolated fingerprint-copy groups (one config per copy fingerprint).
 - **Renderer takes plain values** — `SubscriptionUser` (UUID, short ID, status `active|disabled|limited|expired`, expiry, traffic and its reset strategy) and `ClientEndpoint`s, where `ClientEndpoint.fingerprint_copy` marks copies; a suspended user gets Remnawave's status placeholder entries in every format. `ServiceSettings.public_url` feeds `support-url`/`profile-web-page-url`, and Hysteria2 auth is the VLESS UUID, as Remnawave delivered it.
@@ -9,6 +10,9 @@
 - **Stale-client nudge** — `stale_clients.py` maps a User-Agent to one inert entry (`outdated` v2rayNG below 1.9.17, `abandoned` NekoRay), each rule with its documented reason; it is read per request, stored nowhere, last in every format, and the preview reports it as `stale_client`.
 
 ## Pitfalls
+- **Stash aliases private ranges inside logical rules too** — translate every `GEOIP,private,` occurrence after compilation, preserving network, ports, and `no-resolve`.
+- **Xray names match before resolution** — keep `IPIfNonMatch` with named DNS; the TCP/UDP catch-all prevents a DNS pass before blocked names or tunnel fallthrough.
+- **Named Xray DNS keeps local resolvers direct** — its DNS-tagged LAN rule precedes the automatic tunnel rule, or a loopback resolver is sent to the exit.
 - **Access filters precede name allocation** — effective-access views and previews pair permitted endpoints with the same unique presentation names as live delivery.
 - **Named `/info` extensions appear only when they carry something** — unit corpus users have no schedule, so an always-present `accountSchedule` passed every unit test and failed only the System Lab's live replay.
 - **Every structured renderer gets the routing policy** — pass the topology's `client_routing` to each one, including Xray fingerprint groups and Stash.

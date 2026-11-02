@@ -1,0 +1,44 @@
+{
+  "additionalProperties": false,
+  "description": "Explicit null inherits; confirm needs the hash returned by the no-write preview.",
+  "properties": {
+    "confirm": {
+      "default": false,
+      "title": "Confirm",
+      "type": "boolean"
+    },
+    "policy": {
+      "anyOf": [
+        {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Policy"
+    },
+    "review_hash": {
+      "anyOf": [
+        {
+          "description": "Lowercase hex SHA-256 digest.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Review Hash"
+    }
+  },
+  "required": [
+    "policy"
+  ],
+  "title": "PersonDeliveryPolicyWrite",
+  "type": "object"
+}

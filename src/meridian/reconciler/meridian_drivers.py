@@ -526,6 +526,7 @@ class ClientEndpointDriver:
             return None
         address = payload.address or self.context.address(payload.address_server_ref)
         return ClientEndpoint(
+            exit_ref=payload.workload_ref,
             inbound_ref=payload.inbound_ref,
             remark=payload.remark,
             protocol=payload.protocol,
@@ -637,6 +638,9 @@ class ServiceSettingsDriver:
             public_url=self.context.cluster.panel.public_base_url(),
             update_interval_hours=payload.update_interval_hours,
             client_routing=payload.client_routing,
+            delivery_policies=payload.delivery_policies,
+            default_policy=payload.default_policy,
+            profile_policies=payload.profile_policies,
             server_name=self.context.cluster.branding.server_name,
             server_icon=self.context.cluster.branding.icon,
             color=self.context.cluster.branding.color,

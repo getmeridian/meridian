@@ -28,7 +28,7 @@ def cli_root() -> click.Group:
 
 
 def public_commands(root: click.Group | None = None) -> dict[str, click.Command]:
-    """Every non-hidden leaf command, keyed by its dotted path (`client.add`)."""
+    """Public leaves and JSON-producing group callbacks, keyed by dotted path."""
     leaves: dict[str, click.Command] = {}
 
     def walk(group: click.Group, prefix: tuple[str, ...]) -> None:
@@ -37,6 +37,8 @@ def public_commands(root: click.Group | None = None) -> dict[str, click.Command]
                 continue
             path = (*prefix, name)
             if isinstance(command, click.Group):
+                if command.invoke_without_command and supports_json(command) and "show" not in command.commands:
+                    leaves[".".join(path)] = command
                 walk(command, path)
             else:
                 leaves[".".join(path)] = command

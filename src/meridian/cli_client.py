@@ -6,6 +6,7 @@ import typer
 
 from meridian.cli_client_bulk import bulk_app
 from meridian.cli_client_preview import client_preview_cmd
+from meridian.cli_client_routing import client_routing_cmd
 from meridian.cli_options import (
     ActivationDuration,
     CutOff,
@@ -28,6 +29,7 @@ client_app = typer.Typer(
 )
 client_app.add_typer(bulk_app, name="bulk", rich_help_panel="Bulk changes")
 client_app.command("preview", rich_help_panel="Connections")(client_preview_cmd)
+client_app.command("routing", rich_help_panel="Connections")(client_routing_cmd)
 
 
 @client_app.command("add")

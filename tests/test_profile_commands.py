@@ -134,3 +134,25 @@ def test_default_profile_removal_and_invalid_membership_are_refused_before_servi
             result = CliRunner().invoke(app, argv)
             assert result.exit_code == 2, result.output
         load.assert_not_called()
+
+
+@pytest.mark.parametrize("dry_run", [True, False], ids=["dry-run", "yes"])
+def test_removing_a_profile_with_a_delivery_default_is_a_user_refusal_not_a_traceback(dry_run: bool):
+    data = single_exit_intent().to_data()
+    data["access_profiles"] = [{"id": "limited", "grants": ["exit:exit-a"]}]
+    data["delivery"] = {**data.get("delivery", {}), "profile_policies": {"limited": "full"}}
+    cluster = ClusterConfig(
+        panel=PanelConfig(url="https://198.51.100.10/control", api_token=ADMIN_TOKEN),
+        topology_intent=SetupIntent.model_validate(data),
+    )
+    with (
+        patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
+        patch("meridian.commands.profiles.reviewed_runtime") as runtime,
+    ):
+        result = CliRunner().invoke(
+            app, ["profile", "remove", "limited", "--dry-run" if dry_run else "--yes", "--json"]
+        )
+    assert result.exit_code == 2, result.output
+    error = json.loads(result.stdout)["errors"][0]
+    assert "delivery.profile_policies" in error["message"] and "fleet import" in error["message"]
+    runtime.assert_not_called()

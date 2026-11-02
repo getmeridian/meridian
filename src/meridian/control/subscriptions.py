@@ -27,6 +27,8 @@ from meridian.control.formats.xray_json import xray_json_document
 from meridian.control.models import ClientEndpoint
 from meridian.control.periods import next_period_start
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
+from meridian.core.delivery_policies import ResolvedDeliveryPolicy
+from meridian.core.delivery_preview import SubscriberDeliveryCapabilities
 from meridian.core.device_slots import DeviceSlots
 from meridian.core.notices import RenderedNotice
 from meridian.core.owner_contact import OwnerContact
@@ -76,6 +78,8 @@ def render_subscription(
     notice: RenderedNotice | None = None,
     stale_client: StaleClient | None = None,
     device_slots: DeviceSlots | None = None,
+    delivery_policy: ResolvedDeliveryPolicy | None = None,
+    delivery_capabilities: SubscriberDeliveryCapabilities | None = None,
 ) -> SubscriptionResponse:
     """Render *document* for *user*; a suspended user's entries are status placeholders.
 
@@ -83,6 +87,8 @@ def render_subscription(
     and availability placeholders replace every entry and the nudge with them.
     """
     placeholders = user.placeholders if placeholder_remarks is None else placeholder_remarks
+    if delivery_policy is not None:
+        client_routing = delivery_policy.policy.preset
     if owner_contact is not None and user.status != "active" and placeholder_remarks is None:
         placeholders = contact_remarks(placeholders, owner_contact.text)
     moment = now or datetime.now(UTC)
@@ -97,6 +103,8 @@ def render_subscription(
             info["notice"] = notice.to_data()
         if device_slots is not None:
             info["user"]["deviceSlots"] = device_slots.to_data()
+        if delivery_capabilities is not None:
+            info["user"]["deliveryCapabilities"] = delivery_capabilities.to_data()
         return SubscriptionResponse(200, JSON_TYPE, _json(info), dict(COMMON_HEADERS) | _refill_headers(user, moment))
     headers = subscription_headers(
         user,
@@ -111,14 +119,30 @@ def render_subscription(
     notices = stale_remarks(stale_client, user.language)
     if document == "xray-json":
         body = _json(
-            xray_json_document(endpoints, user.uuid, placeholders, client_routing=client_routing, notices=notices)
+            xray_json_document(
+                endpoints,
+                user.uuid,
+                placeholders,
+                client_routing=client_routing,
+                notices=notices,
+                delivery_policy=delivery_policy,
+            )
         )
         return SubscriptionResponse(200, JSON_TYPE, body, headers)
     if document == "singbox":
         return SubscriptionResponse(
             200,
             JSON_TYPE,
-            _json(singbox_document(endpoints, user.uuid, placeholders, client_routing=client_routing, notices=notices)),
+            _json(
+                singbox_document(
+                    endpoints,
+                    user.uuid,
+                    placeholders,
+                    client_routing=client_routing,
+                    notices=notices,
+                    delivery_policy=delivery_policy,
+                )
+            ),
             headers,
         )
     if document in ("mihomo", "stash"):
@@ -129,6 +153,7 @@ def render_subscription(
             stash=document == "stash",
             client_routing=client_routing,
             notices=notices,
+            delivery_policy=delivery_policy,
         )
         return SubscriptionResponse(200, YAML_TYPE, body, headers)
     return SubscriptionResponse(200, TEXT_TYPE, base64_document(endpoints, user.uuid, placeholders, notices), headers)

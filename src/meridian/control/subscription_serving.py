@@ -6,6 +6,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 
 from meridian.control.access_memberships import eligible_endpoints
+from meridian.control.delivery_preview import preview_delivery_policy
 from meridian.control.device_slots import read_device_slots
 from meridian.control.devices import DeviceLedger, HeaderReader, browser_request
 from meridian.control.formats.entries import SubscriptionUser
@@ -20,6 +21,8 @@ from meridian.control.subscriptions import (
     unknown_subscription,
 )
 from meridian.control.users import USER_SELECT, user_record
+from meridian.core.delivery_policies import resolve_delivery_policy
+from meridian.core.delivery_preview import subscriber_delivery_capabilities
 from meridian.core.languages import FleetLanguage, LanguageState, language_or_english, resolve_language
 from meridian.core.notices import RenderedNotice
 
@@ -52,6 +55,9 @@ def serve_subscription(
         record = user_record(row, now=datetime.fromtimestamp(clock(), UTC))
         bodies = [item[0] for item in store.db.execute("SELECT body FROM endpoints").fetchall()]
         settings = read_settings()
+        delivery_policy = resolve_delivery_policy(
+            settings, profiles=record.profiles, person_override=record.delivery_policy
+        )
         privacy = read_privacy()
         slots = read_device_slots(store, record, privacy) if document == "browser" else None
         notice = read_notice(record)
@@ -72,6 +78,11 @@ def serve_subscription(
         public_url=settings.public_url,
         update_interval_hours=settings.update_interval_hours,
         client_routing=settings.client_routing,
+        delivery_policy=delivery_policy,
+        delivery_capabilities=subscriber_delivery_capabilities(preview_delivery_policy(delivery_policy, endpoints))
+        if document == "browser"
+        and (settings.default_policy is not None or settings.profile_policies or record.delivery_policy is not None)
+        else None,
         owner_contact=settings.owner_contact,
         notice=notice,
         device_slots=slots,

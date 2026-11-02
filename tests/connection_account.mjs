@@ -21,6 +21,7 @@ w.fetch = (url, options) => {
   requests.push({ url, cache: options.cache });
   return Promise.resolve({ status: 200, json: () => Promise.resolve(body) });
 };
+if (mode === 'account-delivery-constraints') w.eval(fs.readFileSync(path.resolve(ui, '../../templates/pwa/delivery-capabilities.js'), 'utf8'));
 w.eval(fs.readFileSync(path.resolve(ui, '../../templates/pwa/account.js'), 'utf8'));
 const settle = () => new Promise(resolve => setTimeout(resolve, 10));
 await settle();

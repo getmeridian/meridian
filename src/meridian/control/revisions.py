@@ -78,9 +78,12 @@ def secret_paths(value: Any, path: str = "") -> list[str]:
     """JSON paths in a topology intent whose key names a secret or whose text holds one; empty means secret-free.
 
     Declared usernames may key creation-setting mappings or display-name strings,
-    so `token` may be a person. Any other secret-shaped key still counts.
+    so `token` may be a person; declared profile IDs may key delivery defaults.
+    Any other secret-shaped key still counts.
     """
-    return _secret_paths(value, path, (), _declared_usernames(value) if not path else frozenset())
+    if path:
+        return _secret_paths(value, path, (), frozenset(), frozenset())
+    return _secret_paths(value, path, (), _declared_usernames(value), _declared_profiles(value))
 
 
 def _declared_usernames(value: Any) -> frozenset[str]:
@@ -89,20 +92,34 @@ def _declared_usernames(value: Any) -> frozenset[str]:
     return frozenset(user for user in users if isinstance(user, str)) if isinstance(users, list) else frozenset()
 
 
-def _secret_paths(value: Any, path: str, parents: tuple[str | int, ...], declared: frozenset[str]) -> list[str]:
+def _declared_profiles(value: Any) -> frozenset[str]:
+    profiles = value.get("access_profiles") if isinstance(value, dict) else None
+    if not isinstance(profiles, list):
+        return frozenset({"default"})
+    return frozenset(
+        {"default"} | {item["id"] for item in profiles if isinstance(item, dict) and isinstance(item.get("id"), str)}
+    )
+
+
+def _secret_paths(
+    value: Any, path: str, parents: tuple[str | int, ...], declared: frozenset[str], profiles: frozenset[str]
+) -> list[str]:
     found: list[str] = []
     for key, item in _children(value):
         here = f"{path}.{key}" if path else str(key)
-        identifier = key in declared and (
-            (parents == ("access", "creation_settings") and isinstance(item, dict))
-            or (parents == ("access", "display_names") and isinstance(item, str))
-        )
+        identifier = (
+            key in declared
+            and (
+                (parents == ("access", "creation_settings") and isinstance(item, dict))
+                or (parents == ("access", "display_names") and isinstance(item, str))
+            )
+        ) or (key in profiles and parents == ("delivery", "profile_policies") and isinstance(item, str))
         if not identifier and isinstance(key, str) and is_sensitive_key(key):
             found.append(here)
         elif isinstance(item, str) and any(pattern.search(item) for pattern in _SECRET_VALUES):
             found.append(here)
         else:
-            found.extend(_secret_paths(item, here, (*parents, key), declared))
+            found.extend(_secret_paths(item, here, (*parents, key), declared, profiles))
     return found
 
 

@@ -21,6 +21,10 @@ from pathlib import Path
 import pytest
 
 from meridian.compiler.delivery import xray_json_template
+from meridian.control.formats.xray_json import xray_json_document
+from meridian.core.delivery_policies import DeliveryPolicySettings, ResolvedDeliveryPolicy, resolve_delivery_policy
+from tests.test_control_subscription_corpus import FLEETS, UUID
+from tests.test_delivery_policies import delivery_data
 
 _HANDSHAKE = b"\x13BitTorrent protocol" + bytes(8) + bytes(range(20)) + b"-MR0001-123456789012"
 _DHT_PING = b"d1:ad2:id20:abcdefghij0123456789e1:q4:ping1:t2:aa1:y1:qe"
@@ -53,16 +57,23 @@ def _socks_request(sock: socket.socket, command: int, address: bytes, port: int)
 
 
 @contextmanager
-def _running_xray(binary: Path, tmp_path: Path, kind: socket.SocketKind) -> Iterator[tuple[dict, list, Path]]:
+def _running_xray(
+    binary: Path, tmp_path: Path, kind: socket.SocketKind, *, policy: ResolvedDeliveryPolicy | None = None
+) -> Iterator[tuple[dict, list, Path]]:
     with ExitStack() as stack:
         peers = [stack.enter_context(_bound_socket(kind)) for _ in range(2)]
-        config = copy.deepcopy(xray_json_template())
-        config.pop("remnawave")
+        config = (
+            xray_json_document(FLEETS["fleet"].endpoints[:1], UUID, delivery_policy=policy)[0]
+            if policy is not None
+            else copy.deepcopy(xray_json_template())
+        )
+        config.pop("remnawave", None)
         config.pop("burstObservatory")  # Never probe external destinations.
         # Keep every generated rule, including the final balancer rule. Replace
         # only health-based selection: the sole local stand-in needs no probe.
         config["routing"]["balancers"][0]["strategy"] = {"type": "random"}
         config["routing"]["balancers"][0].pop("fallbackTag")
+        config["outbounds"] = [outbound for outbound in config["outbounds"] if outbound["tag"] in ("DIRECT", "BLOCK")]
         config["outbounds"][0]["settings"] = {"redirect": f"127.0.0.1:{peers[0].getsockname()[1]}"}
         config["outbounds"].append(
             {
@@ -183,3 +194,45 @@ def test_foreign_domains_never_reach_the_plain_dns_servers(xray_binary, tmp_path
             assert ready == [peers[1]], "a foreign domain left outside the tunnel"
     log = (tmp_path / "xray.log").read_text(encoding="utf-8")
     assert "querying DNS for" not in log and "app/dns: UDP:" not in log
+
+
+@pytest.mark.parametrize(
+    "host,payload,expected",
+    [
+        ("blocked.example.org", b"ordinary payload", None),
+        ("video.example.org", b"ordinary payload", 0),
+        ("peer.example.org", b"ordinary payload", 1),
+        ("127.0.0.1", b"ordinary payload", 0),
+        ("peer.example.org", _HANDSHAKE, 0),
+    ],
+    ids=["blocked-name", "direct-name", "tunnel-fallthrough", "lan-ip", "bittorrent"],
+)
+def test_named_xray_dns_does_not_resolve_before_domain_rules_or_the_catchall(
+    xray_binary: Path, tmp_path: Path, host: str, payload: bytes, expected: int | None
+) -> None:
+    with _bound_socket(socket.SOCK_DGRAM) as dns:
+        data = delivery_data()
+        data["delivery_policies"][0]["rules"][0]["match"]["values"] = ["blocked.example.org"]
+        data["delivery_policies"][0]["dns"]["resolvers"] = [
+            {"transport": "plain", "address": "127.0.0.1", "port": dns.getsockname()[1]}
+        ]
+        policy = resolve_delivery_policy(DeliveryPolicySettings.model_validate(data))
+        with _running_xray(xray_binary, tmp_path, socket.SOCK_STREAM, policy=policy) as (ports, peers, access):
+            with socket.create_connection(("127.0.0.1", ports["SOCKS"]), timeout=3) as client:
+                address = (
+                    b"\x01" + socket.inet_aton(host) if host == "127.0.0.1" else bytes([3, len(host)]) + host.encode()
+                )
+                _socks_request(client, 1, address, 6881)
+                client.sendall(payload)
+                ready, _, _ = select.select(peers, [], [], 1 if expected is None else 3)
+                assert "querying DNS for" not in (tmp_path / "xray.log").read_text(), "routing resolved the hostname"
+                assert not select.select([dns], [], [], 0)[0], "routing queried DNS before choosing an outbound"
+                if expected is None:
+                    assert not ready and "[SOCKS -> BLOCK]" in access.read_text()
+                else:
+                    assert ready == [peers[expected]], "the named policy chose the wrong outbound"
+                    with ready[0].accept()[0] as remote:
+                        remote.settimeout(3)
+                        assert _read_exact(remote, len(payload)) == payload
+        log = (tmp_path / "xray.log").read_text()
+        assert "querying DNS for" not in log

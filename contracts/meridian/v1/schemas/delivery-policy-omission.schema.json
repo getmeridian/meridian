@@ -1,0 +1,105 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "blocked": {
+      "default": false,
+      "title": "Blocked",
+      "type": "boolean"
+    },
+    "context": {
+      "anyOf": [
+        {
+          "enum": [
+            "xray_individual_profiles",
+            "xray_fingerprint_profiles"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Context"
+    },
+    "exit": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Exit"
+    },
+    "profile_count": {
+      "anyOf": [
+        {
+          "maximum": 10000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Profile Count"
+    },
+    "reason": {
+      "enum": [
+        "rules_not_carried",
+        "dns_not_carried",
+        "geosite_not_supported",
+        "geoip_not_supported",
+        "bittorrent_not_supported",
+        "dns_transport_not_supported",
+        "fake_ip_not_supported",
+        "exit_unavailable"
+      ],
+      "title": "Reason",
+      "type": "string"
+    },
+    "resolver": {
+      "anyOf": [
+        {
+          "maximum": 4,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resolver"
+    },
+    "rule": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rule"
+    },
+    "values": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 64,
+      "title": "Values",
+      "type": "array"
+    }
+  },
+  "required": [
+    "reason"
+  ],
+  "title": "DeliveryPolicyOmission",
+  "type": "object"
+}

@@ -82,3 +82,37 @@ def test_json_fleet_export_preserves_creation_settings_for_credential_shaped_use
         assert reply.exit_code == 0, reply.output
         document = json.loads(reply.stdout)["data"]["document"]
         assert document["access"]["creation_settings"][username]["profiles"] == ["limited"]
+
+
+def mapped_profile_intent(profile: str) -> SetupIntent:
+    data = single_exit_intent().to_data()
+    data["access_profiles"] = [{"id": profile, "grants": []}]
+    data["delivery"] = {**data.get("delivery", {}), "profile_policies": {profile: "full"}}
+    return SetupIntent.model_validate(data)
+
+
+@pytest.mark.parametrize("profile", ["token", "secret", "api_key"])
+def test_revisions_accept_credential_shaped_profile_ids_as_delivery_default_keys(profile: str):
+    from meridian.control.revisions import secret_paths
+
+    intent = mapped_profile_intent(profile).model_dump(mode="json", by_alias=True)
+    assert secret_paths(intent) == []
+    intent["delivery"]["profile_policies"]["password"] = "full"
+    assert secret_paths(intent) == ["delivery.profile_policies.password"]
+    intent["delivery"]["profile_policies"] = {profile: {"api_token": "full"}}
+    assert secret_paths(intent) == [f"delivery.profile_policies.{profile}"]
+
+
+@pytest.mark.parametrize("profile", ["token", "secret", "api_key"])
+def test_json_fleet_export_preserves_delivery_defaults_for_credential_shaped_profile_ids(
+    tmp_path: Path, tmp_home: Path, profile: str
+):
+    with serve_control(tmp_path) as url:
+        cluster = ClusterConfig(
+            panel=PanelConfig(url=url, api_token=ADMIN_TOKEN), topology_intent=mapped_profile_intent(profile)
+        )
+        with patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster):
+            reply = CliRunner().invoke(app, ["fleet", "export", "--json"])
+        set_json_mode(False)
+    assert reply.exit_code == 0, reply.output
+    assert json.loads(reply.stdout)["data"]["document"]["delivery"]["profile_policies"] == {profile: "full"}

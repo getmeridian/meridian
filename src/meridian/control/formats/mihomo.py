@@ -20,6 +20,7 @@ import yaml
 
 from meridian.compiler.delivery import mihomo_template
 from meridian.control.formats.capabilities import supported_endpoints
+from meridian.control.formats.delivery_policy import apply_mihomo_policy
 from meridian.control.formats.entries import (
     AUTOMATIC,
     DEFAULT_FINGERPRINT,
@@ -36,6 +37,7 @@ from meridian.control.formats.entries import (
 )
 from meridian.control.models import ClientEndpoint
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING
+from meridian.core.delivery_policies import ResolvedDeliveryPolicy
 from meridian.core.topology import ClientRoutingPolicy
 
 _SELECT_GROUP = "Meridian"
@@ -75,12 +77,15 @@ def mihomo_document(
     stash: bool = False,
     client_routing: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING,
     notices: tuple[str, ...] = (),
+    delivery_policy: ResolvedDeliveryPolicy | None = None,
 ) -> str:
     """Return the Mihomo document, or its Stash variant.
 
     *notices* are inert proxies listed last in the "Meridian" selector only, never in the
     fallback group, unless placeholders replace the real entries.
     """
+    if delivery_policy is not None:
+        client_routing = delivery_policy.policy.preset
     endpoints = presentation_endpoints(endpoints)
     endpoints = supported_endpoints(endpoints, "stash" if stash else "mihomo")
     placeholders = availability_placeholders(primaries(endpoints), placeholders)
@@ -100,6 +105,8 @@ def mihomo_document(
             group["proxies"] = [*(group["proxies"] or []), *names, *inert]
         elif group["name"] == AUTOMATIC:
             group["proxies"] = names
+    if delivery_policy is not None and not delivery_policy.built_in:
+        apply_mihomo_policy(document, delivery_policy, [] if placeholders else endpoints, stash=stash)
     if stash:
         _to_stash(document, [] if placeholders else endpoints)
     return yaml.dump(document, Dumper=_Yaml12SafeDumper, sort_keys=False, allow_unicode=True, width=1_000_000)
@@ -118,7 +125,7 @@ def _to_stash(document: dict[str, Any], listed: list[ClientEndpoint]) -> None:
         dropped = skipped if group.pop("exclude-filter", None) is not None else xhttp
         group["proxies"] = [name for name in group["proxies"] if name not in dropped]
     old, new = _STASH_PRIVATE_RULE
-    document["rules"] = [new + rule.removeprefix(old) if rule.startswith(old) else rule for rule in document["rules"]]
+    document["rules"] = [rule.replace(old, new) for rule in document["rules"]]
 
 
 def mihomo_proxy(endpoint: ClientEndpoint, uuid: str) -> dict[str, Any]:

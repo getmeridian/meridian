@@ -5,9 +5,11 @@ from __future__ import annotations
 import unicodedata
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, Field, WithJsonSchema
+from pydantic import AfterValidator, Field, WithJsonSchema, field_validator
 
 from meridian.control.models import UserStatus
+from meridian.core.delivery_explain import DeliveryExplanation, parse_destination
+from meridian.core.delivery_preview import DeliveryPolicyPreview
 from meridian.core.models import CoreModel
 from meridian.core.subscription_formats import SUFFIX_FORMATS, DocumentFormat
 from meridian.core.topology import ProtocolKind
@@ -55,6 +57,14 @@ class PreviewInputs(CoreModel):
 
 class SubscriptionPreviewRequest(PreviewInputs):
     username: str = Field(min_length=1, max_length=64)
+    destination: str | None = Field(default=None, min_length=1, max_length=512, exclude_if=lambda value: value is None)
+
+    @field_validator("destination")
+    @classmethod
+    def destination_value(cls, value: str | None) -> str | None:
+        if value is not None:
+            parse_destination(value)
+        return value
 
 
 class FormatRule(CoreModel):
@@ -82,6 +92,8 @@ class OmittedEntry(PreviewEntry):
 
 
 class SubscriptionPreview(FormatSelection):
+    delivery: DeliveryPolicyPreview | None = Field(default=None, exclude_if=lambda value: value is None)
+    explanation: DeliveryExplanation | None = Field(default=None, exclude_if=lambda value: value is None)
     username: str = Field(min_length=1, max_length=256, description="Redacted account name.")
     status: UserStatus
     response_kind: ResponseKind

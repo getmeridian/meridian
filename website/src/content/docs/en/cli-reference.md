@@ -233,6 +233,20 @@ Shared filters: `--search TEXT`, `--status STATUS`, `--tag TAG`, `--expiring-wit
 `meridian client bulk disable --tag TRIAL_7 --yes --json`
 
 
+
+```bash
+meridian client routing person
+meridian client routing person work --dry-run --json
+meridian client routing person work --yes --json
+meridian client routing person --inherit --yes
+```
+
+`meridian client routing person` reads the effective policy. Use `meridian client routing person work --dry-run --json`, then `meridian client routing person work --yes --json` to review and save a private override; `meridian client routing person --inherit --yes` clears it. The console's person card uses the same service review and keeps drafts in memory. Person overrides win over profile defaults, which win over the fleet default. Applies and credential reissue preserve overrides; encrypted snapshots carry them, and deletion removes them. This choice changes subscription delivery at app refresh, with no account or node-access edit.
+
+Policy reads need `people.read` and `people.private`; assignment additionally needs `people.delivery`. `delivery.read` reads the reviewed catalog. Existing issued tokens keep their frozen grants; issue a token with the new grant to assign policies. Overrides are blank without private permission and never appear in subscriptions, events, or reviewed intent. A preview writes nothing. Confirmation requires its `review_hash`; a changed override, membership, or catalog needs another preview.
+
+
+
 ### meridian privacy
 
 Choose what the control service stores. Both device limits and daily history default to off; applying the fleet never changes these settings. See [Privacy](/en/privacy/) for the disclosures and seizure consequences.
@@ -480,6 +494,31 @@ Custom token events show the effective capability labels in your CLI language; c
 The service notice is operator-owned. `fleet notice set` shows a rendered preview before confirmation; `--until WHEN` sets its expiry, `--for NAME` uses real account values, and JSON changes require `--yes`. `fleet notice show` reads it; `fleet notice clear` confirms removal. See [Client management](/en/client-management/).
 
 The default `auto` follows each person's browser on connection and support pages and keeps app status remarks in English. An explicit `en`, `ru`, `fa`, or `zh` sets the starting page language and app remarks. `fleet language` reads it; `fleet language CODE --yes --json` saves it. `client set NAME --language CODE` sets a person override; `--language default` follows the fleet. Saved page choices take priority, and people can still switch on the page. Status codes stay English. These service settings survive reviewed applies and encrypted backups.
+
+
+#### Preview and explain delivery
+
+`meridian client preview person --suffix singbox --json` and the console's subscription preview show the effective policy, its source, every format's ordered rules and DNS, and omitted features with reasons. The optional Destination field explains the selected format. Xray omissions distinguish individual and fingerprint profiles that cannot reach a requested exit. Policy rule numbers count LAN first, then custom rules, then the preset tail; they are shared across formats even when a client needs several serialized rules.
+
+```bash
+meridian fleet routing set work --dry-run --json
+meridian fleet routing explain chat.example.test:443 --person person --format singbox --json
+meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --network tcp --protocol other --json
+```
+
+`fleet routing explain` reads the currently applied service settings and optional private person assignment. It returns the first matched rule and action, for example “this destination goes via exit west because rule 2 matched.” Omit `--person` to explain the fleet default. `--format` selects Xray JSON, Mihomo/Clash, Stash, sing-box, or Base64. TCP and ordinary traffic are assumed unless supplied; `--protocol bittorrent` supplies synthetic detected-protocol evidence. No DNS, reachability, or network lookup occurs. A missing port or cached pinned geodata is reported as unknown when an earlier rule needs it. Xray checks names with `IPIfNonMatch`; its final TCP/UDP rule sends unmatched names through the tunnel without a local DNS routing pass. IP rules match connections addressed by IP. Actual app selection and reachability can change which connection an automatic group uses.
+
+| Format / apps | Destination rules | DNS | fake-IP | Via exit | BitTorrent |
+| --- | --- | --- | --- | --- | --- |
+| Xray JSON apps | All eight typed matchers | DoH, plain | Omitted | Yes, within the delivered profile | Best-effort detection |
+| Mihomo / Clash Meta | All eight | DoH, DoT, plain | Yes | Primary connections only | Omitted |
+| Stash | All eight | DoH, DoT, plain | Native mode; custom fake-IP omitted | Primary connections only | Omitted |
+| sing-box / Hiddify | Inline domains, CIDR, ports, TCP/UDP, private IPs | DoH, DoT, plain | Yes | Supported connections only | Omitted |
+| Base64 link apps | No rules | No settings | No | No rule-based choice | No |
+
+The service reads geodata only from already-cached Xray archives whose hash matches Meridian's pin. Explanations never start a download. Clients never receive remote rule sets. Xray sends configured public DNS through its automatic group and retains direct LAN resolvers; other clients use their represented DNS settings. Choosing an unsupported transport never converts it to plain DNS. Existing preset bytes and default fleet corpus answers stay unchanged.
+
+`POST /api/delivery-policies/explain` accepts `destination`, optional `person`, `format`, `port`, `network`, and `protocol`; it needs `delivery.explain`, plus `people.read` and `people.private` with a person. Subscription previews require private permission for policy details or a destination explanation; lower grants receive the existing metadata only. Connection-page `/info` may include `user.deliveryCapabilities`: format names, support flags, and omission codes, without policy names, assignments, memberships, destinations, or endpoint details. The page keeps this fresh data in memory.
 
 ### meridian context
 

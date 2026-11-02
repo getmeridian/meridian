@@ -25,6 +25,8 @@ needs_console_dom = pytest.mark.skipif(
 
 def run_console(mode: str, locale: str = "en", data: Any = None) -> dict[str, Any]:
     runners = {
+        "delivery-person": "control_ui_delivery_policy.mjs",
+        "policy-preview": "control_ui_delivery_policy.mjs",
         "token-expiry-": "control_ui_tokens.mjs",
         "passkey-": "control_ui_passkeys.mjs",
         "profiles-": "control_ui_profiles.mjs",

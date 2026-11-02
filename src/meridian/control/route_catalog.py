@@ -21,6 +21,7 @@ from meridian.control.api_models import (
     SnapshotResponse,
 )
 from meridian.control.command_routes import node_command_routes
+from meridian.control.delivery_policy_routes import DELIVERY_POLICY_ROUTES
 from meridian.control.metrics_export import METRICS_CONTENT_TYPE, MetricsText
 from meridian.control.models import (
     ApplyFenceState,
@@ -169,7 +170,15 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         capability="fleet.apply",
         refusals=(
             ErrorResponse(
-                409, ("profile_in_use", "stale_access", "stale_profile_declarations", "profile_review_required")
+                409,
+                (
+                    "profile_in_use",
+                    "stale_access",
+                    "stale_profile_declarations",
+                    "profile_review_required",
+                    "delivery_policy_in_use",
+                    "conflicting_delivery_policies",
+                ),
             ),
         ),
     ),
@@ -317,6 +326,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
     *PERSON_ROUTES,
     *PEOPLE_ROUTES,
     *ACCESS_PROFILE_ROUTES,
+    *DELIVERY_POLICY_ROUTES,
     route(
         "GET",
         "/api/endpoints/{endpoint_id}",

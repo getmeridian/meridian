@@ -178,6 +178,9 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
                     profile_title=payload.profile_title,
                     update_interval_hours=payload.update_interval_hours,
                     client_routing=payload.client_routing,
+                    delivery_policies=intent.delivery.delivery_policies,
+                    default_policy=intent.delivery.default_policy,
+                    profile_policies=intent.delivery.profile_policies,
                     exit_countries=list(
                         dict.fromkeys(exit_.region for exit_ in intent.exits_in_delivery_order() if exit_.region)
                     ),

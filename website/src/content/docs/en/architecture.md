@@ -178,3 +178,8 @@ Several fleets can share one machine as contexts (`meridian context`). That dire
 ## Access profiles
 
 Named access profiles are part of reviewed topology and compile to stable authentication-inbound references. The service owns membership in a separate table and activates one canonical grant map for node composition, delivery, and previews. Applies preserve membership; the default profile grants the whole fleet. Public aliases sharing an inbound share enforcement. Losing access uses the existing generation-bound flow-block receipts, without storing connection observations.
+
+
+## Delivery policies
+
+Reviewed delivery intent owns named, bounded destination rules and DNS choices. One client representation compiles Xray JSON, Mihomo, Stash, and sing-box; Base64 cannot carry those settings. Fleet and access-profile defaults use the same resolver, with conflicting profile defaults refused. LAN handling and fingerprint isolation remain explicit. Clients use their already-installed pinned geodata, without remote rule-set fetching. See [Client routing](/en/split-routing/).

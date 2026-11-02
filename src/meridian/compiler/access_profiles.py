@@ -5,6 +5,7 @@ from __future__ import annotations
 from meridian.compiler.errors import TopologyCompileError
 from meridian.compiler.models import CompiledResource, ConfigProfilePayload, HostPayload
 from meridian.core.access_profiles import DEFAULT_ACCESS_PROFILE
+from meridian.core.delivery_policies import DeliveryPolicyResolutionError, resolve_delivery_policy
 from meridian.core.topology import SetupIntent
 
 
@@ -57,4 +58,8 @@ def compile_access_profiles(intent: SetupIntent, resources: dict[str, CompiledRe
         unknown = sorted(set(settings.profiles) - {DEFAULT_ACCESS_PROFILE, *result})
         if unknown:
             raise TopologyCompileError(f"Initial profiles for {username} are unknown: {', '.join(unknown)}.")
+        try:
+            resolve_delivery_policy(intent.delivery, profiles=settings.profiles)
+        except DeliveryPolicyResolutionError as exc:
+            raise TopologyCompileError(f"Initial profiles for {username}: {exc}") from None
     return result

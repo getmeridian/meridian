@@ -165,6 +165,16 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
     "client.preview": CommandOutput(
         data_schema="subscription-preview", outcomes=[_ok("format preview read"), *_FAILURES], stability="preview"
     ),
+    "client.routing": CommandOutput(
+        data_schema="client-routing",
+        outcomes=[
+            _ok("person policy read or reviewed"),
+            _ok("private policy assigned", status="changed"),
+            _ok("private policy unchanged", status="no_changes"),
+            *_FAILURES,
+        ],
+        stability="preview",
+    ),
     **{
         f"client.bulk.{action}": CommandOutput(
             data_schema="client-bulk",
@@ -430,6 +440,19 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
             _BUG,
         ],
         stability="preview",
+    ),
+    "fleet.routing.set": CommandOutput(
+        data_schema="fleet-routing",
+        outcomes=[
+            _ok("policy reviewed"),
+            _ok("policy applied", status="changed"),
+            _ok("policy unchanged", status="no_changes"),
+            *_FAILURES,
+        ],
+        stability="preview",
+    ),
+    "fleet.routing.explain": CommandOutput(
+        data_schema="delivery-explanation", outcomes=[_ok("destination explained"), *_FAILURES], stability="preview"
     ),
     "fleet.import": CommandOutput(
         data_schema="fleet-import",

@@ -31,6 +31,7 @@ from meridian.control.commands import CommandLedger
 from meridian.control.connection_pages import ConnectionPages
 from meridian.control.credential_models import UserCredentialRotation
 from meridian.control.cutoff import CutOffLedger
+from meridian.control.delivery_geodata import cached_geodata
 from meridian.control.devices import DeviceLedger, HeaderReader
 from meridian.control.enrollment import NodeAuthority
 from meridian.control.errors import ServiceError
@@ -62,6 +63,7 @@ from meridian.control.people_bulk import BulkLedger
 from meridian.control.people_query import PeopleQueryEngine
 from meridian.control.period_usage import reset_period
 from meridian.control.person_connections import read_connections
+from meridian.control.person_delivery_policy import DeliveryPolicyLedger
 from meridian.control.privacy import PrivacyLedger, read_privacy
 from meridian.control.revisions import RevisionLedger
 from meridian.control.schema import SCHEMA, migrate
@@ -144,6 +146,12 @@ class ControlService:
         self.languages = LanguageLedger(self._store, self.events)
         self.people = PeopleQueryEngine(self._store, clock=clock)
         self.access = AccessProfileLedger(self._store, read_user=self._require_user, read_users=self.list_users)
+        self.delivery = DeliveryPolicyLedger(
+            self._store,
+            read_settings=self.settings,
+            read_user=self._require_user,
+            read_geodata=lambda: cached_geodata(database.parent / "blobs"),
+        )
         self.bulk = BulkLedger(
             self._store,
             self.people,
@@ -201,7 +209,9 @@ class ControlService:
     def sqlite_size_bytes(self) -> int | None:
         return self._store.size_bytes()
 
-    def preview_subscription(self, request: SubscriptionPreviewRequest) -> SubscriptionPreview:
+    def preview_subscription(
+        self, request: SubscriptionPreviewRequest, *, include_delivery: bool = True
+    ) -> SubscriptionPreview:
         return preview_subscription(
             self._store,
             request,
@@ -211,6 +221,8 @@ class ControlService:
             read_language=self.languages.read,
             read_privacy=self.privacy,
             clock=self._clock,
+            include_delivery=include_delivery,
+            read_geodata=self.delivery.read_geodata,
         )
 
     def preview_user_schedule(self, request: UserSchedulePreviewRequest) -> AccountSchedulePreview:

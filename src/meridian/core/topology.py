@@ -12,6 +12,13 @@ from pydantic import Field, HttpUrl, ValidationInfo, field_validator, model_vali
 from meridian.core.access_profiles import AccessProfileIntent
 from meridian.core.client_limits import UserCreationSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
+from meridian.core.delivery_policies import ClientRoutingPolicy as ClientRoutingPolicy
+from meridian.core.delivery_policies import (
+    DeliveryPolicyResolutionError,
+    DeliveryPolicySettings,
+    delivery_exit_refs,
+    resolve_delivery_policy,
+)
 from meridian.core.inputs import (
     AccessUsernameValue,
     DisplayNameValue,
@@ -62,7 +69,6 @@ EgressOverrideAction = Literal["warp", "direct", "block"]
 # v2fly geosite/geoip list names: "netflix", "category-ru", "geolocation-!cn", "google@cn".
 _GEO_LIST_NAME = re.compile(r"[a-z0-9][a-z0-9!@._-]{0,63}")
 DeliveryFormat = Literal["base64", "xray_json", "mihomo", "singbox"]
-ClientRoutingPolicy = Literal["ru-split", "full"]
 SubscriptionUpdateIntervalHours = Annotated[int, Field(ge=1, le=168)]
 
 
@@ -371,7 +377,7 @@ def _accepted_username(name: str) -> bool:
     return True
 
 
-class DeliveryIntent(OwnerContactSettings):
+class DeliveryIntent(OwnerContactSettings, DeliveryPolicySettings):
     """Canonical Remnawave subscription presentation settings."""
 
     profile_title: ServerTitleValue = "Meridian"
@@ -448,6 +454,17 @@ class SetupIntent(CoreModel):
         profile_ids = [profile.id for profile in self.access_profiles]
         if len(profile_ids) != len(set(profile_ids)):
             raise ValueError("Access profile names must be unique.")
+        unknown_profiles = sorted(self.delivery.profile_policies.keys() - {"default", *profile_ids})
+        if unknown_profiles:
+            raise ValueError("Delivery defaults name unknown access profiles: " + ", ".join(unknown_profiles) + ".")
+        for username, settings in self.access.creation_settings.items():
+            try:
+                resolve_delivery_policy(self.delivery, profiles=settings.profiles)
+            except DeliveryPolicyResolutionError as exc:
+                raise ValueError(f"Initial profiles for {username}: {exc}") from None
+        unknown_exits = sorted(delivery_exit_refs(self.delivery) - {exit_.id for exit_ in self.exits})
+        if unknown_exits:
+            raise ValueError("Delivery rules name unknown exits: " + ", ".join(unknown_exits) + ".")
         unknown_servers = sorted(self.server_metadata.keys() - set(self.declared_server_refs()))
         if unknown_servers:
             raise ValueError("Server metadata refers to undeclared servers: " + ", ".join(unknown_servers) + ".")

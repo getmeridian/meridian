@@ -84,6 +84,7 @@ var TEXT = {
 var INFO_TIMEOUT_MS = 10000;
 var snapshot = null, verified = false, checking = false, failed = false;
 var deviceSlots = null;
+var deliveryCapabilities = null;
 var infoUrl = '', storageKey = '', requestId = 0;
 
 function lang() { return TEXT[document.documentElement.lang] ? document.documentElement.lang : 'en'; }
@@ -163,6 +164,7 @@ function readInfo(body, status) {
   if (schedule) answer.schedule = schedule;
   if (!validSnapshot(answer)) throw new Error('account');
   answer.deviceSlots = readSlots(user.deviceSlots);
+  answer.deliveryCapabilities = user.deliveryCapabilities || null;
   return answer;
 }
 function element(tag, cls, text) {
@@ -229,6 +231,9 @@ function render() {
       metric(list, t('renewalsLeft'), schedule.renewalsLeft === null ? t('unlimitedRenewals') : number(schedule.renewalsLeft));
     }
     panel.appendChild(list);
+    if (verified && deliveryCapabilities && window.MeridianDeliveryCapabilities) {
+      window.MeridianDeliveryCapabilities.mount(panel, deliveryCapabilities, lang());
+    }
   } else if (snapshot) panel.appendChild(element('p', 'muted', t('missing')));
   if (checking) panel.appendChild(element('p', 'account-freshness', t('checking')));
   if (snapshot) panel.appendChild(element('p', 'account-freshness', t(verified ? 'checked' : 'saved', { time: date(snapshot.checkedAt, true) })));
@@ -246,6 +251,8 @@ function refresh() {
     if (answer) {
       deviceSlots = answer.deviceSlots || null;
       delete answer.deviceSlots;
+      deliveryCapabilities = answer.deliveryCapabilities || null;
+      delete answer.deliveryCapabilities;
       snapshot = answer; verified = true;
       if (window._meridianConfig) window._meridianConfig.notice = notice;
       if (window.MeridianNotice) window.MeridianNotice.mount(document.getElementById('owner-notice'), notice, lang());
@@ -275,7 +282,7 @@ function bindPage() {
     }
   } catch (e) {}
   if (target !== infoUrl || !storageKey) {
-    requestId++; checking = false; snapshot = null; deviceSlots = null; verified = false; failed = false; infoUrl = target;
+    requestId++; checking = false; snapshot = null; deviceSlots = null; deliveryCapabilities = null; verified = false; failed = false; infoUrl = target;
     /* The path scopes the snapshot to this subscription without saving its host. */
     storageKey = target ? 'meridian-account:' + new URL(target).pathname : '';
     try {
@@ -291,6 +298,14 @@ document.addEventListener('meridian-render', bindPage);
 document.addEventListener('meridian-setup', applyImportState);
 document.addEventListener('visibilitychange', function() { if (document.visibilityState === 'visible') refresh(); });
 window.addEventListener('pageshow', function(event) { if (event.persisted) refresh(); });
+/* The installed account asset fixes the same-origin, content-versioned helper path. */
+var accountScript = document.getElementById('account-js');
+if (accountScript && accountScript.src && !window.MeridianDeliveryCapabilities) {
+  var helper = document.createElement('script');
+  helper.src = accountScript.src.replace(/\/account\.js$/, '/delivery-capabilities.js');
+  helper.onload = render;
+  document.head.appendChild(helper);
+}
 document.addEventListener('click', function(event) {
   var link = event.target.closest('[data-import]');
   if (link && link.getAttribute('aria-disabled') === 'true') event.preventDefault();

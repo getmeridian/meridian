@@ -1,0 +1,156 @@
+{
+  "$defs": {
+    "DeliveryAction": {
+      "additionalProperties": false,
+      "properties": {
+        "exit": {
+          "anyOf": [
+            {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exit"
+        },
+        "kind": {
+          "enum": [
+            "proxy",
+            "direct",
+            "block",
+            "exit"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "DeliveryAction",
+      "type": "object"
+    },
+    "DeliveryPortRange": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
+        },
+        "start": {
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start"
+      ],
+      "title": "DeliveryPortRange",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "$ref": "#/$defs/DeliveryAction"
+    },
+    "domains": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 64,
+      "title": "Domains",
+      "type": "array"
+    },
+    "ips": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 64,
+      "title": "Ips",
+      "type": "array"
+    },
+    "networks": {
+      "items": {
+        "enum": [
+          "tcp",
+          "udp"
+        ],
+        "type": "string"
+      },
+      "maxItems": 2,
+      "title": "Networks",
+      "type": "array"
+    },
+    "number": {
+      "maximum": 133,
+      "minimum": 1,
+      "title": "Number",
+      "type": "integer"
+    },
+    "origin": {
+      "enum": [
+        "lan",
+        "preset",
+        "rule"
+      ],
+      "title": "Origin",
+      "type": "string"
+    },
+    "ports": {
+      "items": {
+        "$ref": "#/$defs/DeliveryPortRange"
+      },
+      "maxItems": 16,
+      "title": "Ports",
+      "type": "array"
+    },
+    "protocols": {
+      "items": {
+        "const": "bittorrent",
+        "type": "string"
+      },
+      "maxItems": 1,
+      "title": "Protocols",
+      "type": "array"
+    },
+    "source_rule": {
+      "anyOf": [
+        {
+          "maximum": 128,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Rule"
+    }
+  },
+  "required": [
+    "number",
+    "origin",
+    "action"
+  ],
+  "title": "DeliveryRoutePreview",
+  "type": "object"
+}

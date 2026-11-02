@@ -1,6 +1,7 @@
 # content/docs — Markdown documentation source
 
 ## Design decisions
+**Named client policies** — routing and architecture guides describe typed rules, DNS limits, profile defaults, exit blocking, local geodata, and unchanged presets in every locale.
 **Access profile guides** — all locales describe shared-inbound grants, private service membership, default equivalence, gain/loss review, flow-block boundaries, and creation-only fleet export.
 **Protected metrics** — token, CLI, and privacy guides share explicit `metrics.read`, frozen presets, the private 443 ingress, authenticated Prometheus configuration, node-only labels, runtime memory bounds, omissions, and scrape-copy retention in every locale.
 **Capacity history** — client, CLI, and privacy guides share receipt freshness, null/zero states, 360 recent slots, 168 hourly buckets, UTC windows, measured intervals, and snapshot behaviour in every locale.
@@ -38,6 +39,7 @@
 **Links** — link other pages as `/{locale}/{page}/` (with `#anchor` from that locale's own heading); the build validates every link.
 
 ## Pitfalls
+- **Routing excerpts share client semantics** — update the routing, client, CLI, and connecting guides together when a client's match or DNS pass changes.
 - **Privacy disclosures are source text** — privacy.md explains defaults, seizure costs, downgrade deletion, and private device re-registration after restore in every locale; totals-only claims must say they are the default.
 - **Locale parity** — every guide entry above holds in all four locales, and all four locale directories must have the same filenames. A missing file means that locale won't have that doc page, and the sidebar will show a gap.
 - **AI bundles are English-only** — `scripts/ai-docs.mjs` reads only from `en/`. Translations don't affect the AI-facing docs.

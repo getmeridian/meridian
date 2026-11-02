@@ -15,6 +15,14 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b9
 
 #### Added
+- Effective delivery-policy previews for every format, offline destination
+  explanations in the API/CLI/console, and private-data-free app limits on
+  connection pages. Explanations use verified cached geodata and never query DNS (#95).
+- Private per-person delivery overrides with service-hashed reviews, dedicated
+  token grants, CLI and console assignment, and snapshot/apply preservation (#95).
+- Typed named delivery policies with ordered destination rules, validated DNS,
+  reviewed fleet/profile defaults, isolated exit choices, and shared format limits.
+  Built-in routing presets and default subscription bytes remain unchanged (#95).
 - Reviewed access profiles with service-owned membership, enforced inbound grants,
   gain/loss previews, private effective-access views, CLI and console assignment,
   bulk reviews, and snapshot and import preservation. Default access stays full.
@@ -94,6 +102,15 @@ newest first; the last is what 4.0 changes compared with 3.x.
   their own review.
 - Keep unresolved lost inbounds in cut-off reviews after credential rotation,
   reissue, replacing imports, or re-enabling a person with narrower access.
+- Refuse conflicting delivery defaults during single and bulk profile previews,
+  undo dry runs, and initial topology validation and compilation; CLI refusals
+  reuse the delivery messages in all four languages (#95).
+- Translate Stash private-range matches to `LAN` inside logical rules too,
+  preserving network and port conditions and `no-resolve` (#95).
+- Match literal geosite attributes in delivery explanations, including `!cn`,
+  so untagged domains do not match an attributed list (#95).
+- Route hostnames before resolving them in named Xray policies, so blocked names and
+  tunnel fallthrough need no local DNS lookup and receive accurate explanations (#95).
 - Report typed directory failures when assigning a person's profiles and print
   the access-loss warning once per review.
 - Refuse profile definitions and membership on Remnawave fleets with migration

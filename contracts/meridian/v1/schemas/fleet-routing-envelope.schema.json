@@ -141,12 +141,41 @@
           "type": "string"
         },
         "policy": {
-          "enum": [
-            "ru-split",
-            "full"
-          ],
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Policy",
           "type": "string"
+        },
+        "preset": {
+          "anyOf": [
+            {
+              "enum": [
+                "ru-split",
+                "full"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Preset"
+        },
+        "rules": {
+          "anyOf": [
+            {
+              "maximum": 128,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rules"
         }
       },
       "required": [
@@ -460,14 +489,14 @@
           "items": {
             "$ref": "#/$defs/ClientRoutingChoice"
           },
+          "maxItems": 66,
           "title": "Choices",
           "type": "array"
         },
         "client_routing": {
-          "enum": [
-            "ru-split",
-            "full"
-          ],
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Client Routing",
           "type": "string"
         },

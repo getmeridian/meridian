@@ -1,0 +1,75 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "bittorrent": {
+      "title": "Bittorrent",
+      "type": "boolean"
+    },
+    "dns_transports": {
+      "items": {
+        "enum": [
+          "doh",
+          "dot",
+          "plain"
+        ],
+        "type": "string"
+      },
+      "maxItems": 3,
+      "title": "Dns Transports",
+      "type": "array"
+    },
+    "fake_ip": {
+      "title": "Fake Ip",
+      "type": "boolean"
+    },
+    "format": {
+      "enum": [
+        "browser",
+        "mihomo",
+        "stash",
+        "singbox",
+        "xray-json",
+        "base64"
+      ],
+      "title": "Format",
+      "type": "string"
+    },
+    "local_geodata": {
+      "title": "Local Geodata",
+      "type": "boolean"
+    },
+    "matches": {
+      "items": {
+        "enum": [
+          "domain_suffix",
+          "domain_keyword",
+          "domain_full",
+          "geosite",
+          "geoip",
+          "cidr",
+          "port",
+          "network"
+        ],
+        "type": "string"
+      },
+      "maxItems": 8,
+      "title": "Matches",
+      "type": "array"
+    },
+    "via_exit": {
+      "title": "Via Exit",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "format",
+    "matches",
+    "dns_transports",
+    "fake_ip",
+    "via_exit",
+    "bittorrent",
+    "local_geodata"
+  ],
+  "title": "DeliveryFormatCapabilities",
+  "type": "object"
+}

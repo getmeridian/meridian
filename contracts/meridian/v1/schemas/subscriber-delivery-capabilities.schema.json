@@ -1,0 +1,72 @@
+{
+  "$defs": {
+    "SubscriberFormatCapabilities": {
+      "additionalProperties": false,
+      "properties": {
+        "dns_supported": {
+          "title": "Dns Supported",
+          "type": "boolean"
+        },
+        "format": {
+          "enum": [
+            "browser",
+            "mihomo",
+            "stash",
+            "singbox",
+            "xray-json",
+            "base64"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "omitted": {
+          "items": {
+            "enum": [
+              "rules_not_carried",
+              "dns_not_carried",
+              "geosite_not_supported",
+              "geoip_not_supported",
+              "bittorrent_not_supported",
+              "dns_transport_not_supported",
+              "fake_ip_not_supported",
+              "exit_unavailable"
+            ],
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Omitted",
+          "type": "array"
+        },
+        "routing_supported": {
+          "title": "Routing Supported",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "format",
+        "routing_supported",
+        "dns_supported",
+        "omitted"
+      ],
+      "title": "SubscriberFormatCapabilities",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Format limits only: no policy names, overrides, profiles, match values, or endpoints.",
+  "properties": {
+    "formats": {
+      "items": {
+        "$ref": "#/$defs/SubscriberFormatCapabilities"
+      },
+      "maxItems": 5,
+      "title": "Formats",
+      "type": "array"
+    }
+  },
+  "required": [
+    "formats"
+  ],
+  "title": "SubscriberDeliveryCapabilities",
+  "type": "object"
+}
