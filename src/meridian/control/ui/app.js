@@ -15,7 +15,7 @@
   var SCREENS = [
     { name: "overview", render: function (view) { return M.renderOverview(view); } },
     { name: "people", render: function (view, route) { return route.arg ? M.renderPerson(view, route.arg) : M.renderPeople(view); } },
-    { name: "servers", render: function (view, route) { return M.renderServers(view, route.arg); } },
+    { name: "servers", render: function (view, route) { return M.renderServers(view, route.arg, route.extra); } },
     { name: "revisions", detailed: true, render: function (view, route) { return M.renderRevisions(view, route.arg); } },
     { name: "tokens", detailed: true, render: function (view) { return M.renderTokens(view); } },
     { name: "settings", render: function (view) { return M.renderSettings(view); } },

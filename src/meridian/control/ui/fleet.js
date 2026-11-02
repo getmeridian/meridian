@@ -24,7 +24,7 @@
 
   // -- servers --------------------------------------------------------------------------------
 
-  M.renderServers = function (view, selectedServer) {
+  M.renderServers = function (view, selectedServer, selectedSection) {
     var disclosureState = new Map(), firstDraw = true;
     var status = h("div", { class: "live-status" });
     var cards = h("div", { class: "live-data" }, h("div", { class: "empty" }, h("span", { class: "spinner" })));
@@ -69,10 +69,15 @@
           if (selectedServer === card.dataset.server) {
             card.classList.add("server-focused");
             card.tabIndex = -1;
-            if (firstDraw) requestAnimationFrame(function () {
-              if (!card.isConnected) return;
-              card.focus({ preventScroll: true }); card.scrollIntoView({ block: "nearest" });
-            });
+            if (firstDraw) {
+              var detail = selectedSection === "allowance" ? card.querySelector('[data-mode-section="allowance"]') : null;
+              if (detail) detail.open = true;
+              var target = detail || card, focus = detail ? detail.querySelector("summary") : card;
+              requestAnimationFrame(function () {
+                if (!target.isConnected) return;
+                focus.focus({ preventScroll: true }); target.scrollIntoView({ block: "start" });
+              });
+            }
           }
         });
         M.mount(cards, all.length ? h("div", { class: "cards" }, all)

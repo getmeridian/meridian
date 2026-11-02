@@ -13,7 +13,7 @@ const dom = new JSDOM('<!doctype html><body><div id="app" class="boot"></div></b
 });
 const w = dom.window, document = w.document;
 let now = Date.parse('2026-11-02T12:00:00Z'), hidden = !!data.hidden, timerId = 0, failReads = !!data.initialFailure;
-const timers = new Map(), requests = [], events = [], writes = [];
+const timers = new Map(), requests = [], events = [], writes = [], scrolls = [];
 let pendingPicker;
 let historyState = 'good';
 w.Date.now = () => now;
@@ -27,7 +27,14 @@ if (data.noStorage) {
 }
 w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
 w.HTMLDialogElement.prototype.close = function () { this.open = false; };
-w.HTMLElement.prototype.scrollIntoView = function () {};
+w.HTMLElement.prototype.scrollIntoView = function (options) {
+  scrolls.push({ server: this.closest('[data-server]')?.dataset.server, section: this.dataset.modeSection,
+    open: this.open, connected: this.isConnected, block: options?.block });
+};
+if (scenario === 'overview-server-jump') {
+  w.requestAnimationFrame = fn => w.setTimeout(() => fn(now), 16);
+  w.cancelAnimationFrame = w.clearTimeout;
+}
 
 const server = { node_id: 'main', role: 'node', region: 'DE', live: true, in_sync: true,
   agent_version: '0.2.17', revision: 2, applied_revision: 2, failed: [], errors: [], traffic_bytes: 1024,
@@ -37,7 +44,7 @@ const server = { node_id: 'main', role: 'node', region: 'DE', live: true, in_syn
     versions: { xray: '26.7.28' } },
   capacity: { status: 'not_reported', recent: [], hourly: [] } };
 const fleet = data.fleet || { profile_title: 'Sample VPN', servers: [server], declared_users: [], display_names: {},
-  server_usage: [], server_attention: [] };
+  server_usage: data.server_usage || [], server_attention: data.server_attention || [] };
 function reply(body, status = 200) {
   return Promise.resolve({ ok: status >= 200 && status < 300, status, headers: { get: () => null },
     text: () => Promise.resolve(JSON.stringify(body)) });
@@ -252,6 +259,21 @@ if (scenario === 'overview-visual') {
   };
 }
 const reads = () => requests.filter(item => !item.url.startsWith('auth/') && !item.url.startsWith('ui/locales/'));
+if (scenario === 'overview-server-jump') {
+  const link = document.querySelector('.overview-attention a[href^="#/servers/"]');
+  report.serverHref = link?.getAttribute('href');
+  link?.click(); await settle(); await advance(20);
+  const allowance = () => document.querySelector('.server-focused [data-mode-section="allowance"]');
+  report.allowanceOpen = allowance()?.open;
+  report.jumpScroll = scrolls.at(-1);
+  report.focusedSummary = document.activeElement?.closest('[data-mode-section]')?.dataset.modeSection;
+  await advance(11000);
+  report.allowanceAfterPollOpen = allowance()?.open;
+  report.scrollCountAfterPoll = scrolls.length;
+  if (allowance()) allowance().open = false;
+  await advance(11000);
+  report.closedAfterPoll = allowance()?.open === false;
+}
 if (scenario === 'overview-mode') {
   report.beforeAttention = attention(); await clickMode('detailed');
 }

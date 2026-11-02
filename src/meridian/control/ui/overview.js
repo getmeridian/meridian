@@ -188,7 +188,7 @@
   function serverFindings(fleet) {
     var rows = new Map();
     function add(id, label) {
-      var href = "#/servers/" + encodeURIComponent(id), previous = rows.get(href);
+      var href = "#/servers/" + encodeURIComponent(id) + "/allowance", previous = rows.get(href);
       rows.set(href, { href: href, label: previous ? previous.label + " · " + label : label });
     }
     (fleet.servers || []).forEach(function (server) {

@@ -107,8 +107,53 @@ def test_server_attention_links_open_the_server_and_payment_reminders() -> None:
             }
         },
     )
-    assert set(result["attention"]) == {"#/servers/offline", "#/servers/behind", "#/servers/relay"}
+    assert set(result["attention"]) == {
+        "#/servers/offline/allowance",
+        "#/servers/behind/allowance",
+        "#/servers/relay/allowance",
+    }
     assert "2" in result["fleetHealth"] and result["healthKind"] == "warn"
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+@pytest.mark.parametrize("mode", ["simple", "detailed"])
+@pytest.mark.parametrize("node_id", ["main", None], ids=["node", "unmeasured-relay"])
+def test_attention_opens_and_scrolls_to_payment_details_once_then_keeps_the_owners_choice(
+    locale: str, mode: str, node_id: str | None
+) -> None:
+    result = run_console(
+        "overview-server-jump",
+        locale,
+        {
+            "storage": {"mrd.mode": mode},
+            "server_attention": [{"server_ref": "sample-server", "reasons": ["payment_due"]}],
+            "server_usage": [
+                {
+                    "server_ref": "sample-server",
+                    "node_id": node_id,
+                    "measurement": "accepted_user_traffic" if node_id else "not_measured",
+                    "metadata": {"allowance_bytes": 1024, "reset_day": 1, "pay_on": "2026-11-08", "pay_every": "month"},
+                    "used_bytes": 512 if node_id else None,
+                    "period_start": "2026-11-01",
+                    "period_end": "2026-12-01",
+                    "next_payment_on": "2026-11-08",
+                }
+            ],
+        },
+    )
+    target = node_id or "sample-server"
+    assert result["allowanceOpen"] and result["allowanceAfterPollOpen"]
+    assert result["jumpScroll"] == {
+        "server": target,
+        "section": "allowance",
+        "open": True,
+        "connected": True,
+        "block": "start",
+    }
+    assert result["serverHref"] == f"#/servers/{target}/allowance"
+    assert result["focusedSummary"] == "allowance"
+    assert result["scrollCountAfterPoll"] == 1 and result["closedAfterPoll"]
+    assert result["mode"] == mode and result["writes"] == []
 
 
 def test_traffic_uses_the_returned_window_and_never_node_lifetime_bytes() -> None:

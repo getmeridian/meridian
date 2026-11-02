@@ -221,7 +221,8 @@
 .mode-note { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-4);
   max-inline-size: 1040px; margin-inline: auto; padding: var(--space-3) 20px 0; }
 .mode-note .btn { min-block-size: 44px; white-space: normal; }
-.server-focused { border-color: var(--ac); scroll-margin-block-start: 12rem; }
+.server-focused { border-color: var(--ac); }
+.server-focused, .server-focused > .mode-disclosure { scroll-margin-block-start: 12rem; }
 
 /* Overview uses the same cards, read rows, chips, and spacing as the shell. */
 .overview-page { display: flex; flex-direction: column; gap: var(--space-4); }

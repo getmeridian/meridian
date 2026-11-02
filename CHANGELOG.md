@@ -15,7 +15,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b11
 
 #### Added
-- Console Overview with fleet health, attention links, and quick person sharing;
+- Console Overview with fleet health, attention links, direct server payment
+  details, and quick person sharing;
   browser-local Simple and Detailed views, an account menu for theme and language,
   Simple server cards that put health first, disclosures available in both views,
   desktop header actions, a safe phone action bar, and shared responsive components
