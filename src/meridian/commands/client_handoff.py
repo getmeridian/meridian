@@ -15,7 +15,7 @@ from meridian.control.models import USERNAME_PATTERN
 from meridian.control_access import AccessPanel
 from meridian.core.command_inputs import ClientNameRequest
 from meridian.core.inputs import validate_access_username_value, validate_display_name_value
-from meridian.core.topology import assign_access_usernames
+from meridian.core.topology import AccessIntent, assign_access_usernames
 from meridian.i18n import isolate, t
 from meridian.remnawave import RemnawaveError, User
 
@@ -54,20 +54,23 @@ def resolve_client_name(
     console = console_people and cluster.runs_control_service
     if console and (name in declared or name in console_names):
         return name
-    found = intent.access.find_user(name) if intent is not None else None
+    matches = intent.access.matching_users(name) if intent is not None else []
     if console:
         wanted = name.strip().casefold()
-        matches = sorted({*([found] if found else []), *(user for user in console_names if user.casefold() == wanted)})
-        if len(matches) > 1:
-            fail(
-                t("client.name_ambiguous", name=isolate(name), people=", ".join(isolate(user) for user in matches)),
-                hint=t("client.exact_name_hint"),
-                hint_type="user",
-            )
-        if matches:
-            return matches[0]
-    if found is not None:
-        return found
+        matches = sorted({*matches, *(user for user in console_names if user.casefold() == wanted)})
+    if len(matches) > 1:
+        fail(
+            t("client.name_ambiguous", name=isolate(name), people=", ".join(isolate(user) for user in matches)),
+            hint=t("client.exact_name_hint"),
+            hint_type="user",
+        )
+    if matches:
+        return matches[0]
+    return require_plausible_client_name(name, console=console)
+
+
+def require_plausible_client_name(name: str, *, console: bool) -> str:
+    """A name no declared person matches, kept only when the service or the panel could hold it."""
     if console and re.fullmatch(USERNAME_PATTERN, name.strip()):
         return name.strip()
     try:
@@ -79,6 +82,18 @@ def resolve_client_name(
             hint_type="user",
         )
     return name
+
+
+def declared_client_name(access: AccessIntent, name: str) -> str | None:
+    """The declared username *name* means, or None; a name matching two declared people is refused."""
+    matches = access.matching_users(name)
+    if len(matches) > 1:
+        fail(
+            t("client.name_ambiguous", name=isolate(name), people=", ".join(isolate(user) for user in matches)),
+            hint=t("client.exact_name_hint"),
+            hint_type="user",
+        )
+    return matches[0] if matches else None
 
 
 def resolve_client_mutation_name(cluster: ClusterConfig, panel: AccessPanel, name: str) -> str:

@@ -331,3 +331,75 @@ def test_invalid_proposal_files_stop_before_loading_the_fleet(tmp_path, case):
         assert "sample-private-credential" not in result.output
     finally:
         set_json_mode(False)
+
+
+def remove_with(cluster, args):
+    with (
+        patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
+        patch("meridian.commands.client_removal.reviewed_runtime", return_value=review_runtime()) as runtime,
+        patch("meridian.commands.client_removal.apply_reviewed_intent") as batch_apply,
+        patch("meridian.commands.client_v4.apply_reviewed_intent") as single_apply,
+        patch.object(ClusterConfig, "save"),
+    ):
+        result = CliRunner().invoke(app, [*args, "--json"])
+    return result, runtime, batch_apply, single_apply
+
+
+def test_declared_usernames_outside_the_typed_name_pattern_can_still_be_removed(removal_cli, tmp_path):
+    """Declared usernames may start with an underscore; removal acts only on declarations, already validated."""
+    remote, cluster = removal_cli
+    intent = single_exit_intent(users=["_sample", "sample-b", "sample-kept"])
+    remote.service.create_user(UserCreate(username="_sample"))
+    revision = commit_topology(remote.service, intent)
+    cluster.topology_intent, cluster.active_plan_hash = intent, revision.plan_hash
+    proposal = preview(remote.service, "delete", names=["_sample"]).proposal
+    path = tmp_path / "removal.json"
+    path.write_text(proposal.model_dump_json(by_alias=True))
+    result, runtime, batch_apply, _ = remove_with(cluster, ["client", "remove", "--proposal", str(path), "--yes"])
+    assert result.exit_code == 0, result.output
+    runtime.return_value.review.assert_called_once()
+    batch_apply.assert_called_once()
+    result, runtime, _, _ = remove_with(cluster, ["client", "remove", "_sample", "sample-b", "--dry-run"])
+    assert result.exit_code == 0, result.output
+
+
+def test_a_proposal_for_someone_already_removed_reports_the_stale_draft(removal_cli, tmp_path):
+    remote, cluster = removal_cli
+    proposal = preview(remote.service, "delete", names=["sample-a"]).proposal
+    intent = single_exit_intent(users=["sample-b", "sample-kept"])
+    revision = commit_topology(remote.service, intent, generation=2, plan_hash="c" * 64)
+    cluster.topology_intent, cluster.active_generation, cluster.active_plan_hash = intent, 2, revision.plan_hash
+    path = tmp_path / "removal.json"
+    path.write_text(proposal.model_dump_json(by_alias=True))
+    result, runtime, batch_apply, _ = remove_with(cluster, ["client", "remove", "--proposal", str(path), "--yes"])
+    assert result.exit_code == 2, result.output
+    assert "does not match the committed topology" in json.loads(result.stdout)["errors"][0]["message"]
+    batch_apply.assert_not_called()
+
+
+@pytest.mark.parametrize("command", ["remove", "reissue"])
+def test_a_name_matching_two_declared_people_is_refused_not_resolved_to_the_first(removal_cli, command):
+    """One person's username can fold onto another person's display name; neither may be guessed."""
+    remote, cluster = removal_cli
+    data = single_exit_intent(users=["biba", "biba-2", "sample-kept"]).model_dump(mode="json")
+    data["access"]["display_names"] = {"biba": "Биба", "biba-2": "Biba"}
+    intent = SetupIntent.model_validate(data)
+    for name in ("biba", "biba-2"):
+        remote.service.create_user(UserCreate(username=name))
+    revision = commit_topology(remote.service, intent)
+    cluster.topology_intent, cluster.active_plan_hash = intent, revision.plan_hash
+    result, _, batch_apply, single_apply = remove_with(cluster, ["client", command, "Biba", "--yes"])
+    assert result.exit_code == 2, result.output
+    assert "could mean" in json.loads(result.stdout)["errors"][0]["message"]
+    single_apply.assert_not_called()
+    batch_apply.assert_not_called()
+
+
+def test_an_unknown_name_is_refused_before_reading_the_service_directory(removal_cli):
+    _, cluster = removal_cli
+    with patch("meridian.commands.client._console_names", side_effect=AssertionError("service contacted")) as names:
+        result, _, _, single_apply = remove_with(cluster, ["client", "remove", "Призрак", "--yes"])
+    assert result.exit_code == 2, result.output
+    assert "not one of your fleet's clients" in json.loads(result.stdout)["errors"][0]["message"]
+    names.assert_not_called()
+    single_apply.assert_not_called()

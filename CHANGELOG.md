@@ -35,7 +35,10 @@ newest first; the last is what 4.0 changes compared with 3.x.
   answers but predates profiles holds none.
 - `meridian client remove NAME` resolves names like `client show`: a console-only
   person's exact name is refused instead of folding onto a declared person with a
-  similar name, and an ambiguous name is refused.
+  similar name, and an ambiguous name is refused. `client reissue` and
+  `client rotate-credentials` also refuse a name matching two people, where one
+  person's username equals another's display name, instead of picking the first,
+  and a declared username starting with `_` or `-` can be removed or reissued again.
 
 ### Since 4.0.0b10
 

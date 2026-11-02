@@ -338,13 +338,18 @@ class AccessIntent(CoreModel):
 
     def find_user(self, name: str) -> str | None:
         """The username a person means by *name*: a username or a display name, ignoring case."""
+        matches = self.matching_users(name)
+        return matches[0] if matches else None
+
+    def matching_users(self, name: str) -> list[str]:
+        """Every username *name* may mean: an exact username alone, else each case-folded username or display name.
+
+        One person's username can fold onto another's display name, so more than one match is ambiguous.
+        """
         if name in self.users:
-            return name
+            return [name]
         wanted = name.strip().casefold()
-        for user in self.users:
-            if wanted in {user.casefold(), self.display_name(user).casefold()}:
-                return user
-        return None
+        return [user for user in self.users if wanted in {user.casefold(), self.display_name(user).casefold()}]
 
 
 def assign_access_usernames(

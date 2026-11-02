@@ -17,10 +17,12 @@ from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import format_traffic, load_topology_cluster, require_intent
 from meridian.commands.client_connections import print_connections
 from meridian.commands.client_handoff import (
+    declared_client_name,
     format_status,
     get_user_or_fail,
     new_client_usernames,
     print_handoff_links,
+    require_plausible_client_name,
     resolve_client_mutation_name,
     resolve_client_name,
     validate_client_name,
@@ -347,20 +349,22 @@ def run_remove(
             if not names:
                 fail(t("bulk.remove_selection"), hint_type="user")
             cluster = load_topology_cluster()
+            access = require_intent(cluster).access
             if draft is None:
-                declared = set(require_intent(cluster).access.users)
-                console_names = _console_names(cluster) if set(names) - declared else []
+                unknown = [value for value in names if not access.matching_users(value)]
+                for value in unknown:
+                    require_plausible_client_name(value, console=cluster.runs_control_service)
+                console_names = _console_names(cluster) if set(names) - set(access.users) else []
                 names = [
                     resolve_client_name(cluster, value, console_people=True, console_names=console_names)
                     for value in names
                 ]
-            for value in names:
-                validate_client_name(value)
             if len(names) != len(set(names)):
                 fail(t("bulk.remove_duplicate"), hint_type="user")
             if cut_off and (draft is not None or len(names) > 1):
                 fail(t("bulk.proposal_no_cut_off"), hint_type="user")
-            require_removal_users(names, require_intent(cluster).access.users)
+            if draft is None:
+                require_removal_users(names, access.users)
             if len(names) == 1 and draft is None and not dry_run:
                 run_remove_v4(names[0], cluster, operation, yes=yes, cut_off=cut_off)
             else:
@@ -383,7 +387,7 @@ def run_reissue(name: str, yes: bool = False, cut_off: bool = False) -> None:
             )
         cluster = load_topology_cluster()
         access = require_intent(cluster).access
-        found = access.find_user(name)
+        found = declared_client_name(access, name)
         if found is None:
             known = ", ".join(access.display_name(user) for user in access.users)
             fail(
@@ -392,7 +396,6 @@ def run_reissue(name: str, yes: bool = False, cut_off: bool = False) -> None:
                 hint_type="user",
             )
         name = found
-        validate_client_name(name)
         shown = access.display_name(name)
         from meridian.commands.node_command_results import cut_off_disclosure
         from meridian.node_commands import cut_off_scope
