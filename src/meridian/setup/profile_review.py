@@ -8,7 +8,12 @@ from meridian.cluster import ClusterConfig
 from meridian.compiler import compile_topology
 from meridian.compiler.models import CompiledResource, NodeWorkloadPayload, ResourcePlan, ServiceSettingsPayload
 from meridian.control.client import ControlClient, ControlServiceError, ControlServiceNotFound
-from meridian.core.access_profile_views import AccessProfileReview, AccessProfileReviewRequest, GrantedInbound
+from meridian.core.access_profile_views import (
+    AccessProfileCatalog,
+    AccessProfileReview,
+    AccessProfileReviewRequest,
+    GrantedInbound,
+)
 from meridian.core.access_profiles import profile_declarations_hash
 from meridian.core.errors import InfrastructureEvidenceUnavailableError, LocalStateError
 from meridian.core.topology import SetupIntent
@@ -38,11 +43,7 @@ def check_profile_access(cluster: ClusterConfig, intent: SetupIntent, *, access_
         if evidence_required:
             raise ProfileReviewUnavailableError() from exc
         return False
-    held_profiles = (
-        live.declarations_hash is not None
-        or live.has_non_default_memberships
-        or any(not profile.built_in for profile in live.profiles)
-    )
+    held_profiles = _held_profiles(live)
     if (
         access_review_hash is not None
         or live.declarations_hash == profile_declarations_hash(intent.access_profiles)
@@ -53,7 +54,7 @@ def check_profile_access(cluster: ClusterConfig, intent: SetupIntent, *, access_
 
 
 def profile_review_needed(cluster: ClusterConfig, intent: SetupIntent, *, allow_bootstrap: bool = False) -> bool:
-    """The last profile and a stored declaration fingerprint still require service review."""
+    """Named memberships and declaration history require review, including an empty map."""
     if intent.control.backend != "meridian":
         return False
     if intent.access_profiles:
@@ -64,14 +65,21 @@ def profile_review_needed(cluster: ClusterConfig, intent: SetupIntent, *, allow_
         raise ProfileReviewUnavailableError()
     try:
         with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
-            settings = client.settings()
-            return bool(settings.access_profiles) or settings.access_profile_declarations_hash is not None
+            return _held_profiles(client.access_profiles())
     except ControlServiceError as exc:
         if not _unavailable(exc):
             raise
         if allow_bootstrap and not cluster.has_used_access_profiles:
             return False
         raise ProfileReviewUnavailableError() from exc
+
+
+def _held_profiles(live: AccessProfileCatalog) -> bool:
+    return (
+        live.declarations_hash is not None
+        or live.has_non_default_memberships
+        or any(not profile.built_in for profile in live.profiles)
+    )
 
 
 def _unavailable(exc: ControlServiceError) -> bool:

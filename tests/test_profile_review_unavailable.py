@@ -83,7 +83,7 @@ def test_plan_keeps_compiled_results_when_profile_evidence_is_unavailable(
             planner.return_value.inspect_intent.side_effect = LocalStateError(
                 "Saved control-service credentials are missing."
             )
-        client.return_value.__enter__.return_value.settings.side_effect = error
+        client.return_value.__enter__.return_value.access_profiles.side_effect = error
         client.return_value.__enter__.return_value.preview_access_profiles.side_effect = error
         reply = CliRunner().invoke(app, ["plan", *(["--json"] if json_output else [])])
     assert reply.exit_code == 3, reply.output
@@ -142,7 +142,7 @@ def test_apply_without_profiles_can_bootstrap_or_repair_with_unavailable_service
         runtime.return_value.review.return_value = review(plan)
         runtime.return_value.apply_intent.return_value = ResourceExecutionResult(plan_hash=plan.plan_hash, generation=2)
         live = client.return_value.__enter__.return_value
-        live.settings.side_effect = ControlServiceError("The control service cannot be reached.", retryable=True)
+        live.access_profiles.side_effect = ControlServiceError("The control service cannot be reached.", retryable=True)
         reply = CliRunner().invoke(app, ["apply", "--yes", "--json"])
         assert reply.exit_code == 0, reply.output
         runtime.return_value.apply_intent.assert_called_once()
@@ -187,7 +187,7 @@ def test_apply_refuses_unavailable_profile_review_only_once_profiles_have_been_u
         patch("meridian.setup.profile_review.ControlClient") as client,
     ):
         runtime.return_value.review.return_value = review(plan)
-        client.return_value.__enter__.return_value.settings.side_effect = ControlServiceError(
+        client.return_value.__enter__.return_value.access_profiles.side_effect = ControlServiceError(
             "The control service cannot be reached.", retryable=True
         )
         runtime.return_value.apply_intent.return_value = ResourceExecutionResult(plan_hash=plan.plan_hash, generation=2)
@@ -235,7 +235,7 @@ def test_fleet_import_uses_the_same_profile_outage_gate(
     ):
         runtime.return_value.review.return_value = review(plan)
         apply.return_value = ResourceExecutionResult(plan_hash=plan.plan_hash, generation=2)
-        client.return_value.__enter__.return_value.settings.side_effect = ControlServiceError(
+        client.return_value.__enter__.return_value.access_profiles.side_effect = ControlServiceError(
             "The control service cannot be reached.", retryable=True
         )
         reply = CliRunner().invoke(

@@ -70,14 +70,15 @@ def save_access_profiles(store: Store, profiles: dict[str, list[str]]) -> None:
 
 
 def refuse_used_profiles(store: Store, values: dict[str, list[str]]) -> None:
-    for profile in sorted(set(read_access_profiles(store)) - values.keys()):
-        row = store.row("SELECT COUNT(*) FROM user_access_memberships WHERE profile = ?", (profile,))
-        assert row is not None
-        if row[0]:
-            noun = "person" if row[0] == 1 else "people"
+    for profile, members in store.rows(
+        "SELECT profile, COUNT(*) FROM user_access_memberships WHERE profile != ? GROUP BY profile ORDER BY profile",
+        (DEFAULT_ACCESS_PROFILE,),
+    ):
+        if profile not in values:
+            noun = "person" if members == 1 else "people"
             raise ServiceError(
                 "profile_in_use",
-                f"Access profile {profile} is used by {row[0]} {noun}. Set their profiles before removing it.",
+                f"Access profile {profile} is used by {members} {noun}. Set their profiles before removing it.",
                 409,
             )
 

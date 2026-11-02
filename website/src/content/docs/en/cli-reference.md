@@ -256,6 +256,8 @@ Bare `privacy` is `privacy show`: settings, disclosures, and the last 50 changes
 
 ### meridian profile
 
+Any non-default membership requires review, even when the live profile map and declaration fingerprint are missing. Previews and settings writes refuse a map that omits a profile still assigned to a person. Restore the missing profile through a reviewed edit, or assign the affected people to other profiles first.
+
 Review which exits and paths each profile grants. `default` always grants everything and cannot be edited or removed.
 
 ```bash

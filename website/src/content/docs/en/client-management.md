@@ -493,6 +493,8 @@ When bulk disabling, deletion, or an expiry change removes access, the service r
 
 ## Access profiles
 
+Any non-default membership requires review, even when the live profile map and declaration fingerprint are missing. Previews and settings writes refuse a map that omits a profile still assigned to a person. Restore the missing profile through a reviewed edit, or assign the affected people to other profiles first.
+
 Profiles are reviewed topology; membership belongs to the operator in the service. The built-in `default` profile grants every exit and path, including future additions. A person may belong to several profiles; their grants are combined. Fleets without named profiles keep the same node documents and subscriptions.
 
 Access profiles require Meridian's control service. On a Remnawave fleet, run `meridian migrate` first; adding, importing, or applying profiles is refused before server or panel changes.

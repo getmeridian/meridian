@@ -12,6 +12,7 @@
 - `plan` and `apply` run the same compiler and runtime as setup.
 
 ## Pitfalls
+- **Profile discovery reads the private catalog** — declarations, named profiles, and non-default memberships all require review, even when the settings map and fingerprint are absent.
 - **Every apply checks profile declarations before the fence** — use `profile_review.py` to compare live intent-level grants; a saved but unapplied edit must not ride the next imperative command, and live maps without a fingerprint need review.
 - **Observed profile history saves with accepted intent** — remember live service use after the fleet fence accepts, in the existing topology save; a separate earlier save persists forgotten bindings even when the fence refuses.
 - **Unsent profiles remain resumable** — save the sticky flag only when it flips, immediately before the named-profile settings request; bootstrap credentials and saved intent alone cannot block a retry, while a lost settings reply keeps history.

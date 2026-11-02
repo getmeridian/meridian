@@ -57,6 +57,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Review non-default profile memberships even when their live declarations and
+  fingerprint are missing. Refuse previews and settings writes that would leave
+  those memberships pointing at profiles absent from the proposed map.
 - Refuse another fleet's snapshot before profile checks or target registration,
   preserving the existing user-facing restore error on fresh and resumed runs.
 - Keep snapshot profile history and clear carried unfinished checkpoints when

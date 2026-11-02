@@ -256,6 +256,8 @@ meridian privacy set [--devices off|private|full] [--device-limit N] [--history 
 
 ### meridian profile
 
+任何非 `default` 成员关系都需要审核，即使服务中的访问配置映射和声明指纹都已缺失。预览和设置写入会拒绝遗漏用户仍所属配置的映射。请通过已审核的修改恢复缺失配置，或先将相关用户分配到其他配置。
+
 审核每个配置允许的出口与路径。`default` 始终允许全部访问，不能编辑或删除。
 
 ```bash
