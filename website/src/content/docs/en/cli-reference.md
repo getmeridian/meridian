@@ -129,7 +129,7 @@ meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DA
 meridian client show NAME [--connections] [--json]
 meridian client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX] [--json]
 meridian client usage NAME [--days N] [--json]
-meridian client list [--attention] [--tag TAG|none] [--json]
+meridian client list [--profile PROFILE] [--attention] [--tag TAG|none] [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
@@ -139,6 +139,8 @@ meridian client disable NAME [--json]
 meridian client reissue NAME [--cut-off] [--yes] [--json]
 meridian client rotate-credentials NAME [--cut-off] [--yes] [--json]
 meridian client remove NAME [--cut-off] [--yes] [--json]
+meridian client remove NAME... [--dry-run] [--yes] [--json]
+meridian client remove --proposal FILE [--dry-run] [--yes] [--json]
 ```
 
 | Flag | Default | Description |
@@ -193,11 +195,13 @@ A TCP flow dispatched before revocation, a Hysteria2 UDP association, or a VLESS
 
 Private metadata: `client set NAME --note TEXT --tag TAG` edits only the supplied fields. A note holds up to 500 plain-text characters, with newlines; `--note ""` clears it. A tag holds 1–16 Latin letters, digits, or underscores, saved in uppercase; `--tag none` clears it. `client show` includes both fields, and `client list --tag TAG` filters its tag column (`none` selects untagged people). Reads and edits require people/admin scope. The web panel edits the same private fields; applies preserve them and encrypted snapshots carry them. See [Private notes and tags](/en/client-management/#private-notes-and-tags).
 
-`client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` explains selection and omissions without credentials. User-Agent is limited to 512 Unicode characters; Accept to 256, both one line and transient. `--suffix` forces one of the existing format URL suffixes. JSON returns `subscription-preview`; the API is the read-scoped `POST /api/subscription/preview`.
+`client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` explains selection and omissions without credentials. User-Agent is limited to 512 Unicode characters; Accept to 256, both one line and transient. `--suffix` supplies an existing format URL suffix; a matching custom format or block rule takes priority. JSON returns `subscription-preview`; the API is the read-scoped `POST /api/subscription/preview`.
 
 #### Reviewed bulk changes
 
 `client list` shows the first 100 matches. `--limit 1–500` sets page size; `--cursor VALUE` continues the same query. JSON adds `total`, contextual `facets`, and optional `next_cursor`; summary counts describe the returned page. `client bulk ACTION` uses the same query, freezes a preview, shows a table, confirms, and commits atomically. `--dry-run` returns the preview only; JSON commit and undo require `--yes`. Exact `--person USERNAME` selection cannot be combined with filters. Read receipts with `client bulk receipt ID`; undo unchanged reversible fields with `client bulk undo ID`. A lost commit reply is resolved by reading the receipt.
+
+`client list --profile PROFILE` filters saved access membership, including `default`; bulk actions use `--match-profile PROFILE` so `set-profiles --profile` remains the membership to assign. JSON includes contextual `facets.profile` counts and each row's saved `profiles`. A multi-profile person is counted once per profile and once in the list. The empty facet key counts all matching people, independently of the active profile filter. Unknown valid profile IDs match nobody; invalid IDs are refused before service access.
 
 A lost commit or undo reply is checked by reading the receipt; undo is confirmed only when the receipt records that it was undone. The console keeps that updated receipt and reads it again when you reopen it. `client bulk undo ID --dry-run` checks that the receipt is reversible, has not been undone, and is still within its undo window without sending a write; the final undo also checks live people and inbound capacity.
 
@@ -218,11 +222,30 @@ Undo writes the original choices, then enforces expiry and quota rules just like
 | `meridian client bulk tag --set-tag none` | Set or clear tag |
 | `meridian client bulk devices --devices unlimited` | Set device cap |
 | `meridian client bulk renewal --renew-days 30 --renewals 5` | Set or clear renewal |
-| `meridian client bulk delete` | Delete service-only people; declared people return commands |
+| `meridian client bulk delete` | Delete service-only people; one local proposal for declared people |
 | `meridian client bulk undo ID` | Undo reversible fields within ten minutes |
 | `meridian client bulk receipt ID` | Read a durable receipt |
 
-Shared filters: `--search TEXT`, `--status STATUS`, `--tag TAG`, `--expiring-within DAYS`, `--quota-at-least PERCENT`, `--never-used`, `--attention`, `--attention-reason REASON`, `--lifecycle STATE`, `--sort name|usage|expiry|activity`, `--order asc|desc`. Use either `--attention` (any default reason) or `--attention-reason`. Lifecycle choices: `pending`, `renewing`, `fixed`, `unlimited`. Names sort by case-folded display name, then exact username. See [client management](/en/client-management/) for review and privacy rules.
+Shared filters: `--search TEXT`, `--status STATUS`, `--tag TAG`, `--match-profile PROFILE`, `--expiring-within DAYS`, `--quota-at-least PERCENT`, `--never-used`, `--attention`, `--attention-reason REASON`, `--lifecycle STATE`, `--sort name|usage|expiry|activity`, `--order asc|desc`. Use either `--attention` (any default reason) or `--attention-reason`. Lifecycle choices: `pending`, `renewing`, `fixed`, `unlimited`. Names sort by case-folded display name, then exact username. See [client management](/en/client-management/) for review and privacy rules.
+
+Declared deletions return one revision-bound `proposal` in the bulk preview and receipt. Save the console's **people-removal.json**, or pass the API bulk preview/receipt or CLI bulk JSON result file to `client remove --proposal FILE`. Files are limited to 64 MiB. The CLI verifies fleet, committed revision/generation/plan, and local intent, reviews every removal together, confirms once, and applies one intent edit. The apply fence rejects an older revision again before server mutation.
+
+The 64 MiB limit applies to bytes actually read, including pipes and special files, before decoding or JSON parsing. Larger input is refused even if its reported size is zero or the file grows during reading.
+
+Proposal `usernames` must exactly match the committed `topology_intent.access.users`, including case. Display names are not accepted in proposals.
+
+A saved bulk file must describe deletion, and its proposal must list exactly the people marked `cli_required`, with the same count. Preview hashes are checked; when a CLI file contains both preview and receipt, their IDs, hashes, and proposals must agree. A standalone receipt keeps the original preview hash and is checked against its recorded outcomes. CLI envelopes reject unknown fields.
+
+For named removal, an exact service username wins over display-name or case-insensitive matches. A name matching two people is refused; use the exact username from `client list`. Remove console-only people with `client bulk delete`.
+
+`client remove NAME...` also supports several declared names, with `--dry-run` to review without saving. A declined review saves nothing, and at least one declared person must remain. JSON previews return `data.clients`, `data.review_hash`, and `data.applied: false`; applied combined removals keep `clients` and `review_hash` and omit default `applied: true`. Individual results keep `data.client`.
+
+Proposals omit private person fields and session cut-off. Bulk removal refuses `--cut-off`; individual `client remove NAME --cut-off` keeps its existing consent and node outcomes. In a mixed batch, service-owned deletions still commit atomically; declared deletions wait for local apply, and a changed topology refuses the entire service commit.
+
+```bash
+meridian client remove --proposal people-removal.json --dry-run --json
+meridian client remove --proposal people-removal.json --yes --json
+```
 
 `meridian client bulk extend --months 1 --person sample-a --dry-run --json`
 
@@ -439,6 +462,7 @@ meridian fleet history [--json]
 meridian fleet events [--since ID] [--limit N] [--json]
 meridian fleet usage [--days N] [--json]
 meridian fleet routing [ru-split|full] [--dry-run] [--yes] [--json]
+meridian fleet response-rules test [--user-agent UA] [--accept TYPE] [--person NAME] [--suffix SUFFIX] [--json]
 meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--json]
 meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
@@ -482,6 +506,8 @@ Custom token events show the effective capability labels in your CLI language; c
 
 **`fleet export`** — prints your fleet's reviewed topology as a YAML file you can edit: exits and their protocol paths, relays, gateways, egress pools, routing rules, routes, clients, and fleet settings. Servers appear by their saved name (or address when unnamed), never by internal ID, and the file starts with `schema: meridian.fleet/v1`. Reality keys, API tokens, client links, and the XHTTP and WSS transport paths stay in Meridian and are not listed. `--json` returns the same document under `data.document`.
 
+To import a JSON export, pass only the contents of `data.document`. Reviewed `delivery` settings, including URL paths in response rules, stay unchanged in exports, import reviews, and apply results.
+
 **`fleet import`** — reads an edited file (or `-` for standard input) and shows what it changes, one line each: `+` adds, `-` removes, and `~` changes a field (`~ exit-2 sni www.example.com -> www.example.org`). It then lists every resource the change deletes and the review hash, asks, and applies exactly that review, like `apply`. A file with no edits prints "No changes". Removing a client from `access.users` removes them like `client remove`: their subscription URL and connection page stop responding. Adding one creates them like `client add` and the service serves their page automatically; `client show NAME` prints their links. New camouflage SNIs get the checks `node sni` runs. Import refuses another `schema`, a server you haven't saved (save it with `meridian server add`), transport paths in the file, changes to the control server, its domain, or its backend, removing or renaming the exit on the control server, and moving an exit to another server (use `node replace`). Keys and credentials stay as they are. Without a terminal, pass `--yes`; `--dry-run` shows the changes and the review without applying anything.
 
 **`fleet usage`** — shows per-server byte totals for each UTC day, including retained use of removed servers. `--days N` chooses 1–730 days within retention. Daily history must be on; JSON returns fleet totals and `nodes[].daily` in `data`.
@@ -519,6 +545,9 @@ meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --net
 The service reads geodata only from already-cached Xray archives whose hash matches Meridian's pin. Explanations never start a download. Clients never receive remote rule sets. Xray sends configured public DNS through its automatic group and retains direct LAN resolvers; other clients use their represented DNS settings. Choosing an unsupported transport never converts it to plain DNS. Existing preset bytes and default fleet corpus answers stay unchanged.
 
 `POST /api/delivery-policies/explain` accepts `destination`, optional `person`, `format`, `port`, `network`, and `protocol`; it needs `delivery.explain`, plus `people.read` and `people.private` with a person. Subscription previews require private permission for policy details or a destination explanation; lower grants receive the existing metadata only. Connection-page `/info` may include `user.deliveryCapabilities`: format names, support flags, and omission codes, without policy names, assignments, memberships, destinations, or endpoint details. The page keeps this fresh data in memory.
+
+
+**`fleet response-rules test`** reads applied app rules with `--user-agent UA`, optional `--accept TYPE`, `--person NAME`, `--suffix SUFFIX`, and `--json`. It explains the first custom or built-in rule, format or refusal, policy source, and redacted header changes. Inputs are transient and bounded to 512/256 characters; no subscription, DNS lookup, device registration, or write occurs. `--person` accepts an account or display name of 1–64 characters; an empty or longer value fails with a user error (exit 2). Rules are edited in `delivery.response_rules` through `fleet export` and reviewed `fleet import`. App rules require Meridian's control service; on Remnawave, run `meridian migrate` before adding any. [Response rules](/en/split-routing/#response-rules-by-app) describes fields, precedence, and refusal behavior.
 
 ### meridian context
 

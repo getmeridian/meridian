@@ -1,6 +1,9 @@
 # core — Meridian API contracts
 
 ## Design decisions
+- **App decisions are finite** — named literal User-Agent/Accept rules reject duplicates and proven shadows; one policy resolver orders person, app, profile, named fleet, and preset choices.
+- **Removal proposals carry identity only** — bounded declared usernames and committed fleet/revision/generation/plan/intent hashes travel without private person fields or cut-off choices.
+- **Profile selection names saved membership** — the optional typed profile ID joins the same query and cursor identity; default is an explicit membership.
 - **Profile declaration fingerprints precede expansion** — hash the normalized named grants with `profile_declarations_hash`, so topology can expand unchanged exit or gateway grants without accepting a profile edit.
 - **Delivery policies are finite** — discriminated matchers, IP-addressed DNS, and bounded catalogs share one person/profile/fleet resolver; conflicting profile defaults refuse.
 - **Access grants and membership have separate owners** — topology compiles named grants; service membership is nonempty and private, with default granting every managed inbound.
@@ -18,7 +21,7 @@
 - **Verification is four-state** — passed, failed, warning, skipped; skipped evidence is inconclusive, never a pass.
 - **Cooperative cancellation** — `core/cancellation.py` owns the token protocol; workers poll only at safe points.
 - **Agent protocol is a contract, kept apart** — `meridian.agent/v1` (`agent_*` modules) is the internal service-to-agent wire format the Rust agent consumes; `schema_agent.AGENT_SCHEMAS` exports it to `contracts/meridian/v1/agent/`, never into `core.schema`. Docstrings are its spec: every field always sent, no floats, no addresses in agent messages; extend it only behind a negotiated capability. `version_skew.py` holds CLI/service/agent compatibility.
-- **Two names per person** — `AccessIntent.users` are Latin usernames; `display_names` keeps a typed name when it differs. `assign_access_usernames()` is the one place mapping typed names to usernames (via anyascii); look people up with `find_user()`.
+- **Two names per person** — `AccessIntent.users` are Latin usernames; `display_names` keeps a typed name when it differs. `assign_access_usernames()` is the one place mapping typed names to usernames (via anyascii); look people up with `matching_users()` where a typed name could mean two people (one's username may fold onto another's display name).
 - **Fleet document** — `fleet_document.py` owns `meridian.fleet/v1` and `intent_changes()`, the one description of how two intents differ; unequal intents always report a change, a reorder at least.
 - **Operator settings have one contract each** — client limits (`client_limits.py`), creation settings (`UserCreationSettings`), languages, notices, owner contact, person metadata, server allowances, and connection-page settings; each module owns its bounds and canonical form. Explicit null clears, omitted fields preserve.
 - **Derived evidence** — `traffic.py` is the aggregate evidence contract (unknown history stays null) and `attention.py` derives typed reasons from it with no stored alert flags; `calendar.py` and `server_calendar.py` share clamped UTC month arithmetic.

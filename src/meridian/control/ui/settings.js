@@ -28,6 +28,7 @@
     var publicUrl = h("p", { class: "mono small link-text" });
     var contactText = h("p", { class: "row-title", dir: "auto" });
     var contactLink = h("p", { class: "mono small link-text", dir: "ltr" });
+    var responseRules = h("ol", { class: "stack-sm", "data-response-rules": "" });
     var error = h("p", { class: "form-error", role: "alert" });
     M.api("GET", "api/settings").then(function (settings) {
       title.textContent = settings.profile_title;
@@ -40,12 +41,18 @@
       var contact = settings.owner_contact || {};
       contactText.textContent = contact.text || M.t("settings.contact_none");
       contactLink.textContent = contact.link || "";
+      M.mount(responseRules, (settings.response_rules || []).map(function (rule, index) {
+        return h("li", { value: index + 1 }, h("bdi", { text: rule.name }), " · ", M.t("response_rules.action_" + rule.action.kind));
+      }));
+      if (!(settings.response_rules || []).length) M.mount(responseRules, h("li", { text: M.t("response_rules.reason_built_in_selector") }));
     }, function (e) { error.textContent = M.errorText(e); });
     return h("section", { class: "card" },
       h("h2", { text: M.t("settings.fleet") }),
       h("p", { class: "label", text: M.t("settings.title") }), title,
       h("p", { class: "muted small", text: M.t("settings.title_hint") }),
       h("p", { class: "label", text: M.t("settings.client_routing") }), routing, routingExplanation,
+      h("p", { class: "label", text: M.t("response_rules.title") }), responseRules,
+      h("p", { class: "muted small", text: M.t("response_rules.reviewed_hint") }),
       h("p", { class: "muted small" }, M.t("settings.routing_hint"), " ", routingCommand), error,
       h("p", { class: "label", text: M.t("settings.public_url") }), publicUrl,
       h("p", { class: "muted small", text: M.t("settings.public_url_hint") }),

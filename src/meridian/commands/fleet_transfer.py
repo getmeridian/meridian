@@ -51,10 +51,20 @@ from meridian.setup.profile_review import profile_review_needed, review_profile_
 EXPORT_COMMAND = "fleet.export"
 IMPORT_COMMAND = "fleet.import"
 # Public configuration fields remain complete in the final export envelope.
-_REVEALED_KEYS = frozenset(
-    {"probe_url", "data.document.delivery.owner_contact.text", "data.document.delivery.owner_contact.link"}
-)
+_REVEALED_KEYS = frozenset({"probe_url"})
 _STYLES = {"add": "green", "remove": "red", "change": "yellow"}
+
+
+def _reviewed_paths(value: object, path: str) -> frozenset[str]:
+    """Reveal every exact path in a reviewed subtree, including its string leaves."""
+    paths = {path}
+    if isinstance(value, dict):
+        for key, item in value.items():
+            paths.update(_reviewed_paths(item, f"{path}.{key}"))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            paths.update(_reviewed_paths(item, f"{path}.{index}"))
+    return frozenset(paths)
 
 
 def run_export() -> None:
@@ -84,13 +94,10 @@ def run_export() -> None:
                     timer=operation.timer,
                 ),
                 reveal=_REVEALED_KEYS
+                | _reviewed_paths(document.get("delivery", {}), "data.document.delivery")
                 | {
                     f"data.document.access.creation_settings.{name}"
                     for name in document["access"].get("creation_settings", {})
-                }
-                | {
-                    f"data.document.delivery.profile_policies.{name}"
-                    for name in document.get("delivery", {}).get("profile_policies", {})
                 },
             )
             return
@@ -305,10 +312,10 @@ def _emit_result(
     if not is_json_mode():
         return
     status: OutputStatus = "changed" if changed else "no_changes" if not result.changes else "ok"
-    contact_paths = frozenset(
+    delivery_paths = frozenset(
         f"data.changes.{index}.{field}"
         for index, change in enumerate(result.changes)
-        if change.subject == "delivery" and change.field == "owner_contact"
+        if change.subject == "delivery"
         for field in ("before", "after")
     )
     emit_json(
@@ -321,7 +328,7 @@ def _emit_result(
             warnings=warnings or None,
             timer=operation.timer,
         ),
-        reveal=_REVEALED_KEYS | contact_paths | profile_review_paths(result.access_review),
+        reveal=_REVEALED_KEYS | delivery_paths | profile_review_paths(result.access_review),
     )
 
 

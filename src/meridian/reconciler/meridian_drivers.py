@@ -641,6 +641,7 @@ class ServiceSettingsDriver:
             delivery_policies=payload.delivery_policies,
             default_policy=payload.default_policy,
             profile_policies=payload.profile_policies,
+            response_rules=payload.response_rules,
             server_name=self.context.cluster.branding.server_name,
             server_icon=self.context.cluster.branding.icon,
             color=self.context.cluster.branding.color,

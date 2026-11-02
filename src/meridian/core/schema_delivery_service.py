@@ -16,10 +16,18 @@ from meridian.core.person_delivery_policy import (
     PersonDeliveryPolicyState,
     PersonDeliveryPolicyWrite,
 )
+from meridian.core.response_rule_test import ResponseRuleDecision, ResponseRuleTestRequest
+from meridian.core.response_rules import (
+    LiteralCondition,
+    ResponseHeaders,
+    ResponseMatcher,
+    ResponseRule,
+    ResponseRuleSettings,
+)
 from meridian.core.schema_envelopes import make_command_envelope
+from meridian.core.subscription_formats import FormatSelection
+from meridian.core.subscription_inputs import PreviewInputs
 from meridian.core.subscription_preview import (
-    FormatSelection,
-    PreviewInputs,
     SubscriptionPreview,
     SubscriptionPreviewRequest,
 )
@@ -29,6 +37,13 @@ def service_delivery_schemas(
     *, envelope_base: type[BaseModel], failure_data_type: type[BaseModel]
 ) -> dict[str, type[BaseModel]]:
     schemas: dict[str, type[BaseModel]] = {
+        "response-rule": ResponseRule,
+        "response-rule-settings": ResponseRuleSettings,
+        "response-rule-matcher": ResponseMatcher,
+        "response-rule-condition": LiteralCondition,
+        "response-rule-headers": ResponseHeaders,
+        "response-rule-test-request": ResponseRuleTestRequest,
+        "response-rule-decision": ResponseRuleDecision,
         "client-routing": ClientRoutingResult,
         "delivery-policy-catalog": DeliveryPolicyCatalog,
         "person-delivery-policy": PersonDeliveryPolicyState,
@@ -76,6 +91,14 @@ def service_delivery_schemas(
         doc="Envelope schema for `meridian client preview --json`.",
     )
     schemas["client-preview-envelope"] = preview_envelope
+    schemas["fleet-response-rules-test-envelope"] = make_command_envelope(
+        "FleetResponseRulesTest",
+        "fleet.response-rules.test",
+        ResponseRuleDecision,
+        envelope_base=envelope_base,
+        failure_data_type=failure_data_type,
+        doc="Envelope schema for `meridian fleet response-rules test --json`.",
+    )[2]
     _, _, routing_envelope = make_command_envelope(
         "ClientRouting",
         "client.routing",

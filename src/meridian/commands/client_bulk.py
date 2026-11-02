@@ -20,6 +20,7 @@ from meridian.control.client import (
     ControlClient,
     ControlServiceError,
     ControlServicePolicyError,
+    ControlServiceTopologyError,
     ControlServiceUncertain,
 )
 from meridian.control.http_errors import validation_message
@@ -37,6 +38,7 @@ from meridian.core.people_bulk import (
     BulkReceipt,
     ClientBulkResult,
 )
+from meridian.core.people_removal import PeopleRemovalProposal
 from meridian.core.queries import bounded_integer
 from meridian.i18n import t
 from meridian.renderers import emit_json
@@ -93,8 +95,8 @@ def preview_table(people: list[BulkPersonChange]) -> None:
     for key in ("person", "field", "before", "after"):
         table.add_column(t("bulk." + key))
     for person in people:
-        if person.cli_command:
-            table.add_row(escape(person.display_name), t("bulk.cli_required"), "", escape(person.cli_command))
+        if person.outcome == "cli_required":
+            table.add_row(escape(person.display_name), t("bulk.cli_required"), "", escape(person.cli_command or ""))
         elif not person.changes:
             table.add_row(escape(person.display_name), t("bulk.unchanged"), "", "")
         else:
@@ -119,6 +121,13 @@ def preview_table(people: list[BulkPersonChange]) -> None:
                     err_console.print(escape(t("profiles.hard_cut_scope")))
                     err_console.print(escape(cut_off_disclosure(person.cut_off)))
     err_console.print(table)
+
+
+def print_removal_proposal(proposal: PeopleRemovalProposal | None) -> None:
+    if proposal is not None:
+        err_console.print(escape(t("bulk.proposal_title")))
+        err_console.print(proposal.model_dump_json(indent=2, by_alias=True), markup=False)
+        err_console.print(escape(t("bulk.proposal_hint")))
 
 
 def result_paths(result: ClientBulkResult) -> frozenset[str]:
@@ -160,6 +169,7 @@ def emit_result(command: str, result: ClientBulkResult, operation: OperationCont
         return
     if result.receipt:
         ok(t("bulk.receipt", id=result.receipt.id))
+        print_removal_proposal(result.receipt.proposal)
         if result.receipt.undo_until and not result.receipt.undone_at:
             err_console.print(t("bulk.undo_hint", id=result.receipt.id))
         if result.receipt.undone_at:
@@ -178,7 +188,7 @@ def run_bulk(action: BulkActionName, options: dict[str, Any]) -> None:
             persons = options.get("persons")
             if persons and any(
                 query.selection_data()[key]
-                for key in ("q", "status", "tag", "expires", "quota", "never", "attention", "lifecycle")
+                for key in ("q", "status", "tag", "profile", "expires", "quota", "never", "attention", "lifecycle")
             ):
                 fail(t("bulk.selection_conflict"), hint_type="user")
             request = BulkPreviewRequest(action=parsed, usernames=persons, query=None if persons else query)
@@ -199,6 +209,7 @@ def run_bulk(action: BulkActionName, options: dict[str, Any]) -> None:
                     err_console.print(t("bulk.nodes", count=review.changed_nodes))
                     for warning in review.warnings:
                         warn(t(f"bulk.warning.{warning}"))
+                    print_removal_proposal(review.proposal)
                 if dry_run:
                     emit_result(command, ClientBulkResult(preview=review, applied=False), operation)
                     return
@@ -214,6 +225,11 @@ def run_bulk(action: BulkActionName, options: dict[str, Any]) -> None:
                 emit_result(command, ClientBulkResult(preview=review, receipt=receipt, applied=True), operation)
         except ControlServicePolicyError as exc:
             fail(t(f"delivery.error_{exc.reason}"), hint_type="user")
+        except ControlServiceTopologyError as exc:
+            fail(
+                t("bulk.proposal_stale" if exc.reason == "stale_topology" else "bulk.proposal_uncommitted"),
+                hint_type="user",
+            )
         except ControlServiceError as exc:
             fail(exc)
 

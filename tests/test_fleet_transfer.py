@@ -25,6 +25,7 @@ from meridian.cluster import (
 from meridian.commands.fleet_transfer import run_export, run_import
 from meridian.core.fleet_document import FLEET_DOCUMENT_SCHEMA, IntentChange, change_line, intent_changes
 from meridian.core.redaction import is_sensitive_key, redact_diagnostic_text
+from meridian.core.schema import schema_model
 from meridian.core.topology import (
     AccessIntent,
     ControlPlaneIntent,
@@ -192,7 +193,64 @@ def _applied(apply: MagicMock) -> SetupIntent:
     return intent
 
 
+def _app_delivery(version: str) -> DeliveryIntent:
+    headers = {
+        "profile_title": f"Help: https://support.example.test/{version}/title",
+        "update_interval_hours": 24,
+        "support_url": f"https://support.example.test/{version}/help",
+        "announce": f"Обновите подключение: https://support.example.test/{version}/news",
+    }
+    actions = [
+        {"kind": "headers", "headers": headers},
+        {"kind": "format", "format": "singbox", "headers": headers},
+        {"kind": "policy", "policy": "full", "headers": headers},
+        {"kind": "block"},
+    ]
+    return DeliveryIntent.model_validate(
+        {
+            "owner_contact": {"text": headers["profile_title"], "link": headers["support_url"]},
+            "response_rules": [
+                {
+                    "name": action["kind"],
+                    "match": {
+                        "user_agent": {
+                            "operator": "prefix",
+                            "value": f"{action['kind']}/ https://app.example.test/{action['kind']}/",
+                        }
+                    },
+                    "action": action,
+                }
+                for action in actions
+            ],
+        }
+    )
+
+
 class TestExport:
+    def test_json_export_and_import_preserve_reviewed_delivery_bytes(
+        self, registry: ServerRegistry, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        delivery = _app_delivery("reviewed")
+        cluster = _cluster(_intent(delivery=delivery))
+        with (
+            patch("meridian.commands.fleet_transfer.load_topology_cluster", return_value=cluster),
+            patch("meridian.commands.fleet_transfer.is_json_mode", return_value=True),
+        ):
+            run_export()
+        output = capsys.readouterr().out
+        schema_model("fleet-export-envelope").model_validate_json(output)
+        document = json.loads(output)["data"]["document"]
+        apply, _ = _import(tmp_path, json.dumps(document), _cluster())
+        restored = _applied(apply)
+
+        assert restored.delivery.model_dump_json().encode() == delivery.model_dump_json().encode()
+        assert document["delivery"] == delivery.to_data()
+        for secret in (XHTTP_TOKEN, PRIVATE_KEY, API_TOKEN, "alloc-secret-path"):
+            assert secret not in output
+
+        apply, _ = _import(tmp_path, json.dumps(document), _cluster(restored), yes=False)
+        apply.assert_not_called()
+
     @pytest.mark.parametrize("policy", ["ru-split", "full"])
     @pytest.mark.parametrize("json_mode", [False, True])
     def test_export_and_import_keep_the_client_routing_policy(
@@ -382,6 +440,24 @@ class TestDiff:
 
 
 class TestImportApplies:
+    @pytest.mark.parametrize("dry_run", [True, False], ids=["review", "apply"])
+    def test_json_import_keeps_the_exact_reviewed_delivery_diff(
+        self, registry: ServerRegistry, tmp_path: Path, capsys: pytest.CaptureFixture[str], dry_run: bool
+    ) -> None:
+        before = _intent(delivery=_app_delivery("before"))
+        after = _intent(delivery=_app_delivery("after"))
+        with patch("meridian.commands.fleet_transfer.is_json_mode", return_value=True):
+            apply, _ = _import(tmp_path, _document_text(registry, after), _cluster(before), dry_run=dry_run)
+        output = capsys.readouterr().out
+        schema_model("fleet-import-envelope").model_validate_json(output)
+        changes = json.loads(output)["data"]["changes"]
+
+        assert changes == [change.to_data() for change in intent_changes(before, after)]
+        if dry_run:
+            apply.assert_not_called()
+        else:
+            assert _applied(apply).delivery == after.delivery
+
     def test_removing_a_client_applies_the_reviewed_intent_without_them(
         self, registry: ServerRegistry, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:

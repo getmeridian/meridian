@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 from meridian import i18n
 from meridian.cli import app
 from meridian.cluster import ClusterConfig, PanelConfig
-from meridian.console import set_json_mode
+from meridian.console import set_json_mode, set_quiet_mode
 from meridian.control.client import ControlClient
 from meridian.control.models import UserUpdate
 from tests.support.control_service import ADMIN_TOKEN, serve_control
@@ -24,6 +24,7 @@ def isolated_cli_state(monkeypatch):
     monkeypatch.setattr(i18n, "_requested", None)
     yield
     set_json_mode(False)
+    set_quiet_mode(False)
 
 
 def test_bulk_actions_are_public_with_shared_selection_flags():

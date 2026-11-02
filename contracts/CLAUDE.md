@@ -1,6 +1,9 @@
 # contracts — Generated meridian-core artifacts
 
 ## Design decisions
+- **App response rules are typed intent** — bounded literals and discriminated format/block/policy/header actions join settings, fleet schemas, a transient tester, and the narrow `delivery.test` capability; request values never enter results.
+- **Removal draft contracts bind committed topology** — previews and receipts compose one secret-free proposal schema; combined CLI removals expose the reviewed names and hash without changing individual results.
+- **Membership query facets** — profile filters and saved row memberships share people-query schemas; the empty profile facet key counts people across overlapping memberships.
 - **Profile declaration fences** — settings publish the reviewed declaration hash and its unchanged-write precondition; the private profile catalog includes that hash and non-default membership evidence.
 - **Metrics is protected text** — `metrics.read` joins catalog-derived explicit preview/issuance contracts, stays outside compatible presets, and serves Prometheus text outside the admin JSON document.
 - **Server capacity schemas** — current state, derived integer values, bounded recent/hourly history, and measured network duration join node and fleet contracts without person labels.

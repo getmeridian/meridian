@@ -58,6 +58,7 @@ from meridian.control.models import (
 )
 from meridian.control.people_route_catalog import PEOPLE_ROUTES
 from meridian.control.person_route_catalog import PERSON_ROUTES
+from meridian.control.response_rule_routes import RESPONSE_RULE_ROUTES
 from meridian.control.route_metadata import (
     CONFLICT,
     HISTORY_OFF,
@@ -327,6 +328,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
     *PEOPLE_ROUTES,
     *ACCESS_PROFILE_ROUTES,
     *DELIVERY_POLICY_ROUTES,
+    *RESPONSE_RULE_ROUTES,
     route(
         "GET",
         "/api/endpoints/{endpoint_id}",

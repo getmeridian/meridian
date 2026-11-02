@@ -129,7 +129,7 @@ meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DA
 meridian client show NAME [--connections] [--json]
 meridian client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX] [--json]
 meridian client usage NAME [--days N] [--json]
-meridian client list [--attention] [--tag TAG|none] [--json]
+meridian client list [--profile PROFILE] [--attention] [--tag TAG|none] [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
@@ -139,6 +139,8 @@ meridian client disable NAME [--json]
 meridian client reissue NAME [--cut-off] [--yes] [--json]
 meridian client rotate-credentials NAME [--cut-off] [--yes] [--json]
 meridian client remove NAME [--cut-off] [--yes] [--json]
+meridian client remove NAME... [--dry-run] [--yes] [--json]
+meridian client remove --proposal FILE [--dry-run] [--yes] [--json]
 ```
 
 | پرچم | پیش‌فرض | توضیح |
@@ -193,11 +195,13 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 فیلدهای خصوصی: `client set NAME --note TEXT --tag TAG` فقط مقدارهای واردشده را تغییر می‌دهد. یادداشت حداکثر ۵۰۰ نویسهٔ متن ساده با امکان چند خط دارد؛ `--note ""` آن را پاک می‌کند. برچسب ۱ تا ۱۶ حرف لاتین، رقم یا زیرخط دارد و با حروف بزرگ ذخیره می‌شود؛ `--tag none` آن را پاک می‌کند. `client show` هر دو فیلد را نشان می‌دهد و `client list --tag TAG` ستون برچسب را فیلتر می‌کند (`none` افراد بدون برچسب را انتخاب می‌کند). خواندن و ویرایش به دسترسی people/admin نیاز دارد. پنل وب همین فیلدها را ویرایش می‌کند؛ اعمال پیکربندی آن‌ها را حفظ می‌کند و پشتیبان‌های رمزگذاری‌شده آن‌ها را منتقل می‌کنند. [یادداشت‌ها و برچسب‌های خصوصی](/fa/client-management/).
 
-`client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` انتخاب قالب و حذف گزینه‌ها را بدون اطلاعات محرمانه توضیح می‌دهد. User-Agent حداکثر ۵۱۲ نویسهٔ Unicode و Accept حداکثر ۲۵۶ نویسه دارند؛ هرکدام یک خط و موقت‌اند. `--suffix` یکی از پسوندهای فعلی نشانی قالب را تحمیل می‌کند. JSON خروجی `subscription-preview` دارد؛ API، `POST /api/subscription/preview` با دسترسی read است.
+`client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` انتخاب قالب و حذف گزینه‌ها را بدون اطلاعات محرمانه توضیح می‌دهد. User-Agent حداکثر ۵۱۲ نویسهٔ Unicode و Accept حداکثر ۲۵۶ نویسه دارند؛ هرکدام یک خط و موقت‌اند. `--suffix` یکی از پسوندهای فعلی نشانی قالب را می‌دهد؛ قانون منطبق برنامه برای قالب یا عدم ارائه اولویت دارد. JSON خروجی `subscription-preview` دارد؛ API، `POST /api/subscription/preview` با دسترسی read است.
 
 #### تغییر گروهی پس از بازبینی
 
 `client list` نخستین ۱۰۰ فرد مطابق را نشان می‌دهد. `--limit 1–500` اندازه صفحه و `--cursor VALUE` ادامه همان پرس‌وجو است. JSON شامل `total`، شمارش‌های `facets` و `next_cursor` اختیاری است؛ خلاصه برای صفحه برگشتی است. `client bulk ACTION` همان پرس‌وجو را با پیش‌نمایش ثابت، جدول، تأیید و ثبت اتمی اجرا می‌کند. `--dry-run` تنها پیش‌نمایش است؛ ثبت و برگشت در JSON به `--yes` نیاز دارند. `--person USERNAME` با فیلتر ترکیب نمی‌شود. رسید را با `client bulk receipt ID` بخوانید و با `client bulk undo ID` برگردانید. گم شدن پاسخ ثبت با خواندن رسید پیگیری می‌شود.
+
+`client list --profile PROFILE` بر اساس پروفایل دسترسی اختصاص‌یافته، از جمله `default`، فیلتر می‌کند. عملیات گروهی از `--match-profile PROFILE` استفاده می‌کنند تا `set-profiles --profile` همچنان پروفایل موردنظر برای اختصاص را مشخص کند. JSON شامل شمارش‌های `facets.profile` با لحاظ سایر فیلترها و `profiles` ذخیره‌شدهٔ هر ردیف است. فرد دارای چند پروفایل در هر پروفایل یک بار و در فهرست یک بار شمرده می‌شود. کلید خالی شمارش همهٔ افراد مطابق را بدون فیلتر پروفایل نشان می‌دهد. نام معتبر ولی ناشناخته نتیجه‌ای ندارد؛ نام نامعتبر پیش از تماس با سرویس رد می‌شود.
 
 اگر پاسخ ثبت یا برگشت گم شود، نتیجه با خواندن رسید بررسی می‌شود؛ برگشت فقط وقتی تأیید می‌شود که رسید انجام آن را ثبت کرده باشد. پنل رسید به‌روز را نگه می‌دارد و هنگام باز کردن دوباره، آن را از سرویس می‌خواند. `client bulk undo ID --dry-run` بدون ارسال تغییر، بررسی می‌کند که عملیات قابل برگشت است، قبلاً برگشت داده نشده و مهلتش پایان نیافته است؛ اجرای نهایی، وضعیت فعلی افراد و ظرفیت ورودی را نیز بررسی می‌کند.
 
@@ -218,11 +222,30 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 | `meridian client bulk tag --set-tag none` | تنظیم یا پاک کردن برچسب |
 | `meridian client bulk devices --devices unlimited` | تنظیم سقف دستگاه |
 | `meridian client bulk renewal --renew-days 30 --renewals 5` | تنظیم یا لغو تمدید |
-| `meridian client bulk delete` | حذف افراد سرویس؛ فرمان برای افراد اعلام‌شده |
+| `meridian client bulk delete` | حذف افراد سرویس؛ یک پیشنهاد محلی برای افراد تعریف‌شده |
 | `meridian client bulk undo ID` | برگشت فیلدها تا ده دقیقه |
 | `meridian client bulk receipt ID` | خواندن رسید ماندگار |
 
-فیلترهای مشترک: `--search TEXT`، `--status STATUS`، `--tag TAG`، `--expiring-within DAYS`، `--quota-at-least PERCENT`، `--never-used`، `--attention`، `--attention-reason REASON`، `--lifecycle STATE`، `--sort name|usage|expiry|activity` و `--order asc|desc`. از `--attention` (هر دلیل) یا `--attention-reason` استفاده کنید. حالت‌ها: `pending`، `renewing`، `fixed`، `unlimited`. نام نمایشی بدون تفاوت حروف بزرگ و کوچک و سپس نام کاربری دقیق ترتیب را تعیین می‌کند. قواعد در [مدیریت کلاینت‌ها](/fa/client-management/) آمده است.
+فیلترهای مشترک: `--search TEXT`، `--status STATUS`، `--tag TAG`، `--match-profile PROFILE`، `--expiring-within DAYS`، `--quota-at-least PERCENT`، `--never-used`، `--attention`، `--attention-reason REASON`، `--lifecycle STATE`، `--sort name|usage|expiry|activity` و `--order asc|desc`. از `--attention` (هر دلیل) یا `--attention-reason` استفاده کنید. حالت‌ها: `pending`، `renewing`، `fixed`، `unlimited`. نام نمایشی بدون تفاوت حروف بزرگ و کوچک و سپس نام کاربری دقیق ترتیب را تعیین می‌کند. قواعد در [مدیریت کلاینت‌ها](/fa/client-management/) آمده است.
+
+حذف افراد تعریف‌شده یک `proposal` وابسته به بازبینی را در پیش‌نمایش و رسید گروهی برمی‌گرداند. **people-removal.json** پنل را ذخیره کنید، یا فایل کامل JSON پیش‌نمایش یا رسید API و خروجی گروهی CLI را به `client remove --proposal FILE` بدهید. حداکثر اندازهٔ فایل ۶۴ MiB است. CLI مجموعهٔ سرورها، بازبینی، نسل و طرح ثبت‌شده و قصد محلی را بررسی می‌کند، همهٔ حذف‌ها را با هم مرور می‌کند، یک تأیید می‌گیرد و یک ویرایش قصد را اعمال می‌کند. قفل اعمال پیش از تغییر سرورها دوباره بازبینی قدیمی را رد می‌کند.
+
+سقف ۶۴ MiB پیش از رمزگشایی متن یا پردازش JSON بر تعداد بایت‌های واقعاً خوانده‌شده اعمال می‌شود، از جمله برای لوله‌ها و فایل‌های ویژه. ورودی بزرگ‌تر رد می‌شود، حتی اگر اندازهٔ گزارش‌شده صفر باشد یا فایل هنگام خواندن بزرگ‌تر شود.
+
+مقادیر `usernames` در پیشنهاد باید دقیقاً، با رعایت بزرگی و کوچکی حروف، با نام‌های ثبت‌شده در `topology_intent.access.users` مطابقت داشته باشند. نام نمایشی در پیشنهاد پذیرفته نمی‌شود.
+
+فایل گروهی ذخیره‌شده باید مربوط به حذف باشد و پیشنهاد آن دقیقاً افراد دارای نتیجهٔ `cli_required` را با شمارش یکسان فهرست کند. هش پیش‌نمایش بررسی می‌شود؛ اگر فایل CLI هم پیش‌نمایش و هم رسید داشته باشد، شناسه‌ها، هش‌ها و پیشنهادهای آن‌ها باید یکسان باشند. رسید مستقل هش پیش‌نمایش اصلی را نگه می‌دارد و پیشنهاد آن با نتایج ثبت‌شده بررسی می‌شود. فیلدهای ناشناخته در قالب پاسخ CLI رد می‌شوند.
+
+برای حذف با نام، نام کاربری دقیق در سرویس بر نام نمایشی یا تطبیق بدون تفاوت حروف بزرگ و کوچک اولویت دارد. اگر نام به دو فرد اشاره کند، حذف رد می‌شود؛ نام کاربری دقیق را از `client list` وارد کنید. افراد ایجادشده فقط در پنل را با `client bulk delete` حذف کنید.
+
+`client remove NAME...` چند نام تعریف‌شده را می‌پذیرد؛ `--dry-run` بدون ذخیره بررسی می‌کند. لغو تأیید هیچ چیزی ذخیره نمی‌کند و دست‌کم یک فرد تعریف‌شده باید باقی بماند. پیش‌نمایش JSON شامل `data.clients`، `data.review_hash` و `data.applied: false` است. حذف گروهی اعمال‌شده `clients` و `review_hash` را نگه می‌دارد و مقدار پیش‌فرض `applied: true` را حذف می‌کند. نتیجهٔ فردی همچنان `data.client` دارد.
+
+پیشنهاد فیلد خصوصی فرد یا انتخاب قطع نشست ندارد. حذف گروهی `--cut-off` را رد می‌کند؛ حذف فردی `client remove NAME --cut-off` تأیید و نتایج فعلی هر سرور را حفظ می‌کند. در گروه مختلط، حذف افراد سرویس همچنان اتمی است؛ حذف افراد تعریف‌شده منتظر اعمال محلی می‌ماند و تغییر توپولوژی کل ثبت سرویس را رد می‌کند.
+
+```bash
+meridian client remove --proposal people-removal.json --dry-run --json
+meridian client remove --proposal people-removal.json --yes --json
+```
 
 `meridian client bulk extend --months 1 --person sample-a --dry-run --json`
 
@@ -439,6 +462,7 @@ meridian fleet history [--json]
 meridian fleet events [--since ID] [--limit N] [--json]
 meridian fleet usage [--days N] [--json]
 meridian fleet routing [ru-split|full] [--dry-run] [--yes] [--json]
+meridian fleet response-rules test [--user-agent UA] [--accept TYPE] [--person NAME] [--suffix SUFFIX] [--json]
 meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--json]
 meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
@@ -482,6 +506,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 **`fleet export`** — توپولوژی بازبینی‌شدهٔ ناوگان شما را به شکل یک فایل YAML قابل ویرایش چاپ می‌کند: خروجی‌ها و مسیرهای پروتکل آن‌ها، relayها، دروازه‌ها، استخرهای خروجی، قواعد مسیریابی، routeها، کاربران و تنظیمات ناوگان. سرورها با نام ذخیره‌شده‌شان (یا نشانی، اگر نامی ندارند) می‌آیند، نه با شناسهٔ داخلی، و فایل با `schema: meridian.fleet/v1` شروع می‌شود. کلیدهای Reality، توکن‌های API، پیوندهای کاربران و مسیرهای انتقال XHTTP و WSS در Meridian می‌مانند و در فایل نیستند. `--json` همین سند را زیر `data.document` برمی‌گرداند.
 
+برای وارد کردن خروجی JSON، فقط محتوای `data.document` را بدهید. تنظیمات بازبینی‌شدهٔ `delivery`، از جمله مسیر URL در قوانین پاسخ، در خروجی، بازبینی وارد کردن و نتیجهٔ اعمال بدون تغییر حفظ می‌شوند.
+
 **`fleet import`** — فایل ویرایش‌شده (یا `-` برای ورودی استاندارد) را می‌خواند و تغییرات آن را هر کدام در یک خط نشان می‌دهد: `+` افزودن، `-` حذف و `~` تغییر یک فیلد (`~ exit-2 sni www.example.com -> www.example.org`). سپس هر منبعی را که تغییر حذف می‌کند و هش بازبینی را فهرست می‌کند، تأیید می‌خواهد و دقیقاً همان بازبینی را مانند `apply` اعمال می‌کند. فایلی بدون ویرایش «تغییری نیست» چاپ می‌کند. حذف یک کاربر از `access.users` او را مانند `client remove` حذف می‌کند: URL اشتراک و صفحهٔ اتصالش دیگر پاسخ نمی‌دهند. افزودن کاربر او را مانند `client add` می‌سازد و سرویس صفحهٔ اتصالش را به‌طور خودکار ارائه می‌کند؛ `client show NAME` پیوندها را چاپ می‌کند. SNIهای استتار تازه همان بررسی‌های `node sni` را می‌گذرانند. وارد کردن این‌ها را رد می‌کند: `schema` دیگر، سروری که ذخیره نکرده‌اید (با `meridian server add` ذخیره‌اش کنید)، مسیرهای انتقال در فایل، تغییر سرور کنترل، دامنه یا بک‌اند آن، حذف یا تغییر نام خروجیِ روی سرور کنترل، و انتقال یک خروجی به سرور دیگر (از `node replace` استفاده کنید). کلیدها و اطلاعات ورود همان‌طور می‌مانند. بدون ترمینال `--yes` بدهید؛ `--dry-run` تغییرات و بازبینی را بدون اعمال نشان می‌دهد.
 
 **`fleet usage`** — مجموع بایت‌های هر سرور را در هر روز UTC، شامل مصرف باقی‌ماندهٔ سرورهای حذف‌شده، نشان می‌دهد. `--days N` بین 1–730 روز در محدودهٔ مدت نگهداری انتخاب می‌کند. تاریخچه باید روشن باشد؛ JSON مجموع مجموعه و `nodes[].daily` را در `data` برمی‌گرداند.
@@ -519,6 +545,9 @@ meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --net
 سرویس دادهٔ جغرافیایی را فقط از آرشیو Xray موجود در کش و تأییدشده با هش ثابت Meridian می‌خواند. توضیح مسیر دانلودی آغاز نمی‌کند. برنامه‌ها مجموعه‌قانون از راه دور دریافت نمی‌کنند. Xray، DNS عمومیِ تنظیم‌شده را از گروه خودکار می‌فرستد و DNS محلی را مستقیم نگه می‌دارد؛ سایر برنامه‌ها از تنظیم DNS قابل نمایش خود استفاده می‌کنند. انتقال پشتیبانی‌نشده به DNS معمولی تبدیل نمی‌شود. بایت‌های حالت‌های پیشین و پاسخ‌های پیکربندی پیش‌فرض در مجموعهٔ مرجع تغییر نمی‌کنند.
 
 `POST /api/delivery-policies/explain` فیلدهای `destination`، `person` اختیاری، `format`، `port`، `network` و `protocol` را می‌پذیرد. به `delivery.explain` و با فرد به `people.read` و `people.private` هم نیاز دارد. جزئیات سیاست و توضیح مقصد در پیش‌نمایش اشتراک به دسترسی خصوصی نیاز دارد؛ دسترسی پایین‌تر فقط فرادادهٔ قبلی را می‌گیرد. `/info` صفحه ممکن است `user.deliveryCapabilities` داشته باشد: نام قالب، پرچم پشتیبانی و کد حذف، بدون نام سیاست، انتخاب فردی، عضویت، مقصد یا جزئیات اتصال. صفحه این اطلاعات تازه را فقط در حافظه نگه می‌دارد.
+
+
+**`fleet response-rules test`** قوانین اعمال‌شدهٔ برنامه را با `--user-agent UA` و گزینه‌های اختیاری `--accept TYPE`، `--person NAME`، `--suffix SUFFIX` و `--json` می‌خواند. اولین قانون سفارشی یا داخلی، قالب یا عدم ارائه، منبع سیاست و تغییر سرآیندهای بدون اطلاعات محرمانه را توضیح می‌دهد. ورودی گذرا و محدود به ۵۱۲/۲۵۶ نویسه است؛ اشتراک، DNS، ثبت دستگاه یا نوشتن انجام نمی‌شود. `--person` نام حساب یا نام نمایشی با طول ۱ تا ۶۴ نویسه را می‌پذیرد؛ مقدار خالی یا طولانی‌تر با خطای ورودی و کد خروج ۲ رد می‌شود. قوانین در `delivery.response_rules` از طریق `fleet export` و `fleet import` بازبینی‌شده ویرایش می‌شوند. این قوانین به سرویس کنترل Meridian نیاز دارند؛ برای Remnawave پیش از افزودن هر قانونی `meridian migrate` را اجرا کنید. [راهنمای مسیریابی](/fa/split-routing/) فیلدها، اولویت و عدم ارائه را توضیح می‌دهد.
 
 ### meridian context
 

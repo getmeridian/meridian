@@ -6,10 +6,12 @@ from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
+from meridian.core.access_profiles import ProfileMembership, default_profiles
 from meridian.core.account_schedule import AccountLifecycleState, AccountSchedulePreview
 from meridian.core.agent_types import Timestamp
 from meridian.core.client_devices import DeviceCap
 from meridian.core.client_limits import LimitStrategy
+from meridian.core.inputs import OptionalTopologyIdValue
 from meridian.core.languages import Language
 from meridian.core.models import CoreModel
 from meridian.core.person_activity import PersonAttentionReason
@@ -25,6 +27,7 @@ class PeopleQuery(CoreModel):
     q: str = Field(default="", max_length=256)
     status: PeopleStatus = ""
     tag: str = Field(default="", max_length=16)
+    profile: OptionalTopologyIdValue = ""
     expires: int | None = Field(default=None, ge=1, le=365, strict=True)
     quota: int | None = Field(default=None, ge=1, le=100, strict=True)
     never: bool = False
@@ -61,6 +64,7 @@ class PeoplePerson(UserTrafficEvidence, AccountLifecycleState):
     """List evidence without connection credentials or private notes."""
 
     username: str
+    profiles: ProfileMembership = Field(default_factory=default_profiles)
     user_id: str
     display_name: str
     declared: bool
@@ -87,6 +91,7 @@ class PeoplePerson(UserTrafficEvidence, AccountLifecycleState):
 class PeopleFacets(CoreModel):
     status: dict[str, int] = Field(default_factory=dict)
     tag: dict[str, int] = Field(default_factory=dict)
+    profile: dict[str, int] = Field(default_factory=dict)
     attention: dict[str, int] = Field(default_factory=dict)
     lifecycle: dict[str, int] = Field(default_factory=dict)
     expires: int = 0

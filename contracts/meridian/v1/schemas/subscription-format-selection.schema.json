@@ -31,12 +31,42 @@
           "title": "Match",
           "type": "string"
         },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "maximum": 64,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Number"
+        },
         "rule": {
           "enum": [
             "suffix",
             "user_agent",
             "accept",
-            "default"
+            "default",
+            "custom"
           ],
           "title": "Rule",
           "type": "string"

@@ -26,8 +26,8 @@ import pytest
 import yaml
 
 from meridian.control.formats.entries import SubscriptionUser, presentation_endpoints, primaries
-from meridian.control.formats.selector import SUFFIX_FORMATS, select_format
-from meridian.control.models import ClientEndpoint
+from meridian.control.formats.response_rules import evaluate_response_rules
+from meridian.control.models import ClientEndpoint, ServiceSettings
 from meridian.control.subscriptions import SubscriptionResponse, render_subscription, unknown_subscription
 from meridian.core.languages import Language
 from tests.systemlab.golden_corpus import Capture, Response, decode_body, load_corpus, normalize_response
@@ -293,10 +293,21 @@ def _render(capture: Capture, language: Language = "en") -> SubscriptionResponse
     fleet = FLEETS[capture.topology]
     status = "disabled" if request["user"] == "disabled" else "active"
     user = SubscriptionUser(username=fleet.username, uuid=UUID, short_id=SHORT_ID, status=status, language=language)
-    document = SUFFIX_FORMATS[request["selector"]] if request["selector"] else None
-    document = document or select_format(request["user_agent"], request["accept"])
+    decision = evaluate_response_rules(
+        ServiceSettings(profile_title=fleet.title),
+        user_agent=request["user_agent"],
+        accept=request["accept"],
+        suffix=request["selector"],
+    )
+    assert decision.format is not None
     return render_subscription(
-        user, fleet.endpoints, document, profile_title=fleet.title, public_url=fleet.public_url, now=NOW
+        user,
+        fleet.endpoints,
+        decision.format,
+        profile_title=fleet.title,
+        public_url=fleet.public_url,
+        now=NOW,
+        delivery_policy=decision.policy,
     )
 
 

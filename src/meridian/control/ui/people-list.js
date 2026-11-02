@@ -6,13 +6,13 @@
   var REASONS = ["expiring", "quota", "unused", "stopped"];
   var SORTS = ["name", "usage", "expiry", "activity"];
   var LIFECYCLES = ["pending", "renewing", "fixed", "unlimited"];
-  var FACETS = ["status", "tag", "expires", "quota", "never", "attention", "lifecycle"];
+  var FACETS = ["status", "tag", "profile", "expires", "quota", "never", "attention", "lifecycle"];
 
   function integer(text, max) {
     return /^[0-9]{1,3}$/.test(text) && Number(text) >= 1 && Number(text) <= max ? String(Number(text)) : "";
   }
   function defaultOrder(sort) { return sort === "usage" || sort === "activity" ? "desc" : "asc"; }
-  function defaults() { return { q: "", status: "", tag: "", expires: "", quota: "", never: false, attention: "", lifecycle: "", sort: "name", order: "asc" }; }
+  function defaults() { return { q: "", status: "", tag: "", profile: "", expires: "", quota: "", never: false, attention: "", lifecycle: "", sort: "name", order: "asc" }; }
   function readFilters() {
     var query = new URLSearchParams(M.route().query || "");
     function one(key) { var values = query.getAll(key); return values.length === 1 ? values[0] : ""; }
@@ -20,6 +20,7 @@
     state.q = one("q").slice(0, 256);
     state.status = STATUSES.indexOf(one("status")) >= 0 ? one("status") : "";
     state.tag = one("tag") === "none" || /^[A-Z0-9_]{1,16}$/.test(one("tag")) ? one("tag") : "";
+    state.profile = /^[a-z0-9][a-z0-9_-]{0,47}$/.test(one("profile")) ? one("profile") : "";
     state.expires = integer(one("expires"), 365); state.quota = integer(one("quota"), 100);
     state.never = one("never") === "1";
     state.attention = one("attention") === "all" || REASONS.indexOf(one("attention")) >= 0 ? one("attention") : "";
@@ -52,7 +53,7 @@
     var loading = h("div", { class: "empty" }, h("span", { class: "spinner" }));
     var status = h("div", { class: "live-status" }), count = h("p", { class: "muted small", role: "status", "aria-live": "polite" });
     function query() {
-      return { q: state.q, status: state.status, tag: state.tag, expires: state.expires ? Number(state.expires) : null,
+      return { q: state.q, status: state.status, tag: state.tag, profile: state.profile, expires: state.expires ? Number(state.expires) : null,
         quota: state.quota ? Number(state.quota) : null, never: state.never, attention: state.attention,
         lifecycle: state.lifecycle, sort: state.sort, order: state.order, limit: 100 };
     }
@@ -104,6 +105,8 @@
     }
     var statusField = select("status", [""].concat(STATUSES), function (key) { return key ? M.t("status." + key) : M.t("people.any_status"); });
     var tagField = select("tag", ["", "none"].concat(state.tag && state.tag !== "none" ? [state.tag] : []), function (key) { return key === "" ? M.t("people.any_tag") : key === "none" ? M.t("people.no_tag") : key; });
+    function profileLabel(key) { return key === "" ? M.t("people.any_profile") : key === "default" ? M.t("people.default_profile") : key; }
+    var profileField = select("profile", ["", "default"].concat(state.profile && state.profile !== "default" ? [state.profile] : []), profileLabel);
     var attentionField = select("attention", ["", "all"].concat(REASONS), function (key) { return key ? M.t(key === "all" ? "people.attention" : "attention.reason." + key) : M.t("people.any_attention"); });
     var lifecycleField = select("lifecycle", [""].concat(LIFECYCLES), function (key) { return M.t("people.lifecycle_" + (key || "any")); });
     function numeric(name, max) {
@@ -136,7 +139,7 @@
     search.value = state.q;
     search.addEventListener("input", function () { state.q = search.value.slice(0, 256); changed(true); });
     var filters = h("details", { class: "card people-filter-card", open: FACETS.some(function (key) { return !!state[key]; }) || state.sort !== "name" || state.order !== defaultOrder(state.sort) },
-      h("summary", { text: M.t("people.filters") }), h("div", { class: "people-filters" }, statusField, tagField, expiresField, quotaField, neverField, attentionField, lifecycleField),
+      h("summary", { text: M.t("people.filters") }), h("div", { class: "people-filters" }, statusField, tagField, profileField, expiresField, quotaField, neverField, attentionField, lifecycleField),
       h("div", { class: "people-sort" }, sortField, orderField, clear));
     var previousButton = h("button", { class: "btn btn-ghost btn-sm", type: "button", disabled: true, text: M.t("people.previous"), onclick: function () { cursor = previous.pop(); stop.refresh(false); } });
     var nextButton = h("button", { class: "btn btn-ghost btn-sm", type: "button", disabled: true, text: M.t("people.next"), onclick: function () { previous.push(cursor); cursor = page.next_cursor; stop.refresh(false); } });
@@ -213,6 +216,9 @@
       var tags = Object.keys(facets.tag).filter(function (key) { return key && key !== "none"; });
       if (state.tag && state.tag !== "none" && tags.indexOf(state.tag) < 0) tags.push(state.tag);
       options(controls.tag, ["", "none"].concat(tags.sort()), facets.tag, function (key) { return key === "" ? M.t("people.any_tag") : key === "none" ? M.t("people.no_tag") : key; });
+      var profileCounts = facets.profile || {}, profiles = Object.keys(profileCounts).filter(function (key) { return key && key !== "default"; });
+      if (state.profile && state.profile !== "default" && profiles.indexOf(state.profile) < 0) profiles.push(state.profile);
+      options(controls.profile, ["", "default"].concat(profiles.sort()), profileCounts, profileLabel);
       options(controls.attention, ["", "all"].concat(REASONS), facets.attention, function (key) { return key ? M.t(key === "all" ? "people.attention" : "attention.reason." + key) : M.t("people.any_attention"); });
       options(controls.lifecycle, [""].concat(LIFECYCLES), facets.lifecycle, function (key) { return M.t("people.lifecycle_" + (key || "any")); });
       ["expires", "quota", "never"].forEach(function (key) { text(counters[key], M.t("people.filter_count", { count: M.count(facets[key]) })); });

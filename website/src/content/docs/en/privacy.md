@@ -27,6 +27,8 @@ A separately issued `metrics.read` token can scrape node capacity, durable node 
 | `private` | HMAC-SHA256 fingerprints of device IDs, made with a secret shared only inside your fleet; no systems, models, or apps | A device count and the cap |
 | `full` | Device ID, platform, OS version, model, user agent, and first and last subscription fetch | Each person's device list |
 
+Response rules read User-Agent and Accept only while answering a request or a rule test, and store neither; only `full` device mode records the User-Agent, as listed above.
+
 **Private disclosure:**
 
 > Each person's devices are counted by an unreadable fingerprint. Meridian stores no device names, systems, or apps. Someone who takes the control server can only check whether a device they already have was used.

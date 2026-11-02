@@ -88,6 +88,7 @@ from meridian.core.person_delivery_policy import (
     PersonDeliveryPolicyState,
     PersonDeliveryPolicyWrite,
 )
+from meridian.core.response_rule_test import ResponseRuleDecision, ResponseRuleTestRequest
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 from meridian.core.token_models import DEFAULT_TOKEN_DAYS, CapabilityCatalog, TokenCapability, TokenPreview
@@ -126,6 +127,14 @@ class ControlServiceNotFound(ControlServiceError):
 
 class ControlServiceConflict(ControlServiceError):
     """The request lost a race or does not fit the object's state (HTTP 409)."""
+
+
+class ControlServiceTopologyError(ControlServiceConflict):
+    """A named removal-proposal refusal, for the local CLI's native messages."""
+
+    def __init__(self, reason: str, message: str) -> None:
+        self.reason = reason
+        super().__init__(message, category="user")
 
 
 class ControlServicePolicyError(ControlServiceError):
@@ -302,6 +311,11 @@ class ControlClient:
     def preview_subscription(self, request: SubscriptionPreviewRequest) -> SubscriptionPreview:
         return SubscriptionPreview.model_validate(
             self._request("POST", "api/subscription/preview", request.to_data(), mutation_method="GET").json()
+        )
+
+    def test_response_rules(self, request: ResponseRuleTestRequest) -> ResponseRuleDecision:
+        return ResponseRuleDecision.model_validate(
+            self._request("POST", "api/response-rules/test", request.to_data(), mutation_method="GET").json()
         )
 
     def preview_user_schedule(self, request: UserSchedulePreviewRequest) -> AccountSchedulePreview:
@@ -588,6 +602,8 @@ class ControlClient:
             ) from exc
         if response.status_code in (400, 409):
             reason = _error_body(response).get("code")
+            if reason in {"stale_topology", "topology_uncommitted"}:
+                raise ControlServiceTopologyError(str(reason), _message(response))
             if reason in {
                 "unknown_delivery_policy",
                 "conflicting_delivery_policies",

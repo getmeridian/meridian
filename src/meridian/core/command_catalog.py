@@ -165,6 +165,11 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
     "client.preview": CommandOutput(
         data_schema="subscription-preview", outcomes=[_ok("format preview read"), *_FAILURES], stability="preview"
     ),
+    "fleet.response-rules.test": CommandOutput(
+        data_schema="response-rule-decision",
+        outcomes=[_ok("app response rule test read"), *_FAILURES],
+        stability="preview",
+    ),
     "client.routing": CommandOutput(
         data_schema="client-routing",
         outcomes=[

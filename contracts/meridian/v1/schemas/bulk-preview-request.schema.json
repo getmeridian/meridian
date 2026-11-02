@@ -274,6 +274,13 @@
           "default": null,
           "title": "Order"
         },
+        "profile": {
+          "default": "",
+          "maxLength": 48,
+          "pattern": "^$|^[a-z0-9][a-z0-9_-]*$",
+          "title": "Profile",
+          "type": "string"
+        },
         "q": {
           "default": "",
           "maxLength": 256,

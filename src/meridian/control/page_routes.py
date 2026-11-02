@@ -6,9 +6,12 @@ import hashlib
 import re
 from urllib.parse import urlsplit
 
+from pydantic import ValidationError
+
 from meridian.control.connection_pages import packaged_assets
 from meridian.control.subscriptions import unknown_subscription
 from meridian.control.ui_routes import UiRequest
+from meridian.core.response_rule_test import ResponseRuleTestRequest
 from meridian.pwa import ASSET_SEGMENT, SECURITY_HEADERS
 
 _TYPES = {
@@ -67,11 +70,17 @@ def legacy_asset(request: UiRequest, match: re.Match[str]) -> None:
 
 
 def page(request: UiRequest, match: re.Match[str]) -> None:
+    if _blocked(request):
+        _unknown(request)
+        return
     response = request.ui.service.pages.render(match[1], match[2])
     request.respond(response.status, response.content_type, response.body.encode("utf-8"), response.headers)
 
 
 def legacy(request: UiRequest, match: re.Match[str]) -> None:
+    if _blocked(request):
+        _unknown(request)
+        return
     response = request.ui.service.pages.legacy(match[1], match[2] or "")
     request.respond(response.status, response.content_type, response.body.encode("utf-8"), response.headers)
 
@@ -79,3 +88,13 @@ def legacy(request: UiRequest, match: re.Match[str]) -> None:
 def _unknown(request: UiRequest) -> None:
     response = unknown_subscription()
     request.respond(response.status, response.content_type, response.body.encode("utf-8"), response.headers)
+
+
+def _blocked(request: UiRequest) -> bool:
+    try:
+        inputs = ResponseRuleTestRequest(
+            user_agent=request.headers.get("User-Agent", ""), accept=request.headers.get("Accept", "")
+        )
+    except ValidationError:
+        return True
+    return request.ui.service.test_response_rules(inputs).block

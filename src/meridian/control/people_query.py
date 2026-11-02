@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
+from meridian.control.access_memberships import read_access_profiles
 from meridian.control.errors import ServiceError
 from meridian.control.people_intent import PeopleIntent, read_people_intent
 from meridian.control.store import Store
@@ -140,6 +141,7 @@ class PeopleQueryEngine:
             q=query.q.casefold(),
             status=query.status,
             tag="" if query.tag == "none" else query.tag,
+            profile=query.profile,
             end=(moment + timedelta(days=query.expires or 7)).timestamp(),
             start=moment.timestamp(),
             quota=query.quota or 80,
@@ -151,6 +153,12 @@ class PeopleQueryEngine:
             else "1",
             "status": "status = :status" if query.status else "1",
             "tag": "tag = :tag" if query.tag else "1",
+            "profile": (
+                "EXISTS (SELECT 1 FROM user_access_memberships m "
+                "WHERE m.user_id = facts.user_id AND m.profile = :profile)"
+            )
+            if query.profile
+            else "1",
             "expires": "expiry_key BETWEEN :start AND :end" if query.expires else "1",
             "quota": "share >= :quota" if query.quota else "1",
             "never": "never_used = 1" if query.never else "1",
@@ -203,6 +211,15 @@ class PeopleQueryEngine:
                 f"SELECT '{facet}', {facet}, SUM(CASE WHEN {self._where(predicates, facet)} "
                 f"THEN 1 ELSE 0 END) FROM facts GROUP BY {facet}"
             )
+        profile_where = self._where(predicates, "profile")
+        counts.extend(
+            [
+                f"SELECT 'profile', '', COUNT(*) FROM facts WHERE {profile_where}",
+                "SELECT 'profile', m.profile, "
+                f"SUM(CASE WHEN {profile_where} THEN 1 ELSE 0 END) "
+                "FROM facts JOIN user_access_memberships m ON m.user_id = facts.user_id GROUP BY m.profile",
+            ]
+        )
         for reason, bit in [("", 0), ("all", 0), *[(name, 1 << index) for index, name in enumerate(REASONS)]]:
             check = "1" if reason == "" else "reasons != 0" if reason == "all" else f"(reasons & {bit}) != 0"
             counts.append(
@@ -218,7 +235,7 @@ class PeopleQueryEngine:
                 f"SELECT '{facet}', '', COUNT(*) FROM facts WHERE {self._where(predicates, facet)} AND ({check})"
             )
         rows = self.store.db.execute(FACTS + " UNION ALL ".join(counts), data).fetchall()
-        facets: dict[str, Any] = {name: {} for name in ("status", "tag", "attention", "lifecycle")}
+        facets: dict[str, Any] = {name: {} for name in ("status", "tag", "profile", "attention", "lifecycle")}
         total = population = 0
         for facet, value, count in rows:
             if facet == "total":
@@ -233,6 +250,8 @@ class PeopleQueryEngine:
             facets["status"].setdefault(name, 0)
         for name in LIFECYCLES:
             facets["lifecycle"].setdefault(name, 0)
+        for name in ("default", *read_access_profiles(self.store)):
+            facets["profile"].setdefault(name, 0)
         facets["status"][""] = sum(facets["status"].values())
         facets["tag"][""] = sum(facets["tag"].values())
         facets["lifecycle"][""] = sum(facets["lifecycle"].values())

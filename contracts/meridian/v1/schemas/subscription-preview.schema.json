@@ -957,12 +957,42 @@
           "title": "Match",
           "type": "string"
         },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "maximum": 64,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Number"
+        },
         "rule": {
           "enum": [
             "suffix",
             "user_agent",
             "accept",
-            "default"
+            "default",
+            "custom"
           ],
           "title": "Rule",
           "type": "string"
@@ -1041,6 +1071,34 @@
         "values"
       ],
       "title": "GeositeMatch",
+      "type": "object"
+    },
+    "MatchedResponseCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "header": {
+          "enum": [
+            "user-agent",
+            "accept"
+          ],
+          "title": "Header",
+          "type": "string"
+        },
+        "operator": {
+          "enum": [
+            "equals",
+            "prefix",
+            "contains"
+          ],
+          "title": "Operator",
+          "type": "string"
+        }
+      },
+      "required": [
+        "header",
+        "operator"
+      ],
+      "title": "MatchedResponseCondition",
       "type": "object"
     },
     "NetworkMatch": {
@@ -1270,6 +1328,7 @@
           "enum": [
             "fleet",
             "profile",
+            "response_rule",
             "person"
           ],
           "title": "Source",
@@ -1282,6 +1341,122 @@
         "source"
       ],
       "title": "ResolvedDeliveryPolicy",
+      "type": "object"
+    },
+    "ResponseRuleDecision": {
+      "additionalProperties": false,
+      "description": "No input headers, token, body, or device data is returned.",
+      "properties": {
+        "action": {
+          "enum": [
+            "format",
+            "block",
+            "policy",
+            "headers"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "block": {
+          "title": "Block",
+          "type": "boolean"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FormatRule"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "format": {
+          "anyOf": [
+            {
+              "enum": [
+                "browser",
+                "mihomo",
+                "stash",
+                "singbox",
+                "xray-json",
+                "base64"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Format"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "maxProperties": 4,
+          "propertyNames": {
+            "enum": [
+              "profile-title",
+              "profile-update-interval",
+              "support-url",
+              "announce"
+            ]
+          },
+          "title": "Headers",
+          "type": "object"
+        },
+        "matched_conditions": {
+          "items": {
+            "$ref": "#/$defs/MatchedResponseCondition"
+          },
+          "maxItems": 2,
+          "title": "Matched Conditions",
+          "type": "array"
+        },
+        "policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResolvedDeliveryPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reason": {
+          "enum": [
+            "first_custom_match",
+            "built_in_selector"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "response_kind": {
+          "enum": [
+            "subscription",
+            "page",
+            "account_info",
+            "blocked"
+          ],
+          "title": "Response Kind",
+          "type": "string"
+        },
+        "selection": {
+          "$ref": "#/$defs/FormatRule"
+        }
+      },
+      "required": [
+        "format",
+        "block",
+        "response_kind",
+        "selection",
+        "action",
+        "reason"
+      ],
+      "title": "ResponseRuleDecision",
       "type": "object"
     }
   },
@@ -1310,16 +1485,23 @@
       "default": null
     },
     "format": {
-      "enum": [
-        "browser",
-        "mihomo",
-        "stash",
-        "singbox",
-        "xray-json",
-        "base64"
+      "anyOf": [
+        {
+          "enum": [
+            "browser",
+            "mihomo",
+            "stash",
+            "singbox",
+            "xray-json",
+            "base64"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
       ],
-      "title": "Format",
-      "type": "string"
+      "title": "Format"
     },
     "included": {
       "items": {
@@ -1380,10 +1562,22 @@
       "enum": [
         "subscription",
         "page",
-        "account_info"
+        "account_info",
+        "blocked"
       ],
       "title": "Response Kind",
       "type": "string"
+    },
+    "response_rule": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResponseRuleDecision"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "selection": {
       "$ref": "#/$defs/FormatRule"

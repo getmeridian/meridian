@@ -643,6 +643,7 @@
           "enum": [
             "fleet",
             "profile",
+            "response_rule",
             "person"
           ],
           "title": "Source",

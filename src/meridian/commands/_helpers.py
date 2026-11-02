@@ -10,6 +10,7 @@ from meridian.cluster import ClusterConfig, ClusterConfigExternallyModifiedError
 from meridian.commands.apply_progress import apply_progress
 from meridian.console import fail
 from meridian.core.errors import LocalStateError, MeridianError
+from meridian.core.people_removal import PeopleRemovalProposal
 from meridian.core.topology import ExitIntent, SetupIntent
 
 if TYPE_CHECKING:
@@ -122,6 +123,7 @@ def reviewed_runtime(
     fence_holder: str | None = None,
     user_cut_off: Mapping[str, list[NodeCommandRecord]] | None = None,
     access_review_hash: str | None = None,
+    removal_proposal: PeopleRemovalProposal | None = None,
 ) -> SetupRuntime:
     """A setup runtime bound to an already-loaded cluster that persists every checkpoint."""
     from meridian.setup.runtime import SetupRuntime
@@ -134,6 +136,7 @@ def reviewed_runtime(
         fence_holder=fence_holder,
         user_cut_off=user_cut_off,
         access_review_hash=access_review_hash,
+        removal_proposal=removal_proposal,
     )
 
 
@@ -149,6 +152,7 @@ def apply_reviewed_intent(
     fence_holder: str | None = None,
     user_cut_off: Mapping[str, list[NodeCommandRecord]] | None = None,
     access_review_hash: str | None = None,
+    removal_proposal: PeopleRemovalProposal | None = None,
 ) -> ResourceExecutionResult:
     """Apply an edited intent with progress, failing with ``failure`` unless every resource converged.
 
@@ -164,6 +168,7 @@ def apply_reviewed_intent(
                 fence_holder=fence_holder,
                 user_cut_off=user_cut_off,
                 access_review_hash=access_review_hash,
+                removal_proposal=removal_proposal,
             ).apply_intent(intent, expected_plan_hash=expected_plan_hash)
     except MeridianError as exc:
         if on_unsaved is not None and isinstance(exc, ReviewedApplyPersistenceError):

@@ -1,6 +1,7 @@
 # reconciler — Declarative plan / apply engine
 
 ## Design decisions
+- **App rules share settings observation** — the service-settings driver applies and compares the full typed ordered list, preserving request-free intent and unchanged default payloads.
 - **Checkpointed apply** — `resource_executor.py` re-observes every immutable compiler action, persists each transition, and cuts over a generation only after all dependencies and postconditions succeed.
 - **Fenced applies** — `fence.py` decides and `state_fence.py` stores the control server's fence (fleet, committed generation and plan hash, lease) by compare-and-swap for the whole apply: a copy behind refuses, one ahead heals a lost commit. Once the control service answers, the fence and a revision per apply live there (`service_fence.py`).
 - **Service bootstrap is a driver** — `control_service_driver.py` installs `ctld`; its attestation hashes payload, target, package identity, and render contract, so only a CLI upgrade or contract bump reinstalls.
@@ -17,6 +18,7 @@
 - **Renderer stamps track what each piece deploys** — bump `render_contract.py` whenever deployed bytes or commands change, and every stamp the change reaches (control service, API, subscription, PWA, console); a missed stamp leaves servers running old bytes after an apply.
 
 ## Pitfalls
+- **People query changes reach three stamps** — membership projections and filter controls change service, API, and console bytes together.
 - **Settings re-check profile declarations** — unreviewed writes carry their declarations fingerprint as a compare-and-swap precondition; reviewed writes replace it under the membership fence, including an empty fingerprint after the last removal. Any write that carries a fingerprint first saves profile use, or plan expects none and reports the empty one as drift.
 - **Membership is creation-only in fleet documents** — exported initial profiles may create a person, but later applies never replace their live memberships.
 - **Account schedules are creation-only inputs** — existing duration, reset anchor, renewal interval, cap, and progress remain the operator's on every apply.

@@ -19,6 +19,24 @@ Status = Annotated[
 Tag = Annotated[
     str | None, typer.Option("--tag", help="Match a tag; none for untagged", rich_help_panel="Matching people")
 ]
+Profile = Annotated[
+    str,
+    typer.Option(
+        "--profile",
+        metavar="PROFILE",
+        help="Match an access membership, including default",
+        rich_help_panel="Matching people",
+    ),
+]
+MatchProfile = Annotated[
+    str,
+    typer.Option(
+        "--match-profile",
+        metavar="PROFILE",
+        help="Select people in an access profile, including default",
+        rich_help_panel="Matching people",
+    ),
+]
 Expiring = Annotated[
     str | None,
     typer.Option(
@@ -69,6 +87,7 @@ def people_query(options: dict[str, Any]) -> PeopleQuery:
     return PeopleQuery(
         q=options.get("q", ""),
         status=options.get("status", ""),
+        profile=options.get("match_profile", ""),
         tag=("none" if wanted_tag == "" else wanted_tag) if wanted_tag is not None else "",
         expires=bounded_integer(options["expiring"], "--expiring-within", 1, 365)
         if options.get("expiring") is not None

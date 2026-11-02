@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from meridian.commands._helpers import load_topology_cluster, require_intent
-from meridian.commands.client_handoff import validate_client_name
+from meridian.commands.client_handoff import declared_client_name
 from meridian.commands.node_command_results import cut_off_disclosure, print_command_results
 from meridian.console import confirm, error_context, fail, is_json_mode, ok, warn
 from meridian.control.client import ControlServiceCredentialsChanged, ControlServiceError
@@ -32,7 +32,7 @@ def run_rotate_credentials(name: str, *, yes: bool = False, cut_off: bool = Fals
             fail(t("client.credentials_requires_yes"), hint=t("client.credentials_yes_hint"), hint_type="user")
         cluster = load_topology_cluster()
         access = require_intent(cluster).access
-        found = access.find_user(name)
+        found = declared_client_name(access, name)
         if found is None:
             fail(
                 t("client.credentials_not_declared", name=isolate(name)),
@@ -40,7 +40,6 @@ def run_rotate_credentials(name: str, *, yes: bool = False, cut_off: bool = Fals
                 hint_type="user",
             )
         name = found
-        validate_client_name(name)
         shown = isolate(access.display_name(name))
         try:
             with access_panel(cluster) as panel:

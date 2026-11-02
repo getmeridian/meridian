@@ -1,0 +1,54 @@
+{
+  "$defs": {
+    "LiteralCondition": {
+      "additionalProperties": false,
+      "description": "A nonempty literal; case folding never turns it into a pattern.",
+      "properties": {
+        "operator": {
+          "enum": [
+            "equals",
+            "prefix",
+            "contains"
+          ],
+          "title": "Operator",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operator",
+        "value"
+      ],
+      "title": "LiteralCondition",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The User-Agent condition and optional Accept condition must both match.",
+  "properties": {
+    "accept": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LiteralCondition"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "user_agent": {
+      "$ref": "#/$defs/LiteralCondition"
+    }
+  },
+  "required": [
+    "user_agent"
+  ],
+  "title": "ResponseMatcher",
+  "type": "object"
+}

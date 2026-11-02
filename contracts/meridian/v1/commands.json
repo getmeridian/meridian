@@ -452,6 +452,7 @@
         "--search",
         "--status",
         "--tag",
+        "--match-profile",
         "--expiring-within",
         "--quota-at-least",
         "--never-used",
@@ -523,6 +524,7 @@
         "--search",
         "--status",
         "--tag",
+        "--match-profile",
         "--expiring-within",
         "--quota-at-least",
         "--never-used",
@@ -593,6 +595,7 @@
         "--search",
         "--status",
         "--tag",
+        "--match-profile",
         "--expiring-within",
         "--quota-at-least",
         "--never-used",
@@ -663,6 +666,7 @@
         "--search",
         "--status",
         "--tag",
+        "--match-profile",
         "--expiring-within",
         "--quota-at-least",
         "--never-used",
@@ -734,6 +738,7 @@
         "--search",
         "--status",
         "--tag",
+        "--match-profile",
         "--expiring-within",
         "--quota-at-least",
         "--never-used",
@@ -806,6 +811,7 @@
         "--search",
         "--status",
         "--tag",
+        "--match-profile",
         "--expiring-within",
         "--quota-at-least",
         "--never-used",
@@ -879,6 +885,7 @@
         "--search",
         "--status",
         "--tag",
+        "--match-profile",
         "--expiring-within",
         "--quota-at-least",
         "--never-used",
@@ -1010,6 +1017,7 @@
         "--search",
         "--status",
         "--tag",
+        "--match-profile",
         "--expiring-within",
         "--quota-at-least",
         "--never-used",
@@ -1080,6 +1088,7 @@
         "--search",
         "--status",
         "--tag",
+        "--match-profile",
         "--expiring-within",
         "--quota-at-least",
         "--never-used",
@@ -1151,6 +1160,7 @@
         "--search",
         "--status",
         "--tag",
+        "--match-profile",
         "--expiring-within",
         "--quota-at-least",
         "--never-used",
@@ -1222,6 +1232,7 @@
         "--search",
         "--status",
         "--tag",
+        "--match-profile",
         "--expiring-within",
         "--quota-at-least",
         "--never-used",
@@ -1578,6 +1589,7 @@
         "--search",
         "--status",
         "--tag",
+        "--profile",
         "--expiring-within",
         "--quota-at-least",
         "--never-used",
@@ -1762,11 +1774,11 @@
       "argv": [
         "client",
         "remove",
-        "NAME"
+        "[NAME......]"
       ],
       "command": "client.remove",
       "data_schema": "client-remove",
-      "description": "Remove a client permanently; their links stop working",
+      "description": "Remove declared clients in one local review and apply; their links stop working.",
       "envelope_schema": "client-remove-envelope",
       "error_schema": "error",
       "exit_codes": {
@@ -1783,6 +1795,8 @@
         "--yes",
         "--json",
         "--cut-off",
+        "--proposal",
+        "--dry-run",
         "--context"
       ],
       "outcomes": [
@@ -2989,6 +3003,66 @@
           "category": "none",
           "exit_code": 0,
           "meaning": "notice read",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "fleet",
+        "response-rules",
+        "test"
+      ],
+      "command": "fleet.response-rules.test",
+      "data_schema": "response-rule-decision",
+      "description": "Explain the first app rule and its format, refusal, policy, and header changes",
+      "envelope_schema": "fleet-response-rules-test-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "app response rule test read",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--user-agent",
+        "--accept",
+        "--person",
+        "--suffix",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "app response rule test read",
           "status": "ok"
         },
         {

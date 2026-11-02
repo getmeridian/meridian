@@ -87,6 +87,21 @@
       "title": "AccessProfileIntent",
       "type": "object"
     },
+    "BlockAction": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "block",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "BlockAction",
+      "type": "object"
+    },
     "CidrMatch": {
       "additionalProperties": false,
       "properties": {
@@ -321,6 +336,14 @@
           "pattern": "^[^\\r\\n\\t]+$",
           "title": "Profile Title",
           "type": "string"
+        },
+        "response_rules": {
+          "items": {
+            "$ref": "#/$defs/ResponseRule"
+          },
+          "maxItems": 64,
+          "title": "Response Rules",
+          "type": "array"
         },
         "template_name": {
           "default": "meridian",
@@ -800,6 +823,52 @@
       "title": "ExitIntent",
       "type": "object"
     },
+    "FormatAction": {
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "enum": [
+            "browser",
+            "mihomo",
+            "stash",
+            "singbox",
+            "xray-json",
+            "base64"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "headers": {
+          "$ref": "#/$defs/ResponseHeaders"
+        },
+        "kind": {
+          "const": "format",
+          "title": "Kind",
+          "type": "string"
+        },
+        "policy": {
+          "anyOf": [
+            {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Policy"
+        }
+      },
+      "required": [
+        "kind",
+        "format"
+      ],
+      "title": "FormatAction",
+      "type": "object"
+    },
     "GeoipMatch": {
       "additionalProperties": false,
       "properties": {
@@ -852,6 +921,52 @@
         "values"
       ],
       "title": "GeositeMatch",
+      "type": "object"
+    },
+    "HeadersAction": {
+      "additionalProperties": false,
+      "properties": {
+        "headers": {
+          "$ref": "#/$defs/ResponseHeaders"
+        },
+        "kind": {
+          "const": "headers",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "headers"
+      ],
+      "title": "HeadersAction",
+      "type": "object"
+    },
+    "LiteralCondition": {
+      "additionalProperties": false,
+      "description": "A nonempty literal; case folding never turns it into a pattern.",
+      "properties": {
+        "operator": {
+          "enum": [
+            "equals",
+            "prefix",
+            "contains"
+          ],
+          "title": "Operator",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operator",
+        "value"
+      ],
+      "title": "LiteralCondition",
       "type": "object"
     },
     "NetworkMatch": {
@@ -1015,6 +1130,32 @@
       "title": "PlainResolver",
       "type": "object"
     },
+    "PolicyAction": {
+      "additionalProperties": false,
+      "properties": {
+        "headers": {
+          "$ref": "#/$defs/ResponseHeaders"
+        },
+        "kind": {
+          "const": "policy",
+          "title": "Kind",
+          "type": "string"
+        },
+        "policy": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Policy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "policy"
+      ],
+      "title": "PolicyAction",
+      "type": "object"
+    },
     "PortMatch": {
       "additionalProperties": false,
       "properties": {
@@ -1156,6 +1297,142 @@
         "protocol"
       ],
       "title": "ProtocolPathIntent",
+      "type": "object"
+    },
+    "ResponseHeaders": {
+      "additionalProperties": false,
+      "description": "Only headers clients consume; text is encoded by the renderer, never sent raw.",
+      "properties": {
+        "announce": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Announce"
+        },
+        "profile_title": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profile Title"
+        },
+        "support_url": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "pattern": "^(?:|https://[^\\s]+|tg://[^\\s]+|mailto:[^\\s]+)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Support Url"
+        },
+        "update_interval_hours": {
+          "anyOf": [
+            {
+              "maximum": 168,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Update Interval Hours"
+        }
+      },
+      "title": "ResponseHeaders",
+      "type": "object"
+    },
+    "ResponseMatcher": {
+      "additionalProperties": false,
+      "description": "The User-Agent condition and optional Accept condition must both match.",
+      "properties": {
+        "accept": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LiteralCondition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "user_agent": {
+          "$ref": "#/$defs/LiteralCondition"
+        }
+      },
+      "required": [
+        "user_agent"
+      ],
+      "title": "ResponseMatcher",
+      "type": "object"
+    },
+    "ResponseRule": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "discriminator": {
+            "mapping": {
+              "block": "#/$defs/BlockAction",
+              "format": "#/$defs/FormatAction",
+              "headers": "#/$defs/HeadersAction",
+              "policy": "#/$defs/PolicyAction"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/FormatAction"
+            },
+            {
+              "$ref": "#/$defs/BlockAction"
+            },
+            {
+              "$ref": "#/$defs/PolicyAction"
+            },
+            {
+              "$ref": "#/$defs/HeadersAction"
+            }
+          ],
+          "title": "Action"
+        },
+        "match": {
+          "$ref": "#/$defs/ResponseMatcher"
+        },
+        "name": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "match",
+        "action"
+      ],
+      "title": "ResponseRule",
       "type": "object"
     },
     "RoutingGatewayIntent": {

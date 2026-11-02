@@ -10,11 +10,13 @@ from rich.table import Table
 from meridian.commands._helpers import load_topology_cluster
 from meridian.commands.client_handoff import resolve_client_mutation_name, resolve_client_name
 from meridian.commands.delivery_preview import print_delivery_preview
+from meridian.commands.response_rules import print_response_rule_decision
 from meridian.commands.routing_explain import print_explanation
 from meridian.console import err_console, error_context, fail, is_json_mode
 from meridian.control_access import access_panel
 from meridian.core.output import OperationContext, command_envelope
-from meridian.core.subscription_preview import PreviewInputs, SubscriptionPreview, SubscriptionPreviewRequest
+from meridian.core.subscription_inputs import PreviewInputs
+from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 from meridian.i18n import t
 from meridian.remnawave import RemnawaveError
 from meridian.renderers import emit_json
@@ -54,7 +56,10 @@ def print_preview(result: SubscriptionPreview) -> None:
     table = Table(box=box.SIMPLE, show_header=False, padding=(0, 1))
     table.add_column(style="bold")
     table.add_column()
-    table.add_row(t("preview.format"), t(f"preview.format_{result.format}"))
+    table.add_row(
+        t("preview.format"),
+        t("response_rules.blocked") if result.format is None else t(f"preview.format_{result.format}"),
+    )
     table.add_row(t("preview.rule"), t(f"preview.rule_{result.selection.rule}"))
     if result.selection.family:
         table.add_row(t("preview.family"), result.selection.family)
@@ -66,6 +71,8 @@ def print_preview(result: SubscriptionPreview) -> None:
     if result.stale_client:
         table.add_row(t("preview.stale_client"), t(f"preview.stale_client_{result.stale_client}"))
     err_console.print(table)
+    if result.response_rule is not None:
+        print_response_rule_decision(result.response_rule)
     if result.delivery is not None:
         print_delivery_preview(result.delivery)
     if result.explanation is not None:

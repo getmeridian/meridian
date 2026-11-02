@@ -8,10 +8,9 @@ nginx gzips JSON and Base64 but leaves YAML as it is (`gzip_types`), as with Rem
 
 from __future__ import annotations
 
-import base64
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from urllib.parse import quote
 
@@ -20,6 +19,7 @@ from meridian.control.formats.contact_remarks import contact_remarks
 from meridian.control.formats.entries import SubscriptionUser
 from meridian.control.formats.links import base64_document, links
 from meridian.control.formats.mihomo import mihomo_document
+from meridian.control.formats.response_rules import encoded_header_text, merge_response_headers
 from meridian.control.formats.selector import DocumentFormat
 from meridian.control.formats.singbox import singbox_document
 from meridian.control.formats.stale_clients import stale_remarks
@@ -32,6 +32,7 @@ from meridian.core.delivery_preview import SubscriberDeliveryCapabilities
 from meridian.core.device_slots import DeviceSlots
 from meridian.core.notices import RenderedNotice
 from meridian.core.owner_contact import OwnerContact
+from meridian.core.response_rules import ResponseHeaderName
 from meridian.core.subscription_preview import StaleClient
 from meridian.core.topology import ClientRoutingPolicy
 
@@ -163,6 +164,15 @@ def unknown_subscription() -> SubscriptionResponse:
     return SubscriptionResponse(404, JSON_TYPE, _json(not_found()), dict(COMMON_HEADERS))
 
 
+def apply_response_headers(
+    response: SubscriptionResponse, changes: dict[ResponseHeaderName, str]
+) -> SubscriptionResponse:
+    """Rule headers apply to successful answers only; every refusal keeps its exact bytes."""
+    if response.status != 200 or not changes:
+        return response
+    return replace(response, headers=merge_response_headers(response.headers, changes))
+
+
 def subscription_headers(
     user: SubscriptionUser,
     *,
@@ -189,12 +199,12 @@ def subscription_headers(
         headers["support-url"] = support_link
     elif public_url:
         headers["support-url"] = subscription_url(public_url, user.short_id) + "/support.html"
-    headers["profile-title"] = "base64:" + base64.b64encode(profile_title.encode("utf-8")).decode("ascii")
+    headers["profile-title"] = encoded_header_text(profile_title)
     if public_url:
         headers["profile-web-page-url"] = subscription_url(public_url, user.short_id)
     headers["profile-update-interval"] = str(update_interval_hours)
     if notice is not None:
-        headers["announce"] = "base64:" + base64.b64encode(notice.text.encode("utf-8")).decode("ascii")
+        headers["announce"] = encoded_header_text(notice.text)
     return headers
 
 

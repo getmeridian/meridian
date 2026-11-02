@@ -129,7 +129,7 @@ meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DA
 meridian client show NAME [--connections] [--json]
 meridian client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX] [--json]
 meridian client usage NAME [--days N] [--json]
-meridian client list [--attention] [--tag TAG|none] [--json]
+meridian client list [--profile PROFILE] [--attention] [--tag TAG|none] [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
@@ -139,6 +139,8 @@ meridian client disable NAME [--json]
 meridian client reissue NAME [--cut-off] [--yes] [--json]
 meridian client rotate-credentials NAME [--cut-off] [--yes] [--json]
 meridian client remove NAME [--cut-off] [--yes] [--json]
+meridian client remove NAME... [--dry-run] [--yes] [--json]
+meridian client remove --proposal FILE [--dry-run] [--yes] [--json]
 ```
 
 | 标志 | 默认值 | 说明 |
@@ -193,11 +195,13 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 私人字段：`client set NAME --note TEXT --tag TAG` 只更改指定的字段。备注最多 500 个纯文本字符，支持换行；`--note ""` 清除备注。标签使用 1–16 个拉丁字母、数字或下划线，保存为大写；`--tag none` 清除标签。`client show` 显示这两个字段，`client list --tag TAG` 筛选标签列（`none` 选择没有标签的人）。读取和编辑需要 people/admin 权限。网页面板编辑相同字段；应用配置保留它们，加密快照保存它们。参见[私人备注和标签](/zh/client-management/#私人备注和标签)。
 
-`client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` 解释格式选择及省略原因，不泄露凭据。User-Agent 最多 512 个 Unicode 字符，Accept 最多 256 个字符，均为单行临时输入。`--suffix` 强制使用现有格式 URL 后缀。JSON 返回 `subscription-preview`；API 为需要 read 权限的 `POST /api/subscription/preview`。
+`client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` 解释格式选择及省略原因，不泄露凭据。User-Agent 最多 512 个 Unicode 字符，Accept 最多 256 个字符，均为单行临时输入。`--suffix` 提供现有格式 URL 后缀；匹配的自定义格式或拒绝规则优先。JSON 返回 `subscription-preview`；API 为需要 read 权限的 `POST /api/subscription/preview`。
 
 #### 经审核的批量更改
 
 `client list` 返回前 100 个匹配人员。`--limit 1–500` 设置页面大小，`--cursor VALUE` 继续同一查询。JSON 新增 `total`、`facets` 与可选的 `next_cursor`，摘要针对返回页面。`client bulk ACTION` 使用相同查询，随后冻结预览、显示表格、确认并原子提交。`--dry-run` 仅预览，JSON 提交和撤销需要 `--yes`。精确 `--person USERNAME` 不能与筛选合用。使用 `client bulk receipt ID` 读回执，使用 `client bulk undo ID` 撤销。提交回复丢失时读取回执确认结果。
+
+`client list --profile PROFILE` 按已分配的访问配置筛选，包括 `default`。批量操作使用 `--match-profile PROFILE`，因此 `set-profiles --profile` 继续表示要分配的配置。JSON 包含考虑其他筛选的 `facets.profile` 计数和每行已保存的 `profiles`。属于多个配置的人员在每个配置中各计一次，在列表中只出现一次。空计数键表示不受当前配置筛选影响的所有匹配人数。格式有效但未知的配置 ID 没有匹配结果；格式无效的 ID 在访问服务前被拒绝。
 
 提交或撤销回复丢失时，会读取回执核实结果；只有回执记录已撤销时，才会报告撤销成功。控制台保留更新后的回执，并在重新打开时再次读取。`client bulk undo ID --dry-run` 不发送写入请求，只检查操作是否可撤销、尚未撤销且仍在撤销期限内；最终撤销还会检查人员当前状态和入站容量。
 
@@ -218,11 +222,30 @@ JSON 筛选计数对所有有效标签均保持整数，包括 `TOKEN` 和 `API_
 | `meridian client bulk tag --set-tag none` | 设置或清除标签 |
 | `meridian client bulk devices --devices unlimited` | 设置设备限制 |
 | `meridian client bulk renewal --renew-days 30 --renewals 5` | 设置或清除续期 |
-| `meridian client bulk delete` | 删除服务人员，为声明人员返回命令 |
+| `meridian client bulk delete` | 删除服务人员，为已声明人员返回一个本地提案 |
 | `meridian client bulk undo ID` | 十分钟内撤销可逆字段 |
 | `meridian client bulk receipt ID` | 读取持久回执 |
 
-共享筛选：`--search TEXT`、`--status STATUS`、`--tag TAG`、`--expiring-within DAYS`、`--quota-at-least PERCENT`、`--never-used`、`--attention`、`--attention-reason REASON`、`--lifecycle STATE`、`--sort name|usage|expiry|activity` 与 `--order asc|desc`。`--attention` 匹配任何原因，不能与 `--attention-reason` 同用。周期状态：`pending`、`renewing`、`fixed`、`unlimited`。先按忽略大小写的显示名称，再按完整用户名排序。规则见[客户端管理](/zh/client-management/)。
+共享筛选：`--search TEXT`、`--status STATUS`、`--tag TAG`、`--match-profile PROFILE`、`--expiring-within DAYS`、`--quota-at-least PERCENT`、`--never-used`、`--attention`、`--attention-reason REASON`、`--lifecycle STATE`、`--sort name|usage|expiry|activity` 与 `--order asc|desc`。`--attention` 匹配任何原因，不能与 `--attention-reason` 同用。周期状态：`pending`、`renewing`、`fixed`、`unlimited`。先按忽略大小写的显示名称，再按完整用户名排序。规则见[客户端管理](/zh/client-management/)。
+
+删除已声明人员会在批量预览和回执中返回一个绑定修订的 `proposal`。保存控制台的 **people-removal.json**，或将完整 API 批量预览、回执或 CLI 批量 JSON 结果文件传给 `client remove --proposal FILE`。文件上限为 64 MiB。CLI 验证服务器集合、已提交的修订、代次、计划及本地意图，一起审核所有删除，只确认一次，并应用一次意图更改。应用栅栏在服务器修改前再次拒绝旧修订。
+
+64 MiB 限制按实际读取的字节数执行，适用于管道和特殊文件，并在文本解码或 JSON 解析前检查。即使报告的大小为零，或文件在读取过程中增长，超出限制的输入也会被拒绝。
+
+提案中的 `usernames` 必须与已提交的 `topology_intent.access.users` 中的用户名完全一致，包括大小写。提案不接受显示名称。
+
+保存的批量文件必须记录删除操作，提案必须恰好列出结果为 `cli_required` 的人员，且计数一致。CLI 会验证预览哈希；如果文件同时包含预览和回执，两者的 ID、哈希和提案必须一致。独立回执保留原始预览哈希，并根据已记录的结果检查提案。CLI 响应外层对象中的未知字段会被拒绝。
+
+按名称删除时，服务中的完整用户名优先于显示名称或忽略大小写的匹配。如果名称匹配两个人，命令会拒绝删除；请使用 `client list` 中的完整用户名。仅在控制台创建的人员请用 `client bulk delete` 删除。
+
+`client remove NAME...` 也接受多个已声明名称，`--dry-run` 只审核、不保存。取消确认不会保存任何更改，且必须至少保留一名已声明人员。JSON 预览返回 `data.clients`、`data.review_hash` 和 `data.applied: false`。已应用的批量删除保留 `clients` 和 `review_hash`，省略默认值 `applied: true`。单人结果继续使用 `data.client`。
+
+提案不含人员私人字段或会话切断选项。批量删除拒绝 `--cut-off`，单人 `client remove NAME --cut-off` 保留原有确认和逐节点结果。混合批次中，服务管理的人员仍以原子事务删除；已声明人员等待本地应用，拓扑变化会拒绝整个服务提交。
+
+```bash
+meridian client remove --proposal people-removal.json --dry-run --json
+meridian client remove --proposal people-removal.json --yes --json
+```
 
 `meridian client bulk extend --months 1 --person sample-a --dry-run --json`
 
@@ -439,6 +462,7 @@ meridian fleet history [--json]
 meridian fleet events [--since ID] [--limit N] [--json]
 meridian fleet usage [--days N] [--json]
 meridian fleet routing [ru-split|full] [--dry-run] [--yes] [--json]
+meridian fleet response-rules test [--user-agent UA] [--accept TYPE] [--person NAME] [--suffix SUFFIX] [--json]
 meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--json]
 meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
@@ -482,6 +506,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 **`fleet export`** — 把集群已审查的拓扑输出为可编辑的 YAML 文件：出口及其协议路径、中继、网关、出口池、路由规则、路由、客户端和集群设置。服务器以保存的名称（没有名称时用地址）出现，从不使用内部 ID；文件以 `schema: meridian.fleet/v1` 开头。Reality 密钥、API 令牌、客户端链接以及 XHTTP 和 WSS 的传输路径都留在 Meridian 中，不会列出。`--json` 在 `data.document` 下返回同一份文档。
 
+导入 JSON 导出文件时，请仅传入 `data.document` 的内容。经过审阅的 `delivery` 设置（包括响应规则中的 URL 路径）会在导出、导入审阅和应用结果中原样保留。
+
 **`fleet import`** — 读取编辑后的文件（或用 `-` 从标准输入读取），每处变更一行：`+` 表示添加，`-` 表示删除，`~` 表示修改字段（`~ exit-2 sni www.example.com -> www.example.org`）。随后列出变更将删除的每个资源和审查哈希，询问确认，并像 `apply` 一样只应用这次审查。未编辑的文件会输出“没有变更”。从 `access.users` 中删除客户端等同于 `client remove`：其订阅 URL 和连接页面不再可用。添加客户端等同于 `client add`，控制服务自动提供其连接页面；用 `client show NAME` 查看链接。新的伪装 SNI 会经过与 `node sni` 相同的检查。导入会拒绝：其他 `schema`、未保存的服务器（用 `meridian server add` 保存）、文件中的传输路径、对控制服务器及其域名或后端的更改、删除或重命名控制服务器上的出口，以及把出口移到另一台服务器（请用 `node replace`）。密钥和凭据保持不变。没有终端时请传入 `--yes`；`--dry-run` 只显示变更和审查结果，不应用任何内容。
 
 **`fleet usage`** — 显示每台服务器每个 UTC 天的总字节数，包括已删除服务器仍在保留期内的用量。`--days N` 选择保留期内 1–730 天。每日历史须开启；JSON 在 `data` 中返回服务器组总量和 `nodes[].daily`。
@@ -519,6 +545,9 @@ meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --net
 服务仅从缓存中读取通过 Meridian 固定哈希验证的 Xray 压缩包，不会因解释路由而开始下载。客户端不会收到远程规则集。Xray 将已配置的公共 DNS 请求通过自动组发送，同时保留局域网 DNS 直连；其他客户端使用可表示的 DNS 设置。不支持的传输不会转换为普通 DNS。原有内置模式的字节内容和默认配置的黄金语料响应保持不变。
 
 `POST /api/delivery-policies/explain` 接受 `destination`、可选 `person`、`format`、`port`、`network`、`protocol`。需要 `delivery.explain`；指定用户时还需要 `people.read` 和 `people.private`。订阅预览中的策略详情或目的地解释需要私有权限，较低权限仅返回原有元数据。连接页面的 `/info` 可包含 `user.deliveryCapabilities`：格式名称、支持标志与省略代码，不含策略名称、个人覆盖、成员关系、目的地或连接详情。页面仅在内存中保留这些新鲜数据。
+
+
+**`fleet response-rules test`** 使用 `--user-agent UA`、可选的 `--accept TYPE`、`--person NAME`、`--suffix SUFFIX` 及 `--json` 读取已应用的应用规则，解释首个自定义或内置匹配、格式或拒绝、策略来源和脱敏后的响应头修改。输入临时保留，限 512/256 个字符；不会获取订阅、查询 DNS、注册设备或写入状态。`--person` 接受 1–64 个字符的账户名或显示名；空值或超长值会返回输入错误（退出码 2）。规则在 `delivery.response_rules` 中编辑，通过 `fleet export` 导出并用 `fleet import` 审阅。应用规则需要 Meridian 控制服务；使用 Remnawave 时，请先运行 `meridian migrate` 再添加规则。[路由指南](/zh/split-routing/)说明字段、优先级和拒绝行为。
 
 ### meridian context
 

@@ -59,6 +59,8 @@ meridian client list
 
 人员页面、`client list` 和批量选择使用同一服务端查询：用户名或显示名称、状态、标签、未来 1–365 天内到期、最低配额用量 1–100%、尚未使用、关注原因与周期状态（`pending`、`renewing`、`fixed`、`unlimited`）。计数考虑搜索和其他筛选。可按名称、周期用量、到期时间或最后活动排序，未知日期在最后。控制台每页显示 100 行，刷新时保留行身份。筛选和排序保存在 URL 片段。参数发送到服务，但不会保存为请求历史。游标分页不包含首次查询后新增的人员，在 15 分钟后过期；返回第一页会重新查询。
 
+在人员页面选择**访问配置**，或使用 `meridian client list --profile limited` 和 `meridian client bulk disable --match-profile limited --dry-run`。筛选匹配已保存的成员关系；`default` 选择明确分配了全部服务器访问权的人员。每个配置的计数考虑搜索及其他筛选，每人只计一次，未使用的配置显示零。属于多个配置的人员仍只有一行，也只作为一个批量操作目标。所有配置的总数是人数，不是成员关系数量之和。筛选与计数仍需要 `people.query` 和 `people.private` 权限，不搜索私人备注。
+
 后台刷新保留人员选择、批量操作、分页控件和键盘焦点。刷新失败时，当前行和控件仍可使用；“下一页”或“上一页”请求失败会保留最后成功加载的页面，以便通过分页控件重试。
 
 提交或撤销回复丢失时，会读取回执核实结果；只有回执记录已撤销时，才会报告撤销成功。控制台保留更新后的回执，并在重新打开时再次读取。`client bulk undo ID --dry-run` 不发送写入请求，只检查操作是否可撤销、尚未撤销且仍在撤销期限内；最终撤销还会检查人员当前状态和入站容量。
@@ -479,6 +481,8 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 `POST /api/subscription/preview` 接受 read 或 people 权限，或管理者会话。配置了访问配置后，需要 people/admin 权限或管理者会话。发送 `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`，省略的请求头默认为空字符串。网页面板设置提供同样的表单，不接受 HWID 或设备请求头。对于通过 API 管理的端点，`enabled: false` 会将保存的端点从订阅中排除，并显示原因为 `disabled_endpoint`；默认值为 true，序列化时省略。经过审核的端点应用操作会恢复拓扑规定的连接提供方式。
 
+订阅预览还会显示已审阅的应用规则、匹配条件及拒绝结果。设置中的规则列表为只读；测试时将用户留空可检查服务器组默认。通过已审阅的配置导入修改 `delivery.response_rules`。类型字段、响应头限制和策略优先级见[路由指南](/zh/split-routing/)。
+
 ## 审核批量更改
 
 使用 Tab 和空格选择行，Shift+空格扩展当前页的范围。**选择全部匹配人员**包含其他页面。更改筛选会清除选择。选择操作，审核每人的更改前后值、警告和将更改的节点文档数量。预览每页显示 100 人，将具体人员与版本冻结十分钟，新匹配人员不会加入。任何人员、限制执行结果或节点配置变化都会拒绝整个提交，并列出变化的人员。更改与回执在同一事务中写入，节点文档仅为整个批次生成一次。
@@ -487,9 +491,25 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 有效期按整天或日历月从当前时间与原到期时间中较晚者延长，并处理短月份。等待首次使用的人员只增加时长，不激活；月数换算为从预览 UTC 日期到相应月份日期的天数。可设置或清除到期时间、配额与重置策略、标签、设备限制（继承／不限／N）或续期，也可启用、停用、重置周期流量或删除。省略的字段保持原值，重置策略与续期次数上限可单独更改。现有节点协议每个受管入站最多支持 10,000 名启用人员，预览拒绝超过此限制的更改。
 
-持久回执保存操作、参数、计数及各人的结果。如果人员及限制执行结果未变化，可在十分钟内撤销一次可逆字段，重启服务后也可撤销。流量重置、删除和会重置流量的计划更改不可逆，提交前明确提示。重置保留累计流量。回执不含私人备注、连接凭据、客户端地址或设备标识符；事件仅包含操作与计数及现有不含私人内容的单人事件。`topology_intent.access.users` 中的人员可接受服务字段更改；删除时返回确切的 `meridian client remove USERNAME` 命令以单独审核，服务批次不会删除他们。
+持久回执保存操作、参数、计数及各人的结果。如果人员及限制执行结果未变化，可在十分钟内撤销一次可逆字段，重启服务后也可撤销。流量重置、删除和会重置流量的计划更改不可逆，提交前明确提示。重置保留累计流量。回执不含私人备注、连接凭据、客户端地址或设备标识符；事件仅包含操作与计数及现有不含私人内容的单人事件。`topology_intent.access.users` 中的人员可接受服务字段更改；删除会返回一个本地拓扑提案，服务批次不会删除他们。
 
-`GET /api/people` 需要 people/admin 或所有者会话，返回 `users`、`total`、`population`、分类 `facets` 与 `next_cursor`。查询键：`q`、`status`、`tag`、`expires`、`quota`、`never`（0/1）、`attention`、`lifecycle`、`sort`、`order`、`limit`（1–500）、`cursor`。继续游标时保持相同筛选和排序。原有 `GET /api/users` 保留。查询响应不含凭据与私人备注；CLI 的 JSON 通过现有授权单人读取接口保留备注。
+删除已声明人员时，预览和回执包含一个 `proposal`，其中仅有 `schema`（`meridian.people-removal/v1`）、`usernames`、`fleet_id`、已提交的 `revision` 和 `generation`、`plan_hash` 及 `intent_sha256`。控制台将其保存到本地的 **people-removal.json**；无法保存时可手动选择并复制 JSON。混合批次中，浏览器只在一个事务中应用服务管理的人员更改，绝不会应用拓扑。
+
+在部署者电脑上使用当前配置副本，先运行 `meridian client remove --proposal people-removal.json --dry-run --json`，再运行 `meridian client remove --proposal people-removal.json`：所有删除只需一次共同审核、一次确认和一次应用。也可直接使用 `meridian client remove sample-a sample-b`。`--proposal` 能读取完整的 API 批量预览或回执 JSON，以及 CLI 批量 JSON 输出，文件大小上限为 64 MiB。名称和提案文件不能同时提供。
+
+64 MiB 限制按实际读取的字节数执行，适用于管道和特殊文件，并在文本解码或 JSON 解析前检查。即使报告的大小为零，或文件在读取过程中增长，超出限制的输入也会被拒绝。
+
+提案中的 `usernames` 必须与已提交的 `topology_intent.access.users` 中的用户名完全一致，包括大小写。提案不接受显示名称。
+
+保存的批量文件必须记录删除操作，提案必须恰好列出结果为 `cli_required` 的人员，且计数一致。CLI 会验证预览哈希；如果文件同时包含预览和回执，两者的 ID、哈希和提案必须一致。独立回执保留原始预览哈希，并根据已记录的结果检查提案。CLI 响应外层对象中的未知字段会被拒绝。
+
+按名称删除时，服务中的完整用户名优先于显示名称或忽略大小写的匹配。如果名称匹配两个人，命令会拒绝删除；请使用 `client list` 中的完整用户名。仅在控制台创建的人员请用 `client bulk delete` 删除。
+
+已提交的修订、代次、计划、服务器集合或本地意图发生变化时，草稿会被拒绝；应用栅栏在修改服务器前再次检查修订，即使计划未变也会拒绝旧修订。拓扑变化也会拒绝整个混合服务提交。服务没有已提交的拓扑栅栏，或所选声明属于未完成的应用时，请先完成 `meridian apply`，再重新预览。
+
+必须至少保留一名已声明人员。提案不包含备注、标签、连接凭据、设备数据或会话切断选项。批量删除拒绝 `--cut-off`；如需原有的会话关闭审核，请逐人运行 `meridian client remove NAME --cut-off`。否则之前开始的传输可能继续。
+
+`GET /api/people` 需要 people/admin 或所有者会话，返回 `users`、`total`、`population`、分类 `facets` 与 `next_cursor`。查询键：`q`、`status`、`tag`、`profile`、`expires`、`quota`、`never`（0/1）、`attention`、`lifecycle`、`sort`、`order`、`limit`（1–500）、`cursor`。继续游标时保持相同筛选和排序。原有 `GET /api/users` 保留。查询响应不含凭据与私人备注；CLI 的 JSON 通过现有授权单人读取接口保留备注。
 
 批量停用、删除或到期变更使用户失去访问权限时，服务会为每位用户和每个受影响节点记录与单个用户操作相同的流阻断回执。连接密钥和订阅链接保持不变。节点确认已应用配置后才会阻断新流；已经开始的传输和 UDP 会话可能继续。删除用户记录后，回执仍保留，以便后续节点报告确认阻断。
 
@@ -556,7 +576,7 @@ JSON 审核和部署导出会保留 `token`、`secret` 等有效配置 ID 和用
 
 ### 私有个人路由
 
-`meridian client routing person` 显示有效策略。运行 `meridian client routing person work --dry-run --json` 审阅，再通过 `meridian client routing person work --yes --json` 保存个人覆盖；`meridian client routing person --inherit --yes` 清除覆盖。面板的用户卡片使用同一服务审阅，草稿只保存在内存中。个人覆盖优先于访问配置默认，访问配置默认优先于服务器默认。应用配置和重新签发凭证保留覆盖；加密快照保存它，删除用户会移除它。选择会在应用刷新订阅时生效，不修改账户或节点访问权限。
+`meridian client routing person` 显示有效策略。运行 `meridian client routing person work --dry-run --json` 审阅，再通过 `meridian client routing person work --yes --json` 保存个人覆盖；`meridian client routing person --inherit --yes` 清除覆盖。面板的用户卡片使用同一服务审阅，草稿只保存在内存中。个人覆盖优先于匹配的应用响应规则，其次是访问配置默认和服务器默认。应用配置和重新签发凭证保留覆盖；加密快照保存它，删除用户会移除它。选择会在应用刷新订阅时生效，不修改账户或节点访问权限。
 
 读取需要 `people.read` 与 `people.private`，分配还需要 `people.delivery`。`delivery.read` 用于读取已审阅目录。已签发令牌保留原有固定权限；分配策略需要签发包含新权限的令牌。没有私有权限时覆盖被隐藏，订阅、事件和已审阅配置均不包含覆盖字段。预览不写入数据。确认需要 `review_hash`；覆盖、成员关系或目录改变后须重新预览。
 
@@ -566,6 +586,7 @@ JSON 审核和部署导出会保留 `token`、`secret` 等有效配置 ID 和用
 | `GET /api/users/{username}/delivery-policy` | 私有覆盖及有效策略；`people.read` 与 `people.private` |
 | `PUT /api/users/{username}/delivery-policy` | `{ "policy": "work", "confirm": false }` 返回预览；确认时提交 `review_hash`；需要 `people.delivery`、`people.read`、`people.private`。显式 `policy: null` 表示继承。 |
 
+| `POST /api/response-rules/test` | 临时应用匹配测试；`delivery.test`，指定用户时还需 `people.read` 和 `people.private` |
 | `POST /api/delivery-policies/explain` | 离线首次匹配解释；`delivery.explain`，指定用户时还需 `people.read` 与 `people.private` |
 
 ## 预览与解释路由

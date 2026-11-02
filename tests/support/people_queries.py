@@ -10,7 +10,14 @@ from pathlib import Path
 from unittest.mock import patch
 from urllib.parse import parse_qs
 
-from meridian.control.models import RevisionProposal, RevisionResult, UserImport, UserImportBatch, UserUpdate
+from meridian.control.models import (
+    RevisionProposal,
+    RevisionResult,
+    ServiceSettings,
+    UserImport,
+    UserImportBatch,
+    UserUpdate,
+)
 from meridian.control.service import ControlService
 from meridian.control.tokens import ROOT
 from meridian.core.people_query import PeopleQuery
@@ -34,6 +41,8 @@ def valid_options(values: dict) -> dict:
         elif name == "q":
             result[name] = str(value)[:256]
         elif name == "tag" and (value == "none" or re.fullmatch(r"[A-Z0-9_]{1,16}", str(value))):
+            result[name] = value
+        elif name == "profile" and re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,47}", str(value)):
             result[name] = value
         elif name == "never":
             result[name] = value is True or value == "1"
@@ -66,6 +75,7 @@ def with_people_replies(data: dict) -> dict:
             clock=lambda: datetime.fromisoformat(NOW).timestamp(),
         )
         try:
+            service.put_settings(ServiceSettings(profile_title="Meridian", access_profiles=data.get("profiles", {})))
             rows = data["people"]
             imports = []
             for index, row in enumerate(rows):
@@ -77,6 +87,7 @@ def with_people_replies(data: dict) -> dict:
                         sub_token=f"sample-token-{index:010d}",
                         status=row.get("status", "active"),
                         tag=row.get("tag", ""),
+                        profiles=row.get("profiles", ["default"]),
                         expire_at=row.get("expire_at"),
                         used_traffic_bytes=used,
                         lifetime_traffic_bytes=used,

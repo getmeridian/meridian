@@ -22,12 +22,17 @@ uv run pytest tests/ -k "test_name"    # by pattern
 **Shared doubles live in `tests/support/`** — `mock_connection.py`, `CaptureReporter`, `fence_host.py`, `control_service.py` (`serve_control`, a real loopback service), `console_dom.py`, and `topology.py` builders; search there before writing a local intent, plan, or panel builder. `tmp_home` isolates a pinned home per test.
 
 ## What's done well
+- **App-rule refusals are HTTP equivalence checks** — compare valid and unknown tokens through GET and HEAD on documents and personal files, with no device, event, or header-history write.
 - **Quirk-named tests** — e.g. `test_fence_write_that_timed_out_after_landing_is_re_read_not_repeated()`; the name is the documentation, and docstrings only explain a non-obvious why.
 - **Tables over near-duplicates** — cases that differ only in inputs and outcome are one `@pytest.mark.parametrize` table with `ids`.
 - Idempotency dual-path: `tests/provision/CLAUDE.md`.
 
 ## Pitfalls
 - **Pinned geodata memory guards start cold** — trace file reads and complete explanations, with destinations that reach category-ru and geoip:ru (documentation ranges stop at the private lists); CI's Xray folder supplies both data files.
+- **CLI locales are test-local** — reset current and requested language before each scenario, or a prior translated command makes later scripted English prompts fail.
+- **CLI test state resets together** — current and requested language plus JSON and quiet modes must not survive into later command assertions.
+- **Removal draft fixtures commit both ledgers** — an applied revision alone does not establish the service fence's committed topology identity.
+- **Localized counts use native digits** — console assertions normalize Persian digits before comparing numeric evidence.
 - **Restore command doubles supply profile evidence** — a confirmation-only scenario stubs the early compatibility check; profile scenarios use real snapshot and service state.
 - **Import test doubles cover profile discovery** — previews that stub resources also supply evidence of an empty service profile map.
 - **Older fixtures rewind membership before capacity** — shared helpers remove schema 24 before schema 23, preserving capacity when only membership is rewound.
@@ -42,7 +47,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - **Capability IDs are data, not translation keys** — asset scans exclude catalog IDs from broad string matching but still require every literal `M.t()` call to resolve.
 - **`tmp_home` must patch both** the env var and `meridian.config` attributes; patch `meridian.config.NAME`, never a module's copy.
 - **The suite isolates the cache and drops `FORCE_COLOR`** — throttled banners would otherwise make output depend on test order, and Rich would turn plain-text assertions into ANSI escapes.
-- **Reset JSON mode after each CLI invocation** — a leaked JSON mode made a later confirmation require `--yes`; read JSON from stdout apart from backup notices.
+- **Output modes reset before every test** (autouse) — a leaked JSON mode made a later confirmation require `--yes`, and the quiet mode every `--json` run sets silenced a later test's stderr; read JSON from stdout apart from backup notices.
 - **MockConnection matches substrings** — `when("grep", rc=1)` matches any command containing "grep"; use specific patterns.
 - **Don't restate registries** — a test that copies a constant, catalog, or schema list fails on every legitimate edit; assert behaviour or let the contract drift check do it.
 - **Every new admin handler needs a runnable `ROUTE_SAMPLES` entry** so the token-scope matrix exercises its permissions.

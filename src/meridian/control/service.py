@@ -65,6 +65,7 @@ from meridian.control.period_usage import reset_period
 from meridian.control.person_connections import read_connections
 from meridian.control.person_delivery_policy import DeliveryPolicyLedger
 from meridian.control.privacy import PrivacyLedger, read_privacy
+from meridian.control.response_rule_testing import test_response_rules
 from meridian.control.revisions import RevisionLedger
 from meridian.control.schema import SCHEMA, migrate
 from meridian.control.schema import SCHEMA_VERSION as SCHEMA_VERSION
@@ -92,6 +93,7 @@ from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_sessions import CredentialRotationRequest, UserFlowBlocks
 from meridian.core.clients import ClientConnections
+from meridian.core.response_rule_test import ResponseRuleDecision, ResponseRuleTestRequest
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 
@@ -162,6 +164,7 @@ class ControlService:
             compose=self._compose_all,
             clock=clock,
             access=self.access,
+            revisions=self.revisions,
         )
         self.pages = ConnectionPages(self._store, self)
         with self._transaction():
@@ -208,6 +211,9 @@ class ControlService:
 
     def sqlite_size_bytes(self) -> int | None:
         return self._store.size_bytes()
+
+    def test_response_rules(self, request: ResponseRuleTestRequest) -> ResponseRuleDecision:
+        return test_response_rules(self._store, request, read_settings=self.settings, read_user=self.get_user)
 
     def preview_subscription(
         self, request: SubscriptionPreviewRequest, *, include_delivery: bool = True

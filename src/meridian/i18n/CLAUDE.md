@@ -1,6 +1,7 @@
 # i18n — CLI message catalog
 
 ## Design decisions
+- **Removal drafts have native refusals** — local review, stale or uncommitted topology, and the individual-only cut-off boundary share en/ru/fa/zh text with the console.
 - **Bulk text matches across surfaces** — selection, before/after, irreversibility, stale people, and undo have native en/ru/fa/zh labels.
 - Locale types and native language names come from core.languages; CLI detection never sets the operator's subscription language, whose fixed status catalog lives in control/formats/status_remarks.py.
 
@@ -11,6 +12,7 @@
 **No markup in catalogs** — callers escape catalog text and add Rich styles themselves, so a translator can never break rendering.
 
 ## What's done well
+- **App rule explanations share native labels** — matched operators, refusals, inherited format selection, and app policy sources use the same four-language wording in CLI and console.
 - **Profile declaration refusals give both routes forward** — native en/ru/fa/zh text names profile or fleet import for edits, and apply for a saved change.
 - **Named routing reviews stay native** — policy choices, unknown names, and rule counts share en/ru/fa/zh text.
 - **Credential rotation explains refresh and ownership** — all locales distinguish preserved subscription URLs from reissued links and label per-node blocking outcomes.
@@ -26,6 +28,9 @@
 - `tests/test_i18n.py` enforces key order/parity, identical placeholders, no reply-word collisions, and that every literal key used in code exists.
 
 ## Pitfalls
+- **Dynamic validation keys cover every request field** — add each `preview.invalid_<field>` to all four CLI catalogs, or invalid input crashes before the user error can render.
+- **Saved-review errors never echo file contents** — describe the mismatch and recovery without exposing unexpected credential fields from untrusted JSON.
+- **Ambiguous names need native recovery text** — the shared client resolver names every match and asks for the exact service username in each locale.
 - **Bulk reply errors name the operation** — the same receipt recovery handles commit and undo, so text must not assume a commit.
 - Server allowance text must disclose accepted upload/download coverage and excluded overhead, host downloads, and relay forwarding in every locale; unmeasured servers never display a zero usage figure.
 

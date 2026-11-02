@@ -1,5 +1,6 @@
 # src/meridian — Python CLI package
 ## Design decisions
+**Removal drafts compare committed identities** — local checks and the service fence require the draft's exact revision, generation, and plan; a newer revision never heals a removal proposal forward.
 **Cluster config** — one hidden `cluster.yml` holds topology intent, bindings, allocations, and checkpoints (`cluster.py` model, `cluster_persistence.py` YAML); users and operator-owned data live in the control service.
 **Service access** — `control/client.py` speaks HTTPS from the deployer to nginx's secret path on 443 with the admin token, no SSH tunnel; client paths use `control_access.access_panel()`, fleet views `fleet_panel()`. `remnawave/` keeps only what `meridian migrate` reads.
 **SSH abstraction** — `ServerConnection` runs locally or over SSH (non-root adds `sudo -n`); `conn.run()` returns `CommandResult`, `ssh_transfer.py` moves files, and `SSHUI` callbacks keep Rich out of transport. A timeout or exit 255 drops the ControlMaster so the next command redials.
@@ -16,11 +17,14 @@
 **Revisions on the service** — `service_fence.py` moves the apply fence into the service and records each reviewed apply as a revision; once handed over, fence.json makes older Meridians refuse, and a service newer than the CLI refuses too (`core/version_skew.py`).
 **Workload secrets** — `reconciler/workloads.py` allocates complete Reality key triples and persists them before remote mutation; `xray_workload.py` renders only reviewed protocols and egress.
 ## What's done well
+- **Response rules are reviewed settings** — fleet exports, service payloads, and apply observations carry one typed rule list; requests never become local fleet state.
+- **List memberships come from query rows** — the directory adapter must never reconstruct a named membership as default while keeping the person metadata view.
 - **Forward-compatible YAML** — unknown keys land inertly in `_extra` (never store load-bearing state there); pre-topology files are refused with rebuild guidance.
 - **Applied kinds are explicit** — `core/resources.APPLIED_KINDS` lists what plan/apply drives; a leftover panel binding fails closed outside migrate's cut-over.
 - **One owner per state** — the service owns users, `cluster.yml` owns topology, and the fence stops a stale or foreign copy from applying.
 - **Read-only fleet projection** — `adapters/cluster.py` is the only source of node and relay rows; it never shows gateways as exits or restricted relay hops as public endpoints.
 ## Pitfalls
+- **Removal fences read committed declarations** — validate proposal usernames against the recorded revision, since local intent already holds the removal when the lease is acquired.
 - **Restore declaration hashes are validated state** — checkpoints accept only a SHA-256 string or an absent legacy value, or malformed YAML can lose the reviewed boundary on resume.
 - **Profile history records service use** — explicit false means declarations are unsent; legacy named intent infers use only when the flag is absent, and later edits never clear recorded history.
 - **A handed-over fence.json is never a fallback** — an unreachable service is retried and refused, or a stale copy could apply around it.

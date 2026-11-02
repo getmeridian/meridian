@@ -1,6 +1,9 @@
 # commands — One module per subcommand
 
 ## Design decisions
+**App matcher tests read applied settings** — `fleet response-rules test` uses the narrow service tester; optional people resolve like client show, and rule edits remain reviewed fleet imports.
+**Batch removal reviews one final intent** — names or a typed proposal file share one review hash, one confirmation, and one apply; cut-off stays on the existing individual path.
+**Bulk profile filters are separate choices** — `--match-profile` selects people; `set-profiles --profile` assigns memberships through the existing frozen review.
 **Profile review logic lives in setup** — commands present gains and losses; the shared apply runtime checks declaration fingerprints for setup and every imperative path before any remote write.
 **Person policy inheritance is explicit** — `client routing --inherit` clears the private override without reserving a policy name.
 **Routing selects reviewed names** — `fleet routing` keeps preset shorthand and selects named policies from intent; a preset selection clears the named fleet default.
@@ -27,6 +30,11 @@
 - `client remove|reissue --cut-off` discloses every affected node and other people's reconnects before confirming, and keeps typed per-node outcomes and new links even on failure.
 
 ## Pitfalls
+- **Fleet JSON keeps reviewed delivery verbatim** — reveal every nested delivery path and each delivery diff's before/after strings, or URL masking corrupts exports and hides the applied change.
+- **Proposal limits bound the read itself** — read at most 64 MiB plus one byte in binary mode; stat sizes cannot bound pipes, special files, or growing files.
+- **Saved reviews validate the whole document** — check preview hashes, declared outcomes and counts, and the CLI envelope before extracting a removal proposal.
+- **Named removals read service usernames for aliases** — exact declarations are already unambiguous; case-folded or display-name inputs need the directory before ownership checks.
+- **Proposal usernames are exact declarations** — never resolve saved usernames through case folding or display names before validating the committed intent.
 - **Restore imports keep the destination file guard** — bind the snapshot-derived model to the current context's loaded timestamp before saving; its temporary file's timestamp is not destination evidence.
 - **Empty restores save derived fleet state** — persist snapshot profile history and normalize carried checkpoints before review; declining the remote restore must not leave raw, unfinished state on disk.
 - **Restore profile checks precede target access** — validate the snapshot before resolving or registering its target, and never give changed live declarations an automatic review after installation.
@@ -54,6 +62,9 @@
 - **Never save intent from a declined or dry-run review**; omitted options preserve saved values.
 - **Role names are server names** — `server set` accepts the exit, gateway, and relay IDs `fleet status` prints, since labs whose saved names are IPs had no other handle.
 - **Profile removal refuses a mapped delivery default first** — intent validation would raise a pydantic error that `profile remove` cannot render; name `delivery.profile_policies` and `fleet import` instead.
+- **Typed names may match two declared people** — resolve through `matching_users()` and refuse more than one; never re-check a declared username against the typed-name pattern, which refuses valid leading `_`/`-`.
+- **A removal draft checks its fence and intent hash before its people** — a stale draft must say so rather than report an already-removed person as undeclared; names no declared person matches, and `--cut-off` misuse, are refused before the service directory is read.
+- **A name pre-check without the directory defers declared ambiguity** — service-owned edits validate before access opens, where an exact console username still wins.
 - **Topology-owned removal and reissue never touch console-only people** — and `client reissue` clears device registrations and makes the new subscription URL the page URL at once.
 - **Flow-block receipts read at commit time are always pending** — re-read them briefly (`node_commands.wait_for_flow_blocks()`) before reporting, since the agent confirms within seconds of applying.
 - **`client enable` reports the status the service answers** (`expired`/`limited` when those still hold), never the requested one.

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export function deliveryReply(url, options, data, writes) {
-  if (url === 'api/subscription/preview') {
+  if (url === 'api/subscription/preview' || url === 'api/response-rules/test') {
     writes.push(JSON.parse(options.body));
     return data.response;
   }
@@ -47,7 +47,7 @@ export async function runDeliveryScenario({ w, M, ui, mode, locale, data, view, 
   if (mode === 'delivery-format-preview') {
     w.eval(fs.readFileSync(path.join(ui, 'format-preview.js'), 'utf8'));
     M.mount(view, M.formatPreviewSection());
-    view.querySelector('[data-preview="person"]').value = data.person || 'person';
+    view.querySelector('[data-preview="person"]').value = data.person === undefined ? 'person' : data.person;
     view.querySelector('[data-preview="user_agent"]').value = data.user_agent || 'Hiddify/2';
     view.querySelector('[data-preview="accept"]').value = data.accept || '';
     view.querySelector('[data-preview="suffix"]').value = data.suffix || '';

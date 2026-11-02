@@ -1,5 +1,6 @@
 # compiler — pure finite topology compilation
 ## Design decisions
+**App rules travel with delivery** — compile the reviewed response list into service settings only; empty lists stay omitted and app choices never change node resources.
 **Topology probes stay separate** — `probes.py` builds verification resources from the reviewed graph; the compile spine only orders them.
 **Named delivery uses one representation** — LAN precedes custom rules and the preset tail; every client renderer preserves conjunctions and reports unsupported geodata without widening a match.
 **Access profiles resolve authentication identities** — exit, gateway, endpoint, and inbound grants compile to stable managed inbounds; unknown references and gateway bridges fail review.
@@ -18,6 +19,7 @@
 - **One camouflage per Reality inbound** — a relay whose SNI differs from its exit gets its own loopback inbound imitating that SNI, so probes never see the exit's certificate.
 - **Fingerprints never mix in a health-checked group** — copies carry `ALT_FINGERPRINT_TAG` and get their own groups (TSPU escalates when one server's fingerprint changes); sing-box skips them.
 ## Pitfalls
+- **Legacy backends cannot enforce response rules** — refuse nonempty app rules before compilation, including built-in policy choices, since only Meridian's service-settings resources carry them.
 - **Hash grants before resolving them** — service settings carry the core declaration fingerprint; a compiled map changes when protocols or camouflage inbounds change, even when the declared grants do not.
 - **Creation profiles share the delivery resolver** — re-check initial memberships at compile even for an already-built intent; conflicting defaults cannot reach apply.
 - **Legacy backends cannot enforce profiles** — refuse named grants or initial memberships on Remnawave before compiling; only migration uses that backend.

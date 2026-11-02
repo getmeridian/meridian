@@ -11,6 +11,11 @@ const dom = new JSDOM('<!doctype html><body><div id="app"></div></body>', {
   url: 'https://198.51.100.1/console/#/people?tag=GROUP_A', runScripts: 'outside-only', pretendToBeVisual: true,
 });
 const w = dom.window;
+let downloadedBlob;
+w.Blob = globalThis.Blob;
+w.URL.createObjectURL = blob => { downloadedBlob = blob; return 'blob:local-proposal'; };
+w.URL.revokeObjectURL = () => {};
+w.HTMLAnchorElement.prototype.click = function () { if (this.download) report.downloadName = this.download; };
 Object.defineProperty(w.document, 'hidden', { value: false, configurable: true });
 w.Date.now = () => Date.parse('2026-11-01T12:00:00Z');
 w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
@@ -126,14 +131,21 @@ if (mode === 'people-bulk-refresh') {
   w.document.querySelector('[data-select-matching]').click();
   report.selected = Number(w.document.querySelector('[data-bulk-count]').getAttribute('data-bulk-count'));
   const action = w.document.querySelector('[name="bulk-action"]');
-  action.value = 'disable'; action.dispatchEvent(new w.Event('change', { bubbles: true }));
+  action.value = data.action || 'disable'; action.dispatchEvent(new w.Event('change', { bubbles: true }));
   w.document.querySelector('[data-bulk-preview]').click();
   await settle();
+  if (data.action === 'delete') {
+    report.previewProposals = w.document.querySelectorAll('[data-removal-proposal]').length;
+    w.document.querySelector('[data-save-proposal]')?.click();
+  }
   const commit = w.document.querySelector('[data-bulk-commit]');
   commit.click(); commit.click();
   await settle();
   report.dialog = w.document.querySelector('dialog')?.textContent || '';
-  if (!data.stale) {
+  if (data.action === 'delete') {
+    report.receiptProposals = w.document.querySelectorAll('[data-removal-proposal]').length;
+    w.document.querySelector('[data-save-proposal]')?.click();
+  } else if (!data.stale) {
     w.document.querySelector('[data-bulk-undo]').click();
     await settle();
     report.dialog = w.document.querySelector('dialog')?.textContent || '';
@@ -152,5 +164,6 @@ if (mode === 'people-bulk-refresh') {
 report.commits = commits; report.undos = undos; report.undone = undone;
 report.outside = requests.some(url => /^https?:/.test(url));
 report.stored = [...Object.keys(w.localStorage), ...Object.keys(w.sessionStorage)];
+if (downloadedBlob) report.savedProposal = JSON.parse(await downloadedBlob.text());
 dom.window.close();
 process.stdout.write(JSON.stringify(report));
