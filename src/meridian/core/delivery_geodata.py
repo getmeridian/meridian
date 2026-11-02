@@ -130,9 +130,7 @@ class GeoData:
             if entries is None:
                 return None
             if attribute:
-                inverse = attribute.startswith("!")
-                wanted = attribute.removeprefix("!")
-                entries = tuple(entry for entry in entries if (wanted in entry.attributes) != inverse)
+                entries = tuple(entry for entry in entries if attribute in entry.attributes)
         matches = [entry.matches(domain) for entry in entries]
         return True if True in matches else None if None in matches else False
 

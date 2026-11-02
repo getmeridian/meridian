@@ -35,6 +35,7 @@
 - Commands build typed, redacted results before any envelope or rendering, and reporter primitives emit typed events without choosing a renderer.
 
 ## Pitfalls
+- **Geosite attributes are literal keys** — `@!cn` selects entries carrying `!cn`; treating it as the absence of `cn` changes the client's match.
 - **Explanations follow the client's name pass** — Xray's `IPIfNonMatch` catch-all ends hostname routing before DNS; an earlier IP rule cannot make a later domain match unknown.
 - **Metadata reveals cover containers** — exact revealed paths preserve nested lists and maps with secret-shaped identifiers; string credential fields and neighbouring branches remain redacted.
 - **Legacy node output omits capacity** — keep the null projection off the wire; control-service nodes carry explicit not-reported/current/stale evidence.

@@ -117,6 +117,8 @@ meridian fleet routing ru-split --yes
 
 规则可匹配域名后缀、完整域名、ASCII 关键词、固定版本的 `geosite`/`geoip` 列表、CIDR、目标端口或 TCP/UDP。`match.kind` 可选 `domain_suffix`、`domain_full`、`domain_keyword`、`geosite`、`geoip`、`cidr`、`port`、`network`。端口值采用 `{"start": 8443, "end": 8445}`；省略 `end` 表示单个端口。同一匹配中的值是备选项，满足任一项即可；可选 `network` 和 `ports` 条件同时限制整条规则。局域网直连规则最先执行，随后按书写顺序执行自定义规则，再执行内置模式的其余规则。首次匹配决定动作。
 
+geosite 属性按固定数据中的完整键名匹配。例如，`@!cn` 只选择带有 `!cn` 属性的条目；没有此属性的条目不会匹配。
+
 动作包括 `{"kind":"proxy"}`（通过 VPN）、`{"kind":"direct"}`（直连）、`{"kind":"block"}`（阻止），以及 `{"kind":"exit","exit":"west"}`（通过已声明的出口）。出口组只包含用户有权使用的连接。如果当前订阅配置没有所需出口，对应目的地会被阻止，不会改用其他出口。Xray 单连接配置及不同 TLS 指纹组保持隔离。BitTorrent 检测仍尽力而为，且仅适用于 Xray。
 
 DNS 使用 `transport: doh | dot | plain`、单播 IP `address` 和可选 `port`，默认端口分别为 443、853、53。DoH 支持受限 `path`，普通 DNS 支持 `protocol: udp | tcp`。加密 DNS 的证书必须对其 IP 有效。需要引导解析的主机名、凭证、任意模板和正则表达式均不接受。Xray 支持 DoH/普通 DNS，省略 DoT 和 fake-IP；Mihomo 与 sing-box 支持三种传输及 fake-IP；Stash 保留原生 DNS 模式并省略 fake-IP。Base64 无法携带路由或 DNS 设置。省略的 DNS 选项不会降级为较弱的传输。

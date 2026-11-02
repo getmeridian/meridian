@@ -55,6 +55,46 @@ def test_pinned_domain_and_ip_lists_explain_the_correct_preset_rule(destination:
     assert result.status == "matched" and result.action.kind == "direct" and result.rule == rule
 
 
+@pytest.mark.parametrize(
+    "attributes", [("!cn",), ("cn",), (), ("ads",), ("cn", "!cn")], ids=["literal", "cn", "untagged", "other", "both"]
+)
+@pytest.mark.parametrize("document", ["xray-json", "mihomo"])
+def test_geosite_attributes_select_literal_keys_in_the_data(attributes: tuple[str, ...], document: str) -> None:
+    domain = field(1, 3) + field(2, "service.example.test")
+    domain += b"".join(field(3, field(1, attribute)) for attribute in attributes)
+    data = GeoData.from_bytes(
+        field(1, field(1, "PRIVATE")) + field(1, field(1, "CATEGORY-COMPANIES") + field(2, domain)), b""
+    )
+    assert data.domain_matches("category-companies@!cn", "service.example.test") is ("!cn" in attributes)
+    assert data.domain_matches("category-companies@cn", "service.example.test") is ("cn" in attributes)
+    settings = DeliveryPolicySettings.model_validate(
+        {
+            "delivery_policies": [
+                {
+                    "id": "work",
+                    "rules": [
+                        {
+                            "match": {"kind": "geosite", "values": ["category-companies@!cn"]},
+                            "action": {"kind": "block"},
+                        }
+                    ],
+                }
+            ],
+            "default_policy": "work",
+        }
+    )
+    result = explain_delivery_policy(
+        resolve_delivery_policy(settings),
+        DeliveryExplainRequest.model_validate({"destination": "service.example.test:443", "format": document}),
+        available_exits={"west"},
+        geodata=data,
+    )
+    assert result.action is not None
+    assert (result.status, result.action.kind, result.rule) == (
+        ("matched", "block", 2) if "!cn" in attributes else ("default", "proxy", None)
+    )
+
+
 def test_cached_data_must_match_a_pin_and_never_starts_a_fetch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w") as archive:
