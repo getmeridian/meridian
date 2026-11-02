@@ -19,7 +19,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   near or over quota, disabled, servers or payments due), and quick Add person and
   Share actions. A Simple/Detailed switch, remembered per browser, keeps everyday
   screens calm and shows revisions, tokens, and full server facts on demand; theme
-  and language move into an account menu (#95).
+  and language move into an account menu. A person's page keeps a summary with
+  Share, Extend, and Disable above tabs, and each setting edits in place (#95).
 - Reviewed subscription response rules by app, with bounded literal User-Agent
   and Accept conditions, ordered format/refusal/policy/header actions, and one
   transient matcher test across API, CLI, and console. Private person policies

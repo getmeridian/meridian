@@ -1,6 +1,9 @@
 # control/ui — The owner's web console
 
 ## Design decisions
+- **Custom expiry selects a fixed draft** — Extend focuses Date for its custom choice; ordinary Edit keeps the person's saved activation mode.
+- **Person tabs keep one screen** — fragments select one labelled panel; only its contents scroll below the summary, and tab changes use the shared navigation guard.
+- **Person rows own separate drafts** — create editors on Edit, preview date and traffic choices in the service, PATCH only that row's edited fields, and close only the saved editor.
 - **Screen metadata is shared** — `M.consoleScreens` owns rendering, navigation, and Detailed-only route checks in one registry.
 - **Display mode is browser-local** — `M.mode()` reads Simple or Detailed; `M.chooseMode()` emits `meridian:mode` after an accepted change. Shared routes and drafts stay mounted, while leaving a Detailed-only route goes to Overview through the navigation guard.
 - **Overview composes owner reads** — bounded people queries, fleet health, opt-in UTC daily traffic, revisions, and recorded owner events provide its figures; unavailable history stays unavailable, and visible refreshes are passive.
@@ -35,6 +38,11 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Inline previews contain their own edits** — an expiry row must leave the traffic strategy to the service, or a sibling save makes its reset preview stale.
+- **Inline time inputs need the field target** — native time controls miss the shared text/date selector; give person editors the same 44 px minimum.
+- **Pending extensions use the service review** — take the duration from the existing bulk preview; a calendar-expiry preview describes a fixed date and must never activate first-use access.
+- **Person mode changes retain row identity** — move notes and tag into More in Simple, preserving draft inputs and focus; Detailed-only tab links use the same mode note and switch.
+- **Selecting the current person tab is no navigation** — open another inline editor without asking to discard a sibling draft.
 - **Phone targets follow width and pointer** — apply 44 px targets at the phone breakpoint as well as for coarse pointers; include local date inputs and chart selectors, keeping other pointer layout rules separate.
 - **Server guidance stays compact** — keep the copyable meridian command beside one caption so the notice does not dominate phone cards.
 - **Isolate count pairs together** — render Overview's active / total as one LTR unit; separate number isolates let RTL reverse the pair around the slash.

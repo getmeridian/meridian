@@ -11,10 +11,11 @@
   var header = null, modeNote = null;
   var activeHash = null, position = 0, navigationTurn = 0, ignoreHash = null;
   var restoring = null, allowedTraversal = false;
+  var renderedRoute = null;
 
   var SCREENS = [
     { name: "overview", render: function (view) { return M.renderOverview(view); } },
-    { name: "people", render: function (view, route) { return route.arg ? M.renderPerson(view, route.arg) : M.renderPeople(view); } },
+    { name: "people", render: function (view, route) { return route.arg ? M.renderPerson(view, route.arg, route.extra) : M.renderPeople(view); } },
     { name: "servers", render: function (view, route) { return M.renderServers(view, route.arg, route.extra); } },
     { name: "revisions", detailed: true, render: function (view, route) { return M.renderRevisions(view, route.arg); } },
     { name: "tokens", detailed: true, render: function (view) { return M.renderTokens(view); } },
@@ -104,6 +105,14 @@
     syncMode();
     var cleanup = screen.render(view, route);
     stopScreen = typeof cleanup === "function" ? cleanup : null;
+    renderedRoute = route;
+  }
+
+  function renderRoute() {
+    var route = M.route();
+    if (stopScreen && stopScreen.route && renderedRoute && renderedRoute.name === route.name && renderedRoute.arg === route.arg) {
+      stopScreen.route(route); renderedRoute = route; syncMode();
+    } else renderNow();
   }
 
   function syncMode() {
@@ -131,7 +140,7 @@
         position++;
         activeHash = hash;
       }
-      renderNow();
+      renderRoute();
     });
   };
 
@@ -158,7 +167,7 @@
     }
     allowedTraversal = false;
     remember(location.hash, nextPosition);
-    renderNow();
+    renderRoute();
   }
 
   function hashChanged() {
@@ -171,7 +180,7 @@
       history.back();
     } else {
       remember(location.hash, position + 1);
-      renderNow();
+      renderRoute();
     }
   }
 

@@ -80,8 +80,10 @@ report.rendered_people = w.document.querySelectorAll('#view .people-item').lengt
 
 if (mode === 'showcase-navigation') {
   await M.go('people', 'Luma');
-  await until(() => w.document.querySelector('.individual-connections'), 'person');
+  await until(() => w.document.querySelector('[data-person-action="share"]'), 'person');
   report.person = w.document.querySelector('#view h1').textContent;
+  w.document.querySelector('[data-person-action="share"]').click();
+  await until(() => w.document.querySelector('dialog .individual-connections'), 'share dialog');
   const disclosure = w.document.querySelector('.individual-connections');
   disclosure.open = true;
   report.connections = disclosure.querySelectorAll('.connection-entry').length;
@@ -89,6 +91,7 @@ if (mode === 'showcase-navigation') {
   qrButton.click();
   await until(() => w.document.querySelector('.connection-qr'), 'qr');
   report.qr = w.document.querySelector('.connection-qr').src.startsWith('data:image/svg+xml');
+  w.document.querySelector('.connection-qr').closest('dialog').querySelector('.btn-icon').click();
   w.document.querySelector('dialog .btn-icon').click();
   await M.go('people');
   await until(() => w.document.querySelector('#view .list'), 'back');
@@ -297,6 +300,7 @@ if (mode === 'showcase-navigation') {
   report.share = await M.api('GET', 'ui/api/people/' + data.person + '/share');
   await M.go('people', data.person);
   await until(() => w.document.querySelector('#view h1')?.textContent === data.person, 'inactive person');
+  await M.navigate(M.personHash(data.person, 'keys'));
   report.card = !!w.document.querySelector('.flow-block-status');
 } else if (mode === 'showcase-share-rotations') {
   if (data.person !== 'Luma') await M.api('POST', 'api/users', { username: data.person });
@@ -310,6 +314,7 @@ if (mode === 'showcase-navigation') {
   }
   await M.go('people', data.person);
   await until(() => w.document.querySelector('#view h1')?.textContent === data.person, 'rotated person');
+  await M.navigate(M.personHash(data.person, 'keys'));
   report.card = !!w.document.querySelector('.flow-block-status');
 } else if (mode === 'showcase-token-console') {
   await M.go('tokens');

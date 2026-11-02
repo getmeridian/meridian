@@ -113,6 +113,8 @@ load('expiry.js');
 if (fs.existsSync(path.join(ui, 'lifecycle.js'))) load('lifecycle.js');
 load('person-connections.js');
 load('share.js');
+load('person-tabs.js');
+load('person-access.js');
 if (mode === 'person-credential-rotation') load('commands.js');
 if (mode === 'person-device-race' || mode === 'person-devices') load('devices.js');
 load('person.js');
@@ -125,8 +127,18 @@ await settle();
 await settle();
 const view = () => w.document.getElementById('view');
 const button = key => [...view().querySelectorAll('button')].find(el => el.textContent.includes(M.t(key)));
+function openEdit(key) {
+  const row = view().querySelector('[data-person-field="' + key + '"]');
+  const more = row?.closest('details');
+  if (more) more.open = true;
+  row?.querySelector('[data-person-edit]')?.click();
+  return row?.querySelector('form');
+}
+async function personTab(tab) { await M.navigate(M.personHash('sample', tab)); await settle(); }
 
 if (mode === 'person-schedules') {
+  const expiryForm = openEdit('expiry');
+  const trafficForm = openEdit('traffic');
   for (const [name, value] of Object.entries(data.edits || {})) {
     const field = view().querySelector('[name="' + name + '"]');
     if (!field) continue;
@@ -140,10 +152,10 @@ if (mode === 'person-schedules') {
     date.dispatchEvent(new w.Event('input', { bubbles: true }));
     await new Promise(resolve => setTimeout(resolve, 350));
   }
-  report.shown = view().textContent;
+  report.shown = view().textContent + [...view().querySelectorAll('[title]')].map(el => el.title).join(' ');
   if (data.submit) {
-    const form = view().querySelector('.access-status + form');
-    form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+    expiryForm.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+    if (M.formDirty(trafficForm)) trafficForm.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
     await settle();
   }
   report.writes = writes;
@@ -209,6 +221,7 @@ async function advance(ms) {
 const guard = () => w.document.querySelector('[data-draft-choice="stay"]')?.closest('dialog');
 function choose(value) { w.document.querySelector('[data-draft-choice="' + value + '"]')?.click(); }
 function fieldFor(screen) {
+  if (screen !== 'password') openEdit(screen === 'access' ? 'expiry' : 'note');
   return screen === 'password' ? view().querySelector('input[type="password"]')
     : screen === 'access' ? view().querySelector('input[type="time"]') : view().querySelector('textarea');
 }
@@ -216,6 +229,7 @@ function fieldFor(screen) {
 if (mode === 'person-first-navigation') {
   M.state.auth.signed_in = true;
   M.go('people', 'sample'); await settle();
+  openEdit('note');
   const note = view().querySelector('textarea');
   note.value = 'Private draft'; note.dispatchEvent(new w.Event('input', { bubbles: true }));
   w.history.back(); await settle(); await settle();
@@ -231,6 +245,7 @@ if (mode === 'person-guard') {
   if (data.screen === 'password') { M.go('settings'); await settle(); }
   const field = fieldFor(data.screen), original = field.value;
   if (data.cycleUnlimited) {
+    openEdit('traffic');
     const never = view().querySelector('.expiry-fields input[type="checkbox"]');
     never.checked = false; never.dispatchEvent(new w.Event('change', { bubbles: true }));
     const date = view().querySelector('input[type="date"]');
@@ -282,7 +297,7 @@ if (mode === 'person-initial-failure') {
   report.retry = !!view().querySelector('.live-retry') && !view().querySelector('.live-retry').hidden;
   failInitial = false;
   view().querySelector('.live-retry')?.click(); await settle();
-  report.recovered = !!view().querySelector('textarea') && !view().classList.contains('view-stale');
+  report.recovered = !!view().querySelector('[data-person-field="note"]') && !view().classList.contains('view-stale');
 }
 
 if (mode === 'person-guard-dialog') {
@@ -308,6 +323,7 @@ if (mode === 'person-guard-dialog') {
 }
 
 if (mode === 'person-guard-save') {
+  openEdit('note'); openEdit('expiry');
   const note = view().querySelector('textarea'), time = view().querySelector('input[type="time"]');
   if (data.twoForms) {
     time.value = '12:34:56'; time.dispatchEvent(new w.Event('input', { bubbles: true }));
@@ -328,6 +344,7 @@ if (mode === 'person-guard-save') {
 }
 
 if (mode.startsWith('person-live') && mode !== 'person-live-language') {
+  openEdit('note'); openEdit('expiry');
   const note = view().querySelector('textarea'), time = view().querySelector('input[type="time"]');
   if (mode === 'person-live-race') {
     const old = { ...user };
@@ -367,6 +384,7 @@ if (mode.startsWith('person-live') && mode !== 'person-live-language') {
 }
 
 if (mode === 'person-device-race') {
+  await personTab('devices');
   M.confirm = () => Promise.resolve(true);
   M.askToLeave = () => Promise.resolve(true);
   if (data.action === 'clear') button('devices.clear').click();
@@ -386,11 +404,14 @@ if (mode === 'person-device-race') {
 }
 
 if (mode === 'person-expiry') {
+  openEdit('expiry');
+  const trafficForm = data.strategy ? openEdit('traffic') : null;
   const date = view().querySelector('input[type="date"]');
   const time = view().querySelector('input[type="time"]');
   const never = view().querySelector('.expiry-fields input[type="checkbox"]');
   report.hasTime = !!time;
   if (data.months) {
+    view().querySelector('[data-person-action="extend"]').closest('details').open = true;
     view().querySelector('[data-months="' + data.months + '"]')?.click();
     await settle();
   } else if (data.clear) {
@@ -407,7 +428,7 @@ if (mode === 'person-expiry') {
   report.zone = view().querySelector('.expiry-zone')?.textContent || '';
   report.utc = view().querySelector('.expiry-utc')?.textContent || '';
   report.beforeSave = writes.map(write => write.body);
-  date?.form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  (trafficForm || date?.form)?.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
   await settle();
   report.writes = writes.map(write => write.body);
   report.error = date?.validationMessage || time?.validationMessage || '';
@@ -415,7 +436,8 @@ if (mode === 'person-expiry') {
 }
 
 if (mode === 'person-connections') {
-  const disclosure = view().querySelector('.individual-connections');
+  view().querySelector('[data-person-action="share"]').click(); await settle();
+  const disclosure = w.document.querySelector('dialog .individual-connections');
   report.closed = !!disclosure && !disclosure.open;
   report.summary = disclosure?.querySelector('summary')?.textContent || '';
   report.remarks = [...(disclosure?.querySelectorAll('.connection-remark') || [])].map(el => el.textContent);
@@ -425,7 +447,7 @@ if (mode === 'person-connections') {
   disclosure?.querySelector('.connection-entry button')?.click();
   report.copied = copied;
   disclosure?.querySelector('.connection-entry button:last-child')?.click();
-  report.qr = w.document.querySelector('dialog img')?.getAttribute('src') || '';
+  report.qr = w.document.querySelector('dialog .connection-qr')?.getAttribute('src') || '';
   report.injected = !!view().querySelector('img[src="x"]') || !!w.pwned;
   report.outside = events.filter(event => event.url?.includes('://'));
 }
@@ -461,7 +483,8 @@ if (mode === 'person-qr') {
   w.HTMLCanvasElement.prototype.toBlob = function (done, type) { done(new w.Blob(['test-only-pixels'], { type })); };
   M.render();
   await settle();
-  const allActions = [...view().querySelectorAll('[data-qr-action]')];
+  view().querySelector('[data-person-action="share"]').click(); await settle();
+  const allActions = [...w.document.querySelectorAll('dialog [data-qr-action]')];
   report.actions = allActions.map(el => el.dataset.qrAction);
   const action = data.action === 'copy' && !allActions.some(el => el.dataset.qrAction === 'copy') ? 'png' : data.action;
   allActions.find(el => el.dataset.qrAction === action)?.click();
@@ -491,21 +514,27 @@ if (mode === 'person-mutation') {
   M.confirmCutOffRemoval = () => Promise.resolve({ cut_off: false });
   M.confirmCutOffReissue = () => Promise.resolve({ cut_off: false });
   const action = data.action || 'toggle';
+  if (action === 'reset') await personTab('usage');
+  if (action === 'reissue' || action === 'remove') await personTab('keys');
   if (data.editBeforeRemove) {
+    openEdit('note');
     const note = view().querySelector('textarea');
     note.value = 'Private draft'; note.dispatchEvent(new w.Event('input', { bubbles: true }));
   }
   if (action === 'save') {
+    openEdit('traffic');
     const strategy = [...view().querySelectorAll('.limit-fields select')].at(-1);
     strategy.value = 'week';
     strategy.dispatchEvent(new w.Event('change', { bubbles: true }));
     strategy.form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
   } else if (action === 'metadata') {
+    openEdit('note');
     const note = view().querySelector('textarea');
     note.value = 'A private draft';
     note.dispatchEvent(new w.Event('input', { bubbles: true }));
     note.form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
   } else if (action === 'clear') {
+    openEdit('expiry');
     const never = view().querySelector('.expiry-fields input[type="checkbox"]');
     never.checked = true;
     never.dispatchEvent(new w.Event('change', { bubbles: true }));
@@ -540,6 +569,7 @@ if (mode === 'person-mutation') {
 
 
 if (mode === 'person-language' || mode === 'person-live-language') {
+  openEdit('language');
   const select = view().querySelector('select[name="language"]');
   report.found = !!select;
   if (select) {
@@ -567,6 +597,7 @@ if (mode === 'person-language' || mode === 'person-live-language') {
     if (!data.failed) user = { ...user, ...writes[0]?.body };
     for (const resolve of pending.splice(0)) resolve(data.failed ? reply({ error: { code: 'network' } }, 503) : reply(user));
     await settle();
+    openEdit('language');
     report.writes = writes.map(write => write.body);
     report.afterSave = view().querySelector('select[name="language"]')?.value;
     report.afterSaveDirty = unloading();
@@ -575,17 +606,17 @@ if (mode === 'person-language' || mode === 'person-live-language') {
 }
 
 if (mode === 'person-period-traffic') {
-  const card = view().querySelector('.cards .card-slot');
+  await personTab('usage');
+  const card = view().querySelector('[data-person-panel="usage"] .card');
   report.facts = [...card.querySelector('dl').children].map(el => el.textContent);
-  report.note = card.querySelector('p.muted')?.textContent || '';
+  report.note = card.querySelector('[data-person-carried]')?.textContent || '';
 }
 
 if (mode === 'person-credential-rotation') {
+  await personTab('keys');
   const rotate = button('person.rotate');
   report.found = !!rotate;
   if (rotate) {
-    const note = view().querySelector('textarea');
-    note.value = 'Private draft'; note.dispatchEvent(new w.Event('input', { bubbles: true }));
     rotate.click(); await settle();
     report.beforeConfirm = writes.slice();
     const dialog = w.document.querySelector('dialog');
@@ -594,6 +625,9 @@ if (mode === 'person-credential-rotation') {
     dialog?.querySelector('.btn-danger')?.click();
     await settle();
     rotate.click(); await settle();
+    await personTab('access'); openEdit('note');
+    const note = view().querySelector('textarea');
+    note.value = 'Private draft'; note.dispatchEvent(new w.Event('input', { bubbles: true }));
     user = { ...user, credential_generation: 2 };
     share.flow_blocks = { username: 'sample', credential_generation: 2, nodes: [] };
     for (const resolve of pending.splice(0)) resolve(reply({ user, subscription_preserved: true, flow_blocks: share.flow_blocks, commands: [] }));
@@ -606,6 +640,7 @@ if (mode === 'person-credential-rotation') {
 }
 
 if (mode === 'person-flow-blocks') {
+  await personTab('keys');
   const card = view().querySelector('.flow-block-status');
   report.found = !!card;
   report.text = card?.textContent || '';

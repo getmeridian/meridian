@@ -33,7 +33,9 @@
       window.dispatchEvent(new CustomEvent("meridian:mode", { detail: { mode: value } }));
       return true;
     }
-    if (next === "simple" && M.isDetailedRoute(M.route().name) && M.navigate) {
+    var route = M.route();
+    var detailedRoute = M.isDetailedRoute(route.name) || M.isDetailedPersonRoute && M.isDetailedPersonRoute(route);
+    if (next === "simple" && detailedRoute && M.navigate) {
       return M.navigate("#/overview").then(function () { return M.route().name === "overview" ? accept() : false; });
     }
     return Promise.resolve(accept());
