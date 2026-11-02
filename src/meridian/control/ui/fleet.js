@@ -220,29 +220,29 @@
 
   M.renderRevisions = function (view, number) {
     if (number) return renderRevision(view, Number(number));
-    loading(view);
+    var list = h("div", {}, h("span", { class: "spinner" }));
+    M.mount(view, [h("div", { class: "page-head" }, h("div", {}, h("h1", { text: M.t("nav.revisions") }),
+      h("p", { class: "muted small", text: M.t("revisions.lede") }))), list]);
     M.api("GET", "api/revisions").then(function (data) {
+      if (!view.isConnected) return;
       var revisions = data.revisions || [];
-      M.mount(view, [
-        h("div", { class: "page-head" }, h("div", {}, h("h1", { text: M.t("nav.revisions") }),
-          h("p", { class: "muted", text: M.t("revisions.lede") }))),
-        revisions.length ? h("div", { class: "list" }, revisions.map(function (r) {
-          return h("a", { class: "row row-link", href: "#/revisions/" + r.number },
-            h("div", { class: "row-main" },
-              h("div", { class: "row-title" }, h("span", { class: "name mono", text: "#" + r.number }),
-                revisionPill(r.status)),
-              h("div", { class: "row-sub" },
-                h("span", { text: M.t("revisions.by", { name: r.author.name }) }),
-                h("span", { text: M.date(r.created_at, true) }))),
-            h("div", { class: "row-side muted small", text: r.detail || "" }));
-        })) : h("div", { class: "empty" }, h("p", { text: M.t("revisions.empty") })),
-      ]);
-    }, function (e) { failed(view, e); });
+      M.mount(list, revisions.length ? h("ul", { class: "list record-list" }, revisions.map(function (revision) {
+        var name = "#" + M.count(revision.number), href = "#/revisions/" + revision.number;
+        return h("li", { class: "row record-row", "data-record": String(revision.number) },
+          h("a", { class: "record-main", href: href },
+            h("div", { class: "row-title" }, h("bdi", { class: "record-name name mono", dir: "ltr", text: name }), revisionPill(revision.status)),
+            h("div", { class: "record-facts row-sub" },
+              h("span", { text: M.t("revisions.by", { name: "\u2068" + revision.author.name + "\u2069" }) }),
+              h("bdi", { text: M.date(revision.created_at, true) }),
+              revision.detail ? h("span", { text: revision.detail }) : null)),
+          M.rowMenu(name, h("a", { class: "btn btn-ghost", href: href, "data-record-action": "changes", text: M.t("revisions.view_changes") })));
+      })) : M.emptyState(M.t("revisions.empty"), M.t("revisions.empty_hint")));
+    }, function (e) { failed(list, e); });
   };
 
   function revisionPill(status) {
-    var kinds = { applied: "ok", approved: "info", proposed: "muted", failed: "err" };
-    return M.pill(kinds[status] || "muted", M.t("revision." + status));
+    var kinds = { applied: "success", approved: "neutral", proposed: "neutral", failed: "danger" };
+    return M.statusChip(kinds[status] || "neutral", M.t("revision." + status));
   }
 
   function renderRevision(view, number) {

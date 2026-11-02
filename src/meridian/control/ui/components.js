@@ -62,6 +62,28 @@
       h("div", { class: "stack-sm muted small" }, content));
   };
 
+  M.rowMenu = function (name, actions) {
+    var summary = h("summary", { class: "btn btn-ghost btn-sm", "aria-label": M.t("records.actions_for", { name: name }) },
+      M.t("action.more"));
+    var menu = h("details", { class: "row-menu" }, summary, h("div", { class: "row-menu-panel card" }, actions));
+    menu.addEventListener("click", function (event) {
+      if (menu.querySelector(".row-menu-panel").contains(event.target) && event.target.closest && event.target.closest("button, a")) {
+        menu.open = false; summary.focus({ preventScroll: true });
+      }
+    }, true);
+    menu.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && menu.open) {
+        event.preventDefault(); event.stopPropagation(); menu.open = false; summary.focus();
+      }
+    });
+    return menu;
+  };
+  document.addEventListener("click", function (event) {
+    document.querySelectorAll(".row-menu[open]").forEach(function (menu) {
+      if (!menu.contains(event.target)) menu.open = false;
+    });
+  });
+
   M.detailedSection = function (label, content, key) {
     return h("details", { class: "mode-disclosure", "data-mode-section": key, open: M.mode() === "detailed" },
       h("summary", { text: label }),

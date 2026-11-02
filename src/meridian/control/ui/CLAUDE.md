@@ -1,6 +1,7 @@
 # control/ui — The owner's web console
 
 ## Design decisions
+- **Record lists use native menus** — show metadata and derived token status in each row; permissions and revoke/diff actions share the local disclosure, while issuance and comparison keep their reviews.
 - **Settings sections share navigation** — fragments select one labelled panel; General stays the default, Advanced uses the shared Detailed note, and clean sections remain mounted across mode changes.
 - **Custom expiry selects a fixed draft** — Extend focuses Date for its custom choice; ordinary Edit keeps the person's saved activation mode.
 - **Person tabs keep one screen** — fragments select one labelled panel; only its contents scroll below the summary, and tab changes use the shared navigation guard.
@@ -58,6 +59,7 @@
 - **Main navigation never shrinks its labels** — keep a spaced scrolling row and reveal the active route after mounting or changing mode, using logical scroll alignment for RTL.
 - **Desktop selection bars set their direction** — override the card's column layout and keep the count and matching offer beside the actions; the phone grid remains separate.
 - **Phone matching selection fills its row** — reset the desktop offer's auto margin at the phone breakpoint so the bottom bar keeps the action across its width.
+- **Menu actions return to their summary** — close and focus it before opening a dialog, or dismissal returns keyboard focus to an action hidden in the closed menu.
 - **Settings lowering keeps saved numbers** — invalid unfinished cap or retention edits cannot block a privacy reduction; review the saved fallback, and track forms only after loading and settling disabled fields.
 - **Inline previews contain their own edits** — an expiry row must leave the traffic strategy to the service, or a sibling save makes its reset preview stale.
 - **Inline time inputs need the field target** — native time controls miss the shared text/date selector; give person editors the same 44 px minimum.
