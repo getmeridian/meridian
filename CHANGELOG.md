@@ -102,6 +102,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
   their own review.
 - Keep unresolved lost inbounds in cut-off reviews after credential rotation,
   reissue, replacing imports, or re-enabling a person with narrower access.
+- Refuse conflicting delivery defaults during single and bulk profile previews,
+  undo dry runs, and initial topology validation and compilation; CLI refusals
+  reuse the delivery messages in all four languages (#95).
 - Translate Stash private-range matches to `LAN` inside logical rules too,
   preserving network and port conditions and `no-resolve` (#95).
 - Match literal geosite attributes in delivery explanations, including `!cn`,

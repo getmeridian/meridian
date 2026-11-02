@@ -16,7 +16,12 @@ from meridian.commands.client_limits import parse_limit_options
 from meridian.commands.profile_review import require_profile_backend
 from meridian.console import confirm, err_console, error_context, fail, is_json_mode, ok, warn
 from meridian.control.access_limits import limit_update
-from meridian.control.client import ControlClient, ControlServiceError, ControlServiceUncertain
+from meridian.control.client import (
+    ControlClient,
+    ControlServiceError,
+    ControlServicePolicyError,
+    ControlServiceUncertain,
+)
 from meridian.control.http_errors import validation_message
 from meridian.control.times import utc_now
 from meridian.core.errors import MeridianError
@@ -207,6 +212,8 @@ def run_bulk(action: BulkActionName, options: dict[str, Any]) -> None:
                     # Never repeat an uncertain write; a receipt is safe to read.
                     receipt = reconcile_receipt(client, review.id)
                 emit_result(command, ClientBulkResult(preview=review, receipt=receipt, applied=True), operation)
+        except ControlServicePolicyError as exc:
+            fail(t(f"delivery.error_{exc.reason}"), hint_type="user")
         except ControlServiceError as exc:
             fail(exc)
 
@@ -252,5 +259,7 @@ def run_receipt(receipt_id: str, *, undo: bool = False, yes: bool = False, dry_r
                     except ControlServiceUncertain:
                         receipt = reconcile_receipt(client, receipt_id, undo=True)
                 emit_result(command, ClientBulkResult(receipt=receipt, applied=undo and not dry_run), operation)
+        except ControlServicePolicyError as exc:
+            fail(t(f"delivery.error_{exc.reason}"), hint_type="user")
         except ControlServiceError as exc:
             fail(exc)

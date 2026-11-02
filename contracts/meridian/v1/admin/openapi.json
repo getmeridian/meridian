@@ -16665,6 +16665,7 @@
             },
             "description": "Conflict",
             "x-meridian-error-codes": [
+              "conflicting_delivery_policies",
               "preview_expired",
               "preview_mismatch",
               "stale_people"
@@ -16720,7 +16721,7 @@
     },
     "/api/people/bulk/preview": {
       "post": {
-        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Previews write no database rows or events. They expire after 10 minutes or a service restart. Declared deletions return exact reviewed CLI commands.",
+        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Previews write no database rows or events. They expire after 10 minutes or a service restart. Declared deletions return exact reviewed CLI commands. Profile choices resolve each person's delivery policy before returning a review.",
         "operationId": "preview_people_bulk",
         "requestBody": {
           "content": {
@@ -16794,6 +16795,19 @@
             "description": "Not Found",
             "x-meridian-error-codes": [
               "not_found"
+            ]
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "conflicting_delivery_policies"
             ]
           },
           "413": {
@@ -16947,7 +16961,7 @@
     },
     "/api/people/bulk/undo": {
       "post": {
-        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Undo lasts 10 minutes, survives service restarts, and is single-use. Reset and delete cannot be undone. dry_run=true checks people, grants, nodes, and restored profiles without writing, returning undo_people.",
+        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Undo lasts 10 minutes, survives service restarts, and is single-use. Reset and delete cannot be undone. dry_run=true checks people, grants, nodes, restored profiles, and delivery defaults without writing, returning undo_people.",
         "operationId": "undo_people_bulk",
         "requestBody": {
           "content": {
@@ -17033,6 +17047,7 @@
             },
             "description": "Conflict",
             "x-meridian-error-codes": [
+              "conflicting_delivery_policies",
               "stale_people",
               "undo_refused"
             ]

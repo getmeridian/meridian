@@ -115,6 +115,8 @@ meridian fleet routing ru-split --yes
 
 示例 IP 属于文档专用地址，请替换为自己的 DNS 服务器地址。`profile_policies` 将访问配置名称（包括 `default`）映射到策略名称。没有映射的配置使用服务器默认策略；同时属于多个已映射配置的用户，必须获得相同策略。通过 `fleet routing` 选择内置模式会清除命名默认策略。删除可选字段可恢复原有内置行为。
 
+单人和批量访问配置预览、`--dry-run` 与撤销试运行，都会先解析每位用户的有效路由策略。有默认映射的配置若选择不同策略，且用户没有已保存的个人覆盖，预览会拒绝更改。`access.creation_settings` 中的初始成员关系也会在配置验证与编译阶段检查默认策略冲突，在生成计划或应用之前拒绝。
+
 规则可匹配域名后缀、完整域名、ASCII 关键词、固定版本的 `geosite`/`geoip` 列表、CIDR、目标端口或 TCP/UDP。`match.kind` 可选 `domain_suffix`、`domain_full`、`domain_keyword`、`geosite`、`geoip`、`cidr`、`port`、`network`。端口值采用 `{"start": 8443, "end": 8445}`；省略 `end` 表示单个端口。同一匹配中的值是备选项，满足任一项即可；可选 `network` 和 `ports` 条件同时限制整条规则。局域网直连规则最先执行，随后按书写顺序执行自定义规则，再执行内置模式的其余规则。首次匹配决定动作。
 
 Stash 使用 `LAN` 表示私有地址范围，包括带有网络和端口条件的逻辑规则。这些 IP 匹配保留 `no-resolve`。

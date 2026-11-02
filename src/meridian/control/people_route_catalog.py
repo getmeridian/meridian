@@ -33,10 +33,11 @@ PEOPLE_ROUTES: tuple[ApiRoute, ...] = (
         "Freeze a bulk selection and review every before/after without writing.",
         credentials=False,
         capability=("people.batch", "people.private"),
-        refusals=(NOT_FOUND,),
+        refusals=(NOT_FOUND, ErrorResponse(409, ("conflicting_delivery_policies",))),
         description=(
             "Previews write no database rows or events. They expire after 10 minutes or a service restart. "
             "Declared deletions return exact reviewed CLI commands."
+            " Profile choices resolve each person's delivery policy before returning a review."
         ),
     ),
     route(
@@ -49,7 +50,11 @@ PEOPLE_ROUTES: tuple[ApiRoute, ...] = (
         "Commit the frozen review atomically and return a durable receipt.",
         credentials=False,
         capability=("people.batch", "people.private"),
-        refusals=(ErrorResponse(409, ("stale_people", "preview_expired", "preview_mismatch")),),
+        refusals=(
+            ErrorResponse(
+                409, ("stale_people", "preview_expired", "preview_mismatch", "conflicting_delivery_policies")
+            ),
+        ),
         description=(
             "Requires the preview ID and hash. "
             "Any changed person or enforcement result refuses the entire operation. A retry returns the same receipt."
@@ -77,10 +82,11 @@ PEOPLE_ROUTES: tuple[ApiRoute, ...] = (
         "Undo reversible field changes while every person is unchanged.",
         credentials=False,
         capability=("people.batch", "people.private"),
-        refusals=(NOT_FOUND, ErrorResponse(409, ("stale_people", "undo_refused"))),
+        refusals=(NOT_FOUND, ErrorResponse(409, ("stale_people", "undo_refused", "conflicting_delivery_policies"))),
         description=(
             "Undo lasts 10 minutes, survives service restarts, and is single-use. Reset and delete cannot be undone. "
-            "dry_run=true checks people, grants, nodes, and restored profiles without writing, returning undo_people."
+            "dry_run=true checks people, grants, nodes, restored profiles, and delivery defaults without writing, "
+            "returning undo_people."
         ),
     ),
 )

@@ -113,6 +113,8 @@ Edit `delivery.delivery_policies` in an exported fleet file and review it with `
 
 This is the `delivery` section, with documentation addresses: replace the resolver with your own. `profile_policies` maps access-profile names, including `default`, to policy names. Profiles without a mapping follow the fleet; multiple mapped profiles must select the same policy. A preset selection through `fleet routing` clears a named fleet default. Removing the optional fields restores the existing preset behavior.
 
+Single and bulk profile previews, `--dry-run`, and undo dry runs resolve each person's delivery choice before returning a review. Conflicting mapped profiles are refused unless a saved person override selects the policy. Initial memberships in `access.creation_settings` are also checked for conflicting mapped defaults during intent validation and compilation, before a plan or apply.
+
 Rules match domain suffixes, full domains, ASCII keywords, pinned `geosite`/`geoip` lists, CIDRs, destination ports, or TCP/UDP. Use `match.kind` values `domain_suffix`, `domain_full`, `domain_keyword`, `geosite`, `geoip`, `cidr`, `port`, and `network`. Port values are objects such as `{"start": 8443, "end": 8445}`; omitting `end` selects one port. Values within a match are alternatives. Optional rule `network` and `ports` conditions narrow the whole match. LAN bypasses come first, custom rules follow in their written order, and the preset's remaining rules follow them. The first match wins.
 
 Stash receives private-range matches as `LAN`, including inside rules with network and port conditions. These IP matches retain `no-resolve`.

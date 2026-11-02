@@ -19,6 +19,7 @@
 - **Fingerprints never mix in a health-checked group** — copies carry `ALT_FINGERPRINT_TAG` and get their own groups (TSPU escalates when one server's fingerprint changes); sing-box skips them.
 ## Pitfalls
 - **Hash grants before resolving them** — service settings carry the core declaration fingerprint; a compiled map changes when protocols or camouflage inbounds change, even when the declared grants do not.
+- **Creation profiles share the delivery resolver** — re-check initial memberships at compile even for an already-built intent; conflicting defaults cannot reach apply.
 - **Legacy backends cannot enforce profiles** — refuse named grants or initial memberships on Remnawave before compiling; only migration uses that backend.
 - **Policies follow stored references** — settings wait for workloads and endpoints; accounts always wait for settings, or their new membership can invalidate the same apply's access fence when the last profile disappears.
 **Public aliases share enforcement** — an endpoint grant includes every public connection backed by that inbound; profile previews must disclose this boundary.

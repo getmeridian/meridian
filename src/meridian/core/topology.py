@@ -13,7 +13,12 @@ from meridian.core.access_profiles import AccessProfileIntent
 from meridian.core.client_limits import UserCreationSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.delivery_policies import ClientRoutingPolicy as ClientRoutingPolicy
-from meridian.core.delivery_policies import DeliveryPolicySettings, delivery_exit_refs
+from meridian.core.delivery_policies import (
+    DeliveryPolicyResolutionError,
+    DeliveryPolicySettings,
+    delivery_exit_refs,
+    resolve_delivery_policy,
+)
 from meridian.core.inputs import (
     AccessUsernameValue,
     DisplayNameValue,
@@ -452,6 +457,11 @@ class SetupIntent(CoreModel):
         unknown_profiles = sorted(self.delivery.profile_policies.keys() - {"default", *profile_ids})
         if unknown_profiles:
             raise ValueError("Delivery defaults name unknown access profiles: " + ", ".join(unknown_profiles) + ".")
+        for username, settings in self.access.creation_settings.items():
+            try:
+                resolve_delivery_policy(self.delivery, profiles=settings.profiles)
+            except DeliveryPolicyResolutionError as exc:
+                raise ValueError(f"Initial profiles for {username}: {exc}") from None
         unknown_exits = sorted(delivery_exit_refs(self.delivery) - {exit_.id for exit_ in self.exits})
         if unknown_exits:
             raise ValueError("Delivery rules name unknown exits: " + ", ".join(unknown_exits) + ".")

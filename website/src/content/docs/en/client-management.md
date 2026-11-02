@@ -505,6 +505,8 @@ Create or replace grants with `meridian profile add|set`; `profile list` shows g
 
 Use `client set person --profile limited --yes`, repeating `--profile` for every membership to keep. This replaces the membership list; choose `default` to restore full access. Profile edits have their own review, separate from account limits, notes, and language. The console's access-profile card shows granted connections and the profiles that permit them, preserves unsaved choices, and opens the same frozen review. **Set profiles** is also a bulk action; its preview shows gained and lost inbounds and rejects changed people or topology at commit.
 
+Single and bulk profile previews, `--dry-run`, and undo dry runs resolve each person's delivery choice before returning a review. Conflicting mapped profiles are refused unless a saved person override selects the policy. Initial memberships in `access.creation_settings` are also checked for conflicting mapped defaults during intent validation and compilation, before a plan or apply.
+
 The CLI reports a service access error if it cannot read the person. A profile loss review prints the revocation warning once.
 
 Bulk undo checks the saved people, grants, and nodes before previewing or writing. Changed access or a deleted profile refuses the whole undo and names the affected people, including with `--dry-run`. Undo previews show the reversed gains, losses, and hard cut-off scope. The API accepts `{"receipt_id":"...","dry_run":true}` at `POST /api/people/bulk/undo`, returning projected `undo_people` without a database change, event, or backup pull. Older receipts without saved access preconditions require a new bulk review.

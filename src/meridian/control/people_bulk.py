@@ -14,6 +14,7 @@ from meridian.control.access_profiles import AccessProfileLedger
 from meridian.control.account_lifecycle import enforce_user_schedules
 from meridian.control.bulk_effects import BulkEffect, prepare_effect, prepare_undo, project_effect
 from meridian.control.bulk_preconditions import BulkPreconditions
+from meridian.control.delivery_policy_settings import read_delivery_policies, require_delivery_policy
 from meridian.control.errors import ServiceError
 from meridian.control.events import EventLedger
 from meridian.control.models import NodeSpec, UserRecord
@@ -104,6 +105,10 @@ class BulkLedger:
         )
 
     def _changed_nodes(self, effects: dict[str, BulkEffect], deleted: set[str]) -> int:
+        settings = read_delivery_policies(self.store)
+        for name, effect in effects.items():
+            if name not in deleted:
+                require_delivery_policy(settings, effect.user.profiles, effect.user.delivery_policy)
         before = self.read_users()
         after = [
             effects[user.username].user if user.username in effects else user

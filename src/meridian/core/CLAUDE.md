@@ -35,6 +35,7 @@
 - Commands build typed, redacted results before any envelope or rendering, and reporter primitives emit typed events without choosing a renderer.
 
 ## Pitfalls
+- **Initial memberships resolve delivery defaults** — reject conflicting profile policies while validating topology, before a reviewed plan can promise an account creation that apply refuses.
 - **Geosite attributes are literal keys** — `@!cn` selects entries carrying `!cn`; treating it as the absence of `cn` changes the client's match.
 - **Explanations follow the client's name pass** — Xray's `IPIfNonMatch` catch-all ends hostname routing before DNS; an earlier IP rule cannot make a later domain match unknown.
 - **Metadata reveals cover containers** — exact revealed paths preserve nested lists and maps with secret-shaped identifiers; string credential fields and neighbouring branches remain redacted.
