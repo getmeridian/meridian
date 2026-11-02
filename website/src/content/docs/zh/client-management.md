@@ -495,6 +495,8 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 ## 访问配置
 
+apply 会先保存入站及连接端点引用，再启用配置授权，最后创建账户。同一次 apply 中新增用户不会使自己的访问审核失效，包括移除最后一个配置时。
+
 `GET /api/users/{username}/cut-off` 需要 `people.read` 与 `people.private`。配置变更导致用户失去的入站访问，只要流阻断回执仍未确认，就会保留在预览中，即使账户仍处于活跃状态。后续执行 `--cut-off` 也会重置这些入站。
 
 配置授权属于已审核的拓扑；用户的配置成员关系由服务保存并归运营者管理。内置 `default` 配置允许访问所有出口和路径，包括未来新增的连接。用户可属于多个配置，权限取并集。未定义命名配置的部署保持原有节点文档和订阅输出。

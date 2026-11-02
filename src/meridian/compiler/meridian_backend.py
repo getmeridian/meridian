@@ -161,7 +161,7 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
                 ControlUserPayload(
                     username=payload.username, creation_settings=intent.access.creation_settings.get(payload.username)
                 ),
-                [CONTROL_SERVICE_ID, *([SERVICE_SETTINGS_ID] if access_profiles else [])],
+                [CONTROL_SERVICE_ID, SERVICE_SETTINGS_ID],
                 _exists(account_id),
             )
         elif isinstance(payload, SubscriptionSettingsPayload):
@@ -194,6 +194,21 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
         elif _panel_only(payload, old):
             renamed[logical_id] = None
 
+    settings, dependencies, conditions = replacements[SERVICE_SETTINGS_ID]
+    replacements[SERVICE_SETTINGS_ID] = (
+        settings,
+        sorted(
+            {
+                *dependencies,
+                *(
+                    logical_id
+                    for logical_id, (payload, _, _) in replacements.items()
+                    if isinstance(payload, NodeWorkloadPayload | ClientEndpointPayload)
+                ),
+            }
+        ),
+        conditions,
+    )
     result = PlanBuilder()
     for logical_id, resource in old.items():
         if logical_id in renamed:

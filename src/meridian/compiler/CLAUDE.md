@@ -16,6 +16,7 @@
 - **One camouflage per Reality inbound** — a relay whose SNI differs from its exit gets its own loopback inbound imitating that SNI, so probes never see the exit's certificate.
 - **Fingerprints never mix in a health-checked group** — copies carry `ALT_FINGERPRINT_TAG` and get their own groups (TSPU escalates when one server's fingerprint changes); sing-box skips them.
 ## Pitfalls
+- **Policies follow stored references** — settings wait for workloads and endpoints; accounts always wait for settings, or their new membership can invalidate the same apply's access fence when the last profile disappears.
 **Public aliases share enforcement** — an endpoint grant includes every public connection backed by that inbound; profile previews must disclose this boundary.
 - **New optional payload or intent fields use `Field(exclude_if=...)` at their default** — otherwise every existing fleet's plan hash changes and re-applies.
 - **A relay's endpoint takes keys from the exit behind it** — resolve `workload_ref` through the Host's `node_ref` runtime, never `owner_ref` (the relay).

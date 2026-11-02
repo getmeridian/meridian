@@ -57,6 +57,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Stage workload and endpoint references before profile activation, and create
+  accounts after settings so one apply cannot invalidate its own access review.
 - Protect cut-off reviews with private access permissions and include unresolved
   inbounds lost through profile changes when cutting off an active person.
 - Show explicit token capabilities in fleet events and refuse token commands
