@@ -9,7 +9,10 @@
     "context": {
       "anyOf": [
         {
-          "maxLength": 512,
+          "enum": [
+            "xray_individual_profiles",
+            "xray_fingerprint_profiles"
+          ],
           "type": "string"
         },
         {
@@ -30,6 +33,20 @@
       ],
       "default": null,
       "title": "Exit"
+    },
+    "profile_count": {
+      "anyOf": [
+        {
+          "maximum": 10000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Profile Count"
     },
     "reason": {
       "enum": [

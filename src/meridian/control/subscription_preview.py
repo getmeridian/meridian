@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from urllib.parse import quote
 
 from meridian.control.access_memberships import eligible_endpoints
+from meridian.control.delivery_preview import preview_delivery_policy
 from meridian.control.devices import browser_request
 from meridian.control.errors import ServiceError
 from meridian.control.formats.capabilities import endpoint_omission, requires_primary, supported_endpoints
@@ -24,6 +25,9 @@ from meridian.control.store import Store
 from meridian.control.subscription_serving import subscription_user
 from meridian.control.subscriptions import JSON_TYPE, TEXT_TYPE, YAML_TYPE, render_subscription, subscription_headers
 from meridian.core.access_profiles import may_use_inbound
+from meridian.core.delivery_explain import DeliveryExplainRequest, explain_delivery_policy
+from meridian.core.delivery_geodata import GeoData
+from meridian.core.delivery_policies import resolve_delivery_policy
 from meridian.core.languages import LanguageState, resolve_language
 from meridian.core.notices import RenderedNotice
 from meridian.core.redaction import REDACTED, redact_preview_text
@@ -49,6 +53,8 @@ def preview_subscription(
     read_language: Callable[[], LanguageState],
     read_privacy: Callable[[], PrivacySettings],
     clock: Callable[[], float],
+    include_delivery: bool = True,
+    read_geodata: Callable[[], GeoData | None] = lambda: None,
 ) -> SubscriptionPreview:
     decision = explain_format(request.user_agent, request.accept, request.suffix)
     with store.lock:
@@ -61,6 +67,9 @@ def preview_subscription(
         endpoints = [ClientEndpoint.model_validate_json(row["body"]) for row in rows]
         identifiers = {id(endpoint): str(row["endpoint_id"]) for endpoint, row in zip(endpoints, rows, strict=True)}
         settings = read_settings()
+        resolved_policy = resolve_delivery_policy(
+            settings, profiles=record.profiles, person_override=record.delivery_policy
+        )
         notice = read_notice(record)
         user = subscription_user(record, resolve_language(read_language().language, record.language))
         now = datetime.fromtimestamp(clock(), UTC)
@@ -120,6 +129,19 @@ def preview_subscription(
         else:
             safe_headers[name] = redact_preview_text(value, known)
     return SubscriptionPreview(
+        delivery=preview_delivery_policy(resolved_policy, presentation_endpoints(allowed))
+        if include_delivery
+        else None,
+        explanation=explain_delivery_policy(
+            resolved_policy,
+            DeliveryExplainRequest(destination=request.destination, person=request.username, format=decision.format),
+            available_exits={endpoint.exit_ref for endpoint in connections if endpoint.exit_ref},
+            geodata=read_geodata(),
+            available=bool(connections),
+            active=user.status == "active",
+        )
+        if include_delivery and request.destination is not None
+        else None,
         **decision.to_data(),
         username=redact_preview_text(record.username, known),
         status=user.status,

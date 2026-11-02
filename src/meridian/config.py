@@ -6,6 +6,11 @@ import os
 from pathlib import Path
 
 from meridian.contexts import CONTEXT_ENV, DEFAULT_CONTEXT, ContextError, ContextSelection, resolve_context
+from meridian.core.xray_pins import XRAY_ARCHIVE_BYTES as XRAY_ARCHIVE_BYTES
+from meridian.core.xray_pins import XRAY_ASSET_MAP as XRAY_ASSET_MAP
+from meridian.core.xray_pins import XRAY_GITHUB_URL as XRAY_GITHUB_URL
+from meridian.core.xray_pins import XRAY_SHA256 as XRAY_SHA256
+from meridian.core.xray_pins import XRAY_VERSION as XRAY_VERSION
 
 # Meridian 3.x keeps its state here; 4.x never writes to it.
 LEGACY_HOME = Path.home() / ".meridian"
@@ -160,30 +165,6 @@ REALM_SHA256: dict[str, str] = {
 # for proxy software. The binary is still Realm; only its installed name changes.
 RELAY_BINARY_PATH = "/usr/local/bin/netfwd"
 LEGACY_REALM_BINARY_PATH = "/usr/local/bin/realm"
-
-# Xray: the core every node agent runs and the client `meridian test` verifies with.
-# Moving it needs scripts/export_geodata_lists.py, since agents load its geodata.
-XRAY_VERSION = "26.7.28"
-XRAY_GITHUB_URL = "https://github.com/XTLS/Xray-core/releases/download"
-XRAY_ASSET_MAP: dict[tuple[str, str], str] = {
-    ("Darwin", "arm64"): "Xray-macos-arm64-v8a.zip",
-    ("Darwin", "x86_64"): "Xray-macos-64.zip",
-    ("Linux", "x86_64"): "Xray-linux-64.zip",
-    ("Linux", "aarch64"): "Xray-linux-arm64-v8a.zip",
-}
-# sha256 of each XRAY_VERSION archive as GitHub publishes it (the same as the release's .dgst SHA2-256)
-XRAY_SHA256: dict[str, str] = {
-    "Xray-macos-arm64-v8a.zip": "9b99a351febe31b7e0c7f22deeb1577a1da0b98aaa51aec7fd17832e68cf63d6",
-    "Xray-macos-64.zip": "812f7d9de6d3506795eabda2f6928ba301c632c3fe6fa39c52ea8e0ed9e4e244",
-    "Xray-linux-64.zip": "8195d909f1109b8f3d99eefe401a3c451d7bf4af71f24d3815420f77e5dd2a40",
-    "Xray-linux-arm64-v8a.zip": "f5698bb218ada3b4022db26fafc39601c5f53b46b19eb76c9616325985807501",
-}
-
-# Xray archive sizes, which the node agent checks before the hash (`binary_pin.size`)
-XRAY_ARCHIVE_BYTES: dict[str, int] = {
-    "Xray-linux-64.zip": 21164807,
-    "Xray-linux-arm64-v8a.zip": 19699639,
-}
 
 # uv installs Meridian's control service (`meridian serve`) with its own Python on the control
 # server; the static musl build runs on every supported distribution.

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from meridian.control.models import ServiceSettings
 from meridian.core.client_routing import FleetRoutingRequest, FleetRoutingResult
 from meridian.core.delivery_capabilities import DeliveryFormatCapabilities, DeliveryPolicyOmission
+from meridian.core.delivery_explain import DeliveryDestination, DeliveryExplainRequest, DeliveryExplanation
 from meridian.core.delivery_matchers import DeliveryDns, DeliveryPortRange
 from meridian.core.delivery_policies import (
     DeliveryAction,
@@ -16,6 +17,12 @@ from meridian.core.delivery_policies import (
     DeliveryPolicySettings,
     DeliveryRule,
     ResolvedDeliveryPolicy,
+)
+from meridian.core.delivery_preview import (
+    DeliveryPolicyPreview,
+    DeliveryRoutePreview,
+    FormatDeliveryPolicy,
+    SubscriberDeliveryCapabilities,
 )
 from meridian.core.fleet_contact import FleetContactRequest, FleetContactResult
 from meridian.core.owner_contact import OwnerContact
@@ -45,6 +52,13 @@ def delivery_schemas(
         doc="Envelope schema for `meridian fleet contact --json`.",
     )
     return {
+        "delivery-destination": DeliveryDestination,
+        "delivery-explain-request": DeliveryExplainRequest,
+        "delivery-explanation": DeliveryExplanation,
+        "delivery-policy-preview": DeliveryPolicyPreview,
+        "delivery-route-preview": DeliveryRoutePreview,
+        "format-delivery-policy": FormatDeliveryPolicy,
+        "subscriber-delivery-capabilities": SubscriberDeliveryCapabilities,
         "delivery-policy": DeliveryPolicy,
         "delivery-policy-settings": DeliveryPolicySettings,
         "delivery-rule": DeliveryRule,
@@ -62,4 +76,19 @@ def delivery_schemas(
         "fleet-routing-envelope": routing_envelope,
         "fleet-routing": FleetRoutingResult,
         "fleet-routing-request": FleetRoutingRequest,
+        "fleet-routing-set-envelope": make_command_envelope(
+            "FleetRoutingSet",
+            "fleet.routing.set",
+            FleetRoutingResult,
+            envelope_base=envelope_base,
+            failure_data_type=failure_data_type,
+            success_statuses=Literal["ok", "changed", "no_changes"],
+        )[2],
+        "fleet-routing-explain-envelope": make_command_envelope(
+            "FleetRoutingExplain",
+            "fleet.routing.explain",
+            DeliveryExplanation,
+            envelope_base=envelope_base,
+            failure_data_type=failure_data_type,
+        )[2],
     }

@@ -59,8 +59,11 @@ def apply_xray_policy(
     dns = xray_dns(resolvers)
     if dns is not None:
         document["dns"] = dns
-        # DNS's own sockets go through the automatic group, never through a direct-name lookup.
+        # Local resolvers retain LAN handling; public DNS sockets use the tunnel.
         routing["rules"].insert(0, {"type": "field", "inboundTag": ["MERIDIAN_DNS"], "balancerTag": "MERIDIAN_AUTO"})
+        routing["rules"].insert(
+            0, {"type": "field", "inboundTag": ["MERIDIAN_DNS"], "ip": ["geoip:private"], "outboundTag": "DIRECT"}
+        )
         routing["domainStrategy"] = "IPOnDemand"
         for outbound in document["outbounds"]:
             if outbound["protocol"] == "freedom":

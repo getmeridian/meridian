@@ -135,3 +135,28 @@ DNS 使用 `transport: doh | dot | plain`、单播 IP `address` 和可选 `port`
 | `GET /api/delivery-policies` | 已审阅目录与访问配置默认；`delivery.read` |
 | `GET /api/users/{username}/delivery-policy` | 私有覆盖及有效策略；`people.read` 与 `people.private` |
 | `PUT /api/users/{username}/delivery-policy` | `{ "policy": "work", "confirm": false }` 返回预览；确认时提交 `review_hash`；需要 `people.delivery`、`people.read`、`people.private`。显式 `policy: null` 表示继承。 |
+
+
+## 预览与解释路由
+
+`meridian client preview person --suffix singbox --json` 与面板订阅预览显示有效策略、选择来源、各格式的有序规则与 DNS，以及省略的功能和原因。可选目的地字段解释当前格式。Xray 预览区分缺少指定出口的单连接配置与指纹配置。规则编号在各格式之间一致：局域网规则最先，其次为自定义规则，最后为内置模式的其余规则。同一编号可能编译为客户端文件中的多条规则。
+
+```bash
+meridian fleet routing set work --dry-run --json
+meridian fleet routing explain chat.example.test:443 --person person --format singbox --json
+meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --network tcp --protocol other --json
+```
+
+`fleet routing explain` 读取服务当前已应用的设置及可选个人私有覆盖，返回首次匹配的规则与动作，例如“此目的地通过出口 west，因为规则 2 匹配”。省略 `--person` 可解释服务器默认策略。`--format` 选择 Xray JSON、Mihomo/Clash、Stash、sing-box 或 Base64。默认假设 TCP 和普通流量；`--protocol bittorrent` 提供模拟的协议检测结果。不发送 DNS、网络或可达性查询。更早的规则需要未知端口或缓存中缺失的固定版本地理数据时，结果显示未知。Xray 规则需要客户端解析后的 IP 时，主机名也保持未知。应用选择与服务器可达性可能改变自动组实际使用的连接。
+
+| 格式 / 应用 | 目的地规则 | DNS | fake-IP | 指定出口 | BitTorrent |
+| --- | --- | --- | --- | --- | --- |
+| Xray JSON 应用 | 全部八类匹配 | DoH、普通 DNS | 省略 | 仅限当前配置 | 尽力检测 |
+| Mihomo / Clash Meta | 全部八类 | DoH、DoT、普通 DNS | 支持 | 仅主连接 | 省略 |
+| Stash | 全部八类 | DoH、DoT、普通 DNS | 原生模式，省略自定义 fake-IP | 仅主连接 | 省略 |
+| sing-box / Hiddify | 内联域名、CIDR、端口、TCP/UDP、私有 IP | DoH、DoT、普通 DNS | 支持 | 仅受支持连接 | 省略 |
+| Base64 链接应用 | 无规则 | 无设置 | 不支持 | 无基于规则的选择 | 不支持 |
+
+服务仅从缓存中读取通过 Meridian 固定哈希验证的 Xray 压缩包，不会因解释路由而开始下载。客户端不会收到远程规则集。Xray 将已配置的公共 DNS 请求通过自动组发送，同时保留局域网 DNS 直连；其他客户端使用可表示的 DNS 设置。不支持的传输不会转换为普通 DNS。原有内置模式的字节内容和默认配置的黄金语料响应保持不变。
+
+`POST /api/delivery-policies/explain` 接受 `destination`、可选 `person`、`format`、`port`、`network`、`protocol`。需要 `delivery.explain`；指定用户时还需要 `people.read` 和 `people.private`。订阅预览中的策略详情或目的地解释需要私有权限，较低权限仅返回原有元数据。连接页面的 `/info` 可包含 `user.deliveryCapabilities`：格式名称、支持标志与省略代码，不含策略名称、个人覆盖、成员关系、目的地或连接详情。页面仅在内存中保留这些新鲜数据。

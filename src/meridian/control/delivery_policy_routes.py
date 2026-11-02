@@ -5,8 +5,10 @@ from __future__ import annotations
 import re
 
 from meridian.control.delivery_routes import DeliveryRequest
+from meridian.control.errors import ServiceError
 from meridian.control.route_metadata import NOT_FOUND
-from meridian.control.route_types import ErrorResponse, route
+from meridian.control.route_types import ErrorResponse, ExtraCapability, route
+from meridian.core.delivery_explain import DeliveryExplainRequest, DeliveryExplanation
 from meridian.core.person_delivery_policy import (
     DeliveryPolicyCatalog,
     PersonDeliveryPolicyReview,
@@ -17,6 +19,17 @@ from meridian.core.person_delivery_policy import (
 
 def delivery_policy_catalog(request: DeliveryRequest, _match: re.Match[str]) -> DeliveryPolicyCatalog:
     return request.ui.service.delivery.catalog()
+
+
+def explain_delivery_policy(request: DeliveryRequest, _match: re.Match[str]) -> DeliveryExplanation:
+    body = DeliveryExplainRequest.model_validate_json(request.read_body())
+    if body.person is not None and (
+        request.caller is None
+        or not request.caller.allows("people.read")
+        or not request.caller.allows("people.private")
+    ):
+        raise ServiceError("insufficient_scope", "Person policy explanations need people.read and people.private.", 403)
+    return request.ui.service.delivery.explain(body)
 
 
 def person_delivery_policy(request: DeliveryRequest, match: re.Match[str]) -> PersonDeliveryPolicyState:
@@ -30,6 +43,22 @@ def set_person_delivery_policy(request: DeliveryRequest, match: re.Match[str]) -
 
 
 DELIVERY_POLICY_ROUTES = (
+    route(
+        "POST",
+        "/api/delivery-policies/explain",
+        ("read", "people"),
+        explain_delivery_policy,
+        DeliveryExplainRequest,
+        DeliveryExplanation,
+        "Explain the first matching client rule without DNS or network requests.",
+        credentials=False,
+        capability="delivery.explain",
+        refusals=(NOT_FOUND,),
+        extra_capabilities=(
+            ExtraCapability("person", "people.read", "people"),
+            ExtraCapability("private_policy", "people.private", "people"),
+        ),
+    ),
     route(
         "GET",
         "/api/delivery-policies",
@@ -72,4 +101,6 @@ DELIVERY_POLICY_ROUTES = (
         "the preview's review_hash and refuses changed membership, catalog, or override.",
     ),
 )
-DELIVERY_POLICY_OWNER_ROUTES = frozenset({delivery_policy_catalog, person_delivery_policy, set_person_delivery_policy})
+DELIVERY_POLICY_OWNER_ROUTES = frozenset(
+    {delivery_policy_catalog, person_delivery_policy, set_person_delivery_policy, explain_delivery_policy}
+)

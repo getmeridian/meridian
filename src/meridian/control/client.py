@@ -75,6 +75,7 @@ from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientExtendRequest
 from meridian.core.client_sessions import CredentialRotationRequest, UserFlowBlocks
 from meridian.core.clients import ClientConnections
+from meridian.core.delivery_explain import DeliveryExplainRequest, DeliveryExplanation
 from meridian.core.errors import MeridianError
 from meridian.core.fleet_events import FleetEventPage, FleetEventQuery
 from meridian.core.languages import LanguageSettings, LanguageState
@@ -226,6 +227,11 @@ class ControlClient:
 
     def delivery_policies(self) -> DeliveryPolicyCatalog:
         return DeliveryPolicyCatalog.model_validate(self._call("GET", "api/delivery-policies"))
+
+    def explain_delivery_policy(self, request: DeliveryExplainRequest) -> DeliveryExplanation:
+        return DeliveryExplanation.model_validate(
+            self._request("POST", "api/delivery-policies/explain", request.to_data(), mutation_method="GET").json()
+        )
 
     def person_delivery_policy(self, username: str) -> PersonDeliveryPolicyState:
         return PersonDeliveryPolicyState.model_validate(

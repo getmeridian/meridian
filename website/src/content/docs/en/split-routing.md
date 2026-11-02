@@ -133,3 +133,28 @@ Policy reads need `people.read` and `people.private`; assignment additionally ne
 | `GET /api/delivery-policies` | Reviewed catalog and profile defaults; `delivery.read` |
 | `GET /api/users/{username}/delivery-policy` | Private override and effective policy; `people.read` and `people.private` |
 | `PUT /api/users/{username}/delivery-policy` | `{ "policy": "work", "confirm": false }` previews; confirm with its `review_hash`; `people.delivery`, `people.read`, `people.private`. Explicit `policy: null` inherits. |
+
+
+## Preview and explain delivery
+
+`meridian client preview person --suffix singbox --json` and the console's subscription preview show the effective policy, its source, every format's ordered rules and DNS, and omitted features with reasons. The optional Destination field explains the selected format. Xray omissions distinguish individual and fingerprint profiles that cannot reach a requested exit. Policy rule numbers count LAN first, then custom rules, then the preset tail; they are shared across formats even when a client needs several serialized rules.
+
+```bash
+meridian fleet routing set work --dry-run --json
+meridian fleet routing explain chat.example.test:443 --person person --format singbox --json
+meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --network tcp --protocol other --json
+```
+
+`fleet routing explain` reads the currently applied service settings and optional private person assignment. It returns the first matched rule and action, for example “this destination goes via exit west because rule 2 matched.” Omit `--person` to explain the fleet default. `--format` selects Xray JSON, Mihomo/Clash, Stash, sing-box, or Base64. TCP and ordinary traffic are assumed unless supplied; `--protocol bittorrent` supplies synthetic detected-protocol evidence. No DNS, reachability, or network lookup occurs. A missing port or cached pinned geodata is reported as unknown when an earlier rule needs it. A hostname whose Xray rule needs a resolved IP also remains unknown. Actual app selection and reachability can change which connection an automatic group uses.
+
+| Format / apps | Destination rules | DNS | fake-IP | Via exit | BitTorrent |
+| --- | --- | --- | --- | --- | --- |
+| Xray JSON apps | All eight typed matchers | DoH, plain | Omitted | Yes, within the delivered profile | Best-effort detection |
+| Mihomo / Clash Meta | All eight | DoH, DoT, plain | Yes | Primary connections only | Omitted |
+| Stash | All eight | DoH, DoT, plain | Native mode; custom fake-IP omitted | Primary connections only | Omitted |
+| sing-box / Hiddify | Inline domains, CIDR, ports, TCP/UDP, private IPs | DoH, DoT, plain | Yes | Supported connections only | Omitted |
+| Base64 link apps | No rules | No settings | No | No rule-based choice | No |
+
+The service reads geodata only from already-cached Xray archives whose hash matches Meridian's pin. Explanations never start a download. Clients never receive remote rule sets. Xray sends configured public DNS through its automatic group and retains direct LAN resolvers; other clients use their represented DNS settings. Choosing an unsupported transport never converts it to plain DNS. Existing preset bytes and default fleet corpus answers stay unchanged.
+
+`POST /api/delivery-policies/explain` accepts `destination`, optional `person`, `format`, `port`, `network`, and `protocol`; it needs `delivery.explain`, plus `people.read` and `people.private` with a person. Subscription previews require private permission for policy details or a destination explanation; lower grants receive the existing metadata only. Connection-page `/info` may include `user.deliveryCapabilities`: format names, support flags, and omission codes, without policy names, assignments, memberships, destinations, or endpoint details. The page keeps this fresh data in memory.

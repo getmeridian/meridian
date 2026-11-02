@@ -18,6 +18,7 @@
 - **Passkeys verify locally** — reviewed `public_url` fixes RP/origin; required user verification, none attestation, bounded CBOR, and existing cryptography verify ES256/Ed25519 without identity lookup or a new dependency. Passkeys satisfy session step-up; add/rename/remove require it, and removal ends other sessions.
 
 ## What's done well
+- **Format previews share routing evidence** — the console renders effective rules, DNS, omissions, and destination results from the same service projection as the CLI.
 - **Connection keys and leaked links have separate actions** — rotation preserves the subscription URL, sends the displayed generation, and locks confirmation and submission; declared people receive the CLI command.
 - **Revocation receipts name their boundary** — show each node's blocked, pending, or old-agent state with the remaining transfers and shared-inbound cut-off effect.
 - **CSP with no script exceptions** — `default-src 'none'`, `script-src 'self'`, `frame-ancestors 'none'`, `no-referrer` on every response; `test_control_ui_assets.py` refuses inline script, style, handlers, HTML sinks, outside URLs, and locale drift.

@@ -23,17 +23,17 @@ from meridian.servers import ServerRegistry
 COMMAND = "fleet.routing"
 
 
-def run_routing(policy: str | None = None, *, dry_run: bool = False, yes: bool = False) -> None:
+def run_routing(policy: str | None = None, *, dry_run: bool = False, yes: bool = False, command: str = COMMAND) -> None:
     """Read local intent, or confirm and apply exactly the reviewed policy edit."""
     operation = OperationContext()
-    with console.error_context(COMMAND, timer=operation.timer):
+    with console.error_context(command, timer=operation.timer):
         request = validate_command_input(
             FleetRoutingRequest, t("fleet_routing.invalid"), client_routing=policy, dry_run=dry_run, yes=yes
         )
-        _run(request, operation)
+        _run(request, operation, command=command)
 
 
-def _run(request: FleetRoutingRequest, operation: OperationContext) -> None:
+def _run(request: FleetRoutingRequest, operation: OperationContext, *, command: str = COMMAND) -> None:
     if request.client_routing is None and request.dry_run:
         console.fail(t("fleet_routing.choose_for_review"), hint_type="user")
     cluster = load_topology_cluster()
@@ -47,11 +47,11 @@ def _run(request: FleetRoutingRequest, operation: OperationContext) -> None:
         )
     result = FleetRoutingResult(client_routing=policy, choices=choices, dry_run=request.dry_run)
     if request.client_routing is None:
-        _emit(result, operation, status="ok", text="Read client routing policy")
+        _emit(result, operation, status="ok", text="Read client routing policy", command=command)
         _print_policy(result)
         return
     if policy == previous:
-        _emit(result, operation, status="no_changes", text="Client routing is unchanged")
+        _emit(result, operation, status="no_changes", text="Client routing is unchanged", command=command)
         if not console.is_json_mode():
             console.ok(t("fleet_routing.unchanged", policy=policy))
         _print_policy(result)
@@ -91,7 +91,7 @@ def _run(request: FleetRoutingRequest, operation: OperationContext) -> None:
                 console.err_console.print(f"    [red]remove[/red] {escape(logical_id)}")
         console.err_console.print(f"  [dim]Review {preview.review_hash}[/dim]")
     if request.dry_run:
-        _emit(result, operation, status="ok", text="Reviewed client routing policy")
+        _emit(result, operation, status="ok", text="Reviewed client routing policy", command=command)
         if not console.is_json_mode():
             console.info(t("fleet_routing.dry_run", policy=policy))
         return
@@ -112,6 +112,7 @@ def _run(request: FleetRoutingRequest, operation: OperationContext) -> None:
         operation,
         status="changed",
         text="Applied client routing policy",
+        command=command,
     )
     if not console.is_json_mode():
         console.ok(t("fleet_routing.changed", policy=policy))
@@ -133,11 +134,13 @@ def _print_policy(result: FleetRoutingResult) -> None:
         console.err_console.print(f"  [dim]{escape(t('fleet_routing.exit_policy'))}[/dim]")
 
 
-def _emit(result: FleetRoutingResult, operation: OperationContext, *, status: OutputStatus, text: str) -> None:
+def _emit(
+    result: FleetRoutingResult, operation: OperationContext, *, status: OutputStatus, text: str, command: str = COMMAND
+) -> None:
     if console.is_json_mode():
         emit_json(
             command_envelope(
-                command=COMMAND,
+                command=command,
                 data=result.to_data(),
                 summary=Summary(text=text, changed=status == "changed"),
                 status=status,

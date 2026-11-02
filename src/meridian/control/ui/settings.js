@@ -31,10 +31,11 @@
     var error = h("p", { class: "form-error", role: "alert" });
     M.api("GET", "api/settings").then(function (settings) {
       title.textContent = settings.profile_title;
-      var policy = settings.client_routing || "ru-split";
+      var policy = settings.default_policy || settings.client_routing || "ru-split";
+      var named = policy !== "full" && policy !== "ru-split";
       routing.textContent = policy;
-      routingExplanation.textContent = M.t(policy === "full" ? "settings.routing_full" : "settings.routing_ru_split");
-      routingCommand.textContent = "meridian fleet routing " + (policy === "full" ? "ru-split" : "full");
+      routingExplanation.textContent = M.t(named ? "policy.named" : policy === "full" ? "settings.routing_full" : "settings.routing_ru_split");
+      routingCommand.textContent = named ? "meridian fleet routing set POLICY" : "meridian fleet routing " + (policy === "full" ? "ru-split" : "full");
       publicUrl.textContent = settings.public_url || M.t("settings.no_public_url");
       var contact = settings.owner_contact || {};
       contactText.textContent = contact.text || M.t("settings.contact_none");

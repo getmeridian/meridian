@@ -38,6 +38,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 
 ## What's done well
 - **Snapshot profile reads are passive** — deserialize authenticated bytes in memory; never instantiate a service or migrate a database to judge restore compatibility.
+- **Policy previews are transient** — cached geodata verifies archive pins; requests trigger no fetch, and public app limits omit policy names, overrides, and memberships.
 - **Flow events record real transitions** — repeated hellos, reports, and unrelated revisions leave a confirmed receipt and its event history unchanged.
 - A revision is signed only when the resources' hash or the signing certificate changes, so repeated applies never wake agents.
 - A token's public ID finds its row, so its hash is compared once in constant time (against a dummy when none matches); a refused CSR rolls back and never burns the enrollment token.

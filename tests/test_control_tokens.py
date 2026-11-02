@@ -67,6 +67,7 @@ ROUTE_SAMPLES = {
     "metrics": ("/metrics", None),
     "node_capacity": ("/api/nodes/main/capacity", None),
     "delivery_policy_catalog": ("/api/delivery-policies", None),
+    "explain_delivery_policy": ("/api/delivery-policies/explain", {"destination": "example.test"}),
     "person_delivery_policy": ("/api/users/alice/delivery-policy", None),
     "set_person_delivery_policy": ("/api/users/alice/delivery-policy", {"policy": None}),
     "token_capabilities": ("/api/token-capabilities", None),
@@ -228,6 +229,7 @@ def test_people_access_is_declared_on_person_routes_and_private_profile_reviews(
             "token_capabilities",
             "access_profile_catalog",
             "delivery_policy_catalog",
+            "explain_delivery_policy",
             "subscription_preview",
         }
         assert any(scope_covers("people", scope) for scope in requirements) == manages_people
@@ -394,6 +396,7 @@ def test_people_reads_credentials_and_edits_people_without_fleet_access(fleet: F
             "/api/token-capabilities",
             "/api/access-profiles",
             "/api/delivery-policies",
+            "/api/delivery-policies/explain",
             "/api/subscription/preview",
         }:
             continue

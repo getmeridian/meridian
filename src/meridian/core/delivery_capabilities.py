@@ -44,7 +44,8 @@ class DeliveryPolicyOmission(CoreModel):
     resolver: int | None = Field(default=None, ge=1, le=4)
     exit: str | None = None
     blocked: bool = False
-    context: str | None = Field(default=None, max_length=512)
+    context: Literal["xray_individual_profiles", "xray_fingerprint_profiles"] | None = None
+    profile_count: int | None = Field(default=None, ge=1, le=10000)
 
 
 _MATCHES: list[DeliveryMatchKind] = [

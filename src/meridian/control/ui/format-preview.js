@@ -8,6 +8,7 @@
     var person = h("input", { type: "text", maxlength: "64", autocomplete: "off", "data-preview": "person" });
     var agent = h("input", { type: "text", maxlength: "1024", autocomplete: "off", "data-preview": "user_agent" });
     var accept = h("input", { type: "text", maxlength: "512", autocomplete: "off", "data-preview": "accept" });
+    var destination = h("input", { type: "text", maxlength: "512", autocomplete: "off", "data-preview": "destination" });
     var suffix = h("select", { "data-preview": "suffix" },
       ["", "info", "json", "v2ray-json", "mihomo", "clash", "stash", "singbox"].map(function (value) {
         return h("option", { value: value, text: value || M.t("preview.automatic") });
@@ -16,7 +17,8 @@
     var result = h("div", { class: "stack", "data-preview": "result", "aria-live": "polite" });
     var form = h("form", { class: "stack", novalidate: true },
       M.field(M.t("preview.person"), person), M.field(M.t("preview.user_agent"), agent),
-      M.field(M.t("preview.accept"), accept), M.field(M.t("preview.suffix"), suffix), error,
+      M.field(M.t("preview.accept"), accept), M.field(M.t("preview.suffix"), suffix),
+      M.field(M.t("policy.destination"), destination, M.t("policy.destination_hint")), error,
       h("div", { class: "row-actions" }, h("button", { type: "submit", class: "btn btn-primary btn-sm" }, M.t("preview.run"))));
     var pending = false;
     form.addEventListener("submit", function (event) {
@@ -31,6 +33,7 @@
         error.textContent = M.t("preview.invalid_accept"); return;
       }
       var body = { username: username, user_agent: agent.value, accept: accept.value, suffix: suffix.value };
+      if (destination.value.trim()) body.destination = destination.value.trim();
       pending = true;
       M.busy(form, function () { return M.api("POST", "api/subscription/preview", body); }).then(function (data) {
         draw(result, data);
@@ -62,6 +65,8 @@
       h("p", {}, M.t("preview.protocols") + ": ", h("bdi", { text: (data.protocols || []).join(", ") || M.t("preview.none") })),
       data.placeholder ? h("p", { class: "muted small", text: M.t("preview.placeholder_" + data.placeholder) }) : null,
       data.stale_client ? h("p", { class: "muted small", text: M.t("preview.stale_client_" + data.stale_client) }) : null,
+      M.policyExplanation ? M.policyExplanation(data.explanation) : null,
+      M.policyPreview ? M.policyPreview(data.delivery) : null,
       h("div", { class: "list list-plain" }, rows),
       h("details", {}, h("summary", { text: M.t("preview.headers") }), headers),
     ]);

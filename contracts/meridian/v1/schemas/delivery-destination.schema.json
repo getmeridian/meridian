@@ -1,0 +1,48 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "host": {
+      "maxLength": 253,
+      "minLength": 1,
+      "title": "Host",
+      "type": "string"
+    },
+    "network": {
+      "default": "tcp",
+      "enum": [
+        "tcp",
+        "udp"
+      ],
+      "title": "Network",
+      "type": "string"
+    },
+    "port": {
+      "anyOf": [
+        {
+          "maximum": 65535,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Port"
+    },
+    "protocol": {
+      "default": "other",
+      "enum": [
+        "other",
+        "bittorrent"
+      ],
+      "title": "Protocol",
+      "type": "string"
+    }
+  },
+  "required": [
+    "host"
+  ],
+  "title": "DeliveryDestination",
+  "type": "object"
+}

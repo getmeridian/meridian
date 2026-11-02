@@ -26,6 +26,7 @@
 
 ## What's done well
 - **Capacity preserves missing evidence** — negotiated samples use nullable figures, integer load/rates, and epoch-local host counters without interface or client identities.
+- **Explanations never guess past missing evidence** — pure first-match evaluation reports unavailable geodata or ports, and Xray pin identity lives in core for every reader.
 - **Credential rotation composes existing client status and node outcomes** — its request requires an integer generation, its CLI result carries no credential, and stale retries cannot create another generation.
 - **Flow-block evidence is capability-gated and revision-bound** — account generations and node outcomes carry no connection or device data.
 - **Defaults stay off the wire** — new intent and settings fields omit their defaults (routing `ru-split`, the six-hour refresh, empty mappings), so existing plans and payloads keep their hashes.

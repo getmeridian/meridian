@@ -42,11 +42,15 @@ def put_language(request: DeliveryRequest, _match: re.Match[str]) -> LanguageSta
 
 
 def subscription_preview(request: DeliveryRequest, _match: re.Match[str]) -> SubscriptionPreview:
+    body = SubscriptionPreviewRequest.model_validate_json(request.read_body())
+    private = request.caller is not None and request.caller.allows("people.private")
     if request.ui.service.settings().access_profiles and (
         request.caller is None or not request.caller.allows("people.private")
     ):
         raise ServiceError("insufficient_scope", "Access profile previews need the people.private permission.", 403)
-    return request.ui.service.preview_subscription(SubscriptionPreviewRequest.model_validate_json(request.read_body()))
+    if body.destination is not None and not private:
+        raise ServiceError("insufficient_scope", "Destination policy previews need people.private.", 403)
+    return request.ui.service.preview_subscription(body, include_delivery=private)
 
 
 DELIVERY_OWNER_ROUTES = frozenset({get_notice, put_notice, get_language, put_language, subscription_preview})

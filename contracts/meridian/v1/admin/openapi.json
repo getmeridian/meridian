@@ -1945,6 +1945,7 @@
                   "people.edit",
                   "people.delivery",
                   "delivery.read",
+                  "delivery.explain",
                   "people.credentials",
                   "people.reset",
                   "people.reissue",
@@ -2034,6 +2035,7 @@
               "people.edit",
               "people.delivery",
               "delivery.read",
+              "delivery.explain",
               "people.credentials",
               "people.reset",
               "people.reissue",
@@ -2101,6 +2103,7 @@
               "people.edit",
               "people.delivery",
               "delivery.read",
+              "delivery.explain",
               "people.credentials",
               "people.reset",
               "people.reissue",
@@ -3301,6 +3304,54 @@
         "title": "DeliveryAction",
         "type": "object"
       },
+      "DeliveryDestination": {
+        "additionalProperties": false,
+        "properties": {
+          "host": {
+            "maxLength": 253,
+            "minLength": 1,
+            "title": "Host",
+            "type": "string"
+          },
+          "network": {
+            "default": "tcp",
+            "enum": [
+              "tcp",
+              "udp"
+            ],
+            "title": "Network",
+            "type": "string"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "maximum": 65535,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Port"
+          },
+          "protocol": {
+            "default": "other",
+            "enum": [
+              "other",
+              "bittorrent"
+            ],
+            "title": "Protocol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "host"
+        ],
+        "title": "DeliveryDestination",
+        "type": "object"
+      },
       "DeliveryDns": {
         "additionalProperties": false,
         "properties": {
@@ -3341,6 +3392,261 @@
           "resolvers"
         ],
         "title": "DeliveryDns",
+        "type": "object"
+      },
+      "DeliveryExplainRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "destination": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Destination",
+            "type": "string"
+          },
+          "format": {
+            "default": "xray-json",
+            "enum": [
+              "browser",
+              "mihomo",
+              "stash",
+              "singbox",
+              "xray-json",
+              "base64"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "network": {
+            "anyOf": [
+              {
+                "enum": [
+                  "tcp",
+                  "udp"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Network"
+          },
+          "person": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Person"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "maximum": 65535,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Port"
+          },
+          "protocol": {
+            "default": "other",
+            "enum": [
+              "other",
+              "bittorrent"
+            ],
+            "title": "Protocol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "destination"
+        ],
+        "title": "DeliveryExplainRequest",
+        "type": "object"
+      },
+      "DeliveryExplanation": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryAction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destination": {
+            "$ref": "#/components/schemas/DeliveryDestination"
+          },
+          "format": {
+            "enum": [
+              "browser",
+              "mihomo",
+              "stash",
+              "singbox",
+              "xray-json",
+              "base64"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "geodata_available": {
+            "title": "Geodata Available",
+            "type": "boolean"
+          },
+          "omitted": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPolicyOmission"
+            },
+            "maxItems": 512,
+            "title": "Omitted",
+            "type": "array"
+          },
+          "policy": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "title": "Policy",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "rule_matched",
+              "default_proxy",
+              "geodata_unavailable",
+              "port_required",
+              "ip_required",
+              "rules_not_carried",
+              "no_connections",
+              "inactive_person"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "maximum": 133,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Rule"
+          },
+          "status": {
+            "enum": [
+              "matched",
+              "default",
+              "unknown",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "destination",
+          "format",
+          "policy",
+          "status",
+          "action",
+          "reason",
+          "geodata_available"
+        ],
+        "title": "DeliveryExplanation",
+        "type": "object"
+      },
+      "DeliveryFormatCapabilities": {
+        "additionalProperties": false,
+        "properties": {
+          "bittorrent": {
+            "title": "Bittorrent",
+            "type": "boolean"
+          },
+          "dns_transports": {
+            "items": {
+              "enum": [
+                "doh",
+                "dot",
+                "plain"
+              ],
+              "type": "string"
+            },
+            "maxItems": 3,
+            "title": "Dns Transports",
+            "type": "array"
+          },
+          "fake_ip": {
+            "title": "Fake Ip",
+            "type": "boolean"
+          },
+          "format": {
+            "enum": [
+              "browser",
+              "mihomo",
+              "stash",
+              "singbox",
+              "xray-json",
+              "base64"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "local_geodata": {
+            "title": "Local Geodata",
+            "type": "boolean"
+          },
+          "matches": {
+            "items": {
+              "enum": [
+                "domain_suffix",
+                "domain_keyword",
+                "domain_full",
+                "geosite",
+                "geoip",
+                "cidr",
+                "port",
+                "network"
+              ],
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Matches",
+            "type": "array"
+          },
+          "via_exit": {
+            "title": "Via Exit",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "format",
+          "matches",
+          "dns_transports",
+          "fake_ip",
+          "via_exit",
+          "bittorrent",
+          "local_geodata"
+        ],
+        "title": "DeliveryFormatCapabilities",
         "type": "object"
       },
       "DeliveryPolicy": {
@@ -3433,6 +3739,138 @@
         "title": "DeliveryPolicyCatalog",
         "type": "object"
       },
+      "DeliveryPolicyOmission": {
+        "additionalProperties": false,
+        "properties": {
+          "blocked": {
+            "default": false,
+            "title": "Blocked",
+            "type": "boolean"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "enum": [
+                  "xray_individual_profiles",
+                  "xray_fingerprint_profiles"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Context"
+          },
+          "exit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Exit"
+          },
+          "profile_count": {
+            "anyOf": [
+              {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile Count"
+          },
+          "reason": {
+            "enum": [
+              "rules_not_carried",
+              "dns_not_carried",
+              "geosite_not_supported",
+              "geoip_not_supported",
+              "bittorrent_not_supported",
+              "dns_transport_not_supported",
+              "fake_ip_not_supported",
+              "exit_unavailable"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "resolver": {
+            "anyOf": [
+              {
+                "maximum": 4,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Resolver"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Rule"
+          },
+          "values": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "DeliveryPolicyOmission",
+        "type": "object"
+      },
+      "DeliveryPolicyPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "effective": {
+            "$ref": "#/components/schemas/ResolvedDeliveryPolicy"
+          },
+          "formats": {
+            "items": {
+              "$ref": "#/components/schemas/FormatDeliveryPolicy"
+            },
+            "maxItems": 5,
+            "title": "Formats",
+            "type": "array"
+          },
+          "geodata_source": {
+            "title": "Geodata Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "effective",
+          "formats",
+          "geodata_source"
+        ],
+        "title": "DeliveryPolicyPreview",
+        "type": "object"
+      },
       "DeliveryPortRange": {
         "additionalProperties": false,
         "properties": {
@@ -3461,6 +3899,95 @@
           "start"
         ],
         "title": "DeliveryPortRange",
+        "type": "object"
+      },
+      "DeliveryRoutePreview": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/DeliveryAction"
+          },
+          "domains": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Domains",
+            "type": "array"
+          },
+          "ips": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Ips",
+            "type": "array"
+          },
+          "networks": {
+            "items": {
+              "enum": [
+                "tcp",
+                "udp"
+              ],
+              "type": "string"
+            },
+            "maxItems": 2,
+            "title": "Networks",
+            "type": "array"
+          },
+          "number": {
+            "maximum": 133,
+            "minimum": 1,
+            "title": "Number",
+            "type": "integer"
+          },
+          "origin": {
+            "enum": [
+              "lan",
+              "preset",
+              "rule"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "ports": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPortRange"
+            },
+            "maxItems": 16,
+            "title": "Ports",
+            "type": "array"
+          },
+          "protocols": {
+            "items": {
+              "const": "bittorrent",
+              "type": "string"
+            },
+            "maxItems": 1,
+            "title": "Protocols",
+            "type": "array"
+          },
+          "source_rule": {
+            "anyOf": [
+              {
+                "maximum": 128,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Rule"
+          }
+        },
+        "required": [
+          "number",
+          "origin",
+          "action"
+        ],
+        "title": "DeliveryRoutePreview",
         "type": "object"
       },
       "DeliveryRule": {
@@ -4195,6 +4722,82 @@
         "title": "FleetEventsQuery",
         "type": "object"
       },
+      "FormatDeliveryPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "capabilities": {
+            "$ref": "#/components/schemas/DeliveryFormatCapabilities"
+          },
+          "dns": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryDns"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dns_source": {
+            "enum": [
+              "preset",
+              "custom",
+              "omitted"
+            ],
+            "title": "Dns Source",
+            "type": "string"
+          },
+          "final_action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryAction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "format": {
+            "enum": [
+              "browser",
+              "mihomo",
+              "stash",
+              "singbox",
+              "xray-json",
+              "base64"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "omitted": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPolicyOmission"
+            },
+            "maxItems": 512,
+            "title": "Omitted",
+            "type": "array"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryRoutePreview"
+            },
+            "maxItems": 133,
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "format",
+          "capabilities",
+          "rules",
+          "final_action",
+          "dns",
+          "dns_source",
+          "omitted"
+        ],
+        "title": "FormatDeliveryPolicy",
+        "type": "object"
+      },
       "FormatRule": {
         "additionalProperties": false,
         "properties": {
@@ -4578,6 +5181,7 @@
                 "people.edit",
                 "people.delivery",
                 "delivery.read",
+                "delivery.explain",
                 "people.credentials",
                 "people.reset",
                 "people.reissue",
@@ -6339,6 +6943,7 @@
                   "people.edit",
                   "people.delivery",
                   "delivery.read",
+                  "delivery.explain",
                   "people.credentials",
                   "people.reset",
                   "people.reissue",
@@ -9371,6 +9976,28 @@
       "SubscriptionPreview": {
         "additionalProperties": false,
         "properties": {
+          "delivery": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryPolicyPreview"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryExplanation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "format": {
             "enum": [
               "browser",
@@ -9509,6 +10136,20 @@
             "title": "Accept",
             "type": "string"
           },
+          "destination": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Destination"
+          },
           "suffix": {
             "default": "",
             "enum": [
@@ -9646,6 +10287,7 @@
                     "people.edit",
                     "people.delivery",
                     "delivery.read",
+                    "delivery.explain",
                     "people.credentials",
                     "people.reset",
                     "people.reissue",
@@ -9671,7 +10313,7 @@
                   ],
                   "type": "string"
                 },
-                "maxItems": 35,
+                "maxItems": 36,
                 "minItems": 1,
                 "type": "array"
               },
@@ -9771,6 +10413,7 @@
                 "people.edit",
                 "people.delivery",
                 "delivery.read",
+                "delivery.explain",
                 "people.credentials",
                 "people.reset",
                 "people.reissue",
@@ -9869,6 +10512,7 @@
                 "people.edit",
                 "people.delivery",
                 "delivery.read",
+                "delivery.explain",
                 "people.credentials",
                 "people.reset",
                 "people.reissue",
@@ -9966,6 +10610,7 @@
                 "people.edit",
                 "people.delivery",
                 "delivery.read",
+                "delivery.explain",
                 "people.credentials",
                 "people.reset",
                 "people.reissue",
@@ -13375,6 +14020,136 @@
         ],
         "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "read",
+          "people"
+        ]
+      }
+    },
+    "/api/delivery-policies/explain": {
+      "post": {
+        "description": "Requires delivery.explain capabilities. Compatible presets: read or people, including scopes that cover them.",
+        "operationId": "explain_delivery_policy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryExplainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryExplanation"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Explain the first matching client rule without DNS or network requests.",
+        "tags": [
+          "delivery-policies"
+        ],
+        "x-meridian-capabilities": [
+          "delivery.explain"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-credentials": false,
+        "x-meridian-extra-capabilities": {
+          "person": "people.read",
+          "private_policy": "people.private"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "read",
@@ -20813,6 +21588,7 @@
       "commands.restart",
       "commands.run",
       "console.read",
+      "delivery.explain",
       "delivery.read",
       "fleet.apply",
       "fleet.read",
@@ -20844,6 +21620,7 @@
       "api.read",
       "commands.read",
       "console.read",
+      "delivery.explain",
       "delivery.read",
       "fleet.read",
       "people.read",
@@ -20854,6 +21631,7 @@
     ],
     "people": [
       "api.read",
+      "delivery.explain",
       "delivery.read",
       "people.batch",
       "people.credentials",
@@ -20871,6 +21649,7 @@
       "api.read",
       "commands.read",
       "console.read",
+      "delivery.explain",
       "delivery.read",
       "fleet.read",
       "people.read",
@@ -20882,6 +21661,7 @@
       "api.read",
       "commands.read",
       "console.read",
+      "delivery.explain",
       "delivery.read",
       "fleet.read",
       "people.read",

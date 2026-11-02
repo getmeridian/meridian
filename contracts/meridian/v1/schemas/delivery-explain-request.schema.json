@@ -1,0 +1,82 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "destination": {
+      "maxLength": 512,
+      "minLength": 1,
+      "title": "Destination",
+      "type": "string"
+    },
+    "format": {
+      "default": "xray-json",
+      "enum": [
+        "browser",
+        "mihomo",
+        "stash",
+        "singbox",
+        "xray-json",
+        "base64"
+      ],
+      "title": "Format",
+      "type": "string"
+    },
+    "network": {
+      "anyOf": [
+        {
+          "enum": [
+            "tcp",
+            "udp"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Network"
+    },
+    "person": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Person"
+    },
+    "port": {
+      "anyOf": [
+        {
+          "maximum": 65535,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Port"
+    },
+    "protocol": {
+      "default": "other",
+      "enum": [
+        "other",
+        "bittorrent"
+      ],
+      "title": "Protocol",
+      "type": "string"
+    }
+  },
+  "required": [
+    "destination"
+  ],
+  "title": "DeliveryExplainRequest",
+  "type": "object"
+}

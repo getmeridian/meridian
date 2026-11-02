@@ -15,6 +15,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b9
 
 #### Added
+- Effective delivery-policy previews for every format, offline destination
+  explanations in the API/CLI/console, and private-data-free app limits on
+  connection pages. Explanations use verified cached geodata and never query DNS (#95).
 - Private per-person delivery overrides with service-hashed reviews, dedicated
   token grants, CLI and console assignment, and snapshot/apply preservation (#95).
 - Typed named delivery policies with ordered destination rules, validated DNS,

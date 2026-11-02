@@ -5,10 +5,13 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from meridian.control.delivery_policy_settings import require_delivery_policy
+from meridian.control.delivery_preview import explain_person_delivery
 from meridian.control.errors import ServiceError
 from meridian.control.models import ServiceSettings, UserRecord
 from meridian.control.store import Store
 from meridian.core.agent_types import canonical_sha256
+from meridian.core.delivery_explain import DeliveryExplainRequest, DeliveryExplanation
+from meridian.core.delivery_geodata import GeoData
 from meridian.core.delivery_policies import delivery_policy_catalog
 from meridian.core.person_delivery_policy import (
     DeliveryPolicyCatalog,
@@ -20,11 +23,26 @@ from meridian.core.person_delivery_policy import (
 
 class DeliveryPolicyLedger:
     def __init__(
-        self, store: Store, *, read_settings: Callable[[], ServiceSettings], read_user: Callable[[str], UserRecord]
+        self,
+        store: Store,
+        *,
+        read_settings: Callable[[], ServiceSettings],
+        read_user: Callable[[str], UserRecord],
+        read_geodata: Callable[[], GeoData | None],
     ) -> None:
         self.store = store
         self.read_settings = read_settings
         self.read_user = read_user
+        self.read_geodata = read_geodata
+
+    def explain(self, request: DeliveryExplainRequest) -> DeliveryExplanation:
+        return explain_person_delivery(
+            self.store,
+            request,
+            read_user=self.read_user,
+            read_settings=self.read_settings,
+            read_geodata=self.read_geodata,
+        )
 
     def catalog(self) -> DeliveryPolicyCatalog:
         with self.store.lock:

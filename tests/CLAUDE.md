@@ -32,6 +32,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - **Older fixtures rewind membership before capacity** — shared helpers remove schema 24 before schema 23, preserving capacity when only membership is rewound.
 - **Profile migration fixtures drop membership triggers first** — their row-version references otherwise prevent rewinding people tables; schema 24 is one self-contained membership step after capacity schema 23.
 - **Policy migration fixtures drop override triggers first** — their people-version references otherwise prevent older-table rewinds; schema 25 is one self-contained step after membership schema 24.
+- **The PWA DOM includes head** — locally loaded optional feature scripts need the same document parent as the real page, or a test double turns account loading into a page error.
 - **Bulk and flow migrations stay ordered** — schema 20 owns people queries; schema 21 owns generations and receipts, and older fixtures rewind both.
 - **Terminal test readers use poll or selectors** — full suites allocate descriptors above select's fixed limit, breaking pexpect and pipe-key reads.
 - **People-query fixtures use real service pages** — DOM scenarios receive backend replies; rewound databases drop people indices and triggers before removing columns.

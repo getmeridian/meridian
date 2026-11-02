@@ -117,6 +117,7 @@ function createBrowser(config, catalog, options = {}) {
   document.createTextNode = text => new Element('#text', document, String(text));
   document.getElementById = id => document.querySelector('#' + id);
   document.documentElement = document.appendChild(document.createElement('html'));
+  document.head = document.documentElement.appendChild(document.createElement('head'));
   document.documentElement.lang = 'en'; document.documentElement.dir = 'ltr';
   if (options.pageLanguage) document.documentElement.setAttribute('data-language', options.pageLanguage);
   document.body = document.documentElement.appendChild(document.createElement('body'));

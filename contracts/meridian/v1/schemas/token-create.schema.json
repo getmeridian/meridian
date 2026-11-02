@@ -20,6 +20,7 @@
               "people.edit",
               "people.delivery",
               "delivery.read",
+              "delivery.explain",
               "people.credentials",
               "people.reset",
               "people.reissue",
@@ -45,7 +46,7 @@
             ],
             "type": "string"
           },
-          "maxItems": 35,
+          "maxItems": 36,
           "minItems": 1,
           "type": "array"
         },

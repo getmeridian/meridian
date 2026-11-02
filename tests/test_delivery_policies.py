@@ -310,3 +310,31 @@ def test_undeclared_exit_and_profile_defaults_are_refused_before_compile() -> No
     data["delivery"]["delivery_policies"][0]["rules"][0]["action"] = {"kind": "exit", "exit": "missing"}
     with pytest.raises(ValidationError, match="unknown exits"):
         SetupIntent.model_validate(data)
+
+
+def test_xray_dns_preserves_direct_lan_resolvers_before_the_tunnel_rule() -> None:
+    from meridian.core.delivery_policies import resolve_delivery_policy
+
+    data = policy_data()
+    data["dns"]["resolvers"] = [{"transport": "plain", "address": "127.0.0.53"}]
+    settings = ServiceSettings.model_validate(
+        {"profile_title": "Meridian", "delivery_policies": [data], "default_policy": "work"}
+    )
+    user = SubscriptionUser(username="person", uuid=UUID, short_id=SHORT_ID)
+    config = json.loads(
+        render_subscription(
+            user,
+            FLEETS["fleet"].endpoints,
+            "xray-json",
+            profile_title="Meridian",
+            delivery_policy=resolve_delivery_policy(settings),
+        ).body
+    )[0]
+    rules = config["routing"]["rules"]
+    assert rules[0] == {
+        "type": "field",
+        "inboundTag": ["MERIDIAN_DNS"],
+        "ip": ["geoip:private"],
+        "outboundTag": "DIRECT",
+    }
+    assert rules[1]["inboundTag"] == ["MERIDIAN_DNS"] and rules[1]["balancerTag"] == "MERIDIAN_AUTO"

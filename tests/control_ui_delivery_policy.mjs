@@ -16,7 +16,8 @@ let writes = 0;
 w.fetch = async (url, options = {}) => {
   calls.push(String(url));
   let body;
-  if (url === 'api/delivery-policies') body = data.catalog;
+  if (url === 'api/subscription/preview') { report.previewBody = JSON.parse(options.body); body = data.response; }
+  else if (url === 'api/delivery-policies') body = data.catalog;
   else if (url === 'api/users/person/delivery-policy' && (options.method || 'GET') === 'GET') body = data.state;
   else if (url === 'api/users/person/delivery-policy') {
     const request = JSON.parse(options.body);
@@ -26,14 +27,24 @@ w.fetch = async (url, options = {}) => {
   else throw new Error('Unexpected request: ' + url);
   return { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify(body) };
 };
-for (const name of ['core.js', 'drafts.js', 'person-delivery-policy.js']) {
+for (const name of ['core.js', 'drafts.js', 'person-delivery-policy.js', 'format-preview.js', 'policy-preview.js']) {
   if (fs.existsSync(path.join(ui, name))) w.eval(fs.readFileSync(path.join(ui, name), 'utf8'));
 }
 const M = w.M, catalog = JSON.parse(fs.readFileSync(path.join(ui, 'locales', locale + '.json')));
 M.t = (key, params = {}) => (catalog[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? ''));
 M.i18n = { lang: locale, locale: () => locale === 'zh' ? 'zh-CN' : locale };
 const settle = async () => { for (let i = 0; i < 30; i++) await new Promise(resolve => setImmediate(resolve)); };
-if (!M.personDeliveryPolicy) report.missing = 'person policy editor';
+if (mode === 'policy-preview') {
+  const app = w.document.getElementById('app'); app.appendChild(M.formatPreviewSection());
+  app.querySelector('[data-preview="person"]').value = 'person';
+  app.querySelector('[data-preview="suffix"]').value = 'singbox';
+  app.querySelector('[data-preview="destination"]').value = 'chat.example.test:443';
+  app.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  report.text = app.querySelector('[data-preview="result"]').textContent;
+  report.explanation = app.querySelector('[data-policy-explanation]')?.textContent;
+  report.formatCount = app.querySelectorAll('[data-policy-preview] > details').length;
+} else if (!M.personDeliveryPolicy) report.missing = 'person policy editor';
 else {
   const card = M.personDeliveryPolicy(data.user, () => { report.saved = true; });
   const app = w.document.getElementById('app'); app.appendChild(card.node);

@@ -441,6 +441,19 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         ],
         stability="preview",
     ),
+    "fleet.routing.set": CommandOutput(
+        data_schema="fleet-routing",
+        outcomes=[
+            _ok("policy reviewed"),
+            _ok("policy applied", status="changed"),
+            _ok("policy unchanged", status="no_changes"),
+            *_FAILURES,
+        ],
+        stability="preview",
+    ),
+    "fleet.routing.explain": CommandOutput(
+        data_schema="delivery-explanation", outcomes=[_ok("destination explained"), *_FAILURES], stability="preview"
+    ),
     "fleet.import": CommandOutput(
         data_schema="fleet-import",
         outcomes=[

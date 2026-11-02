@@ -28,6 +28,7 @@ from meridian.control.models import ClientEndpoint
 from meridian.control.periods import next_period_start
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.delivery_policies import ResolvedDeliveryPolicy
+from meridian.core.delivery_preview import SubscriberDeliveryCapabilities
 from meridian.core.device_slots import DeviceSlots
 from meridian.core.notices import RenderedNotice
 from meridian.core.owner_contact import OwnerContact
@@ -78,6 +79,7 @@ def render_subscription(
     stale_client: StaleClient | None = None,
     device_slots: DeviceSlots | None = None,
     delivery_policy: ResolvedDeliveryPolicy | None = None,
+    delivery_capabilities: SubscriberDeliveryCapabilities | None = None,
 ) -> SubscriptionResponse:
     """Render *document* for *user*; a suspended user's entries are status placeholders.
 
@@ -101,6 +103,8 @@ def render_subscription(
             info["notice"] = notice.to_data()
         if device_slots is not None:
             info["user"]["deviceSlots"] = device_slots.to_data()
+        if delivery_capabilities is not None:
+            info["user"]["deliveryCapabilities"] = delivery_capabilities.to_data()
         return SubscriptionResponse(200, JSON_TYPE, _json(info), dict(COMMON_HEADERS) | _refill_headers(user, moment))
     headers = subscription_headers(
         user,
