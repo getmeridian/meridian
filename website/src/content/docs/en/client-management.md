@@ -53,7 +53,7 @@ This prints the personal URL, plus status, traffic, expiry, and when the client 
 
 ## List clients
 
-In **People**, search and filter chips sit together. Open a chip to choose its filter; remove an active chip with its × button, or use **Clear filters** to reset the view. Rows show the name, tag, status, compact period usage, and expiry in words. Last activity, note presence, **From your computer**, and attention reasons sit on a second line. Click anywhere in a row or focus it and press Enter to open the person. Phones show cards. **Add person** stays visible in both views; an empty list offers it too, while no matches offers **Clear filters**.
+In **People**, search and filter chips sit together. Open a chip to choose its filter; remove an active chip with its × button, or use **Clear filters** to reset the view. Rows show the name, tag, status, compact period usage, and expiry in words. Last activity, note presence, **From your computer**, and attention reasons sit on a second line. Click anywhere in a row or focus it and press Enter to open the person. Phones show cards, with one horizontally scrolling filter row below search; active chips stay visible and removable. **Add person** stays visible in both views; an empty list offers it too, while no matches offers **Clear filters**.
 
 ```
 meridian client list

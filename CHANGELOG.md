@@ -24,7 +24,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   Share, Extend, and Disable above tabs, reset and expiry together below usage,
   and each setting edits in place; Simple opens Access & limits directly. The Share
   dialog presents QR and links under one heading. People
-  gets removable filter chips and compact rows with near-quota labels only before
+  gets removable filter chips, one scrolling filter row on phones, and compact
+  rows with near-quota labels only before
   the limit is reached, and its selection bar appears only
   once someone is selected, as one compact row on desktop or a bottom bar on phones (#95).
 - Reviewed subscription response rules by app, with bounded literal User-Agent

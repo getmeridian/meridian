@@ -40,6 +40,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Phone filter controls scroll in one row** — keep their fixed panels and the removable active chips outside the clipped scrolling area.
 - **Share dialogs own their heading and frame** — mount the common caption, QR, links, actions, and connections as unframed content, including the missing-public-URL case.
 - **One visible person panel needs no tabs** — hide the strip and label a direct region; restore the tablist and tabpanel relationships when another tab is visible.
 - **Summary dates share the meter's meta line** — put reset before expiry in words below usage, retaining the expiry's focusable exact-date tooltip.

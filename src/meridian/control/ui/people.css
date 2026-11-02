@@ -65,7 +65,10 @@
 @media (max-width: 640px) {
   .people-toolbar { flex-wrap: wrap; }
   .people-toolbar .search { flex-basis: 100%; min-inline-size: 0; }
-  .people-filter-chips { inline-size: 100%; }
+  .people-filter-chips { inline-size: 100%; flex-wrap: nowrap; overflow-x: auto;
+    overscroll-behavior-inline: contain; scrollbar-width: thin; }
+  .people-filter { flex: 0 0 auto; }
+  .people-filter > summary { white-space: nowrap; }
   .people-filter-panel { position: fixed; inset-inline: 14px; inset-block-start: auto;
     inset-block-end: max(14px, env(safe-area-inset-bottom)); inline-size: auto; max-inline-size: none; }
   .people-list { display: flex; flex-direction: column; gap: var(--space-3); background: transparent; border: 0; box-shadow: none; overflow: visible; }

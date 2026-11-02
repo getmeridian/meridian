@@ -65,6 +65,15 @@ const active = () => [...view().querySelectorAll('[data-remove-filter]')].map(ch
 report.active = active();
 report.dir = w.document.documentElement.dir;
 report.text = view().textContent;
+if (data.scenario === 'chips' && data.width) {
+  loadStyles(w, ui, ['tokens.css', 'styles.css', 'screens.css', 'people.css'], data.width);
+  const filters = view().querySelector('.people-filter-chips'), style = w.getComputedStyle(filters);
+  report.filterLayout = { wrap: style.flexWrap, overflow: style.overflowX,
+    shrink: [...filters.children].map(chip => w.getComputedStyle(chip).flexShrink),
+    underSearch: !!(view().querySelector('input[type="search"]').compareDocumentPosition(filters) & w.Node.DOCUMENT_POSITION_FOLLOWING),
+    activeOutside: !filters.contains(view().querySelector('.people-active-filters')),
+    panelPosition: w.getComputedStyle(filters.querySelector('.people-filter-panel')).position };
+}
 if (data.scenario === 'selection') {
   const original = rows();
   view().querySelector('[data-people-select]')?.click();

@@ -131,6 +131,21 @@ def test_removing_one_chip_keeps_the_other_filter():
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_phone_filter_controls_scroll_in_one_row_and_active_chips_stay_removable(locale):
+    result = run_console(
+        "people-triage-ux",
+        locale,
+        {"people": people(), "scenario": "chips", "width": 390, "hash": "#/people?status=active&tag=GROUP_A", "remove": "tag"},
+    )
+    layout = result["filterLayout"]
+    assert layout["wrap"] == "nowrap" and layout["overflow"] == "auto"
+    assert all(value == "0" for value in layout["shrink"])
+    assert layout["underSearch"] and layout["activeOutside"] and layout["panelPosition"] == "fixed"
+    assert result["removeVisible"] and [chip["key"] for chip in result["afterRemove"]] == ["status"]
+    assert result["afterSelected"] == 0 and result["panelKept"] and result["panelEscaped"]
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 def test_people_rows_show_compact_usage_and_secondary_facts_and_activate_as_links(locale):
     rows = people()
     rows[0].update(used_traffic_bytes=51 * 1024**3, traffic_limit_bytes=100 * 1024**3, note="Private sample note")
