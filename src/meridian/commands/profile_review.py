@@ -8,6 +8,7 @@ from meridian.compiler.models import CompiledResource, NodeWorkloadPayload, Reso
 from meridian.control.client import ControlClient
 from meridian.core.access_profile_views import AccessProfileReview, AccessProfileReviewRequest, GrantedInbound
 from meridian.core.client_limits import UserCreationSettings
+from meridian.core.topology import SetupIntent
 
 
 def profile_review_paths(review: AccessProfileReview | None) -> frozenset[str]:
@@ -17,6 +18,16 @@ def profile_review_paths(review: AccessProfileReview | None) -> frozenset[str]:
         if review is not None
         else frozenset()
     )
+
+
+def profile_review_needed(cluster: ClusterConfig, intent: SetupIntent) -> bool:
+    """Removing the last profile still reviews the live service's membership and fences its hash."""
+    if intent.access_profiles:
+        return True
+    if not cluster.panel.url or not cluster.panel.api_token:
+        return False
+    with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
+        return bool(client.settings().access_profiles)
 
 
 def review_profile_access(cluster: ClusterConfig, plan: ResourcePlan) -> AccessProfileReview | None:

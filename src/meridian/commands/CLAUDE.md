@@ -23,6 +23,7 @@
 - `client remove|reissue --cut-off` discloses every affected node and other people's reconnects before confirming, and keeps typed per-node outcomes and new links even on failure.
 
 ## Pitfalls
+- **The last profile still needs review** — plan and apply check the proposed intent and live service, refuse memberships still in use, and carry the access hash even when the proposed map is empty.
 - **Token clients require a configured control service** — reject missing credentials and Remnawave before constructing the HTTP client.
 - **Token events name their grant kind** — a null scope means explicit capabilities; render shared permission labels instead of None.
 - **Token expiry is the reviewed instant** — issue the preview's expires_at, never restart the day count after confirmation.

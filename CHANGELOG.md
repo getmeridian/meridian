@@ -57,6 +57,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Review and fence removal of the last service-held access profile in plan and
+  apply, refusing profiles still assigned to people.
 - Stage workload and endpoint references before profile activation, and create
   accounts after settings so one apply cannot invalidate its own access review.
 - Protect cut-off reviews with private access permissions and include unresolved

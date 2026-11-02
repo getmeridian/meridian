@@ -495,6 +495,8 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 ## 访问配置
 
+`plan` 和 `apply` 会同时审核服务中已有的配置与拟应用的拓扑。移除最后一个配置也必须经过审核和并发变更校验；只要仍有成员，就会被拒绝。
+
 apply 会先保存入站及连接端点引用，再启用配置授权，最后创建账户。同一次 apply 中新增用户不会使自己的访问审核失效，包括移除最后一个配置时。
 
 `GET /api/users/{username}/cut-off` 需要 `people.read` 与 `people.private`。配置变更导致用户失去的入站访问，只要流阻断回执仍未确认，就会保留在预览中，即使账户仍处于活跃状态。后续执行 `--cut-off` 也会重置这些入站。

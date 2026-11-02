@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
 from typer.testing import CliRunner
 
 from meridian.cli import app
@@ -86,3 +87,55 @@ def test_read_only_reviews_do_not_trigger_post_mutation_backups(tmp_path: Path):
         finally:
             stop()
         assert writes == []
+
+
+@pytest.mark.parametrize("in_use", [False, True])
+@pytest.mark.parametrize("argv", [["plan", "--json"], ["apply", "--json"], ["apply", "--yes", "--json"]])
+def test_removing_the_service_last_profile_is_reviewed_refused_when_used_and_fenced(
+    tmp_path: Path, tmp_home: Path, argv: list[str], in_use: bool
+):
+    with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN, report_mutations=False) as admin:
+        admin.put_settings(ServiceSettings(profile_title="Meridian", access_profiles={"limited": []}))
+        admin.create_user(UserCreate(username="person", profiles=["limited"] if in_use else ["default"]))
+        intent = single_exit_intent()
+        plan = compile_topology(intent)
+        cluster = ClusterConfig(panel=PanelConfig(url=url, api_token=ADMIN_TOKEN), topology_intent=intent)
+        review = SimpleNamespace(plan=plan, review_hash="a" * 64, retiring=[])
+        inspection = SimpleNamespace(
+            plan_hash=plan.plan_hash,
+            review_hash="a" * 64,
+            converged=False,
+            retiring=[],
+            fence_warning="",
+            inspections=[
+                SimpleNamespace(action=SimpleNamespace(resource=row), error="", converged=True)
+                for row in plan.resources
+            ],
+        )
+        with (
+            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
+            patch("meridian.commands.v4_topology.reviewed_runtime") as runtime,
+            patch("meridian.setup.runtime.SetupRuntime") as planner,
+            patch("meridian.commands.v4_topology.forget_unreachable_servers"),
+        ):
+            runtime.return_value.review.return_value = review
+            runtime.return_value.apply_intent.return_value = ResourceExecutionResult(
+                plan_hash=plan.plan_hash, generation=2
+            )
+            planner.return_value.inspect_intent.return_value = inspection
+            reply = CliRunner().invoke(app, argv)
+            set_json_mode(False)
+            if in_use:
+                assert reply.exit_code == (1 if argv[0] == "plan" else 2), reply.output
+                assert "limited" in reply.output and "used by 1 person" in reply.output
+                runtime.return_value.apply_intent.assert_not_called()
+            else:
+                assert reply.exit_code == (0 if "--yes" in argv else 2), reply.output
+                data = json.loads(reply.stdout)["data"]
+                assert data["access_review"]["access_profiles"] == {}
+                assert data["access_review"]["access_hash"]
+                if "--yes" in argv:
+                    assert runtime.call_args.kwargs["access_review_hash"] == data["access_review"]["access_hash"]
+                else:
+                    runtime.return_value.apply_intent.assert_not_called()
+        assert admin.settings().access_profiles == {"limited": []}

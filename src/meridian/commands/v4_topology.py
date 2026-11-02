@@ -8,7 +8,12 @@ from rich.markup import escape
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import forget_unreachable_servers, require_intent, reviewed_runtime
 from meridian.commands.apply_progress import apply_progress
-from meridian.commands.profile_review import profile_review_paths, review_profile_access, review_profile_resources
+from meridian.commands.profile_review import (
+    profile_review_needed,
+    profile_review_paths,
+    review_profile_access,
+    review_profile_resources,
+)
 from meridian.console import confirm, err_console, fail, ok, warn
 from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_result
 from meridian.core.models import ErrorModel, OutputStatus, Summary
@@ -34,7 +39,7 @@ def run_v4_apply(
     registry = ServerRegistry(SERVER_PROFILES_FILE)
     forget_unreachable_servers(cluster, registry, intent, forget=forget_unreachable, yes=yes)
     review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(intent), cluster=cluster)
-    access_review = review_profile_access(cluster, review.plan) if intent.access_profiles else None
+    access_review = review_profile_access(cluster, review.plan) if profile_review_needed(cluster, intent) else None
     if access_review is not None and not json_output:
         from meridian.commands.profiles import print_access_review
 
@@ -155,12 +160,13 @@ def run_v4_plan(
     from meridian.servers import ServerRegistry
     from meridian.setup.runtime import SetupRuntime
 
+    intent = require_intent(cluster)
     inspection = SetupRuntime(
         ServerRegistry(SERVER_PROFILES_FILE),
         cluster_loader=lambda: cluster,
-    ).inspect_intent(require_intent(cluster))
+    ).inspect_intent(intent)
     resources = [item.action.resource for item in inspection.inspections]
-    access_review = review_profile_resources(cluster, resources) if require_intent(cluster).access_profiles else None
+    access_review = review_profile_resources(cluster, resources) if profile_review_needed(cluster, intent) else None
     observation_errors = [item for item in inspection.inspections if item.error]
     drifted = [item for item in inspection.inspections if not item.error and not item.converged]
     converged = (

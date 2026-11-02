@@ -493,6 +493,8 @@ When bulk disabling, deletion, or an expiry change removes access, the service r
 
 ## Access profiles
 
+`plan` and `apply` review profiles held by the service as well as those in the proposed topology. Removing the last profile is reviewed and fenced, and is refused while anyone still belongs to it.
+
 An apply stores inbound and endpoint references before activating profile grants, then creates accounts. Adding a person in that apply cannot invalidate its own access review, including when removing the last profile.
 
 `GET /api/users/{username}/cut-off` requires `people.read` and `people.private`. Its review includes inbounds lost through a profile change while their flow-block receipts remain unresolved, even if the person is still active. A subsequent `--cut-off` resets those inbounds too.
