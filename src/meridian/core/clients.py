@@ -5,13 +5,14 @@ from __future__ import annotations
 from collections.abc import Collection, Mapping
 from typing import Literal, Protocol, Sequence
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from meridian.control.command_models import NodeCommandOutcome
 from meridian.control.models import UserStatus, UserUsage
 from meridian.core.access_profile_views import PersonAccess
 from meridian.core.access_profiles import default_profiles
 from meridian.core.account_schedule import AccountLifecycleState, AccountSchedulePreview
+from meridian.core.agent_types import Sha256Hex
 from meridian.core.client_devices import DeviceCap
 from meridian.core.client_limits import canonical_expiry, traffic_reset_from_strategy
 from meridian.core.client_sessions import UserFlowBlocks
@@ -221,12 +222,21 @@ class ClientReference(CoreModel):
 
 
 class ClientRemoveResult(CoreModel):
-    """Result for removing one client."""
+    """One client or one combined removal review; session cut-off remains an individual action."""
 
-    client: ClientReference
+    client: ClientReference | None = Field(default=None, exclude_if=lambda value: value is None)
+    clients: list[ClientReference] | None = Field(default=None, min_length=1, exclude_if=lambda value: value is None)
+    review_hash: Sha256Hex | None = Field(default=None, exclude_if=lambda value: value is None)
+    applied: bool = Field(default=True, exclude_if=lambda value: value)
     cut_off: list[NodeCommandOutcome] | None = Field(
         default=None, description="Per-node open-session results when --cut-off was requested."
     )
+
+    @model_validator(mode="after")
+    def one_selection(self) -> ClientRemoveResult:
+        if (self.client is None) == (self.clients is None):
+            raise ValueError("Supply one client or the combined client list.")
+        return self
 
 
 # What a client is after enable/disable: enabling an expired or over-quota client leaves it so.

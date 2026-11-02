@@ -41,8 +41,10 @@ from meridian.control.models import (
 )
 from meridian.control.revisions import secret_paths
 from meridian.core.errors import LocalStateError
+from meridian.core.people_removal import PeopleRemovalProposal
 from meridian.core.topology import SetupIntent
 from meridian.core.version_skew import newer_service_hint, service_skew
+from meridian.people_removal import require_removal_fence
 from meridian.reconciler.fence import (
     RENEW_AFTER,
     FenceRecord,
@@ -129,10 +131,12 @@ class ControlServiceFence:
         client_factory: ClientFactory | None = None,
         ssh_fence: SSHApplyFence | None = None,
         cli_version: str = __version__,
+        removal_proposal: PeopleRemovalProposal | None = None,
     ) -> None:
         self._cluster = cluster
         self._cli_version = cli_version
         self._draft = revision
+        self._removal_proposal = removal_proposal
         self._ssh = ssh_fence or SSHApplyFence(conn, holder=holder, clock=clock, on_stall=on_stall)
         self._holder = self._ssh.holder
         self._now = clock or (lambda: datetime.now(UTC))
@@ -149,6 +153,7 @@ class ControlServiceFence:
     def acquire(self, local: LocalFenceView) -> str:
         try:
             located = self._locate()
+            self._require_removal_proposal(located)
             self._mode = located.mode
             if located.mode == "ssh":
                 return self._ssh.acquire(local)
@@ -170,6 +175,7 @@ class ControlServiceFence:
     def ensure(self, local: LocalFenceView) -> None:
         try:
             located = self._locate()
+            self._require_removal_proposal(located)
             self._decide(located, local, new_fleet_id="")
         finally:
             self._close()
@@ -291,6 +297,17 @@ class ControlServiceFence:
                 f"({self._cli_version}); applying would downgrade it.",
                 hint=newer_service_hint(health.version),
                 category="user",
+            )
+
+    def _require_removal_proposal(self, located: _Located) -> None:
+        if self._removal_proposal is not None:
+            remote = located.remote
+            require_removal_fence(
+                self._removal_proposal,
+                fleet_id=located.fleet_id,
+                generation=remote.generation if remote else None,
+                plan_hash=remote.plan_hash if remote else None,
+                revision=located.committed_revision,
             )
 
     def _decide(self, located: _Located, local: LocalFenceView, *, new_fleet_id: str) -> FenceRecord:

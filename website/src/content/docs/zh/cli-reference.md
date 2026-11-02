@@ -139,6 +139,8 @@ meridian client disable NAME [--json]
 meridian client reissue NAME [--cut-off] [--yes] [--json]
 meridian client rotate-credentials NAME [--cut-off] [--yes] [--json]
 meridian client remove NAME [--cut-off] [--yes] [--json]
+meridian client remove NAME... [--dry-run] [--yes] [--json]
+meridian client remove --proposal FILE [--dry-run] [--yes] [--json]
 ```
 
 | 标志 | 默认值 | 说明 |
@@ -220,11 +222,22 @@ JSON 筛选计数对所有有效标签均保持整数，包括 `TOKEN` 和 `API_
 | `meridian client bulk tag --set-tag none` | 设置或清除标签 |
 | `meridian client bulk devices --devices unlimited` | 设置设备限制 |
 | `meridian client bulk renewal --renew-days 30 --renewals 5` | 设置或清除续期 |
-| `meridian client bulk delete` | 删除服务人员，为声明人员返回命令 |
+| `meridian client bulk delete` | 删除服务人员，为已声明人员返回一个本地提案 |
 | `meridian client bulk undo ID` | 十分钟内撤销可逆字段 |
 | `meridian client bulk receipt ID` | 读取持久回执 |
 
 共享筛选：`--search TEXT`、`--status STATUS`、`--tag TAG`、`--match-profile PROFILE`、`--expiring-within DAYS`、`--quota-at-least PERCENT`、`--never-used`、`--attention`、`--attention-reason REASON`、`--lifecycle STATE`、`--sort name|usage|expiry|activity` 与 `--order asc|desc`。`--attention` 匹配任何原因，不能与 `--attention-reason` 同用。周期状态：`pending`、`renewing`、`fixed`、`unlimited`。先按忽略大小写的显示名称，再按完整用户名排序。规则见[客户端管理](/zh/client-management/)。
+
+删除已声明人员会在批量预览和回执中返回一个绑定修订的 `proposal`。保存控制台的 **people-removal.json**，或将完整 API 批量预览、回执或 CLI 批量 JSON 结果文件传给 `client remove --proposal FILE`。文件上限为 64 MiB。CLI 验证服务器集合、已提交的修订、代次、计划及本地意图，一起审核所有删除，只确认一次，并应用一次意图更改。应用栅栏在服务器修改前再次拒绝旧修订。
+
+`client remove NAME...` 也接受多个已声明名称，`--dry-run` 只审核、不保存。取消确认不会保存任何更改，且必须至少保留一名已声明人员。JSON 预览返回 `data.clients`、`data.review_hash` 和 `data.applied: false`。已应用的批量删除保留 `clients` 和 `review_hash`，省略默认值 `applied: true`。单人结果继续使用 `data.client`。
+
+提案不含人员私人字段或会话切断选项。批量删除拒绝 `--cut-off`，单人 `client remove NAME --cut-off` 保留原有确认和逐节点结果。混合批次中，服务管理的人员仍以原子事务删除；已声明人员等待本地应用，拓扑变化会拒绝整个服务提交。
+
+```bash
+meridian client remove --proposal people-removal.json --dry-run --json
+meridian client remove --proposal people-removal.json --yes --json
+```
 
 `meridian client bulk extend --months 1 --person sample-a --dry-run --json`
 

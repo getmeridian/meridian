@@ -139,6 +139,8 @@ meridian client disable NAME [--json]
 meridian client reissue NAME [--cut-off] [--yes] [--json]
 meridian client rotate-credentials NAME [--cut-off] [--yes] [--json]
 meridian client remove NAME [--cut-off] [--yes] [--json]
+meridian client remove NAME... [--dry-run] [--yes] [--json]
+meridian client remove --proposal FILE [--dry-run] [--yes] [--json]
 ```
 
 | Flag | Default | Description |
@@ -220,11 +222,22 @@ Undo writes the original choices, then enforces expiry and quota rules just like
 | `meridian client bulk tag --set-tag none` | Set or clear tag |
 | `meridian client bulk devices --devices unlimited` | Set device cap |
 | `meridian client bulk renewal --renew-days 30 --renewals 5` | Set or clear renewal |
-| `meridian client bulk delete` | Delete service-only people; declared people return commands |
+| `meridian client bulk delete` | Delete service-only people; one local proposal for declared people |
 | `meridian client bulk undo ID` | Undo reversible fields within ten minutes |
 | `meridian client bulk receipt ID` | Read a durable receipt |
 
 Shared filters: `--search TEXT`, `--status STATUS`, `--tag TAG`, `--match-profile PROFILE`, `--expiring-within DAYS`, `--quota-at-least PERCENT`, `--never-used`, `--attention`, `--attention-reason REASON`, `--lifecycle STATE`, `--sort name|usage|expiry|activity`, `--order asc|desc`. Use either `--attention` (any default reason) or `--attention-reason`. Lifecycle choices: `pending`, `renewing`, `fixed`, `unlimited`. Names sort by case-folded display name, then exact username. See [client management](/en/client-management/) for review and privacy rules.
+
+Declared deletions return one revision-bound `proposal` in the bulk preview and receipt. Save the console's **people-removal.json**, or pass the API bulk preview/receipt or CLI bulk JSON result file to `client remove --proposal FILE`. Files are limited to 64 MiB. The CLI verifies fleet, committed revision/generation/plan, and local intent, reviews every removal together, confirms once, and applies one intent edit. The apply fence rejects an older revision again before server mutation.
+
+`client remove NAME...` also supports several declared names, with `--dry-run` to review without saving. A declined review saves nothing, and at least one declared person must remain. JSON previews return `data.clients`, `data.review_hash`, and `data.applied: false`; applied combined removals keep `clients` and `review_hash` and omit default `applied: true`. Individual results keep `data.client`.
+
+Proposals omit private person fields and session cut-off. Bulk removal refuses `--cut-off`; individual `client remove NAME --cut-off` keeps its existing consent and node outcomes. In a mixed batch, service-owned deletions still commit atomically; declared deletions wait for local apply, and a changed topology refuses the entire service commit.
+
+```bash
+meridian client remove --proposal people-removal.json --dry-run --json
+meridian client remove --proposal people-removal.json --yes --json
+```
 
 `meridian client bulk extend --months 1 --person sample-a --dry-run --json`
 

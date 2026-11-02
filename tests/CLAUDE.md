@@ -30,6 +30,8 @@ uv run pytest tests/ -k "test_name"    # by pattern
 ## Pitfalls
 - **Pinned geodata memory guards start cold** — trace file reads and complete explanations, with destinations that reach category-ru and geoip:ru (documentation ranges stop at the private lists); CI's Xray folder supplies both data files.
 - **CLI locales are test-local** — reset current and requested language before each scenario, or a prior translated command makes later scripted English prompts fail.
+- **CLI test state resets together** — current and requested language plus JSON and quiet modes must not survive into later command assertions.
+- **Removal draft fixtures commit both ledgers** — an applied revision alone does not establish the service fence's committed topology identity.
 - **Localized counts use native digits** — console assertions normalize Persian digits before comparing numeric evidence.
 - **Restore command doubles supply profile evidence** — a confirmation-only scenario stubs the early compatibility check; profile scenarios use real snapshot and service state.
 - **Import test doubles cover profile discovery** — previews that stub resources also supply evidence of an empty service profile map.

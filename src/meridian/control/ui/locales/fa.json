@@ -663,7 +663,7 @@
   "bulk.inherit": "استفاده از محدودیت سرویس",
   "bulk.unlimited": "نامحدود",
   "bulk.unchanged": "بدون تغییر",
-  "bulk.cli_required": "این فرمان CLI را پس از بازبینی اجرا کنید",
+  "bulk.cli_required": "بررسی محلی توپولوژی لازم است",
   "bulk.summary": "افراد: {targeted}. دارای تغییر: {changed}؛ بدون تغییر: {unchanged}؛ نیازمند CLI: {cli_required}.",
   "bulk.nodes": "سندهای گره که تغییر می‌کنند: {count}.",
   "bulk.confirm": "این تغییرات بازبینی‌شده برای {count} نفر اعمال شود؟",
@@ -703,7 +703,7 @@
   "bulk.no_undo_changes": "تغییری در سرویس برای برگشت وجود ندارد.",
   "bulk.warning.irreversible": "این عملیات قابل برگشت نیست. بازنشانی ترافیک، حذف و بازنشانی ناشی از تغییر زمان‌بندی برگشت‌پذیر نیستند.",
   "bulk.warning.period_reset": "ترافیک دوره فعلی صفر می‌شود؛ مجموع مصرف حفظ می‌شود.",
-  "bulk.warning.topology_delete": "حذف این فرد در اختیار فایل پیکربندی سرورهاست. فرمان نمایش‌داده‌شده را اجرا و تغییرات توپولوژی را بازبینی کنید.",
+  "bulk.warning.topology_delete": "حذف این فرد در پیشنهاد بررسی و اعمال محلی از طریق CLI قرار دارد.",
   "bulk.warning.disabled": "این فرد غیرفعال می‌ماند.",
   "bulk.warning.expiry_blocks_enable": "پس از فعال‌سازی هم پایان اعتبار مانع دسترسی است.",
   "bulk.warning.quota_blocks_enable": "پس از فعال‌سازی هم سهمیه مصرف‌شده مانع دسترسی است.",
@@ -955,5 +955,13 @@
   "delivery.source_response_rule": "قانون پاسخ برنامه",
   "people.filter_profile": "پروفایل دسترسی",
   "people.any_profile": "همهٔ پروفایل‌ها",
-  "people.default_profile": "default (دسترسی کامل)"
+  "people.default_profile": "default (دسترسی کامل)",
+  "bulk.proposal_title": "پیشنهاد حذف محلی",
+  "bulk.proposal_explain": "ثبت فقط افراد تحت مدیریت سرویس را تغییر می‌دهد. این پیش‌نویس را ذخیره کنید و روی رایانهٔ مدیر استقرار بررسی کنید. CLI همهٔ افراد تعریف‌شدهٔ فهرست را در یک اجرا حذف می‌کند و توپولوژی قدیمی را نمی‌پذیرد. بستن نشست‌ها در این پیش‌نویس نیست؛ انتقال‌های قبلی ممکن است ادامه پیدا کنند.",
+  "bulk.proposal_identity": "بازبینی {revision} · نسل {generation}",
+  "bulk.proposal_save": "ذخیرهٔ پیشنهاد",
+  "bulk.proposal_manual": "کپی دستی JSON پیش‌نویس",
+  "bulk.proposal_save_failed": "فایل ذخیره نشد. JSON پیش‌نویس را در people-removal.json روی رایانهٔ خود کپی کنید و فرمان نمایش‌داده‌شده را اجرا کنید.",
+  "error.stale_topology": "توپولوژی ثبت‌شده پس از بررسی تغییر کرده است. پیش‌نمایش تازه‌ای بسازید.",
+  "error.topology_uncommitted": "meridian apply را روی رایانهٔ مدیر استقرار کامل کنید تا این افراد در توپولوژی ثبت شوند؛ سپس دوباره پیش‌نمایش بگیرید."
 }

@@ -17,6 +17,7 @@ from meridian.core.people_query import PeopleQuery
 from tests.support.control_service import ADMIN_TOKEN, serve_control
 from tests.support.text import unstyle
 from tests.support.topology import single_exit_intent
+from tests.test_client_bulk_commands import isolated_cli_state as isolated_cli_state
 from tests.test_control_people_bulk import commit, preview
 from tests.test_control_people_query import people_service as people_service
 from tests.test_control_people_query import query, seed

@@ -2,6 +2,7 @@
 
 ## Design decisions
 **App response rules** — all locales document reviewed literal fields, first-match ordering, suffix precedence, exact unknown-token refusals, typed headers, private policy precedence, and the API/CLI/console tester.
+**Declared removal drafts** — client and CLI guides share local JSON download, file shapes and bounds, one review/apply, exact revision refusal, atomic mixed batches, the retained-person rule, and individual-only cut-off in every locale.
 **Membership filters** — client and CLI guides distinguish list `--profile`, bulk `--match-profile`, explicit default membership, contextual overlap counts, and existing private query permissions in every locale.
 **Named client policies** — routing and architecture guides describe typed rules, DNS limits, profile defaults, exit blocking, local geodata, and unchanged presets in every locale.
 **Access profile guides** — all locales describe shared-inbound grants, private service membership, default equivalence, gain/loss review, flow-block boundaries, and creation-only fleet export.

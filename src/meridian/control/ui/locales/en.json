@@ -663,7 +663,7 @@
   "bulk.inherit": "Inherit the service limit",
   "bulk.unlimited": "Unlimited",
   "bulk.unchanged": "No changes",
-  "bulk.cli_required": "Run this reviewed CLI command",
+  "bulk.cli_required": "Local topology review required",
   "bulk.summary": "People: {targeted}. Changes: {changed}; unchanged: {unchanged}; CLI required: {cli_required}.",
   "bulk.nodes": "Node documents that change: {count}.",
   "bulk.confirm": "Apply these reviewed changes to {count} people?",
@@ -703,7 +703,7 @@
   "bulk.no_undo_changes": "There are no service changes to undo.",
   "bulk.warning.irreversible": "This operation cannot be undone. Traffic resets, deletion, and any reset caused by a schedule change are irreversible.",
   "bulk.warning.period_reset": "The current period's traffic will be reset; lifetime totals are kept.",
-  "bulk.warning.topology_delete": "The fleet file owns this person's deletion. Run the shown command and review its topology changes.",
+  "bulk.warning.topology_delete": "This person's deletion is included in the proposal for local CLI review and apply.",
   "bulk.warning.disabled": "This person remains disabled.",
   "bulk.warning.expiry_blocks_enable": "Expiry still prevents access after enabling.",
   "bulk.warning.quota_blocks_enable": "The quota still prevents access after enabling.",
@@ -955,5 +955,13 @@
   "delivery.source_response_rule": "app response rule",
   "people.filter_profile": "Access profile",
   "people.any_profile": "All profiles",
-  "people.default_profile": "default (full access)"
+  "people.default_profile": "default (full access)",
+  "bulk.proposal_title": "Local removal proposal",
+  "bulk.proposal_explain": "Commit changes service-owned people only. Save this draft and review it on the deployer's computer. The CLI removes every listed declared person in one apply and refuses an older topology. This draft excludes session cut-off; earlier transfers may continue.",
+  "bulk.proposal_identity": "Revision {revision} · generation {generation}",
+  "bulk.proposal_save": "Save proposal",
+  "bulk.proposal_manual": "Copy draft JSON manually",
+  "bulk.proposal_save_failed": "The file could not be saved. Copy the draft JSON into people-removal.json on your computer and run the shown command.",
+  "error.stale_topology": "The committed topology changed since review. Create a new preview.",
+  "error.topology_uncommitted": "Finish meridian apply on the deployer's computer to commit these declared people, then preview again."
 }

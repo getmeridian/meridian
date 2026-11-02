@@ -491,7 +491,15 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 有效期按整天或日历月从当前时间与原到期时间中较晚者延长，并处理短月份。等待首次使用的人员只增加时长，不激活；月数换算为从预览 UTC 日期到相应月份日期的天数。可设置或清除到期时间、配额与重置策略、标签、设备限制（继承／不限／N）或续期，也可启用、停用、重置周期流量或删除。省略的字段保持原值，重置策略与续期次数上限可单独更改。现有节点协议每个受管入站最多支持 10,000 名启用人员，预览拒绝超过此限制的更改。
 
-持久回执保存操作、参数、计数及各人的结果。如果人员及限制执行结果未变化，可在十分钟内撤销一次可逆字段，重启服务后也可撤销。流量重置、删除和会重置流量的计划更改不可逆，提交前明确提示。重置保留累计流量。回执不含私人备注、连接凭据、客户端地址或设备标识符；事件仅包含操作与计数及现有不含私人内容的单人事件。`topology_intent.access.users` 中的人员可接受服务字段更改；删除时返回确切的 `meridian client remove USERNAME` 命令以单独审核，服务批次不会删除他们。
+持久回执保存操作、参数、计数及各人的结果。如果人员及限制执行结果未变化，可在十分钟内撤销一次可逆字段，重启服务后也可撤销。流量重置、删除和会重置流量的计划更改不可逆，提交前明确提示。重置保留累计流量。回执不含私人备注、连接凭据、客户端地址或设备标识符；事件仅包含操作与计数及现有不含私人内容的单人事件。`topology_intent.access.users` 中的人员可接受服务字段更改；删除会返回一个本地拓扑提案，服务批次不会删除他们。
+
+删除已声明人员时，预览和回执包含一个 `proposal`，其中仅有 `schema`（`meridian.people-removal/v1`）、`usernames`、`fleet_id`、已提交的 `revision` 和 `generation`、`plan_hash` 及 `intent_sha256`。控制台将其保存到本地的 **people-removal.json**；无法保存时可手动选择并复制 JSON。混合批次中，浏览器只在一个事务中应用服务管理的人员更改，绝不会应用拓扑。
+
+在部署者电脑上使用当前配置副本，先运行 `meridian client remove --proposal people-removal.json --dry-run --json`，再运行 `meridian client remove --proposal people-removal.json`：所有删除只需一次共同审核、一次确认和一次应用。也可直接使用 `meridian client remove sample-a sample-b`。`--proposal` 能读取完整的 API 批量预览或回执 JSON，以及 CLI 批量 JSON 输出，文件大小上限为 64 MiB。名称和提案文件不能同时提供。
+
+已提交的修订、代次、计划、服务器集合或本地意图发生变化时，草稿会被拒绝；应用栅栏在修改服务器前再次检查修订，即使计划未变也会拒绝旧修订。拓扑变化也会拒绝整个混合服务提交。服务没有已提交的拓扑栅栏，或所选声明属于未完成的应用时，请先完成 `meridian apply`，再重新预览。
+
+必须至少保留一名已声明人员。提案不包含备注、标签、连接凭据、设备数据或会话切断选项。批量删除拒绝 `--cut-off`；如需原有的会话关闭审核，请逐人运行 `meridian client remove NAME --cut-off`。否则之前开始的传输可能继续。
 
 `GET /api/people` 需要 people/admin 或所有者会话，返回 `users`、`total`、`population`、分类 `facets` 与 `next_cursor`。查询键：`q`、`status`、`tag`、`profile`、`expires`、`quota`、`never`（0/1）、`attention`、`lifecycle`、`sort`、`order`、`limit`（1–500）、`cursor`。继续游标时保持相同筛选和排序。原有 `GET /api/users` 保留。查询响应不含凭据与私人备注；CLI 的 JSON 通过现有授权单人读取接口保留备注。
 

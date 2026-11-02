@@ -139,6 +139,8 @@ meridian client disable NAME [--json]
 meridian client reissue NAME [--cut-off] [--yes] [--json]
 meridian client rotate-credentials NAME [--cut-off] [--yes] [--json]
 meridian client remove NAME [--cut-off] [--yes] [--json]
+meridian client remove NAME... [--dry-run] [--yes] [--json]
+meridian client remove --proposal FILE [--dry-run] [--yes] [--json]
 ```
 
 | Параметр | По умолчанию | Описание |
@@ -220,11 +222,22 @@ TCP-поток, начатый до отзыва ключа, UDP-сеанс Hyst
 | `meridian client bulk tag --set-tag none` | Указать или убрать метку |
 | `meridian client bulk devices --devices unlimited` | Указать лимит устройств |
 | `meridian client bulk renewal --renew-days 30 --renewals 5` | Настроить или отключить продление |
-| `meridian client bulk delete` | Удалить людей сервиса; для объявленных получить команду |
+| `meridian client bulk delete` | Удалить людей сервиса; один черновик для пользователей конфигурации |
 | `meridian client bulk undo ID` | Отменить обратимые поля в течение десяти минут |
 | `meridian client bulk receipt ID` | Прочитать квитанцию |
 
 Общие фильтры: `--search TEXT`, `--status STATUS`, `--tag TAG`, `--match-profile PROFILE`, `--expiring-within DAYS`, `--quota-at-least PERCENT`, `--never-used`, `--attention`, `--attention-reason REASON`, `--lifecycle STATE`, `--sort name|usage|expiry|activity`, `--order asc|desc`. Используйте либо `--attention` (любая причина), либо `--attention-reason`. Состояния срока: `pending`, `renewing`, `fixed`, `unlimited`. Сортировка по имени не учитывает регистр, затем используется точное имя пользователя. Правила проверки и приватности — в [управлении клиентами](/ru/client-management/).
+
+Удаление пользователей из конфигурации возвращает один черновик `proposal`, привязанный к ревизии, в предварительной проверке и квитанции группы. Сохраните **people-removal.json** из панели либо передайте полный JSON предварительной проверки или квитанции API, или JSON-ответ групповой команды CLI, в `client remove --proposal FILE`. Максимальный размер файла — 64 МиБ. CLI сверяет набор серверов, применённую ревизию, поколение, план и локальную конфигурацию, проверяет все удаления вместе, один раз запрашивает подтверждение и применяет одно изменение конфигурации. Перед записью на серверы блокировка применения снова отклоняет устаревшую ревизию.
+
+`client remove NAME...` также принимает несколько имён из конфигурации; `--dry-run` проверяет удаление без сохранения. Отказ от подтверждения ничего не сохраняет; хотя бы один пользователь должен остаться в конфигурации. Предварительная проверка в JSON возвращает `data.clients`, `data.review_hash` и `data.applied: false`. После группового удаления остаются `clients` и `review_hash`, а значение по умолчанию `applied: true` не выводится. Для одного пользователя сохраняется `data.client`.
+
+Черновик не содержит личных полей или выбора закрытия сессий. Групповое удаление отклоняет `--cut-off`; одиночное `client remove NAME --cut-off` сохраняет прежнее подтверждение и результаты по серверам. В смешанной группе пользователи сервиса удаляются одной транзакцией, а пользователи конфигурации — после применения с вашего компьютера. Изменение конфигурации отклоняет всю групповую операцию сервиса.
+
+```bash
+meridian client remove --proposal people-removal.json --dry-run --json
+meridian client remove --proposal people-removal.json --yes --json
+```
 
 `meridian client bulk extend --months 1 --person sample-a --dry-run --json`
 

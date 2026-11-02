@@ -1774,11 +1774,11 @@
       "argv": [
         "client",
         "remove",
-        "NAME"
+        "[NAME......]"
       ],
       "command": "client.remove",
       "data_schema": "client-remove",
-      "description": "Remove a client permanently; their links stop working",
+      "description": "Remove declared clients in one local review and apply; their links stop working.",
       "envelope_schema": "client-remove-envelope",
       "error_schema": "error",
       "exit_codes": {
@@ -1795,6 +1795,8 @@
         "--yes",
         "--json",
         "--cut-off",
+        "--proposal",
+        "--dry-run",
         "--context"
       ],
       "outcomes": [

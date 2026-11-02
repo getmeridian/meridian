@@ -139,6 +139,8 @@ meridian client disable NAME [--json]
 meridian client reissue NAME [--cut-off] [--yes] [--json]
 meridian client rotate-credentials NAME [--cut-off] [--yes] [--json]
 meridian client remove NAME [--cut-off] [--yes] [--json]
+meridian client remove NAME... [--dry-run] [--yes] [--json]
+meridian client remove --proposal FILE [--dry-run] [--yes] [--json]
 ```
 
 | پرچم | پیش‌فرض | توضیح |
@@ -220,11 +222,22 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 | `meridian client bulk tag --set-tag none` | تنظیم یا پاک کردن برچسب |
 | `meridian client bulk devices --devices unlimited` | تنظیم سقف دستگاه |
 | `meridian client bulk renewal --renew-days 30 --renewals 5` | تنظیم یا لغو تمدید |
-| `meridian client bulk delete` | حذف افراد سرویس؛ فرمان برای افراد اعلام‌شده |
+| `meridian client bulk delete` | حذف افراد سرویس؛ یک پیشنهاد محلی برای افراد تعریف‌شده |
 | `meridian client bulk undo ID` | برگشت فیلدها تا ده دقیقه |
 | `meridian client bulk receipt ID` | خواندن رسید ماندگار |
 
 فیلترهای مشترک: `--search TEXT`، `--status STATUS`، `--tag TAG`، `--match-profile PROFILE`، `--expiring-within DAYS`، `--quota-at-least PERCENT`، `--never-used`، `--attention`، `--attention-reason REASON`، `--lifecycle STATE`، `--sort name|usage|expiry|activity` و `--order asc|desc`. از `--attention` (هر دلیل) یا `--attention-reason` استفاده کنید. حالت‌ها: `pending`، `renewing`، `fixed`، `unlimited`. نام نمایشی بدون تفاوت حروف بزرگ و کوچک و سپس نام کاربری دقیق ترتیب را تعیین می‌کند. قواعد در [مدیریت کلاینت‌ها](/fa/client-management/) آمده است.
+
+حذف افراد تعریف‌شده یک `proposal` وابسته به بازبینی را در پیش‌نمایش و رسید گروهی برمی‌گرداند. **people-removal.json** پنل را ذخیره کنید، یا فایل کامل JSON پیش‌نمایش یا رسید API و خروجی گروهی CLI را به `client remove --proposal FILE` بدهید. حداکثر اندازهٔ فایل ۶۴ MiB است. CLI مجموعهٔ سرورها، بازبینی، نسل و طرح ثبت‌شده و قصد محلی را بررسی می‌کند، همهٔ حذف‌ها را با هم مرور می‌کند، یک تأیید می‌گیرد و یک ویرایش قصد را اعمال می‌کند. قفل اعمال پیش از تغییر سرورها دوباره بازبینی قدیمی را رد می‌کند.
+
+`client remove NAME...` چند نام تعریف‌شده را می‌پذیرد؛ `--dry-run` بدون ذخیره بررسی می‌کند. لغو تأیید هیچ چیزی ذخیره نمی‌کند و دست‌کم یک فرد تعریف‌شده باید باقی بماند. پیش‌نمایش JSON شامل `data.clients`، `data.review_hash` و `data.applied: false` است. حذف گروهی اعمال‌شده `clients` و `review_hash` را نگه می‌دارد و مقدار پیش‌فرض `applied: true` را حذف می‌کند. نتیجهٔ فردی همچنان `data.client` دارد.
+
+پیشنهاد فیلد خصوصی فرد یا انتخاب قطع نشست ندارد. حذف گروهی `--cut-off` را رد می‌کند؛ حذف فردی `client remove NAME --cut-off` تأیید و نتایج فعلی هر سرور را حفظ می‌کند. در گروه مختلط، حذف افراد سرویس همچنان اتمی است؛ حذف افراد تعریف‌شده منتظر اعمال محلی می‌ماند و تغییر توپولوژی کل ثبت سرویس را رد می‌کند.
+
+```bash
+meridian client remove --proposal people-removal.json --dry-run --json
+meridian client remove --proposal people-removal.json --yes --json
+```
 
 `meridian client bulk extend --months 1 --person sample-a --dry-run --json`
 

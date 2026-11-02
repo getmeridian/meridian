@@ -42,6 +42,7 @@ from meridian.core.clients import (
     client_metadata_paths,
     connection_credential_paths,
 )
+from meridian.core.errors import MeridianError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.people_query import PeopleQuery
@@ -316,22 +317,49 @@ def _list(*, operation: OperationContext, query: PeopleQuery) -> None:
     err_console.print()
 
 
-def run_remove(name: str, yes: bool = False, cut_off: bool = False) -> None:
+def run_remove(
+    name: str | list[str] | None = None,
+    yes: bool = False,
+    cut_off: bool = False,
+    *,
+    proposal: str | None = None,
+    dry_run: bool = False,
+) -> None:
     """Remove a client from the fleet."""
     operation = OperationContext()
     with error_context("client.remove", timer=operation.timer):
-        if is_json_mode() and not yes:
+        if is_json_mode() and not yes and not dry_run:
             fail(
                 "Client removal requires explicit confirmation in JSON mode",
                 hint="Pass --yes to confirm the mutation.",
                 hint_type="user",
             )
-        cluster = load_topology_cluster()
-        name = resolve_client_name(cluster, name)
-        validate_client_name(name)
         try:
-            run_remove_v4(name, cluster, operation, yes=yes, cut_off=cut_off)
-        except ControlServiceError as exc:
+            from meridian.commands.client_removal import read_removal_proposal, run_reviewed_removal
+
+            names = [name] if isinstance(name, str) else name or []
+            if proposal is not None and names:
+                fail(t("bulk.proposal_selection"), hint_type="user")
+            draft = read_removal_proposal(proposal) if proposal is not None else None
+            if draft is not None:
+                names = draft.usernames
+            if not names:
+                fail(t("bulk.remove_selection"), hint_type="user")
+            cluster = load_topology_cluster()
+            names = [resolve_client_name(cluster, value) for value in names]
+            for value in names:
+                validate_client_name(value)
+            if len(names) != len(set(names)):
+                fail(t("bulk.remove_duplicate"), hint_type="user")
+            if cut_off and (draft is not None or len(names) > 1):
+                fail(t("bulk.proposal_no_cut_off"), hint_type="user")
+            if len(names) == 1 and draft is None and not dry_run:
+                run_remove_v4(names[0], cluster, operation, yes=yes, cut_off=cut_off)
+            else:
+                if cut_off:
+                    fail(t("bulk.proposal_no_cut_off"), hint_type="user")
+                run_reviewed_removal(names, cluster, operation, yes=yes, dry_run=dry_run, proposal=draft)
+        except MeridianError as exc:
             fail(exc)
 
 

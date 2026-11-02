@@ -17,10 +17,39 @@
     },
     "ClientRemoveResult": {
       "additionalProperties": false,
-      "description": "Result for removing one client.",
+      "description": "One client or one combined removal review; session cut-off remains an individual action.",
       "properties": {
+        "applied": {
+          "default": true,
+          "title": "Applied",
+          "type": "boolean"
+        },
         "client": {
-          "$ref": "#/$defs/ClientReference"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClientReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "clients": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ClientReference"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clients"
         },
         "cut_off": {
           "anyOf": [
@@ -37,11 +66,22 @@
           "default": null,
           "description": "Per-node open-session results when --cut-off was requested.",
           "title": "Cut Off"
+        },
+        "review_hash": {
+          "anyOf": [
+            {
+              "description": "Lowercase hex SHA-256 digest.",
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Review Hash"
         }
       },
-      "required": [
-        "client"
-      ],
       "title": "ClientRemoveResult",
       "type": "object"
     },

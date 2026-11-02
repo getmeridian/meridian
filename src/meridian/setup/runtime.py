@@ -21,6 +21,7 @@ from meridian.control.command_models import NodeCommandRecord
 from meridian.core.cancellation import CancellationToken
 from meridian.core.errors import LocalStateError
 from meridian.core.output import OperationContext
+from meridian.core.people_removal import PeopleRemovalProposal
 from meridian.core.reporters import NoopReporter, Reporter
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
@@ -115,6 +116,7 @@ class SetupRuntime:
         fence_holder: str | None = None,
         user_cut_off: Mapping[str, list[NodeCommandRecord]] | None = None,
         access_review_hash: str | None = None,
+        removal_proposal: PeopleRemovalProposal | None = None,
     ) -> None:
         self._registry = registry
         self._cluster_loader = cluster_loader
@@ -128,6 +130,7 @@ class SetupRuntime:
         self._fence_holder = fence_holder
         self._user_cut_off = user_cut_off if user_cut_off is not None else {}
         self._access_review_hash = access_review_hash
+        self._removal_proposal = removal_proposal
         self._control_bootstrap = control_bootstrap or partial(
             bootstrap_reviewed_control_service,
             cancellation=cancellation,
@@ -283,7 +286,14 @@ class SetupRuntime:
         draft = RevisionDraft.from_intent(
             review.intent, plan_hash=review.plan.plan_hash, review_hash=review.review_hash
         )
-        return ControlServiceFence(connection, cluster, draft, holder=self._fence_holder, on_stall=on_stall)
+        return ControlServiceFence(
+            connection,
+            cluster,
+            draft,
+            holder=self._fence_holder,
+            on_stall=on_stall,
+            removal_proposal=self._removal_proposal,
+        )
 
     def _build_drivers(
         self,

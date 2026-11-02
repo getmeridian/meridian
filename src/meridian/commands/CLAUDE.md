@@ -2,6 +2,7 @@
 
 ## Design decisions
 **App matcher tests read applied settings** — `fleet response-rules test` uses the narrow service tester; optional people resolve like client show, and rule edits remain reviewed fleet imports.
+**Batch removal reviews one final intent** — names or a typed proposal file share one review hash, one confirmation, and one apply; cut-off stays on the existing individual path.
 **Bulk profile filters are separate choices** — `--match-profile` selects people; `set-profiles --profile` assigns memberships through the existing frozen review.
 **Profile review logic lives in setup** — commands present gains and losses; the shared apply runtime checks declaration fingerprints for setup and every imperative path before any remote write.
 **Person policy inheritance is explicit** — `client routing --inherit` clears the private override without reserving a policy name.

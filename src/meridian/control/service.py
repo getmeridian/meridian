@@ -164,6 +164,7 @@ class ControlService:
             compose=self._compose_all,
             clock=clock,
             access=self.access,
+            revisions=self.revisions,
         )
         self.pages = ConnectionPages(self._store, self)
         with self._transaction():

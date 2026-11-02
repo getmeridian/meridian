@@ -249,15 +249,24 @@ def client_extend_cmd(
 
 @client_app.command("remove")
 def client_remove(
-    name: str = typer.Argument(..., help="Client name"),
+    names: list[str] | None = typer.Argument(
+        None, metavar="NAME...", help="Declared client name(s) to remove together"
+    ),
     yes: Yes = False,
     _json: Json = False,
     cut_off: CutOff = False,
+    proposal: str | None = typer.Option(
+        None, "--proposal", metavar="FILE", help="Read a saved bulk removal proposal; refuses a stale topology"
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Review all removals without saving or applying"),
 ) -> None:
-    """Remove a client permanently; their links stop working"""
+    """Remove declared clients in one local review and apply; their links stop working.
+
+    Use names or --proposal FILE. --cut-off is available for individual removal only.
+    """
     from meridian.commands.client import run_remove
 
-    run_remove(name, yes=yes, cut_off=cut_off)
+    run_remove(names, yes=yes, cut_off=cut_off, proposal=proposal, dry_run=dry_run)
 
 
 @client_app.command("reissue")

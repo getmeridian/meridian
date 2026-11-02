@@ -19,12 +19,14 @@ from meridian.core.people_bulk import (
     ClientBulkResult,
 )
 from meridian.core.people_query import PeopleFacets, PeoplePage, PeoplePerson, PeopleQuery
+from meridian.core.people_removal import PeopleRemovalProposal
 
 PEOPLE_SCHEMAS: dict[str, type[BaseModel]] = {
     "people-query": PeopleQuery,
     "people-page": PeoplePage,
     "people-person": PeoplePerson,
     "people-facets": PeopleFacets,
+    "people-removal-proposal": PeopleRemovalProposal,
     "bulk-action": BulkAction,
     "bulk-preview-request": BulkPreviewRequest,
     "bulk-preview": BulkPreview,

@@ -2,6 +2,7 @@
 
 ## Design decisions
 - **App decisions are finite** — named literal User-Agent/Accept rules reject duplicates and proven shadows; one policy resolver orders person, app, profile, named fleet, and preset choices.
+- **Removal proposals carry identity only** — bounded declared usernames and committed fleet/revision/generation/plan/intent hashes travel without private person fields or cut-off choices.
 - **Profile selection names saved membership** — the optional typed profile ID joins the same query and cursor identity; default is an explicit membership.
 - **Profile declaration fingerprints precede expansion** — hash the normalized named grants with `profile_declarations_hash`, so topology can expand unchanged exit or gateway grants without accepting a profile edit.
 - **Delivery policies are finite** — discriminated matchers, IP-addressed DNS, and bounded catalogs share one person/profile/fleet resolver; conflicting profile defaults refuse.

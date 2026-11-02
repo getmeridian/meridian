@@ -1,6 +1,7 @@
 # i18n — CLI message catalog
 
 ## Design decisions
+- **Removal drafts have native refusals** — local review, stale or uncommitted topology, and the individual-only cut-off boundary share en/ru/fa/zh text with the console.
 - **Bulk text matches across surfaces** — selection, before/after, irreversibility, stale people, and undo have native en/ru/fa/zh labels.
 - Locale types and native language names come from core.languages; CLI detection never sets the operator's subscription language, whose fixed status catalog lives in control/formats/status_remarks.py.
 

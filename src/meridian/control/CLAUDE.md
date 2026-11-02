@@ -4,6 +4,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 
 ## Design decisions
 - **Response rules need no schema step** — reviewed rules live in meta beside delivery settings; absent means empty, and settings writes, restores, and reads keep the same typed list.
+- **Declared bulk deletion freezes one draft** — the committed revision and fence identify it, the preview hash includes it, and commit re-checks it while only service-owned deletions write accounts.
 - **Profile declarations save with settings** — meta keeps their reviewed fingerprint, included in the access hash; unreviewed settings compare it atomically, and bootstrap requires no fingerprint, grants, or non-default memberships.
 - **Person delivery overrides stay private** — schema 25 owns one nullable-by-absence mapping; stateless hashes fence catalog, membership, and override, without events or node recomposition.
 - **Reviewed delivery choices validate membership** — policy catalogs live in settings; profile defaults must agree before a settings or membership write commits.

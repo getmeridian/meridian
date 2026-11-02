@@ -27,6 +27,11 @@ newest first; the last is what 4.0 changes compared with 3.x.
 - Filter people by access profile, including `default`, with contextual membership
   counts in the API, CLI, and People screen. Paging and bulk selection share the
   filter; list JSON reports saved memberships without searching private notes (#95).
+- Bulk deletion returns one secret-free proposal for all topology-declared people,
+  tied to the committed fleet revision and plan. Save it from the console or bulk
+  JSON and review it with `client remove --proposal`; several names share one
+  confirmation and apply. Stale proposals are refused, mixed service-owned deletes
+  stay atomic, and session cut-off remains an individual removal choice (#95).
 
 ### Since 4.0.0b10
 

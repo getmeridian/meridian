@@ -1,5 +1,6 @@
 # src/meridian — Python CLI package
 ## Design decisions
+**Removal drafts compare committed identities** — local checks and the service fence require the draft's exact revision, generation, and plan; a newer revision never heals a removal proposal forward.
 **Cluster config** — one hidden `cluster.yml` holds topology intent, bindings, allocations, and checkpoints (`cluster.py` model, `cluster_persistence.py` YAML); users and operator-owned data live in the control service.
 **Service access** — `control/client.py` speaks HTTPS from the deployer to nginx's secret path on 443 with the admin token, no SSH tunnel; client paths use `control_access.access_panel()`, fleet views `fleet_panel()`. `remnawave/` keeps only what `meridian migrate` reads.
 **SSH abstraction** — `ServerConnection` runs locally or over SSH (non-root adds `sudo -n`); `conn.run()` returns `CommandResult`, `ssh_transfer.py` moves files, and `SSHUI` callbacks keep Rich out of transport. A timeout or exit 255 drops the ControlMaster so the next command redials.

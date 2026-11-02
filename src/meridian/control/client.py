@@ -129,6 +129,14 @@ class ControlServiceConflict(ControlServiceError):
     """The request lost a race or does not fit the object's state (HTTP 409)."""
 
 
+class ControlServiceTopologyError(ControlServiceConflict):
+    """A named removal-proposal refusal, for the local CLI's native messages."""
+
+    def __init__(self, reason: str, message: str) -> None:
+        self.reason = reason
+        super().__init__(message, category="user")
+
+
 class ControlServicePolicyError(ControlServiceError):
     """A named refusal the CLI can translate without inspecting message text."""
 
@@ -594,6 +602,8 @@ class ControlClient:
             ) from exc
         if response.status_code in (400, 409):
             reason = _error_body(response).get("code")
+            if reason in {"stale_topology", "topology_uncommitted"}:
+                raise ControlServiceTopologyError(str(reason), _message(response))
             if reason in {
                 "unknown_delivery_policy",
                 "conflicting_delivery_policies",

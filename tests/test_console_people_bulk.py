@@ -7,6 +7,7 @@ from meridian.core.people_query import PeopleQuery
 from tests.support.console_dom import needs_console_dom, run_console
 from tests.test_control_people_query import people_service as people_service
 from tests.test_control_people_query import seed
+from tests.test_declared_people_proposals import committed_people as committed_people
 
 pytestmark = needs_console_dom
 
@@ -96,3 +97,35 @@ def test_console_uncertain_undo_reads_receipt_and_keeps_the_last_receipt_current
         assert bulk_flow["receipt"]["id"] in result["error"]
     assert result["stored"] == [] and not result["outside"]
     assert "bulk." not in result["dialog"]
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_declared_delete_offers_one_local_proposal_without_browser_topology_writes(committed_people, locale):
+    from meridian.control.models import UserUpdate
+    from tests.test_control_people_bulk import commit, preview
+
+    service, _, _ = committed_people
+    for name in ("p-a", "p-b", "p-c", "p-d"):
+        service.update_user(name, UserUpdate(tag="GROUP_A"))
+    query = PeopleQuery(tag="GROUP_A")
+    before = service.people.query(query).to_data()
+    review = preview(service, "delete", filters={"tag": "GROUP_A"})
+    receipt = commit(service, review)
+    result = run_console(
+        "people-bulk",
+        locale,
+        {
+            "action": "delete",
+            "page": before,
+            "after": service.people.query(query).to_data(),
+            "review": review.to_data(),
+            "receipt": receipt.to_data(),
+        },
+    )
+    assert result["previewProposals"] == result["receiptProposals"] == 1
+    assert result["savedProposal"] == review.proposal.to_data()
+    assert result["downloadName"] == "people-removal.json"
+    assert result["commits"] == 1 and result["undos"] == 0
+    assert result["stored"] == [] and not result["outside"]
+    assert "bulk." not in result["dialog"]
+    assert "meridian client remove --proposal people-removal.json" in result["dialog"]

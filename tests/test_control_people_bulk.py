@@ -92,14 +92,19 @@ def test_undo_restores_fields_and_is_single_use(people_service):
         people_service.bulk.undo(receipt.id)
 
 
-def test_delete_keeps_declared_people_and_returns_the_exact_reviewed_cli_command(people_service):
+def test_delete_keeps_declared_people_and_returns_one_revision_bound_proposal(people_service):
+    from tests.support.people_proposals import commit_topology
+    from tests.support.topology import single_exit_intent
+
     seed(people_service)
+    commit_topology(people_service, single_exit_intent(users=["p-b", "p-d"]))
     review = preview(people_service, "delete", names=["p-a", "p-b"])
     assert not review.reversible
     declared = next(person for person in review.people if person.username == "p-b")
-    assert declared.cli_command == "meridian client remove p-b"
+    assert declared.cli_command is None and review.proposal.usernames == ["p-b"]
     receipt = commit(people_service, review)
     assert receipt.counts.changed == 1 and receipt.counts.cli_required == 1
+    assert receipt.proposal == review.proposal
     assert people_service.get_user("p-a") is None and people_service.get_user("p-b") is not None
     with pytest.raises(ServiceError, match="cannot be undone"):
         people_service.bulk.undo(receipt.id)

@@ -19,8 +19,10 @@ from meridian.control.errors import ServiceError
 from meridian.control.events import EventLedger
 from meridian.control.models import NodeSpec, UserRecord
 from meridian.control.node_documents import NodeDocumentComposer, with_users
+from meridian.control.people_proposals import removal_proposal, require_current_proposal
 from meridian.control.people_query import PeopleQueryEngine
 from meridian.control.period_usage import reset_period
+from meridian.control.revisions import RevisionLedger
 from meridian.control.store import Store
 from meridian.control.times import format_timestamp
 from meridian.control.traffic import TrafficLedger
@@ -85,11 +87,13 @@ class BulkLedger:
         compose: NodeDocumentComposer,
         clock: Callable[[], float],
         access: AccessProfileLedger,
+        revisions: RevisionLedger,
     ) -> None:
         self.store, self.people, self.events, self.traffic = store, people, events, traffic
         self.read_user, self.read_users, self.compose, self.clock = read_user, read_users, compose, clock
         self._previews: OrderedDict[str, FrozenPreview] = OrderedDict()
         self.access = access
+        self.revisions = revisions
 
     def _nodes(self) -> str:
         return canonical_sha256(
@@ -156,6 +160,7 @@ class BulkLedger:
             effects: dict[str, BulkEffect] = {}
             changes: list[BulkPersonChange] = []
             deleted: set[str] = set()
+            declared_deletions: list[str] = []
             reversible = request.action.action not in ("delete", "reset-traffic")
             for name in names:
                 baseline = project_effect(self.read_user(name), now)
@@ -166,11 +171,12 @@ class BulkLedger:
                 versions[name] = version
                 before = BulkFields.from_user(user)
                 warnings: list[BulkWarning] = []
-                command = None
+                cli_required = False
                 if request.action.action == "delete":
                     after = None
                     if name in intent.declared:
-                        command = f"meridian client remove {name}"
+                        declared_deletions.append(name)
+                        cli_required = True
                         warnings.append("topology_delete")
                         after = before
                     else:
@@ -194,7 +200,7 @@ class BulkLedger:
                     if request.action.action == "set-profiles"
                     else None
                 )
-                outcome: BulkOutcome = "cli_required" if command else "changed" if fields else "unchanged"
+                outcome: BulkOutcome = "cli_required" if cli_required else "changed" if fields else "unchanged"
                 changes.append(
                     BulkPersonChange(
                         username=name,
@@ -204,7 +210,6 @@ class BulkLedger:
                         after=after,
                         changes=fields,
                         outcome=outcome,
-                        cli_command=command,
                         warnings=warnings,
                         access=access_change,
                         cut_off=self.access.loss_scope(access_change.lost) if access_change is not None else None,
@@ -226,6 +231,7 @@ class BulkLedger:
                 changed_nodes=self._changed_nodes(effects, deleted),
                 reversible=reversible,
                 warnings=warnings,
+                proposal=removal_proposal(self.revisions, declared_deletions),
             )
             review = BulkPreview.model_validate(
                 {
@@ -346,6 +352,8 @@ class BulkLedger:
             now = format_timestamp(self.clock())
             if datetime.fromisoformat(now) > datetime.fromisoformat(review.expires_at):
                 raise ServiceError("preview_expired", "This preview expired. Preview again.", 409)
+            if review.proposal is not None:
+                require_current_proposal(self.revisions, review.proposal)
             self._refuse_stale(frozen.versions)
             self._refuse_changed_nodes(frozen.nodes, frozen.versions)
             declared = self.people.intent().declared
@@ -357,7 +365,7 @@ class BulkLedger:
                 if BulkFields.from_user(baselines[person.username].user) != person.before
                 or (
                     review.action.action == "delete"
-                    and (person.cli_command is not None) != (person.username in declared)
+                    and (person.outcome == "cli_required") != (person.username in declared)
                 )
                 or (
                     review.action.action != "delete"
@@ -434,6 +442,7 @@ class BulkLedger:
                 committed_at=now,
                 counts=committed_counts,
                 people=outcomes,
+                proposal=review.proposal,
                 changed_nodes=changed_nodes,
                 undo_until=format_timestamp(self.clock() + UNDO_SECONDS)
                 if review.reversible and committed_counts.changed
