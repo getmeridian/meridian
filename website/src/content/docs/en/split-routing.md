@@ -167,6 +167,8 @@ The service reads geodata only from already-cached Xray archives whose hash matc
 
 ## Response rules by app
 
+App rules require Meridian's control service. With `control.backend: remnawave`, every nonempty rule list is refused before a plan is built, including built-in policy choices. Run `meridian migrate` first.
+
 Edit `delivery.response_rules` in a fleet export and review it with `meridian fleet import`. Rules run in their written order; the first match supplies one action. An empty list keeps every existing subscription byte unchanged. Rules travel with the other reviewed delivery settings and survive encrypted snapshots. Settings in the console lists them read-only.
 
 Every `match` requires a `user_agent` condition and may add one `accept` condition; both must match. Each condition has `operator: equals | prefix | contains` and a nonempty literal `value`, compared without case sensitivity. Accept is the only additional request header: the captured clients use it to distinguish browser HTML from app documents. Forwarded addresses, device headers, authorization, regexes, and version comparisons are unavailable.

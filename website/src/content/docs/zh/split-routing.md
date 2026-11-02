@@ -169,6 +169,8 @@ meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --net
 
 ## 按应用选择订阅响应
 
+这些规则需要 Meridian 控制服务。若使用 `control.backend: remnawave`，任何非空规则列表（包括选择内置策略的规则）都会在生成计划前被拒绝；请先运行 `meridian migrate`。
+
 在导出的服务器配置中编辑 `delivery.response_rules`，再通过 `meridian fleet import` 审阅。规则按书写顺序执行，首个匹配项提供一个动作。空列表保持现有订阅的每个字节不变。规则随其他已审阅的交付设置传到服务，并由加密快照保存。网页面板的设置以只读方式列出规则。
 
 每个 `match` 必须包含 `user_agent` 条件，也可添加一个 `accept` 条件；两者都必须匹配。条件包含 `operator: equals | prefix | contains` 和非空字面字符串 `value`，匹配不区分大小写。Accept 是唯一可用的额外请求头：已捕获的客户端用它区分浏览器 HTML 和应用文档。不支持转发地址、设备请求头、授权信息、正则表达式或版本比较。

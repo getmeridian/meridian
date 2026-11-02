@@ -29,6 +29,8 @@ def validate_delivery_backend(intent: SetupIntent) -> None:
         raise TopologyCompileError(
             "Named delivery policies need Meridian's control service. Run meridian migrate first."
         )
+    if intent.control.backend != "meridian" and intent.delivery.response_rules:
+        raise TopologyCompileError("App response rules need Meridian's control service. Run meridian migrate first.")
 
 
 # Route by the sniffed name (IP-only clients and QUIC) without rewriting the destination.

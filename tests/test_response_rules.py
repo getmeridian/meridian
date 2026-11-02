@@ -14,6 +14,7 @@ from pydantic import ValidationError
 
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.compiler import compile_topology
+from meridian.compiler.errors import TopologyCompileError
 from meridian.compiler.models import ServiceSettingsPayload
 from meridian.control.client import ControlClient
 from meridian.control.formats.entries import SubscriptionUser
@@ -26,7 +27,7 @@ from meridian.core.delivery_policies import resolve_delivery_policy
 from meridian.core.fleet_document import intent_changes
 from meridian.core.response_rule_test import ResponseRuleTestRequest
 from meridian.core.subscription_preview import SubscriptionPreviewRequest
-from meridian.core.topology import DeliveryIntent
+from meridian.core.topology import ControlPlaneIntent, DeliveryIntent
 from meridian.reconciler.meridian_drivers import MeridianDriverContext, ServiceSettingsDriver
 from meridian.reconciler.resources import build_resource_actions, observation_converges
 from tests.support.control_service import ADMIN_TOKEN, FLEET_ID, serve_control
@@ -45,6 +46,33 @@ def test_reviewed_response_rules_compile_into_service_settings() -> None:
     plan = compile_topology(single_exit_intent(delivery=delivery))
     settings = next(item.payload for item in plan.resources if isinstance(item.payload, ServiceSettingsPayload))
     assert settings.to_data()["response_rules"] == rules
+
+
+@pytest.mark.parametrize(
+    "action",
+    [
+        {"kind": "block"},
+        {"kind": "format", "format": "singbox"},
+        {"kind": "headers", "headers": {"announce": "Refresh your connections"}},
+        {"kind": "policy", "policy": "full"},
+    ],
+    ids=["block", "format", "headers", "built-in-policy"],
+)
+def test_remnawave_refuses_response_rules_before_compiling_resources(action: dict) -> None:
+    intent = single_exit_intent(
+        control=ControlPlaneIntent(server_ref="srv-control", backend="remnawave"),
+        delivery=DeliveryIntent.model_validate({"response_rules": [app_rule(action)]}),
+    )
+    with pytest.raises(TopologyCompileError) as exc_info:
+        compile_topology(intent)
+    assert str(exc_info.value) == "App response rules need Meridian's control service. Run meridian migrate first."
+
+
+def test_remnawave_keeps_the_same_plan_with_empty_response_rules() -> None:
+    control = ControlPlaneIntent(server_ref="srv-control", backend="remnawave")
+    before = compile_topology(single_exit_intent(control=control))
+    after = compile_topology(single_exit_intent(control=control, delivery=DeliveryIntent(response_rules=[])))
+    assert after == before
 
 
 @pytest.mark.parametrize("kind", ["format", "block", "policy", "headers"])
