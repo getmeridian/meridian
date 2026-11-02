@@ -33,7 +33,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   confirmation and apply. Named removals use the service's exact-name and ambiguity
   rules. Proposal usernames must match exact committed declarations;
   stale proposals are refused. Saved preview hashes, declared outcomes, and whole
-  JSON envelopes are validated. Mixed service-owned deletes
+  JSON envelopes are validated; reads stop at 64 MiB for files and streams alike.
+  Mixed service-owned deletes
   stay atomic, and session cut-off remains an individual removal choice (#95).
 
 ### Since 4.0.0b10

@@ -495,6 +495,8 @@ For declared deletions, the preview and receipt carry one `proposal` containing 
 
 Run `meridian client remove --proposal people-removal.json --dry-run --json` on the deployer's current fleet copy, then `meridian client remove --proposal people-removal.json` for one combined review, one confirmation, and one apply. The CLI also accepts `meridian client remove sample-a sample-b`, and `--proposal` can read an entire API bulk preview/receipt or CLI bulk JSON output, up to 64 MiB. Names and a proposal cannot be combined.
 
+The 64 MiB limit applies to bytes actually read, including pipes and special files, before decoding or JSON parsing. Larger input is refused even if its reported size is zero or the file grows during reading.
+
 Proposal `usernames` must exactly match the committed `topology_intent.access.users`, including case. Display names are not accepted in proposals.
 
 A saved bulk file must describe deletion, and its proposal must list exactly the people marked `cli_required`, with the same count. Preview hashes are checked; when a CLI file contains both preview and receipt, their IDs, hashes, and proposals must agree. A standalone receipt keeps the original preview hash and is checked against its recorded outcomes. CLI envelopes reject unknown fields.

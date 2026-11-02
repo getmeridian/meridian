@@ -31,6 +31,7 @@
 
 ## Pitfalls
 - **Fleet JSON keeps reviewed delivery verbatim** — reveal every nested delivery path and each delivery diff's before/after strings, or URL masking corrupts exports and hides the applied change.
+- **Proposal limits bound the read itself** — read at most 64 MiB plus one byte in binary mode; stat sizes cannot bound pipes, special files, or growing files.
 - **Saved reviews validate the whole document** — check preview hashes, declared outcomes and counts, and the CLI envelope before extracting a removal proposal.
 - **Named removals read service usernames for aliases** — exact declarations are already unambiguous; case-folded or display-name inputs need the directory before ownership checks.
 - **Proposal usernames are exact declarations** — never resolve saved usernames through case folding or display names before validating the committed intent.

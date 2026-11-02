@@ -52,10 +52,11 @@ def _reviewed_proposal(view: BulkPreview | BulkReceipt) -> PeopleRemovalProposal
 def read_removal_proposal(path: str) -> PeopleRemovalProposal:
     """Accept the saved proposal, API preview/receipt, or CLI bulk output envelope."""
     try:
-        source = Path(path)
-        if source.stat().st_size > MAX_PROPOSAL_FILE_BYTES:
+        with Path(path).open("rb") as source:
+            content = source.read(MAX_PROPOSAL_FILE_BYTES + 1)
+        if len(content) > MAX_PROPOSAL_FILE_BYTES:
             raise ValueError
-        body = json.loads(source.read_text(encoding="utf-8"))
+        body = json.loads(content.decode("utf-8"))
         if not isinstance(body, dict):
             raise ValueError
         if "data" in body:

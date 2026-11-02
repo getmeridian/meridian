@@ -1,6 +1,9 @@
 """Saved removal reviews must agree with their declared targets and CLI envelopes."""
 
 import json
+import os
+import threading
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -133,3 +136,90 @@ def test_proposal_reader_accepts_an_unchanged_combined_cli_result(bulk_review, t
         command="client.bulk.delete", data=ClientBulkResult(preview=review, receipt=receipt, applied=True).to_data()
     ).to_data()
     assert read_removal_proposal(save_document(tmp_path, body)) == review.proposal
+
+
+@pytest.mark.parametrize("source", ["fifo", "descriptor"])
+def test_proposal_reader_bounds_streams_with_no_reported_file_size(bulk_review, tmp_path, monkeypatch, source):
+    review, _ = bulk_review
+    maximum = 1024
+    monkeypatch.setattr("meridian.commands.client_removal.MAX_PROPOSAL_FILE_BYTES", maximum)
+    payload = review.proposal.model_dump_json(by_alias=True).encode("utf-8") + b" " * (maximum * 2)
+    read_fd = None
+    if source == "fifo":
+        path = tmp_path / "removal.fifo"
+        os.mkfifo(path)
+    else:
+        read_fd, write_fd = os.pipe()
+        path = Path(f"/dev/fd/{read_fd}")
+    assert path.stat().st_size == 0
+    errors = []
+    reader_ready = threading.Event()
+    original_open = Path.open
+
+    def open_reader(target, mode="r", *args, **kwargs):
+        if target == path and mode in {"r", "rb"}:
+            reader_ready.set()
+        return original_open(target, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", open_reader)
+
+    def write():
+        try:
+            if not reader_ready.wait(timeout=5):
+                errors.append(RuntimeError("The reader did not open the stream."))
+                return
+            with path.open("wb") if source == "fifo" else os.fdopen(write_fd, "wb") as stream:
+                stream.write(payload)
+        except OSError as exc:
+            errors.append(exc)
+
+    writer = threading.Thread(target=write, daemon=True)
+    writer.start()
+    try:
+        with pytest.raises(MeridianError, match="valid removal proposal"):
+            read_removal_proposal(str(path))
+    finally:
+        writer.join(timeout=5)
+        if read_fd is not None:
+            os.close(read_fd)
+    assert not writer.is_alive()
+    assert not errors
+
+
+def test_proposal_reader_bounds_a_file_that_grows_when_opened(bulk_review, tmp_path, monkeypatch):
+    review, _ = bulk_review
+    path = tmp_path / "growing.json"
+    path.write_text(review.proposal.model_dump_json(by_alias=True))
+    maximum = 1024
+    assert path.stat().st_size < maximum
+    monkeypatch.setattr("meridian.commands.client_removal.MAX_PROPOSAL_FILE_BYTES", maximum)
+    original_open = Path.open
+    grown = False
+
+    def open_after_growth(source, mode="r", *args, **kwargs):
+        nonlocal grown
+        if source == path and mode in {"r", "rb"} and not grown:
+            grown = True
+            with original_open(path, "ab") as stream:
+                stream.write(b" " * (maximum * 2))
+        return original_open(source, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", open_after_growth)
+    with pytest.raises(MeridianError, match="valid removal proposal"):
+        read_removal_proposal(str(path))
+    assert grown
+
+
+@pytest.mark.parametrize("excess", [0, 1], ids=["at_limit", "over_limit"])
+def test_proposal_reader_keeps_the_exact_byte_limit(bulk_review, tmp_path, monkeypatch, excess):
+    review, _ = bulk_review
+    payload = review.proposal.model_dump_json(by_alias=True).encode("utf-8")
+    maximum = len(payload)
+    monkeypatch.setattr("meridian.commands.client_removal.MAX_PROPOSAL_FILE_BYTES", maximum)
+    path = tmp_path / "removal.json"
+    path.write_bytes(payload + b" " * excess)
+    if excess:
+        with pytest.raises(MeridianError, match="valid removal proposal"):
+            read_removal_proposal(str(path))
+    else:
+        assert read_removal_proposal(str(path)) == review.proposal
