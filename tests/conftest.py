@@ -68,6 +68,15 @@ def _isolated_output_locale(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _isolated_output_modes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each scenario starts with human, non-quiet output; any `--json` run also turns quiet mode on."""
+    from meridian.console import _state
+
+    monkeypatch.setattr(_state, "json_mode", False)
+    monkeypatch.setattr(_state, "quiet_mode", False)
+
+
+@pytest.fixture(autouse=True)
 def _isolated_legacy_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Never let a developer's real 3.x ~/.meridian decide what a test sees."""
     import meridian.config as cfg

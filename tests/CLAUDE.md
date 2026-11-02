@@ -47,7 +47,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - **Capability IDs are data, not translation keys** — asset scans exclude catalog IDs from broad string matching but still require every literal `M.t()` call to resolve.
 - **`tmp_home` must patch both** the env var and `meridian.config` attributes; patch `meridian.config.NAME`, never a module's copy.
 - **The suite isolates the cache and drops `FORCE_COLOR`** — throttled banners would otherwise make output depend on test order, and Rich would turn plain-text assertions into ANSI escapes.
-- **Reset JSON mode after each CLI invocation** — a leaked JSON mode made a later confirmation require `--yes`; read JSON from stdout apart from backup notices.
+- **Output modes reset before every test** (autouse) — a leaked JSON mode made a later confirmation require `--yes`, and the quiet mode every `--json` run sets silenced a later test's stderr; read JSON from stdout apart from backup notices.
 - **MockConnection matches substrings** — `when("grep", rc=1)` matches any command containing "grep"; use specific patterns.
 - **Don't restate registries** — a test that copies a constant, catalog, or schema list fails on every legitimate edit; assert behaviour or let the contract drift check do it.
 - **Every new admin handler needs a runnable `ROUTE_SAMPLES` entry** so the token-scope matrix exercises its permissions.
