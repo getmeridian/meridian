@@ -106,14 +106,21 @@
     var error = h("p", { class: "field-error schedule-error", role: "alert" });
     var nodes = h("div", { class: "stack-sm traffic-fields" }, limits.nodes, anchor.node, error, preview);
     function value() { return Object.assign(limits.value(), anchor.change()); }
+    // The schedule preview accepts only schedule fields, so the cap never rides along or gets validated here.
+    function scheduleBody(change) {
+      var body = { username: user.username, traffic_limit_strategy: limits.strategy.value };
+      if ("traffic_reset_anchor_day" in change) body.traffic_reset_anchor_day = change.traffic_reset_anchor_day;
+      return body;
+    }
     var schedulePreview = M.scheduleEditorPreview(nodes, preview, function () {
-      return Object.assign({ username: user.username }, value());
+      return scheduleBody(anchor.change());
     }, facts, error);
     limits.strategy.addEventListener("change", schedulePreview.update); anchor.input.addEventListener("input", schedulePreview.update);
     return { nodes: nodes, value: value, stop: schedulePreview.stop, refresh: function (changed, dirty, active) {
       if (dirty && active) schedulePreview.update(); else if (!dirty) schedulePreview.refresh(changed.schedule);
     }, review: function (change) {
-      return schedulePreview.review(Object.assign({ username: user.username }, change));
+      if (!("traffic_limit_strategy" in change || "traffic_reset_anchor_day" in change)) return null;
+      return schedulePreview.review(scheduleBody(change));
     } };
   }
 

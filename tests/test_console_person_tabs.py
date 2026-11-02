@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.models import UserCreate
 from meridian.control.service import ControlService
 from meridian.core.people_bulk import BulkAction, BulkPreviewRequest
@@ -12,6 +13,8 @@ from tests.support.console_dom import needs_console_dom, run_console
 from tests.support.control_service import FLEET_ID
 
 pytestmark = needs_console_dom
+# The stub refuses what the real preview request forbids, so a console body cannot drift past it.
+PREVIEW_FIELDS = sorted(UserSchedulePreviewRequest.model_fields)
 
 
 @pytest.fixture(autouse=True)
@@ -301,7 +304,7 @@ def test_traffic_editor_previews_while_editing_and_focuses_then_clears_an_invali
     result = run_console(
         "person-tabs-traffic-preview",
         locale,
-        {"clock": True, "schedulePreview": {"next_reset_at": "2026-11-15T00:00:00Z"}},
+        {"clock": True, "previewFields": PREVIEW_FIELDS, "schedulePreview": {"next_reset_at": "2026-11-15T00:00:00Z"}},
     )
     assert result["initialReset"] == "2026-12-01T00:00:00Z UTC"
     assert len(result["invalid"]["fields"]) == 1 and result["invalid"]["focused"]
@@ -317,6 +320,34 @@ def test_traffic_editor_previews_while_editing_and_focuses_then_clears_an_invali
     assert editing["previews"][0]["method"] == "POST"
     assert result["writes"] == [{"traffic_limit_strategy": "month_rolling", "traffic_reset_anchor_day": 15}]
     assert result["closed"]
+
+
+def test_traffic_quota_edits_preview_only_schedule_fields_and_save_the_new_cap() -> None:
+    result = run_console("person-tabs-traffic-quota", data={"clock": True, "previewFields": PREVIEW_FIELDS})
+    assert result["editing"]["errors"] == [] and result["editing"]["invalid"] == "false"
+    assert result["editing"]["previews"] == [{"username": "sample", "traffic_limit_strategy": "week"}]
+    assert result["saved"]["errors"] == [] and result["saved"]["closed"]
+    assert result["saved"]["writes"] == [{"traffic_limit_bytes": 200 * 1024**3, "traffic_limit_strategy": "week"}]
+
+
+def test_a_reset_preview_runs_before_the_operator_types_a_limit() -> None:
+    result = run_console(
+        "person-tabs-traffic-quota",
+        data={"clock": True, "previewFields": PREVIEW_FIELDS, "emptyLimit": True, "user": {"traffic_limit_bytes": 0}},
+    )
+    assert result["editing"]["previews"] == [{"username": "sample", "traffic_limit_strategy": "week"}]
+
+
+def test_a_sibling_save_never_moves_focus_into_an_invalid_reset_day() -> None:
+    result = run_console("person-tabs-sibling-focus", data={"previewFields": PREVIEW_FIELDS})
+    assert result["saved"] and not result["anchorFocused"]
+
+
+def test_custom_date_over_an_open_first_use_editor_refreshes_its_preview() -> None:
+    result = run_console("person-tabs-custom-preview", data={"clock": True, "previewFields": PREVIEW_FIELDS})
+    assert result["custom"]["mode"] == "fixed" and result["custom"]["date"] == "2026-12-02"
+    assert result["custom"]["previews"] > result["firstUse"]["previews"]
+    assert not result["custom"]["last"].get("activation_duration_days")
 
 
 @pytest.mark.parametrize("first_use", [False, True])

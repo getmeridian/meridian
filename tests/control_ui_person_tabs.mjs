@@ -57,7 +57,8 @@ w.fetch = async (url, options = {}) => {
   if (url === 'auth/state') return reply({ configured: true, owner_exists: true, signed_in: true });
   if (url === 'ui/api/fleet') return reply({ profile_title: 'Test fleet', display_names: { sample: 'Sample person' }, servers: [], declared_users: [] });
   if (url === 'api/users/preview') {
-    const answer = data.failPreview
+    const extra = data.previewFields && Object.keys(body || {}).filter(key => !data.previewFields.includes(key));
+    const answer = data.failPreview || extra?.length
       ? reply({ error: { code: 'invalid_request', message: 'Choose a valid account schedule.' } }, 400)
       : reply({ ...user.schedule, ...data.schedulePreview, expire_at: body.expire_at === undefined ? user.expire_at : body.expire_at });
     return data.holdPreview ? new Promise(resolve => previewWaiters.push(() => resolve(answer))) : answer;
@@ -349,6 +350,42 @@ if (scenario === 'person-tabs-traffic-preview') {
   report.editing = { reset: preview.querySelector('bdi')?.title || '', previews: requests(), writes: writes.slice() };
   form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await settle(); await settle();
   report.writes = writes; report.closed = !fieldRow('traffic').querySelector('form');
+}
+
+if (scenario === 'person-tabs-traffic-quota') {
+  const form = await edit('traffic'), limits = form.querySelector('.limit-fields');
+  const gb = limits.querySelector('input'), mode = limits.querySelector('select');
+  const errors = () => [...form.querySelectorAll('[role="alert"]')].filter(el => el.textContent.trim()).map(el => el.textContent);
+  if (data.emptyLimit) change(mode, 'limited'); else change(gb, '200');
+  change(form.querySelector('[name="traffic_limit_strategy"]'), 'week'); await advance(250);
+  report.editing = { errors: errors(), invalid: gb.getAttribute('aria-invalid'),
+    previews: events.filter(event => event.url === 'api/users/preview').map(event => event.body) };
+  if (!data.emptyLimit) {
+    form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await settle(); await settle();
+    report.saved = { errors: errors(), writes: writes.slice(), closed: !fieldRow('traffic').querySelector('form') };
+  }
+}
+
+if (scenario === 'person-tabs-sibling-focus') {
+  const traffic = await edit('traffic'), anchor = traffic.querySelector('[name="traffic_reset_anchor_day"]');
+  change(traffic.querySelector('[name="traffic_limit_strategy"]'), 'month_rolling'); change(anchor, '0');
+  const note = await edit('note'), area = note.querySelector('textarea');
+  change(area, 'Updated private note');
+  note.querySelector('[type="submit"]').focus();
+  note.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await settle(); await settle();
+  report.saved = writes.some(body => body.note === 'Updated private note');
+  report.anchorFocused = document.activeElement === anchor;
+}
+
+if (scenario === 'person-tabs-custom-preview') {
+  const form = await edit('expiry');
+  const count = () => events.filter(event => event.url === 'api/users/preview').length;
+  change(form.querySelector('[name="expiry_mode"]'), 'first_use'); await advance(250);
+  report.firstUse = { previews: count() };
+  const menu = view().querySelector('[data-person-action="extend"]').closest('details'); menu.open = true;
+  menu.querySelector('[data-person-custom-expiry]').click(); await settle(); await advance(250);
+  report.custom = { previews: count(), last: events.filter(event => event.url === 'api/users/preview').at(-1)?.body,
+    mode: form.querySelector('[name="expiry_mode"]').value, date: form.querySelector('input[type="date"]').value };
 }
 
 if (scenario === 'person-tabs-saving-preview') {

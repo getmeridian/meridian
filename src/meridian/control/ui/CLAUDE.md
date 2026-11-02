@@ -47,7 +47,8 @@
 - **Hidden person tab strips hand off focus** — returning to the sole Access panel focuses its region; a visible strip retains tab focus.
 - **Inline refreshes distinguish saved choices from drafts** — reseed changed clean editors with focus, retain edited baselines, refresh sibling schedules, and let summary presets read the current account.
 - **Passive reads keep a draft's reviewed dates** — only edits and saves request a new draft preview, since repeated POST previews would renew the owner's idle activity.
-- **Traffic previews start with saved dates** — debounce period and reset-day edits, show and focus the reset field's own error, and clear obsolete form errors on input.
+- **Traffic previews start with saved dates** — debounce period and reset-day edits, show the reset field's own error, focus it only on submit, and clear obsolete form errors on input.
+- **Schedule previews carry only schedule fields** — the preview request forbids extras, so forwarding the traffic cap failed every quota save; a cap-only save needs no preview.
 - **Saving owns the preview timer** — cancel pending previews before the final review, reject timer work during saving, and never validate controls from a delayed callback.
 - **Custom date starts before the draft snapshot** — choose its fixed mode quietly, keep untouched existing editors clean, and let the date field own its single validation alert.
 - **Quiet date choices still cancel presets** — send a silent change through the expiry guard so an earlier calendar reply cannot fill the newly opened custom editor.
@@ -65,6 +66,7 @@
 - **Settings lowering keeps saved numbers** — invalid unfinished cap or retention edits cannot block a privacy reduction; review the saved fallback, and track forms only after loading and settling disabled fields.
 - **Inline previews contain their own edits** — an expiry row must leave the traffic strategy to the service, or a sibling save makes its reset preview stale.
 - **Inline time inputs need the field target** — native time controls miss the shared text/date selector; give person editors the same 44 px minimum.
+- **Custom date over an open editor refreshes its preview** when the date holds a value, or the panel keeps describing the mode it left.
 - **Pending extensions use the service review** — take the duration from the existing bulk preview; a calendar-expiry preview describes a fixed date and must never activate first-use access.
 - **Person mode changes retain row identity** — move notes and tag into More in Simple, preserving draft inputs and focus; Detailed-only tab links use the same mode note and switch.
 - **Selecting the current person tab is no navigation** — open another inline editor without asking to discard a sibling draft.

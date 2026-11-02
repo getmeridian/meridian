@@ -97,7 +97,7 @@
       }, true);
     });
     return { node: node, input: anchor, validate: validate, change: function () {
-      if (!validate()) { anchor.focus(); throw new Error(anchor.validationMessage); }
+      if (!validate()) throw new Error(anchor.validationMessage);
       var body = {};
       if (!anchor.disabled && anchor.value !== initial) body.traffic_reset_anchor_day = anchor.value ? Number(anchor.value) : null;
       return body;
@@ -242,6 +242,7 @@
         expiry.never.checked = false;
         expiry.never.dispatchEvent(new CustomEvent("change", { bubbles: true, detail: { quiet: true } }));
         sync(); error.textContent = "";
+        if (expiry.date.value) update();
       } else mode.dispatchEvent(new Event("change", { bubbles: true }));
     }, setDuration: function (days) {
       mode.value = "first_use"; duration.value = String(days);
