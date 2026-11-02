@@ -396,6 +396,9 @@ if (scenario.startsWith('overview-')) {
   report.historyUnavailable = !!document.querySelector('[data-history-unavailable]');
   report.sparkline = !!document.querySelector('.overview-traffic:not([hidden]) svg');
   report.recent = [...document.querySelectorAll('.overview-recent [data-recent-kind]')].map(el => el.dataset.recentKind);
+  report.recentLinks = Object.fromEntries([...document.querySelectorAll('.overview-recent [data-recent-kind]')]
+    .map(el => [el.dataset.recentKind, el.getAttribute('href')]));
+  report.historyPrivacyLink = document.querySelector('.overview-traffic a')?.getAttribute('href') || null;
 }
 
 report.mode = M.mode?.() || null;

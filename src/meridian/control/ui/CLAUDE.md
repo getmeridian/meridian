@@ -59,6 +59,7 @@
 - **Main navigation never shrinks its labels** — keep a spaced scrolling row and reveal the active route after mounting or changing mode, using logical scroll alignment for RTL.
 - **Desktop selection bars set their direction** — override the card's column layout and keep the count and matching offer beside the actions; the phone grid remains separate.
 - **Phone matching selection fills its row** — reset the desktop offer's auto margin at the phone breakpoint so the bottom bar keeps the action across its width.
+- **Settings links name their section** — history-off notices go to Privacy, and recent settings edits go to their own fragment; the base route opens General.
 - **Menu actions return to their summary** — close and focus it before opening a dialog, or dismissal returns keyboard focus to an action hidden in the closed menu.
 - **Settings lowering keeps saved numbers** — invalid unfinished cap or retention edits cannot block a privacy reduction; review the saved fallback, and track forms only after loading and settling disabled fields.
 - **Inline previews contain their own edits** — an expiry row must leave the traffic strategy to the service, or a sibling save makes its reset preview stale.

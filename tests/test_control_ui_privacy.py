@@ -104,7 +104,7 @@ def test_the_fleet_chart_can_pick_a_node_without_another_request() -> None:
 
 def test_history_off_is_a_plain_notice_with_a_privacy_link_and_no_chart() -> None:
     result = _run("history-off")
-    assert result["bars"] == [] and result["links"] == ["#/settings"]
+    assert result["bars"] == [] and result["links"] == ["#/settings/privacy"]
     assert "Daily history is off" in result["text"]
 
 

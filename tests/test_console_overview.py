@@ -170,6 +170,32 @@ def test_unavailable_history_never_claims_zero_counted_traffic(setting: str) -> 
     assert result["traffic"] == "—" and result["historyUnavailable"]
 
 
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_history_notices_and_recent_settings_edits_link_to_their_sections(locale: str) -> None:
+    result = run_console(
+        "overview-attention",
+        locale,
+        {
+            "storage": {"mrd.mode": "detailed"},
+            "historyOff": True,
+            "events": [
+                {
+                    "id": index,
+                    "time": "2026-11-02T11:00:00Z",
+                    "kind": section + ".changed",
+                    "actor": "owner",
+                    "subject": section,
+                }
+                for index, section in enumerate(["privacy", "notice", "language"], 1)
+            ],
+        },
+    )
+    assert result["historyPrivacyLink"] == "#/settings/privacy"
+    assert result["recentLinks"] == {
+        section + ".changed": "#/settings/" + section for section in ("privacy", "notice", "language")
+    }
+
+
 def test_detailed_recent_changes_merge_newest_revisions_and_owner_edits() -> None:
     result = run_console(
         "overview-attention",

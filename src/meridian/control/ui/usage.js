@@ -73,7 +73,7 @@
         if (e.code === "history_off") {
           description.textContent = "";
           M.mount(chart, [h("p", { class: "muted", text: M.t("usage.off") }),
-            h("a", { href: "#/settings", text: M.t("privacy.title") })]);
+            h("a", { href: "#/settings/privacy", text: M.t("privacy.title") })]);
         } else M.mount(chart, h("p", { class: "form-error", role: "alert", text: M.errorText(e) }));
       });
     }
