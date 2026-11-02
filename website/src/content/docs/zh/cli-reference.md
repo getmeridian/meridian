@@ -595,6 +595,8 @@ meridian token revoke TOKEN_ID [--yes] [--json]
 
 列出、创建和撤销令牌需要已配置的 Meridian 控制服务。未保存服务 URL 或访问凭证时，命令以代码 2 退出并提示部署步骤；Remnawave 服务器会提示运行 `meridian migrate`。本地权限目录在未配置服务器时仍可查看。
 
+抓取指标时明确选择 `--capability metrics.read`；它通过现有私有控制入口读取 Prometheus 文本，不允许修改账户或配置。兼容预设保留已冻结的权限。先使用 `--dry-run` 审阅，再使用 `--yes` 签发；[用户管理](/zh/client-management/)提供了带认证的 Prometheus 配置。
+
 ### meridian panel
 
 显示网页面板的地址；在面板还没有所有者时，同时显示一次性设置链接。

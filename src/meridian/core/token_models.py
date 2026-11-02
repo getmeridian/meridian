@@ -20,6 +20,7 @@ ScopeRequirement: TypeAlias = TokenScope | tuple[TokenScope, ...]
 TokenCapability = Literal[
     "api.read",
     "fleet.read",
+    "metrics.read",
     "topology.read",
     "fleet.apply",
     "nodes.enroll",

@@ -183,6 +183,9 @@ class ControlService:
     def settings(self) -> ServiceSettings:
         return read_settings(self._store)
 
+    def sqlite_size_bytes(self) -> int | None:
+        return self._store.size_bytes()
+
     def preview_subscription(self, request: SubscriptionPreviewRequest) -> SubscriptionPreview:
         return preview_subscription(
             self._store,

@@ -60,6 +60,7 @@ from meridian.control.openapi import openapi_document
 from meridian.control.operations_api import read_attention, read_events, read_history_days
 from meridian.control.owner import OwnerSession
 from meridian.control.people_routes import PEOPLE_OWNER_ROUTES
+from meridian.control.request_metrics import RequestMetrics, request_route_id
 from meridian.control.route_catalog import api_route_for
 from meridian.control.route_table import Route, control_routes
 from meridian.control.route_types import ApiRoute
@@ -110,6 +111,10 @@ class ControlServer(ThreadingHTTPServer):
         if blobs is not None:
             service.background.blob_mirror = blobs.health
         self.ui = UiContext(service, public_path)
+        self.requests = RequestMetrics(
+            request_route_id(handler, api_route_for(method, handler.__name__))
+            for method, _pattern, _scope, handler in ALL_ROUTES
+        )
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -121,6 +126,16 @@ class _Handler(BaseHTTPRequestHandler):
     caller: Caller | None = None
     owner_session: OwnerSession | None = None
     api_route: ApiRoute | None = None
+
+    def handle_one_request(self) -> None:
+        started = time.monotonic()
+        self._metrics_route = "unmatched"
+        self._metrics_status: int | None = None
+        try:
+            super().handle_one_request()
+        finally:
+            if self._metrics_status is not None:
+                self.server.requests.observe(self._metrics_route, self._metrics_status, time.monotonic() - started)
 
     def do_GET(self) -> None:
         self._dispatch("GET")
@@ -163,6 +178,7 @@ class _Handler(BaseHTTPRequestHandler):
                 match = pattern.fullmatch(path)
                 if match and route_method == method:
                     self.api_route = api_route_for(method, handler.__name__)
+                    self._metrics_route = request_route_id(handler, self.api_route)
                     if scope is not None:
                         self.caller = self._authorize(scope)
                         if self.owner_session is not None:
@@ -260,6 +276,7 @@ class _Handler(BaseHTTPRequestHandler):
         self._send(status, "application/json", data)
 
     def _send(self, status: int, content_type: str, data: bytes, headers: dict[str, str] | None = None) -> None:
+        self._metrics_status = status
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))

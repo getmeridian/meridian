@@ -334,6 +334,35 @@ The console can issue the existing read/propose/approve/people presets and narro
 
 New API, CLI, and console tokens default to **90 days**. `expires_in_days` accepts 1–3650, or use a future UTC `expires_at`. To choose no expiry, explicitly send `never_expires: true` or use `--never-expires`; null alone is refused. Existing expiry values stay unchanged. The compatible `read`, `propose`, `approve`, `people`, and `admin` presets are expanded once into equivalent stored grants; future catalog changes do not re-expand issued tokens. Read presets keep their existing node/endpoint access, including endpoint credentials, while people’s UUIDs and subscription tokens remain blank. A custom token has `scope: null`; every record lists its effective `capabilities`. Expiry and revocation refuse the next request with `401 unauthenticated`. Protect any token that grants credentials like a password.
 
+#### Prometheus metrics
+
+Scrape the existing control ingress with a dedicated **`metrics.read`** token. Select it explicitly in the console’s token review or use the CLI below; compatible presets, including `admin`, keep their frozen grants and do not gain it. The grant reads only node aggregates and service runtime metrics, with no account reads or writes. The unlisted root credential can issue the scraper token.
+
+```bash
+meridian token create "Metrics scraper" --capability metrics.read --expires-days 90 --dry-run --json
+meridian token create "Metrics scraper" --capability metrics.read --expires-days 90 --yes --json
+```
+
+Creation JSON reveals the one-time secret at `data.issued.token`. Save only that value in a file readable by Prometheus, such as `/etc/prometheus/meridian.token`. Replace `CONTROL_PATH` with the private console path from `meridian panel`, and use the control server’s address. HTTPS stays on the existing port 443; keep certificate verification enabled.
+
+```yaml
+scrape_configs:
+  - job_name: meridian
+    scheme: https
+    metrics_path: /CONTROL_PATH/metrics
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/meridian.token
+    static_configs:
+      - targets: ["198.51.100.10:443"]
+```
+
+`/metrics` is relative to the private control path, requires a bearer token, supports GET/HEAD, and returns Prometheus 0.0.4 text with `Cache-Control: no-store`. There is no additional listener. Node labels contain only topology IDs and fixed state values; service labels use fixed route IDs, status classes, latency buckets, and task names. No people, addresses, devices, URLs, secret paths, or credentials are exported.
+
+The text includes CPU/load/memory, epoch-local host receive/send counters and rates, Xray uptime/memory, and the existing durable counted-people traffic total per node. Host counters include overhead and other services. `meridian_node_capacity_status` names current/stale/unavailable/not-reported states; nullable or stale numeric readings are omitted. Counter resets start another epoch; initial or unmeasured rates stay absent. Service counters and latency histograms are bounded in memory and reset on restart; task started/healthy/error and success times distinguish missing work from failures. `meridian_control_sqlite_bytes` includes the database, WAL, and shared-memory file.
+
 #### OpenAPI contract
 
 Read **OpenAPI 3.1** from `GET /api/openapi.json`, or the generated `contracts/meridian/v1/admin/openapi.json`. Send `Authorization: Bearer <token>`. All `x-meridian-capabilities` are required; `x-meridian-conditional-capabilities` describes body choices, and `x-meridian-extra-capabilities` describes credential/private-field and self-approval gates. `x-meridian-scopes` and `x-meridian-capability-grants` document compatible presets. `x-meridian-credentials: true` marks responses that may contain credentials: keep them private and do not log them. Agent enrollment/protocol, subscriptions, pages, and console authentication are separate surfaces.

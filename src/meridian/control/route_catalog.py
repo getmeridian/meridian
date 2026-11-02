@@ -8,7 +8,7 @@ are omitted from the published OpenAPI document.
 
 from __future__ import annotations
 
-from meridian.control import capacity_routes, delivery_routes, ui_routes
+from meridian.control import capacity_routes, delivery_routes, metrics_routes, ui_routes
 from meridian.control.api_models import (
     DeletedResource,
     DeployerStateReceipt,
@@ -19,6 +19,7 @@ from meridian.control.api_models import (
     SnapshotResponse,
 )
 from meridian.control.command_routes import node_command_routes
+from meridian.control.metrics_export import METRICS_CONTENT_TYPE, MetricsText
 from meridian.control.models import (
     ApplyFenceState,
     ApplyFenceSwap,
@@ -72,6 +73,19 @@ from meridian.core.subscription_preview import SubscriptionPreview, Subscription
 from meridian.core.token_models import CapabilityCatalog, TokenPreview
 
 API_ROUTES: tuple[ApiRoute, ...] = (
+    route(
+        "GET",
+        "/metrics",
+        (),
+        metrics_routes.metrics,
+        None,
+        MetricsText,
+        "Read Prometheus node and service metrics.",
+        credentials=False,
+        capability="metrics.read",
+        content_type=METRICS_CONTENT_TYPE,
+        internal_reason="Protected Prometheus text, outside the admin JSON API and compatible presets.",
+    ),
     route(
         "GET",
         "/api/nodes/{node_id}/capacity",

@@ -1638,6 +1638,7 @@
                 "enum": [
                   "api.read",
                   "fleet.read",
+                  "metrics.read",
                   "topology.read",
                   "fleet.apply",
                   "nodes.enroll",
@@ -1724,6 +1725,7 @@
             "enum": [
               "api.read",
               "fleet.read",
+              "metrics.read",
               "topology.read",
               "fleet.apply",
               "nodes.enroll",
@@ -1788,6 +1790,7 @@
             "enum": [
               "api.read",
               "fleet.read",
+              "metrics.read",
               "topology.read",
               "fleet.apply",
               "nodes.enroll",
@@ -3640,6 +3643,7 @@
               "enum": [
                 "api.read",
                 "fleet.read",
+                "metrics.read",
                 "topology.read",
                 "fleet.apply",
                 "nodes.enroll",
@@ -5335,6 +5339,7 @@
                 "enum": [
                   "api.read",
                   "fleet.read",
+                  "metrics.read",
                   "topology.read",
                   "fleet.apply",
                   "nodes.enroll",
@@ -8119,6 +8124,7 @@
                   "enum": [
                     "api.read",
                     "fleet.read",
+                    "metrics.read",
                     "topology.read",
                     "fleet.apply",
                     "nodes.enroll",
@@ -8152,7 +8158,7 @@
                   ],
                   "type": "string"
                 },
-                "maxItems": 32,
+                "maxItems": 33,
                 "minItems": 1,
                 "type": "array"
               },
@@ -8241,6 +8247,7 @@
               "enum": [
                 "api.read",
                 "fleet.read",
+                "metrics.read",
                 "topology.read",
                 "fleet.apply",
                 "nodes.enroll",
@@ -8336,6 +8343,7 @@
               "enum": [
                 "api.read",
                 "fleet.read",
+                "metrics.read",
                 "topology.read",
                 "fleet.apply",
                 "nodes.enroll",
@@ -8430,6 +8438,7 @@
               "enum": [
                 "api.read",
                 "fleet.read",
+                "metrics.read",
                 "topology.read",
                 "fleet.apply",
                 "nodes.enroll",

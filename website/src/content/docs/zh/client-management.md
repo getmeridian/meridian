@@ -336,6 +336,35 @@ meridian token revoke TOKEN_ID --yes --json
 
 新 API、CLI 和面板令牌默认有效期为 **90 天**。`expires_in_days` 接受 1–3650，也可指定未来 UTC 时间 `expires_at`。不过期必须明确选择 `never_expires: true` 或 `--never-expires`，单独的 `null` 会被拒绝。已有到期时间保持不变。兼容 `read`、`propose`、`approve`、`people`、`admin` 预设仅展开一次并保存等效权限，目录更新不会重新扩展已签发令牌。read 保留现有节点及端点访问（包括端点凭证），用户 UUID 和订阅令牌仍为空。自选令牌使用 `scope: null`，每条记录的 `capabilities` 列出实际权限。到期和撤销会使下一次请求返回 `401 unauthenticated`。包含凭证权限的令牌应像密码一样保护。
 
+#### Prometheus 指标
+
+通过现有控制入口使用专用 **`metrics.read`** 令牌抓取指标。在面板的令牌审阅中明确选择该权限，或使用下面的 CLI 命令。兼容预设（包括 `admin`）保留已冻结的权限，不会自动获得此权限。它只能读取节点汇总及服务运行指标，不能读取或修改账户。未列入令牌列表的根凭据可以签发抓取令牌。
+
+```bash
+meridian token create "Metrics scraper" --capability metrics.read --expires-days 90 --dry-run --json
+meridian token create "Metrics scraper" --capability metrics.read --expires-days 90 --yes --json
+```
+
+签发 JSON 仅在 `data.issued.token` 中显示一次性秘密。仅将该值保存到 Prometheus 可读取的文件中，例如 `/etc/prometheus/meridian.token`。将 `CONTROL_PATH` 替换为 `meridian panel` 显示的私有面板路径，并使用控制服务器地址。HTTPS 使用现有 443 端口，请保持证书验证。
+
+```yaml
+scrape_configs:
+  - job_name: meridian
+    scheme: https
+    metrics_path: /CONTROL_PATH/metrics
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/meridian.token
+    static_configs:
+      - targets: ["198.51.100.10:443"]
+```
+
+`/metrics` 相对于私有控制路径，需要 bearer token，支持 GET/HEAD，并返回带有 `Cache-Control: no-store` 的 Prometheus 0.0.4 文本。不会新增监听端口。节点标签仅包含拓扑 ID 和固定状态；服务标签使用固定路由 ID、响应状态类别、延迟区间和任务名称。不导出人员、地址、设备、URL、私有路径或凭据。
+
+文本包含 CPU、负载和内存，按计数周期记录的主机接收/发送计数与速率，Xray 内存和运行时间，以及现有账本中的每个节点用户流量总量。主机流量包括协议开销和其他服务。`meridian_node_capacity_status` 区分最新、过期、不可用和未报告状态；缺失或过期的数值会被省略。重置开始新计数周期；首个样本或未测量区间的速率不发布。请求计数和延迟直方图保存在有限内存中，重启后重置。任务启动、健康、错误和成功时间区分未运行与失败。`meridian_control_sqlite_bytes` 包含数据库、WAL 和共享内存文件。
+
 #### OpenAPI 契约
 
 通过 `GET /api/openapi.json` 或生成文件 `contracts/meridian/v1/admin/openapi.json` 读取 **OpenAPI 3.1**。发送 `Authorization: Bearer <token>`。必须拥有全部 `x-meridian-capabilities`；请求体条件由 `x-meridian-conditional-capabilities` 描述，凭证/私人字段及自我批准条件在 `x-meridian-extra-capabilities` 中。`x-meridian-scopes` 和 `x-meridian-capability-grants` 描述兼容预设。`x-meridian-credentials: true` 表示响应可能包含凭证，请保密且不要记录。agent 注册与协议、订阅、页面和面板认证使用独立接口。

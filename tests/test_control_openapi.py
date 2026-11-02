@@ -78,7 +78,9 @@ def test_every_server_route_has_a_catalog_entry_or_an_internal_reason() -> None:
     published = {(method.upper(), path) for path, operations in document["paths"].items() for method in operations}
     assert published == {(item.method, item.path) for item in API_ROUTES if item.internal_reason is None}
     for item in API_ROUTES:
-        assert item.scope and item.summary and "\n" not in item.summary
+        assert item.capabilities and item.summary and "\n" not in item.summary
+        if item.path.startswith("/api/"):
+            assert item.scope
         assert item.response_model is not None and item.errors
         if item.internal_reason is not None:
             assert item.internal_reason.strip()

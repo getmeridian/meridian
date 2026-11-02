@@ -595,6 +595,8 @@ Declining creation or revocation, or running either without a terminal and witho
 
 Listing, creation, and revocation require a configured Meridian control service. A missing saved service URL or credential exits 2 with deployment guidance; a Remnawave fleet points to `meridian migrate`. The local capability catalog remains available without a fleet.
 
+For scraping, explicitly choose `--capability metrics.read`; it reads Prometheus text through the existing private control ingress and grants no account or configuration changes. Existing compatible presets retain their frozen grants. Review with `--dry-run`, then issue with `--yes`; [client management](/en/client-management/) has the authenticated Prometheus configuration.
+
 ### meridian panel
 
 Show the web panel's address, and a one-time setup link while it has no owner.

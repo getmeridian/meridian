@@ -17,6 +17,8 @@ The service keeps one hour of recent observations in memory, at most one point p
 
 The Servers screen shows current capacity and the latest 24 UTC hourly buckets, including the incomplete current hour, with measured network duration. A sample becomes stale after 180 seconds without an accepted collection; hellos, polls, and duplicate reports do not refresh it. Recent memory series clear on service restart; hourly rollups survive. Server aggregates ride encrypted snapshots at every privacy level, and restored current samples remain stale until new evidence arrives. A seized service reveals how busy each server was; these series name no people or connections.
 
+A separately issued `metrics.read` token can scrape node capacity, durable node traffic totals, and service request counts/latency, task health, and SQLite size through the existing private control ingress. Labels never contain people, client addresses, devices, URLs, credentials, or secret paths; request observations retain only fixed route IDs and aggregate counters in memory. Compatible presets do not gain this grant. Prometheus keeps its own copies and retention: revocation stops new scrapes but does not remove existing copies. Pages and the console make no external requests. See [API tokens and scraping](/en/client-management/) for setup.
+
 ## Device limits
 
 | Level | What Meridian keeps | What you see |
