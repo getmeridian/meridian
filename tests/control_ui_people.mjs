@@ -29,9 +29,11 @@ w.fetch = (url, options) => {
 };
 const load = name => w.eval(fs.readFileSync(path.join(ui, name), 'utf8'));
 load('core.js'); load('drafts.js'); load('people.js'); load('people-bulk.js'); load('people-bulk-fields.js');
+load('components.js'); load('shell.js');
 if (fs.existsSync(path.join(ui, 'people-list.js'))) load('people-list.js');
 const M = w.M;
-M.i18n = { locale: () => locale === 'zh' ? 'zh-CN' : locale, load: () => Promise.resolve() };
+M.i18n = { locale: () => locale === 'zh' ? 'zh-CN' : locale, load: () => Promise.resolve(), lang: locale,
+  langs: ['en', 'ru', 'fa', 'zh'], names: { en: 'English', ru: 'Русский', fa: 'فارسی', zh: '中文' } };
 M.t = (key, params = {}) => (catalog[key] || key).replace(/\{(\w+)\}/g, (_, key) => String(params[key] ?? ''));
 M.takeSetupToken = () => '';
 M.renderServers = view => M.mount(view, M.h('p', { text: 'Servers' }));

@@ -319,7 +319,10 @@
     });
   };
 
-  M.pill = function (kind, text) { return M.h("span", { class: "pill pill-" + kind, text: text }); };
+  M.pill = function (kind, text) {
+    var status = { ok: "success", warn: "warn", err: "danger", info: "neutral", muted: "neutral" }[kind] || "neutral";
+    return M.h("span", { class: "pill pill-" + kind + " status-chip status-chip-" + status, text: text });
+  };
 
   /* Only the newest request may settle: superseded data and errors cannot replace current state. */
   M.latestOnly = function () {
@@ -347,7 +350,7 @@
       clearTimeout(ageTimer);
       if (!active()) return stop();
       updated.textContent = updatedAt === null ? M.t("live.never") : M.t("live.updated", {
-        seconds: M.count(Math.max(0, Math.floor((Date.now() - updatedAt) / 1000))) });
+        seconds: "\u2068" + M.count(Math.max(0, Math.floor((Date.now() - updatedAt) / 1000))) + "\u2069" });
       if (!document.hidden) ageTimer = setTimeout(age, 1000);
     }
     function schedule() {
@@ -356,6 +359,11 @@
         var delay = Math.min(120000, options.interval * Math.pow(2, Math.min(failures, 8)));
         pollTimer = setTimeout(function () { refresh(true); }, delay);
       }
+    }
+    function showTrouble(error) {
+      view.classList.add("view-stale");
+      M.mount(trouble, [M.pill("warn", M.t("live.stale")), " ", M.errorText(error)]);
+      retry.hidden = false;
     }
     function refresh(passive) {
       clearTimeout(pollTimer);
@@ -366,19 +374,21 @@
         if (options.accept && !options.accept(data)) { view.setAttribute("aria-busy", "false"); schedule(); return; }
         options.draw(data);
         updatedAt = Date.now();
-        failures = 0;
-        view.classList.remove("view-stale");
-        M.clear(trouble);
-        retry.hidden = true;
+        var warning = options.warning && options.warning(data);
+        if (warning) { failures++; showTrouble(warning); }
+        else {
+          failures = 0;
+          view.classList.remove("view-stale");
+          M.clear(trouble);
+          retry.hidden = true;
+        }
         view.setAttribute("aria-busy", "false");
         age();
         schedule();
       }, function (error) {
         if (!active()) return;
         failures++;
-        view.classList.add("view-stale");
-        M.mount(trouble, [M.pill("warn", M.t("live.stale")), " ", M.errorText(error)]);
-        retry.hidden = false;
+        showTrouble(error);
         view.setAttribute("aria-busy", "false");
         if (updatedAt === null && options.empty) options.empty();
         age();
@@ -416,7 +426,7 @@
   M.route = function () {
     var hash = location.hash.replace(/^#\/?/, ""), queryAt = hash.indexOf("?");
     var parts = (queryAt < 0 ? hash : hash.slice(0, queryAt)).split("/").map(decodePart);
-    var route = { name: parts[0] || "people", arg: parts[1] || "", extra: parts[2] || "" };
+    var route = { name: parts[0] || "overview", arg: parts[1] || "", extra: parts[2] || "" };
     if (queryAt >= 0) route.query = hash.slice(queryAt + 1);
     return route;
   };

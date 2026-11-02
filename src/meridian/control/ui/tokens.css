@@ -1,3 +1,63 @@
+/* Meridian console — tokens, base, and components.
+ * Palette: the website's warm light-first tokens (website/src/styles/tokens.css), written
+ * as light defaults plus a dark block, because there is no build step to lower
+ * light-dark(). The OS picks the theme; data-theme on <html> overrides it.
+ * System fonts only: the console makes no outside requests and ships no font files. */
+
+:root {
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-1: 8px; --radius-2: 12px; --radius-3: 16px;
+  --r: var(--radius-1); --r2: var(--radius-2); --r3: var(--radius-3);
+  color-scheme: light;
+  --bg: #FDFAF6; --s1: #FFFFFF; --s2: #F5F0E8; --band: #F7F2EA;
+  --b1: #E5DFD3; --b2: #D5CFC3;
+  --t1: #1A1D2E; --t2: #555A6E; --t3: var(--t2);
+  --ac: #C8933A; --ac-hover: #BC8833; --ac-text: #85601F; --on-ac: #1A1D2E;
+  --ac2: #C8933A1A; --ac3: #C8933A0D;
+  --ok: #23744F; --ok2: #23744F14; --err: #B33A3A; --err2: #B33A3A12; --on-err: #FFFFFF; --warn2: #C8933A1F;
+  --info: #2B6CB0; --info2: #2B6CB014;
+  --code-bg: #F0EBE1;
+  --shadow-sm: 0 1px 2px rgba(26, 29, 46, .05);
+  --shadow-md: 0 2px 8px rgba(26, 29, 46, .07);
+  --shadow-lg: 0 12px 36px rgba(26, 29, 46, .14);
+  --body: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  --heading: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #1C1E28; --s1: #252836; --s2: #2E3145; --band: #20222D;
+    --b1: #3A3E52; --b2: #4A4F66;
+    --t1: #E4E2DE; --t2: #A6A8B6; --t3: var(--t2);
+    --ac: #D4A24E; --ac-hover: #E0B060; --ac-text: #D4A24E; --on-ac: #1C1E28;
+    --ac2: #D4A24E1F; --ac3: #D4A24E0F;
+    --ok: #5CE88E; --ok2: #5CE88E14; --err: #F06060; --err2: #F0606014; --on-err: #1C1E28; --warn2: #D4A24E1F;
+    --info: #7FB2F0; --info2: #7FB2F014;
+    --code-bg: #1E2030;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .25);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, .3);
+    --shadow-lg: 0 12px 36px rgba(0, 0, 0, .45);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1C1E28; --s1: #252836; --s2: #2E3145; --band: #20222D;
+  --b1: #3A3E52; --b2: #4A4F66;
+  --t1: #E4E2DE; --t2: #A6A8B6; --t3: var(--t2);
+  --ac: #D4A24E; --ac-hover: #E0B060; --ac-text: #D4A24E; --on-ac: #1C1E28;
+  --ac2: #D4A24E1F; --ac3: #D4A24E0F;
+  --ok: #5CE88E; --ok2: #5CE88E14; --err: #F06060; --err2: #F0606014; --on-err: #1C1E28; --warn2: #D4A24E1F;
+  --info: #7FB2F0; --info2: #7FB2F014;
+  --code-bg: #1E2030;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .25);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, .3);
+  --shadow-lg: 0 12px 36px rgba(0, 0, 0, .45);
+}
+:lang(fa) { --body: Vazirmatn, "Noto Sans Arabic", Tahoma, system-ui, sans-serif; --heading: var(--body); }
+:lang(zh) { --body: system-ui, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; --heading: var(--body); }
+:lang(ru) { --heading: Georgia, "Times New Roman", serif; }
+
 /* Token choices share the console palette and keep full rows easy to tap. */
 .token-choices { border: 1px solid var(--b1); border-radius: var(--r2); padding: .75rem; min-width: 0; }
 .token-choices legend { color: var(--t2); font-weight: 600; padding-inline: .25rem; }

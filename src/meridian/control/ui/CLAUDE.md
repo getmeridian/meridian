@@ -1,6 +1,10 @@
 # control/ui — The owner's web console
 
 ## Design decisions
+- **Screen metadata is shared** — `M.consoleScreens` owns rendering, navigation, and Detailed-only route checks in one registry.
+- **Display mode is browser-local** — `M.mode()` reads Simple or Detailed; `M.chooseMode()` emits `meridian:mode` after an accepted change. Shared routes and drafts stay mounted, while leaving a Detailed-only route goes to Overview through the navigation guard.
+- **Overview composes owner reads** — bounded people queries, fleet health, opt-in UTC daily traffic, revisions, and recorded owner events provide its figures; unavailable history stays unavailable, and visible refreshes are passive.
+- **Sharing has one view** — Overview's bounded person picker and the person page use `share.js`; fetched links and QR data stay in memory.
 - **App testing stays transient** — Settings lists reviewed response rules read-only; the subscription form uses the shared tester without a person and the full preview with one, keeping headers and results only in memory.
 - **Declared removal drafts leave the browser as JSON** — one local download and selectable fallback serve the whole frozen set; the existing bulk commit still changes only service-owned people.
 - **Profile filters use query facets** — retain the selected ID in the fragment and expose default and zero-count profiles without a second catalog request.
@@ -31,6 +35,10 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Partial reads retain evidence** — failed traffic or recent-change reads keep usable data with retry and backoff; history-off clears the in-memory traffic window.
+- **Picker replies follow the query** — check both search and cursor before drawing, including during the debounce; expired cursors restart at the first page.
+- **Disclosure refresh keeps open state** — retain each server's capacity, history, billing, and action disclosures across passive reads; changing mode must not replace an edited form.
+- **Overview retries keep card slots** — an initial read failure replaces their content, or the next successful draw loses its target.
 - **Profile declaration refusals name the CLI review** — grants and membership have different fences; translated errors point to profile, fleet import, and apply without calling a declaration race a membership edit.
 - **Capacity gaps stay gaps** — null and stale readings never become zero; chart peak labels use observed peaks, not the axis minimum, and host traffic stays distinct from counted people traffic.
 - **Empty WebAuthn owner handles are null** — zero-length ArrayBuffers are truthy; never encode them as empty strings.

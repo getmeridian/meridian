@@ -11,7 +11,7 @@ const [, , , mode, locale, input] = process.argv;
 const data = JSON.parse(input === '-' ? fs.readFileSync(0, 'utf8') : input);
 const directory = path.resolve(data.directory);
 const html = fs.readFileSync(path.join(directory, 'console/index.html'), 'utf8');
-const dom = new JSDOM(html, { url: `https://198.51.100.1/demo/console/?lang=${locale}${data.route ? '#' + data.route : ''}`, runScripts: 'outside-only', pretendToBeVisual: true });
+const dom = new JSDOM(html, { url: `https://198.51.100.1/demo/console/?lang=${locale}#${data.route || '/people'}`, runScripts: 'outside-only', pretendToBeVisual: true });
 const w = dom.window;
 let demoNow;
 if (mode === 'showcase-queries' || ['schedule', 'undo', 'share', 'token', 'declared', 'calendar'].some(prefix => mode.startsWith('showcase-' + prefix + '-'))) {

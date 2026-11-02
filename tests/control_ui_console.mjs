@@ -146,7 +146,7 @@ w.fetch = (url, options) => {
     return { ...reply, text: async () => JSON.stringify(peoplePage((body.users || []).map(user => ({ ...user, display_name: data?.fleet?.display_names?.[user.username] || user.username, declared: (data?.fleet?.declared_users || []).includes(user.username) })))) };
   });
 };
-for (const script of ['core.js', 'drafts.js', 'passkeys.js', 'qr-export.js', 'people.js', 'people-bulk.js', 'people-bulk-fields.js', 'people-list.js', 'expiry.js', 'lifecycle.js', 'person-connections.js', 'capacity.js', 'fleet.js', 'tokens.js']) {
+for (const script of ['core.js', 'drafts.js', 'components.js', 'shell.js', 'passkeys.js', 'qr-export.js', 'people.js', 'people-bulk.js', 'people-bulk-fields.js', 'people-list.js', 'expiry.js', 'lifecycle.js', 'person-connections.js', 'share.js', 'capacity.js', 'fleet.js', 'tokens.js']) {
   w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 }
 const M = w.M;
@@ -541,9 +541,10 @@ if (mode.startsWith('phone-')) {
     w.document.body.appendChild(app);
     M.i18n.load = () => Promise.resolve();
     M.takeSetupToken = () => '';
+    M.renderOverview = view => M.mount(view, M.h('p', { text: 'Overview' }));
     w.eval(fs.readFileSync(path.join(ui, 'app.js'), 'utf8'));
     await settle();
-    report.signOutName = app.querySelector('.top button')?.getAttribute('aria-label') || '';
+    report.signOutName = app.querySelector('.account-menu [data-sign-out]')?.getAttribute('aria-label') || '';
   } else if (mode === 'phone-touch') {
     const targets = ['btn btn-sm', 'btn-icon', 'cmd-copy', 'tab'].map(className => M.h('button', { class: className }));
     M.mount(view, targets);

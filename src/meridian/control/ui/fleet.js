@@ -24,7 +24,8 @@
 
   // -- servers --------------------------------------------------------------------------------
 
-  M.renderServers = function (view) {
+  M.renderServers = function (view, selectedServer) {
+    var disclosureState = new Map(), firstDraw = true;
     var status = h("div", { class: "live-status" });
     var cards = h("div", { class: "live-data" }, h("div", { class: "empty" }, h("span", { class: "spinner" })));
     M.mount(view, [
@@ -37,6 +38,14 @@
       load: function (passive) { return M.api("GET", "ui/api/fleet", undefined, { passive: passive }); },
       draw: function (fleet) {
         M.state.fleet = fleet;
+        if (M.updateFleetTitle) M.updateFleetTitle();
+        cards.querySelectorAll("[data-server]").forEach(function (card) {
+          var states = {};
+          card.querySelectorAll("[data-mode-section], .capacity-history, .secondary-actions").forEach(function (detail) {
+            states[detail.dataset.modeSection || (detail.classList.contains("capacity-history") ? "history" : "actions")] = detail.open;
+          });
+          disclosureState.set(card.dataset.server, states);
+        });
         var servers = fleet.servers || [];
         var usage = fleet.server_usage || [];
         var attention = fleet.server_attention || [];
@@ -51,8 +60,24 @@
         usage.filter(function (item) {
           return !item.node_id || !servers.some(function (server) { return server.node_id === item.node_id; });
         }).forEach(function (item) { all.push(billingCard(item, reasons(item))); });
+        all.forEach(function (card) {
+          var states = disclosureState.get(card.dataset.server);
+          if (states) card.querySelectorAll("[data-mode-section], .capacity-history, .secondary-actions").forEach(function (detail) {
+            var key = detail.dataset.modeSection || (detail.classList.contains("capacity-history") ? "history" : "actions");
+            if (M.has(states, key)) detail.open = states[key];
+          });
+          if (selectedServer === card.dataset.server) {
+            card.classList.add("server-focused");
+            card.tabIndex = -1;
+            if (firstDraw) requestAnimationFrame(function () {
+              if (!card.isConnected) return;
+              card.focus({ preventScroll: true }); card.scrollIntoView({ block: "nearest" });
+            });
+          }
+        });
         M.mount(cards, all.length ? h("div", { class: "cards" }, all)
           : h("div", { class: "empty" }, h("p", { text: M.t("servers.empty") })));
+        firstDraw = false;
       },
       empty: function () { M.clear(cards); },
     });
@@ -71,7 +96,7 @@
     if (healthStatus === "healthy" && faults.length) healthStatus = "degraded";
     var coreUptime = checks.find(function (check) { return check.name === "xray.uptime"; });
     var up = coreUptime && /^up (\d+)\s*s$/.exec(coreUptime.message);
-    return h("section", { class: "card server" },
+    return h("section", { class: "card server", "data-server": server.node_id },
       h("div", { class: "card-head" },
         h("div", { class: "server-name" },
           h("span", { class: "dot " + (server.live ? "dot-ok" : "dot-err"), "aria-hidden": "true" }),
@@ -114,18 +139,20 @@
           return h("li", { class: "mono small", text: line });
         })))
         : null,
-      M.serverCapacity(server.capacity),
-      usage ? allowanceDetails(usage, attention) : h("p", { class: "muted small", text: M.t("server_allowance.approximate") }),
-      h("div", { class: "row-actions" }, h("button", { class: "btn btn-ghost btn-sm", type: "button",
-        onclick: function () { M.restartNode(server.node_id); } }, M.t("commands.restart"))));
+      M.detailedSection(M.t("capacity.title"), M.serverCapacity(server.capacity), "capacity"),
+      usage ? M.detailedSection(M.t("server_allowance.title"), allowanceDetails(usage, attention), "allowance")
+        : h("p", { class: "muted small", text: M.t("server_allowance.approximate") }),
+      h("details", { class: "secondary-actions" }, h("summary", { text: M.t("action.more") }),
+        h("div", { class: "row-actions" }, h("button", { class: "btn btn-ghost btn-sm", type: "button",
+          onclick: function () { M.restartNode(server.node_id); } }, M.t("commands.restart")))));
   }
 
   function billingDate(value) { return "\u2066" + String(value || "").slice(0, 10) + "\u2069"; }
 
   function billingCard(usage, attention) {
-    return h("section", { class: "card server" },
+    return h("section", { class: "card server", "data-server": usage.server_ref },
       h("div", { class: "card-head" }, h("h2", { class: "mono", text: usage.server_ref })),
-      allowanceDetails(usage, attention));
+      M.detailedSection(M.t("server_allowance.title"), allowanceDetails(usage, attention), "allowance"));
   }
 
   function allowanceDetails(usage, attention) {
