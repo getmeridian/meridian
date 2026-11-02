@@ -115,3 +115,46 @@ def test_cached_data_must_match_a_pin_and_never_starts_a_fetch(tmp_path: Path, m
 def test_truncated_geodata_is_refused(data: bytes) -> None:
     with pytest.raises(ValueError):
         GeoData.from_bytes(data, b"")
+
+
+def test_geodata_decodes_only_the_lists_an_explanation_reads(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Decoding every pinned list at once took over 400 MB and outgrew the control service's memory limit."""
+    from meridian.core import delivery_geodata
+
+    sites, ips = dataset()
+    sites += b"".join(
+        field(1, field(1, f"LIST-{n}") + field(2, field(1, 2) + field(2, f"{n}.test"))) for n in range(40)
+    )
+    decoded: list[bytes] = []
+    real = delivery_geodata._site_list
+    monkeypatch.setattr(delivery_geodata, "_site_list", lambda raw: decoded.append(raw) or real(raw))
+    data = GeoData.from_bytes(sites, ips)
+    assert len(data.sites) == 42 and not decoded
+    assert data.domain_matches("list-7", "www.7.test") is True
+    assert data.domain_matches("list-7", "8.test") is False
+    assert len(decoded) == 1
+    for n in range(40):
+        data.domain_matches(f"list-{n}", "x.test")
+    assert len(data.sites._decoded) == delivery_geodata.DECODED_LISTS  # type: ignore[attr-defined]
+    assert data.domain_matches("missing", "x.test") is None
+
+
+def test_pinned_geodata_stays_small_in_memory() -> None:
+    import os
+    import tracemalloc
+
+    binary = os.environ.get("MERIDIAN_TEST_XRAY")
+    folder = Path(binary).parent if binary else None
+    if folder is None or not (folder / "geosite.dat").is_file() or not (folder / "geoip.dat").is_file():
+        pytest.skip("pinned geodata beside MERIDIAN_TEST_XRAY is not available")
+    sites, ips = (folder / "geosite.dat").read_bytes(), (folder / "geoip.dat").read_bytes()
+    tracemalloc.start()
+    try:
+        data = GeoData.from_bytes(sites, ips)
+        assert data.domain_matches("private", "router.lan") is True
+        assert data.ip_matches("private", [ipaddress.ip_address("10.0.0.1")]) is True
+        assert data.domain_matches("category-ru", "yandex.ru") is True
+        _current, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert peak < 64 * 1024 * 1024

@@ -36,6 +36,7 @@
 
 ## Pitfalls
 - **Initial memberships resolve delivery defaults** — reject conflicting profile policies while validating topology, before a reviewed plan can promise an account creation that apply refuses.
+- **Geodata decodes lazily** — index list names and decode only what an explanation reads; decoding every pinned list took over 400 MB, and the control service was OOM-killed under its 256 MB limit.
 - **Geosite attributes are literal keys** — `@!cn` selects entries carrying `!cn`; treating it as the absence of `cn` changes the client's match.
 - **Explanations follow the client's name pass** — Xray's `IPIfNonMatch` catch-all ends hostname routing before DNS; an earlier IP rule cannot make a later domain match unknown.
 - **Metadata reveals cover containers** — exact revealed paths preserve nested lists and maps with secret-shaped identifiers; string credential fields and neighbouring branches remain redacted.
