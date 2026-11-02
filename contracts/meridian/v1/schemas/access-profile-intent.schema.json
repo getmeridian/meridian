@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "description": "A named set of reviewed exits, gateways, public endpoints, or authentication inbounds.",
+  "properties": {
+    "grants": {
+      "items": {
+        "pattern": "^(?:exit|gateway|inbound|endpoint):[a-z0-9][a-z0-9:_.-]{0,191}$",
+        "type": "string"
+      },
+      "maxItems": 10000,
+      "title": "Grants",
+      "type": "array"
+    },
+    "id": {
+      "maxLength": 48,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "title": "Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "grants"
+  ],
+  "title": "AccessProfileIntent",
+  "type": "object"
+}

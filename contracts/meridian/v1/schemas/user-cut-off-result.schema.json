@@ -855,6 +855,17 @@
         "period_traffic": {
           "$ref": "#/$defs/PeriodTraffic"
         },
+        "profiles": {
+          "description": "Operator-owned access membership; people.private reads it.",
+          "items": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "type": "string"
+          },
+          "title": "Profiles",
+          "type": "array"
+        },
         "quota_used_percent": {
           "anyOf": [
             {

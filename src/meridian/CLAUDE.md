@@ -21,6 +21,8 @@
 - **One owner per state** — the service owns users, `cluster.yml` owns topology, and the fence stops a stale or foreign copy from applying.
 - **Read-only fleet projection** — `adapters/cluster.py` is the only source of node and relay rows; it never shows gateways as exits or restricted relay hops as public endpoints.
 ## Pitfalls
+- **Restore declaration hashes are validated state** — checkpoints accept only a SHA-256 string or an absent legacy value, or malformed YAML can lose the reviewed boundary on resume.
+- **Profile history records service use** — explicit false means declarations are unsent; legacy named intent infers use only when the flag is absent, and later edits never clear recorded history.
 - **A handed-over fence.json is never a fallback** — an unreachable service is retried and refused, or a stale copy could apply around it.
 - **Server ownership compares canonical addresses and fails closed** — two spellings of one IPv6 address once passed as two machines; an unreadable context refuses, and bindings claim servers until retirement.
 - **A live agent that could not apply is a failed node**, and a refused service token (401/403) stops `fleet status` with exit 2 rather than reading as degraded.

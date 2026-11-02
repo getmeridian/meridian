@@ -1,6 +1,7 @@
 # content/docs — Markdown documentation source
 
 ## Design decisions
+**Access profile guides** — all locales describe shared-inbound grants, private service membership, default equivalence, gain/loss review, flow-block boundaries, and creation-only fleet export.
 **Protected metrics** — token, CLI, and privacy guides share explicit `metrics.read`, frozen presets, the private 443 ingress, authenticated Prometheus configuration, node-only labels, runtime memory bounds, omissions, and scrape-copy retention in every locale.
 **Capacity history** — client, CLI, and privacy guides share receipt freshness, null/zero states, 360 recent slots, 168 hourly buckets, UTC windows, measured intervals, and snapshot behaviour in every locale.
 **Node capacity** — privacy guides distinguish server aggregates from counted personal traffic, nullable collection, epoch resets, and the pinned core's unsupported connection counts in all four locales.

@@ -158,6 +158,8 @@ def _show(*, name: str, operation: OperationContext, connections: bool = False) 
             declared_usernames=access_users,
             read_usage=panel.recent_usage if cluster.runs_control_service else None,
             read_connections=panel.user_connections if connections else None,
+            read_access=panel.user_access if cluster.runs_control_service else None,
+            read_default_access=bool(cluster.topology_intent and cluster.topology_intent.access_profiles),
         )
     except ClientNotFoundError:
         fail(
@@ -188,6 +190,14 @@ def _show(*, name: str, operation: OperationContext, connections: bool = False) 
     print_handoff_links(result.subscription_url, page_url=result.share_url)
     if result.client.connections is not None:
         print_connections(result.client.connections)
+    if result.client.access is not None:
+        for connection in result.client.access.connections:
+            err_console.print(
+                "  "
+                + escape(connection.remark)
+                + " — "
+                + escape(t("profiles.granted_by", profiles=", ".join(connection.granted_by)))
+            )
 
     err_console.print()
     print_client_usage(detail)

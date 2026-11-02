@@ -61,6 +61,7 @@ READS_ONLY = frozenset(
         "client.usage",
         "client.preview",
         "client.bulk.receipt",
+        "profile.list",
         "doctor",
         "fleet.export",
         "fleet.history",

@@ -16,7 +16,8 @@
                 "tag",
                 "devices",
                 "renewal",
-                "delete"
+                "delete",
+                "set-profiles"
               ],
               "type": "string"
             },

@@ -1,6 +1,234 @@
 {
   "components": {
     "schemas": {
+      "AccessChange": {
+        "additionalProperties": false,
+        "properties": {
+          "gained": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Gained",
+            "type": "array"
+          },
+          "lost": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Lost",
+            "type": "array"
+          },
+          "profiles": {
+            "items": {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Profiles",
+            "type": "array"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "profiles",
+          "gained",
+          "lost"
+        ],
+        "title": "AccessChange",
+        "type": "object"
+      },
+      "AccessProfileCatalog": {
+        "additionalProperties": false,
+        "properties": {
+          "access_hash": {
+            "description": "Lowercase hex SHA-256 digest.",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Access Hash",
+            "type": "string"
+          },
+          "declarations_hash": {
+            "anyOf": [
+              {
+                "description": "Lowercase hex SHA-256 digest.",
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Declarations Hash"
+          },
+          "has_non_default_memberships": {
+            "default": false,
+            "title": "Has Non Default Memberships",
+            "type": "boolean"
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/AccessProfileSummary"
+            },
+            "title": "Profiles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "profiles",
+          "access_hash"
+        ],
+        "title": "AccessProfileCatalog",
+        "type": "object"
+      },
+      "AccessProfileReview": {
+        "additionalProperties": false,
+        "properties": {
+          "access_hash": {
+            "description": "Lowercase hex SHA-256 digest.",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Access Hash",
+            "type": "string"
+          },
+          "access_profiles": {
+            "maxProperties": 64,
+            "patternProperties": {
+              "^[a-z0-9][a-z0-9_-]*$": {
+                "items": {
+                  "pattern": "^inbound:[a-z0-9][a-z0-9:_.-]{0,191}$",
+                  "type": "string"
+                },
+                "maxItems": 10000,
+                "type": "array"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 48,
+              "minLength": 1
+            },
+            "title": "Access Profiles",
+            "type": "object"
+          },
+          "cut_off": {
+            "$ref": "#/components/schemas/CutOffPlan"
+          },
+          "gained_people": {
+            "minimum": 0,
+            "title": "Gained People",
+            "type": "integer"
+          },
+          "lost_people": {
+            "minimum": 0,
+            "title": "Lost People",
+            "type": "integer"
+          },
+          "people": {
+            "items": {
+              "$ref": "#/components/schemas/AccessChange"
+            },
+            "title": "People",
+            "type": "array"
+          }
+        },
+        "required": [
+          "access_hash",
+          "access_profiles",
+          "people",
+          "gained_people",
+          "lost_people",
+          "cut_off"
+        ],
+        "title": "AccessProfileReview",
+        "type": "object"
+      },
+      "AccessProfileReviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "access_profiles": {
+            "maxProperties": 64,
+            "patternProperties": {
+              "^[a-z0-9][a-z0-9_-]*$": {
+                "items": {
+                  "pattern": "^inbound:[a-z0-9][a-z0-9:_.-]{0,191}$",
+                  "type": "string"
+                },
+                "maxItems": 10000,
+                "type": "array"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 48,
+              "minLength": 1
+            },
+            "title": "Access Profiles",
+            "type": "object"
+          },
+          "existing_inbounds": {
+            "items": {
+              "$ref": "#/components/schemas/GrantedInbound"
+            },
+            "maxItems": 10000,
+            "title": "Existing Inbounds",
+            "type": "array"
+          },
+          "inbound_refs": {
+            "items": {
+              "pattern": "^inbound:[a-z0-9][a-z0-9:_.-]{0,191}$",
+              "type": "string"
+            },
+            "maxItems": 10000,
+            "title": "Inbound Refs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "access_profiles"
+        ],
+        "title": "AccessProfileReviewRequest",
+        "type": "object"
+      },
+      "AccessProfileSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "built_in": {
+            "default": false,
+            "title": "Built In",
+            "type": "boolean"
+          },
+          "id": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "title": "Id",
+            "type": "string"
+          },
+          "inbound_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Inbound Refs",
+            "type": "array"
+          },
+          "members": {
+            "minimum": 0,
+            "title": "Members",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "inbound_refs",
+          "members"
+        ],
+        "title": "AccessProfileSummary",
+        "type": "object"
+      },
       "AccountSchedulePreview": {
         "additionalProperties": false,
         "description": "Effective dates after catch-up; calculating them never writes or activates an account.",
@@ -654,7 +882,8 @@
               "tag",
               "devices",
               "renewal",
-              "delete"
+              "delete",
+              "set-profiles"
             ],
             "title": "Action",
             "type": "string"
@@ -715,6 +944,18 @@
             ],
             "default": null,
             "title": "Months"
+          },
+          "profiles": {
+            "items": {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Profiles",
+            "type": "array"
           },
           "renewal_interval_days": {
             "anyOf": [
@@ -832,7 +1073,8 @@
               "tag",
               "devices",
               "renewal",
-              "delete"
+              "delete",
+              "set-profiles"
             ],
             "title": "Action",
             "type": "string"
@@ -893,6 +1135,18 @@
             ],
             "default": null,
             "title": "Months"
+          },
+          "profiles": {
+            "items": {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Profiles",
+            "type": "array"
           },
           "renewal_interval_days": {
             "anyOf": [
@@ -1067,7 +1321,8 @@
                   "tag",
                   "devices",
                   "renewal",
-                  "delete"
+                  "delete",
+                  "set-profiles"
                 ],
                 "type": "string"
               },
@@ -1156,6 +1411,18 @@
           },
           "period_traffic": {
             "$ref": "#/components/schemas/PeriodTraffic"
+          },
+          "profiles": {
+            "items": {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Profiles",
+            "type": "array"
           },
           "renewal_anchor_at": {
             "anyOf": [
@@ -1304,6 +1571,17 @@
       "BulkPersonChange": {
         "additionalProperties": false,
         "properties": {
+          "access": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccessChange"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "after": {
             "anyOf": [
               {
@@ -1335,6 +1613,17 @@
             ],
             "default": null,
             "title": "Cli Command"
+          },
+          "cut_off": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CutOffPlan"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "display_name": {
             "title": "Display Name",
@@ -1562,6 +1851,7 @@
               }
             ],
             "default": null,
+            "description": "Projected or completed inverse changes; a dry run leaves undone_at null.",
             "title": "Undo People"
           },
           "undo_until": {
@@ -1610,6 +1900,12 @@
       "BulkUndoRequest": {
         "additionalProperties": false,
         "properties": {
+          "dry_run": {
+            "default": false,
+            "description": "Validate all undo preconditions and return inverse changes without writing.",
+            "title": "Dry Run",
+            "type": "boolean"
+          },
           "receipt_id": {
             "pattern": "^[0-9a-f]{32}$",
             "title": "Receipt Id",
@@ -2543,6 +2839,20 @@
             "title": "Host",
             "type": "string"
           },
+          "inbound_ref": {
+            "anyOf": [
+              {
+                "pattern": "^inbound:[a-z0-9][a-z0-9:_.-]{0,191}$",
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "title": "Inbound Ref"
+          },
           "path": {
             "default": "",
             "title": "Path",
@@ -3474,6 +3784,92 @@
         "title": "FormatRule",
         "type": "object"
       },
+      "GrantedConnection": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "granted_by": {
+            "items": {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "title": "Granted By",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "inbound_ref": {
+            "title": "Inbound Ref",
+            "type": "string"
+          },
+          "protocol": {
+            "enum": [
+              "reality",
+              "xhttp",
+              "wss",
+              "hysteria2"
+            ],
+            "title": "Protocol",
+            "type": "string"
+          },
+          "remark": {
+            "title": "Remark",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "remark",
+          "protocol",
+          "inbound_ref",
+          "granted_by",
+          "available"
+        ],
+        "title": "GrantedConnection",
+        "type": "object"
+      },
+      "GrantedInbound": {
+        "additionalProperties": false,
+        "properties": {
+          "granted_by": {
+            "items": {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "title": "Granted By",
+            "type": "array"
+          },
+          "inbound_ref": {
+            "title": "Inbound Ref",
+            "type": "string"
+          },
+          "inbound_tag": {
+            "title": "Inbound Tag",
+            "type": "string"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "inbound_tag",
+          "inbound_ref",
+          "granted_by"
+        ],
+        "title": "GrantedInbound",
+        "type": "object"
+      },
       "HealthCheck": {
         "additionalProperties": false,
         "description": "One local health probe (for example `xray`, `nginx`, `disk`).",
@@ -3835,6 +4231,20 @@
             ],
             "title": "Flow",
             "type": "string"
+          },
+          "inbound_ref": {
+            "anyOf": [
+              {
+                "pattern": "^inbound:[a-z0-9][a-z0-9:_.-]{0,191}$",
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "title": "Inbound Ref"
           },
           "protocol": {
             "enum": [
@@ -4640,6 +5050,25 @@
         "additionalProperties": false,
         "description": "What the deployer asks one node to run; the service adds user resources and signs.",
         "properties": {
+          "access_profiles": {
+            "maxProperties": 64,
+            "patternProperties": {
+              "^[a-z0-9][a-z0-9_-]*$": {
+                "items": {
+                  "pattern": "^inbound:[a-z0-9][a-z0-9:_.-]{0,191}$",
+                  "type": "string"
+                },
+                "maxItems": 10000,
+                "type": "array"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 48,
+              "minLength": 1
+            },
+            "title": "Access Profiles",
+            "type": "object"
+          },
           "managed_inbounds": {
             "description": "Each gets a users resource, `users_resource_id(tag)`, right after the `xray_config` resource.",
             "items": {
@@ -5244,7 +5673,8 @@
               "unsupported_format",
               "disabled_endpoint",
               "status_placeholder",
-              "availability_placeholder"
+              "availability_placeholder",
+              "access_profile"
             ],
             "title": "Reason",
             "type": "string"
@@ -6082,6 +6512,49 @@
           }
         },
         "title": "PeriodTraffic",
+        "type": "object"
+      },
+      "PersonAccess": {
+        "additionalProperties": false,
+        "properties": {
+          "connections": {
+            "items": {
+              "$ref": "#/components/schemas/GrantedConnection"
+            },
+            "title": "Connections",
+            "type": "array"
+          },
+          "inbounds": {
+            "items": {
+              "$ref": "#/components/schemas/GrantedInbound"
+            },
+            "title": "Inbounds",
+            "type": "array"
+          },
+          "profiles": {
+            "items": {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Profiles",
+            "type": "array"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "profiles",
+          "inbounds",
+          "connections"
+        ],
+        "title": "PersonAccess",
         "type": "object"
       },
       "PersonAttention": {
@@ -7710,6 +8183,39 @@
       "ServiceSettings": {
         "additionalProperties": false,
         "properties": {
+          "access_profile_declarations_hash": {
+            "anyOf": [
+              {
+                "description": "Lowercase hex SHA-256 digest.",
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Access Profile Declarations Hash"
+          },
+          "access_profiles": {
+            "maxProperties": 64,
+            "patternProperties": {
+              "^[a-z0-9][a-z0-9_-]*$": {
+                "items": {
+                  "pattern": "^inbound:[a-z0-9][a-z0-9:_.-]{0,191}$",
+                  "type": "string"
+                },
+                "maxItems": 10000,
+                "type": "array"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 48,
+              "minLength": 1
+            },
+            "title": "Access Profiles",
+            "type": "object"
+          },
           "client_routing": {
             "default": "ru-split",
             "enum": [
@@ -7798,6 +8304,160 @@
           "profile_title"
         ],
         "title": "ServiceSettings",
+        "type": "object"
+      },
+      "ServiceSettingsWrite": {
+        "additionalProperties": false,
+        "properties": {
+          "access_profile_declarations_hash": {
+            "anyOf": [
+              {
+                "description": "Lowercase hex SHA-256 digest.",
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Access Profile Declarations Hash"
+          },
+          "access_profiles": {
+            "maxProperties": 64,
+            "patternProperties": {
+              "^[a-z0-9][a-z0-9_-]*$": {
+                "items": {
+                  "pattern": "^inbound:[a-z0-9][a-z0-9:_.-]{0,191}$",
+                  "type": "string"
+                },
+                "maxItems": 10000,
+                "type": "array"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 48,
+              "minLength": 1
+            },
+            "title": "Access Profiles",
+            "type": "object"
+          },
+          "client_routing": {
+            "default": "ru-split",
+            "enum": [
+              "ru-split",
+              "full"
+            ],
+            "title": "Client Routing",
+            "type": "string"
+          },
+          "color": {
+            "default": "",
+            "enum": [
+              "",
+              "ocean",
+              "sunset",
+              "forest",
+              "lavender",
+              "rose",
+              "slate"
+            ],
+            "title": "Color",
+            "type": "string"
+          },
+          "exit_countries": {
+            "items": {
+              "maxLength": 2,
+              "pattern": "^$|^[A-Za-z]{2}$",
+              "type": "string"
+            },
+            "maxItems": 250,
+            "title": "Exit Countries",
+            "type": "array"
+          },
+          "expected_access_hash": {
+            "anyOf": [
+              {
+                "description": "Lowercase hex SHA-256 digest.",
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expected Access Hash"
+          },
+          "expected_profile_declarations_hash": {
+            "anyOf": [
+              {
+                "description": "Lowercase hex SHA-256 digest.",
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expected Profile Declarations Hash"
+          },
+          "owner_contact": {
+            "$ref": "#/components/schemas/OwnerContact",
+            "description": "Optional public owner contact, chosen through reviewed delivery intent."
+          },
+          "profile_title": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Profile Title",
+            "type": "string"
+          },
+          "public_url": {
+            "default": "",
+            "description": "Public base of subscriptions and connection pages (scheme, host, connection-page path), without a trailing slash; empty leaves out the links built from it.",
+            "maxLength": 512,
+            "pattern": "^(?:https://[^\\s/]+(?:/[A-Za-z0-9._~-]+)*)?$",
+            "title": "Public Url",
+            "type": "string"
+          },
+          "server_icon": {
+            "default": "",
+            "maxLength": 409600,
+            "title": "Server Icon",
+            "type": "string"
+          },
+          "server_name": {
+            "default": "",
+            "maxLength": 100,
+            "title": "Server Name",
+            "type": "string"
+          },
+          "servers": {
+            "patternProperties": {
+              "^[^\\r\\n\\t]+$": {
+                "$ref": "#/components/schemas/ServerAllowanceSpec"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 120,
+              "minLength": 1
+            },
+            "title": "Servers",
+            "type": "object"
+          },
+          "update_interval_hours": {
+            "default": 6,
+            "maximum": 168,
+            "minimum": 1,
+            "title": "Update Interval Hours",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profile_title"
+        ],
+        "title": "ServiceSettingsWrite",
         "type": "object"
       },
       "ServiceSignature": {
@@ -8670,6 +9330,18 @@
             "default": null,
             "title": "Expire At"
           },
+          "profiles": {
+            "items": {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Profiles",
+            "type": "array"
+          },
           "renewal_interval_days": {
             "anyOf": [
               {
@@ -9189,6 +9861,27 @@
             "title": "Note",
             "type": "string"
           },
+          "profiles": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 48,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                  "type": "string"
+                },
+                "maxItems": 64,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Omitted preserves existing membership, or selects default for a new person.",
+            "title": "Profiles"
+          },
           "renewal_anchor_at": {
             "anyOf": [
               {
@@ -9502,6 +10195,18 @@
             "title": "Note",
             "type": "string"
           },
+          "profiles": {
+            "items": {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Profiles",
+            "type": "array"
+          },
           "renewal_interval_days": {
             "anyOf": [
               {
@@ -9796,6 +10501,17 @@
           },
           "period_traffic": {
             "$ref": "#/components/schemas/PeriodTraffic"
+          },
+          "profiles": {
+            "description": "Operator-owned access membership; people.private reads it.",
+            "items": {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "title": "Profiles",
+            "type": "array"
           },
           "quota_used_percent": {
             "anyOf": [
@@ -10300,6 +11016,18 @@
             "title": "Note",
             "type": "string"
           },
+          "profiles": {
+            "items": {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Profiles",
+            "type": "array"
+          },
           "renewal_interval_days": {
             "anyOf": [
               {
@@ -10625,6 +11353,209 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",
   "paths": {
+    "/api/access-profiles": {
+      "get": {
+        "description": "Requires people.read and people.private capabilities. Compatible presets: people, including scopes that cover them.",
+        "operationId": "access_profile_catalog",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessProfileCatalog"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Read reviewed profiles and private membership counts.",
+        "tags": [
+          "access-profiles"
+        ],
+        "x-meridian-capabilities": [
+          "people.read",
+          "people.private"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "people"
+        ]
+      }
+    },
+    "/api/access-profiles/preview": {
+      "post": {
+        "description": "Requires fleet.apply and people.private capabilities. Compatible presets: admin, including scopes that cover them. Read-only. A grant covers every endpoint sharing its authentication inbound. The returned access_hash fences membership at apply.",
+        "operationId": "access_profile_preview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccessProfileReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessProfileReview"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "profile_in_use"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Review who gains or loses access before applying a topology change.",
+        "tags": [
+          "access-profiles"
+        ],
+        "x-meridian-capabilities": [
+          "fleet.apply",
+          "people.private"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "admin"
+        ]
+      }
+    },
     "/api/attention": {
       "get": {
         "description": "Requires fleet.read capabilities. Compatible presets: read, including scopes that cover them.",
@@ -14289,7 +15220,7 @@
     },
     "/api/people/bulk/undo": {
       "post": {
-        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Undo lasts 10 minutes, survives service restarts, and is single-use. Reset and delete cannot be undone.",
+        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Undo lasts 10 minutes, survives service restarts, and is single-use. Reset and delete cannot be undone. dry_run=true checks people, grants, nodes, and restored profiles without writing, returning undo_people.",
         "operationId": "undo_people_bulk",
         "requestBody": {
           "content": {
@@ -14793,6 +15724,9 @@
         ],
         "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
+        "x-meridian-extra-capabilities": {
+          "private_membership": "people.private"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "propose"
@@ -14893,6 +15827,9 @@
         ],
         "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
+        "x-meridian-extra-capabilities": {
+          "private_membership": "people.private"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "read"
@@ -15007,6 +15944,7 @@
         "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-extra-capabilities": {
+          "private_membership": "people.private",
           "self_approval": "revisions.approve_own"
         },
         "x-meridian-scope-mode": "any",
@@ -15158,6 +16096,9 @@
         ],
         "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
+        "x-meridian-extra-capabilities": {
+          "private_membership": "people.private"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "admin"
@@ -15322,7 +16263,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ServiceSettings"
+                "$ref": "#/components/schemas/ServiceSettingsWrite"
               }
             }
           },
@@ -15379,6 +16320,22 @@
               "insufficient_scope"
             ]
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "profile_in_use",
+              "profile_review_required",
+              "stale_access",
+              "stale_profile_declarations"
+            ]
+          },
           "413": {
             "content": {
               "application/json": {
@@ -15428,7 +16385,7 @@
     },
     "/api/subscription/preview": {
       "post": {
-        "description": "Requires fleet.read capabilities. Compatible presets: read, including scopes that cover them.",
+        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them.",
         "operationId": "subscription_preview",
         "requestBody": {
           "content": {
@@ -15541,13 +16498,17 @@
           "subscription"
         ],
         "x-meridian-capabilities": [
-          "fleet.read"
+          "people.read"
         ],
         "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
+        "x-meridian-extra-capabilities": {
+          "access_profiles": "people.private"
+        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
-          "read"
+          "read",
+          "people"
         ]
       }
     },
@@ -16221,7 +17182,7 @@
     },
     "/api/users": {
       "get": {
-        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them. User UUIDs and subscription tokens need people.credentials; private notes and tags need people.private. These fields are otherwise blank, including in mutation responses. People and admin presets include both. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them. User UUIDs and subscription tokens need people.credentials; private notes, tags, and profiles need people.private. These fields are otherwise blank, including in mutation responses. People and admin presets include both. This response can contain credentials; keep it private and do not log it.",
         "operationId": "list_users",
         "responses": {
           "200": {
@@ -16850,7 +17811,7 @@
         ]
       },
       "get": {
-        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them. User UUIDs and subscription tokens need people.credentials; private notes and tags need people.private. These fields are otherwise blank, including in mutation responses. People and admin presets include both. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them. User UUIDs and subscription tokens need people.credentials; private notes, tags, and profiles need people.private. These fields are otherwise blank, including in mutation responses. People and admin presets include both. This response can contain credentials; keep it private and do not log it.",
         "operationId": "get_user",
         "parameters": [
           {
@@ -17180,6 +18141,107 @@
         ]
       }
     },
+    "/api/users/{username}/access": {
+      "get": {
+        "description": "Requires people.read and people.private capabilities. Compatible presets: people, including scopes that cover them.",
+        "operationId": "person_access",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "username",
+            "required": true,
+            "schema": {
+              "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonAccess"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Read a person's effective grants and the profiles that allow each connection.",
+        "tags": [
+          "users"
+        ],
+        "x-meridian-capabilities": [
+          "people.read",
+          "people.private"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "people"
+        ]
+      }
+    },
     "/api/users/{username}/connections": {
       "get": {
         "description": "Requires people.credentials capabilities. Compatible presets: people, including scopes that cover them. Each connection URI and format URL connects as the person. This response can contain credentials; keep it private and do not log it.",
@@ -17282,7 +18344,7 @@
     },
     "/api/users/{username}/cut-off": {
       "get": {
-        "description": "Requires commands.read capabilities. Compatible presets: read, including scopes that cover them.",
+        "description": "Requires people.read and people.private capabilities. Compatible presets: people, including scopes that cover them. Includes current grants and unresolved access-change receipts; membership is private operator data.",
         "operationId": "cut_off_scope",
         "parameters": [
           {
@@ -17370,13 +18432,14 @@
           "users"
         ],
         "x-meridian-capabilities": [
-          "commands.read"
+          "people.read",
+          "people.private"
         ],
         "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
-          "read"
+          "people"
         ]
       }
     },

@@ -181,6 +181,7 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
             "tag",
             "devices",
             "renewal",
+            "set-profiles",
             "delete",
             "undo",
             "receipt",
@@ -404,6 +405,19 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         ],
         stability="preview",
     ),
+    **{
+        "profile." + action: CommandOutput(
+            data_schema="profile-list" if action == "list" else "profile-edit",
+            outcomes=[
+                _ok("access profiles were read or reviewed"),
+                _ok("no grants changed", status="no_changes"),
+                _ok("reviewed grants were applied", status="changed"),
+                *_FAILURES,
+            ],
+            stability="preview",
+        )
+        for action in ("add", "set", "remove", "list")
+    },
     "fleet.routing": CommandOutput(
         data_schema="fleet-routing",
         outcomes=[

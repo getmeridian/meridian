@@ -9,11 +9,16 @@ from pydantic import Field
 
 from meridian.control.command_models import NodeCommandOutcome
 from meridian.control.models import UserStatus, UserUsage
+from meridian.core.access_profile_views import PersonAccess
+from meridian.core.access_profiles import default_profiles
 from meridian.core.account_schedule import AccountLifecycleState, AccountSchedulePreview
 from meridian.core.client_devices import DeviceCap
 from meridian.core.client_limits import canonical_expiry, traffic_reset_from_strategy
+from meridian.core.client_sessions import UserFlowBlocks
+from meridian.core.inputs import TopologyIdValue
 from meridian.core.languages import Language
 from meridian.core.models import CoreModel
+from meridian.core.people_bulk import BulkPreview, BulkReceipt
 from meridian.core.people_query import PeopleFacets
 from meridian.core.person_activity import PersonAttentionReason
 from meridian.core.person_metadata import PersonTag, PrivateNote
@@ -69,6 +74,9 @@ class ClientRecord(UserTrafficEvidence, AccountLifecycleState):
     """Redacted client metadata suitable for list views."""
 
     username: str
+    profiles: list[TopologyIdValue] = Field(
+        default_factory=default_profiles, description="Operator-owned access memberships; people/admin only."
+    )
     id: str
     status: str
     traffic_used_bytes: int
@@ -173,6 +181,7 @@ class ClientShowResult(CoreModel):
     """Result for showing one client."""
 
     client: ClientDetail
+    access: PersonAccess | None = Field(default=None, exclude_if=lambda value: value is None)
     handoff: ClientHandoff
     connections: ClientConnections | None = Field(default=None, description="Only requested by --connections.")
     usage: UserUsage | None = Field(
@@ -241,6 +250,10 @@ class ClientLimitsResult(CoreModel):
     """Result for changing a client's limits or resetting their traffic: the client as the panel now has it."""
 
     client: ClientRecord
+    profile_preview: BulkPreview | None = Field(default=None, exclude_if=lambda value: value is None)
+    profile_receipt: BulkReceipt | None = Field(default=None, exclude_if=lambda value: value is None)
+    access: PersonAccess | None = Field(default=None, exclude_if=lambda value: value is None)
+    flow_blocks: UserFlowBlocks | None = Field(default=None, exclude_if=lambda value: value is None)
     schedule_preview: AccountSchedulePreview | None = Field(default=None, exclude_if=lambda value: value is None)
     applied: bool = Field(default=True, exclude_if=lambda value: value is True)
 
@@ -278,6 +291,7 @@ def build_client_record(
             }
         ).model_dump(),
         username=user.username,
+        profiles=getattr(user, "profiles", default_profiles()),
         id=user.id,
         status=user.status,
         traffic_used_bytes=user.used_traffic_bytes,
@@ -351,9 +365,11 @@ def build_client_show_result(
     declared: bool = True,
     usage: UserUsage | None = None,
     connections: ClientConnections | None = None,
+    access: PersonAccess | None = None,
 ) -> ClientShowResult:
     """Build a one-client result with optional handoff links."""
     return ClientShowResult(
+        access=access,
         client=build_client_detail(user, declared=declared),
         handoff=ClientHandoff(
             share_available=bool(share_url),

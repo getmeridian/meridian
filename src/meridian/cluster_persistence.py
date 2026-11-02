@@ -285,6 +285,7 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         control_migration=control_migration,
         control_restore=control_restore,
         topology_intent=v3.topology_intent,
+        access_profiles_used=v3.access_profiles_used,
         workloads=v3.workloads,
         managed_bindings=v3.managed_bindings,
         allocations=v3.allocations,
@@ -364,7 +365,7 @@ def _validate_cluster_structure(data: dict[str, Any]) -> None:
 
     for key in ("panel", "branding"):
         _require_mapping(data, key)
-    for key in ("subscription_page", "telegram", "control_migration"):
+    for key in ("subscription_page", "telegram", "control_migration", "control_restore"):
         _require_mapping(data, key, nullable=True)
 
     validate_cluster_v3_structure(data)

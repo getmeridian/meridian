@@ -91,6 +91,7 @@ def drop_flow_blocks_schema(db: sqlite3.Connection) -> None:
 
 def drop_owner_capability_schema(db: sqlite3.Connection) -> None:
     """Rewind schema step 22 before replaying any earlier migration."""
+    drop_capacity_schema(db)
     for table in ("ui_passkeys", "ui_passkey_owner"):
         db.execute(f"DROP TABLE IF EXISTS {table}")
     if "capabilities" in {row[1] for row in db.execute("PRAGMA table_info(api_tokens)")}:
@@ -137,6 +138,7 @@ def bootstrap_context(**fields: object) -> ProvisionContext:
 
 def drop_people_query_schema(db: sqlite3.Connection) -> None:
     """Rewound fixtures drop later people indices, triggers, and receipt tables."""
+    drop_access_membership_schema(db)
     for kind, name in db.execute(
         "SELECT type, name FROM sqlite_master WHERE name LIKE 'people_%' AND type IN ('index', 'trigger')"
     ).fetchall():
@@ -144,3 +146,17 @@ def drop_people_query_schema(db: sqlite3.Connection) -> None:
     db.execute("DROP TABLE IF EXISTS bulk_receipts")
     db.execute("DROP TABLE IF EXISTS people_versions")
     drop_flow_blocks_schema(db)
+
+
+def drop_access_membership_schema(db: sqlite3.Connection) -> None:
+    """Rewind the self-contained membership step before dropping people row versions."""
+    for name in ("default", "insert", "delete"):
+        db.execute(f"DROP TRIGGER IF EXISTS access_membership_{name}")
+    db.execute("DROP TABLE IF EXISTS user_access_memberships")
+
+
+def drop_capacity_schema(db: sqlite3.Connection) -> None:
+    """Rewind capacity schema 23 after removing the later membership step."""
+    drop_access_membership_schema(db)
+    for table in ("node_capacity_hourly", "node_capacity_state"):
+        db.execute(f"DROP TABLE IF EXISTS {table}")

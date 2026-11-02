@@ -11,8 +11,9 @@ from rich.markup import escape
 from rich.table import Table
 
 from meridian.cli_people import people_query
-from meridian.commands._helpers import load_topology_cluster
+from meridian.commands._helpers import load_topology_cluster, require_intent
 from meridian.commands.client_limits import parse_limit_options
+from meridian.commands.profile_review import require_profile_backend
 from meridian.console import confirm, err_console, error_context, fail, is_json_mode, ok, warn
 from meridian.control.access_limits import limit_update
 from meridian.control.client import ControlClient, ControlServiceError, ControlServiceUncertain
@@ -37,7 +38,9 @@ from meridian.renderers import emit_json
 
 
 def parse_bulk_action(action: BulkActionName, options: dict[str, Any]) -> BulkAction:
-    if action == "extend":
+    if action == "set-profiles":
+        params = {"profiles": options.get("profile")}
+    elif action == "extend":
         params = {
             name: bounded_integer(options[name], "--" + name, 1, 3650 if name == "days" else 120)
             for name in ("days", "months")
@@ -69,6 +72,8 @@ def field_value(fields: BulkFields | None, name: str) -> str:
     value = getattr(fields, name, None)
     if name == "status":
         return t(f"bulk.status.{fields.status}")
+    if name == "profiles":
+        return ", ".join(fields.profiles)
     if name == "device_limit":
         return t("bulk.inherit") if value is None else t("bulk.unlimited") if value == 0 else str(value)
     if name == "traffic_limit_bytes":
@@ -78,7 +83,7 @@ def field_value(fields: BulkFields | None, name: str) -> str:
     return t("bulk.none") if value is None or value == "" else str(value)
 
 
-def preview_table(people: list[BulkPersonChange], *, undo: bool = False) -> None:
+def preview_table(people: list[BulkPersonChange]) -> None:
     table = Table(title=t("bulk.preview_title"), show_lines=True)
     for key in ("person", "field", "before", "after"):
         table.add_column(t("bulk." + key))
@@ -89,15 +94,25 @@ def preview_table(people: list[BulkPersonChange], *, undo: bool = False) -> None
             table.add_row(escape(person.display_name), t("bulk.unchanged"), "", "")
         else:
             for index, field in enumerate(person.changes):
-                left, right = (person.after, person.before) if undo else (person.before, person.after)
                 table.add_row(
                     escape(person.display_name) if index == 0 else "",
                     t(f"bulk.field.{field}"),
-                    escape(field_value(left, field)),
-                    escape(field_value(right, field)),
+                    escape(field_value(person.before, field)),
+                    escape(field_value(person.after, field)),
                 )
         for warning in person.warnings:
             warn(t(f"bulk.warning.{warning}"))
+        if person.access is not None:
+            for key, refs in (("gained", person.access.gained), ("lost", person.access.lost)):
+                if refs:
+                    err_console.print(escape(t("profiles." + key)) + ": " + escape(", ".join(refs)))
+            if person.access.lost:
+                from meridian.commands.node_command_results import cut_off_disclosure
+
+                warn(t("profiles.revocation"))
+                if person.cut_off is not None:
+                    err_console.print(escape(t("profiles.hard_cut_scope")))
+                    err_console.print(escape(cut_off_disclosure(person.cut_off)))
     err_console.print(table)
 
 
@@ -168,6 +183,8 @@ def run_bulk(action: BulkActionName, options: dict[str, Any]) -> None:
         if is_json_mode() and not yes and not dry_run:
             fail(t("bulk.json_confirm"), hint_type="user")
         cluster = load_topology_cluster()
+        if action == "set-profiles":
+            require_profile_backend(require_intent(cluster), requested=True)
         try:
             with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
                 review = client.preview_bulk(request)
@@ -223,8 +240,10 @@ def run_receipt(receipt_id: str, *, undo: bool = False, yes: bool = False, dry_r
                 receipt = client.bulk_receipt(receipt_id)
                 if undo:
                     require_undo_eligible(receipt)
+                    receipt = client.preview_bulk_undo(receipt_id)
                 if not is_json_mode():
-                    preview_table(receipt.people, undo=undo)
+                    people = receipt.undo_people if undo else receipt.people
+                    preview_table(people or [])
                 if undo and not dry_run:
                     if not yes and not confirm(t("bulk.undo_confirm", count=receipt.counts.changed)):
                         raise typer.Exit(1)

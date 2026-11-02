@@ -12,6 +12,7 @@ panel probes have no equivalent. Once Remnawave is gone the compiler emits these
 
 from __future__ import annotations
 
+from meridian.compiler.access_profiles import compile_access_profiles
 from meridian.compiler.builder import PlanBuilder
 from meridian.compiler.client_delivery import ALT_FINGERPRINT_TAG
 from meridian.compiler.errors import TopologyCompileError
@@ -39,6 +40,7 @@ from meridian.compiler.models import (
     SubscriptionSettingsPayload,
     make_resource,
 )
+from meridian.core.access_profiles import profile_declarations_hash
 from meridian.core.server_allowances import ServerAllowanceSpec
 from meridian.core.topology import SetupIntent
 
@@ -72,6 +74,7 @@ def validate_meridian_backend(intent: SetupIntent) -> None:
 def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilder:
     """Return a builder whose panel-shaped resources are replaced by Meridian's own kinds."""
     old = builder.resources
+    access_profiles = compile_access_profiles(intent, old)
     renamed: dict[str, str | None] = {}
     replacements: dict[str, tuple[ResourcePayload, list[str], list[ResourcePostcondition]]] = {}
 
@@ -120,6 +123,7 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
                     server_ref=payload.server_ref,
                     agent_ref=agent_id,
                     profile=profile,
+                    access_profiles=access_profiles,
                 ),
                 [f"profile:{exit_id}", f"binding:{exit_id}", logical_id, *profile.inbound_refs],
                 extra=[agent_id],
@@ -136,6 +140,7 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
                     owner_ref=payload.owner_ref,
                     # A relay owns its Host, but the keys belong to the exit whose node serves it.
                     workload_ref=_workload_of(payload, old),
+                    inbound_ref=payload.inbound_ref if access_profiles else "",
                     remark=payload.remark,
                     protocol=payload.protocol,
                     address_server_ref=payload.address_server_ref,
@@ -157,7 +162,7 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
                 ControlUserPayload(
                     username=payload.username, creation_settings=intent.access.creation_settings.get(payload.username)
                 ),
-                [CONTROL_SERVICE_ID],
+                [CONTROL_SERVICE_ID, SERVICE_SETTINGS_ID],
                 _exists(account_id),
             )
         elif isinstance(payload, SubscriptionSettingsPayload):
@@ -165,6 +170,10 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
             replacements[SERVICE_SETTINGS_ID] = (
                 ServiceSettingsPayload(
                     owner_contact=intent.delivery.owner_contact,
+                    access_profiles=access_profiles,
+                    access_profile_declarations_hash=(
+                        profile_declarations_hash(intent.access_profiles) if intent.access_profiles else None
+                    ),
                     servers=_server_settings(intent),
                     profile_title=payload.profile_title,
                     update_interval_hours=payload.update_interval_hours,
@@ -189,6 +198,21 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
         elif _panel_only(payload, old):
             renamed[logical_id] = None
 
+    settings, dependencies, conditions = replacements[SERVICE_SETTINGS_ID]
+    replacements[SERVICE_SETTINGS_ID] = (
+        settings,
+        sorted(
+            {
+                *dependencies,
+                *(
+                    logical_id
+                    for logical_id, (payload, _, _) in replacements.items()
+                    if isinstance(payload, NodeWorkloadPayload | ClientEndpointPayload)
+                ),
+            }
+        ),
+        conditions,
+    )
     result = PlanBuilder()
     for logical_id, resource in old.items():
         if logical_id in renamed:

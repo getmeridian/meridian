@@ -6,6 +6,7 @@ from typing import Literal, Self
 
 from pydantic import Field, field_validator, model_validator
 
+from meridian.core.access_profiles import AccessProfileIntent
 from meridian.core.inputs import (
     OptionalCountryCodeValue,
     OptionalHostnameValue,
@@ -139,6 +140,7 @@ class SetupAccessSelection(CoreModel):
     """Human access and canonical subscription delivery choices."""
 
     access: AccessIntent
+    access_profiles: list[AccessProfileIntent] = Field(default_factory=list, exclude_if=lambda value: not value)
     delivery: DeliveryIntent = Field(default_factory=DeliveryIntent)
 
 
@@ -223,6 +225,7 @@ class SetupDraft(CoreModel):
             ),
             access=SetupAccessSelection(
                 access=intent.access,
+                access_profiles=intent.access_profiles,
                 delivery=intent.delivery,
             ),
         )
@@ -344,6 +347,7 @@ class SetupDraft(CoreModel):
             routes=self.routing.routes,
             default_egress_ref=self.routing.default_egress_ref,
             access=self.access.access,
+            access_profiles=self.access.access_profiles,
             delivery=self.access.delivery,
             harden=self.roles.harden,
             forward_client_ips=self.roles.forward_client_ips,

@@ -15,6 +15,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b9
 
 #### Added
+- Reviewed access profiles with service-owned membership, enforced inbound grants,
+  gain/loss previews, private effective-access views, CLI and console assignment,
+  bulk reviews, and snapshot and import preservation. Default access stays full.
 - Authenticated Prometheus metrics on the existing private control ingress with
   an explicit read-only `metrics.read` grant, node-only capacity/traffic series,
   route-ID request counters and latency, background health, and SQLite size (#55).
@@ -54,6 +57,57 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Bind imported restore state to the current context's file guard, accepting
+  existing cluster files without topology while refusing concurrent file edits.
+- Review non-default profile memberships even when their live declarations and
+  fingerprint are missing. Refuse previews and settings writes that would leave
+  those memberships pointing at profiles absent from the proposed map.
+- Refuse another fleet's snapshot before profile checks or target registration,
+  preserving the existing user-facing restore error on fresh and resumed runs.
+- Keep snapshot profile history and clear carried unfinished checkpoints when
+  importing fleet files into an empty restore context, even if review fails
+  or the remote restore is declined.
+- Resume profile setup after failures or cancellation before declarations reach
+  the service. Record profile use immediately before the settings write, keeping
+  later outages protected even when its reply is lost.
+- Preserve deposited profile history when restore keeps local topology, and
+  refuse mismatched snapshot profiles before staging, uploading, or installing.
+  Pin reviewed declarations through restore checkpoints and fence matching
+  legacy profile adoption without approving later live edits.
+- Fence setup and every imperative apply against reviewed profile declarations
+  before local saves or remote writes. Keep topology expansion of unchanged
+  grants working, and re-check the fingerprint atomically with service settings.
+- Save profile history with accepted topology after the fleet fence check,
+  preserving local intent and forgotten bindings when a stale copy is refused.
+- Recognize access-profile use in current configuration edits and save it as
+  permanent history, so an outage cannot bypass review before a reload.
+- Refuse single-person and bulk profile assignment on Remnawave before directory
+  or service access, including dry runs and default membership.
+- Accept usernames such as token, secret, and api_key in revision and apply
+  checks while still rejecting secret fields and values in their settings.
+- Reject secret-shaped access-map keys in revisions when their declared username
+  carries a malformed creation-settings or display-name value.
+- Keep plan results when profile evidence is unavailable and allow bootstrap or
+  repair without review only for fleets that have never used access profiles.
+  Persist profile use before remote writes, refuse unreviewed applies and imports
+  during later outages, and let topology edits expand unchanged grants under
+  their own review.
+- Keep unresolved lost inbounds in cut-off reviews after credential rotation,
+  reissue, replacing imports, or re-enabling a person with narrower access.
+- Report typed directory failures when assigning a person's profiles and print
+  the access-loss warning once per review.
+- Refuse profile definitions and membership on Remnawave fleets with migration
+  guidance, and skip profile API reads for plans without Meridian service settings.
+- Preserve profile grants and fleet-export creation settings for identifiers
+  such as token and secret in JSON, while keeping string credentials redacted.
+- Guard bulk undo against changed grants, nodes, and removed profiles, name stale
+  people, and show validated inverse access and cut-off previews in dry runs too.
+- Review and fence removal of the last service-held access profile in plan and
+  apply, refusing profiles still assigned to people.
+- Stage workload and endpoint references before profile activation, and create
+  accounts after settings so one apply cannot invalidate its own access review.
+- Protect cut-off reviews with private access permissions and include unresolved
+  inbounds lost through profile changes when cutting off an active person.
 - Show explicit token capabilities in fleet events and refuse token commands
   without configured Meridian control service access.
 - Token CLI cancellations exit 1, and issuance keeps the reviewed absolute expiry.

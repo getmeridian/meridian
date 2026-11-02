@@ -129,6 +129,9 @@ def client_usage_cmd(
 @client_app.command("set")
 def client_set_cmd(
     name: str = typer.Argument(..., help="Client name"),
+    profile: list[str] | None = typer.Option(
+        None, "--profile", metavar="PROFILE", help="Replace access memberships; repeat for every profile to keep"
+    ),
     limit: TrafficLimit = None,
     reset: TrafficResetPeriod = None,
     expires: Expires = None,
@@ -166,6 +169,7 @@ def client_set_cmd(
 
     run_set(
         name,
+        profiles=profile,
         limit=limit,
         reset=reset,
         expires=expires,

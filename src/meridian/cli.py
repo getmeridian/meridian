@@ -43,6 +43,7 @@ from meridian.cli_options import (
     enable_json_output,
 )
 from meridian.cli_privacy import privacy_app
+from meridian.cli_profiles import profile_app
 from meridian.cli_token import token_app
 from meridian.config import DISABLE_UPDATE_CHECK
 from meridian.console import banner, banner_due
@@ -56,7 +57,7 @@ CHECK_AND_FIX = "Check & fix"
 ADVANCED = "Advanced"
 _HELP_LAYOUT: tuple[tuple[str, tuple[str, ...]], ...] = (
     (GET_STARTED, ("setup", "deploy", "help")),
-    (CLIENTS, ("client",)),
+    (CLIENTS, ("client", "profile")),
     (SERVERS, ("node", "relay", "route", "fleet", "server", "context")),
     (CHECK_AND_FIX, ("check", "test", "probe", "doctor", "logs", "plan", "apply", "backup", "restore")),
     (ADVANCED, ("panel", "token", "privacy", "scan", "update", "migrate", "teardown", "api")),
@@ -187,6 +188,7 @@ app = typer.Typer(
 )
 
 app.add_typer(client_app, name="client", rich_help_panel=CLIENTS)
+app.add_typer(profile_app, name="profile", rich_help_panel=CLIENTS)
 app.add_typer(server_app, name="server", rich_help_panel=SERVERS)
 app.add_typer(node_app, name="node", rich_help_panel=SERVERS)
 app.add_typer(relay_app, name="relay", rich_help_panel=SERVERS)

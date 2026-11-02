@@ -68,6 +68,9 @@ ROUTE_SAMPLES = {
     "node_capacity": ("/api/nodes/main/capacity", None),
     "token_capabilities": ("/api/token-capabilities", None),
     "preview_token": ("/api/tokens/preview", {"name": "Integration", "scope": "read"}),
+    "access_profile_catalog": ("/api/access-profiles", None),
+    "access_profile_preview": ("/api/access-profiles/preview", {"access_profiles": {}}),
+    "person_access": ("/api/users/alice/access", None),
     "openapi": ("/api/openapi.json", None),
     "health": ("/api/health", None),
     "get_settings": ("/api/settings", None),
@@ -212,14 +215,17 @@ def test_new_tokens_expire_by_default(fleet: Fleet) -> None:
     assert datetime.fromisoformat(issued["expires_at"]).timestamp() == pytest.approx(fleet.clock.now + 90 * 86400)
 
 
-def test_people_access_is_declared_only_on_user_routes() -> None:
+def test_people_access_is_declared_on_person_routes_and_private_profile_reviews() -> None:
     for _method, pattern, needed, handler in ROUTES:
         if needed is None:
             continue
         requirements = (needed,) if isinstance(needed, str) else needed
-        manages_people = (
-            pattern.pattern.startswith(("/api/users", "/api/people")) and handler.__name__ != "cut_off_scope"
-        ) or handler.__name__ in {"openapi", "token_capabilities"}
+        manages_people = (pattern.pattern.startswith(("/api/users", "/api/people"))) or handler.__name__ in {
+            "openapi",
+            "token_capabilities",
+            "access_profile_catalog",
+            "subscription_preview",
+        }
         assert any(scope_covers("people", scope) for scope in requirements) == manages_people
         assert all(scope_covers("admin", scope) for scope in requirements)
 
@@ -379,7 +385,12 @@ def test_people_reads_credentials_and_edits_people_without_fleet_access(fleet: F
     )
     assert status == 200 and (updated["status"], updated["traffic_limit_bytes"]) == ("disabled", 1000)
     for method, path, body, _needed in SCOPE_MATRIX:
-        if path.startswith(("/api/users", "/api/people")) or path in {"/api/openapi.json", "/api/token-capabilities"}:
+        if path.startswith(("/api/users", "/api/people")) or path in {
+            "/api/openapi.json",
+            "/api/token-capabilities",
+            "/api/access-profiles",
+            "/api/subscription/preview",
+        }:
             continue
         status, answer = _request(fleet.url + path.format(victim="0123456789ab"), method, body, token)
         assert (status, answer["error"]["code"]) == (403, "insufficient_scope"), path

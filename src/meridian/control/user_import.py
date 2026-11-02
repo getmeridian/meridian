@@ -6,6 +6,7 @@ import secrets
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+from meridian.control.access_memberships import save_memberships
 from meridian.control.account_lifecycle import validate_user_schedule
 from meridian.control.errors import ServiceError
 from meridian.control.events import EventLedger
@@ -65,6 +66,11 @@ def import_users(
                     if existing is not None
                     else 1,
                     "created_at": created_at,
+                    "profiles": item.profiles
+                    if item.profiles is not None
+                    else existing.profiles
+                    if existing is not None
+                    else ["default"],
                     "language": existing.language if existing is not None else None,
                     "expire_at": whole_seconds(require_finite_user_expiry(item.expire_at)),
                     "traffic_reset_at": period_began(item, moment),
@@ -90,6 +96,7 @@ def import_users(
                 updates = ", ".join(f"{field} = ?" for field in columns)
                 store.db.execute(f"UPDATE users SET {updates} WHERE username = ?", (*values, item.username))
                 replaced.append(item.username)
+            save_memberships(store, record.user_id, record.profiles)
             if item.first_traffic_at is not None:
                 store.db.execute(
                     "INSERT INTO traffic_totals (user_id, uplink_bytes, downlink_bytes, first_traffic_at)"

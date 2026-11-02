@@ -75,16 +75,34 @@ _SECRET_VALUES = (
 
 
 def secret_paths(value: Any, path: str = "") -> list[str]:
-    """JSON paths in `value` whose key names a secret or whose text holds one; empty means secret-free."""
+    """JSON paths in a topology intent whose key names a secret or whose text holds one; empty means secret-free.
+
+    Declared usernames may key creation-setting mappings or display-name strings,
+    so `token` may be a person. Any other secret-shaped key still counts.
+    """
+    return _secret_paths(value, path, (), _declared_usernames(value) if not path else frozenset())
+
+
+def _declared_usernames(value: Any) -> frozenset[str]:
+    access = value.get("access") if isinstance(value, dict) else None
+    users = access.get("users") if isinstance(access, dict) else None
+    return frozenset(user for user in users if isinstance(user, str)) if isinstance(users, list) else frozenset()
+
+
+def _secret_paths(value: Any, path: str, parents: tuple[str | int, ...], declared: frozenset[str]) -> list[str]:
     found: list[str] = []
     for key, item in _children(value):
         here = f"{path}.{key}" if path else str(key)
-        if isinstance(key, str) and is_sensitive_key(key):
+        identifier = key in declared and (
+            (parents == ("access", "creation_settings") and isinstance(item, dict))
+            or (parents == ("access", "display_names") and isinstance(item, str))
+        )
+        if not identifier and isinstance(key, str) and is_sensitive_key(key):
             found.append(here)
         elif isinstance(item, str) and any(pattern.search(item) for pattern in _SECRET_VALUES):
             found.append(here)
         else:
-            found.extend(secret_paths(item, here))
+            found.extend(_secret_paths(item, here, (*parents, key), declared))
     return found
 
 

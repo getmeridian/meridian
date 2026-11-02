@@ -79,7 +79,8 @@ PEOPLE_ROUTES: tuple[ApiRoute, ...] = (
         capability=("people.batch", "people.private"),
         refusals=(NOT_FOUND, ErrorResponse(409, ("stale_people", "undo_refused"))),
         description=(
-            "Undo lasts 10 minutes, survives service restarts, and is single-use. Reset and delete cannot be undone."
+            "Undo lasts 10 minutes, survives service restarts, and is single-use. Reset and delete cannot be undone. "
+            "dry_run=true checks people, grants, nodes, and restored profiles without writing, returning undo_people."
         ),
     ),
 )

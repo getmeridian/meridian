@@ -174,3 +174,7 @@ The agent is a static binary for x86-64 and ARM64 servers. Meridian upgrades it 
 The directory follows `$XDG_CONFIG_HOME` when it is set, and `MERIDIAN_HOME` overrides it. While `~/.config/meridian/` doesn't exist, Meridian also uses `~/.meridian-v4/` or `~/.meridian/` when either holds a fleet (it has a `servers.json`). Meridian 3.x state in `~/.meridian/` is never touched.
 
 Several fleets can share one machine as contexts (`meridian context`). That directory is the `default` context; another context keeps its own `cluster.yml`, backup, `servers.json`, `setup.json`, snapshots, and device key in `contexts/NAME/`, while the SSH key, the update-check cache, the language choice, and the local Xray runtime stay shared. `--context`, then `MERIDIAN_CONTEXT`, then the saved `current-context` choose one; `MERIDIAN_HOME` pins a single fleet.
+
+## Access profiles
+
+Named access profiles are part of reviewed topology and compile to stable authentication-inbound references. The service owns membership in a separate table and activates one canonical grant map for node composition, delivery, and previews. Applies preserve membership; the default profile grants the whole fleet. Public aliases sharing an inbound share enforcement. Losing access uses the existing generation-bound flow-block receipts, without storing connection observations.

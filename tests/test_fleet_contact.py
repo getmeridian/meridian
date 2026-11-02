@@ -160,6 +160,7 @@ def test_fleet_import_reviews_and_preserves_public_contact_values(tmp_home: Path
     source = tmp_path / "fleet.yml"
     source.write_text(dump_fleet_document(document))
     with (
+        patch("meridian.commands.fleet_transfer.profile_review_needed", return_value=False),
         patch("meridian.setup.runtime.SetupRuntime.review", return_value=review_result()) as review,
         patch("meridian.setup.runtime.SetupRuntime.apply_intent") as apply,
     ):

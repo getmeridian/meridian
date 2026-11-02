@@ -1,6 +1,8 @@
 # commands — One module per subcommand
 
 ## Design decisions
+**Profile review logic lives in setup** — commands present gains and losses; the shared apply runtime checks declaration fingerprints for setup and every imperative path before any remote write.
+**Profile reviews include people** — `profile`, `plan`, `apply`, and fleet import review effective gains/losses and fence the service membership hash; assignment uses the existing bulk receipt.
 **Bulk reviews** — `client bulk` and `client list` use the service query; commit only the returned ID/hash, and read the receipt after an uncertain reply.
 **Token issuance** — `token` reviews the same typed permissions and expiry as the console; mutations require JSON `--yes`, and only the producing create envelope reveals `data.issued.token`.
 **Client registration** — `cli_client.py` owns the client group so lifecycle options do not grow `cli_groups.py`.
@@ -22,6 +24,15 @@
 - `client remove|reissue --cut-off` discloses every affected node and other people's reconnects before confirming, and keeps typed per-node outcomes and new links even on failure.
 
 ## Pitfalls
+- **Restore imports keep the destination file guard** — bind the snapshot-derived model to the current context's loaded timestamp before saving; its temporary file's timestamp is not destination evidence.
+- **Empty restores save derived fleet state** — persist snapshot profile history and normalize carried checkpoints before review; declining the remote restore must not leave raw, unfinished state on disk.
+- **Restore profile checks precede target access** — validate the snapshot before resolving or registering its target, and never give changed live declarations an automatic review after installation.
+- **Assignment guards cover both entry points** — single-person and bulk profile assignment require the Meridian backend before directory or service access, even for default membership.
+- **Profile outages keep their uncertainty** — plan retains unavailable evidence; apply and fleet import may skip an unavailable review only before profiles have ever been used.
+- **Profile lookups may translate errors** — catch MeridianError around the directory adapter as well as API calls; the shared preview table owns the revocation warning.
+- **Legacy profile requests stop before I/O** — require the Meridian backend for profile commands and edits; resource reviews without service settings return no profile review instead of querying a legacy panel.
+- **Undo previews are inverse changes** — read the service-validated undo_people before confirmation, including dry runs, so gained/lost access and hard cut-off warnings describe the undo.
+- **The last profile still needs review** — plan and apply check the proposed intent and live service, refuse memberships still in use, and carry the access hash even when the proposed map is empty.
 - **Token clients require a configured control service** — reject missing credentials and Remnawave before constructing the HTTP client.
 - **Token events name their grant kind** — a null scope means explicit capabilities; render shared permission labels instead of None.
 - **Token expiry is the reviewed instant** — issue the preview's expires_at, never restart the day count after confirmation.

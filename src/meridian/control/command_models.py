@@ -7,8 +7,10 @@ from typing import Annotated, Literal
 from pydantic import Field, RootModel
 
 from meridian.control.models import UserRecord
-from meridian.core.agent_protocol import AgentCommand, Capability, CommandEffect, CommandResult, CommandResultStatus
+from meridian.core.agent_protocol import AgentCommand, Capability, CommandResult, CommandResultStatus
 from meridian.core.agent_types import InboundTag, NodeId, NodeStateRef, ResourceId
+from meridian.core.client_sessions import CutOffNode as CutOffNode
+from meridian.core.client_sessions import CutOffPlan as CutOffPlan
 from meridian.core.client_sessions import UserCutOffRequest as UserCutOffRequest
 from meridian.core.models import CoreModel
 
@@ -73,22 +75,6 @@ class NodeCommandTargets(CoreModel):
     units: list[CommandUnitTarget]
     inbounds: list[InboundTag]
     capabilities: list[Capability]
-
-
-class CutOffNode(CoreModel):
-    node_id: NodeId
-    inbound_tags: list[InboundTag]
-    effect: CommandEffect = Field(
-        default="inbound_reset",
-        description="A core restart reconnects every Xray inbound and bridge on this node; "
-        "an inbound reset reconnects the listed inbounds, with whole-core fallback on failure.",
-    )
-
-
-class CutOffPlan(CoreModel):
-    """Every managed inbound that may hold the person's open sessions; contains no person or credential."""
-
-    nodes: list[CutOffNode]
 
 
 class UserCutOffMutation(CoreModel):

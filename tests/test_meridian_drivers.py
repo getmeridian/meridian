@@ -113,7 +113,9 @@ class FakeControl:
     def settings(self) -> ServiceSettings:
         return self.current_settings
 
-    def put_settings(self, settings: ServiceSettings) -> ServiceSettings:
+    def put_settings(
+        self, settings: ServiceSettings, *, expected_profile_declarations_hash: str | None = None
+    ) -> ServiceSettings:
         self.current_settings = settings
         return settings
 
@@ -158,6 +160,7 @@ def _setup(
             connection_for=lambda _ref: conn or MockConnection().when("uname -m", stdout="x86_64\n"),
             server_addresses=addresses or {"srv-a": "198.51.100.10"},
             agent_binary=lambda _arch: BINARY,
+            persist=lambda _c: None,
             sleep=lambda _s: None,
         )
     )

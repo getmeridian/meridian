@@ -90,6 +90,9 @@ class FlowBlockLedger:
                     ):
                         credentials_changed.add(user_id)
 
+        node = self._store.row("SELECT * FROM nodes WHERE node_id = ?", (node_id,))
+        assert node is not None
+        evidence = FlowBlockEvidence.from_node(node, fleet_epoch=self._store.fleet_epoch, now=self._clock())
         for user_id in sorted(gone):
             user = directory.get(user_id)
             if user is None:
@@ -110,7 +113,13 @@ class FlowBlockLedger:
                 "SELECT * FROM user_flow_blocks WHERE user_id = ? AND node_id = ? AND credential_generation = ?",
                 (user_id, node_id, generation),
             )
-            identities = json.loads(previous["identities"]) if previous is not None else {}
+            # Only an unconfirmed receipt carries over: a confirmed one already blocked its
+            # identities, and folding them back in would widen the next cut-off.
+            identities = (
+                json.loads(previous["identities"])
+                if previous is not None and evidence.status(self._required(previous)) != "blocked"
+                else {}
+            )
             identities.update(lost_identities[user_id])
             self._store.db.execute(
                 "INSERT INTO user_flow_blocks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -156,9 +165,6 @@ class FlowBlockLedger:
                     " WHERE user_id = ? AND node_id = ? AND credential_generation = ?",
                     (json.dumps(sorted(remaining)), json.dumps(remaining, sort_keys=True), *key),
                 )
-        node = self._store.row("SELECT * FROM nodes WHERE node_id = ?", (node_id,))
-        assert node is not None
-        evidence = FlowBlockEvidence.from_node(node, fleet_epoch=self._store.fleet_epoch, now=self._clock())
         for receipt in self._rows(node_id):
             if receipt["fleet_epoch"] != required.fleet_epoch:
                 self._store.db.execute(

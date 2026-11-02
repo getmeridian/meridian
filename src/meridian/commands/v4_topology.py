@@ -8,12 +8,21 @@ from rich.markup import escape
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import forget_unreachable_servers, require_intent, reviewed_runtime
 from meridian.commands.apply_progress import apply_progress
+from meridian.commands.profile_plan import inspect_profile_plan
+from meridian.commands.profile_review import profile_review_paths, require_profile_backend
+from meridian.compiler.models import ServiceSettingsPayload
 from meridian.console import confirm, err_console, fail, ok, warn
 from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_result
 from meridian.core.models import ErrorModel, OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.plan import CompiledPlanDriftResult, CompiledPlanResourceResult, CompiledPlanResult
 from meridian.renderers import emit_json
+from meridian.setup.profile_review import (
+    ProfileReviewUnavailableError,
+    profile_review_needed,
+    review_profile_access,
+    review_profile_resources,
+)
 
 
 def run_v4_apply(
@@ -30,9 +39,19 @@ def run_v4_apply(
     from meridian.servers import ServerRegistry
 
     intent = require_intent(cluster)
+    require_profile_backend(intent)
     registry = ServerRegistry(SERVER_PROFILES_FILE)
     forget_unreachable_servers(cluster, registry, intent, forget=forget_unreachable, yes=yes)
     review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(intent), cluster=cluster)
+    access_review = (
+        review_profile_access(cluster, review.plan)
+        if profile_review_needed(cluster, intent, allow_bootstrap=True)
+        else None
+    )
+    if access_review is not None and not json_output:
+        from meridian.commands.profiles import print_access_review
+
+        print_access_review(access_review)
     if not yes:
         if json_output:
             error = ErrorModel(
@@ -51,6 +70,7 @@ def run_v4_apply(
                         resource_count=len(review.plan.resources),
                         review_hash=review.review_hash,
                         retiring_resources=[binding.logical_id for binding in review.retiring],
+                        access_review=access_review,
                     ).to_data(),
                     summary=Summary(
                         text=error.message,
@@ -60,7 +80,8 @@ def run_v4_apply(
                     exit_code=2,
                     errors=[error],
                     timer=operation.timer,
-                )
+                ),
+                reveal=profile_review_paths(access_review),
             )
             raise typer.Exit(2)
         err_console.print(
@@ -74,9 +95,12 @@ def run_v4_apply(
             raise typer.Exit(1)
 
     with apply_progress(machine_output=json_output, registry=registry) as reporter:
-        result = reviewed_runtime(registry, cluster, reporter).apply_intent(
-            intent, expected_plan_hash=review.review_hash
-        )
+        result = reviewed_runtime(
+            registry,
+            cluster,
+            reporter,
+            access_review_hash=access_review.access_hash if access_review is not None else None,
+        ).apply_intent(intent, expected_plan_hash=review.review_hash)
     status: OutputStatus = "failed" if not result.all_succeeded else "changed" if result.changed else "no_changes"
     exit_code = 0 if result.all_succeeded else 3
     summary_text = "Topology converged." if result.all_succeeded else "Topology apply failed."
@@ -85,6 +109,7 @@ def run_v4_apply(
         exit_code=exit_code,
         summary=summary_text,
     )
+    result_data = type(result_data).model_validate({**result_data.to_data(), "access_review": access_review})
     apply_error: ErrorModel | None = None
     if not result.all_succeeded:
         apply_error = ErrorModel(
@@ -109,7 +134,8 @@ def run_v4_apply(
                 exit_code=exit_code,
                 errors=[apply_error] if apply_error else None,
                 timer=operation.timer,
-            )
+            ),
+            reveal=profile_review_paths(access_review),
         )
         if apply_error:
             raise typer.Exit(3)
@@ -142,15 +168,33 @@ def run_v4_plan(
     from meridian.servers import ServerRegistry
     from meridian.setup.runtime import SetupRuntime
 
-    inspection = SetupRuntime(
-        ServerRegistry(SERVER_PROFILES_FILE),
-        cluster_loader=lambda: cluster,
-    ).inspect_intent(require_intent(cluster))
+    intent = require_intent(cluster)
+    require_profile_backend(intent)
+    inspection = inspect_profile_plan(
+        cluster, intent, SetupRuntime(ServerRegistry(SERVER_PROFILES_FILE), cluster_loader=lambda: cluster)
+    )
     resources = [item.action.resource for item in inspection.inspections]
-    observation_errors = [item for item in inspection.inspections if item.error]
+    access_review = None
+    observation_errors = [
+        CompiledPlanDriftResult(logical_id=item.action.resource.logical_id, error=item.error)
+        for item in inspection.inspections
+        if item.error
+    ]
+    try:
+        if profile_review_needed(cluster, intent):
+            access_review = review_profile_resources(cluster, resources)
+    except ProfileReviewUnavailableError as exc:
+        settings_id = next(
+            (row.logical_id for row in resources if isinstance(row.payload, ServiceSettingsPayload)), "access-profiles"
+        )
+        if not any(item.logical_id == settings_id for item in observation_errors):
+            observation_errors.append(CompiledPlanDriftResult(logical_id=settings_id, error=str(exc)))
     drifted = [item for item in inspection.inspections if not item.error and not item.converged]
     converged = (
-        inspection.converged and cluster.active_plan_hash == inspection.plan_hash and not cluster.pending_plan_hash
+        not observation_errors
+        and inspection.converged
+        and cluster.active_plan_hash == inspection.plan_hash
+        and not cluster.pending_plan_hash
     )
     state_changes: list[str] = []
     if cluster.pending_plan_hash:
@@ -190,13 +234,7 @@ def run_v4_plan(
             exit_code=3 if observation_errors else exit_code,
             state_changes=state_changes,
             warnings=[inspection.fence_warning] if inspection.fence_warning else [],
-            observation_errors=[
-                CompiledPlanDriftResult(
-                    logical_id=item.action.resource.logical_id,
-                    error=item.error,
-                )
-                for item in observation_errors
-            ],
+            observation_errors=observation_errors,
             drifted_resources=[
                 CompiledPlanDriftResult(
                     logical_id=item.action.resource.logical_id,
@@ -205,6 +243,7 @@ def run_v4_plan(
                 for item in drifted
             ],
             retiring_resources=inspection.retiring,
+            access_review=access_review,
             review_hash=inspection.review_hash or inspection.plan_hash,
             resources=[
                 CompiledPlanResourceResult(
@@ -241,10 +280,15 @@ def run_v4_plan(
                 exit_code=3 if evidence_error else exit_code,
                 errors=[evidence_error] if evidence_error else None,
                 timer=operation.timer,
-            )
+            ),
+            reveal=profile_review_paths(access_review),
         )
     else:
         state = "[green]converged[/green]" if converged else "[yellow]changes pending[/yellow]"
+        if access_review is not None:
+            from meridian.commands.profiles import print_access_review
+
+            print_access_review(access_review)
         reviewed = inspection.review_hash or inspection.plan_hash
         err_console.print(f"\n  [bold]Topology[/bold] — {state}\n  [dim]{reviewed}[/dim]\n")
         for kind_name, count in sorted(counts.items()):
@@ -257,10 +301,8 @@ def run_v4_plan(
             # Unobservable until its dependencies apply; apply re-checks it then.
             waits = item.waiting_on[:2] + ([f"{len(item.waiting_on) - 2} more"] if len(item.waiting_on) > 2 else [])
             err_console.print(f"  [dim]recheck[/dim] {logical_id} — after {escape(', '.join(waits))}")
-        for item in observation_errors:
-            err_console.print(
-                f"  [yellow]unavailable[/yellow] {escape(item.action.resource.logical_id)} — {escape(item.error)}"
-            )
+        for issue in observation_errors:
+            err_console.print(f"  [yellow]unavailable[/yellow] {escape(issue.logical_id)} — {escape(issue.error)}")
         for logical_id in inspection.retiring:
             err_console.print(f"  [red]remove[/red] {escape(logical_id)}")
         for change in state_changes:

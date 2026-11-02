@@ -228,6 +228,7 @@ def test_control_service_apply_keeps_limits_set_by_the_operator(tmp_path: Path) 
                 connection_for=lambda _ref: MockConnection(),
                 server_addresses={"srv-a": "198.51.100.10"},
                 agent_binary=lambda _arch: MagicMock(),
+                persist=lambda _c: None,
                 sleep=lambda _s: None,
             )
         )["control_user"]

@@ -1,5 +1,6 @@
 # compiler — pure finite topology compilation
 ## Design decisions
+**Access profiles resolve authentication identities** — exit, gateway, endpoint, and inbound grants compile to stable managed inbounds; unknown references and gateway bridges fail review.
 **Pure and deterministic** — output depends only on `SetupIntent` and a secret-free `DeploymentContract`: no I/O, secrets, clock reads, or randomness (tested). It never holds generated credentials or private Reality keys.
 **Finite, reviewed resources** — only explicitly typed payloads, each with a stable logical ID, sorted dependencies, typed postconditions, an ownership marker, and a payload hash; the plan hash covers the ordered graph, resolved SSH targets, runtime pins, and renderer contract. This is not a generic provider layer.
 **Control-service backend** — `meridian_backend.py` runs after the base compile and swaps panel kinds for `control_service`, `agent_runtime`, `node_workload`, `client_endpoint`, `control_user`, and `service_settings`; a routing gateway is one more agent node whose pools and routes fold into its workload. Only client-IP forwarding is refused (it changes the PROXY chain).
@@ -15,6 +16,10 @@
 - **One camouflage per Reality inbound** — a relay whose SNI differs from its exit gets its own loopback inbound imitating that SNI, so probes never see the exit's certificate.
 - **Fingerprints never mix in a health-checked group** — copies carry `ALT_FINGERPRINT_TAG` and get their own groups (TSPU escalates when one server's fingerprint changes); sing-box skips them.
 ## Pitfalls
+- **Hash grants before resolving them** — service settings carry the core declaration fingerprint; a compiled map changes when protocols or camouflage inbounds change, even when the declared grants do not.
+- **Legacy backends cannot enforce profiles** — refuse named grants or initial memberships on Remnawave before compiling; only migration uses that backend.
+- **Policies follow stored references** — settings wait for workloads and endpoints; accounts always wait for settings, or their new membership can invalidate the same apply's access fence when the last profile disappears.
+**Public aliases share enforcement** — an endpoint grant includes every public connection backed by that inbound; profile previews must disclose this boundary.
 - **New optional payload or intent fields use `Field(exclude_if=...)` at their default** — otherwise every existing fleet's plan hash changes and re-applies.
 - **A relay's endpoint takes keys from the exit behind it** — resolve `workload_ref` through the Host's `node_ref` runtime, never `owner_ref` (the relay).
 - **Certificates depend on their TCP/80 ACME rule, never on the node runtime** — Hysteria2 makes Xray load the certificate at startup, so the runtime waits for the certificate; the control bootstrap likewise depends on its public 80/443 rules.

@@ -71,6 +71,18 @@
       "title": "Note",
       "type": "string"
     },
+    "profiles": {
+      "items": {
+        "maxLength": 48,
+        "minLength": 1,
+        "pattern": "^[a-z0-9][a-z0-9_-]*$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "title": "Profiles",
+      "type": "array"
+    },
     "renewal_interval_days": {
       "anyOf": [
         {

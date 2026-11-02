@@ -10,17 +10,22 @@ has accepted the new epoch refuses anything the old server still signs.
 from __future__ import annotations
 
 import hashlib
+import json
 import sqlite3
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from meridian.control.backups import strip_unsnapshotted
 from meridian.control.errors import ServiceError
 from meridian.control.models import DeployerState
+from meridian.control.profile_declarations import DECLARATIONS_META, SnapshotProfileAccess
 from meridian.control.service import ControlService
 from meridian.control.store import Store
+from meridian.core.access_profiles import DEFAULT_ACCESS_PROFILE
 from meridian.core.errors import MeridianError
 
 
@@ -45,6 +50,33 @@ def read_deployer_state(database: bytes) -> DeployerState | None:
     finally:
         copy.close()
     return DeployerState.model_validate_json(row[0]) if row else None
+
+
+def read_snapshot_profile_access(database: bytes) -> SnapshotProfileAccess:
+    """Read declaration, grant, and membership evidence from the authenticated database bytes."""
+    copy = sqlite3.connect(":memory:")
+    try:
+        copy.deserialize(database)
+        meta = dict(
+            copy.execute("SELECT key, value FROM meta WHERE key IN (?, ?)", ("access_profiles", DECLARATIONS_META))
+        )
+        memberships = copy.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'user_access_memberships'"
+        ).fetchone()
+        return SnapshotProfileAccess(
+            access_profiles=json.loads(meta.get("access_profiles", "{}")),
+            declarations_hash=meta.get(DECLARATIONS_META),
+            has_non_default_memberships=bool(
+                memberships
+                and copy.execute(
+                    "SELECT 1 FROM user_access_memberships WHERE profile != ? LIMIT 1", (DEFAULT_ACCESS_PROFILE,)
+                ).fetchone()
+            ),
+        )
+    except (sqlite3.Error, ValidationError, ValueError) as exc:
+        raise RestoreError("The snapshot's access profile state is unreadable.", category="user") from exc
+    finally:
+        copy.close()
 
 
 def stage_restored_database(

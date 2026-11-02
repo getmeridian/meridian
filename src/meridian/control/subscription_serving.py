@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+from meridian.control.access_memberships import eligible_endpoints
 from meridian.control.device_slots import read_device_slots
 from meridian.control.devices import DeviceLedger, HeaderReader, browser_request
 from meridian.control.formats.entries import SubscriptionUser
@@ -60,7 +61,9 @@ def serve_subscription(
             with store.transaction():
                 hwid_flags = devices.fetch(record, privacy, device_headers if device_headers is not None else {})
     user = subscription_user(record, language)
-    endpoints = [ClientEndpoint.model_validate_json(body) for body in bodies]
+    endpoints = eligible_endpoints(
+        record, [ClientEndpoint.model_validate_json(body) for body in bodies], settings.access_profiles
+    )
     return render_subscription(
         user,
         endpoints,

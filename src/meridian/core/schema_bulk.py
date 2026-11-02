@@ -20,6 +20,7 @@ def bulk_envelopes(*, envelope_base: type[BaseModel], failure_data_type: Any) ->
         "tag",
         "devices",
         "renewal",
+        "set-profiles",
         "delete",
         "undo",
         "receipt",

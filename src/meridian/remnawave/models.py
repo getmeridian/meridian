@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from meridian.control.models import NodeRuntime
+from meridian.core.access_profiles import default_profiles
 from meridian.core.account_schedule import AccountSchedulePreview
 from meridian.core.capacity import CapacityCurrent
 from meridian.core.languages import Language
@@ -24,6 +25,7 @@ class User:
     id: str = ""
     short_uuid: str = ""
     username: str = ""
+    profiles: list[str] = field(default_factory=default_profiles)
     vless_uuid: str = ""  # VLESS protocol UUID (used by Xray, differs from account UUID)
     status: str = ""  # "ACTIVE", "DISABLED", "LIMITED", "EXPIRED"
     used_traffic_bytes: int = 0  # this traffic period's use

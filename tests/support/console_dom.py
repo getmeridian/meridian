@@ -27,6 +27,7 @@ def run_console(mode: str, locale: str = "en", data: Any = None) -> dict[str, An
     runners = {
         "token-expiry-": "control_ui_tokens.mjs",
         "passkey-": "control_ui_passkeys.mjs",
+        "profiles-": "control_ui_profiles.mjs",
         "page-": "control_ui_page.mjs",
         "people-bulk-expiry": "control_ui_bulk_expiry.mjs",
         "people-bulk": "control_ui_people_bulk.mjs",

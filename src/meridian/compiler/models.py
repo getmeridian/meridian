@@ -16,6 +16,8 @@ from meridian.compiler.names import (
     RemnawaveTemplateName,
     RemnawaveUsername,
 )
+from meridian.core.access_profiles import AccessProfileMap, InboundReference
+from meridian.core.agent_types import Sha256Hex
 from meridian.core.client_limits import UserCreationSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import (
@@ -465,6 +467,7 @@ class NodeWorkloadPayload(CoreModel):
     server_ref: str
     agent_ref: str
     profile: ConfigProfilePayload
+    access_profiles: AccessProfileMap = Field(default_factory=dict, exclude_if=lambda value: not value)
 
 
 class ClientEndpointPayload(CoreModel):
@@ -473,6 +476,7 @@ class ClientEndpointPayload(CoreModel):
     kind: Literal["client_endpoint"] = "client_endpoint"
     owner_ref: str
     workload_ref: str
+    inbound_ref: InboundReference | Literal[""] = Field(default="", exclude_if=lambda value: not value)
     remark: str
     protocol: ProtocolKind
     address_server_ref: str
@@ -496,6 +500,8 @@ class ControlUserPayload(CoreModel):
 class ServiceSettingsPayload(OwnerContactSettings):
     kind: Literal["service_settings"] = "service_settings"
     profile_title: str
+    access_profiles: AccessProfileMap = Field(default_factory=dict, exclude_if=lambda value: not value)
+    access_profile_declarations_hash: Sha256Hex | None = Field(default=None, exclude_if=lambda value: value is None)
     servers: dict[ServerReferenceValue, ServerAllowanceSpec] = Field(
         default_factory=dict, exclude_if=lambda servers: not servers
     )

@@ -50,7 +50,8 @@ def people_bulk_receipt(request: DeliveryRequest, match: re.Match[str]) -> BulkR
 
 
 def undo_people_bulk(request: DeliveryRequest, _match: re.Match[str]) -> BulkReceipt:
-    return request.ui.service.bulk.undo(BulkUndoRequest.model_validate_json(request.read_body()).receipt_id)
+    undo = BulkUndoRequest.model_validate_json(request.read_body())
+    return request.ui.service.bulk.undo(undo.receipt_id, dry_run=undo.dry_run)
 
 
 PEOPLE_OWNER_ROUTES = frozenset(

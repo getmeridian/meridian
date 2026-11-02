@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import Field
 
+from meridian.core.access_profile_views import AccessProfileReview
 from meridian.core.models import CoreModel
 from meridian.core.resources import ResourceKind
 
@@ -42,6 +43,7 @@ class CompiledPlanResult(CoreModel):
     drifted_resources: list[CompiledPlanDriftResult] = Field(default_factory=list)
     retiring_resources: list[str] = Field(default_factory=list)
     resources: list[CompiledPlanResourceResult] = Field(default_factory=list)
+    access_review: AccessProfileReview | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class PlanCommandData(CompiledPlanResult):

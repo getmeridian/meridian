@@ -1,0 +1,130 @@
+{
+  "$defs": {
+    "AccessProfileCatalog": {
+      "additionalProperties": false,
+      "properties": {
+        "access_hash": {
+          "description": "Lowercase hex SHA-256 digest.",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Access Hash",
+          "type": "string"
+        },
+        "declarations_hash": {
+          "anyOf": [
+            {
+              "description": "Lowercase hex SHA-256 digest.",
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Declarations Hash"
+        },
+        "has_non_default_memberships": {
+          "default": false,
+          "title": "Has Non Default Memberships",
+          "type": "boolean"
+        },
+        "profiles": {
+          "items": {
+            "$ref": "#/$defs/AccessProfileSummary"
+          },
+          "title": "Profiles",
+          "type": "array"
+        }
+      },
+      "required": [
+        "profiles",
+        "access_hash"
+      ],
+      "title": "AccessProfileCatalog",
+      "type": "object"
+    },
+    "AccessProfileIntent": {
+      "additionalProperties": false,
+      "description": "A named set of reviewed exits, gateways, public endpoints, or authentication inbounds.",
+      "properties": {
+        "grants": {
+          "items": {
+            "pattern": "^(?:exit|gateway|inbound|endpoint):[a-z0-9][a-z0-9:_.-]{0,191}$",
+            "type": "string"
+          },
+          "maxItems": 10000,
+          "title": "Grants",
+          "type": "array"
+        },
+        "id": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "grants"
+      ],
+      "title": "AccessProfileIntent",
+      "type": "object"
+    },
+    "AccessProfileSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "built_in": {
+          "default": false,
+          "title": "Built In",
+          "type": "boolean"
+        },
+        "id": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "inbound_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Inbound Refs",
+          "type": "array"
+        },
+        "members": {
+          "minimum": 0,
+          "title": "Members",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "inbound_refs",
+        "members"
+      ],
+      "title": "AccessProfileSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "catalog": {
+      "$ref": "#/$defs/AccessProfileCatalog"
+    },
+    "profiles": {
+      "items": {
+        "$ref": "#/$defs/AccessProfileIntent"
+      },
+      "title": "Profiles",
+      "type": "array"
+    }
+  },
+  "required": [
+    "profiles",
+    "catalog"
+  ],
+  "title": "ProfileListResult",
+  "type": "object"
+}

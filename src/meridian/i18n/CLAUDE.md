@@ -11,6 +11,7 @@
 **No markup in catalogs** — callers escape catalog text and add Rich styles themselves, so a translator can never break rendering.
 
 ## What's done well
+- **Profile declaration refusals give both routes forward** — native en/ru/fa/zh text names profile or fleet import for edits, and apply for a saved change.
 - **Credential rotation explains refresh and ownership** — all locales distinguish preserved subscription URLs from reissued links and label per-node blocking outcomes.
 - **Cut-off previews name every boundary** — core restarts cover all Xray inbounds and bridges; resets name affected tags and the whole-core fallback in every locale.
 - Fleet browser/default labels, person overrides, and JSON confirmation guidance match across all four locales; the console locale remains separate from the language given to people's pages.

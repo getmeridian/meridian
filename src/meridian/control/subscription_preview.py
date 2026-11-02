@@ -6,16 +6,24 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from urllib.parse import quote
 
+from meridian.control.access_memberships import eligible_endpoints
 from meridian.control.devices import browser_request
 from meridian.control.errors import ServiceError
 from meridian.control.formats.capabilities import endpoint_omission, requires_primary, supported_endpoints
-from meridian.control.formats.entries import SubscriptionUser, ordered, presentation_endpoints, primaries
+from meridian.control.formats.entries import (
+    SubscriptionUser,
+    ordered,
+    presentation_endpoints,
+    presentation_pairs,
+    primaries,
+)
 from meridian.control.formats.selector import explain_format
 from meridian.control.formats.stale_clients import stale_client
 from meridian.control.models import ClientEndpoint, PrivacySettings, ServiceSettings, UserRecord
 from meridian.control.store import Store
 from meridian.control.subscription_serving import subscription_user
 from meridian.control.subscriptions import JSON_TYPE, TEXT_TYPE, YAML_TYPE, render_subscription, subscription_headers
+from meridian.core.access_profiles import may_use_inbound
 from meridian.core.languages import LanguageState, resolve_language
 from meridian.core.notices import RenderedNotice
 from meridian.core.redaction import REDACTED, redact_preview_text
@@ -67,13 +75,16 @@ def preview_subscription(
             (endpoint.reality_public_key, endpoint.reality_short_id, endpoint.salamander_password, endpoint.path)
         )
     known += [quote(value, safe="") for value in known if value]
-    eligible = supported_endpoints(presentation_endpoints(endpoints), decision.format)
+    allowed = eligible_endpoints(record, endpoints, settings.access_profiles)
+    allowed_names = {id(original): named for original, named in presentation_pairs(allowed)}
+    eligible = supported_endpoints(presentation_endpoints(allowed), decision.format)
     connections = primaries(eligible) if requires_primary(decision.format) else eligible
     placeholder = user.status if user.status != "active" else "no_connections" if not connections else None
     included: list[PreviewEntry] = []
     omitted: list[OmittedEntry] = []
     shown = presentation_endpoints(endpoints, include_disabled=True)
     for original, endpoint in zip(ordered(endpoints), shown, strict=True):
+        endpoint = allowed_names.get(id(original), endpoint)
         metadata = PreviewEntry(
             id=redact_preview_text(identifiers[id(original)], known),
             remark=redact_preview_text(endpoint.remark, known),
@@ -81,7 +92,9 @@ def preview_subscription(
             fingerprint_copy=endpoint.fingerprint_copy,
         )
         reason = endpoint_omission(endpoint, decision.format)
-        if endpoint.enabled and user.status != "active":
+        if not may_use_inbound(record.profiles, settings.access_profiles, endpoint.inbound_ref):
+            reason = "access_profile", None
+        elif endpoint.enabled and user.status != "active":
             reason = "status_placeholder", None
         elif reason is None and placeholder == "no_connections":
             reason = "availability_placeholder", None

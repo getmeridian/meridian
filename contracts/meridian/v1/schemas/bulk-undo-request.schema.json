@@ -1,6 +1,12 @@
 {
   "additionalProperties": false,
   "properties": {
+    "dry_run": {
+      "default": false,
+      "description": "Validate all undo preconditions and return inverse changes without writing.",
+      "title": "Dry Run",
+      "type": "boolean"
+    },
     "receipt_id": {
       "pattern": "^[0-9a-f]{32}$",
       "title": "Receipt Id",

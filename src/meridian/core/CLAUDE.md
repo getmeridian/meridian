@@ -1,7 +1,10 @@
 # core — Meridian API contracts
 
 ## Design decisions
+- **Profile declaration fingerprints precede expansion** — hash the normalized named grants with `profile_declarations_hash`, so topology can expand unchanged exit or gateway grants without accepting a profile edit.
+- **Access grants and membership have separate owners** — topology compiles named grants; service membership is nonempty and private, with default granting every managed inbound.
 - **Capacity has one projection** — `capacity.py` owns freshness, nullable current evidence, integer derived values, and recent/hourly bounds for service, fleet JSON, and console.
+- **Connection vocabulary stays in core** — session cut-off scopes and protocol names must not import service records, or shared apply contracts cycle through topology.
 - **People queries have one typed request** — paging controls never change which people match a selection.
 - **Bulk contracts separate selection from mutation** — before/after fields and receipts omit credentials and private notes.
 - **Token grants are independent of presets** — frozen explicit capabilities compose separately from identity and future resource bounds; token schemas and command envelopes live in `schema_tokens.py`.
@@ -30,6 +33,7 @@
 - Commands build typed, redacted results before any envelope or rendering, and reporter primitives emit typed events without choosing a renderer.
 
 ## Pitfalls
+- **Metadata reveals cover containers** — exact revealed paths preserve nested lists and maps with secret-shaped identifiers; string credential fields and neighbouring branches remain redacted.
 - **Legacy node output omits capacity** — keep the null projection off the wire; control-service nodes carry explicit not-reported/current/stale evidence.
 - **Hourly byte sums cross agent epochs** — keep aggregate bytes as nonnegative integers; the agent's safe-integer ceiling governs individual wire counters, not rollup totals.
 - **Revealed metadata keeps scalar types** — secret-shaped tag keys must not replace facet counts with redaction strings; container reveals still mask string credentials.

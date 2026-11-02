@@ -5,7 +5,9 @@ from __future__ import annotations
 import re
 from typing import Protocol
 
+from meridian.control.errors import ServiceError
 from meridian.control.operations_api import query_options
+from meridian.control.tokens import Caller
 from meridian.control.ui_routes import UiContext
 from meridian.core.languages import LanguageSettings, LanguageState
 from meridian.core.notices import NoticeState, NoticeWrite
@@ -14,6 +16,7 @@ from meridian.core.subscription_preview import SubscriptionPreview, Subscription
 
 class DeliveryRequest(Protocol):
     path: str
+    caller: Caller | None
 
     @property
     def ui(self) -> UiContext: ...
@@ -39,6 +42,10 @@ def put_language(request: DeliveryRequest, _match: re.Match[str]) -> LanguageSta
 
 
 def subscription_preview(request: DeliveryRequest, _match: re.Match[str]) -> SubscriptionPreview:
+    if request.ui.service.settings().access_profiles and (
+        request.caller is None or not request.caller.allows("people.private")
+    ):
+        raise ServiceError("insufficient_scope", "Access profile previews need the people.private permission.", 403)
     return request.ui.service.preview_subscription(SubscriptionPreviewRequest.model_validate_json(request.read_body()))
 
 

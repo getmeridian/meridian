@@ -155,7 +155,8 @@
             "unsupported_format",
             "disabled_endpoint",
             "status_placeholder",
-            "availability_placeholder"
+            "availability_placeholder",
+            "access_profile"
           ],
           "title": "Reason",
           "type": "string"

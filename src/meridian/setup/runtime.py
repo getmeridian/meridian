@@ -59,6 +59,7 @@ from meridian.setup.control_service import (
     verify_control_service,
 )
 from meridian.setup.legacy_guard import refuse_legacy_deployments
+from meridian.setup.profile_review import check_profile_access
 from meridian.ssh import ServerConnection
 
 PersistCluster = Callable[[ClusterConfig], None]
@@ -113,6 +114,7 @@ class SetupRuntime:
         fence_factory: FenceFactory | None = None,
         fence_holder: str | None = None,
         user_cut_off: Mapping[str, list[NodeCommandRecord]] | None = None,
+        access_review_hash: str | None = None,
     ) -> None:
         self._registry = registry
         self._cluster_loader = cluster_loader
@@ -125,6 +127,7 @@ class SetupRuntime:
         # A caller already holding the lease (`meridian migrate`) applies under the same holder.
         self._fence_holder = fence_holder
         self._user_cut_off = user_cut_off if user_cut_off is not None else {}
+        self._access_review_hash = access_review_hash
         self._control_bootstrap = control_bootstrap or partial(
             bootstrap_reviewed_control_service,
             cancellation=cancellation,
@@ -224,6 +227,7 @@ class SetupRuntime:
 
         refuse_if_superseded()
         validate_resource_plan_transition(review.plan, cluster)
+        profile_history = check_profile_access(cluster, review.intent, access_review_hash=self._access_review_hash)
         targets = sorted(review.plan.deployment_contract.server_targets)
         entries = {
             **self._retirement_entries(review.retiring, review.plan),
@@ -238,6 +242,8 @@ class SetupRuntime:
         if fence is not None:
             # Refuse a stale copy before its intent edit is saved, not only before the first action.
             fence.ensure(local_fence_view(cluster))
+        if profile_history and not cluster.access_profiles_used:
+            cluster.access_profiles_used = True
         cluster.topology_intent = review.intent
         self._persist(cluster)
 
@@ -309,6 +315,7 @@ class SetupRuntime:
                 connections=connections,
                 addresses=addresses,
                 user_cut_off=self._user_cut_off,
+                access_review_hash=self._access_review_hash,
             )
         )
         assert_complete_driver_registry(drivers)

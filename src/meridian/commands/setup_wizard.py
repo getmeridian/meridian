@@ -470,7 +470,13 @@ class SetupWizard:
         if renamed:
             self.prompt.say(t("access.usernames", pairs=", ".join(renamed)), style="dim")
         title = draft.roles.control.title if draft.roles is not None else "Meridian"
-        self.service.configure_access(SetupAccessSelection(access=access, delivery=DeliveryIntent(profile_title=title)))
+        self.service.configure_access(
+            SetupAccessSelection(
+                access=access,
+                access_profiles=draft.access.access_profiles if draft.access is not None else [],
+                delivery=DeliveryIntent(profile_title=title),
+            )
+        )
 
     # 6-9. review, apply, verify, handoff
     def _review(self, draft: SetupDraft) -> None:

@@ -9,6 +9,7 @@
 - **Stale-client nudge** — `stale_clients.py` maps a User-Agent to one inert entry (`outdated` v2rayNG below 1.9.17, `abandoned` NekoRay), each rule with its documented reason; it is read per request, stored nowhere, last in every format, and the preview reports it as `stale_client`.
 
 ## Pitfalls
+- **Access filters precede name allocation** — effective-access views and previews pair permitted endpoints with the same unique presentation names as live delivery.
 - **Named `/info` extensions appear only when they carry something** — unit corpus users have no schedule, so an always-present `accountSchedule` passed every unit test and failed only the System Lab's live replay.
 - **Every structured renderer gets the routing policy** — pass the topology's `client_routing` to each one, including Xray fingerprint groups and Stash.
 - **Header and `/info` traffic use the same period projection** — legacy combined use is included in download and explicitly exposed as unattributed, so a reset never erases lifetime accounting.

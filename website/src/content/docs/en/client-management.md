@@ -475,7 +475,7 @@ Two apps earn one inert extra entry at the end of their subscription, in the per
 
 Response headers are redacted: URLs are replaced, and encoded profile titles and notices show only their `base64:` prefix. The preview returns no body, URIs, keys, private notes, or tags. User-Agent is bounded to 512 Unicode characters and Accept to 256, each one line. Inputs are transient: they are neither stored nor echoed, never register a device, and trigger no backup write.
 
-`POST /api/subscription/preview` needs read scope or the owner session. Send `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`; omitted headers default to empty strings. Settings in the web panel has the same form. No HWID or device-header input is accepted. For API-managed endpoints, `enabled: false` excludes the saved endpoint from subscriptions and appears as `disabled_endpoint`; true is the default and is omitted from serialized endpoints. A reviewed endpoint apply restores topology-defined delivery.
+`POST /api/subscription/preview` accepts read or people scope, or the owner session. When access profiles are configured, it requires people/admin or the owner session. Send `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`; omitted headers default to empty strings. Settings in the web panel has the same form. No HWID or device-header input is accepted. For API-managed endpoints, `enabled: false` excludes the saved endpoint from subscriptions and appears as `disabled_endpoint`; true is the default and is omitted from serialized endpoints. A reviewed endpoint apply restores topology-defined delivery.
 
 ## Review changes for many people
 
@@ -490,3 +490,62 @@ Durable receipts retain action, parameters, counts, and per-person outcomes. Rev
 `GET /api/people` requires people/admin or an owner session. It returns `users`, `total`, `population`, contextual `facets`, and `next_cursor`. Query keys: `q`, `status`, `tag`, `expires`, `quota`, `never` (0/1), `attention`, `lifecycle`, `sort`, `order`, `limit` (1–500), `cursor`. Keep filters and order when continuing a cursor. The plain `GET /api/users` route remains available. Query responses omit credentials and private notes; CLI JSON retains its existing note view through the authorized per-person read.
 
 When bulk disabling, deletion, or an expiry change removes access, the service records the same flow-block receipts for each person and affected node as an individual edit. Connection keys and subscription URLs stay unchanged. New streams are blocked after the node confirms the applied document; transfers and UDP sessions started earlier may continue. Deleting an account keeps its revocation receipts so later node reports can confirm blocking.
+
+## Access profiles
+
+Any non-default membership requires review, even when the live profile map and declaration fingerprint are missing. Previews and settings writes refuse a map that omits a profile still assigned to a person. Restore the missing profile through a reviewed edit, or assign the affected people to other profiles first.
+
+Profiles are reviewed topology; membership belongs to the operator in the service. The built-in `default` profile grants every exit and path, including future additions. A person may belong to several profiles; their grants are combined. Fleets without named profiles keep the same node documents and subscriptions.
+
+Access profiles require Meridian's control service. On a Remnawave fleet, run `meridian migrate` first; adding, importing, or applying profiles is refused before server or panel changes.
+
+Single-person `client set --profile` and bulk `client bulk set-profiles` also refuse Remnawave before looking up people or contacting a service, including `--dry-run` and assignment to `default`.
+
+Create or replace grants with `meridian profile add|set`; `profile list` shows grants and membership counts. References are `exit:ID`, `gateway:ID`, or the compiler's stable `inbound:...` and `endpoint:...` IDs. Unknown and retired references fail review. Gateway bridge inbounds cannot be assigned to people. A public endpoint grants its authentication inbound, so every other public connection sharing that inbound is granted too. `--empty` creates a profile with no connections.
+
+Use `client set person --profile limited --yes`, repeating `--profile` for every membership to keep. This replaces the membership list; choose `default` to restore full access. Profile edits have their own review, separate from account limits, notes, and language. The console's access-profile card shows granted connections and the profiles that permit them, preserves unsaved choices, and opens the same frozen review. **Set profiles** is also a bulk action; its preview shows gained and lost inbounds and rejects changed people or topology at commit.
+
+The CLI reports a service access error if it cannot read the person. A profile loss review prints the revocation warning once.
+
+Bulk undo checks the saved people, grants, and nodes before previewing or writing. Changed access or a deleted profile refuses the whole undo and names the affected people, including with `--dry-run`. Undo previews show the reversed gains, losses, and hard cut-off scope. The API accepts `{"receipt_id":"...","dry_run":true}` at `POST /api/people/bulk/undo`, returning projected `undo_people` without a database change, event, or backup pull. Older receipts without saved access preconditions require a new bulk review.
+
+Losing a grant removes the connection from every subscription format, individual links, and the connection page, and removes the person from the node's inbound. After that node applies the revision, the existing per-person flow block stops new connections and new streams from open sessions. Connection keys, subscription URLs, and device registrations stay the same. Transfers and UDP associations already dispatched may continue. The review names the affected nodes and the hard cut-off boundary: a VLESS cut-off restarts Xray and reconnects every inbound and bridge on that node; an inbound reset affects the listed inbounds, with whole-core fallback on failure. A reviewed `meridian node restart NODE --core --yes` ends existing transfers by reconnecting everyone on that node.
+
+`GET /api/users/{username}/cut-off` requires `people.read` and `people.private`. Its review includes inbounds lost through a profile change while their flow-block receipts remain unresolved, even if the person is still active. A subsequent `--cut-off` resets those inbounds too.
+
+Every unresolved receipt contributes its inbounds, regardless of its current reason. Rotating connection keys, reissuing a link, replacing keys and profiles together through import, or re-enabling a person after narrowing access keeps lost inbounds in the cut-off review until blocking is confirmed or the same key regains access.
+
+Removing a profile still used by people is refused with its membership count. Move those people to other profiles first. Ordinary applies never replace membership. Snapshots preserve every person's memberships; a replacing user import preserves them when `profiles` is omitted. Fleet export carries declared people's current memberships as creation-only settings, so a new fleet can recreate them while existing people retain their operator-owned choices. Console-only people remain service data in the snapshot.
+
+Restore also preserves earlier profile use and refuses snapshot profiles that differ from local intent before staging or target access. It compares stored declarations, or the exact compiled map for an unstamped snapshot. Restore matching state first, then review the desired saved change with `meridian apply`; `--force` cannot bypass the match. See [Recovery](/en/recovery/).
+
+`plan` and `apply` review profiles held by the service as well as those in the proposed topology. Removing the last profile is reviewed and fenced, and is refused while anyone still belongs to it.
+
+Every apply path, including `setup --intent`, restarting setup, and imperative commands such as `client add` or `fleet contact`, checks declared profile IDs and grants against the service before saving topology or writing to servers. A saved but unapplied profile edit is refused: edit profiles with `meridian profile` or `meridian fleet import`, or run `meridian apply` to review the saved change. Changing protocols or relay camouflage may expand an unchanged `exit:` or `gateway:` grant; the topology command's own review covers that change.
+
+A fresh fleet can introduce profiles through `setup --intent`. Bootstrap is allowed only while the service has no declaration fingerprint, no named profiles, and no non-default memberships. If the service holds profiles without a fingerprint, run `meridian apply` to review them before other topology commands.
+
+Meridian remembers that your fleet has used named profiles. Saving a configuration with profiles records this fact, and removing the last profile does not reset it. Current configuration edits also count when checking whether an outage requires review.
+
+If another managing copy causes an apply to refuse, local topology and forgotten-server records stay unchanged. Once an apply is accepted, Meridian remembers profile use even if a later deployment step fails.
+
+`fleet import` uses the same profile check, including when both the saved and imported topology have no profiles. If service settings are unavailable, `plan` still returns its compiled result with unavailable evidence and exit `3`. An apply or import can proceed without the profile review only for a fresh fleet or when saved generation evidence proves no profiles were recorded. Otherwise, restore control-service access and retry. Import dry runs require live evidence.
+
+An apply stores inbound and endpoint references before activating profile grants, then creates accounts. Adding a person in that apply cannot invalidate its own access review, including when removing the last profile.
+
+Membership is private operator data: `people.private` reveals `profiles` in person and revision results. Effective-access and membership-count reads require both `people.read` and `people.private`; policy reviews require `fleet.apply` and `people.private`. Account edits use `people.edit`, and bulk assignment uses `people.batch` and `people.private`. Format previews require `people.read`, plus `people.private` while profiles are configured. The people/admin presets include the necessary private permissions; other presets receive an empty `profiles` list and no creation memberships. Profiles store membership only, with no client IP, device, or connection observations.
+
+JSON reviews and fleet exports preserve valid profile IDs and usernames such as `token` and `secret`, including nested grant and creation-setting lists. Credential fields remain redacted.
+
+Usernames such as `token`, `secret`, and `api_key` are also valid in revision proposals and reviewed applies. Their creation settings and display names still undergo the usual secret check. The username must be declared in `access.users`; its value must be a mapping in `access.creation_settings` or a string in `access.display_names`. Otherwise secret-shaped keys are rejected as usual.
+
+| Operation | Meaning |
+| --- | --- |
+| `GET /api/access-profiles` | Reviewed grants and private membership counts; `people.read` and `people.private` |
+| `GET /api/users/{username}/access` | Effective inbounds and connections with `granted_by`; `people.read` and `people.private`, no credentials |
+| `POST /api/access-profiles/preview` | Review a compiled `access_profiles` map and future `inbound_refs`; `fleet.apply` and `people.private`, no writes |
+| `PATCH /api/users/{username}` | Set a nonempty `profiles` list with `people.edit`; omitted membership is preserved |
+
+For a frozen assignment, use `POST /api/people/bulk/preview` with `{"usernames":["person"],"action":{"action":"set-profiles","profiles":["limited"]}}`, then commit its ID and hash. The profile preview returns `access_hash`; `PUT /api/settings` accepts it as `expected_access_hash` and refuses membership changes since review. Optional `existing_inbounds` identifies the current node/tag references when upgrading older specs. These previews persist no request data.
+
+Settings carry `access_profile_declarations_hash`, the SHA-256 of normalized intent-level profile declarations. Reviewed writes set it under `expected_access_hash`; writes keeping the same declarations send `expected_profile_declarations_hash`, which the service checks in the settings transaction. Removing the last profile keeps the fingerprint of empty declarations. `GET /api/access-profiles` includes `declarations_hash` and, when true, `has_non_default_memberships`; these reads keep the existing private permissions. Replacing an established fingerprint or grant map without either fence is refused.

@@ -78,6 +78,10 @@ The output shows the plan hash, resource counts by kind, and any resources that 
 
 Don't edit the topology in `cluster.yml` by hand. Change it with `meridian setup`, `deploy`, `client add`, `node add`, or `relay add`.
 
+If access profile settings cannot be read, `plan` preserves the compiled result, lists unavailable evidence in `observation_errors`, and exits `3` with `MERIDIAN_PLAN_EVIDENCE_UNAVAILABLE`. Apply and import may skip an unavailable profile review only if the fleet has never sent named profiles to the service. After the fleet fence accepts, Meridian saves `access_profiles_used: true` immediately before the first settings request carrying named profiles. A failure or lost reply keeps that history, as does removing the last profile. Saving profiles in intent alone does not mark them used; older files without the flag still count saved named profiles as used. A fence refusal saves neither the proposal nor forgotten-server records. Once profiles have been sent, unavailable evidence stops apply and import with retryable exit `3`; restore control-service access and retry. Import dry runs always require live evidence.
+
+Setup (including `--restart` and `--intent`) and every imperative apply compare declared profile IDs and grants with the live service before saving topology or writing to servers. A mismatch needs `meridian profile` or `meridian fleet import`, or `meridian apply` to review a saved change. Unchanged `exit:` and `gateway:` grants may expand as protocols or relay camouflage change under that command's topology review. Fresh bootstrap requires no service fingerprint, named profiles, or non-default memberships. Setup interrupted before its profile settings request can resume with `meridian setup --yes`, including failures after control credentials were saved. Once declarations may have reached the service, an outage requires access to be restored before retrying.
+
 ### meridian apply
 
 Apply the reviewed topology in `cluster.yml` to your servers. Apply shows the plan hash and resource count, asks for confirmation, then applies the exact plan it showed, with checkpoints. An interrupted apply resumes where it stopped.
@@ -99,6 +103,9 @@ Removals are applied too: whatever left the topology (users, protocol paths, exi
 Every apply is recorded in the control service as a revision (see `meridian fleet history`), and holds a lease there while it runs, so two machines never apply at once.
 
 ### meridian client
+
+`client set NAME --profile PROFILE` replaces profile membership after a service review; repeat `--profile` for every profile to keep. `--dry-run` previews without saving and JSON writes need `--yes`. Use a separate command for account limits, notes, or language. `client bulk set-profiles --profile PROFILE` uses the same selection flags and frozen commit as other bulk actions, including repeated `--person`, `--search`, and `--tag`.
+
 
 The schedule options below work with `client add` and `client set`. New settings are applied only at creation; later applies preserve operator edits. `client show` carries the typed fields and the service’s computed `schedule` in JSON. `client set --dry-run` returns `data.schedule_preview` and `applied: false`; schedule changes in JSON need `--yes`. `client extend --days N` adds days to a pending first-use duration without activating it; after activation it extends the expiry and starts a new renewal series.
 
@@ -246,6 +253,24 @@ meridian privacy set [--devices off|private|full] [--device-limit N] [--history 
 | `--json` | | Emit a `meridian.output/v1` envelope |
 
 Bare `privacy` is `privacy show`: settings, disclosures, and the last 50 changes. `set` changes only options you pass, shows what a raised level stores and what a lowered one removes, and asks for confirmation. Identical values are a no-op. JSON `data` includes the settings and changes; a set also reports `deleted` row counts and `rekeyed_devices`. The change records the token's name, `owner`, or `root`, the time, and before/after values. Private records are cleared after a restore because the fleet fingerprint key is never snapshotted.
+
+### meridian profile
+
+Any non-default membership requires review, even when the live profile map and declaration fingerprint are missing. Previews and settings writes refuse a map that omits a profile still assigned to a person. Restore the missing profile through a reviewed edit, or assign the affected people to other profiles first.
+
+Review which exits and paths each profile grants. `default` always grants everything and cannot be edited or removed.
+
+```bash
+meridian profile add limited --grant exit:main --dry-run --json
+meridian profile add limited --grant exit:main --yes --json
+meridian profile set limited --grant inbound:main:main-reality --yes
+meridian profile set limited --empty --yes
+meridian profile list --json
+meridian profile remove limited --dry-run --json
+meridian profile remove limited --yes --json
+```
+
+Repeat `--grant` to combine `exit:`, `gateway:`, `inbound:`, and `endpoint:` references. `set` replaces the whole grant list. `--empty` grants nothing. The review lists people gaining and losing access, shared-inbound aliases, and the cut-off scope. Used-profile removal reports the count and refuses until membership is moved. Applies keep existing memberships, keys, and URLs. `plan`, `apply`, and fleet import include the same access review for profiled fleets.
 
 ### meridian server
 
@@ -651,6 +676,10 @@ After every command that changes the fleet, Meridian saves the control service's
 
 ### meridian restore
 
+Restore checks the snapshot's fleet before profile compatibility or target access. `--force` keeps this check. Choose this fleet's snapshot, or restore another fleet's snapshot into a different empty context.
+
+An empty context imports validated fleet files before remote restore confirmation. Saved files keep profile history from the snapshot database and discard a carried unfinished restore. They remain if review fails or you decline confirmation; finished restore records are retained. An existing `cluster.yml` without topology is accepted; changes to that file after loading are refused.
+
 Rebuild a lost or seized control server on another server from a snapshot.
 
 ```
@@ -674,6 +703,8 @@ Restore opens the snapshot, reviews what it will do, and asks. It then installs 
 On a bare IP every subscription URL contains the control server's address, so each link changes: the review says so and the end prints every client's new link. With a domain, links stay the same once its DNS record points at the new server; the review names the records.
 
 Restore refuses while the old control server still answers, because two control services would split the fleet; `--force` overrides it, for example when the old server was seized. It warns when `--snapshot` names an older file than the newest saved one: an older snapshot brings back tokens, machines, and people you have since removed. A restore that stops can be run again and continues where it stopped.
+
+Restore also checks snapshot profiles against the local intent before staging or target access; `--force` does not skip this check. A stored declaration fingerprint permits topology expansion of unchanged grants. Unstamped snapshots require an identical compiled grant map. Restore merges deposited profile history even when it retains newer local intent, and pins reviewed declarations through resumes. Choose a matching snapshot, or restore matching fleet files into a new context and review the desired saved change afterwards with `meridian apply`. See [Recovery](/en/recovery/).
 
 On a machine without the fleet, pass the snapshot file and `--recovery-key`: the snapshot's own copy of the fleet's files is restored first. If this machine's copy is older than the snapshot's, restore puts the fleet in a new context and, after the review names it, takes the fleet over from the old one, which is then marked superseded and refuses changes until you `meridian context remove` it.
 

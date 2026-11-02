@@ -78,6 +78,10 @@ meridian plan [--json]
 
 不要手工编辑 `cluster.yml` 中的拓扑。用 `meridian setup`、`deploy`、`client add`、`node add` 或 `relay add` 变更它。
 
+如果无法读取访问配置设置，`plan` 会保留已编译的计划，在 `observation_errors` 中列出不可用的证据，并以代码 `3` 和错误 `MERIDIAN_PLAN_EVIDENCE_UNAVAILABLE` 退出。只有集群从未向服务发送命名访问配置时，应用和导入才可跳过不可用的访问审核。部署应用校验通过后，Meridian 会在首次发送包含命名访问配置的设置请求之前，立即保存 `access_profiles_used: true`。请求失败、响应丢失或删除最后一个访问配置都不会清除记录。仅将访问配置保存到拓扑中不算使用过；没有该标志的旧文件，只要已保存的拓扑包含命名访问配置，仍视为使用过。旧副本被拒绝时，不会保存提议或已忘记服务器的记录。一旦发送过访问配置，无法获取审核证据时，应用和导入会以可重试的代码 `3` 退出；请恢复控制服务访问后重试。导入预览始终需要服务的实时证据。
+
+设置命令（包括 `--restart` 和 `--intent`）及所有应用命令，都会在保存拓扑或写入服务器前，将访问配置 ID 和授权声明与服务核对。存在差异时，请使用 `meridian profile` 或 `meridian fleet import` 修改，或通过 `meridian apply` 审核已保存的修改。协议或中继伪装名称变化可以改变同一个 `exit:`、`gateway:` 授权所涵盖的连接，由相应拓扑命令审核。初始化要求服务尚无声明指纹、命名访问配置和非 `default` 成员关系。在访问配置设置请求之前中断的初始化，可以通过 `meridian setup --yes` 继续，即使控制服务凭据已经保存。如果声明可能已发送到服务，重试前必须先恢复服务访问。
+
 ### meridian apply
 
 应用 `cluster.yml` 中已审核的拓扑到你的服务器。应用显示计划哈希和资源计数，要求确认，然后应用它显示的确切计划，带检查点。中断的应用从停止的地方恢复。
@@ -99,6 +103,9 @@ JSON `data` 包含 `plan_hash`、`generation` 和 `actions[]` 带 `status: "conv
 每次应用都会在控制服务中记录为一个修订（见 `meridian fleet history`），并在运行期间在那里持有租约，因此两台机器永远不会同时应用。
 
 ### meridian client
+
+`client set NAME --profile PROFILE` 在服务预览后替换配置成员关系；为每个需保留的配置重复 `--profile`。`--dry-run` 只预览，JSON 写入需要 `--yes`。限额、备注或语言请单独修改。`client bulk set-profiles --profile PROFILE` 使用其他批量操作相同的筛选及固定提交机制，包括可重复的 `--person`、`--search` 和 `--tag`。
+
 
 以下时间安排选项适用于 `client add` 和 `client set`。初始设置仅在创建时应用，后续 apply 会保留管理员修改。`client show` 的 JSON 包含类型明确的字段和服务计算的 `schedule`。`client set --dry-run` 返回 `data.schedule_preview` 与 `applied: false`；JSON 模式保存时间安排需添加 `--yes`。`client extend --days N` 对待激活账户只增加有效天数，不开始计时；激活后延长到期时间，并开始新一轮续期。
 
@@ -246,6 +253,24 @@ meridian privacy set [--devices off|private|full] [--device-limit N] [--history 
 | `--json` | | 输出 `meridian.output/v1` envelope |
 
 单独运行 `privacy` 等同于 `privacy show`：显示设置、隐私说明和最近 50 次变更。`set` 只更改传入选项，说明提高级别会保存什么、降低级别会删除什么，并要求确认。相同值不会产生变更。JSON 的 `data` 包含设置和变更；`set` 还报告 `deleted` 中的删除记录数和 `rekeyed_devices` 中的转换数。日志保存令牌名称、`owner` 或 `root`、时间和前后值。恢复后清空私密设备记录，因为指纹密钥永远不包含在快照中。
+
+### meridian profile
+
+任何非 `default` 成员关系都需要审核，即使服务中的访问配置映射和声明指纹都已缺失。预览和设置写入会拒绝遗漏用户仍所属配置的映射。请通过已审核的修改恢复缺失配置，或先将相关用户分配到其他配置。
+
+审核每个配置允许的出口与路径。`default` 始终允许全部访问，不能编辑或删除。
+
+```bash
+meridian profile add limited --grant exit:main --dry-run --json
+meridian profile add limited --grant exit:main --yes --json
+meridian profile set limited --grant inbound:main:main-reality --yes
+meridian profile set limited --empty --yes
+meridian profile list --json
+meridian profile remove limited --dry-run --json
+meridian profile remove limited --yes --json
+```
+
+重复 `--grant` 可组合 `exit:`、`gateway:`、`inbound:` 和 `endpoint:` 引用。`set` 替换整个授权列表，`--empty` 清空授权。预览列出获得或失去访问的用户、共享入站及会话断开范围。配置仍有成员时无法删除，须先调整成员关系。apply 保留现有成员关系、密钥和 URL。启用配置后，`plan`、`apply` 和部署导入都包含相同的访问预览。
 
 ### meridian server
 
@@ -651,6 +676,10 @@ meridian backup revoke ID
 
 ### meridian restore
 
+restore 会先检查快照是否属于当前集群，然后再核对访问配置或访问目标服务器。指定 `--force` 也会保留这项检查。请选择当前集群的快照，或在另一个空上下文中恢复其他集群的快照。
+
+空上下文会在确认远程恢复之前导入经过验证的部署文件。保存的文件会合并快照数据库中的访问配置使用历史，并清除从原机器带来的未完成恢复记录。即使审核失败或取消确认，这些文件仍会保留；已完成的恢复记录也会保留。已有的 `cluster.yml` 只要尚未包含拓扑也可导入；读取后的文件变更会拒绝此次写入。
+
 用快照在另一台服务器上重建丢失或被查扣的控制服务器。
 
 ```
@@ -674,6 +703,8 @@ restore 会打开快照，审核它要做的事并请求确认。然后它用快
 使用裸 IP 时，每个订阅 URL 都包含控制服务器的地址，因此所有链接都会改变：审核时会说明这一点，结束时会打印每个客户端的新链接。使用域名时，只要域名的 DNS 记录指向新服务器，链接就保持不变；审核时会列出这些记录。
 
 只要旧控制服务器还在响应，restore 就会拒绝执行，因为两个控制服务会让集群分裂；`--force` 可以覆盖这一点，例如旧服务器已被查扣时。如果 `--snapshot` 指定的文件比最新保存的快照旧，它会发出警告：旧快照会带回你之后删除的令牌、机器和用户。中途停止的 restore 可以再次运行，会从中断处继续。
+
+restore 还会在暂存数据库或访问目标服务器前，将快照访问配置与本地拓扑核对；`--force` 不会跳过此检查。有声明指纹时，可在拓扑审核中改变同一声明所涵盖的连接。没有指纹的快照要求编译后的授权映射完全一致。即使保留较新的本地拓扑，恢复也会合并快照中的历史访问配置使用记录，并在检查点固定已审核的声明。请选择匹配的快照，或将对应的部署文件恢复到新上下文，完成后再用 `meridian apply` 审核所需的已保存修改。参见[恢复](/zh/recovery/)。
 
 在没有该集群的机器上，请传入快照文件和 `--recovery-key`：会先恢复快照自带的集群文件副本。如果这台机器上的副本比快照中的旧，restore 会把集群放进一个新的上下文，并在审核中说明后，从旧上下文接管集群；旧上下文会被标记为已被取代，并拒绝任何修改，直到你用 `meridian context remove` 删除它。
 

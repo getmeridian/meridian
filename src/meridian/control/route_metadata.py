@@ -12,10 +12,12 @@ USER_RESPONSE_CAPABILITIES = (
     ExtraCapability("private_metadata", "people.private", "people"),
 )
 DECLARED_CAPABILITY = ExtraCapability("declared_people", "fleet.apply", "admin")
+REVISION_RESPONSE_CAPABILITIES = (ExtraCapability("private_membership", "people.private", "people"),)
 
 
 USER_CREDENTIALS = (
-    "User UUIDs and subscription tokens need people.credentials; private notes and tags need people.private. "
+    "User UUIDs and subscription tokens need people.credentials; "
+    "private notes, tags, and profiles need people.private. "
     "These fields are otherwise blank, including in mutation responses. People and admin presets include both."
 )
 DECLARED_USER = (

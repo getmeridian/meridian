@@ -1,5 +1,48 @@
 {
   "$defs": {
+    "AccessChange": {
+      "additionalProperties": false,
+      "properties": {
+        "gained": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Gained",
+          "type": "array"
+        },
+        "lost": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Lost",
+          "type": "array"
+        },
+        "profiles": {
+          "items": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Profiles",
+          "type": "array"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "profiles",
+        "gained",
+        "lost"
+      ],
+      "title": "AccessChange",
+      "type": "object"
+    },
     "BulkAction": {
       "additionalProperties": false,
       "properties": {
@@ -14,7 +57,8 @@
             "tag",
             "devices",
             "renewal",
-            "delete"
+            "delete",
+            "set-profiles"
           ],
           "title": "Action",
           "type": "string"
@@ -75,6 +119,18 @@
           ],
           "default": null,
           "title": "Months"
+        },
+        "profiles": {
+          "items": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Profiles",
+          "type": "array"
         },
         "renewal_interval_days": {
           "anyOf": [
@@ -259,6 +315,18 @@
         "period_traffic": {
           "$ref": "#/$defs/PeriodTraffic"
         },
+        "profiles": {
+          "items": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Profiles",
+          "type": "array"
+        },
         "renewal_anchor_at": {
           "anyOf": [
             {
@@ -406,6 +474,17 @@
     "BulkPersonChange": {
       "additionalProperties": false,
       "properties": {
+        "access": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AccessChange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "after": {
           "anyOf": [
             {
@@ -437,6 +516,17 @@
           ],
           "default": null,
           "title": "Cli Command"
+        },
+        "cut_off": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CutOffPlan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "display_name": {
           "title": "Display Name",
@@ -487,6 +577,64 @@
         "outcome"
       ],
       "title": "BulkPersonChange",
+      "type": "object"
+    },
+    "CutOffNode": {
+      "additionalProperties": false,
+      "properties": {
+        "effect": {
+          "default": "inbound_reset",
+          "description": "A core restart reconnects every Xray inbound and bridge on this node; an inbound reset reconnects the listed inbounds, with whole-core fallback on failure.",
+          "enum": [
+            "inbound_reset",
+            "core_restart"
+          ],
+          "title": "Effect",
+          "type": "string"
+        },
+        "inbound_tags": {
+          "items": {
+            "description": "Xray inbound tag.",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "title": "Inbound Tags",
+          "type": "array"
+        },
+        "node_id": {
+          "description": "Node identifier: the server's lowercase topology ID, unique within the fleet.",
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Node Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "inbound_tags"
+      ],
+      "title": "CutOffNode",
+      "type": "object"
+    },
+    "CutOffPlan": {
+      "additionalProperties": false,
+      "description": "Every managed inbound that may hold the person's open sessions; contains no person or credential.",
+      "properties": {
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/CutOffNode"
+          },
+          "title": "Nodes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "nodes"
+      ],
+      "title": "CutOffPlan",
       "type": "object"
     },
     "PeriodTraffic": {
@@ -568,6 +716,7 @@
         }
       ],
       "default": null,
+      "description": "Projected or completed inverse changes; a dry run leaves undone_at null.",
       "title": "Undo People"
     },
     "undo_until": {

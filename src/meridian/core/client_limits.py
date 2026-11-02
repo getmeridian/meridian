@@ -16,6 +16,7 @@ from typing import Literal
 
 from pydantic import Field, SerializerFunctionWrapHandler, field_validator, model_serializer, model_validator
 
+from meridian.core.access_profiles import ProfileMembership, default_profiles
 from meridian.core.account_schedule import FINITE_EXPIRY_YEAR as NEVER_EXPIRES_YEAR
 from meridian.core.account_schedule import (
     LIFECYCLE_FIELDS,
@@ -62,6 +63,7 @@ class UserCreationSettings(AccountLifecycleSettings):
     traffic_limit_bytes: int = Field(default=0, ge=0, le=MAX_TRAFFIC_LIMIT_BYTES)
     traffic_limit_strategy: LimitStrategy = "no_reset"
     device_limit: DeviceCap | None = None
+    profiles: ProfileMembership = Field(default_factory=default_profiles, exclude_if=lambda value: value == ["default"])
 
     @model_serializer(mode="wrap")
     def omit_unused_schedules(self, handler: SerializerFunctionWrapHandler) -> dict[str, object]:

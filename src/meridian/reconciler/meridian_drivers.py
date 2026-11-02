@@ -37,6 +37,7 @@ from meridian.control.client import (
 from meridian.control.command_models import NodeCommandRecord
 from meridian.control.models import ClientEndpoint, NodeSpec, NodeStatus, ServiceSettings, UserCreate
 from meridian.control_artifacts import AgentBinary
+from meridian.core.access_profiles import profile_declarations_hash
 from meridian.core.agent_protocol import AgentBootstrap
 from meridian.core.agent_types import AGENT_PROTOCOL, canonical_sha256
 from meridian.host_runtime import (
@@ -97,8 +98,10 @@ class MeridianDriverContext:
     connection_for: Callable[[str], ServerConnection]
     server_addresses: Mapping[str, str]
     agent_binary: Callable[[str], AgentBinary]
+    persist: Callable[[ClusterConfig], None]
     sleep: Callable[[float], None] = time.sleep
     user_cut_off: Mapping[str, list[NodeCommandRecord]] = field(default_factory=dict)
+    access_review_hash: str | None = None
     _architectures: dict[str, str] = field(default_factory=dict, repr=False)
 
     def architecture(self, server_ref: str) -> str:
@@ -422,7 +425,13 @@ class NodeWorkloadDriver:
         credentials = self.context.service_credentials(payload.profile, action.generation)
         if (keys is None and _needs_keys(payload.profile)) or credentials is None:
             return _observation(action, exists=False, connected=False, remote_id="")
-        spec = build_node_spec(payload.profile, keys, credentials, arch=self.context.architecture(payload.server_ref))
+        spec = build_node_spec(
+            payload.profile,
+            keys,
+            credentials,
+            arch=self.context.architecture(payload.server_ref),
+            access_profiles=payload.access_profiles,
+        )
         with self.context.client() as client:
             status = client.node(payload.workload_ref)
         stored = status is not None and status.spec_sha256 == _spec_hash(spec)
@@ -446,7 +455,13 @@ class NodeWorkloadDriver:
                 f"Routing gateway {payload.workload_ref} dials an exit that has no Reality keys yet.",
                 hint="Apply the plan again; the exit workloads it routes to come first.",
             )
-        spec = build_node_spec(payload.profile, keys, credentials, arch=self.context.architecture(payload.server_ref))
+        spec = build_node_spec(
+            payload.profile,
+            keys,
+            credentials,
+            arch=self.context.architecture(payload.server_ref),
+            access_profiles=payload.access_profiles,
+        )
         with self.context.client() as client:
             status = client.put_node(payload.workload_ref, spec)
             deadline = time.monotonic() + WORKLOAD_APPLY_TIMEOUT
@@ -511,6 +526,7 @@ class ClientEndpointDriver:
             return None
         address = payload.address or self.context.address(payload.address_server_ref)
         return ClientEndpoint(
+            inbound_ref=payload.inbound_ref,
             remark=payload.remark,
             protocol=payload.protocol,
             address=address,
@@ -584,12 +600,37 @@ class ServiceSettingsDriver:
     @_uncertain_writes_are_unknown
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
         with self.context.client() as client:
-            client.put_settings(self._settings(action))
+            settings = self._settings(action)
+            if settings.access_profile_declarations_hash is not None and not self.context.cluster.access_profiles_used:
+                self.context.cluster.access_profiles_used = True
+                try:
+                    self.context.persist(self.context.cluster)
+                except Exception:
+                    self.context.cluster.access_profiles_used = False
+                    raise
+            if self.context.access_review_hash is None:
+                client.put_settings(
+                    settings,
+                    expected_profile_declarations_hash=(
+                        settings.access_profile_declarations_hash or profile_declarations_hash([])
+                    ),
+                )
+            else:
+                client.put_settings(settings, expected_access_hash=self.context.access_review_hash)
         return ResourceApplyReceipt(remote_id="settings")
 
     def _settings(self, action: ResourceAction) -> ServiceSettings:
         payload = payload_of(action, ServiceSettingsPayload)
         return ServiceSettings(
+            access_profiles=payload.access_profiles,
+            access_profile_declarations_hash=(
+                payload.access_profile_declarations_hash
+                or (
+                    profile_declarations_hash([])
+                    if self.context.cluster.has_used_access_profiles or self.context.access_review_hash is not None
+                    else None
+                )
+            ),
             owner_contact=payload.owner_contact,
             profile_title=payload.profile_title,
             servers=payload.servers,

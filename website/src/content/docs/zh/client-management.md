@@ -477,7 +477,7 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 响应头经过脱敏：URL 被替换，编码后的配置名称和通知只保留 `base64:` 前缀。预览不返回订阅正文、URI、密钥、私有备注或标签。User-Agent 最多 512 个 Unicode 字符，Accept 最多 256 个字符，两者均为单行。输入仅用于本次请求，不保存或回显，不注册设备，也不触发备份写入。
 
-`POST /api/subscription/preview` 需要 read 权限或管理者会话。发送 `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`，省略的请求头默认为空字符串。网页面板设置提供同样的表单，不接受 HWID 或设备请求头。对于通过 API 管理的端点，`enabled: false` 会将保存的端点从订阅中排除，并显示原因为 `disabled_endpoint`；默认值为 true，序列化时省略。经过审核的端点应用操作会恢复拓扑规定的连接提供方式。
+`POST /api/subscription/preview` 接受 read 或 people 权限，或管理者会话。配置了访问配置后，需要 people/admin 权限或管理者会话。发送 `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`，省略的请求头默认为空字符串。网页面板设置提供同样的表单，不接受 HWID 或设备请求头。对于通过 API 管理的端点，`enabled: false` 会将保存的端点从订阅中排除，并显示原因为 `disabled_endpoint`；默认值为 true，序列化时省略。经过审核的端点应用操作会恢复拓扑规定的连接提供方式。
 
 ## 审核批量更改
 
@@ -492,3 +492,62 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 `GET /api/people` 需要 people/admin 或所有者会话，返回 `users`、`total`、`population`、分类 `facets` 与 `next_cursor`。查询键：`q`、`status`、`tag`、`expires`、`quota`、`never`（0/1）、`attention`、`lifecycle`、`sort`、`order`、`limit`（1–500）、`cursor`。继续游标时保持相同筛选和排序。原有 `GET /api/users` 保留。查询响应不含凭据与私人备注；CLI 的 JSON 通过现有授权单人读取接口保留备注。
 
 批量停用、删除或到期变更使用户失去访问权限时，服务会为每位用户和每个受影响节点记录与单个用户操作相同的流阻断回执。连接密钥和订阅链接保持不变。节点确认已应用配置后才会阻断新流；已经开始的传输和 UDP 会话可能继续。删除用户记录后，回执仍保留，以便后续节点报告确认阻断。
+
+## 访问配置
+
+任何非 `default` 成员关系都需要审核，即使服务中的访问配置映射和声明指纹都已缺失。预览和设置写入会拒绝遗漏用户仍所属配置的映射。请通过已审核的修改恢复缺失配置，或先将相关用户分配到其他配置。
+
+配置授权属于已审核的拓扑；用户的配置成员关系由服务保存并归运营者管理。内置 `default` 配置允许访问所有出口和路径，包括未来新增的连接。用户可属于多个配置，权限取并集。未定义命名配置的部署保持原有节点文档和订阅输出。
+
+访问配置需要 Meridian 控制服务。Remnawave 部署请先运行 `meridian migrate`；新增、导入或应用访问配置会在修改服务器或面板之前被拒绝。
+
+单人分配命令 `client set --profile` 和批量分配命令 `client bulk set-profiles` 也会在 Remnawave 上被拒绝，且拒绝发生在查询用户或联系服务之前。这包括 `--dry-run` 和分配 `default` 配置。
+
+使用 `meridian profile add|set` 创建或替换授权，`profile list` 显示授权及成员数量。支持 `exit:ID`、`gateway:ID`，以及编译器的稳定 `inbound:...` 和 `endpoint:...` 引用。未知或已移除的引用会在审核时被拒绝。网关与出口之间的内部桥接入站不能授权给用户。授权公开连接实际授权其认证入站，因此通向同一入站的其他公开连接也会被授权。`--empty` 可创建不允许任何连接的配置。
+
+使用 `client set person --profile limited --yes` 替换配置列表，为每个需要保留的配置重复 `--profile`。选择 `default` 可恢复完整访问。配置成员变更单独审核，与账户限额、备注及语言分开修改。控制台的访问配置卡显示已授权连接及授权原因，保留未保存的选择，并打开相同的固定预览。批量操作 **设置访问配置** 显示新增和失去的入站访问；提交时若用户或拓扑发生变化，整个操作会被拒绝。
+
+CLI 无法读取用户时会报告服务访问错误。配置变更导致访问丢失的警告，每次审核只显示一次。
+
+批量撤销在预览或写入前都会检查保存的用户版本、授权和节点。访问权限已变更或配置已删除时，会拒绝整个撤销并列出受影响用户，`--dry-run` 也一样。撤销预览显示反向的新增、失去访问及相应的彻底断开范围。API 可向 `POST /api/people/bulk/undo` 发送 `{"receipt_id":"...","dry_run":true}`，获得预计的 `undo_people`，不修改数据库、不记录事件，也不拉取备份。未保存访问前提条件的旧回执需要重新进行批量审核。
+
+失去授权会从所有订阅格式、独立连接链接和连接页面移除该连接，同时从节点入站删除该用户。节点应用新版本后，现有的逐用户流阻断机制会阻止新连接及已打开会话中的新流。连接密钥、订阅 URL 和设备注册保持不变。已经开始的传输及 UDP 关联可能继续。预览列出受影响节点及彻底断开的范围：VLESS 会重启 Xray，让该节点上的所有入站和桥接连接重新连接；入站重置只影响所列入站，失败时可能退回整个 Xray 重启。经过审核的 `meridian node restart NODE --core --yes` 会通过让所有人重新连接来结束该节点上的现有传输。
+
+`GET /api/users/{username}/cut-off` 需要 `people.read` 与 `people.private`。配置变更导致用户失去的入站访问，只要流阻断回执仍未确认，就会保留在预览中，即使账户仍处于活跃状态。后续执行 `--cut-off` 也会重置这些入站。
+
+每条尚未确认的回执都会将其入站纳入预览，与当前记录的原因无关。轮换连接密钥、重新签发链接、导入时同时替换密钥与配置归属，或在缩小访问范围后重新启用账户，都不会移除已失去的入站。只有确认阻断，或恢复同一密钥的访问后，这些入站才会从切断会话的预览中移除。
+
+仍有成员的配置无法删除，错误会报告人数。请先将用户移到其他配置。普通 apply 不会覆盖成员关系。快照保留所有用户的配置；替换式用户导入在省略 `profiles` 时保留现有成员关系。部署导出将已声明用户的当前配置保存为仅用于创建的设置，新部署可据此创建用户，已存在用户继续保留运营者的选择。只在控制台创建的用户仍保存在服务快照中。
+
+恢复会保留历史访问配置使用记录，并在暂存数据库或联系目标服务器前拒绝与本地拓扑不匹配的快照。存在指纹时比较已保存的声明；没有指纹时，编译后的授权映射必须完全一致。请先恢复匹配的状态，再运行 `meridian apply` 审核所需的已保存修改；`--force` 无法跳过匹配检查。参见[恢复](/zh/recovery/)。
+
+`plan` 和 `apply` 会同时审核服务中已有的配置与拟应用的拓扑。移除最后一个配置也必须经过审核和并发变更校验；只要仍有成员，就会被拒绝。
+
+所有应用路径，包括 `setup --intent`、通过 `--restart` 重新设置，以及 `client add`、`fleet contact` 等命令，都会在保存拓扑或写入服务器前，将访问配置 ID 和授权声明与服务核对。已保存但尚未应用的访问配置修改不能随其他命令应用：请使用 `meridian profile` 或 `meridian fleet import` 修改配置，或运行 `meridian apply` 审核已保存的修改。更换协议或中继伪装名称可能改变同一个 `exit:` 或 `gateway:` 授权所包含的连接；这些变化由拓扑命令自身的审核覆盖。
+
+新部署可以通过 `setup --intent` 引入访问配置。只有服务尚无声明指纹、命名访问配置和非 `default` 成员关系时，才允许初始化。如果服务已有访问配置但没有声明指纹，请先运行 `meridian apply` 审核，再使用其他拓扑命令。
+
+Meridian 会记住部署曾使用命名访问配置。保存含有访问配置的拓扑会记录这一事实，删除最后一个配置也不会清除记录。判断服务不可用时是否仍需审核，也会考虑当前的拓扑修改。
+
+如果另一台管理设备的修改导致应用被拒绝，本地拓扑和已忘记服务器的记录会保持原样。应用获准后，即使后续部署步骤失败，Meridian 也会保留访问配置使用记录。
+
+`fleet import` 使用相同的访问配置检查，即使保存的拓扑和导入文件都没有访问配置。如果无法读取服务设置，`plan` 仍会返回已编译的计划，标记不可用的证据，并以代码 `3` 退出。只有首次部署，或保存的代次证据能证明未记录访问配置时，应用或导入才可跳过此审核。其他情况需要恢复控制服务访问后重试。导入预览需要服务的实时证据。
+
+apply 会先保存入站及连接端点引用，再启用配置授权，最后创建账户。同一次 apply 中新增用户不会使自己的访问审核失效，包括移除最后一个配置时。
+
+成员关系属于运营者的私有数据：`people.private` 允许在用户和配置版本响应中读取 `profiles`。实际访问权限和成员数量需要 `people.read` 与 `people.private`；授权审核需要 `fleet.apply` 与 `people.private`。账户编辑使用 `people.edit`，批量分配使用 `people.batch` 与 `people.private`。订阅格式预览需要 `people.read`，启用配置后还需要 `people.private`。people/admin 预设包含所需私有权限；其他预设收到空的 `profiles` 列表，初始成员关系也会隐藏。配置仅保存成员关系，不保存客户端 IP、设备信息或连接观察数据。
+
+JSON 审核和部署导出会保留 `token`、`secret` 等有效配置 ID 和用户名，包括嵌套的授权及创建设置列表。凭证字段仍会隐藏。
+
+`token`、`secret` 和 `api_key` 等用户名也可用于修订提案和经过审核的拓扑应用。其创建设置和显示名称仍会接受常规的敏感数据检查。用户名必须在 `access.users` 中声明；在 `access.creation_settings` 中对应的值必须是映射对象，在 `access.display_names` 中则必须是字符串。否则，类似敏感字段名称的键仍会被拒绝。
+
+| 操作 | 含义 |
+| --- | --- |
+| `GET /api/access-profiles` | 已审核授权与私有成员数量；`people.read` 与 `people.private` |
+| `GET /api/users/{username}/access` | 含 `granted_by` 的实际入站与连接；`people.read` 与 `people.private`，不含密钥 |
+| `POST /api/access-profiles/preview` | 预览 `access_profiles` 映射及未来 `inbound_refs`；`fleet.apply` 与 `people.private`，不写入数据 |
+| `PATCH /api/users/{username}` | 使用 `people.edit` 设置非空 `profiles` 列表；省略字段会保留成员关系 |
+
+固定分配请向 `POST /api/people/bulk/preview` 发送 `{"usernames":["person"],"action":{"action":"set-profiles","profiles":["limited"]}}`，再提交其 ID 和哈希。配置预览返回 `access_hash`；`PUT /api/settings` 通过 `expected_access_hash` 接收该值，若成员关系已变化则拒绝应用。可选的 `existing_inbounds` 在升级旧节点规格时提供当前节点和标签的引用。预览请求数据不会持久保存。
+
+设置通过 `access_profile_declarations_hash` 保存规范化拓扑访问配置声明的 SHA-256。审核后的写入使用 `expected_access_hash` 设置该值；保持原声明的写入发送 `expected_profile_declarations_hash`，由服务在同一设置事务中校验。删除最后一个访问配置后，仍保留空声明的指纹。`GET /api/access-profiles` 返回 `declarations_hash`，并在存在非默认成员关系时返回 `has_non_default_memberships: true`；读取权限保持不变。未提供任一校验条件时，替换已有指纹或授权映射会被拒绝。

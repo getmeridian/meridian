@@ -1,0 +1,83 @@
+{
+  "$defs": {
+    "GrantedInbound": {
+      "additionalProperties": false,
+      "properties": {
+        "granted_by": {
+          "items": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "type": "string"
+          },
+          "title": "Granted By",
+          "type": "array"
+        },
+        "inbound_ref": {
+          "title": "Inbound Ref",
+          "type": "string"
+        },
+        "inbound_tag": {
+          "title": "Inbound Tag",
+          "type": "string"
+        },
+        "node_id": {
+          "title": "Node Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "inbound_tag",
+        "inbound_ref",
+        "granted_by"
+      ],
+      "title": "GrantedInbound",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "access_profiles": {
+      "maxProperties": 64,
+      "patternProperties": {
+        "^[a-z0-9][a-z0-9_-]*$": {
+          "items": {
+            "pattern": "^inbound:[a-z0-9][a-z0-9:_.-]{0,191}$",
+            "type": "string"
+          },
+          "maxItems": 10000,
+          "type": "array"
+        }
+      },
+      "propertyNames": {
+        "maxLength": 48,
+        "minLength": 1
+      },
+      "title": "Access Profiles",
+      "type": "object"
+    },
+    "existing_inbounds": {
+      "items": {
+        "$ref": "#/$defs/GrantedInbound"
+      },
+      "maxItems": 10000,
+      "title": "Existing Inbounds",
+      "type": "array"
+    },
+    "inbound_refs": {
+      "items": {
+        "pattern": "^inbound:[a-z0-9][a-z0-9:_.-]{0,191}$",
+        "type": "string"
+      },
+      "maxItems": 10000,
+      "title": "Inbound Refs",
+      "type": "array"
+    }
+  },
+  "required": [
+    "access_profiles"
+  ],
+  "title": "AccessProfileReviewRequest",
+  "type": "object"
+}

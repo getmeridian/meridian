@@ -159,6 +159,7 @@ def print_client_usage(record: ClientRecord) -> None:
     rows.append(
         (t("client.label.language"), LANGUAGE_NAMES[record.language] if record.language else t("language.default"))
     )
+    rows.append((t("client.label.profiles"), escape(", ".join(record.profiles) or t("profiles.none"))))
     # One column for every label, shown or not, so values line up the same in every view.
     width = max(cell_len(label) for label in (last_seen, *(label for label, _value in rows))) + 1
     for label, value in rows:
@@ -170,6 +171,7 @@ def print_client_usage(record: ClientRecord) -> None:
 def run_set(
     name: str,
     *,
+    profiles: list[str] | None = None,
     limit: str | None,
     reset: str | None,
     expires: str | None,
@@ -189,6 +191,32 @@ def run_set(
     """Change a client's traffic limit, reset period, or expiry."""
     operation = OperationContext()
     with error_context("client.set", timer=operation.timer):
+        if profiles is not None:
+            if (
+                any(
+                    value is not None
+                    for value in (
+                        limit,
+                        reset,
+                        expires,
+                        devices,
+                        note,
+                        tag,
+                        language,
+                        reset_day,
+                        duration,
+                        renew_days,
+                        renew_months,
+                        renewals,
+                    )
+                )
+                or no_renew
+            ):
+                fail(t("profiles.separate_choices"), hint_type="user")
+            from meridian.commands.client_profiles import run_set_profiles
+
+            run_set_profiles(name, profiles, dry_run=dry_run, yes=yes, operation=operation)
+            return
         change = parse_limit_options(
             limit=limit,
             reset=reset,

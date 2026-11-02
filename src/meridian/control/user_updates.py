@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from meridian.control.access_memberships import save_memberships
 from meridian.control.account_lifecycle import merge_user_update
 from meridian.control.events import EventLedger
 from meridian.control.models import UserRecord, UserUpdate
@@ -41,6 +42,9 @@ def save_user_fields(store: Store, user: UserRecord, fields: tuple[str, ...] = O
     """Write validated operator fields in the caller's existing transaction."""
     if not set(fields) <= set(OPERATOR_FIELDS):
         raise ValueError("Only operator-owned fields may be changed.")
+    if "profiles" in fields:
+        save_memberships(store, user.user_id, user.profiles)
+        fields = tuple(field for field in fields if field != "profiles")
     columns = ", ".join(f"{field} = ?" for field in fields)
     store.db.execute(
         f"UPDATE users SET {columns} WHERE user_id = ?", (*(getattr(user, field) for field in fields), user.user_id)

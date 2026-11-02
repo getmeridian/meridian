@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from pydantic import Field
 
+from meridian.core.access_profile_views import AccessProfileReview
 from meridian.core.models import CoreModel
 
 CompiledApplyActionStatus = Literal["converged", "applied", "failed", "unknown", "skipped"]
@@ -43,6 +44,7 @@ class CompiledApplyResult(CoreModel):
     actions: list[CompiledApplyActionResult] = Field(default_factory=list)
     retired_resources: list[str] = Field(default_factory=list)
     retirement_errors: list[str] = Field(default_factory=list)
+    access_review: AccessProfileReview | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class ApplyCommandData(CompiledApplyResult):
@@ -58,6 +60,7 @@ class CompiledApplyPreview(CoreModel):
         default="", description="Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed."
     )
     retiring_resources: list[str] = Field(default_factory=list)
+    access_review: AccessProfileReview | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 def build_compiled_apply_result(
