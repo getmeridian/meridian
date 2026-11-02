@@ -59,6 +59,15 @@ def servers_file(tmp_home: Path) -> Path:
 
 
 @pytest.fixture(autouse=True)
+def _isolated_output_locale(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each CLI scenario starts with the default language and may select its own within the test."""
+    import meridian.i18n as i18n
+
+    monkeypatch.setattr(i18n, "_current", i18n.DEFAULT_LOCALE)
+    monkeypatch.setattr(i18n, "_requested", None)
+
+
+@pytest.fixture(autouse=True)
 def _isolated_legacy_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Never let a developer's real 3.x ~/.meridian decide what a test sees."""
     import meridian.config as cfg

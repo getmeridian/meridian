@@ -28,6 +28,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 
 ## Pitfalls
 - **Pinned geodata memory guards start cold** — trace file reads and complete explanations, with destinations that reach category-ru and geoip:ru (documentation ranges stop at the private lists); CI's Xray folder supplies both data files.
+- **CLI locales are test-local** — reset current and requested language before each scenario, or a prior translated command makes later scripted English prompts fail.
 - **Restore command doubles supply profile evidence** — a confirmation-only scenario stubs the early compatibility check; profile scenarios use real snapshot and service state.
 - **Import test doubles cover profile discovery** — previews that stub resources also supply evidence of an empty service profile map.
 - **Older fixtures rewind membership before capacity** — shared helpers remove schema 24 before schema 23, preserving capacity when only membership is rewound.
