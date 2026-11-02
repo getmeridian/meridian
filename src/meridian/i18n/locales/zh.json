@@ -238,6 +238,8 @@
   "client.extended": "已延长“{name}”的访问期限",
   "client.extend_days_invalid": "天数必须是 1 到 3650 之间的整数。",
   "client.console_note": "· console：在网页面板中添加；也可通过 CLI 修改状态、限额和设备注册。",
+  "client.name_ambiguous": "“{name}”可能指以下人员：{people}。",
+  "client.exact_name_hint": "请使用 meridian client list 显示的完整用户名。",
   "client.traffic_reset": "已重置“{name}”的流量，用量从零开始计算。",
   "client.limits_hint": "修改限制：meridian client set NAME --limit SIZE --reset PERIOD --expires DATE --devices N",
   "sni.exit_subject": "出口 {exit}",

@@ -128,6 +128,53 @@ def test_removal_fence_reads_the_committed_intent_after_the_local_removal_is_sav
         fence.release()
 
 
+@pytest.mark.parametrize("single", [True, False], ids=["single", "batch"])
+@pytest.mark.parametrize("dry_run", [False, True], ids=["apply", "preview"])
+@pytest.mark.parametrize("query", ["exact", "ambiguous"])
+def test_named_removal_resolves_service_names_before_checking_declarations(colliding_removal, single, dry_run, query):
+    _, cluster, proposal = colliding_removal
+    console_name = proposal.usernames[0]
+    name = console_name if query == "exact" else console_name.title()
+    args = ["client", "remove", name, *([] if single else ["sample-b"]), "--yes", "--json"]
+    if dry_run:
+        args.append("--dry-run")
+    with (
+        patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
+        patch("meridian.commands.client_removal.reviewed_runtime", return_value=review_runtime()) as runtime,
+        patch("meridian.commands.client_removal.apply_reviewed_intent") as batch_apply,
+        patch("meridian.commands.client_v4.apply_reviewed_intent") as single_apply,
+        patch.object(ClusterConfig, "save") as save,
+    ):
+        result = CliRunner().invoke(app, args)
+    assert result.exit_code == 2, result.output
+    message = json.loads(result.stdout)["errors"][0]["message"]
+    assert ("could mean" if query == "ambiguous" else "not declared in the topology") in message
+    runtime.assert_not_called()
+    batch_apply.assert_not_called()
+    single_apply.assert_not_called()
+    save.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("locale", "message"),
+    [("en", "could mean"), ("ru", "может означать"), ("fa", "ممکن است"), ("zh", "可能指")],
+)
+def test_named_removal_explains_ambiguity_in_the_requested_language(colliding_removal, locale, message):
+    _, cluster, proposal = colliding_removal
+    with (
+        patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
+        patch("meridian.commands.client_removal.reviewed_runtime", return_value=review_runtime()) as runtime,
+        patch("meridian.commands.client_removal.apply_reviewed_intent") as apply,
+    ):
+        result = CliRunner().invoke(
+            app, ["--lang", locale, "client", "remove", proposal.usernames[0].title(), "--dry-run", "--json"]
+        )
+    assert result.exit_code == 2, result.output
+    assert message in json.loads(result.stdout)["errors"][0]["message"]
+    runtime.assert_not_called()
+    apply.assert_not_called()
+
+
 def test_multiple_names_are_one_dry_run_review_and_do_not_save_intent(removal_cli):
     _, cluster = removal_cli
     runtime = review_runtime()

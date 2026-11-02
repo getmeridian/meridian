@@ -65,7 +65,7 @@ def require_current_removal(cluster: ClusterConfig, proposal: PeopleRemovalPropo
         plan_hash=cluster.active_plan_hash,
         revision=proposal.revision,
     )
-    require_removal_users(proposal, require_intent(cluster).access.users)
+    require_removal_users(proposal.usernames, require_intent(cluster).access.users)
     if canonical_sha256(require_intent(cluster).model_dump(mode="json")) != proposal.intent_sha256:
         fail(t("bulk.proposal_stale"), hint_type="user")
     with ControlClient(cluster.panel.url, cluster.panel.api_token, report_mutations=False) as client:
@@ -93,9 +93,7 @@ def run_reviewed_removal(
     if proposal is not None:
         require_current_removal(cluster, proposal)
     intent = require_intent(cluster)
-    unknown = sorted(set(names) - set(intent.access.users))
-    if unknown:
-        fail(t("bulk.remove_undeclared", people=", ".join(isolate(name) for name in unknown)), hint_type="user")
+    require_removal_users(names, intent.access.users)
     if not set(intent.access.users) - set(names):
         fail(t("bulk.remove_last"), hint_type="user")
     updated = intent

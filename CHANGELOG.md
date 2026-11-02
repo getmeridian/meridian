@@ -30,7 +30,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
 - Bulk deletion returns one secret-free proposal for all topology-declared people,
   tied to the committed fleet revision and plan. Save it from the console or bulk
   JSON and review it with `client remove --proposal`; several names share one
-  confirmation and apply. Proposal usernames must match exact committed declarations;
+  confirmation and apply. Named removals use the service's exact-name and ambiguity
+  rules. Proposal usernames must match exact committed declarations;
   stale proposals are refused, mixed service-owned deletes
   stay atomic, and session cut-off remains an individual removal choice (#95).
 

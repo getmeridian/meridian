@@ -238,6 +238,8 @@
   "client.extended": "Extended access for '{name}'",
   "client.extend_days_invalid": "Days must be an integer from 1 to 3650.",
   "client.console_note": "· console: added in the web panel; status, limits, and devices can also be changed in the CLI.",
+  "client.name_ambiguous": "'{name}' could mean {people}",
+  "client.exact_name_hint": "Use the exact username shown by meridian client list.",
   "client.traffic_reset": "Reset traffic for '{name}'; their usage starts again from zero.",
   "client.limits_hint": "Change limits: meridian client set NAME --limit SIZE --reset PERIOD --expires DATE --devices N",
   "sni.exit_subject": "exit {exit}",

@@ -232,6 +232,8 @@ Declared deletions return one revision-bound `proposal` in the bulk preview and 
 
 Proposal `usernames` must exactly match the committed `topology_intent.access.users`, including case. Display names are not accepted in proposals.
 
+For named removal, an exact service username wins over display-name or case-insensitive matches. A name matching two people is refused; use the exact username from `client list`. Remove console-only people with `client bulk delete`.
+
 `client remove NAME...` also supports several declared names, with `--dry-run` to review without saving. A declined review saves nothing, and at least one declared person must remain. JSON previews return `data.clients`, `data.review_hash`, and `data.applied: false`; applied combined removals keep `clients` and `review_hash` and omit default `applied: true`. Individual results keep `data.client`.
 
 Proposals omit private person fields and session cut-off. Bulk removal refuses `--cut-off`; individual `client remove NAME --cut-off` keeps its existing consent and node outcomes. In a mixed batch, service-owned deletions still commit atomically; declared deletions wait for local apply, and a changed topology refuses the entire service commit.

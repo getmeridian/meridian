@@ -499,6 +499,8 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 提案中的 `usernames` 必须与已提交的 `topology_intent.access.users` 中的用户名完全一致，包括大小写。提案不接受显示名称。
 
+按名称删除时，服务中的完整用户名优先于显示名称或忽略大小写的匹配。如果名称匹配两个人，命令会拒绝删除；请使用 `client list` 中的完整用户名。仅在控制台创建的人员请用 `client bulk delete` 删除。
+
 已提交的修订、代次、计划、服务器集合或本地意图发生变化时，草稿会被拒绝；应用栅栏在修改服务器前再次检查修订，即使计划未变也会拒绝旧修订。拓扑变化也会拒绝整个混合服务提交。服务没有已提交的拓扑栅栏，或所选声明属于未完成的应用时，请先完成 `meridian apply`，再重新预览。
 
 必须至少保留一名已声明人员。提案不包含备注、标签、连接凭据、设备数据或会话切断选项。批量删除拒绝 `--cut-off`；如需原有的会话关闭审核，请逐人运行 `meridian client remove NAME --cut-off`。否则之前开始的传输可能继续。

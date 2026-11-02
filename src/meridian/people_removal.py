@@ -21,9 +21,9 @@ def require_removal_fence(
         raise FleetFenceError(t("bulk.proposal_stale"), category="user")
 
 
-def require_removal_users(proposal: PeopleRemovalProposal, usernames: Collection[str]) -> None:
-    """Saved proposal usernames must be exact declarations, without display-name resolution."""
-    unknown = sorted(set(proposal.usernames) - set(usernames))
+def require_removal_users(usernames: Collection[str], declared: Collection[str]) -> None:
+    """Removal targets must be exact declarations after any named-command resolution."""
+    unknown = sorted(set(usernames) - set(declared))
     if unknown:
         raise FleetFenceError(
             t("bulk.remove_undeclared", people=", ".join(isolate(name) for name in unknown)), category="user"
@@ -39,4 +39,4 @@ def require_removal_revision(proposal: PeopleRemovalProposal, revision: Revision
         or revision.plan_hash != proposal.plan_hash
     ):
         raise FleetFenceError(t("bulk.proposal_stale"), category="user")
-    require_removal_users(proposal, revision.intent.get("access", {}).get("users", []))
+    require_removal_users(proposal.usernames, revision.intent.get("access", {}).get("users", []))

@@ -16,6 +16,7 @@ from meridian.control_access import AccessPanel
 from meridian.core.command_inputs import ClientNameRequest
 from meridian.core.inputs import validate_access_username_value, validate_display_name_value
 from meridian.core.topology import assign_access_usernames
+from meridian.i18n import isolate, t
 from meridian.remnawave import RemnawaveError, User
 
 
@@ -59,8 +60,8 @@ def resolve_client_name(
         matches = sorted({*([found] if found else []), *(user for user in console_names if user.casefold() == wanted)})
         if len(matches) > 1:
             fail(
-                f"'{name}' could mean {', '.join(matches)}",
-                hint="Use the exact username, as `meridian client list` shows it.",
+                t("client.name_ambiguous", name=isolate(name), people=", ".join(isolate(user) for user in matches)),
+                hint=t("client.exact_name_hint"),
                 hint_type="user",
             )
         if matches:

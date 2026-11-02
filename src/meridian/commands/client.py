@@ -51,6 +51,7 @@ from meridian.core.redaction import HANDOFF_LINK_KEYS
 from meridian.core.services.clients import ClientListServiceResult, ClientNotFoundError, collect_client_show
 from meridian.handoff import client_handoffs, page_url
 from meridian.i18n import t
+from meridian.people_removal import require_removal_users
 from meridian.remnawave import RemnawaveError
 from meridian.renderers import emit_json
 
@@ -347,13 +348,19 @@ def run_remove(
                 fail(t("bulk.remove_selection"), hint_type="user")
             cluster = load_topology_cluster()
             if draft is None:
-                names = [resolve_client_name(cluster, value) for value in names]
+                declared = set(require_intent(cluster).access.users)
+                console_names = _console_names(cluster) if set(names) - declared else []
+                names = [
+                    resolve_client_name(cluster, value, console_people=True, console_names=console_names)
+                    for value in names
+                ]
             for value in names:
                 validate_client_name(value)
             if len(names) != len(set(names)):
                 fail(t("bulk.remove_duplicate"), hint_type="user")
             if cut_off and (draft is not None or len(names) > 1):
                 fail(t("bulk.proposal_no_cut_off"), hint_type="user")
+            require_removal_users(names, require_intent(cluster).access.users)
             if len(names) == 1 and draft is None and not dry_run:
                 run_remove_v4(names[0], cluster, operation, yes=yes, cut_off=cut_off)
             else:

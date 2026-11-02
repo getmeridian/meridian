@@ -31,6 +31,7 @@
 
 ## Pitfalls
 - **Fleet JSON keeps reviewed delivery verbatim** — reveal every nested delivery path and each delivery diff's before/after strings, or URL masking corrupts exports and hides the applied change.
+- **Named removals read service usernames for aliases** — exact declarations are already unambiguous; case-folded or display-name inputs need the directory before ownership checks.
 - **Proposal usernames are exact declarations** — never resolve saved usernames through case folding or display names before validating the committed intent.
 - **Restore imports keep the destination file guard** — bind the snapshot-derived model to the current context's loaded timestamp before saving; its temporary file's timestamp is not destination evidence.
 - **Empty restores save derived fleet state** — persist snapshot profile history and normalize carried checkpoints before review; declining the remote restore must not leave raw, unfinished state on disk.

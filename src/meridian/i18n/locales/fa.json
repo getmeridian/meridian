@@ -238,6 +238,8 @@
   "client.extended": "مدت دسترسی «{name}» تمدید شد",
   "client.extend_days_invalid": "تعداد روزها باید عددی صحیح بین ۱ و ۳۶۵۰ باشد.",
   "client.console_note": "· console: در پنل وب اضافه شده؛ وضعیت، محدودیت‌ها و دستگاه‌ها را می‌توان از CLI هم تغییر داد.",
+  "client.name_ambiguous": "نام «{name}» ممکن است به این افراد اشاره کند: {people}.",
+  "client.exact_name_hint": "نام کاربری دقیق را از meridian client list وارد کنید.",
   "client.traffic_reset": "ترافیک «{name}» صفر شد و شمارش از نو آغاز می‌شود.",
   "client.limits_hint": "تغییر محدودیت‌ها: meridian client set NAME --limit SIZE --reset PERIOD --expires DATE --devices N",
   "sni.exit_subject": "خروجی {exit}",
