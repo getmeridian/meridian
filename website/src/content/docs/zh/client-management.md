@@ -551,3 +551,15 @@ JSON 审核和部署导出会保留 `token`、`secret` 等有效配置 ID 和用
 固定分配请向 `POST /api/people/bulk/preview` 发送 `{"usernames":["person"],"action":{"action":"set-profiles","profiles":["limited"]}}`，再提交其 ID 和哈希。配置预览返回 `access_hash`；`PUT /api/settings` 通过 `expected_access_hash` 接收该值，若成员关系已变化则拒绝应用。可选的 `existing_inbounds` 在升级旧节点规格时提供当前节点和标签的引用。预览请求数据不会持久保存。
 
 设置通过 `access_profile_declarations_hash` 保存规范化拓扑访问配置声明的 SHA-256。审核后的写入使用 `expected_access_hash` 设置该值；保持原声明的写入发送 `expected_profile_declarations_hash`，由服务在同一设置事务中校验。删除最后一个访问配置后，仍保留空声明的指纹。`GET /api/access-profiles` 返回 `declarations_hash`，并在存在非默认成员关系时返回 `has_non_default_memberships: true`；读取权限保持不变。未提供任一校验条件时，替换已有指纹或授权映射会被拒绝。
+
+### 私有个人路由
+
+`meridian client routing person` 显示有效策略。运行 `meridian client routing person work --dry-run --json` 审阅，再通过 `meridian client routing person work --yes --json` 保存个人覆盖；`meridian client routing person --inherit --yes` 清除覆盖。面板的用户卡片使用同一服务审阅，草稿只保存在内存中。个人覆盖优先于访问配置默认，访问配置默认优先于服务器默认。应用配置和重新签发凭证保留覆盖；加密快照保存它，删除用户会移除它。选择会在应用刷新订阅时生效，不修改账户或节点访问权限。
+
+读取需要 `people.read` 与 `people.private`，分配还需要 `people.delivery`。`delivery.read` 用于读取已审阅目录。已签发令牌保留原有固定权限；分配策略需要签发包含新权限的令牌。没有私有权限时覆盖被隐藏，订阅、事件和已审阅配置均不包含覆盖字段。预览不写入数据。确认需要 `review_hash`；覆盖、成员关系或目录改变后须重新预览。
+
+| 操作 | 含义 |
+| --- | --- |
+| `GET /api/delivery-policies` | 已审阅目录与访问配置默认；`delivery.read` |
+| `GET /api/users/{username}/delivery-policy` | 私有覆盖及有效策略；`people.read` 与 `people.private` |
+| `PUT /api/users/{username}/delivery-policy` | `{ "policy": "work", "confirm": false }` 返回预览；确认时提交 `review_hash`；需要 `people.delivery`、`people.read`、`people.private`。显式 `policy: null` 表示继承。 |

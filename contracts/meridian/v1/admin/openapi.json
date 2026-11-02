@@ -1943,6 +1943,8 @@
                   "people.batch",
                   "people.private",
                   "people.edit",
+                  "people.delivery",
+                  "delivery.read",
                   "people.credentials",
                   "people.reset",
                   "people.reissue",
@@ -2030,6 +2032,8 @@
               "people.batch",
               "people.private",
               "people.edit",
+              "people.delivery",
+              "delivery.read",
               "people.credentials",
               "people.reset",
               "people.reissue",
@@ -2095,6 +2099,8 @@
               "people.batch",
               "people.private",
               "people.edit",
+              "people.delivery",
+              "delivery.read",
               "people.credentials",
               "people.reset",
               "people.reissue",
@@ -3383,6 +3389,50 @@
         "title": "DeliveryPolicy",
         "type": "object"
       },
+      "DeliveryPolicyCatalog": {
+        "additionalProperties": false,
+        "properties": {
+          "default_policy": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "title": "Default Policy",
+            "type": "string"
+          },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPolicy"
+            },
+            "maxItems": 66,
+            "title": "Policies",
+            "type": "array"
+          },
+          "profile_policies": {
+            "maxProperties": 64,
+            "patternProperties": {
+              "^[a-z0-9][a-z0-9_-]*$": {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 48,
+              "minLength": 1
+            },
+            "title": "Profile Policies",
+            "type": "object"
+          }
+        },
+        "required": [
+          "policies",
+          "default_policy",
+          "profile_policies"
+        ],
+        "title": "DeliveryPolicyCatalog",
+        "type": "object"
+      },
       "DeliveryPortRange": {
         "additionalProperties": false,
         "properties": {
@@ -4526,6 +4576,8 @@
                 "people.batch",
                 "people.private",
                 "people.edit",
+                "people.delivery",
+                "delivery.read",
                 "people.credentials",
                 "people.reset",
                 "people.reissue",
@@ -6285,6 +6337,8 @@
                   "people.batch",
                   "people.private",
                   "people.edit",
+                  "people.delivery",
+                  "delivery.read",
                   "people.credentials",
                   "people.reset",
                   "people.reissue",
@@ -7092,6 +7146,114 @@
           "reasons"
         ],
         "title": "PersonAttention",
+        "type": "object"
+      },
+      "PersonDeliveryPolicyReview": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {
+            "$ref": "#/components/schemas/PersonDeliveryPolicyState"
+          },
+          "before": {
+            "$ref": "#/components/schemas/PersonDeliveryPolicyState"
+          },
+          "confirmed": {
+            "default": false,
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "review_hash": {
+            "description": "Lowercase hex SHA-256 digest.",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Review Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "before",
+          "after",
+          "review_hash"
+        ],
+        "title": "PersonDeliveryPolicyReview",
+        "type": "object"
+      },
+      "PersonDeliveryPolicyState": {
+        "additionalProperties": false,
+        "properties": {
+          "effective": {
+            "$ref": "#/components/schemas/ResolvedDeliveryPolicy"
+          },
+          "override": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override"
+          },
+          "username": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "override",
+          "effective"
+        ],
+        "title": "PersonDeliveryPolicyState",
+        "type": "object"
+      },
+      "PersonDeliveryPolicyWrite": {
+        "additionalProperties": false,
+        "description": "Explicit null inherits; confirm needs the hash returned by the no-write preview.",
+        "properties": {
+          "confirm": {
+            "default": false,
+            "title": "Confirm",
+            "type": "boolean"
+          },
+          "policy": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy"
+          },
+          "review_hash": {
+            "anyOf": [
+              {
+                "description": "Lowercase hex SHA-256 digest.",
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Review Hash"
+          }
+        },
+        "required": [
+          "policy"
+        ],
+        "title": "PersonDeliveryPolicyWrite",
         "type": "object"
       },
       "PlainResolver": {
@@ -7937,6 +8099,45 @@
           "inbound_tag"
         ],
         "title": "ResetInboundCreate",
+        "type": "object"
+      },
+      "ResolvedDeliveryPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "built_in": {
+            "title": "Built In",
+            "type": "boolean"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/DeliveryPolicy"
+          },
+          "profiles": {
+            "items": {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Profiles",
+            "type": "array"
+          },
+          "source": {
+            "enum": [
+              "fleet",
+              "profile",
+              "person"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "policy",
+          "built_in",
+          "source"
+        ],
+        "title": "ResolvedDeliveryPolicy",
         "type": "object"
       },
       "ResourceError": {
@@ -9443,6 +9644,8 @@
                     "people.batch",
                     "people.private",
                     "people.edit",
+                    "people.delivery",
+                    "delivery.read",
                     "people.credentials",
                     "people.reset",
                     "people.reissue",
@@ -9468,7 +9671,7 @@
                   ],
                   "type": "string"
                 },
-                "maxItems": 33,
+                "maxItems": 35,
                 "minItems": 1,
                 "type": "array"
               },
@@ -9566,6 +9769,8 @@
                 "people.batch",
                 "people.private",
                 "people.edit",
+                "people.delivery",
+                "delivery.read",
                 "people.credentials",
                 "people.reset",
                 "people.reissue",
@@ -9662,6 +9867,8 @@
                 "people.batch",
                 "people.private",
                 "people.edit",
+                "people.delivery",
+                "delivery.read",
                 "people.credentials",
                 "people.reset",
                 "people.reissue",
@@ -9757,6 +9964,8 @@
                 "people.batch",
                 "people.private",
                 "people.edit",
+                "people.delivery",
+                "delivery.read",
                 "people.credentials",
                 "people.reset",
                 "people.reissue",
@@ -11030,6 +11239,22 @@
             "minimum": 1,
             "title": "Credential Generation",
             "type": "integer"
+          },
+          "delivery_policy": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Private operator-owned client policy override; null follows profile/fleet defaults.",
+            "title": "Delivery Policy"
           },
           "device_limit": {
             "anyOf": [
@@ -13077,6 +13302,83 @@
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "admin"
+        ]
+      }
+    },
+    "/api/delivery-policies": {
+      "get": {
+        "description": "Requires delivery.read capabilities. Compatible presets: read or people, including scopes that cover them.",
+        "operationId": "delivery_policy_catalog",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPolicyCatalog"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Read the reviewed client policy catalog and profile defaults.",
+        "tags": [
+          "delivery-policies"
+        ],
+        "x-meridian-capabilities": [
+          "delivery.read"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "read",
+          "people"
         ]
       }
     },
@@ -16980,6 +17282,8 @@
             },
             "description": "Conflict",
             "x-meridian-error-codes": [
+              "conflicting_delivery_policies",
+              "delivery_policy_in_use",
               "profile_in_use",
               "profile_review_required",
               "stale_access",
@@ -17832,7 +18136,7 @@
     },
     "/api/users": {
       "get": {
-        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them. User UUIDs and subscription tokens need people.credentials; private notes, tags, and profiles need people.private. These fields are otherwise blank, including in mutation responses. People and admin presets include both. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them. User UUIDs and subscription tokens need people.credentials; private notes, tags, profiles, and delivery-policy overrides need people.private. These fields are otherwise blank, including in mutation responses. People and admin presets include both. This response can contain credentials; keep it private and do not log it.",
         "operationId": "list_users",
         "responses": {
           "200": {
@@ -18461,7 +18765,7 @@
         ]
       },
       "get": {
-        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them. User UUIDs and subscription tokens need people.credentials; private notes, tags, and profiles need people.private. These fields are otherwise blank, including in mutation responses. People and admin presets include both. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.read capabilities. Compatible presets: read or people, including scopes that cover them. User UUIDs and subscription tokens need people.credentials; private notes, tags, profiles, and delivery-policy overrides need people.private. These fields are otherwise blank, including in mutation responses. People and admin presets include both. This response can contain credentials; keep it private and do not log it.",
         "operationId": "get_user",
         "parameters": [
           {
@@ -19082,6 +19386,258 @@
           "users"
         ],
         "x-meridian-capabilities": [
+          "people.read",
+          "people.private"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "people"
+        ]
+      }
+    },
+    "/api/users/{username}/delivery-policy": {
+      "get": {
+        "description": "Requires people.read and people.private capabilities. Compatible presets: people, including scopes that cover them.",
+        "operationId": "person_delivery_policy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "username",
+            "required": true,
+            "schema": {
+              "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDeliveryPolicyState"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Read a person's private routing override and effective policy.",
+        "tags": [
+          "users"
+        ],
+        "x-meridian-capabilities": [
+          "people.read",
+          "people.private"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "people"
+        ]
+      },
+      "put": {
+        "description": "Requires people.delivery and people.read and people.private capabilities. Compatible presets: people, including scopes that cover them. Explicit null follows profile/fleet defaults. confirm=false writes nothing; confirm=true requires the preview's review_hash and refuses changed membership, catalog, or override.",
+        "operationId": "set_person_delivery_policy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "username",
+            "required": true,
+            "schema": {
+              "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonDeliveryPolicyWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDeliveryPolicyReview"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request",
+              "unknown_delivery_policy"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "conflicting_delivery_policies",
+              "stale_delivery_policy"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Preview or confirm a private client routing override without changing node access.",
+        "tags": [
+          "users"
+        ],
+        "x-meridian-capabilities": [
+          "people.delivery",
           "people.read",
           "people.private"
         ],
@@ -20257,6 +20813,7 @@
       "commands.restart",
       "commands.run",
       "console.read",
+      "delivery.read",
       "fleet.apply",
       "fleet.read",
       "nodes.enroll",
@@ -20264,6 +20821,7 @@
       "people.batch",
       "people.bulk",
       "people.credentials",
+      "people.delivery",
       "people.devices",
       "people.edit",
       "people.private",
@@ -20286,6 +20844,7 @@
       "api.read",
       "commands.read",
       "console.read",
+      "delivery.read",
       "fleet.read",
       "people.read",
       "revisions.approve",
@@ -20295,8 +20854,10 @@
     ],
     "people": [
       "api.read",
+      "delivery.read",
       "people.batch",
       "people.credentials",
+      "people.delivery",
       "people.devices",
       "people.edit",
       "people.private",
@@ -20310,6 +20871,7 @@
       "api.read",
       "commands.read",
       "console.read",
+      "delivery.read",
       "fleet.read",
       "people.read",
       "revisions.propose",
@@ -20320,6 +20882,7 @@
       "api.read",
       "commands.read",
       "console.read",
+      "delivery.read",
       "fleet.read",
       "people.read",
       "revisions.read",

@@ -1965,6 +1965,80 @@
     {
       "argv": [
         "client",
+        "routing",
+        "PERSON",
+        "[POLICY]"
+      ],
+      "command": "client.routing",
+      "data_schema": "client-routing",
+      "description": "Read or review a person's client routing override",
+      "envelope_schema": "client-routing-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "person policy read or reviewed; private policy assigned; private policy unchanged",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--inherit",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "person policy read or reviewed",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "private policy assigned",
+          "status": "changed"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "private policy unchanged",
+          "status": "no_changes"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "changed",
+        "no_changes",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
         "set",
         "NAME"
       ],

@@ -233,6 +233,20 @@ JSON 筛选计数对所有有效标签均保持整数，包括 `TOKEN` 和 `API_
 `meridian client bulk disable --tag TRIAL_7 --yes --json`
 
 
+
+```bash
+meridian client routing person
+meridian client routing person work --dry-run --json
+meridian client routing person work --yes --json
+meridian client routing person --inherit --yes
+```
+
+`meridian client routing person` 显示有效策略。运行 `meridian client routing person work --dry-run --json` 审阅，再通过 `meridian client routing person work --yes --json` 保存个人覆盖；`meridian client routing person --inherit --yes` 清除覆盖。面板的用户卡片使用同一服务审阅，草稿只保存在内存中。个人覆盖优先于访问配置默认，访问配置默认优先于服务器默认。应用配置和重新签发凭证保留覆盖；加密快照保存它，删除用户会移除它。选择会在应用刷新订阅时生效，不修改账户或节点访问权限。
+
+读取需要 `people.read` 与 `people.private`，分配还需要 `people.delivery`。`delivery.read` 用于读取已审阅目录。已签发令牌保留原有固定权限；分配策略需要签发包含新权限的令牌。没有私有权限时覆盖被隐藏，订阅、事件和已审阅配置均不包含覆盖字段。预览不写入数据。确认需要 `review_hash`；覆盖、成员关系或目录改变后须重新预览。
+
+
+
 ### meridian privacy
 
 选择控制服务保存哪些信息。设备限制和每日历史默认均关闭；应用服务器组配置不会改变这些设置。[隐私](/zh/privacy/)说明每个级别保存什么，以及服务器被夺取后的后果。

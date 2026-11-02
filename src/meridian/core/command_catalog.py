@@ -165,6 +165,16 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
     "client.preview": CommandOutput(
         data_schema="subscription-preview", outcomes=[_ok("format preview read"), *_FAILURES], stability="preview"
     ),
+    "client.routing": CommandOutput(
+        data_schema="client-routing",
+        outcomes=[
+            _ok("person policy read or reviewed"),
+            _ok("private policy assigned", status="changed"),
+            _ok("private policy unchanged", status="no_changes"),
+            *_FAILURES,
+        ],
+        stability="preview",
+    ),
     **{
         f"client.bulk.{action}": CommandOutput(
             data_schema="client-bulk",

@@ -4,6 +4,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 
 ## Design decisions
 - **Profile declarations save with settings** — meta keeps their reviewed fingerprint, included in the access hash; unreviewed settings compare it atomically, and bootstrap requires no fingerprint, grants, or non-default memberships.
+- **Person delivery overrides stay private** — schema 25 owns one nullable-by-absence mapping; stateless hashes fence catalog, membership, and override, without events or node recomposition.
 - **Reviewed delivery choices validate membership** — policy catalogs live in settings; profile defaults must agree before a settings or membership write commits.
 - **Profile activation is atomic** — service settings hold the canonical grant map; staged specs carry references, and map or membership changes compose documents with the existing flow-block ledger.
 - **Metrics has its own grant** — cataloged `/metrics` uses `metrics.read` on the existing ingress, with no compatible preset expansion; node series and bounded route-ID/runtime counters expose no person labels.

@@ -233,6 +233,20 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 `meridian client bulk disable --tag TRIAL_7 --yes --json`
 
 
+
+```bash
+meridian client routing person
+meridian client routing person work --dry-run --json
+meridian client routing person work --yes --json
+meridian client routing person --inherit --yes
+```
+
+`meridian client routing person` سیاست مؤثر را نشان می‌دهد. با `meridian client routing person work --dry-run --json` بازبینی و با `meridian client routing person work --yes --json` تنظیم فردی را ذخیره کنید. `meridian client routing person --inherit --yes` آن را پاک می‌کند. کارت فرد در پنل از همان بازبینی سرویس استفاده می‌کند و پیش‌نویس را فقط در حافظه نگه می‌دارد. تنظیم فردی بر پروفایل دسترسی و پروفایل بر پیش‌فرض سرورها اولویت دارد. اعمال پیکربندی و صدور دوبارهٔ اعتبارنامه آن را نگه می‌دارند؛ snapshot رمزنگاری‌شده آن را دارد و حذف فرد آن را پاک می‌کند. انتخاب در تازه‌سازی اشتراک به برنامه می‌رسد و حساب یا دسترسی گره را ویرایش نمی‌کند.
+
+خواندن به `people.read` و `people.private` نیاز دارد؛ انتساب به `people.delivery` هم نیاز دارد. `delivery.read` فهرست بازبینی‌شده را می‌خواند. توکن‌های صادرشده دسترسی ثابت قبلی خود را نگه می‌دارند؛ برای انتساب یک توکن با دسترسی تازه صادر کنید. تنظیم فردی بدون دسترسی خصوصی پنهان است و در اشتراک، رویداد یا پیکربندی بازبینی‌شده نیست. پیش‌نمایش چیزی ذخیره نمی‌کند. تأیید به `review_hash` نیاز دارد؛ تغییر تنظیم فردی، عضویت یا فهرست نیازمند بازبینی دوباره است.
+
+
+
 ### meridian privacy
 
 اطلاعاتی را که سرویس کنترل نگه می‌دارد انتخاب کنید. محدودیت دستگاه و تاریخچهٔ روزانه به‌صورت پیش‌فرض خاموش‌اند؛ اعمال تنظیمات سرورها این انتخاب‌ها را تغییر نمی‌دهد. توضیح افشای اطلاعات و پیامد تصرف سرور را در [حریم خصوصی](/fa/privacy/) بخوانید.

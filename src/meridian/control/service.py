@@ -62,6 +62,7 @@ from meridian.control.people_bulk import BulkLedger
 from meridian.control.people_query import PeopleQueryEngine
 from meridian.control.period_usage import reset_period
 from meridian.control.person_connections import read_connections
+from meridian.control.person_delivery_policy import DeliveryPolicyLedger
 from meridian.control.privacy import PrivacyLedger, read_privacy
 from meridian.control.revisions import RevisionLedger
 from meridian.control.schema import SCHEMA, migrate
@@ -144,6 +145,7 @@ class ControlService:
         self.languages = LanguageLedger(self._store, self.events)
         self.people = PeopleQueryEngine(self._store, clock=clock)
         self.access = AccessProfileLedger(self._store, read_user=self._require_user, read_users=self.list_users)
+        self.delivery = DeliveryPolicyLedger(self._store, read_settings=self.settings, read_user=self._require_user)
         self.bulk = BulkLedger(
             self._store,
             self.people,

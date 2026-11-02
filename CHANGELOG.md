@@ -15,6 +15,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b9
 
 #### Added
+- Private per-person delivery overrides with service-hashed reviews, dedicated
+  token grants, CLI and console assignment, and snapshot/apply preservation (#95).
 - Typed named delivery policies with ordered destination rules, validated DNS,
   reviewed fleet/profile defaults, isolated exit choices, and shared format limits.
   Built-in routing presets and default subscription bytes remain unchanged (#95).

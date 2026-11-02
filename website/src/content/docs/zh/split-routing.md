@@ -122,3 +122,16 @@ meridian fleet routing ru-split --yes
 DNS 使用 `transport: doh | dot | plain`、单播 IP `address` 和可选 `port`，默认端口分别为 443、853、53。DoH 支持受限 `path`，普通 DNS 支持 `protocol: udp | tcp`。加密 DNS 的证书必须对其 IP 有效。需要引导解析的主机名、凭证、任意模板和正则表达式均不接受。Xray 支持 DoH/普通 DNS，省略 DoT 和 fake-IP；Mihomo 与 sing-box 支持三种传输及 fake-IP；Stash 保留原生 DNS 模式并省略 fake-IP。Base64 无法携带路由或 DNS 设置。省略的 DNS 选项不会降级为较弱的传输。
 
 每项策略最多 128 条规则、每个域名/IP 匹配最多 64 个值、最多四个 DNS 服务器；目录最多 64 项策略。单项策略最多 64 KiB，整个目录最多 256 KiB。地理列表名称必须存在于客户端已安装的固定版本文件中。策略不会添加远程规则集下载；sing-box 省略 geosite 和非私有 geoip 匹配。应用更改后刷新订阅。
+
+
+### 私有个人路由
+
+`meridian client routing person` 显示有效策略。运行 `meridian client routing person work --dry-run --json` 审阅，再通过 `meridian client routing person work --yes --json` 保存个人覆盖；`meridian client routing person --inherit --yes` 清除覆盖。面板的用户卡片使用同一服务审阅，草稿只保存在内存中。个人覆盖优先于访问配置默认，访问配置默认优先于服务器默认。应用配置和重新签发凭证保留覆盖；加密快照保存它，删除用户会移除它。选择会在应用刷新订阅时生效，不修改账户或节点访问权限。
+
+读取需要 `people.read` 与 `people.private`，分配还需要 `people.delivery`。`delivery.read` 用于读取已审阅目录。已签发令牌保留原有固定权限；分配策略需要签发包含新权限的令牌。没有私有权限时覆盖被隐藏，订阅、事件和已审阅配置均不包含覆盖字段。预览不写入数据。确认需要 `review_hash`；覆盖、成员关系或目录改变后须重新预览。
+
+| 操作 | 含义 |
+| --- | --- |
+| `GET /api/delivery-policies` | 已审阅目录与访问配置默认；`delivery.read` |
+| `GET /api/users/{username}/delivery-policy` | 私有覆盖及有效策略；`people.read` 与 `people.private` |
+| `PUT /api/users/{username}/delivery-policy` | `{ "policy": "work", "confirm": false }` 返回预览；确认时提交 `review_hash`；需要 `people.delivery`、`people.read`、`people.private`。显式 `policy: null` 表示继承。 |

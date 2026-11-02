@@ -24,6 +24,18 @@ _LABELS: dict[TokenCapability, tuple[str, str, str, str]] = {
         "خواندن آمار منابع گره‌ها و سرویس در Prometheus",
         "读取 Prometheus 节点资源和服务指标",
     ),
+    "people.delivery": (
+        "Choose people's client routing policies",
+        "Выбирать политики маршрутизации для пользователей",
+        "انتخاب سیاست مسیریابی دستگاه افراد",
+        "选择用户的客户端路由策略",
+    ),
+    "delivery.read": (
+        "Read reviewed client routing policies",
+        "Читать проверенные политики маршрутизации",
+        "خواندن سیاست‌های مسیریابی بازبینی‌شده",
+        "读取已审阅的客户端路由策略",
+    ),
     "api.read": (
         "Read the API contract and permission catalog",
         "Читать описание API и список прав",

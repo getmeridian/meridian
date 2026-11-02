@@ -549,3 +549,15 @@ Usernames such as `token`, `secret`, and `api_key` are also valid in revision pr
 For a frozen assignment, use `POST /api/people/bulk/preview` with `{"usernames":["person"],"action":{"action":"set-profiles","profiles":["limited"]}}`, then commit its ID and hash. The profile preview returns `access_hash`; `PUT /api/settings` accepts it as `expected_access_hash` and refuses membership changes since review. Optional `existing_inbounds` identifies the current node/tag references when upgrading older specs. These previews persist no request data.
 
 Settings carry `access_profile_declarations_hash`, the SHA-256 of normalized intent-level profile declarations. Reviewed writes set it under `expected_access_hash`; writes keeping the same declarations send `expected_profile_declarations_hash`, which the service checks in the settings transaction. Removing the last profile keeps the fingerprint of empty declarations. `GET /api/access-profiles` includes `declarations_hash` and, when true, `has_non_default_memberships`; these reads keep the existing private permissions. Replacing an established fingerprint or grant map without either fence is refused.
+
+### Private person routing
+
+`meridian client routing person` reads the effective policy. Use `meridian client routing person work --dry-run --json`, then `meridian client routing person work --yes --json` to review and save a private override; `meridian client routing person --inherit --yes` clears it. The console's person card uses the same service review and keeps drafts in memory. Person overrides win over profile defaults, which win over the fleet default. Applies and credential reissue preserve overrides; encrypted snapshots carry them, and deletion removes them. This choice changes subscription delivery at app refresh, with no account or node-access edit.
+
+Policy reads need `people.read` and `people.private`; assignment additionally needs `people.delivery`. `delivery.read` reads the reviewed catalog. Existing issued tokens keep their frozen grants; issue a token with the new grant to assign policies. Overrides are blank without private permission and never appear in subscriptions, events, or reviewed intent. A preview writes nothing. Confirmation requires its `review_hash`; a changed override, membership, or catalog needs another preview.
+
+| Operation | Meaning |
+| --- | --- |
+| `GET /api/delivery-policies` | Reviewed catalog and profile defaults; `delivery.read` |
+| `GET /api/users/{username}/delivery-policy` | Private override and effective policy; `people.read` and `people.private` |
+| `PUT /api/users/{username}/delivery-policy` | `{ "policy": "work", "confirm": false }` previews; confirm with its `review_hash`; `people.delivery`, `people.read`, `people.private`. Explicit `policy: null` inherits. |

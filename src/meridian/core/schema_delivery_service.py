@@ -9,6 +9,13 @@ from pydantic import BaseModel
 from meridian.control.models import ClientEndpoint
 from meridian.core.languages import LanguageSettings, LanguageState
 from meridian.core.notices import Notice, NoticeState, NoticeWrite, RenderedNotice
+from meridian.core.person_delivery_policy import (
+    ClientRoutingResult,
+    DeliveryPolicyCatalog,
+    PersonDeliveryPolicyReview,
+    PersonDeliveryPolicyState,
+    PersonDeliveryPolicyWrite,
+)
 from meridian.core.schema_envelopes import make_command_envelope
 from meridian.core.subscription_preview import (
     FormatSelection,
@@ -22,6 +29,11 @@ def service_delivery_schemas(
     *, envelope_base: type[BaseModel], failure_data_type: type[BaseModel]
 ) -> dict[str, type[BaseModel]]:
     schemas: dict[str, type[BaseModel]] = {
+        "client-routing": ClientRoutingResult,
+        "delivery-policy-catalog": DeliveryPolicyCatalog,
+        "person-delivery-policy": PersonDeliveryPolicyState,
+        "person-delivery-policy-write": PersonDeliveryPolicyWrite,
+        "person-delivery-policy-review": PersonDeliveryPolicyReview,
         "notice": Notice,
         "notice-state": NoticeState,
         "notice-write": NoticeWrite,
@@ -64,4 +76,14 @@ def service_delivery_schemas(
         doc="Envelope schema for `meridian client preview --json`.",
     )
     schemas["client-preview-envelope"] = preview_envelope
+    _, _, routing_envelope = make_command_envelope(
+        "ClientRouting",
+        "client.routing",
+        ClientRoutingResult,
+        envelope_base=envelope_base,
+        failure_data_type=failure_data_type,
+        success_statuses=Literal["ok", "changed", "no_changes"],
+        doc="Envelope schema for `meridian client routing --json`.",
+    )
+    schemas["client-routing-envelope"] = routing_envelope
     return schemas

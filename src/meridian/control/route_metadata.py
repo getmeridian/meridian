@@ -17,7 +17,7 @@ REVISION_RESPONSE_CAPABILITIES = (ExtraCapability("private_membership", "people.
 
 USER_CREDENTIALS = (
     "User UUIDs and subscription tokens need people.credentials; "
-    "private notes, tags, and profiles need people.private. "
+    "private notes, tags, profiles, and delivery-policy overrides need people.private. "
     "These fields are otherwise blank, including in mutation responses. People and admin presets include both."
 )
 DECLARED_USER = (

@@ -53,7 +53,9 @@ def serve_subscription(
         record = user_record(row, now=datetime.fromtimestamp(clock(), UTC))
         bodies = [item[0] for item in store.db.execute("SELECT body FROM endpoints").fetchall()]
         settings = read_settings()
-        delivery_policy = resolve_delivery_policy(settings, profiles=record.profiles)
+        delivery_policy = resolve_delivery_policy(
+            settings, profiles=record.profiles, person_override=record.delivery_policy
+        )
         privacy = read_privacy()
         slots = read_device_slots(store, record, privacy) if document == "browser" else None
         notice = read_notice(record)

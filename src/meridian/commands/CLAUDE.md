@@ -2,6 +2,7 @@
 
 ## Design decisions
 **Profile review logic lives in setup** — commands present gains and losses; the shared apply runtime checks declaration fingerprints for setup and every imperative path before any remote write.
+**Person policy inheritance is explicit** — `client routing --inherit` clears the private override without reserving a policy name.
 **Routing selects reviewed names** — `fleet routing` keeps preset shorthand and selects named policies from intent; a preset selection clears the named fleet default.
 **Profile reviews include people** — `profile`, `plan`, `apply`, and fleet import review effective gains/losses and fence the service membership hash; assignment uses the existing bulk receipt.
 **Bulk reviews** — `client bulk` and `client list` use the service query; commit only the returned ID/hash, and read the receipt after an uncertain reply.

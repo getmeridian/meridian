@@ -34,6 +34,7 @@ from meridian.control.api_auth import authorize_api, authorize_body, bearer_toke
 from meridian.control.api_models import DeletedResource, DeployerStateReceipt, UserList
 from meridian.control.blobs import BlobStore, fleet_artifacts, served_hashes
 from meridian.control.command_models import NodeCommandRequest, UserCutOffRequest
+from meridian.control.delivery_policy_routes import DELIVERY_POLICY_OWNER_ROUTES
 from meridian.control.delivery_routes import DELIVERY_OWNER_ROUTES
 from meridian.control.enrollment import Session
 from meridian.control.errors import ServiceError, agent_error
@@ -669,6 +670,7 @@ OWNER_STEP_UP: frozenset[Callable[..., Any]] = frozenset({_Handler.create_token,
 OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
     {
         *ACCESS_PROFILE_OWNER_ROUTES,
+        *DELIVERY_POLICY_OWNER_ROUTES,
         _Handler.get_settings,
         _Handler.get_privacy,
         _Handler.put_privacy,

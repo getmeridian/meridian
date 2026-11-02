@@ -86,7 +86,7 @@ def visible_user(user: UserRecord, caller: Caller) -> UserRecord:
     if not caller.allows("people.credentials"):
         changes.update(uuid="", sub_token="")
     if not caller.allows("people.private"):
-        changes.update(note="", tag="", profiles=[])
+        changes.update(note="", tag="", profiles=[], delivery_policy=None)
     return user.model_copy(update=changes) if changes else user
 
 

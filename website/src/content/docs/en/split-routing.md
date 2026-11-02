@@ -120,3 +120,16 @@ Actions are `{"kind":"proxy"}`, `{"kind":"direct"}`, `{"kind":"block"}`, or `{"k
 DNS resolvers use `transport: doh | dot | plain`, a unicast IP `address`, and an optional `port` (443, 853, or 53 by default). DoH accepts a bounded `path`; plain DNS accepts `protocol: udp | tcp`. Encrypted resolvers must have a certificate valid for their IP. Hostname bootstrap, credentials, raw templates, and regex rules are refused. Xray supports DoH/plain but omits DoT and fake-IP; Mihomo and sing-box support all three transports and fake-IP; Stash keeps its native DNS mode and omits fake-IP. Base64 carries neither routing nor DNS settings. An omitted DNS choice is never converted to a weaker transport.
 
 Each policy has at most 128 rules, 64 values per domain/IP match, and four resolvers; the catalog has at most 64 policies. A policy must fit within 64 KiB and the catalog within 256 KiB. Geodata names must exist in the pinned files clients already have. No policy adds remote rule-set fetching; sing-box omits geosite and non-private geoip matches. Refresh the subscription after applying a change.
+
+
+### Private person routing
+
+`meridian client routing person` reads the effective policy. Use `meridian client routing person work --dry-run --json`, then `meridian client routing person work --yes --json` to review and save a private override; `meridian client routing person --inherit --yes` clears it. The console's person card uses the same service review and keeps drafts in memory. Person overrides win over profile defaults, which win over the fleet default. Applies and credential reissue preserve overrides; encrypted snapshots carry them, and deletion removes them. This choice changes subscription delivery at app refresh, with no account or node-access edit.
+
+Policy reads need `people.read` and `people.private`; assignment additionally needs `people.delivery`. `delivery.read` reads the reviewed catalog. Existing issued tokens keep their frozen grants; issue a token with the new grant to assign policies. Overrides are blank without private permission and never appear in subscriptions, events, or reviewed intent. A preview writes nothing. Confirmation requires its `review_hash`; a changed override, membership, or catalog needs another preview.
+
+| Operation | Meaning |
+| --- | --- |
+| `GET /api/delivery-policies` | Reviewed catalog and profile defaults; `delivery.read` |
+| `GET /api/users/{username}/delivery-policy` | Private override and effective policy; `people.read` and `people.private` |
+| `PUT /api/users/{username}/delivery-policy` | `{ "policy": "work", "confirm": false }` previews; confirm with its `review_hash`; `people.delivery`, `people.read`, `people.private`. Explicit `policy: null` inherits. |

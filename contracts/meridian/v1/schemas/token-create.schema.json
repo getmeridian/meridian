@@ -18,6 +18,8 @@
               "people.batch",
               "people.private",
               "people.edit",
+              "people.delivery",
+              "delivery.read",
               "people.credentials",
               "people.reset",
               "people.reissue",
@@ -43,7 +45,7 @@
             ],
             "type": "string"
           },
-          "maxItems": 33,
+          "maxItems": 35,
           "minItems": 1,
           "type": "array"
         },

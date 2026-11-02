@@ -39,6 +39,7 @@ USER_SELECT = (
     " t.last_seen_at, t.first_traffic_at, t.last_traffic_node"
     ", (SELECT json_group_array(profile) FROM (SELECT profile FROM user_access_memberships m"
     " WHERE m.user_id = u.user_id ORDER BY profile))"
+    ", (SELECT policy FROM person_delivery_policies p WHERE p.user_id = u.user_id)"
     " FROM users u LEFT JOIN traffic_totals t ON t.user_id = u.user_id"
 )
 
@@ -56,6 +57,7 @@ def user_record(row: Any, *, now: datetime) -> UserRecord:
         first_traffic_at,
         last_traffic_node,
         profiles,
+        delivery_policy,
     ) = tuple(row)
     usage = period_usage(up, down, upload_offset=up_offset, download_offset=down_offset, carried_bytes=carried)
     record = UserRecord.model_validate(
@@ -68,6 +70,7 @@ def user_record(row: Any, *, now: datetime) -> UserRecord:
             "first_traffic_at": first_traffic_at,
             "last_traffic_node": last_traffic_node,
             "profiles": json.loads(profiles),
+            "delivery_policy": delivery_policy,
         }
     )
     return UserRecord.model_validate(

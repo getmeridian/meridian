@@ -233,6 +233,20 @@ Shared filters: `--search TEXT`, `--status STATUS`, `--tag TAG`, `--expiring-wit
 `meridian client bulk disable --tag TRIAL_7 --yes --json`
 
 
+
+```bash
+meridian client routing person
+meridian client routing person work --dry-run --json
+meridian client routing person work --yes --json
+meridian client routing person --inherit --yes
+```
+
+`meridian client routing person` reads the effective policy. Use `meridian client routing person work --dry-run --json`, then `meridian client routing person work --yes --json` to review and save a private override; `meridian client routing person --inherit --yes` clears it. The console's person card uses the same service review and keeps drafts in memory. Person overrides win over profile defaults, which win over the fleet default. Applies and credential reissue preserve overrides; encrypted snapshots carry them, and deletion removes them. This choice changes subscription delivery at app refresh, with no account or node-access edit.
+
+Policy reads need `people.read` and `people.private`; assignment additionally needs `people.delivery`. `delivery.read` reads the reviewed catalog. Existing issued tokens keep their frozen grants; issue a token with the new grant to assign policies. Overrides are blank without private permission and never appear in subscriptions, events, or reviewed intent. A preview writes nothing. Confirmation requires its `review_hash`; a changed override, membership, or catalog needs another preview.
+
+
+
 ### meridian privacy
 
 Choose what the control service stores. Both device limits and daily history default to off; applying the fleet never changes these settings. See [Privacy](/en/privacy/) for the disclosures and seizure consequences.

@@ -19,6 +19,12 @@ MAX_DELIVERY_POLICY_BYTES = 65_536
 MAX_DELIVERY_CATALOG_BYTES = 262_144
 
 
+class DeliveryPolicyResolutionError(ValueError):
+    def __init__(self, code: Literal["unknown_delivery_policy", "conflicting_delivery_policies"], message: str) -> None:
+        self.code = code
+        super().__init__(message)
+
+
 class DeliveryAction(CoreModel):
     kind: Literal["proxy", "direct", "block", "exit"]
     exit: TopologyIdValue | None = Field(default=None, exclude_if=lambda value: value is None)
@@ -124,15 +130,19 @@ def resolve_delivery_policy(
         chosen_profiles = sorted({profile for profile in profiles if profile in settings.profile_policies})
         choices = {settings.profile_policies[profile] for profile in chosen_profiles}
         if len(choices) > 1:
-            raise ValueError(
+            raise DeliveryPolicyResolutionError(
+                "conflicting_delivery_policies",
                 "These access profiles select different delivery policies. "
-                "Set a person override or use agreeing profile defaults."
+                "Set a person override or use agreeing profile defaults.",
             )
         if choices:
             name, source = choices.pop(), "profile"
     policy = next((policy for policy in delivery_policy_catalog(settings) if policy.id == name), None)
     if policy is None:
-        raise ValueError(f"Unknown delivery policy {name!r}. Choose a policy in the reviewed fleet intent.")
+        raise DeliveryPolicyResolutionError(
+            "unknown_delivery_policy",
+            f"Unknown delivery policy {name!r}. Choose a policy in the reviewed fleet intent.",
+        )
     return ResolvedDeliveryPolicy(
         policy=policy, built_in=name in BUILTIN_DELIVERY_POLICIES, source=source, profiles=chosen_profiles
     )

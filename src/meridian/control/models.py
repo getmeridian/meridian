@@ -241,6 +241,12 @@ class UserRecord(UserTrafficEvidence, AccountLifecycleState):
     profiles: list[TopologyIdValue] = Field(
         default_factory=default_profiles, description="Operator-owned access membership; people.private reads it."
     )
+    delivery_policy: TopologyIdValue | None = Field(
+        default=None,
+        repr=False,
+        exclude_if=lambda value: value is None,
+        description="Private operator-owned client policy override; null follows profile/fleet defaults.",
+    )
     user_id: str
     credential_generation: CredentialGeneration = 1
     uuid: str
