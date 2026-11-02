@@ -523,6 +523,8 @@ Membership is private operator data: `people.private` reveals `profiles` in pers
 
 JSON reviews and fleet exports preserve valid profile IDs and usernames such as `token` and `secret`, including nested grant and creation-setting lists. Credential fields remain redacted.
 
+Usernames such as `token`, `secret`, and `api_key` are also valid in revision proposals and reviewed applies. Their creation settings and display names still undergo the usual secret check.
+
 | Operation | Meaning |
 | --- | --- |
 | `GET /api/access-profiles` | Reviewed grants and private membership counts; `people.read` and `people.private` |

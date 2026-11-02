@@ -76,15 +76,20 @@ _SECRET_VALUES = (
 
 def secret_paths(value: Any, path: str = "") -> list[str]:
     """JSON paths in `value` whose key names a secret or whose text holds one; empty means secret-free."""
+    return _secret_paths(value, path, ())
+
+
+def _secret_paths(value: Any, path: str, parents: tuple[str | int, ...]) -> list[str]:
     found: list[str] = []
+    usernames = parents in {("access", "creation_settings"), ("access", "display_names")}
     for key, item in _children(value):
         here = f"{path}.{key}" if path else str(key)
-        if isinstance(key, str) and is_sensitive_key(key):
+        if not usernames and isinstance(key, str) and is_sensitive_key(key):
             found.append(here)
         elif isinstance(item, str) and any(pattern.search(item) for pattern in _SECRET_VALUES):
             found.append(here)
         else:
-            found.extend(secret_paths(item, here))
+            found.extend(_secret_paths(item, here, (*parents, key)))
     return found
 
 

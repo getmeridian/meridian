@@ -57,6 +57,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Accept usernames such as token, secret, and api_key in revision and apply
+  checks while still rejecting secret fields and values in their settings.
 - Keep plan results when profile evidence is unavailable, allow control-service
   bootstrap or repair only with proven empty profile history, and give fleet
   imports the same profile review and membership fence as plan and apply.
