@@ -10,9 +10,10 @@ from meridian.commands.client_bulk import preview_table, reconcile_receipt, resu
 from meridian.commands.client_handoff import resolve_client_mutation_name, resolve_client_name
 from meridian.commands.client_limits import print_client_usage
 from meridian.console import confirm, fail, is_json_mode, ok, warn
-from meridian.control.client import ControlClient, ControlServiceError, ControlServiceUncertain
+from meridian.control.client import ControlClient, ControlServiceUncertain
 from meridian.control_access import access_panel
 from meridian.core.clients import ClientLimitsResult, build_client_record, client_metadata_paths
+from meridian.core.errors import MeridianError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.people_bulk import BulkAction, BulkCommitRequest, BulkPreviewRequest, ClientBulkResult
@@ -29,8 +30,8 @@ def run_set_profiles(name: str, profiles: list[str], *, dry_run: bool, yes: bool
     if is_json_mode() and not yes and not dry_run:
         fail(t("profiles.requires_yes"), hint_type="user")
     cluster = load_topology_cluster()
-    resolve_client_name(cluster, name, console_people=True)
     try:
+        resolve_client_name(cluster, name, console_people=True)
         with access_panel(cluster) as panel:
             name = resolve_client_mutation_name(cluster, panel, name)
             user = panel.get_user(name)
@@ -41,8 +42,6 @@ def run_set_profiles(name: str, profiles: list[str], *, dry_run: bool, yes: bool
                 preview = client.preview_bulk(BulkPreviewRequest(action=action, usernames=[name]))
                 if not is_json_mode():
                     preview_table(preview.people)
-                    if any(person.access is not None and person.access.lost for person in preview.people):
-                        warn(t("profiles.revocation"))
                 if dry_run:
                     result = ClientLimitsResult(
                         client=build_client_record(user, declared=declared), profile_preview=preview, applied=False
@@ -65,7 +64,7 @@ def run_set_profiles(name: str, profiles: list[str], *, dry_run: bool, yes: bool
                         access=client.user_access(name),
                         flow_blocks=blocks,
                     )
-    except ControlServiceError as exc:
+    except MeridianError as exc:
         fail(exc)
     if is_json_mode():
         metadata = result_paths(

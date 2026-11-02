@@ -493,29 +493,31 @@ When bulk disabling, deletion, or an expiry change removes access, the service r
 
 ## Access profiles
 
-Access profiles require Meridian's control service. On a Remnawave fleet, run `meridian migrate` first; adding, importing, or applying profiles is refused before server or panel changes.
-
-JSON reviews and fleet exports preserve valid profile IDs and usernames such as `token` and `secret`, including nested grant and creation-setting lists. Credential fields remain redacted.
-
-Bulk undo checks the saved people, grants, and nodes before previewing or writing. Changed access or a deleted profile refuses the whole undo and names the affected people, including with `--dry-run`. Undo previews show the reversed gains, losses, and hard cut-off scope. The API accepts `{"receipt_id":"...","dry_run":true}` at `POST /api/people/bulk/undo`, returning projected `undo_people` without a database change, event, or backup pull. Older receipts without saved access preconditions require a new bulk review.
-
-`plan` and `apply` review profiles held by the service as well as those in the proposed topology. Removing the last profile is reviewed and fenced, and is refused while anyone still belongs to it.
-
-An apply stores inbound and endpoint references before activating profile grants, then creates accounts. Adding a person in that apply cannot invalidate its own access review, including when removing the last profile.
-
-`GET /api/users/{username}/cut-off` requires `people.read` and `people.private`. Its review includes inbounds lost through a profile change while their flow-block receipts remain unresolved, even if the person is still active. A subsequent `--cut-off` resets those inbounds too.
-
 Profiles are reviewed topology; membership belongs to the operator in the service. The built-in `default` profile grants every exit and path, including future additions. A person may belong to several profiles; their grants are combined. Fleets without named profiles keep the same node documents and subscriptions.
+
+Access profiles require Meridian's control service. On a Remnawave fleet, run `meridian migrate` first; adding, importing, or applying profiles is refused before server or panel changes.
 
 Create or replace grants with `meridian profile add|set`; `profile list` shows grants and membership counts. References are `exit:ID`, `gateway:ID`, or the compiler's stable `inbound:...` and `endpoint:...` IDs. Unknown and retired references fail review. Gateway bridge inbounds cannot be assigned to people. A public endpoint grants its authentication inbound, so every other public connection sharing that inbound is granted too. `--empty` creates a profile with no connections.
 
 Use `client set person --profile limited --yes`, repeating `--profile` for every membership to keep. This replaces the membership list; choose `default` to restore full access. Profile edits have their own review, separate from account limits, notes, and language. The console's access-profile card shows granted connections and the profiles that permit them, preserves unsaved choices, and opens the same frozen review. **Set profiles** is also a bulk action; its preview shows gained and lost inbounds and rejects changed people or topology at commit.
 
+The CLI reports a service access error if it cannot read the person. A profile loss review prints the revocation warning once.
+
+Bulk undo checks the saved people, grants, and nodes before previewing or writing. Changed access or a deleted profile refuses the whole undo and names the affected people, including with `--dry-run`. Undo previews show the reversed gains, losses, and hard cut-off scope. The API accepts `{"receipt_id":"...","dry_run":true}` at `POST /api/people/bulk/undo`, returning projected `undo_people` without a database change, event, or backup pull. Older receipts without saved access preconditions require a new bulk review.
+
 Losing a grant removes the connection from every subscription format, individual links, and the connection page, and removes the person from the node's inbound. After that node applies the revision, the existing per-person flow block stops new connections and new streams from open sessions. Connection keys, subscription URLs, and device registrations stay the same. Transfers and UDP associations already dispatched may continue. The review names the affected nodes and the hard cut-off boundary: a VLESS cut-off restarts Xray and reconnects every inbound and bridge on that node; an inbound reset affects the listed inbounds, with whole-core fallback on failure. A reviewed `meridian node restart NODE --core --yes` ends existing transfers by reconnecting everyone on that node.
+
+`GET /api/users/{username}/cut-off` requires `people.read` and `people.private`. Its review includes inbounds lost through a profile change while their flow-block receipts remain unresolved, even if the person is still active. A subsequent `--cut-off` resets those inbounds too.
 
 Removing a profile still used by people is refused with its membership count. Move those people to other profiles first. Ordinary applies never replace membership. Snapshots preserve every person's memberships; a replacing user import preserves them when `profiles` is omitted. Fleet export carries declared people's current memberships as creation-only settings, so a new fleet can recreate them while existing people retain their operator-owned choices. Console-only people remain service data in the snapshot.
 
+`plan` and `apply` review profiles held by the service as well as those in the proposed topology. Removing the last profile is reviewed and fenced, and is refused while anyone still belongs to it.
+
+An apply stores inbound and endpoint references before activating profile grants, then creates accounts. Adding a person in that apply cannot invalidate its own access review, including when removing the last profile.
+
 Membership is private operator data: `people.private` reveals `profiles` in person and revision results. Effective-access and membership-count reads require both `people.read` and `people.private`; policy reviews require `fleet.apply` and `people.private`. Account edits use `people.edit`, and bulk assignment uses `people.batch` and `people.private`. Format previews require `people.read`, plus `people.private` while profiles are configured. The people/admin presets include the necessary private permissions; other presets receive an empty `profiles` list and no creation memberships. Profiles store membership only, with no client IP, device, or connection observations.
+
+JSON reviews and fleet exports preserve valid profile IDs and usernames such as `token` and `secret`, including nested grant and creation-setting lists. Credential fields remain redacted.
 
 | Operation | Meaning |
 | --- | --- |
