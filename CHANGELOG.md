@@ -44,6 +44,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Show explicit token capabilities in fleet events and refuse token commands
+  without configured Meridian control service access.
 - Token CLI cancellations exit 1, and issuance keeps the reviewed absolute expiry.
 - Accept authenticator responses with an empty owner handle in the console.
 - Preserve passkey registration proofs through a renewed identity check or a

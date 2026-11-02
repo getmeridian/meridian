@@ -10,6 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 from meridian.cli import app
+from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.console import set_json_mode, set_quiet_mode
 from meridian.control.client import ControlClient
 from meridian.control.models import TokenCreate
@@ -17,6 +18,7 @@ from meridian.control.tokens import ROOT
 from tests.support.control_service import ADMIN_TOKEN
 from tests.support.text import unstyle
 from tests.support.token_service import Fleet, serve_tokens
+from tests.support.topology import single_exit_intent
 
 
 @pytest.fixture(autouse=True)
@@ -170,3 +172,59 @@ def test_a_review_that_expires_during_confirmation_refuses_issuance(
     )
     assert result.exit_code == 2, result.output
     assert fleet.service.tokens.list_tokens().tokens == []
+
+
+@pytest.mark.parametrize(
+    ("url", "credential", "backend"),
+    [
+        ("", "root-token", "meridian"),
+        ("https://198.51.100.10/console", "", "meridian"),
+        ("", "", "meridian"),
+        ("https://198.51.100.10/console", "root-token", "remnawave"),
+        ("", "", "remnawave"),
+    ],
+    ids=["missing-url", "missing-credential", "unconfigured", "legacy", "legacy-unconfigured"],
+)
+@pytest.mark.parametrize(
+    "command",
+    [
+        ["list"],
+        ["create", "Reader", "--capability", "people.read", "--dry-run"],
+        ["revoke", "0123456789ab", "--yes"],
+    ],
+    ids=["list", "create", "revoke"],
+)
+def test_token_commands_refuse_missing_or_legacy_service_access_before_building_a_client(
+    tmp_home: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    url: str,
+    credential: str,
+    backend: str,
+    command: list[str],
+) -> None:
+    from meridian.commands import token
+
+    intent = single_exit_intent()
+    intent = type(intent).model_validate(
+        {**intent.to_data(), "control": {**intent.control.to_data(), "backend": backend}}
+    )
+    cluster = ClusterConfig(topology_intent=intent, panel=PanelConfig(url=url, api_token=credential))
+    monkeypatch.setattr(token, "load_topology_cluster", lambda: cluster)
+
+    def client(*args: object, **kwargs: object) -> None:
+        pytest.fail("A refused fleet must never construct a client.")
+
+    monkeypatch.setattr(token, "ControlClient", client)
+    result = CliRunner().invoke(app, ["--lang", "en", "token", *command, "--json"])
+    assert result.exit_code == 2, result.output
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "failed"
+    assert payload["command"] == "token." + command[0]
+    hint = payload["errors"][0]["hint"]
+    if backend == "remnawave":
+        assert "meridian migrate" in hint
+    else:
+        from meridian.i18n import t
+
+        assert hint == t("events.deploy_first")
+        assert payload["errors"][0]["message"] == t("events.credentials_missing")

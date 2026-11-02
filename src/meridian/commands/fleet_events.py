@@ -9,6 +9,7 @@ from rich.table import Table
 from meridian.commands._helpers import load_topology_cluster
 from meridian.console import err_console, error_context, fail, info, is_json_mode
 from meridian.control.client import ControlClient, ControlServiceError
+from meridian.control.token_capabilities import permission
 from meridian.core.agent_types import MAX_SAFE_INTEGER
 from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.fleet_events import (
@@ -24,7 +25,7 @@ from meridian.core.fleet_events import (
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.queries import bounded_integer
-from meridian.i18n import t
+from meridian.i18n import current_locale, t
 from meridian.renderers import emit_json
 
 
@@ -107,7 +108,15 @@ def _detail(event: FleetEvent) -> str:
         }
         return detail.node_id + ": " + t(labels[detail.status])
     if isinstance(detail, TokenEventDetail):
-        return t("events.scope", scope=detail.scope)
+        if detail.scope is not None:
+            return t("events.scope", scope=detail.scope)
+        if detail.capabilities:
+            return (
+                t("token.permissions")
+                + " "
+                + ", ".join(permission(capability).labels[current_locale()] for capability in detail.capabilities)
+            )
+        return ""
     if isinstance(detail, PrivacyEventDetail):
         return t("events.audit", id=detail.audit_id)
     if isinstance(detail, NodeEventDetail) and detail.failed_resources:

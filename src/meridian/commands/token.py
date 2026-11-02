@@ -12,6 +12,7 @@ from meridian.commands._helpers import load_topology_cluster
 from meridian.console import confirm, err_console, error_context, fail, is_json_mode
 from meridian.control.client import ControlClient, ControlServiceError
 from meridian.control.token_capabilities import capability_catalog, permission
+from meridian.core.errors import LocalStateError, RemnawaveFleetError
 from meridian.core.models import CoreModel, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.token_models import DEFAULT_TOKEN_DAYS, TokenCreate, TokenCreateResult, TokenPreview
@@ -22,6 +23,10 @@ from meridian.renderers import emit_json
 @contextmanager
 def token_client() -> Iterator[ControlClient]:
     cluster = load_topology_cluster()
+    if not cluster.runs_control_service:
+        fail(RemnawaveFleetError())
+    if not cluster.is_configured:
+        fail(LocalStateError(t("events.credentials_missing"), hint=t("events.deploy_first")))
     with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
         yield client
 

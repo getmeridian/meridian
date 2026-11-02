@@ -22,6 +22,8 @@
 - `client remove|reissue --cut-off` discloses every affected node and other people's reconnects before confirming, and keeps typed per-node outcomes and new links even on failure.
 
 ## Pitfalls
+- **Token clients require a configured control service** — reject missing credentials and Remnawave before constructing the HTTP client.
+- **Token events name their grant kind** — a null scope means explicit capabilities; render shared permission labels instead of None.
 - **Token expiry is the reviewed instant** — issue the preview's expires_at, never restart the day count after confirmation.
 - **Undo dry runs check the receipt** — reject irreversible, already-undone, or expired receipts; uncertain undo succeeds only after reading its recorded completion.
 - **Escape at the console boundary once** — ok/warn already escape Rich markup; pass translated display names and disclosures unchanged.
