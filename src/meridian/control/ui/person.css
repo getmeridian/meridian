@@ -15,7 +15,7 @@ body:has(.person-page) { overflow: hidden; }
 .person-title-row h1 { overflow-wrap: anywhere; }
 .person-primary-actions { flex-shrink: 0; flex-wrap: nowrap; }
 .person-primary-actions .btn { min-block-size: 44px; }
-.person-summary-facts { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--space-4); align-items: center; }
+.person-summary-facts { display: flex; flex-direction: column; gap: var(--space-2); }
 .person-summary-usage .usage { min-inline-size: 0; }
 .person-summary-usage .usage-text { font-size: .875rem; }
 .person-expiry-detail { position: relative; inline-size: fit-content; max-inline-size: 100%; }
@@ -67,8 +67,6 @@ body:has(.person-page) { overflow: hidden; }
   .person-summary { gap: var(--space-2); padding-block-end: var(--space-2); }
   .person-summary-head { gap: var(--space-2); }
   .person-primary-actions .btn { padding-inline: var(--space-2); font-size: .875rem; }
-  .person-summary-facts { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
-  .person-summary-facts > .stack-sm { gap: var(--space-1); }
   .person-access-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
   .person-access-row > dt { padding-block-start: 0; }
   .person-panel .facts { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }

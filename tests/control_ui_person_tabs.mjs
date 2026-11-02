@@ -123,6 +123,10 @@ if (scenario === 'person-tabs-header') {
   report.meter = head?.querySelector('meter')?.getAttribute('value');
   report.reset = head?.querySelector('[data-person-reset]')?.textContent;
   const expiry = head?.querySelector('[data-person-expiry]');
+  const meta = head?.querySelector('[data-person-meta]');
+  report.meta = { together: !!meta && meta.contains(expiry) && meta.contains(head.querySelector('[data-person-reset]')),
+    resetFirst: !!meta && !!(head.querySelector('[data-person-reset]').compareDocumentPosition(expiry) & w.Node.DOCUMENT_POSITION_FOLLOWING),
+    text: meta?.textContent || '' };
   report.expiryFocusable = expiry?.tabIndex === 0;
   report.exactExpiry = expiry?.getAttribute('title') || '';
   report.actions = [...(head?.querySelectorAll('[data-person-action]') || [])].map(el => el.dataset.personAction);

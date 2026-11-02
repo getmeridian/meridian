@@ -40,6 +40,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Summary dates share the meter's meta line** — put reset before expiry in words below usage, retaining the expiry's focusable exact-date tooltip.
 - **Near-quota labels stop at the limit** — suppress that row reason for limited people or an exact service percentage of at least 100; keep the inclusive quota filter and other reasons.
 - **Main navigation never shrinks its labels** — keep a spaced scrolling row and reveal the active route after mounting or changing mode, using logical scroll alignment for RTL.
 - **Desktop selection bars set their direction** — override the card's column layout and keep the count and matching offer beside the actions; the phone grid remains separate.

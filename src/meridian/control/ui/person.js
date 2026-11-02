@@ -209,8 +209,9 @@
         h("div", { class: "stack-sm" }, h("div", { class: "person-title-row" }, screen.title, screen.badge, screen.tag), screen.usernameLabel),
         h("div", { class: "row-actions person-primary-actions", role: "group", "aria-label": M.t("person.actions") },
           shareButton, screen.extend, screen.toggle)),
-      h("div", { class: "person-summary-facts" }, h("div", { class: "stack-sm" }, screen.summaryUsage, screen.reset),
-        h("div", { class: "stack-sm" }, h("span", { class: "person-expiry-detail" }, screen.expiry, screen.expiryTooltip), screen.receipt)));
+      h("div", { class: "person-summary-facts" }, screen.summaryUsage,
+        h("p", { class: "muted small person-summary-meta", "data-person-meta": "" }, screen.reset, " · ",
+          h("span", { class: "person-expiry-detail" }, screen.expiry, screen.expiryTooltip)), screen.receipt));
   }
 
   function drawSummary(screen, user, share) {

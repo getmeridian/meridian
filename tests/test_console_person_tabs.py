@@ -33,6 +33,14 @@ def test_person_summary_keeps_actions_and_exact_dates_outside_the_tab_panels(loc
     assert result["outside"] == []
 
 
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_summary_expiry_shares_the_reset_meta_line_and_keeps_its_exact_date(locale: str) -> None:
+    result = run_console("person-tabs-header", locale)
+    assert result["meta"]["together"] and result["meta"]["resetFirst"]
+    assert result["reset"] + " · " in result["meta"]["text"]
+    assert result["expiryFocusable"] and "2026-12-02T12:00:00Z" in result["exactExpiry"]
+
+
 @pytest.mark.parametrize("tab", ["", "usage", "devices", "routing", "keys"])
 def test_person_tab_deep_links_select_one_labelled_panel(tab: str) -> None:
     result = run_console("person-tabs-route", data={"tab": tab, "mode": "detailed"})
