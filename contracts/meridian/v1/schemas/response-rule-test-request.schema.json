@@ -1,0 +1,48 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "accept": {
+      "default": "",
+      "maxLength": 256,
+      "title": "Accept",
+      "type": "string"
+    },
+    "person": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Person"
+    },
+    "suffix": {
+      "default": "",
+      "enum": [
+        "",
+        "info",
+        "json",
+        "v2ray-json",
+        "mihomo",
+        "clash",
+        "stash",
+        "singbox"
+      ],
+      "title": "Suffix",
+      "type": "string"
+    },
+    "user_agent": {
+      "default": "",
+      "maxLength": 512,
+      "title": "User Agent",
+      "type": "string"
+    }
+  },
+  "title": "ResponseRuleTestRequest",
+  "type": "object"
+}

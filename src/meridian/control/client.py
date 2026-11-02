@@ -88,6 +88,7 @@ from meridian.core.person_delivery_policy import (
     PersonDeliveryPolicyState,
     PersonDeliveryPolicyWrite,
 )
+from meridian.core.response_rule_test import ResponseRuleDecision, ResponseRuleTestRequest
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 from meridian.core.token_models import DEFAULT_TOKEN_DAYS, CapabilityCatalog, TokenCapability, TokenPreview
@@ -302,6 +303,11 @@ class ControlClient:
     def preview_subscription(self, request: SubscriptionPreviewRequest) -> SubscriptionPreview:
         return SubscriptionPreview.model_validate(
             self._request("POST", "api/subscription/preview", request.to_data(), mutation_method="GET").json()
+        )
+
+    def test_response_rules(self, request: ResponseRuleTestRequest) -> ResponseRuleDecision:
+        return ResponseRuleDecision.model_validate(
+            self._request("POST", "api/response-rules/test", request.to_data(), mutation_method="GET").json()
         )
 
     def preview_user_schedule(self, request: UserSchedulePreviewRequest) -> AccountSchedulePreview:

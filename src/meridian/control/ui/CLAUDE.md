@@ -1,6 +1,7 @@
 # control/ui — The owner's web console
 
 ## Design decisions
+- **App testing stays transient** — Settings lists reviewed response rules read-only; the subscription form uses the shared tester without a person and the full preview with one, keeping headers and results only in memory.
 - **Person routing uses service reviews** — policy choices remain in memory, passive reads preserve edits, and confirmation submits one frozen hash.
 - **Profile assignment shares bulk review** — person and bulk forms send the same frozen membership action, preserve drafts during passive access reads, and disclose lost inbounds before commit.
 - **People pages are bounded service reads** — rows and fragment filters survive refresh; selection sends usernames or the same query, then a frozen review and receipt.

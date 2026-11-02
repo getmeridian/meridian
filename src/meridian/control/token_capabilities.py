@@ -18,6 +18,12 @@ from meridian.core.token_models import (
 
 # Human wording belongs to the adapters; API, CLI, and console consume these same labels.
 _LABELS: dict[TokenCapability, tuple[str, str, str, str]] = {
+    "delivery.test": (
+        "Test app subscription response rules",
+        "Проверять правила ответа подписки для приложений",
+        "آزمایش قوانین پاسخ اشتراک برای برنامه‌ها",
+        "测试应用订阅响应规则",
+    ),
     "metrics.read": (
         "Read Prometheus node capacity and service metrics",
         "Смотреть показатели серверов и сервиса в Prometheus",

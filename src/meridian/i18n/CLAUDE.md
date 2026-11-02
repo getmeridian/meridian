@@ -11,6 +11,7 @@
 **No markup in catalogs** — callers escape catalog text and add Rich styles themselves, so a translator can never break rendering.
 
 ## What's done well
+- **App rule explanations share native labels** — matched operators, refusals, inherited format selection, and app policy sources use the same four-language wording in CLI and console.
 - **Profile declaration refusals give both routes forward** — native en/ru/fa/zh text names profile or fleet import for edits, and apply for a saved change.
 - **Named routing reviews stay native** — policy choices, unknown names, and rule counts share en/ru/fa/zh text.
 - **Credential rotation explains refresh and ownership** — all locales distinguish preserved subscription URLs from reissued links and label per-node blocking outcomes.

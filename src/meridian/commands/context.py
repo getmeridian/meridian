@@ -69,6 +69,7 @@ READS_ONLY = frozenset(
         "fleet.inventory",
         "fleet.status",
         "fleet.usage",
+        "fleet.response-rules.test",
         "fleet.notice.show",
         "logs",
         "node.list",

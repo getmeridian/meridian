@@ -1,6 +1,7 @@
 # reconciler — Declarative plan / apply engine
 
 ## Design decisions
+- **App rules share settings observation** — the service-settings driver applies and compares the full typed ordered list, preserving request-free intent and unchanged default payloads.
 - **Checkpointed apply** — `resource_executor.py` re-observes every immutable compiler action, persists each transition, and cuts over a generation only after all dependencies and postconditions succeed.
 - **Fenced applies** — `fence.py` decides and `state_fence.py` stores the control server's fence (fleet, committed generation and plan hash, lease) by compare-and-swap for the whole apply: a copy behind refuses, one ahead heals a lost commit. Once the control service answers, the fence and a revision per apply live there (`service_fence.py`).
 - **Service bootstrap is a driver** — `control_service_driver.py` installs `ctld`; its attestation hashes payload, target, package identity, and render contract, so only a CLI upgrade or contract bump reinstalls.

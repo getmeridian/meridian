@@ -22,12 +22,14 @@ uv run pytest tests/ -k "test_name"    # by pattern
 **Shared doubles live in `tests/support/`** — `mock_connection.py`, `CaptureReporter`, `fence_host.py`, `control_service.py` (`serve_control`, a real loopback service), `console_dom.py`, and `topology.py` builders; search there before writing a local intent, plan, or panel builder. `tmp_home` isolates a pinned home per test.
 
 ## What's done well
+- **App-rule refusals are HTTP equivalence checks** — compare valid and unknown tokens through GET and HEAD on documents and personal files, with no device, event, or header-history write.
 - **Quirk-named tests** — e.g. `test_fence_write_that_timed_out_after_landing_is_re_read_not_repeated()`; the name is the documentation, and docstrings only explain a non-obvious why.
 - **Tables over near-duplicates** — cases that differ only in inputs and outcome are one `@pytest.mark.parametrize` table with `ids`.
 - Idempotency dual-path: `tests/provision/CLAUDE.md`.
 
 ## Pitfalls
 - **Pinned geodata memory guards start cold** — trace file reads and complete explanations, with destinations that reach category-ru and geoip:ru (documentation ranges stop at the private lists); CI's Xray folder supplies both data files.
+- **Minimal migration fixtures retain prior device tables** — schema 26 clears the old User-Agent column, even in a capacity-only fixture.
 - **CLI locales are test-local** — reset current and requested language before each scenario, or a prior translated command makes later scripted English prompts fail.
 - **Restore command doubles supply profile evidence** — a confirmation-only scenario stubs the early compatibility check; profile scenarios use real snapshot and service state.
 - **Import test doubles cover profile discovery** — previews that stub resources also supply evidence of an empty service profile map.

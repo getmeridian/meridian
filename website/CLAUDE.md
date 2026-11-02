@@ -5,6 +5,7 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 ```
 
 ## Design decisions
+- **App delivery guides stay local** — routing, CLI, person, and architecture guides describe reviewed response rules and transient testing in all four locales, with no remote templates or page requests.
 
 **Static Astro** — every page is a flat HTTP request with minimal shipped JS; content collections hold docs and blog.
 **Docs run on Starlight** — `src/content/docs/{locale}/` renders at `/{locale}/{page}/`; `src/lib/docs-sidebar.mjs` lists the sidebar for every locale, and `astro.config.mjs` refuses a page missing from it and redirects old `/docs/{locale}/{page}/` URLs.

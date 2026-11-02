@@ -25,7 +25,9 @@ A separately issued `metrics.read` token can scrape node capacity, durable node 
 | --- | --- | --- |
 | `off` (default) | No device records; devices are not tracked or limited | No device count |
 | `private` | HMAC-SHA256 fingerprints of device IDs, made with a secret shared only inside your fleet; no systems, models, or apps | A device count and the cap |
-| `full` | Device ID, platform, OS version, model, user agent, and first and last subscription fetch | Each person's device list |
+| `full` | Device ID, platform, OS version, model, and first and last subscription fetch | Each person's device list |
+
+User-Agent and Accept are used only for transient subscription matching and testing; they are never collected as device details. Upgrades clear older device User-Agent values, and restores clear them from older snapshots. The compatibility API field `user_agent` stays null.
 
 **Private disclosure:**
 

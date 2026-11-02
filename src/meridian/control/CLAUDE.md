@@ -3,6 +3,7 @@
 Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `formats/CLAUDE.md`.
 
 ## Design decisions
+- **Response rules need no schema step** — reviewed rules live in meta beside delivery settings; absent means empty, and settings writes, restores, and reads keep the same typed list.
 - **Profile declarations save with settings** — meta keeps their reviewed fingerprint, included in the access hash; unreviewed settings compare it atomically, and bootstrap requires no fingerprint, grants, or non-default memberships.
 - **Person delivery overrides stay private** — schema 25 owns one nullable-by-absence mapping; stateless hashes fence catalog, membership, and override, without events or node recomposition.
 - **Reviewed delivery choices validate membership** — policy catalogs live in settings; profile defaults must agree before a settings or membership write commits.
@@ -37,6 +38,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - **People triage facts are derived reads** — records expose never-used, exact quota percentage, and default attention reasons from shared predicates; no filter flags or request data are stored.
 
 ## What's done well
+- **Header observations stay transient** — schema 26 clears device User-Agents and the collector leaves that compatibility field null; opt-in device fields never carry the app matcher input.
 - **Snapshot profile reads are passive** — deserialize authenticated bytes in memory; never instantiate a service or migrate a database to judge restore compatibility.
 - **Policy previews are transient** — cached geodata verifies archive pins; requests trigger no fetch, and public app limits omit policy names, overrides, and memberships.
 - **Flow events record real transitions** — repeated hellos, reports, and unrelated revisions leave a confirmed receipt and its event history unchanged.
@@ -45,6 +47,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - A proposal whose intent contains a secret-shaped key or value, or a malformed `access` block, is refused and never stored.
 
 ## Pitfalls
+- **App blocks cover personal page files and legacy redirects** — use the shared decision before rendering or redirecting, or support/config routes reveal a valid token through a blocked app.
 - **Policy writes keep declaration fences** — save catalogs and declaration fingerprints in one settings transaction, so either refusal rolls back both.
 - **Profile writes validate every membership** — previews and settings refuse any non-default profile missing from the proposed map, including memberships whose live declaration has already disappeared.
 - **Receipt row guards stay explicit** — a derived boolean does not narrow an optional SQLite row for static checks.

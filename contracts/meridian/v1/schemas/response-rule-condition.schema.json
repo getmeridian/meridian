@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "description": "A nonempty literal; case folding never turns it into a pattern.",
+  "properties": {
+    "operator": {
+      "enum": [
+        "equals",
+        "prefix",
+        "contains"
+      ],
+      "title": "Operator",
+      "type": "string"
+    },
+    "value": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Value",
+      "type": "string"
+    }
+  },
+  "required": [
+    "operator",
+    "value"
+  ],
+  "title": "LiteralCondition",
+  "type": "object"
+}

@@ -1,6 +1,7 @@
 # contracts — Generated meridian-core artifacts
 
 ## Design decisions
+- **App response rules are typed intent** — bounded literals and discriminated format/block/policy/header actions join settings, fleet schemas, a transient tester, and the narrow `delivery.test` capability; request values never enter results.
 - **Profile declaration fences** — settings publish the reviewed declaration hash and its unchanged-write precondition; the private profile catalog includes that hash and non-default membership evidence.
 - **Metrics is protected text** — `metrics.read` joins catalog-derived explicit preview/issuance contracts, stays outside compatible presets, and serves Prometheus text outside the admin JSON document.
 - **Server capacity schemas** — current state, derived integer values, bounded recent/hourly history, and measured network duration join node and fleet contracts without person labels.

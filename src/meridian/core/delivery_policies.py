@@ -106,7 +106,7 @@ class DeliveryPolicySettings(CoreModel):
 class ResolvedDeliveryPolicy(CoreModel):
     policy: DeliveryPolicy
     built_in: bool
-    source: Literal["fleet", "profile", "person"]
+    source: Literal["fleet", "profile", "response_rule", "person"]
     profiles: list[TopologyIdValue] = Field(default_factory=list, max_length=64)
 
 
@@ -119,13 +119,16 @@ def resolve_delivery_policy(
     *,
     profiles: Sequence[str] = (),
     person_override: str | None = None,
+    response_override: str | None = None,
 ) -> ResolvedDeliveryPolicy:
-    """Person wins; agreeing profile defaults follow; then the fleet's named policy or preset."""
-    source: Literal["fleet", "profile", "person"] = "fleet"
+    """Person, then app response rule, agreeing profiles, then fleet named policy or preset."""
+    source: Literal["fleet", "profile", "response_rule", "person"] = "fleet"
     chosen_profiles: list[str] = []
     name = settings.default_policy or settings.client_routing
     if person_override is not None:
         name, source = person_override, "person"
+    elif response_override is not None:
+        name, source = response_override, "response_rule"
     else:
         chosen_profiles = sorted({profile for profile in profiles if profile in settings.profile_policies})
         choices = {settings.profile_policies[profile] for profile in chosen_profiles}

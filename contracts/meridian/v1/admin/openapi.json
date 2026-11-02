@@ -868,6 +868,21 @@
         "title": "BinaryPinResource",
         "type": "object"
       },
+      "BlockAction": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "block",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "BlockAction",
+        "type": "object"
+      },
       "BulkAction-Input": {
         "additionalProperties": false,
         "properties": {
@@ -1946,6 +1961,7 @@
                   "people.delivery",
                   "delivery.read",
                   "delivery.explain",
+                  "delivery.test",
                   "people.credentials",
                   "people.reset",
                   "people.reissue",
@@ -2036,6 +2052,7 @@
               "people.delivery",
               "delivery.read",
               "delivery.explain",
+              "delivery.test",
               "people.credentials",
               "people.reset",
               "people.reissue",
@@ -2104,6 +2121,7 @@
               "people.delivery",
               "delivery.read",
               "delivery.explain",
+              "delivery.test",
               "people.credentials",
               "people.reset",
               "people.reissue",
@@ -2819,15 +2837,9 @@
             "title": "Platform"
           },
           "user_agent": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "User Agent"
+            "description": "Always null: request User-Agents are not collected.",
+            "title": "User Agent",
+            "type": "null"
           }
         },
         "required": [
@@ -4722,6 +4734,52 @@
         "title": "FleetEventsQuery",
         "type": "object"
       },
+      "FormatAction": {
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "enum": [
+              "browser",
+              "mihomo",
+              "stash",
+              "singbox",
+              "xray-json",
+              "base64"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "headers": {
+            "$ref": "#/components/schemas/ResponseHeaders"
+          },
+          "kind": {
+            "const": "format",
+            "title": "Kind",
+            "type": "string"
+          },
+          "policy": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Policy"
+          }
+        },
+        "required": [
+          "kind",
+          "format"
+        ],
+        "title": "FormatAction",
+        "type": "object"
+      },
       "FormatDeliveryPolicy": {
         "additionalProperties": false,
         "properties": {
@@ -4829,12 +4887,42 @@
             "title": "Match",
             "type": "string"
           },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Name"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "maximum": 64,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Number"
+          },
           "rule": {
             "enum": [
               "suffix",
               "user_agent",
               "accept",
-              "default"
+              "default",
+              "custom"
             ],
             "title": "Rule",
             "type": "string"
@@ -4999,6 +5087,25 @@
           "granted_by"
         ],
         "title": "GrantedInbound",
+        "type": "object"
+      },
+      "HeadersAction": {
+        "additionalProperties": false,
+        "properties": {
+          "headers": {
+            "$ref": "#/components/schemas/ResponseHeaders"
+          },
+          "kind": {
+            "const": "headers",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "headers"
+        ],
+        "title": "HeadersAction",
         "type": "object"
       },
       "HealthCheck": {
@@ -5182,6 +5289,7 @@
                 "people.delivery",
                 "delivery.read",
                 "delivery.explain",
+                "delivery.test",
                 "people.credentials",
                 "people.reset",
                 "people.reissue",
@@ -5353,6 +5461,33 @@
         "title": "LanguageState",
         "type": "object"
       },
+      "LiteralCondition": {
+        "additionalProperties": false,
+        "description": "A nonempty literal; case folding never turns it into a pattern.",
+        "properties": {
+          "operator": {
+            "enum": [
+              "equals",
+              "prefix",
+              "contains"
+            ],
+            "title": "Operator",
+            "type": "string"
+          },
+          "value": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operator",
+          "value"
+        ],
+        "title": "LiteralCondition",
+        "type": "object"
+      },
       "ManagedInbound": {
         "additionalProperties": false,
         "description": "An Xray inbound whose clients the service fills from its user records.",
@@ -5402,6 +5537,34 @@
           "protocol"
         ],
         "title": "ManagedInbound",
+        "type": "object"
+      },
+      "MatchedResponseCondition": {
+        "additionalProperties": false,
+        "properties": {
+          "header": {
+            "enum": [
+              "user-agent",
+              "accept"
+            ],
+            "title": "Header",
+            "type": "string"
+          },
+          "operator": {
+            "enum": [
+              "equals",
+              "prefix",
+              "contains"
+            ],
+            "title": "Operator",
+            "type": "string"
+          }
+        },
+        "required": [
+          "header",
+          "operator"
+        ],
+        "title": "MatchedResponseCondition",
         "type": "object"
       },
       "NetworkCapacity": {
@@ -6944,6 +7107,7 @@
                   "people.delivery",
                   "delivery.read",
                   "delivery.explain",
+                  "delivery.test",
                   "people.credentials",
                   "people.reset",
                   "people.reissue",
@@ -7899,6 +8063,32 @@
         "title": "PlainResolver",
         "type": "object"
       },
+      "PolicyAction": {
+        "additionalProperties": false,
+        "properties": {
+          "headers": {
+            "$ref": "#/components/schemas/ResponseHeaders"
+          },
+          "kind": {
+            "const": "policy",
+            "title": "Kind",
+            "type": "string"
+          },
+          "policy": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "title": "Policy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "policy"
+        ],
+        "title": "PolicyAction",
+        "type": "object"
+      },
       "PortMatch": {
         "additionalProperties": false,
         "properties": {
@@ -8731,6 +8921,7 @@
             "enum": [
               "fleet",
               "profile",
+              "response_rule",
               "person"
             ],
             "title": "Source",
@@ -8791,6 +8982,306 @@
           "retryable"
         ],
         "title": "ResourceError",
+        "type": "object"
+      },
+      "ResponseHeaders": {
+        "additionalProperties": false,
+        "description": "Only headers clients consume; text is encoded by the renderer, never sent raw.",
+        "properties": {
+          "announce": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Announce"
+          },
+          "profile_title": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile Title"
+          },
+          "support_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "pattern": "^(?:|https://[^\\s]+|tg://[^\\s]+|mailto:[^\\s]+)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Support Url"
+          },
+          "update_interval_hours": {
+            "anyOf": [
+              {
+                "maximum": 168,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Update Interval Hours"
+          }
+        },
+        "title": "ResponseHeaders",
+        "type": "object"
+      },
+      "ResponseMatcher": {
+        "additionalProperties": false,
+        "description": "The User-Agent condition and optional Accept condition must both match.",
+        "properties": {
+          "accept": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LiteralCondition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "user_agent": {
+            "$ref": "#/components/schemas/LiteralCondition"
+          }
+        },
+        "required": [
+          "user_agent"
+        ],
+        "title": "ResponseMatcher",
+        "type": "object"
+      },
+      "ResponseRule": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "discriminator": {
+              "mapping": {
+                "block": "#/components/schemas/BlockAction",
+                "format": "#/components/schemas/FormatAction",
+                "headers": "#/components/schemas/HeadersAction",
+                "policy": "#/components/schemas/PolicyAction"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FormatAction"
+              },
+              {
+                "$ref": "#/components/schemas/BlockAction"
+              },
+              {
+                "$ref": "#/components/schemas/PolicyAction"
+              },
+              {
+                "$ref": "#/components/schemas/HeadersAction"
+              }
+            ],
+            "title": "Action"
+          },
+          "match": {
+            "$ref": "#/components/schemas/ResponseMatcher"
+          },
+          "name": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "match",
+          "action"
+        ],
+        "title": "ResponseRule",
+        "type": "object"
+      },
+      "ResponseRuleDecision": {
+        "additionalProperties": false,
+        "description": "No input headers, token, body, or device data is returned.",
+        "properties": {
+          "action": {
+            "enum": [
+              "format",
+              "block",
+              "policy",
+              "headers"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "block": {
+            "title": "Block",
+            "type": "boolean"
+          },
+          "fallback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FormatRule"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "format": {
+            "anyOf": [
+              {
+                "enum": [
+                  "browser",
+                  "mihomo",
+                  "stash",
+                  "singbox",
+                  "xray-json",
+                  "base64"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 4,
+            "propertyNames": {
+              "enum": [
+                "profile-title",
+                "profile-update-interval",
+                "support-url",
+                "announce"
+              ]
+            },
+            "title": "Headers",
+            "type": "object"
+          },
+          "matched_conditions": {
+            "items": {
+              "$ref": "#/components/schemas/MatchedResponseCondition"
+            },
+            "maxItems": 2,
+            "title": "Matched Conditions",
+            "type": "array"
+          },
+          "policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResolvedDeliveryPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "reason": {
+            "enum": [
+              "first_custom_match",
+              "built_in_selector"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "response_kind": {
+            "enum": [
+              "subscription",
+              "page",
+              "account_info",
+              "blocked"
+            ],
+            "title": "Response Kind",
+            "type": "string"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/FormatRule"
+          }
+        },
+        "required": [
+          "format",
+          "block",
+          "response_kind",
+          "selection",
+          "action",
+          "reason"
+        ],
+        "title": "ResponseRuleDecision",
+        "type": "object"
+      },
+      "ResponseRuleTestRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "accept": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Accept",
+            "type": "string"
+          },
+          "person": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Person"
+          },
+          "suffix": {
+            "default": "",
+            "enum": [
+              "",
+              "info",
+              "json",
+              "v2ray-json",
+              "mihomo",
+              "clash",
+              "stash",
+              "singbox"
+            ],
+            "title": "Suffix",
+            "type": "string"
+          },
+          "user_agent": {
+            "default": "",
+            "maxLength": 512,
+            "title": "User Agent",
+            "type": "string"
+          }
+        },
+        "title": "ResponseRuleTestRequest",
         "type": "object"
       },
       "RestartUnitCommand": {
@@ -9683,6 +10174,14 @@
             "title": "Public Url",
             "type": "string"
           },
+          "response_rules": {
+            "items": {
+              "$ref": "#/components/schemas/ResponseRule"
+            },
+            "maxItems": 64,
+            "title": "Response Rules",
+            "type": "array"
+          },
           "server_icon": {
             "default": "",
             "maxLength": 409600,
@@ -9877,6 +10376,14 @@
             "title": "Public Url",
             "type": "string"
           },
+          "response_rules": {
+            "items": {
+              "$ref": "#/components/schemas/ResponseRule"
+            },
+            "maxItems": 64,
+            "title": "Response Rules",
+            "type": "array"
+          },
           "server_icon": {
             "default": "",
             "maxLength": 409600,
@@ -9999,16 +10506,23 @@
             "default": null
           },
           "format": {
-            "enum": [
-              "browser",
-              "mihomo",
-              "stash",
-              "singbox",
-              "xray-json",
-              "base64"
+            "anyOf": [
+              {
+                "enum": [
+                  "browser",
+                  "mihomo",
+                  "stash",
+                  "singbox",
+                  "xray-json",
+                  "base64"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Format",
-            "type": "string"
+            "title": "Format"
           },
           "included": {
             "items": {
@@ -10069,10 +10583,22 @@
             "enum": [
               "subscription",
               "page",
-              "account_info"
+              "account_info",
+              "blocked"
             ],
             "title": "Response Kind",
             "type": "string"
+          },
+          "response_rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResponseRuleDecision"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "selection": {
             "$ref": "#/components/schemas/FormatRule"
@@ -10288,6 +10814,7 @@
                     "people.delivery",
                     "delivery.read",
                     "delivery.explain",
+                    "delivery.test",
                     "people.credentials",
                     "people.reset",
                     "people.reissue",
@@ -10313,7 +10840,7 @@
                   ],
                   "type": "string"
                 },
-                "maxItems": 36,
+                "maxItems": 37,
                 "minItems": 1,
                 "type": "array"
               },
@@ -10414,6 +10941,7 @@
                 "people.delivery",
                 "delivery.read",
                 "delivery.explain",
+                "delivery.test",
                 "people.credentials",
                 "people.reset",
                 "people.reissue",
@@ -10513,6 +11041,7 @@
                 "people.delivery",
                 "delivery.read",
                 "delivery.explain",
+                "delivery.test",
                 "people.credentials",
                 "people.reset",
                 "people.reissue",
@@ -10611,6 +11140,7 @@
                 "people.delivery",
                 "delivery.read",
                 "delivery.explain",
+                "delivery.test",
                 "people.credentials",
                 "people.reset",
                 "people.reissue",
@@ -17286,6 +17816,136 @@
         ]
       }
     },
+    "/api/response-rules/test": {
+      "post": {
+        "description": "Requires delivery.test capabilities. Compatible presets: read or people, including scopes that cover them. The first custom match precedes the built-in selector. Literal User-Agent and optional Accept conditions are case-insensitive. With person, resolve private overrides above app rules and profile/fleet defaults. Header text and URLs are redacted; a block matches the anonymous unknown-token refusal.",
+        "operationId": "response_rules_test",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResponseRuleTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseRuleDecision"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-meridian-error-codes": [
+              "not_found"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Test ordered app response rules without fetching a subscription or retaining request headers.",
+        "tags": [
+          "response-rules"
+        ],
+        "x-meridian-capabilities": [
+          "delivery.test"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-credentials": false,
+        "x-meridian-extra-capabilities": {
+          "person": "people.read",
+          "private_policy": "people.private"
+        },
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "read",
+          "people"
+        ]
+      }
+    },
     "/api/revisions": {
       "get": {
         "description": "Requires revisions.read capabilities. Compatible presets: read, including scopes that cover them.",
@@ -21605,6 +22265,7 @@
       "console.read",
       "delivery.explain",
       "delivery.read",
+      "delivery.test",
       "fleet.apply",
       "fleet.read",
       "nodes.enroll",
@@ -21637,6 +22298,7 @@
       "console.read",
       "delivery.explain",
       "delivery.read",
+      "delivery.test",
       "fleet.read",
       "people.read",
       "revisions.approve",
@@ -21648,6 +22310,7 @@
       "api.read",
       "delivery.explain",
       "delivery.read",
+      "delivery.test",
       "people.batch",
       "people.credentials",
       "people.delivery",
@@ -21666,6 +22329,7 @@
       "console.read",
       "delivery.explain",
       "delivery.read",
+      "delivery.test",
       "fleet.read",
       "people.read",
       "revisions.propose",
@@ -21678,6 +22342,7 @@
       "console.read",
       "delivery.explain",
       "delivery.read",
+      "delivery.test",
       "fleet.read",
       "people.read",
       "revisions.read",

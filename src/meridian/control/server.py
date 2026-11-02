@@ -64,6 +64,7 @@ from meridian.control.operations_api import read_attention, read_events, read_hi
 from meridian.control.owner import OwnerSession
 from meridian.control.people_routes import PEOPLE_OWNER_ROUTES
 from meridian.control.request_metrics import RequestMetrics, request_route_id
+from meridian.control.response_rule_routes import RESPONSE_RULE_OWNER_ROUTES
 from meridian.control.route_catalog import api_route_for
 from meridian.control.route_table import Route, control_routes
 from meridian.control.route_types import ApiRoute
@@ -671,6 +672,7 @@ OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
     {
         *ACCESS_PROFILE_OWNER_ROUTES,
         *DELIVERY_POLICY_OWNER_ROUTES,
+        *RESPONSE_RULE_OWNER_ROUTES,
         _Handler.get_settings,
         _Handler.get_privacy,
         _Handler.put_privacy,

@@ -22,7 +22,7 @@ from meridian.control.tokens import API_TOKENS_TABLE_V4
 from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPOCH_BASELINES
 from meridian.control.user_flow_blocks import FLOW_BLOCKS_TABLE
 
-SCHEMA_VERSION = 25
+SCHEMA_VERSION = 26
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS secrets (name TEXT PRIMARY KEY, value BLOB NOT NULL);
@@ -148,6 +148,8 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     MEMBERSHIP_SCHEMA,
     # 24 -> 25: private person delivery overrides and stale-review row versions.
     PERSON_DELIVERY_POLICY_SCHEMA,
+    # 25 -> 26: app matchers retain no User-Agent, including existing full-mode device rows.
+    ("UPDATE devices SET user_agent = NULL",),
 )
 
 

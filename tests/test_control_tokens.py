@@ -64,6 +64,7 @@ def _mint(fleet: Fleet, scope: str, name: str = "device") -> dict[str, Any]:
 BACKUP_KEY = generate_key_pair().public
 # Samples carry no permissions: every requirement comes directly from server.ROUTES.
 ROUTE_SAMPLES = {
+    "response_rules_test": ("/api/response-rules/test", {"user_agent": "Hiddify/2"}),
     "metrics": ("/metrics", None),
     "node_capacity": ("/api/nodes/main/capacity", None),
     "delivery_policy_catalog": ("/api/delivery-policies", None),
@@ -231,6 +232,7 @@ def test_people_access_is_declared_on_person_routes_and_private_profile_reviews(
             "delivery_policy_catalog",
             "explain_delivery_policy",
             "subscription_preview",
+            "response_rules_test",
         }
         assert any(scope_covers("people", scope) for scope in requirements) == manages_people
         assert all(scope_covers("admin", scope) for scope in requirements)
@@ -398,6 +400,7 @@ def test_people_reads_credentials_and_edits_people_without_fleet_access(fleet: F
             "/api/delivery-policies",
             "/api/delivery-policies/explain",
             "/api/subscription/preview",
+            "/api/response-rules/test",
         }:
             continue
         status, answer = _request(fleet.url + path.format(victim="0123456789ab"), method, body, token)

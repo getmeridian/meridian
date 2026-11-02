@@ -193,7 +193,7 @@ A TCP flow dispatched before revocation, a Hysteria2 UDP association, or a VLESS
 
 Private metadata: `client set NAME --note TEXT --tag TAG` edits only the supplied fields. A note holds up to 500 plain-text characters, with newlines; `--note ""` clears it. A tag holds 1–16 Latin letters, digits, or underscores, saved in uppercase; `--tag none` clears it. `client show` includes both fields, and `client list --tag TAG` filters its tag column (`none` selects untagged people). Reads and edits require people/admin scope. The web panel edits the same private fields; applies preserve them and encrypted snapshots carry them. See [Private notes and tags](/en/client-management/#private-notes-and-tags).
 
-`client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` explains selection and omissions without credentials. User-Agent is limited to 512 Unicode characters; Accept to 256, both one line and transient. `--suffix` forces one of the existing format URL suffixes. JSON returns `subscription-preview`; the API is the read-scoped `POST /api/subscription/preview`.
+`client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` explains selection and omissions without credentials. User-Agent is limited to 512 Unicode characters; Accept to 256, both one line and transient. `--suffix` supplies an existing format URL suffix; a matching custom format or block rule takes priority. JSON returns `subscription-preview`; the API is the read-scoped `POST /api/subscription/preview`.
 
 #### Reviewed bulk changes
 
@@ -439,6 +439,7 @@ meridian fleet history [--json]
 meridian fleet events [--since ID] [--limit N] [--json]
 meridian fleet usage [--days N] [--json]
 meridian fleet routing [ru-split|full] [--dry-run] [--yes] [--json]
+meridian fleet response-rules test [--user-agent UA] [--accept TYPE] [--person NAME] [--suffix SUFFIX] [--json]
 meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--json]
 meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
@@ -519,6 +520,9 @@ meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --net
 The service reads geodata only from already-cached Xray archives whose hash matches Meridian's pin. Explanations never start a download. Clients never receive remote rule sets. Xray sends configured public DNS through its automatic group and retains direct LAN resolvers; other clients use their represented DNS settings. Choosing an unsupported transport never converts it to plain DNS. Existing preset bytes and default fleet corpus answers stay unchanged.
 
 `POST /api/delivery-policies/explain` accepts `destination`, optional `person`, `format`, `port`, `network`, and `protocol`; it needs `delivery.explain`, plus `people.read` and `people.private` with a person. Subscription previews require private permission for policy details or a destination explanation; lower grants receive the existing metadata only. Connection-page `/info` may include `user.deliveryCapabilities`: format names, support flags, and omission codes, without policy names, assignments, memberships, destinations, or endpoint details. The page keeps this fresh data in memory.
+
+
+**`fleet response-rules test`** reads applied app rules with `--user-agent UA`, optional `--accept TYPE`, `--person NAME`, `--suffix SUFFIX`, and `--json`. It explains the first custom or built-in rule, format or refusal, policy source, and redacted header changes. Inputs are transient and bounded to 512/256 characters; no subscription, DNS lookup, device registration, or write occurs. Rules are edited in `delivery.response_rules` through `fleet export` and reviewed `fleet import`. [Response rules](/en/split-routing/#response-rules-by-app) describes fields, precedence, and refusal behavior.
 
 ### meridian context
 

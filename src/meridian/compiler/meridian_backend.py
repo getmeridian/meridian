@@ -181,6 +181,7 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
                     delivery_policies=intent.delivery.delivery_policies,
                     default_policy=intent.delivery.default_policy,
                     profile_policies=intent.delivery.profile_policies,
+                    response_rules=intent.delivery.response_rules,
                     exit_countries=list(
                         dict.fromkeys(exit_.region for exit_ in intent.exits_in_delivery_order() if exit_.region)
                     ),

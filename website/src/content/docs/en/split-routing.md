@@ -130,7 +130,7 @@ Each policy has at most 128 rules, 64 values per domain/IP match, and four resol
 
 ### Private person routing
 
-`meridian client routing person` reads the effective policy. Use `meridian client routing person work --dry-run --json`, then `meridian client routing person work --yes --json` to review and save a private override; `meridian client routing person --inherit --yes` clears it. The console's person card uses the same service review and keeps drafts in memory. Person overrides win over profile defaults, which win over the fleet default. Applies and credential reissue preserve overrides; encrypted snapshots carry them, and deletion removes them. This choice changes subscription delivery at app refresh, with no account or node-access edit.
+`meridian client routing person` reads the effective policy. Use `meridian client routing person work --dry-run --json`, then `meridian client routing person work --yes --json` to review and save a private override; `meridian client routing person --inherit --yes` clears it. The console's person card uses the same service review and keeps drafts in memory. Person overrides win over matched app response rules, followed by profile defaults and the fleet default. Applies and credential reissue preserve overrides; encrypted snapshots carry them, and deletion removes them. This choice changes subscription delivery at app refresh, with no account or node-access edit.
 
 Policy reads need `people.read` and `people.private`; assignment additionally needs `people.delivery`. `delivery.read` reads the reviewed catalog. Existing issued tokens keep their frozen grants; issue a token with the new grant to assign policies. Overrides are blank without private permission and never appear in subscriptions, events, or reviewed intent. A preview writes nothing. Confirmation requires its `review_hash`; a changed override, membership, or catalog needs another preview.
 
@@ -164,3 +164,55 @@ meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --net
 The service reads geodata only from already-cached Xray archives whose hash matches Meridian's pin. Explanations never start a download. Clients never receive remote rule sets. Xray sends configured public DNS through its automatic group and retains direct LAN resolvers; other clients use their represented DNS settings. Choosing an unsupported transport never converts it to plain DNS. Existing preset bytes and default fleet corpus answers stay unchanged.
 
 `POST /api/delivery-policies/explain` accepts `destination`, optional `person`, `format`, `port`, `network`, and `protocol`; it needs `delivery.explain`, plus `people.read` and `people.private` with a person. Subscription previews require private permission for policy details or a destination explanation; lower grants receive the existing metadata only. Connection-page `/info` may include `user.deliveryCapabilities`: format names, support flags, and omission codes, without policy names, assignments, memberships, destinations, or endpoint details. The page keeps this fresh data in memory.
+
+## Response rules by app
+
+Edit `delivery.response_rules` in a fleet export and review it with `meridian fleet import`. Rules run in their written order; the first match supplies one action. An empty list keeps every existing subscription byte unchanged. Rules travel with the other reviewed delivery settings and survive encrypted snapshots. Settings in the console lists them read-only.
+
+Every `match` requires a `user_agent` condition and may add one `accept` condition; both must match. Each condition has `operator: equals | prefix | contains` and a nonempty literal `value`, compared without case sensitivity. Accept is the only additional request header: the captured clients use it to distinguish browser HTML from app documents. Forwarded addresses, device headers, authorization, regexes, and version comparisons are unavailable.
+
+For example, these are fields inside the exported fleet's `delivery` section:
+
+```yaml
+delivery_policies:
+  - id: mobile
+    preset: full
+response_rules:
+  - name: legacy-desktop
+    match:
+      user_agent: {operator: prefix, value: "NekoRay/"}
+    action: {kind: block}
+  - name: mobile
+    match:
+      user_agent: {operator: prefix, value: "Hiddify/"}
+      accept: {operator: contains, value: "*/*"}
+    action:
+      kind: format
+      format: singbox
+      policy: mobile
+      headers:
+        profile_title: "Meridian · mobile"
+        update_interval_hours: 12
+        support_url: "https://support.example.test/help"
+```
+
+`format` accepts `browser`, `base64`, `xray-json`, `mihomo`, `stash`, or `singbox`; it overrides suffix, Accept, and built-in app selection. `browser` means HTML at the base URL and account JSON with a nonempty suffix. A `format` action may also set `policy` and `headers`. A `policy` action needs a known policy name and may set `headers`. A `headers` action changes only typed headers. Policy and header actions retain the built-in format choice. Actions do not accumulate across rules.
+
+A `block` action has no other fields. It returns exactly the unknown-token 404, including body and headers, for app documents and personal page files; it registers no device. This is a delivery choice, not a replacement for account or access-profile enforcement.
+
+Policy precedence is: **private person override → matched app rule → agreeing profile defaults → named fleet default → fleet preset**. All formats use the same resolver and delivery-policy representation. Membership reviews still refuse conflicting profile defaults unless a saved person override resolves them; they cannot assume every app will match a rule.
+
+Typed `headers` accept `profile_title` (1–100 characters), `update_interval_hours` (whole hours, 1–168), `support_url` (up to 2048 characters, absolute https:, tg:, or mailto:, without credentials), and `announce` (up to 500 characters). Text must be one plain line; titles and announcements are encoded as UTF-8 Base64. An empty support URL or announcement removes that inherited header; omitted or null fields inherit. Other header names and control characters are refused.
+
+There are at most 64 rules and 64 KiB of rule data. Names use up to 48 lowercase letters, digits, hyphens, or underscores; literals use 1–256 characters. Duplicate names, equivalent conditions, and rules wholly covered by an earlier rule are refused. Put narrow exceptions before broader prefixes. User-Agent and Accept are evaluated transiently, never stored or logged, at every privacy level.
+
+### Test a request
+
+```bash
+meridian fleet response-rules test --user-agent "Hiddify/2" --accept "*/*" --json
+meridian fleet response-rules test --user-agent "Hiddify/2" --accept "*/*" --person person --suffix json --json
+```
+
+The command reads currently applied service settings. It returns the rule name and number or built-in rule, matched condition operators, format or refusal, effective policy and source, changed headers, and why. Header text and URLs are redacted; an empty header value means removal. It fetches no subscription, makes no DNS or remote-template request, and writes nothing. `--person` includes private person/profile choices; without it, profile and person overrides are absent. Inputs are one line, up to 512 User-Agent characters and 256 Accept characters.
+
+`POST /api/response-rules/test` accepts `user_agent`, `accept`, `suffix`, and optional `person`. It needs the narrow `delivery.test` grant; with a person it also needs `people.read` and `people.private`. Existing tokens keep frozen permissions. The console's subscription preview uses the same decision: leave Person blank for this tester, or enter a person to see included entries, omissions, and routing details. A destination preview requires a person. Draft inputs and results stay in memory.

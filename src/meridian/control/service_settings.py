@@ -20,6 +20,7 @@ from meridian.control.profile_declarations import (
     read_profile_declarations_hash,
     save_profile_declarations_hash,
 )
+from meridian.control.response_rule_settings import read_response_rules, save_response_rules
 from meridian.control.server_allowances import save_server_settings, server_settings
 from meridian.control.store import Store
 from meridian.control.times import utc_now
@@ -46,6 +47,7 @@ def save_settings(
         save_access_profiles(store, settings.access_profiles)
         save_profile_declarations_hash(store, settings.access_profile_declarations_hash)
         save_delivery_policies(store, settings, access_profiles=settings.access_profiles)
+        save_response_rules(store, settings)
         store.set_meta("profile_title", settings.profile_title)
         store.set_meta("public_url", settings.public_url)
         save_update_interval_hours(store, settings.update_interval_hours)
@@ -69,6 +71,7 @@ def read_settings(store: Store) -> ServiceSettings:
         delivery_policies=policies.delivery_policies,
         default_policy=policies.default_policy,
         profile_policies=policies.profile_policies,
+        response_rules=read_response_rules(store),
         servers=server_settings(store),
         **page_settings(store).model_dump(),
     )

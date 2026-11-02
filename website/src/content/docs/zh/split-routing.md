@@ -132,7 +132,7 @@ DNS 使用 `transport: doh | dot | plain`、单播 IP `address` 和可选 `port`
 
 ### 私有个人路由
 
-`meridian client routing person` 显示有效策略。运行 `meridian client routing person work --dry-run --json` 审阅，再通过 `meridian client routing person work --yes --json` 保存个人覆盖；`meridian client routing person --inherit --yes` 清除覆盖。面板的用户卡片使用同一服务审阅，草稿只保存在内存中。个人覆盖优先于访问配置默认，访问配置默认优先于服务器默认。应用配置和重新签发凭证保留覆盖；加密快照保存它，删除用户会移除它。选择会在应用刷新订阅时生效，不修改账户或节点访问权限。
+`meridian client routing person` 显示有效策略。运行 `meridian client routing person work --dry-run --json` 审阅，再通过 `meridian client routing person work --yes --json` 保存个人覆盖；`meridian client routing person --inherit --yes` 清除覆盖。面板的用户卡片使用同一服务审阅，草稿只保存在内存中。个人覆盖优先于匹配的应用响应规则，其次是访问配置默认和服务器默认。应用配置和重新签发凭证保留覆盖；加密快照保存它，删除用户会移除它。选择会在应用刷新订阅时生效，不修改账户或节点访问权限。
 
 读取需要 `people.read` 与 `people.private`，分配还需要 `people.delivery`。`delivery.read` 用于读取已审阅目录。已签发令牌保留原有固定权限；分配策略需要签发包含新权限的令牌。没有私有权限时覆盖被隐藏，订阅、事件和已审阅配置均不包含覆盖字段。预览不写入数据。确认需要 `review_hash`；覆盖、成员关系或目录改变后须重新预览。
 
@@ -166,3 +166,55 @@ meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --net
 服务仅从缓存中读取通过 Meridian 固定哈希验证的 Xray 压缩包，不会因解释路由而开始下载。客户端不会收到远程规则集。Xray 将已配置的公共 DNS 请求通过自动组发送，同时保留局域网 DNS 直连；其他客户端使用可表示的 DNS 设置。不支持的传输不会转换为普通 DNS。原有内置模式的字节内容和默认配置的黄金语料响应保持不变。
 
 `POST /api/delivery-policies/explain` 接受 `destination`、可选 `person`、`format`、`port`、`network`、`protocol`。需要 `delivery.explain`；指定用户时还需要 `people.read` 和 `people.private`。订阅预览中的策略详情或目的地解释需要私有权限，较低权限仅返回原有元数据。连接页面的 `/info` 可包含 `user.deliveryCapabilities`：格式名称、支持标志与省略代码，不含策略名称、个人覆盖、成员关系、目的地或连接详情。页面仅在内存中保留这些新鲜数据。
+
+## 按应用选择订阅响应
+
+在导出的服务器配置中编辑 `delivery.response_rules`，再通过 `meridian fleet import` 审阅。规则按书写顺序执行，首个匹配项提供一个动作。空列表保持现有订阅的每个字节不变。规则随其他已审阅的交付设置传到服务，并由加密快照保存。网页面板的设置以只读方式列出规则。
+
+每个 `match` 必须包含 `user_agent` 条件，也可添加一个 `accept` 条件；两者都必须匹配。条件包含 `operator: equals | prefix | contains` 和非空字面字符串 `value`，匹配不区分大小写。Accept 是唯一可用的额外请求头：已捕获的客户端用它区分浏览器 HTML 和应用文档。不支持转发地址、设备请求头、授权信息、正则表达式或版本比较。
+
+例如，以下字段位于导出文件的 `delivery` 部分：
+
+```yaml
+delivery_policies:
+  - id: mobile
+    preset: full
+response_rules:
+  - name: legacy-desktop
+    match:
+      user_agent: {operator: prefix, value: "NekoRay/"}
+    action: {kind: block}
+  - name: mobile
+    match:
+      user_agent: {operator: prefix, value: "Hiddify/"}
+      accept: {operator: contains, value: "*/*"}
+    action:
+      kind: format
+      format: singbox
+      policy: mobile
+      headers:
+        profile_title: "Meridian · 手机"
+        update_interval_hours: 12
+        support_url: "https://support.example.test/help"
+```
+
+`format` 接受 `browser`、`base64`、`xray-json`、`mihomo`、`stash` 或 `singbox`，优先于后缀、Accept 和内置应用选择。`browser` 在基础 URL 返回 HTML，带非空后缀时返回账户 JSON。`format` 动作还可设置 `policy` 和 `headers`。`policy` 动作必须指定已知策略名称，也可设置 `headers`。`headers` 动作只修改类型化的响应头。策略或响应头动作保留内置格式选择；不同规则的动作不叠加。
+
+`block` 动作不含其他字段。应用文档和个人页面文件均返回与未知令牌完全相同的 404，包括响应体和响应头，且不注册设备。这是订阅交付设置，账户和访问配置的限制仍由各自的机制执行。
+
+策略优先级为：**个人私有覆盖 → 匹配的应用规则 → 一致的访问配置默认 → 服务器组命名默认 → 服务器组内置模式**。所有格式使用同一解析函数和交付策略中间表示。成员关系审阅仍会拒绝冲突的访问配置默认，除非已保存的个人覆盖解决了冲突；不能假设所有应用都会匹配规则。
+
+类型化的 `headers` 仅接受 `profile_title`（1–100 个字符）、`update_interval_hours`（整数小时，1–168）、`support_url`（最多 2048 个字符，绝对 https:、tg: 或 mailto: 链接，不含凭据）以及 `announce`（最多 500 个字符）。文本必须为单行纯文本；标题和公告编码为 UTF-8 Base64。空支持链接或公告删除继承的响应头；省略字段或 null 表示继承。其他响应头名称和控制字符会被拒绝。
+
+最多允许 64 条规则，规则数据总计不超过 64 KiB。名称最多 48 个小写拉丁字母、数字、连字符或下划线；条件字面值为 1–256 个字符。重复名称、等价条件以及被前面规则完全覆盖的规则会被拒绝。请把精确例外放在较宽的前缀规则之前。User-Agent 和 Accept 仅在请求期间求值，在所有隐私级别下都不会保存或记录。
+
+### 测试请求
+
+```bash
+meridian fleet response-rules test --user-agent "Hiddify/2" --accept "*/*" --json
+meridian fleet response-rules test --user-agent "Hiddify/2" --accept "*/*" --person person --suffix json --json
+```
+
+命令读取服务当前已应用的设置，返回自定义规则的名称和序号或内置规则、匹配条件的运算符、格式或拒绝结果、有效策略及来源、修改的响应头和原因。响应头文本和链接会脱敏；空值表示删除。测试不会下载订阅、查询 DNS、请求远程模板或写入状态。`--person` 纳入个人私有覆盖和访问配置；省略时不使用这些选择。输入必须为单行，User-Agent 最多 512 个字符，Accept 最多 256 个字符。
+
+`POST /api/response-rules/test` 接受 `user_agent`、`accept`、`suffix` 和可选 `person`。需要单独的 `delivery.test` 权限；指定用户时还需要 `people.read` 和 `people.private`。已签发令牌保持原有的固定权限。面板的订阅预览使用同一决策：用户留空以测试默认设置，指定用户则显示可用连接、省略项及路由详情。预览目的地需要指定用户。输入和结果只留在内存中。

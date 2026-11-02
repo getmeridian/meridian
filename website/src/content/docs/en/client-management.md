@@ -477,6 +477,8 @@ Response headers are redacted: URLs are replaced, and encoded profile titles and
 
 `POST /api/subscription/preview` accepts read or people scope, or the owner session. When access profiles are configured, it requires people/admin or the owner session. Send `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`; omitted headers default to empty strings. Settings in the web panel has the same form. No HWID or device-header input is accepted. For API-managed endpoints, `enabled: false` excludes the saved endpoint from subscriptions and appears as `disabled_endpoint`; true is the default and is omitted from serialized endpoints. A reviewed endpoint apply restores topology-defined delivery.
 
+The subscription preview also identifies reviewed app rules, their conditions, and refusal outcomes. Settings lists response rules read-only; leave Person blank in the tester to read fleet defaults. Edit `delivery.response_rules` through a reviewed fleet import. See [Response rules by app](/en/split-routing/#response-rules-by-app) for the typed fields, header limits, and policy precedence.
+
 ## Review changes for many people
 
 Use Tab and Space to select rows; Shift+Space extends the selection on the current page. **Select all matching** includes other pages. Changing filters clears selection. Choose an action, review each person's before/after and warnings in pages of 100, and inspect the count of changed node documents. A preview freezes exact people and row versions for ten minutes; new matches are excluded. Any changed person, enforcement result, or node specification refuses the whole commit. Stale people are named. Every change and receipt lands in one transaction, with one document composition for the batch.
@@ -554,7 +556,7 @@ Settings carry `access_profile_declarations_hash`, the SHA-256 of normalized int
 
 ### Private person routing
 
-`meridian client routing person` reads the effective policy. Use `meridian client routing person work --dry-run --json`, then `meridian client routing person work --yes --json` to review and save a private override; `meridian client routing person --inherit --yes` clears it. The console's person card uses the same service review and keeps drafts in memory. Person overrides win over profile defaults, which win over the fleet default. Applies and credential reissue preserve overrides; encrypted snapshots carry them, and deletion removes them. This choice changes subscription delivery at app refresh, with no account or node-access edit.
+`meridian client routing person` reads the effective policy. Use `meridian client routing person work --dry-run --json`, then `meridian client routing person work --yes --json` to review and save a private override; `meridian client routing person --inherit --yes` clears it. The console's person card uses the same service review and keeps drafts in memory. Person overrides win over matched app response rules, followed by profile defaults and the fleet default. Applies and credential reissue preserve overrides; encrypted snapshots carry them, and deletion removes them. This choice changes subscription delivery at app refresh, with no account or node-access edit.
 
 Policy reads need `people.read` and `people.private`; assignment additionally needs `people.delivery`. `delivery.read` reads the reviewed catalog. Existing issued tokens keep their frozen grants; issue a token with the new grant to assign policies. Overrides are blank without private permission and never appear in subscriptions, events, or reviewed intent. A preview writes nothing. Confirmation requires its `review_hash`; a changed override, membership, or catalog needs another preview.
 
@@ -564,6 +566,7 @@ Policy reads need `people.read` and `people.private`; assignment additionally ne
 | `GET /api/users/{username}/delivery-policy` | Private override and effective policy; `people.read` and `people.private` |
 | `PUT /api/users/{username}/delivery-policy` | `{ "policy": "work", "confirm": false }` previews; confirm with its `review_hash`; `people.delivery`, `people.read`, `people.private`. Explicit `policy: null` inherits. |
 
+| `POST /api/response-rules/test` | Transient app matcher; `delivery.test`, plus `people.read` and `people.private` with a person |
 | `POST /api/delivery-policies/explain` | Offline first-match explanation; `delivery.explain`, plus `people.read` and `people.private` with a person |
 
 ## Preview and explain delivery

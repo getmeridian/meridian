@@ -178,6 +178,7 @@ def test_capacity_migration_is_one_self_contained_step_from_22(tmp_path: Path) -
         "CREATE TABLE nodes(node_id TEXT PRIMARY KEY);"
         "CREATE TABLE users(user_id TEXT PRIMARY KEY);"
         "CREATE TABLE people_versions(user_id TEXT PRIMARY KEY, version INTEGER NOT NULL);"
+        "CREATE TABLE devices(user_agent TEXT);"
     )
     with store.transaction():
         store.set_meta("schema_version", "22")

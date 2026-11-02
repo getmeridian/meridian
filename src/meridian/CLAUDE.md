@@ -16,6 +16,7 @@
 **Revisions on the service** — `service_fence.py` moves the apply fence into the service and records each reviewed apply as a revision; once handed over, fence.json makes older Meridians refuse, and a service newer than the CLI refuses too (`core/version_skew.py`).
 **Workload secrets** — `reconciler/workloads.py` allocates complete Reality key triples and persists them before remote mutation; `xray_workload.py` renders only reviewed protocols and egress.
 ## What's done well
+- **Response rules are reviewed settings** — fleet exports, service payloads, and apply observations carry one typed rule list; requests never become local fleet state.
 - **Forward-compatible YAML** — unknown keys land inertly in `_extra` (never store load-bearing state there); pre-topology files are refused with rebuild guidance.
 - **Applied kinds are explicit** — `core/resources.APPLIED_KINDS` lists what plan/apply drives; a leftover panel binding fails closed outside migrate's cut-over.
 - **One owner per state** — the service owns users, `cluster.yml` owns topology, and the fence stops a stale or foreign copy from applying.

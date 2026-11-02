@@ -5,7 +5,7 @@ from __future__ import annotations
 import ipaddress
 import re
 from collections.abc import Iterable, Sequence
-from typing import Annotated, Final, Literal, Self
+from typing import Final, Literal, Self
 
 from pydantic import Field, HttpUrl, ValidationInfo, field_validator, model_validator
 
@@ -15,7 +15,6 @@ from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_I
 from meridian.core.delivery_policies import ClientRoutingPolicy as ClientRoutingPolicy
 from meridian.core.delivery_policies import (
     DeliveryPolicyResolutionError,
-    DeliveryPolicySettings,
     delivery_exit_refs,
     resolve_delivery_policy,
 )
@@ -39,7 +38,9 @@ from meridian.core.inputs import (
 from meridian.core.models import CoreModel
 from meridian.core.owner_contact import OwnerContactSettings
 from meridian.core.protocols import ProtocolKind as ProtocolKind
+from meridian.core.response_rules import ResponseRuleSettings
 from meridian.core.server_allowances import ServerMetadata
+from meridian.core.subscription_formats import SubscriptionUpdateIntervalHours as SubscriptionUpdateIntervalHours
 
 ServerCapability = Literal["panel", "exit", "relay", "routing_gateway"]
 # route: through an exit or pool; direct: out of the gateway's own address; block: dropped.
@@ -69,7 +70,6 @@ EgressOverrideAction = Literal["warp", "direct", "block"]
 # v2fly geosite/geoip list names: "netflix", "category-ru", "geolocation-!cn", "google@cn".
 _GEO_LIST_NAME = re.compile(r"[a-z0-9][a-z0-9!@._-]{0,63}")
 DeliveryFormat = Literal["base64", "xray_json", "mihomo", "singbox"]
-SubscriptionUpdateIntervalHours = Annotated[int, Field(ge=1, le=168)]
 
 
 def _geo_list_name(kind: str, value: str) -> str:
@@ -377,7 +377,7 @@ def _accepted_username(name: str) -> bool:
     return True
 
 
-class DeliveryIntent(OwnerContactSettings, DeliveryPolicySettings):
+class DeliveryIntent(OwnerContactSettings, ResponseRuleSettings):
     """Canonical Remnawave subscription presentation settings."""
 
     profile_title: ServerTitleValue = "Meridian"

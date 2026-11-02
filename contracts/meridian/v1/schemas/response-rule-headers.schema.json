@@ -1,0 +1,63 @@
+{
+  "additionalProperties": false,
+  "description": "Only headers clients consume; text is encoded by the renderer, never sent raw.",
+  "properties": {
+    "announce": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Announce"
+    },
+    "profile_title": {
+      "anyOf": [
+        {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Profile Title"
+    },
+    "support_url": {
+      "anyOf": [
+        {
+          "maxLength": 2048,
+          "pattern": "^(?:|https://[^\\s]+|tg://[^\\s]+|mailto:[^\\s]+)$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Support Url"
+    },
+    "update_interval_hours": {
+      "anyOf": [
+        {
+          "maximum": 168,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Update Interval Hours"
+    }
+  },
+  "title": "ResponseHeaders",
+  "type": "object"
+}

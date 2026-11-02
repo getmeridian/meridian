@@ -1,0 +1,889 @@
+{
+  "$defs": {
+    "BlockAction": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "block",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "BlockAction",
+      "type": "object"
+    },
+    "CidrMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "cidr",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "maxLength": 49,
+            "minLength": 3,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "CidrMatch",
+      "type": "object"
+    },
+    "DeliveryAction": {
+      "additionalProperties": false,
+      "properties": {
+        "exit": {
+          "anyOf": [
+            {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exit"
+        },
+        "kind": {
+          "enum": [
+            "proxy",
+            "direct",
+            "block",
+            "exit"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "DeliveryAction",
+      "type": "object"
+    },
+    "DeliveryDns": {
+      "additionalProperties": false,
+      "properties": {
+        "fake_ip": {
+          "default": false,
+          "title": "Fake Ip",
+          "type": "boolean"
+        },
+        "resolvers": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "doh": "#/$defs/DohResolver",
+                "dot": "#/$defs/DotResolver",
+                "plain": "#/$defs/PlainResolver"
+              },
+              "propertyName": "transport"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/DohResolver"
+              },
+              {
+                "$ref": "#/$defs/DotResolver"
+              },
+              {
+                "$ref": "#/$defs/PlainResolver"
+              }
+            ]
+          },
+          "maxItems": 4,
+          "minItems": 1,
+          "title": "Resolvers",
+          "type": "array"
+        }
+      },
+      "required": [
+        "resolvers"
+      ],
+      "title": "DeliveryDns",
+      "type": "object"
+    },
+    "DeliveryPolicy": {
+      "additionalProperties": false,
+      "description": "LAN always precedes custom rules; the preset's remaining rules follow them.",
+      "properties": {
+        "dns": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DeliveryDns"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "preset": {
+          "default": "full",
+          "enum": [
+            "ru-split",
+            "full"
+          ],
+          "title": "Preset",
+          "type": "string"
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/DeliveryRule"
+          },
+          "maxItems": 128,
+          "title": "Rules",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "DeliveryPolicy",
+      "type": "object"
+    },
+    "DeliveryPortRange": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
+        },
+        "start": {
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start"
+      ],
+      "title": "DeliveryPortRange",
+      "type": "object"
+    },
+    "DeliveryRule": {
+      "additionalProperties": false,
+      "description": "Values are alternatives; network and ports narrow the whole match with AND.",
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/DeliveryAction"
+        },
+        "match": {
+          "discriminator": {
+            "mapping": {
+              "cidr": "#/$defs/CidrMatch",
+              "domain_full": "#/$defs/DomainFullMatch",
+              "domain_keyword": "#/$defs/DomainKeywordMatch",
+              "domain_suffix": "#/$defs/DomainSuffixMatch",
+              "geoip": "#/$defs/GeoipMatch",
+              "geosite": "#/$defs/GeositeMatch",
+              "network": "#/$defs/NetworkMatch",
+              "port": "#/$defs/PortMatch"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/DomainSuffixMatch"
+            },
+            {
+              "$ref": "#/$defs/DomainKeywordMatch"
+            },
+            {
+              "$ref": "#/$defs/DomainFullMatch"
+            },
+            {
+              "$ref": "#/$defs/GeositeMatch"
+            },
+            {
+              "$ref": "#/$defs/GeoipMatch"
+            },
+            {
+              "$ref": "#/$defs/CidrMatch"
+            },
+            {
+              "$ref": "#/$defs/PortMatch"
+            },
+            {
+              "$ref": "#/$defs/NetworkMatch"
+            }
+          ],
+          "title": "Match"
+        },
+        "network": {
+          "anyOf": [
+            {
+              "enum": [
+                "tcp",
+                "udp"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Network"
+        },
+        "ports": {
+          "items": {
+            "$ref": "#/$defs/DeliveryPortRange"
+          },
+          "maxItems": 16,
+          "title": "Ports",
+          "type": "array"
+        }
+      },
+      "required": [
+        "match",
+        "action"
+      ],
+      "title": "DeliveryRule",
+      "type": "object"
+    },
+    "DohResolver": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "maxLength": 45,
+          "minLength": 3,
+          "title": "Address",
+          "type": "string"
+        },
+        "path": {
+          "default": "/dns-query",
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "port": {
+          "default": 443,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        },
+        "transport": {
+          "const": "doh",
+          "title": "Transport",
+          "type": "string"
+        }
+      },
+      "required": [
+        "transport",
+        "address"
+      ],
+      "title": "DohResolver",
+      "type": "object"
+    },
+    "DomainFullMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "domain_full",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "DomainFullMatch",
+      "type": "object"
+    },
+    "DomainKeywordMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "domain_keyword",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "maxLength": 80,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "DomainKeywordMatch",
+      "type": "object"
+    },
+    "DomainSuffixMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "domain_suffix",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "DomainSuffixMatch",
+      "type": "object"
+    },
+    "DotResolver": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "maxLength": 45,
+          "minLength": 3,
+          "title": "Address",
+          "type": "string"
+        },
+        "port": {
+          "default": 853,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        },
+        "transport": {
+          "const": "dot",
+          "title": "Transport",
+          "type": "string"
+        }
+      },
+      "required": [
+        "transport",
+        "address"
+      ],
+      "title": "DotResolver",
+      "type": "object"
+    },
+    "FormatAction": {
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "enum": [
+            "browser",
+            "mihomo",
+            "stash",
+            "singbox",
+            "xray-json",
+            "base64"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "headers": {
+          "$ref": "#/$defs/ResponseHeaders"
+        },
+        "kind": {
+          "const": "format",
+          "title": "Kind",
+          "type": "string"
+        },
+        "policy": {
+          "anyOf": [
+            {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Policy"
+        }
+      },
+      "required": [
+        "kind",
+        "format"
+      ],
+      "title": "FormatAction",
+      "type": "object"
+    },
+    "GeoipMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "geoip",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "GeoipMatch",
+      "type": "object"
+    },
+    "GeositeMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "geosite",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "GeositeMatch",
+      "type": "object"
+    },
+    "HeadersAction": {
+      "additionalProperties": false,
+      "properties": {
+        "headers": {
+          "$ref": "#/$defs/ResponseHeaders"
+        },
+        "kind": {
+          "const": "headers",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "headers"
+      ],
+      "title": "HeadersAction",
+      "type": "object"
+    },
+    "LiteralCondition": {
+      "additionalProperties": false,
+      "description": "A nonempty literal; case folding never turns it into a pattern.",
+      "properties": {
+        "operator": {
+          "enum": [
+            "equals",
+            "prefix",
+            "contains"
+          ],
+          "title": "Operator",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operator",
+        "value"
+      ],
+      "title": "LiteralCondition",
+      "type": "object"
+    },
+    "NetworkMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "network",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "enum": [
+              "tcp",
+              "udp"
+            ],
+            "type": "string"
+          },
+          "maxItems": 2,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "NetworkMatch",
+      "type": "object"
+    },
+    "PlainResolver": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "maxLength": 45,
+          "minLength": 3,
+          "title": "Address",
+          "type": "string"
+        },
+        "port": {
+          "default": 53,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        },
+        "protocol": {
+          "default": "udp",
+          "enum": [
+            "tcp",
+            "udp"
+          ],
+          "title": "Protocol",
+          "type": "string"
+        },
+        "transport": {
+          "const": "plain",
+          "title": "Transport",
+          "type": "string"
+        }
+      },
+      "required": [
+        "transport",
+        "address"
+      ],
+      "title": "PlainResolver",
+      "type": "object"
+    },
+    "PolicyAction": {
+      "additionalProperties": false,
+      "properties": {
+        "headers": {
+          "$ref": "#/$defs/ResponseHeaders"
+        },
+        "kind": {
+          "const": "policy",
+          "title": "Kind",
+          "type": "string"
+        },
+        "policy": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Policy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "policy"
+      ],
+      "title": "PolicyAction",
+      "type": "object"
+    },
+    "PortMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "port",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "$ref": "#/$defs/DeliveryPortRange"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "PortMatch",
+      "type": "object"
+    },
+    "ResponseHeaders": {
+      "additionalProperties": false,
+      "description": "Only headers clients consume; text is encoded by the renderer, never sent raw.",
+      "properties": {
+        "announce": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Announce"
+        },
+        "profile_title": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profile Title"
+        },
+        "support_url": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "pattern": "^(?:|https://[^\\s]+|tg://[^\\s]+|mailto:[^\\s]+)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Support Url"
+        },
+        "update_interval_hours": {
+          "anyOf": [
+            {
+              "maximum": 168,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Update Interval Hours"
+        }
+      },
+      "title": "ResponseHeaders",
+      "type": "object"
+    },
+    "ResponseMatcher": {
+      "additionalProperties": false,
+      "description": "The User-Agent condition and optional Accept condition must both match.",
+      "properties": {
+        "accept": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LiteralCondition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "user_agent": {
+          "$ref": "#/$defs/LiteralCondition"
+        }
+      },
+      "required": [
+        "user_agent"
+      ],
+      "title": "ResponseMatcher",
+      "type": "object"
+    },
+    "ResponseRule": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "discriminator": {
+            "mapping": {
+              "block": "#/$defs/BlockAction",
+              "format": "#/$defs/FormatAction",
+              "headers": "#/$defs/HeadersAction",
+              "policy": "#/$defs/PolicyAction"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/FormatAction"
+            },
+            {
+              "$ref": "#/$defs/BlockAction"
+            },
+            {
+              "$ref": "#/$defs/PolicyAction"
+            },
+            {
+              "$ref": "#/$defs/HeadersAction"
+            }
+          ],
+          "title": "Action"
+        },
+        "match": {
+          "$ref": "#/$defs/ResponseMatcher"
+        },
+        "name": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "match",
+        "action"
+      ],
+      "title": "ResponseRule",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "client_routing": {
+      "default": "ru-split",
+      "enum": [
+        "ru-split",
+        "full"
+      ],
+      "title": "Client Routing",
+      "type": "string"
+    },
+    "default_policy": {
+      "anyOf": [
+        {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Default Policy"
+    },
+    "delivery_policies": {
+      "items": {
+        "$ref": "#/$defs/DeliveryPolicy"
+      },
+      "maxItems": 64,
+      "title": "Delivery Policies",
+      "type": "array"
+    },
+    "profile_policies": {
+      "maxProperties": 64,
+      "patternProperties": {
+        "^[a-z0-9][a-z0-9_-]*$": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "type": "string"
+        }
+      },
+      "propertyNames": {
+        "maxLength": 48,
+        "minLength": 1
+      },
+      "title": "Profile Policies",
+      "type": "object"
+    },
+    "response_rules": {
+      "items": {
+        "$ref": "#/$defs/ResponseRule"
+      },
+      "maxItems": 64,
+      "title": "Response Rules",
+      "type": "array"
+    }
+  },
+  "title": "ResponseRuleSettings",
+  "type": "object"
+}

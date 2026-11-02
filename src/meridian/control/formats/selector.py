@@ -25,7 +25,7 @@ import re
 
 from meridian.core.subscription_formats import SUFFIX_FORMATS as SUFFIX_FORMATS
 from meridian.core.subscription_formats import DocumentFormat as DocumentFormat
-from meridian.core.subscription_preview import FormatRule, FormatSelection, UserAgentFamily
+from meridian.core.subscription_formats import FormatRule, FormatSelection, UserAgentFamily
 
 _MIHOMO = re.compile(
     r"^(?:flclash|rabbit|flowvy|murge|mihomo|prizrak-box|koala-clash|clash(?:-verge|-nyanpasu|x meta|[-.]?meta))",

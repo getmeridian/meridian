@@ -1,6 +1,7 @@
 # commands — One module per subcommand
 
 ## Design decisions
+**App matcher tests read applied settings** — `fleet response-rules test` uses the narrow service tester; optional people resolve like client show, and rule edits remain reviewed fleet imports.
 **Profile review logic lives in setup** — commands present gains and losses; the shared apply runtime checks declaration fingerprints for setup and every imperative path before any remote write.
 **Person policy inheritance is explicit** — `client routing --inherit` clears the private override without reserving a policy name.
 **Routing selects reviewed names** — `fleet routing` keeps preset shorthand and selects named policies from intent; a preset selection clears the named fleet default.

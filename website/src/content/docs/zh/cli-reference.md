@@ -193,7 +193,7 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 私人字段：`client set NAME --note TEXT --tag TAG` 只更改指定的字段。备注最多 500 个纯文本字符，支持换行；`--note ""` 清除备注。标签使用 1–16 个拉丁字母、数字或下划线，保存为大写；`--tag none` 清除标签。`client show` 显示这两个字段，`client list --tag TAG` 筛选标签列（`none` 选择没有标签的人）。读取和编辑需要 people/admin 权限。网页面板编辑相同字段；应用配置保留它们，加密快照保存它们。参见[私人备注和标签](/zh/client-management/#私人备注和标签)。
 
-`client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` 解释格式选择及省略原因，不泄露凭据。User-Agent 最多 512 个 Unicode 字符，Accept 最多 256 个字符，均为单行临时输入。`--suffix` 强制使用现有格式 URL 后缀。JSON 返回 `subscription-preview`；API 为需要 read 权限的 `POST /api/subscription/preview`。
+`client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` 解释格式选择及省略原因，不泄露凭据。User-Agent 最多 512 个 Unicode 字符，Accept 最多 256 个字符，均为单行临时输入。`--suffix` 提供现有格式 URL 后缀；匹配的自定义格式或拒绝规则优先。JSON 返回 `subscription-preview`；API 为需要 read 权限的 `POST /api/subscription/preview`。
 
 #### 经审核的批量更改
 
@@ -439,6 +439,7 @@ meridian fleet history [--json]
 meridian fleet events [--since ID] [--limit N] [--json]
 meridian fleet usage [--days N] [--json]
 meridian fleet routing [ru-split|full] [--dry-run] [--yes] [--json]
+meridian fleet response-rules test [--user-agent UA] [--accept TYPE] [--person NAME] [--suffix SUFFIX] [--json]
 meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--json]
 meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
@@ -519,6 +520,9 @@ meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --net
 服务仅从缓存中读取通过 Meridian 固定哈希验证的 Xray 压缩包，不会因解释路由而开始下载。客户端不会收到远程规则集。Xray 将已配置的公共 DNS 请求通过自动组发送，同时保留局域网 DNS 直连；其他客户端使用可表示的 DNS 设置。不支持的传输不会转换为普通 DNS。原有内置模式的字节内容和默认配置的黄金语料响应保持不变。
 
 `POST /api/delivery-policies/explain` 接受 `destination`、可选 `person`、`format`、`port`、`network`、`protocol`。需要 `delivery.explain`；指定用户时还需要 `people.read` 和 `people.private`。订阅预览中的策略详情或目的地解释需要私有权限，较低权限仅返回原有元数据。连接页面的 `/info` 可包含 `user.deliveryCapabilities`：格式名称、支持标志与省略代码，不含策略名称、个人覆盖、成员关系、目的地或连接详情。页面仅在内存中保留这些新鲜数据。
+
+
+**`fleet response-rules test`** 使用 `--user-agent UA`、可选的 `--accept TYPE`、`--person NAME`、`--suffix SUFFIX` 及 `--json` 读取已应用的应用规则，解释首个自定义或内置匹配、格式或拒绝、策略来源和脱敏后的响应头修改。输入临时保留，限 512/256 个字符；不会获取订阅、查询 DNS、注册设备或写入状态。规则在 `delivery.response_rules` 中编辑，通过 `fleet export` 导出并用 `fleet import` 审阅。[路由指南](/zh/split-routing/)说明字段、优先级和拒绝行为。
 
 ### meridian context
 

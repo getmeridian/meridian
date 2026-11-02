@@ -32,6 +32,7 @@ TokenCapability = Literal[
     "people.delivery",
     "delivery.read",
     "delivery.explain",
+    "delivery.test",
     "people.credentials",
     "people.reset",
     "people.reissue",

@@ -193,7 +193,7 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 فیلدهای خصوصی: `client set NAME --note TEXT --tag TAG` فقط مقدارهای واردشده را تغییر می‌دهد. یادداشت حداکثر ۵۰۰ نویسهٔ متن ساده با امکان چند خط دارد؛ `--note ""` آن را پاک می‌کند. برچسب ۱ تا ۱۶ حرف لاتین، رقم یا زیرخط دارد و با حروف بزرگ ذخیره می‌شود؛ `--tag none` آن را پاک می‌کند. `client show` هر دو فیلد را نشان می‌دهد و `client list --tag TAG` ستون برچسب را فیلتر می‌کند (`none` افراد بدون برچسب را انتخاب می‌کند). خواندن و ویرایش به دسترسی people/admin نیاز دارد. پنل وب همین فیلدها را ویرایش می‌کند؛ اعمال پیکربندی آن‌ها را حفظ می‌کند و پشتیبان‌های رمزگذاری‌شده آن‌ها را منتقل می‌کنند. [یادداشت‌ها و برچسب‌های خصوصی](/fa/client-management/).
 
-`client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` انتخاب قالب و حذف گزینه‌ها را بدون اطلاعات محرمانه توضیح می‌دهد. User-Agent حداکثر ۵۱۲ نویسهٔ Unicode و Accept حداکثر ۲۵۶ نویسه دارند؛ هرکدام یک خط و موقت‌اند. `--suffix` یکی از پسوندهای فعلی نشانی قالب را تحمیل می‌کند. JSON خروجی `subscription-preview` دارد؛ API، `POST /api/subscription/preview` با دسترسی read است.
+`client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX]` انتخاب قالب و حذف گزینه‌ها را بدون اطلاعات محرمانه توضیح می‌دهد. User-Agent حداکثر ۵۱۲ نویسهٔ Unicode و Accept حداکثر ۲۵۶ نویسه دارند؛ هرکدام یک خط و موقت‌اند. `--suffix` یکی از پسوندهای فعلی نشانی قالب را می‌دهد؛ قانون منطبق برنامه برای قالب یا عدم ارائه اولویت دارد. JSON خروجی `subscription-preview` دارد؛ API، `POST /api/subscription/preview` با دسترسی read است.
 
 #### تغییر گروهی پس از بازبینی
 
@@ -439,6 +439,7 @@ meridian fleet history [--json]
 meridian fleet events [--since ID] [--limit N] [--json]
 meridian fleet usage [--days N] [--json]
 meridian fleet routing [ru-split|full] [--dry-run] [--yes] [--json]
+meridian fleet response-rules test [--user-agent UA] [--accept TYPE] [--person NAME] [--suffix SUFFIX] [--json]
 meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--json]
 meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
@@ -519,6 +520,9 @@ meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --net
 سرویس دادهٔ جغرافیایی را فقط از آرشیو Xray موجود در کش و تأییدشده با هش ثابت Meridian می‌خواند. توضیح مسیر دانلودی آغاز نمی‌کند. برنامه‌ها مجموعه‌قانون از راه دور دریافت نمی‌کنند. Xray، DNS عمومیِ تنظیم‌شده را از گروه خودکار می‌فرستد و DNS محلی را مستقیم نگه می‌دارد؛ سایر برنامه‌ها از تنظیم DNS قابل نمایش خود استفاده می‌کنند. انتقال پشتیبانی‌نشده به DNS معمولی تبدیل نمی‌شود. بایت‌های حالت‌های پیشین و پاسخ‌های پیکربندی پیش‌فرض در مجموعهٔ مرجع تغییر نمی‌کنند.
 
 `POST /api/delivery-policies/explain` فیلدهای `destination`، `person` اختیاری، `format`، `port`، `network` و `protocol` را می‌پذیرد. به `delivery.explain` و با فرد به `people.read` و `people.private` هم نیاز دارد. جزئیات سیاست و توضیح مقصد در پیش‌نمایش اشتراک به دسترسی خصوصی نیاز دارد؛ دسترسی پایین‌تر فقط فرادادهٔ قبلی را می‌گیرد. `/info` صفحه ممکن است `user.deliveryCapabilities` داشته باشد: نام قالب، پرچم پشتیبانی و کد حذف، بدون نام سیاست، انتخاب فردی، عضویت، مقصد یا جزئیات اتصال. صفحه این اطلاعات تازه را فقط در حافظه نگه می‌دارد.
+
+
+**`fleet response-rules test`** قوانین اعمال‌شدهٔ برنامه را با `--user-agent UA` و گزینه‌های اختیاری `--accept TYPE`، `--person NAME`، `--suffix SUFFIX` و `--json` می‌خواند. اولین قانون سفارشی یا داخلی، قالب یا عدم ارائه، منبع سیاست و تغییر سرآیندهای بدون اطلاعات محرمانه را توضیح می‌دهد. ورودی گذرا و محدود به ۵۱۲/۲۵۶ نویسه است؛ اشتراک، DNS، ثبت دستگاه یا نوشتن انجام نمی‌شود. قوانین در `delivery.response_rules` از طریق `fleet export` و `fleet import` بازبینی‌شده ویرایش می‌شوند. [راهنمای مسیریابی](/fa/split-routing/) فیلدها، اولویت و عدم ارائه را توضیح می‌دهد.
 
 ### meridian context
 

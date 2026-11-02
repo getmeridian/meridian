@@ -479,6 +479,8 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 `POST /api/subscription/preview` 接受 read 或 people 权限，或管理者会话。配置了访问配置后，需要 people/admin 权限或管理者会话。发送 `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`，省略的请求头默认为空字符串。网页面板设置提供同样的表单，不接受 HWID 或设备请求头。对于通过 API 管理的端点，`enabled: false` 会将保存的端点从订阅中排除，并显示原因为 `disabled_endpoint`；默认值为 true，序列化时省略。经过审核的端点应用操作会恢复拓扑规定的连接提供方式。
 
+订阅预览还会显示已审阅的应用规则、匹配条件及拒绝结果。设置中的规则列表为只读；测试时将用户留空可检查服务器组默认。通过已审阅的配置导入修改 `delivery.response_rules`。类型字段、响应头限制和策略优先级见[路由指南](/zh/split-routing/)。
+
 ## 审核批量更改
 
 使用 Tab 和空格选择行，Shift+空格扩展当前页的范围。**选择全部匹配人员**包含其他页面。更改筛选会清除选择。选择操作，审核每人的更改前后值、警告和将更改的节点文档数量。预览每页显示 100 人，将具体人员与版本冻结十分钟，新匹配人员不会加入。任何人员、限制执行结果或节点配置变化都会拒绝整个提交，并列出变化的人员。更改与回执在同一事务中写入，节点文档仅为整个批次生成一次。
@@ -556,7 +558,7 @@ JSON 审核和部署导出会保留 `token`、`secret` 等有效配置 ID 和用
 
 ### 私有个人路由
 
-`meridian client routing person` 显示有效策略。运行 `meridian client routing person work --dry-run --json` 审阅，再通过 `meridian client routing person work --yes --json` 保存个人覆盖；`meridian client routing person --inherit --yes` 清除覆盖。面板的用户卡片使用同一服务审阅，草稿只保存在内存中。个人覆盖优先于访问配置默认，访问配置默认优先于服务器默认。应用配置和重新签发凭证保留覆盖；加密快照保存它，删除用户会移除它。选择会在应用刷新订阅时生效，不修改账户或节点访问权限。
+`meridian client routing person` 显示有效策略。运行 `meridian client routing person work --dry-run --json` 审阅，再通过 `meridian client routing person work --yes --json` 保存个人覆盖；`meridian client routing person --inherit --yes` 清除覆盖。面板的用户卡片使用同一服务审阅，草稿只保存在内存中。个人覆盖优先于匹配的应用响应规则，其次是访问配置默认和服务器默认。应用配置和重新签发凭证保留覆盖；加密快照保存它，删除用户会移除它。选择会在应用刷新订阅时生效，不修改账户或节点访问权限。
 
 读取需要 `people.read` 与 `people.private`，分配还需要 `people.delivery`。`delivery.read` 用于读取已审阅目录。已签发令牌保留原有固定权限；分配策略需要签发包含新权限的令牌。没有私有权限时覆盖被隐藏，订阅、事件和已审阅配置均不包含覆盖字段。预览不写入数据。确认需要 `review_hash`；覆盖、成员关系或目录改变后须重新预览。
 
@@ -566,6 +568,7 @@ JSON 审核和部署导出会保留 `token`、`secret` 等有效配置 ID 和用
 | `GET /api/users/{username}/delivery-policy` | 私有覆盖及有效策略；`people.read` 与 `people.private` |
 | `PUT /api/users/{username}/delivery-policy` | `{ "policy": "work", "confirm": false }` 返回预览；确认时提交 `review_hash`；需要 `people.delivery`、`people.read`、`people.private`。显式 `policy: null` 表示继承。 |
 
+| `POST /api/response-rules/test` | 临时应用匹配测试；`delivery.test`，指定用户时还需 `people.read` 和 `people.private` |
 | `POST /api/delivery-policies/explain` | 离线首次匹配解释；`delivery.explain`，指定用户时还需 `people.read` 与 `people.private` |
 
 ## 预览与解释路由

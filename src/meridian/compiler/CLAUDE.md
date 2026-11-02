@@ -1,5 +1,6 @@
 # compiler — pure finite topology compilation
 ## Design decisions
+**App rules travel with delivery** — compile the reviewed response list into service settings only; empty lists stay omitted and app choices never change node resources.
 **Topology probes stay separate** — `probes.py` builds verification resources from the reviewed graph; the compile spine only orders them.
 **Named delivery uses one representation** — LAN precedes custom rules and the preset tail; every client renderer preserves conjunctions and reports unsupported geodata without widening a match.
 **Access profiles resolve authentication identities** — exit, gateway, endpoint, and inbound grants compile to stable managed inbounds; unknown references and gateway bridges fail review.

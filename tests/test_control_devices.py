@@ -120,7 +120,8 @@ def test_full_truncates_each_detail_and_keeps_the_raw_hwid(service: ControlServi
     view = service.user_devices("alice").to_data()
     device = view["devices"][0]
     assert device["device_key"] == HWID
-    assert [device[name] for name in ("platform", "os_version", "model", "user_agent")] == [c * 512 for c in "pvma"]
+    assert [device[name] for name in ("platform", "os_version", "model")] == [c * 512 for c in "pvm"]
+    assert device["user_agent"] is None
     assert device["first_seen_at"] == device["last_seen_at"] and device["first_seen_at"] is not None
     assert "198.51.100.20" not in repr(device_rows(tmp_path))
 

@@ -126,7 +126,7 @@ class DeviceLedger:
                         _header(headers, "x-device-os"),
                         _header(headers, "x-ver-os"),
                         _header(headers, "x-device-model"),
-                        _header(headers, "user-agent"),
+                        None,
                         timestamp,
                         timestamp,
                         user.user_id,

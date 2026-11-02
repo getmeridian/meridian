@@ -18,24 +18,30 @@ from meridian.control.formats.entries import (
     presentation_pairs,
     primaries,
 )
-from meridian.control.formats.selector import explain_format
+from meridian.control.formats.response_rules import evaluate_response_rules, merge_response_headers
 from meridian.control.formats.stale_clients import stale_client
 from meridian.control.models import ClientEndpoint, PrivacySettings, ServiceSettings, UserRecord
+from meridian.control.response_rule_testing import safe_response_decision, safe_response_headers
 from meridian.control.store import Store
 from meridian.control.subscription_serving import subscription_user
-from meridian.control.subscriptions import JSON_TYPE, TEXT_TYPE, YAML_TYPE, render_subscription, subscription_headers
+from meridian.control.subscriptions import (
+    JSON_TYPE,
+    TEXT_TYPE,
+    YAML_TYPE,
+    render_subscription,
+    subscription_headers,
+    unknown_subscription,
+)
 from meridian.core.access_profiles import may_use_inbound
 from meridian.core.delivery_explain import DeliveryExplainRequest, explain_delivery_policy
 from meridian.core.delivery_geodata import GeoData
-from meridian.core.delivery_policies import resolve_delivery_policy
 from meridian.core.languages import LanguageState, resolve_language
 from meridian.core.notices import RenderedNotice
-from meridian.core.redaction import REDACTED, redact_preview_text
+from meridian.core.redaction import redact_preview_text
+from meridian.core.response_rule_test import ResponseRuleDecision
 from meridian.core.subscription_preview import (
-    FormatSelection,
     OmittedEntry,
     PreviewEntry,
-    ResponseKind,
     SubscriptionPreview,
     SubscriptionPreviewRequest,
 )
@@ -56,26 +62,52 @@ def preview_subscription(
     include_delivery: bool = True,
     read_geodata: Callable[[], GeoData | None] = lambda: None,
 ) -> SubscriptionPreview:
-    decision = explain_format(request.user_agent, request.accept, request.suffix)
     with store.lock:
         record = read_user(request.username)
         if record is None:
             raise ServiceError("not_found", "Unknown person. Check names with meridian client list.", 404)
+        settings = read_settings()
+        decision = evaluate_response_rules(
+            settings,
+            user_agent=request.user_agent,
+            accept=request.accept,
+            suffix=request.suffix,
+            profiles=record.profiles,
+            person_override=record.delivery_policy,
+        )
+        document = decision.format
+        if document is None:
+            refusal = unknown_subscription()
+            return SubscriptionPreview(
+                format=None,
+                selection=decision.selection,
+                response_rule=safe_response_decision(decision),
+                username=redact_preview_text(record.username, [record.uuid, record.sub_token]),
+                status=record.status,
+                response_kind="blocked",
+                protocols=[],
+                included=[],
+                omitted=[],
+                placeholder=None,
+                response_headers=refusal.headers
+                | {
+                    "content-type": refusal.content_type,
+                    "cache-control": "no-store",
+                },
+            )
         rows = store.rows("SELECT endpoint_id, body FROM endpoints ORDER BY endpoint_id")
         if len(rows) > 10_000:
             raise ServiceError("invalid_request", "This fleet has too many endpoints to preview.", 400)
         endpoints = [ClientEndpoint.model_validate_json(row["body"]) for row in rows]
         identifiers = {id(endpoint): str(row["endpoint_id"]) for endpoint, row in zip(endpoints, rows, strict=True)}
-        settings = read_settings()
-        resolved_policy = resolve_delivery_policy(
-            settings, profiles=record.profiles, person_override=record.delivery_policy
-        )
+        resolved_policy = decision.policy
+        assert resolved_policy is not None
         notice = read_notice(record)
         user = subscription_user(record, resolve_language(read_language().language, record.language))
         now = datetime.fromtimestamp(clock(), UTC)
         hwid_active = (
             read_privacy().device_limits != "off"
-            and decision.format != "browser"
+            and document != "browser"
             and not browser_request(request.user_agent, request.accept)
         )
     known = [record.uuid, record.sub_token]
@@ -86,8 +118,8 @@ def preview_subscription(
     known += [quote(value, safe="") for value in known if value]
     allowed = eligible_endpoints(record, endpoints, settings.access_profiles)
     allowed_names = {id(original): named for original, named in presentation_pairs(allowed)}
-    eligible = supported_endpoints(presentation_endpoints(allowed), decision.format)
-    connections = primaries(eligible) if requires_primary(decision.format) else eligible
+    eligible = supported_endpoints(presentation_endpoints(allowed), document)
+    connections = primaries(eligible) if requires_primary(document) else eligible
     placeholder = user.status if user.status != "active" else "no_connections" if not connections else None
     included: list[PreviewEntry] = []
     omitted: list[OmittedEntry] = []
@@ -100,7 +132,7 @@ def preview_subscription(
             protocol=endpoint.protocol,
             fingerprint_copy=endpoint.fingerprint_copy,
         )
-        reason = endpoint_omission(endpoint, decision.format)
+        reason = endpoint_omission(endpoint, document)
         if not may_use_inbound(record.profiles, settings.access_profiles, endpoint.inbound_ref):
             reason = "access_profile", None
         elif endpoint.enabled and user.status != "active":
@@ -112,29 +144,17 @@ def preview_subscription(
         else:
             omitted.append(OmittedEntry(**metadata.to_data(), reason=reason[0], restriction=reason[1]))
     # The same rule as live delivery: only an app document with real entries carries the nudge.
-    stale = stale_client(request.user_agent) if decision.format != "browser" and placeholder is None else None
-    response_kind: ResponseKind = (
-        "subscription" if decision.format != "browser" else "account_info" if request.suffix else "page"
-    )
-    headers = preview_headers(user, decision, settings, notice, now)
+    stale = stale_client(request.user_agent) if document != "browser" and placeholder is None else None
+    headers = merge_response_headers(preview_headers(user, decision, settings, notice, now), decision.headers)
     if hwid_active:
         headers["x-hwid-active"] = "true"
-    safe_headers = {}
-    for name, value in headers.items():
-        name = name.lower()
-        if name in ("support-url", "profile-web-page-url"):
-            safe_headers[name] = REDACTED
-        elif name in ("profile-title", "announce"):
-            safe_headers[name] = "base64:" + REDACTED
-        else:
-            safe_headers[name] = redact_preview_text(value, known)
     return SubscriptionPreview(
         delivery=preview_delivery_policy(resolved_policy, presentation_endpoints(allowed))
         if include_delivery
         else None,
         explanation=explain_delivery_policy(
             resolved_policy,
-            DeliveryExplainRequest(destination=request.destination, person=request.username, format=decision.format),
+            DeliveryExplainRequest(destination=request.destination, person=request.username, format=document),
             available_exits={endpoint.exit_ref for endpoint in connections if endpoint.exit_ref},
             geodata=read_geodata(),
             available=bool(connections),
@@ -142,22 +162,26 @@ def preview_subscription(
         )
         if include_delivery and request.destination is not None
         else None,
-        **decision.to_data(),
+        format=document,
+        selection=decision.selection,
+        response_rule=safe_response_decision(decision, include_policy=include_delivery)
+        if decision.selection.rule == "custom"
+        else None,
         username=redact_preview_text(record.username, known),
         status=user.status,
-        response_kind=response_kind,
+        response_kind=decision.response_kind,
         protocols=[protocol for protocol in PROTOCOL_PRIORITY if any(entry.protocol == protocol for entry in included)],
         included=included,
         omitted=omitted,
         placeholder=placeholder,
         stale_client=stale,
-        response_headers=safe_headers,
+        response_headers=safe_response_headers(headers, known),
     )
 
 
 def preview_headers(
     user: SubscriptionUser,
-    decision: FormatSelection,
+    decision: ResponseRuleDecision,
     settings: ServiceSettings,
     notice: RenderedNotice | None,
     now: datetime,

@@ -183,3 +183,5 @@ Named access profiles are part of reviewed topology and compile to stable authen
 ## Delivery policies
 
 Reviewed delivery intent owns named, bounded destination rules and DNS choices. One client representation compiles Xray JSON, Mihomo, Stash, and sing-box; Base64 cannot carry those settings. Fleet and access-profile defaults use the same resolver, with conflicting profile defaults refused. LAN handling and fingerprint isolation remain explicit. Clients use their already-installed pinned geodata, without remote rule-set fetching. See [Client routing](/en/split-routing/).
+
+- **App response rules** — reviewed `delivery.response_rules` select formats, refusals, typed headers, and app policy overrides before the built-in selector. The service, CLI tester, and console preview share one pure decision and the delivery-policy resolver; request headers stay transient.
