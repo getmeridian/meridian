@@ -11,7 +11,7 @@ from typer.testing import CliRunner
 from meridian.cli import app
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.compiler import compile_topology
-from meridian.console import set_json_mode
+from meridian.console import set_json_mode, set_quiet_mode
 from meridian.control.client import ControlClient
 from meridian.control.models import ServiceSettings, UserCreate
 from meridian.core.access_profile_views import AccessProfileReviewRequest, GrantedInbound
@@ -21,6 +21,13 @@ from tests.support.control_service import ADMIN_TOKEN, serve_control
 from tests.support.topology import single_exit_intent
 from tests.test_access_profiles import HY2, POLICY, REALITY
 from tests.test_access_profiles import service as service
+
+
+@pytest.fixture(autouse=True)
+def command_modes():
+    yield
+    set_json_mode(False)
+    set_quiet_mode(False)
 
 
 def test_fleet_export_carries_current_creation_membership_without_rewriting_intent(tmp_path: Path, tmp_home: Path):

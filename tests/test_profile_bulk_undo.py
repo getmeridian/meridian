@@ -11,7 +11,7 @@ from meridian import i18n
 from meridian.cli import app
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands import client_bulk
-from meridian.console import set_json_mode
+from meridian.console import set_json_mode, set_quiet_mode
 from meridian.control.client import ControlClient, add_mutation_listener
 from meridian.control.errors import ServiceError
 from meridian.control.models import NodeSpec, ServiceSettings, UserCreate
@@ -31,6 +31,7 @@ def command_modes(monkeypatch):
     monkeypatch.setattr(i18n, "_requested", None)
     yield
     set_json_mode(False)
+    set_quiet_mode(False)
 
 
 def assign(service, before: str, after: str, names=("person", "other")):

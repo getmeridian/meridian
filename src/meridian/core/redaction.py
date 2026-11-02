@@ -204,7 +204,8 @@ def redact(value: Any, *, reveal: frozenset[str] = frozenset()) -> Any:
     """Return a JSON-safe structure with obvious secrets removed.
 
     String values at a key or exact dotted path in ``reveal`` are kept verbatim.
-    Non-string scalar metadata beneath a revealed path also keeps its type.
+    Containers and non-string scalar metadata beneath a revealed path keep their
+    types; nested string credentials still follow normal redaction.
     """
     return _redact(value, reveal, "")
 
@@ -234,6 +235,10 @@ def _redact(value: Any, reveal: frozenset[str], path: str) -> Any:
                 (item is None or isinstance(item, bool | int | float)) and (revealed or revealed_metadata)
             ):
                 redacted[key_str] = item
+            elif (revealed or revealed_metadata) and isinstance(
+                item, dict | list | tuple | set | frozenset | BaseModel
+            ):
+                redacted[key_str] = _redact(item, reveal, item_path)
             elif key_str == "properties" and isinstance(item, dict) and _is_json_schema_property_map(item):
                 redacted[key_str] = {
                     str(prop): _redact(schema, reveal, _child_path(item_path, prop)) for prop, schema in item.items()
