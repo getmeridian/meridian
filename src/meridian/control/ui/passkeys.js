@@ -106,7 +106,9 @@
     var card = h("section", { class: "card" },
       h("div", { class: "card-head" }, h("h2", { text: M.t("passkeys.title") }),
         M.pill(state.available && supported ? "ok" : "muted", M.t(state.available && supported ? "passkeys.ready" : "passkeys.unavailable"))),
-      h("p", { class: "muted small", text: M.t(state.available ? "passkeys.text" : "passkeys.no_domain") }),
+      h("p", { class: "muted small", text: M.t(state.available ? "passkeys.caption" : "passkeys.domain_caption") }),
+      M.learnMore([h("p", { text: M.t(state.available ? "passkeys.text" : "passkeys.no_domain") }),
+        h("p", { text: M.t("passkeys.recovery") })]),
       state.available && !supported ? h("p", { class: "muted small", text: M.t("error.passkey_browser") }) : null,
       list,
       state.available && supported ? h("div", { class: "row-actions" },
@@ -114,8 +116,7 @@
           nameDialog(M.t("passkeys.add"), "", add).then(function (saved) {
             if (saved) refresh("passkeys.added");
           });
-        } }, M.t("passkeys.add"))) : null,
-      h("p", { class: "muted small", text: M.t("passkeys.recovery") }));
+        } }, M.t("passkeys.add"))) : null);
 
     function refresh(key) {
       M.toast(M.t(key));

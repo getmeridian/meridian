@@ -362,12 +362,13 @@ if (mode === 'owner-settings') {
   M.privacySection = M.noticeSection = M.languageSection = M.formatPreviewSection = M.cliHint = () => M.h('section');
   M.i18n = { ...M.i18n, langs: [locale], names: { [locale]: locale }, lang: locale };
   M.state.auth = { passkeys: { reason: 'no_domain' } };
+  w.eval(fs.readFileSync(path.join(ui, 'settings-sections.js'), 'utf8'));
   w.eval(fs.readFileSync(path.join(ui, 'settings.js'), 'utf8'));
   M.renderSettings(view);
   await settle();
   const fleet = view.querySelector('.card');
   report.text = fleet.textContent;
-  report.controls = fleet.querySelectorAll('input,button,select,textarea,form').length;
+  report.controls = fleet.querySelectorAll('input,button:not(.cmd-copy),select,textarea,form').length;
   report.injected = !!fleet.querySelector('img[src="x"]') || !!w.pwned;
 }
 

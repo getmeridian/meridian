@@ -134,7 +134,7 @@ def test_phone_fields_and_actions_have_44_pixel_targets_with_any_pointer(
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
-def test_settings_moves_appearance_and_discloses_advanced_sections_without_losing_input(locale: str) -> None:
+def test_settings_moves_appearance_and_opens_advanced_without_losing_input(locale: str) -> None:
     result = run_console("shell-settings", locale, {"hash": "#/settings"})
     assert result["appearanceCards"] == 0
     assert result["advancedInitiallyClosed"]

@@ -98,8 +98,12 @@ if (mode === 'showcase-navigation') {
   await M.go('servers');
   await until(() => w.document.querySelector('#view').textContent.includes('Example Hosting'), 'servers');
   report.servers = (await M.api('GET', 'ui/api/fleet')).servers.length;
-  await M.go('settings');
+  await M.go('settings', 'notice');
   await until(() => w.document.querySelector('[data-notice="text"]')?.value, 'settings');
+  await M.go('settings', 'privacy');
+  await until(() => w.document.querySelector('.privacy-choice'), 'privacy');
+  await M.go('settings', 'language');
+  await until(() => w.document.querySelector('[data-language]') && !w.document.querySelector('[data-language]').disabled, 'language');
   report.settings = !!w.document.querySelector('.privacy-choice') && !!w.document.querySelector('[data-language]');
   await M.go('tokens');
   await until(() => w.document.querySelector('#view').textContent.includes('People helper'), 'tokens');

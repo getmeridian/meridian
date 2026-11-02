@@ -11,7 +11,7 @@ const dom = new JSDOM('<!doctype html><body><main id="view"></main></body>', {
 });
 const w = dom.window;
 const requests = [];
-for (const script of ['core.js', 'drafts.js', 'components.js', 'shell.js', 'passkeys.js', 'settings.js']) w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
+for (const script of ['core.js', 'drafts.js', 'components.js', 'shell.js', 'passkeys.js', 'settings-sections.js', 'settings.js']) w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 const M = w.M;
 const catalog = JSON.parse(fs.readFileSync(path.join(ui, 'locales', locale + '.json')));
 M.t = (key, params = {}) => (catalog[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? ''));
@@ -30,7 +30,7 @@ await new Promise(setImmediate);
 const fleet = view.querySelector('.card');
 process.stdout.write(JSON.stringify({
   text: fleet.textContent,
-  controls: fleet.querySelectorAll('input,button,select,textarea,form').length,
+  controls: fleet.querySelectorAll('input,button:not(.cmd-copy),select,textarea,form').length,
   requests,
 }));
 w.close();

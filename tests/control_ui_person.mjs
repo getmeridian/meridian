@@ -119,6 +119,7 @@ if (mode === 'person-credential-rotation') load('commands.js');
 if (mode === 'person-device-race' || mode === 'person-devices') load('devices.js');
 load('person.js');
 load('settings.js');
+load('settings-sections.js');
 load('components.js'); load('shell.js');
 M.renderOverview = view => M.mount(view, M.h('p', { text: 'Overview' }));
 load('app.js');
@@ -242,7 +243,7 @@ if (mode === 'person-guard') {
     M.go('servers'); await settle();
     M.go('people', 'sample'); await settle();
   }
-  if (data.screen === 'password') { M.go('settings'); await settle(); }
+  if (data.screen === 'password') { M.go('settings', 'security'); await settle(); }
   const field = fieldFor(data.screen), original = field.value;
   if (data.cycleUnlimited) {
     openEdit('traffic');

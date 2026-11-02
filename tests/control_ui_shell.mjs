@@ -233,14 +233,16 @@ if (scenario === 'shell-cli-hint') {
 }
 if (scenario === 'shell-settings') {
   report.appearanceCards = [...document.querySelectorAll('#view h2')].filter(el => el.textContent === M.t('settings.appearance')).length;
-  const sections = [...document.querySelectorAll('[data-mode-section]')];
-  report.advancedInitiallyClosed = sections.length >= 2 && sections.every(el => !el.open);
+  report.advancedInitiallyClosed = document.querySelector('[data-settings-section="advanced"]')?.hidden &&
+    !document.querySelector('[data-settings-panel="general"]')?.hidden;
+  await M.navigate('#/settings/advanced'); await settle();
   const input = document.querySelector('[data-format-person]');
   if (input) input.value = 'sample';
   await clickMode('detailed');
   report.samePreviewInput = !!input && input === document.querySelector('[data-format-person]');
   report.previewValue = document.querySelector('[data-format-person]')?.value;
-  report.advancedAfterDetailedOpen = sections.length >= 2 && sections.every(el => el.open);
+  report.advancedAfterDetailedOpen = !document.querySelector('[data-settings-panel="advanced"]')?.hidden &&
+    !document.querySelector('[data-settings-section="advanced"]')?.hidden;
 }
 
 const clean = text => String(text || '').replace(/[\u2066-\u2069]/g, '').replace(/[۰-۹]/g, char => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(char)));

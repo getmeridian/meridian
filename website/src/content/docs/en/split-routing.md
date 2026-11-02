@@ -50,7 +50,7 @@ meridian fleet routing ru-split --yes
 
 The bare command shows the current choice and explains both policies. A change edits the topology, shows the review, and applies exactly that review after confirmation. Without a terminal or with `--json`, pass `--yes`; `--dry-run --json` returns the review without applying it. Apps receive the policy at their next subscription refresh (six hours by default, set by `delivery.update_interval_hours`) or after a manual refresh. The setup wizard keeps `ru-split` without an extra question.
 
-`fleet export` and `fleet import` preserve `delivery.client_routing: full`. The `ru-split` default is omitted; removing the field from an exported file restores it. The web panel shows the policy read-only in Settings with the CLI command that changes it.
+`fleet export` and `fleet import` preserve `delivery.client_routing: full`. The `ru-split` default is omitted; removing the field from an exported file restores it. The web panel shows the policy read-only in **Settings → General** with the CLI command that changes it.
 
 Apps that import a plain Base64 link list receive no routing rules. Configure split or full routing in those apps yourself, or use a structured subscription. Hiddify receives the sing-box document and follows its inline rules.
 
@@ -169,7 +169,7 @@ The service reads geodata only from already-cached Xray archives whose hash matc
 
 App rules require Meridian's control service. With `control.backend: remnawave`, every nonempty rule list is refused before a plan is built, including built-in policy choices. Run `meridian migrate` first.
 
-Edit `delivery.response_rules` in a fleet export and review it with `meridian fleet import`. Rules run in their written order; the first match supplies one action. An empty list keeps every existing subscription byte unchanged. Rules travel with the other reviewed delivery settings and survive encrypted snapshots. Settings in the console lists them read-only.
+Edit `delivery.response_rules` in a fleet export and review it with `meridian fleet import`. Rules run in their written order; the first match supplies one action. An empty list keeps every existing subscription byte unchanged. Rules travel with the other reviewed delivery settings and survive encrypted snapshots. **Settings → Advanced** in the console lists them read-only.
 
 Every `match` requires a `user_agent` condition and may add one `accept` condition; both must match. Each condition has `operator: equals | prefix | contains` and a nonempty literal `value`, compared without case sensitivity. Accept is the only additional request header: the captured clients use it to distinguish browser HTML from app documents. Forwarded addresses, device headers, authorization, regexes, and version comparisons are unavailable.
 
@@ -217,4 +217,4 @@ meridian fleet response-rules test --user-agent "Hiddify/2" --accept "*/*" --per
 
 The command reads currently applied service settings. It returns the rule name and number or built-in rule, matched condition operators, format or refusal, effective policy and source, changed headers, and why. Header text and URLs are redacted; an empty header value means removal. It fetches no subscription, makes no DNS or remote-template request, and writes nothing. `--person` includes private person/profile choices; without it, profile and person overrides are absent. Inputs are one line, up to 512 User-Agent characters and 256 Accept characters.
 
-`POST /api/response-rules/test` accepts `user_agent`, `accept`, `suffix`, and optional `person`. It needs the narrow `delivery.test` grant; with a person it also needs `people.read` and `people.private`. Existing tokens keep frozen permissions. The console's subscription preview uses the same decision: leave Person blank for this tester, or enter a person to see included entries, omissions, and routing details. A destination preview requires a person. Draft inputs and results stay in memory.
+`POST /api/response-rules/test` accepts `user_agent`, `accept`, `suffix`, and optional `person`. It needs the narrow `delivery.test` grant; with a person it also needs `people.read` and `people.private`. Existing tokens keep frozen permissions. The subscription preview in **Settings → Advanced** uses the same decision: leave Person blank for this tester, or enter a person to see included entries, omissions, and routing details. A destination preview requires a person. Draft inputs and results stay in memory.

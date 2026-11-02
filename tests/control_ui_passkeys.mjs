@@ -68,7 +68,7 @@ w.fetch = async (url, options) => {
   else if (options.method === 'DELETE') { passkeys = []; result = { removed: true }; }
   return { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify(result) };
 };
-for (const script of ['core.js', 'drafts.js', 'passkeys.js', 'auth.js']) {
+for (const script of ['core.js', 'drafts.js', 'components.js', 'passkeys.js', 'auth.js']) {
   w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 }
 const M = w.M;

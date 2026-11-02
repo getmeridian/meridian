@@ -5,59 +5,90 @@
   var M = (window.M = window.M || {});
   var h = M.h;
 
-  M.renderSettings = function (view) {
-    M.mount(view, [
-      h("div", { class: "page-head" }, h("div", {}, h("h1", { text: M.t("nav.settings") }))),
-      fleetCard(),
-      M.noticeSection(),
-      M.languageSection(),
-      M.detailedSection(M.t("preview.title"), M.formatPreviewSection(), "formats"),
-      M.privacySection(),
-      h("h2", { class: "section-title", text: M.t("settings.security") }),
-      h("div", { class: "cards" }, passwordCard(), totpCard(), M.passkeyCard(), sessionsCard()),
-      M.cliHint(),
-    ]);
+  M.renderSettings = function (view, initial) {
+    var mounted = {}, settings = null;
+    function readSettings() { return settings || (settings = M.api("GET", "api/settings")); }
+    var builders = {
+      general: function () { return [generalCard(readSettings()), M.cliHint()]; },
+      notice: function () { return M.noticeSection(); },
+      language: function () { return M.languageSection(); },
+      privacy: function () { return M.privacySection(); },
+      security: function () {
+        return [h("h2", { class: "section-title", text: M.t("settings.security") }),
+          h("div", { class: "cards" }, passwordCard(), totpCard(), M.passkeyCard(), sessionsCard())];
+      },
+      advanced: function () { return [M.formatPreviewSection(), advancedFacts(readSettings())]; },
+    };
+    var sections = M.settingsSections(function (next, previous, panel, oldPanel) {
+      if (oldPanel && M.hasUnsavedEdits(oldPanel)) {
+        M.discardDrafts(oldPanel); M.clear(oldPanel); mounted[previous] = false;
+      }
+      if (!mounted[next]) { M.mount(panel, builders[next]()); mounted[next] = true; }
+    });
+    M.mount(view, [h("div", { class: "page-head" }, h("h1", { text: M.t("nav.settings") })), sections.node]);
+    sections.select(initial);
+    var stop = function () { sections.stop(); M.discardDrafts(view); };
+    stop.route = function (route) { sections.select(route.arg); };
+    return stop;
   };
 
-  function fleetCard() {
-    // The title is the fleet file's (`delivery.profile_title`): every apply sets it, so it is shown, not edited.
-    var title = h("p", { class: "row-title" });
-    var routing = h("p", { class: "row-title mono", dir: "ltr" });
-    var routingExplanation = h("p", { class: "muted small" });
-    var routingCommand = h("code", { dir: "ltr" });
-    var publicUrl = h("p", { class: "mono small link-text" });
-    var contactText = h("p", { class: "row-title", dir: "auto" });
-    var contactLink = h("p", { class: "mono small link-text", dir: "ltr" });
+  function routingFacts(settings) {
+    var policy = settings.default_policy || settings.client_routing || "ru-split";
+    var named = policy !== "full" && policy !== "ru-split";
+    return { policy: policy,
+      explanation: M.t(named ? "policy.named" : policy === "full" ? "settings.routing_full" : "settings.routing_ru_split"),
+      command: named ? "meridian fleet routing set POLICY" : "meridian fleet routing " + (policy === "full" ? "ru-split" : "full") };
+  }
+
+  function fact(label, value, caption, command) {
+    return M.keyValue(label, h("div", { class: "stack-sm" }, value,
+      h("div", { class: "settings-command muted small" }, h("span", { text: caption }), command)));
+  }
+
+  function generalCard(read) {
+    // Reviewed topology owns all four values; this screen never submits them.
+    var title = h("bdi", { class: "settings-fact-value" }), publicUrl = h("bdi", { class: "link-text", dir: "ltr" });
+    var contactText = h("bdi", { class: "settings-fact-value", dir: "auto" });
+    var contactLink = h("bdi", { class: "link-text", dir: "ltr" });
+    var routing = h("bdi", { class: "settings-fact-value mono", dir: "ltr" });
+    var routingExplanation = h("p"), routingCommand = h("span");
+    var error = h("p", { class: "form-error", role: "alert" });
+    read.then(function (settings) {
+      title.textContent = settings.profile_title;
+      publicUrl.textContent = settings.public_url || M.t("settings.no_public_url");
+      var contact = settings.owner_contact || {}, facts = routingFacts(settings);
+      contactText.textContent = contact.text || M.t("settings.contact_none");
+      contactLink.textContent = contact.link || ""; contactLink.hidden = !contact.link;
+      routing.textContent = facts.policy; routingExplanation.textContent = facts.explanation;
+      M.mount(routingCommand, M.command(facts.command));
+    }, function (e) { error.textContent = M.errorText(e); });
+    return h("section", { class: "card" }, h("h2", { text: M.t("settings.general") }), error,
+      h("dl", { class: "settings-facts" },
+        fact(M.t("settings.title"), title, M.t("settings.title_caption"), M.command("meridian setup")),
+        fact(M.t("settings.public_url"), publicUrl, M.t("settings.address_caption"), M.command("meridian setup")),
+        fact(M.t("settings.owner_contact"), [contactText, contactLink], M.t("settings.contact_hint"), M.command("meridian fleet contact")),
+        fact(M.t("settings.client_routing"), routing, M.t("settings.routing_hint"), routingCommand)),
+      M.learnMore([h("p", { text: M.t("settings.title_hint") }), h("p", { text: M.t("settings.public_url_hint") }), routingExplanation]));
+  }
+
+  function advancedFacts(read) {
+    var routing = h("bdi", { class: "settings-fact-value mono", dir: "ltr" });
+    var explanation = h("p", { class: "muted small" }), command = h("div");
     var responseRules = h("ol", { class: "stack-sm", "data-response-rules": "" });
     var error = h("p", { class: "form-error", role: "alert" });
-    M.api("GET", "api/settings").then(function (settings) {
-      title.textContent = settings.profile_title;
-      var policy = settings.default_policy || settings.client_routing || "ru-split";
-      var named = policy !== "full" && policy !== "ru-split";
-      routing.textContent = policy;
-      routingExplanation.textContent = M.t(named ? "policy.named" : policy === "full" ? "settings.routing_full" : "settings.routing_ru_split");
-      routingCommand.textContent = named ? "meridian fleet routing set POLICY" : "meridian fleet routing " + (policy === "full" ? "ru-split" : "full");
-      publicUrl.textContent = settings.public_url || M.t("settings.no_public_url");
-      var contact = settings.owner_contact || {};
-      contactText.textContent = contact.text || M.t("settings.contact_none");
-      contactLink.textContent = contact.link || "";
+    read.then(function (settings) {
+      var facts = routingFacts(settings);
+      routing.textContent = facts.policy; explanation.textContent = facts.explanation;
+      M.mount(command, M.command(facts.command));
       M.mount(responseRules, (settings.response_rules || []).map(function (rule, index) {
         return h("li", { value: index + 1 }, h("bdi", { text: rule.name }), " · ", M.t("response_rules.action_" + rule.action.kind));
       }));
       if (!(settings.response_rules || []).length) M.mount(responseRules, h("li", { text: M.t("response_rules.reason_built_in_selector") }));
     }, function (e) { error.textContent = M.errorText(e); });
-    return h("section", { class: "card" },
-      h("h2", { text: M.t("settings.fleet") }),
-      h("p", { class: "label", text: M.t("settings.title") }), title,
-      h("p", { class: "muted small", text: M.t("settings.title_hint") }),
-      M.detailedSection(M.t("settings.client_routing"), [routing, routingExplanation,
-        h("p", { class: "label", text: M.t("response_rules.title") }), responseRules,
-        h("p", { class: "muted small", text: M.t("response_rules.reviewed_hint") }),
-        h("p", { class: "muted small" }, M.t("settings.routing_hint"), " ", routingCommand)], "routing"), error,
-      h("p", { class: "label", text: M.t("settings.public_url") }), publicUrl,
-      h("p", { class: "muted small", text: M.t("settings.public_url_hint") }),
-      h("p", { class: "label", text: M.t("settings.owner_contact") }), contactText, contactLink,
-      h("p", { class: "muted small" }, M.t("settings.contact_hint"), " ", h("code", { dir: "ltr", text: "meridian fleet contact" })));
+    return h("div", { class: "stack" },
+      h("section", { class: "card" }, h("h2", { text: M.t("settings.client_routing") }), routing, explanation, command, error),
+      h("section", { class: "card" }, h("h2", { text: M.t("response_rules.title") }),
+        h("p", { class: "muted small", text: M.t("response_rules.reviewed_hint") }), responseRules));
   }
 
   function passwordCard() {
@@ -105,8 +136,8 @@
     return h("section", { class: "card" },
       h("div", { class: "card-head" }, h("h2", { text: M.t("totp.title") }),
         M.pill(on ? "ok" : "muted", M.t(on ? "totp.on" : "totp.off"))),
-      h("p", { class: "muted small", text: M.t("totp.offer_why") }),
       h("p", { class: "muted small", text: M.t(on ? "totp.on_text" : "totp.off_hint") }),
+      M.learnMore(h("p", { text: M.t("totp.offer_why") })),
       h("div", { class: "row-actions" }, button));
   }
 

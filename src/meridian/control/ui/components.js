@@ -57,6 +57,11 @@
       h("p", { class: "strong", text: title }), caption ? h("p", { class: "muted small", text: caption }) : null);
   };
 
+  M.learnMore = function (content) {
+    return h("details", { class: "learn-more" }, h("summary", { text: M.t("action.learn_more") }),
+      h("div", { class: "stack-sm muted small" }, content));
+  };
+
   M.detailedSection = function (label, content, key) {
     return h("details", { class: "mode-disclosure", "data-mode-section": key, open: M.mode() === "detailed" },
       h("summary", { text: label }),

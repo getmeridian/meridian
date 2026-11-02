@@ -41,6 +41,7 @@ def run_console(mode: str, locale: str = "en", data: Any = None) -> dict[str, An
         "command-": "control_ui_commands.mjs",
         "showcase-": "control_ui_showcase.mjs",
         "person-tabs-": "control_ui_person_tabs.mjs",
+        "settings-": "control_ui_settings.mjs",
         "person-": "control_ui_person.mjs",
     }
     runner = next((name for prefix, name in runners.items() if mode.startswith(prefix)), "control_ui_console.mjs")

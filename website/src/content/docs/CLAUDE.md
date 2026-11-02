@@ -1,6 +1,7 @@
 # content/docs — Markdown documentation source
 
 ## Design decisions
+**Settings sections** — all locales describe fragment links, desktop and phone sub-navigation, guarded drafts, Advanced in Detailed, and Security's password, code, passkey, and session controls.
 **Person summary and tabs** — all locales describe the fixed summary, fragment tabs, Simple More, inline Save/Cancel guards, service-previewed extensions, and the shared Share dialog.
 **App response rules** — all locales document reviewed literal fields, first-match ordering, suffix precedence, exact unknown-token refusals, typed headers, private policy precedence, and the API/CLI/console tester.
 **Declared removal drafts** — client and CLI guides share local JSON download, file shapes and bounds, one review/apply, exact revision refusal, atomic mixed batches, the retained-person rule, and individual-only cut-off in every locale.

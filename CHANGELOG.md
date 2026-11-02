@@ -18,19 +18,13 @@ newest first; the last is what 4.0 changes compared with 3.x.
 - The web panel opens on an Overview: fleet health, what needs attention (expiring,
   near or over quota, disabled, servers or payments due), and quick Add person and
   Share actions. A Simple/Detailed switch, remembered per browser, keeps everyday
-  screens calm and shows revisions, tokens, and full server facts on demand; phone
-  navigation scrolls with the active page in view, and theme and language move into
-  an account menu. A person's summary keeps named Share, Extend, and Disable/Enable
-  actions above tabs, with reset and expiry together below usage. Each setting
-  edits in place from a clean draft; extensions follow saved access and keep
-  first-use accounts pending. Date and traffic previews update while editing and
-  keep saving forms locked; background reads refresh untouched editors and
-  preserve drafts. Simple opens Access & limits directly with keyboard focus in
-  the visible content. The Share dialog presents QR and links under one heading.
-  People gets removable filter chips, one scrolling filter row on phones, and
-  compact rows with near-quota labels only before the limit is reached. Its
-  selection bar appears only once someone is selected, as one compact row on
-  desktop or a bottom bar on phones (#95).
+  screens calm and shows revisions, tokens, and full server facts on demand; theme
+  and language move into an account menu. A person's page keeps a summary with
+  Share, Extend, and Disable above tabs, and each setting edits in place. People
+  gets removable filter chips and compact rows, and its selection bar appears only
+  once someone is selected (#95).
+- Settings is split into General, Notice, Language, Privacy, Security, and Advanced
+  sections with their own links; Tokens and Revisions become tidy lists (#95).
 - Reviewed subscription response rules by app, with bounded literal User-Agent
   and Accept conditions, ordered format/refusal/policy/header actions, and one
   transient matcher test across API, CLI, and console. Private person policies

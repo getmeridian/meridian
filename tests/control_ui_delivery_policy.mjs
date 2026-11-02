@@ -27,7 +27,7 @@ w.fetch = async (url, options = {}) => {
   else throw new Error('Unexpected request: ' + url);
   return { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify(body) };
 };
-for (const name of ['core.js', 'drafts.js', 'person-delivery-policy.js', 'format-preview.js', 'policy-preview.js']) {
+for (const name of ['core.js', 'drafts.js', 'components.js', 'person-delivery-policy.js', 'format-preview.js', 'policy-preview.js']) {
   if (fs.existsSync(path.join(ui, name))) w.eval(fs.readFileSync(path.join(ui, name), 'utf8'));
 }
 const M = w.M, catalog = JSON.parse(fs.readFileSync(path.join(ui, 'locales', locale + '.json')));
