@@ -7,8 +7,8 @@
   var h = M.h;
 
   M.cliHint = function () {
-    return h("div", { class: "cli-hint" }, M.icon("terminal"),
-      h("div", {}, h("p", { class: "strong", text: M.t("cli.title") }), h("p", { class: "muted small", text: M.t("cli.text") })),
+    return h("p", { class: "cli-hint muted small" }, M.icon("terminal"),
+      h("span", { text: M.t("cli.title") }),
       M.command("meridian"));
   };
 

@@ -113,10 +113,9 @@
 .card-slot > .card { height: 100%; }
 .server-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .server-name h2 { font-size: 1rem; overflow-wrap: anywhere; }
-.cli-hint { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 16px; border-radius: var(--r2);
+.cli-hint { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; padding: var(--space-2) var(--space-3); border-radius: var(--r2);
   background: var(--band); border: 1px dashed var(--b2); color: var(--t2); }
-.cli-hint > div { flex: 1; min-width: 200px; }
-.cli-hint .strong { color: var(--t1); }
+.cli-hint > span:not(.cmd) { flex: 1; min-inline-size: 0; overflow-wrap: anywhere; }
 
 /* -- revision diff -------------------------------------------------------------------------- */
 .diff-list { list-style: none; display: flex; flex-direction: column; gap: 2px; font-family: var(--mono); font-size: .8125rem;

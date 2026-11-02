@@ -201,6 +201,13 @@ if (scenario === 'shell-server-facts') {
     .some(el => el.textContent === label));
   report.moreAfterPollOpen = document.querySelector('[data-server="main"] .secondary-actions')?.open;
 }
+if (scenario === 'shell-cli-hint') {
+  const hint = document.querySelector('.cli-hint');
+  report.hintParagraphs = hint.querySelectorAll('p').length + (hint.tagName === 'P' ? 1 : 0);
+  report.hintCommand = [...hint.querySelectorAll('code')].map(el => el.textContent);
+  report.hintCopyCount = hint.querySelectorAll('.cmd-copy').length;
+  report.hintTitle = hint.textContent.includes(M.t('cli.title'));
+}
 if (scenario === 'shell-settings') {
   report.appearanceCards = [...document.querySelectorAll('#view h2')].filter(el => el.textContent === M.t('settings.appearance')).length;
   const sections = [...document.querySelectorAll('[data-mode-section]')];

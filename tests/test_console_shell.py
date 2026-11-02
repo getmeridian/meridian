@@ -101,6 +101,14 @@ def test_simple_server_cards_keep_host_facts_in_more_across_modes_and_refresh(lo
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_server_management_guidance_is_one_caption_with_a_copyable_command(locale: str) -> None:
+    result = run_console("shell-cli-hint", locale, {"hash": "#/servers"})
+    assert result["hintParagraphs"] == 1 and result["hintTitle"]
+    assert result["hintCommand"] == ["meridian"] and result["hintCopyCount"] == 1
+    assert result["writes"] == []
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 def test_settings_moves_appearance_and_discloses_advanced_sections_without_losing_input(locale: str) -> None:
     result = run_console("shell-settings", locale, {"hash": "#/settings"})
     assert result["appearanceCards"] == 0

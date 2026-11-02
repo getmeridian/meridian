@@ -19,6 +19,7 @@ newest first; the last is what 4.0 changes compared with 3.x.
   details, and quick person sharing;
   browser-local Simple and Detailed views, an account menu for theme and language,
   Simple server cards that put health first, disclosures available in both views,
+  compact guidance for server changes,
   desktop header actions, a safe phone action bar, and shared responsive components
   and isolated figures in all four languages (#95).
 - Reviewed subscription response rules by app, with bounded literal User-Agent
