@@ -104,6 +104,8 @@ def run_change(
         found = next((item for item in current.access_profiles if item.id == name), None)
         if (action == "add") == (found is not None):
             console.fail(t("profiles.exists" if action == "add" else "profiles.unknown", name=name), hint_type="user")
+        if action == "remove" and name in current.delivery.profile_policies:
+            console.fail(t("profiles.delivery_default", name=name), hint_type="user")
         items = [
             profile if item.id == name and action == "set" else item
             for item in current.access_profiles

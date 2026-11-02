@@ -808,6 +808,7 @@
   "profiles.choose_grants": "برای هر مرجع --grant را تکرار کنید یا برای حذف همهٔ دسترسی‌ها --empty را بزنید.",
   "profiles.invalid": "نام پروفایل را با حروف کوچک و مرجع‌های exit:، gateway:، inbound: یا endpoint: وارد کنید. مرجع‌ها نباید تکراری باشند.",
   "profiles.requires_yes": "با --dry-run بازبینی کنید و سپس برای تأیید تغییر در حالت JSON، --yes را بزنید.",
+  "profiles.delivery_default": "پروفایل دسترسی {name} یک سیاست تحویل پیش‌فرض دارد. ابتدا آن را با meridian fleet import از delivery.profile_policies حذف کنید.",
   "profiles.exists": "پروفایل دسترسی {name} از قبل وجود دارد.",
   "profiles.unknown": "پروفایل دسترسی {name} پیدا نشد. meridian profile list را بررسی کنید.",
   "profiles.confirm": "پروفایل {name} و تغییرات دسترسی بازبینی‌شده اعمال شود؟",

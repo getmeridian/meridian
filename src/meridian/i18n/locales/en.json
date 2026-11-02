@@ -808,6 +808,7 @@
   "profiles.choose_grants": "Repeat --grant for every reference, or use --empty to grant nothing.",
   "profiles.invalid": "Use a lowercase profile name and exit:, gateway:, inbound:, or endpoint: references. Grants must be unique.",
   "profiles.requires_yes": "Review with --dry-run, then pass --yes to confirm the change in JSON mode.",
+  "profiles.delivery_default": "Access profile {name} has a delivery default. Remove it from delivery.profile_policies with meridian fleet import first.",
   "profiles.exists": "Access profile {name} already exists.",
   "profiles.unknown": "Unknown access profile {name}. Check meridian profile list.",
   "profiles.confirm": "Apply profile {name} and the reviewed access changes?",

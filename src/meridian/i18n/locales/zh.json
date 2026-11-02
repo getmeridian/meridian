@@ -808,6 +808,7 @@
   "profiles.choose_grants": "为每个引用重复使用 --grant，或使用 --empty 清空所有授权。",
   "profiles.invalid": "请使用小写配置名称以及 exit:、gateway:、inbound: 或 endpoint: 引用。引用不能重复。",
   "profiles.requires_yes": "先用 --dry-run 预览，再用 --yes 确认 JSON 模式下的变更。",
+  "profiles.delivery_default": "访问配置 {name} 设有默认投递策略。请先用 meridian fleet import 将其从 delivery.profile_policies 中移除。",
   "profiles.exists": "访问配置 {name} 已存在。",
   "profiles.unknown": "找不到访问配置 {name}。请查看 meridian profile list。",
   "profiles.confirm": "应用配置 {name} 及已预览的访问变更？",

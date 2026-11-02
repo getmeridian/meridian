@@ -53,6 +53,7 @@
 - **A new public command needs a `_HELP_LAYOUT` entry, a `rich_help_panel`, and a `core.command_catalog.COMMAND_OUTPUTS` entry** (`test_cli_catalog.py`); hidden `serve` and `dev` stay out of the catalog.
 - **Never save intent from a declined or dry-run review**; omitted options preserve saved values.
 - **Role names are server names** — `server set` accepts the exit, gateway, and relay IDs `fleet status` prints, since labs whose saved names are IPs had no other handle.
+- **Profile removal refuses a mapped delivery default first** — intent validation would raise a pydantic error that `profile remove` cannot render; name `delivery.profile_policies` and `fleet import` instead.
 - **Topology-owned removal and reissue never touch console-only people** — and `client reissue` clears device registrations and makes the new subscription URL the page URL at once.
 - **Flow-block receipts read at commit time are always pending** — re-read them briefly (`node_commands.wait_for_flow_blocks()`) before reporting, since the agent confirms within seconds of applying.
 - **`client enable` reports the status the service answers** (`expired`/`limited` when those still hold), never the requested one.

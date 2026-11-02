@@ -808,6 +808,7 @@
   "profiles.choose_grants": "Повторите --grant для каждого разрешённого подключения или укажите --empty, чтобы закрыть весь доступ.",
   "profiles.invalid": "Используйте имя профиля в нижнем регистре и ссылки exit:, gateway:, inbound: или endpoint:. Не повторяйте ссылки.",
   "profiles.requires_yes": "Проверьте изменения с --dry-run, затем подтвердите их флагом --yes в режиме JSON.",
+  "profiles.delivery_default": "Для профиля доступа {name} задана политика доставки. Сначала уберите её из delivery.profile_policies через meridian fleet import.",
   "profiles.exists": "Профиль доступа {name} уже существует.",
   "profiles.unknown": "Профиль доступа {name} не найден. Проверьте meridian profile list.",
   "profiles.confirm": "Применить профиль {name} и проверенные изменения доступа?",
