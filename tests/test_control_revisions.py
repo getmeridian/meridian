@@ -204,17 +204,37 @@ def test_secret_shaped_usernames_keep_creation_settings_and_display_names_in_rev
 @pytest.mark.parametrize(
     ("intent", "leak"),
     [
-        ({"access": {"creation_settings": {"token": {"api_key": "value"}}}}, "access.creation_settings.token.api_key"),
-        ({"access": {"display_names": {"token": {"password": "value"}}}}, "access.display_names.token.password"),
         (
-            {"access": {"creation_settings": {"token": {"nested": [{"secret": "value"}]}}}},
+            {"access": {"users": ["token"], "creation_settings": {"token": {"api_key": "value"}}}},
+            "access.creation_settings.token.api_key",
+        ),
+        (
+            {"access": {"users": ["token"], "display_names": {"token": {"password": "value"}}}},
+            "access.display_names.token.password",
+        ),
+        (
+            {"access": {"users": ["token"], "creation_settings": {"token": {"nested": [{"secret": "value"}]}}}},
             "access.creation_settings.token.nested.0.secret",
         ),
-        ({"access": {"display_names": {"token": "mrd_0123456789ab_" + "0" * 64}}}, "access.display_names.token"),
+        (
+            {"access": {"users": ["token"], "display_names": {"token": "mrd_0123456789ab_" + "0" * 64}}},
+            "access.display_names.token",
+        ),
         ({"other": {"access": {"creation_settings": {"api_key": {}}}}}, "other.access.creation_settings.api_key"),
         ({"access.creation_settings": {"secret": {}}}, "access.creation_settings.secret"),
+        ({"access": {"creation_settings": {"api_key": "value"}}}, "access.creation_settings.api_key"),
+        ({"access": {"users": ["alice"], "display_names": {"api_key": "value"}}}, "access.display_names.api_key"),
     ],
-    ids=["creation-field", "display-name-field", "nested-field", "secret-value", "nested-map", "dotted-map"],
+    ids=[
+        "creation-field",
+        "display-name-field",
+        "nested-field",
+        "secret-value",
+        "nested-map",
+        "dotted-map",
+        "undeclared-scalars",
+        "undeclared-display-name",
+    ],
 )
 def test_username_map_exceptions_still_detect_secret_fields_and_values(intent: dict[str, Any], leak: str):
     assert secret_paths(intent) == [leak]
