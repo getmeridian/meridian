@@ -91,14 +91,14 @@ system-lab-fast: system-lab-preflight system-lab-agent ## Re-run system lab pres
 
 ## —— Real-VM harness (LOCAL ONLY, costs real money) ————————————————
 
-real-lab: ## Provision Hetzner VM + verify + destroy (TOPO=single by default)
+real-lab: ## Verify a Hetzner VM + destroy (TOPO=single by default; domain or upgrade)
 	@if [ -z "$$HCLOUD_TOKEN" ]; then \
 		echo "  ✗ HCLOUD_TOKEN is not set. See tests/realvm/README.md"; exit 2; \
 	fi
 	@echo "  NOTE: this provisions a real VM and costs real money (~€0.01 for a full run)."
 	PYTHONUNBUFFERED=1 uv run --group realvm python -m tests.realvm.orchestrator up $${TOPO:-single}
 
-real-lab-keep: ## Provision + verify, but DON'T auto-destroy (useful with TIER=interactive)
+real-lab-keep: ## Provision + verify, retaining the VM and fleet home (TOPO=single|domain|upgrade)
 	@if [ -z "$$HCLOUD_TOKEN" ]; then \
 		echo "  ✗ HCLOUD_TOKEN is not set. See tests/realvm/README.md"; exit 2; \
 	fi

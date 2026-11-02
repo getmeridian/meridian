@@ -1,0 +1,28 @@
+# Single bare-IP exit deployed by a published wheel, then upgraded by this checkout.
+# No sslip.io certificate issuance. REALVM_UPGRADE_FROM pins the starting release;
+# otherwise choose the newest PyPI release strictly below VERSION, including pre-releases.
+name: upgrade
+description: "Published release to checkout in place, preserving subscriptions and account limits"
+
+provider: hetzner
+region: nbg1
+size: cx23
+image: ubuntu-24.04
+
+nodes:
+  - role: exit
+    name: exit-1
+    harden: true
+
+verify:
+  tier_alpha:
+    - published_release_deployed
+    - limited_client_created
+    - subscriptions_captured
+    - checkout_applied
+    - control_schema_current
+    - plan_converged
+    - subscriptions_unchanged
+    - client_metadata_preserved
+    - agent_version_current
+    - connection_test_passes

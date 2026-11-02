@@ -19,17 +19,21 @@ from __future__ import annotations
 
 import argparse
 import os
+import shlex
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any, NoReturn, TextIO
 
 import yaml
 
 from tests.realvm.providers.base import CloudProvider, ProviderError, VMInstance, VMSpec
+from tests.realvm.upgrade_support import redact_output
 
 HARNESS_LABEL = "meridian-realvm-test"  # marker label — always "1" on harness VMs
 FLEET_ID_LABEL = "meridian-fleet-id"  # per-run uuid, groups VMs of one run
@@ -59,13 +63,29 @@ SUPPORTED_TOPOLOGIES = {
         "plan_converged_domain_paths",
         "ip_certificate_retired",
     ),
+    "upgrade": (
+        "published_release_deployed",
+        "limited_client_created",
+        "subscriptions_captured",
+        "checkout_applied",
+        "control_schema_current",
+        "plan_converged",
+        "subscriptions_unchanged",
+        "client_metadata_preserved",
+        "agent_version_current",
+        "connection_test_passes",
+    ),
 }
 # Node roles each topology must declare, in order.
-TOPOLOGY_ROLES = {"single": ["exit"], "domain": ["exit"]}
+TOPOLOGY_ROLES = {"single": ["exit"], "domain": ["exit"], "upgrade": ["exit"]}
 # Verifier script per topology, under verify/.
-VERIFIERS = {"single": "single.sh", "domain": "domain.sh"}
+VERIFIERS = {"single": "single.sh", "domain": "domain.sh", "upgrade": "upgrade.sh"}
 # A verifier that reached no verdict (a Let's Encrypt rate limit); see tests/realvm/domain_support.py.
 INCONCLUSIVE_EXIT = 75
+
+
+def _print(message: str = "", *, file: TextIO | None = None) -> None:
+    print(redact_output(message, known=(os.environ.get("HCLOUD_TOKEN", ""),)), file=file, flush=True)
 
 
 @dataclass
@@ -116,14 +136,14 @@ def confirm_cost(provider: CloudProvider, topology: Topology, hours: float = 0.5
     total = per_vm * n_vms if per_vm is not None else None
     pretty = f"≈ €{total:.4f}" if total is not None else "unknown (provider has no pricing API)"
 
-    print()
-    print(f"  Topology:   {topology.name}")
-    print(f"  Provider:   {topology.provider}")
-    print(f"  Region:     {topology.region}")
-    print(f"  VM count:   {n_vms}  ({topology.size}, {topology.image})")
-    print(f"  Estimated:  {pretty} for {hours} hour(s)")
-    print("  Safety cap: 5 VMs (override with MERIDIAN_REALVM_FORCE=1)")
-    print()
+    _print()
+    _print(f"  Topology:   {topology.name}")
+    _print(f"  Provider:   {topology.provider}")
+    _print(f"  Region:     {topology.region}")
+    _print(f"  VM count:   {n_vms}  ({topology.size}, {topology.image})")
+    _print(f"  Estimated:  {pretty} for {hours} hour(s)")
+    _print("  Safety cap: 5 VMs (override with MERIDIAN_REALVM_FORCE=1)")
+    _print()
 
     if n_vms > 5 and os.environ.get("MERIDIAN_REALVM_FORCE", "0") != "1":
         _fail(f"Topology wants {n_vms} VMs — above the safety cap.\nSet MERIDIAN_REALVM_FORCE=1 to proceed.")
@@ -221,7 +241,7 @@ def require_agent_build() -> None:
 def provision(provider: CloudProvider, topology: Topology, fleet_id: str) -> list[VMInstance]:
     ssh_path, ssh_pub = _read_ssh_public_key()
     key_name = f"meridian-realvm-{fleet_id[:8]}"
-    print(f"  → Uploading SSH key {key_name} ...")
+    _print(f"  → Uploading SSH key {key_name} ...")
     ssh_key_id = provider.upload_ssh_key(name=key_name, public_key=ssh_pub)
 
     labels = {
@@ -236,7 +256,7 @@ def provision(provider: CloudProvider, topology: Topology, fleet_id: str) -> lis
     instances: list[VMInstance] = []
     for i, node_spec in enumerate(topology.nodes):
         vm_name = f"meridian-realvm-{topology.name}-{node_spec.get('name', f'n{i}')}-{fleet_id[:8]}"
-        print(f"  → Provisioning {vm_name} ...")
+        _print(f"  → Provisioning {vm_name} ...")
         spec = VMSpec(
             name=vm_name,
             image=topology.image,
@@ -249,7 +269,7 @@ def provision(provider: CloudProvider, topology: Topology, fleet_id: str) -> lis
             instance = provider.create_vm(spec)
         except ProviderError as e:
             # On provision failure, teardown what we already have.
-            print(f"    ✗ Provision failed: {e}")
+            _print(f"    ✗ Provision failed: {e}")
             for done in instances:
                 try:
                     provider.destroy_vm(done.id)
@@ -260,7 +280,7 @@ def provision(provider: CloudProvider, topology: Topology, fleet_id: str) -> lis
             except Exception:
                 pass
             raise
-        print(f"    ✓ {instance.name} [{instance.public_ipv4}]")
+        _print(f"    ✓ {instance.name} [{instance.public_ipv4}]")
         instances.append(instance)
 
     # Wait for ssh to actually accept connections (cloud-init may still be
@@ -289,7 +309,7 @@ def _wait_ssh(ip: str, port: int, timeout_sec: int) -> None:
 
 def destroy_fleet(provider: CloudProvider, fleet_id: str) -> None:
     """Destroy every VM with the given fleet-id label, plus its SSH key."""
-    print(f"  → Destroying fleet {fleet_id[:8]} ...")
+    _print(f"  → Destroying fleet {fleet_id[:8]} ...")
     # Find all VMs with this fleet id
     vms = provider.list_vms({HARNESS_LABEL: "1", FLEET_ID_LABEL: fleet_id})
     ssh_key_ids = {vm.labels.get("meridian-ssh-key-id", "") for vm in vms}
@@ -298,9 +318,9 @@ def destroy_fleet(provider: CloudProvider, fleet_id: str) -> None:
     for vm in vms:
         try:
             provider.destroy_vm(vm.id)
-            print(f"    ✓ destroyed {vm.name}")
+            _print(f"    ✓ destroyed {vm.name}")
         except Exception as e:
-            print(f"    ✗ could not destroy {vm.name}: {e}")
+            _print(f"    ✗ could not destroy {vm.name}: {e}")
 
     # SSH public keys carry no ongoing cost on Hetzner, but tidy anyway.
     # The key id is stashed in the VM label at provision time.
@@ -314,21 +334,21 @@ def destroy_fleet(provider: CloudProvider, fleet_id: str) -> None:
 def destroy_all_orphans(provider: CloudProvider, *, execute: bool = False) -> None:
     vms = provider.list_vms({HARNESS_LABEL: "1"})
     if not vms:
-        print("  No harness-tagged VMs found.")
+        _print("  No harness-tagged VMs found.")
         return
-    print(f"  Found {len(vms)} harness-tagged VM(s):")
+    _print(f"  Found {len(vms)} harness-tagged VM(s):")
     for vm in vms:
         fleet = vm.labels.get(FLEET_ID_LABEL, "?")
-        print(f"    - {vm.name}  [{vm.public_ipv4}]  fleet={fleet[:8]}")
+        _print(f"    - {vm.name}  [{vm.public_ipv4}]  fleet={fleet[:8]}")
     if not execute:
-        print("\n  Run with --execute to actually destroy them.")
+        _print("\n  Run with --execute to actually destroy them.")
         return
     for vm in vms:
         try:
             provider.destroy_vm(vm.id)
-            print(f"    ✓ destroyed {vm.name}")
+            _print(f"    ✓ destroyed {vm.name}")
         except Exception as e:
-            print(f"    ✗ could not destroy {vm.name}: {e}")
+            _print(f"    ✗ could not destroy {vm.name}: {e}")
 
 
 # --------------------------------------------------------------------------
@@ -336,44 +356,87 @@ def destroy_all_orphans(provider: CloudProvider, *, execute: bool = False) -> No
 # --------------------------------------------------------------------------
 
 
-def run_verification(topology: Topology, instances: list[VMInstance]) -> int:
+def _verification_workspace(fleet_id: str) -> Path:
+    workspace = Path(tempfile.mkdtemp(prefix=f"meridian-realvm-{fleet_id[:8]}-"))
+    try:
+        (workspace / "home").mkdir(mode=0o700)
+        (workspace / "fleet-id").write_text(fleet_id + "\n")
+    except BaseException:
+        shutil.rmtree(workspace)
+        raise
+    return workspace
+
+
+def _kept_workspace(workspace: Path) -> None:
+    _print(f"  Kept fleet home: {workspace / 'home'}")
+    if (workspace / "env.sh").exists():
+        _print(f"  source {shlex.quote(str(workspace / 'env.sh'))}")
+    _print(
+        f'  uv run python -m tests.realvm.orchestrator down --fleet "$(cat {shlex.quote(str(workspace / "fleet-id"))})"'
+    )
+
+
+def run_verification(
+    topology: Topology,
+    instances: list[VMInstance],
+    *,
+    upgrade_from: str = "",
+    keep: bool = False,
+    workspace: Path | None = None,
+) -> int:
     """Run tier α verification on the provisioned fleet. Returns exit code
     (0=all passed, non-zero=failures)."""
     # Single-VM topologies verify against instance[0]; multi-node ones need their own wiring.
     if topology.name not in VERIFIERS:
-        print(f"  ✗ Verification for {topology.name} is not implemented; refusing to report success.")
+        _print(f"  ✗ Verification for {topology.name} is not implemented; refusing to report success.")
         return 2
 
     ip = instances[0].public_ipv4
     if not ip:
         _fail("VM has no public IPv4 — cannot verify.")
 
-    print(f"\n  Running tier α verification against {ip} ...\n")
+    _print(f"\n  Running tier α verification against {ip} ...\n")
 
     # Invoke the shell verify script — keeps Meridian CLI invocation logic
     # in shell (matches systemlab/controller-run.sh which developers know).
     verify_sh = Path(__file__).parent / "verify" / VERIFIERS[topology.name]
     if not verify_sh.exists():
-        print(f"  ✗ verify script not found: {verify_sh}")
+        _print(f"  ✗ verify script not found: {verify_sh}")
         return 2
 
-    # Isolate Meridian's config dir per fleet — otherwise `meridian deploy`
-    # refuses to run when the developer already has a cluster.yml configured
-    # from unrelated work. Cleans up on destroy via rmtree.
+    # SSH ControlPath must live outside synced checkouts. A kept VM needs its local home too.
     fleet_id = instances[0].labels.get(FLEET_ID_LABEL, "unknown")
-    meridian_home = Path(__file__).parent / ".local" / f"fleet-{fleet_id[:8]}"
-    meridian_home.mkdir(parents=True, exist_ok=True)
-
-    env = {
-        **os.environ,
-        "TARGET_IP": ip,
-        "MERIDIAN_FLEET_ID": fleet_id,
-        "MERIDIAN_HOME": str(meridian_home),
-    }
-    result = subprocess.run(["bash", str(verify_sh)], env=env)
-    if result.returncode == INCONCLUSIVE_EXIT:
-        print(f"\n  ? Inconclusive: {topology.name} reached no verdict (see above); this is not a product failure.")
-    return result.returncode
+    owns_workspace = workspace is None
+    workspace = workspace or _verification_workspace(fleet_id)
+    meridian_home = workspace / "home"
+    try:
+        env = {
+            **os.environ,
+            "TARGET_IP": ip,
+            "MERIDIAN_FLEET_ID": fleet_id,
+            "MERIDIAN_HOME": str(meridian_home),
+            "MERIDIAN_DISABLE_UPDATE_CHECK": "1",
+        }
+        if upgrade_from:
+            env["REALVM_UPGRADE_FROM"] = upgrade_from
+        with subprocess.Popen(
+            ["bash", str(verify_sh)], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
+        ) as process:
+            assert process.stdout is not None
+            for line in process.stdout:
+                _print(line.rstrip("\n"))
+            code = process.wait()
+        if code == INCONCLUSIVE_EXIT:
+            _print(
+                f"\n  ? Inconclusive: {topology.name} reached no verdict (see above); this is not a product failure."
+            )
+        return code
+    finally:
+        if owns_workspace:
+            if keep:
+                _kept_workspace(workspace)
+            else:
+                shutil.rmtree(workspace)
 
 
 # --------------------------------------------------------------------------
@@ -382,7 +445,7 @@ def run_verification(topology: Topology, instances: list[VMInstance]) -> int:
 
 
 def _fail(msg: str) -> NoReturn:
-    print(f"\n  ✗ {msg}\n", file=sys.stderr)
+    _print(f"\n  ✗ {msg}\n", file=sys.stderr)
     sys.exit(2)
 
 
@@ -392,23 +455,57 @@ def cmd_up(args: argparse.Namespace) -> int:
     topology = load_topology(args.topology)
     require_supported_topology(topology)
     require_agent_build()
+    upgrade_from = ""
+    if topology.name == "upgrade":
+        from tests.realvm.upgrade_verifier import VerificationError, preflight_upgrade
+
+        try:
+            upgrade_from, _agent_version = preflight_upgrade(Path(__file__).parents[2], os.environ)
+        except VerificationError as exc:
+            _print(f"  {'Inconclusive' if exc.exit_code == INCONCLUSIVE_EXIT else 'Refused'}: {exc}")
+            return exc.exit_code
     provider = make_provider(topology.provider)
     confirm_cost(provider, topology, hours=0.5)
 
     fleet_id = str(uuid.uuid4())
-    print(f"\n  Fleet id: {fleet_id}\n")
+    _print(f"\n  Fleet prefix: {fleet_id[:8]}\n")
 
     instances: list[VMInstance] = []
     rc = 0
+    workspace = _verification_workspace(fleet_id) if topology.name == "upgrade" else None
+    previous_key = os.environ.get("MERIDIAN_TEST_SSH_KEY")
     try:
+        if workspace is not None and not previous_key:
+            key = workspace / "id_ed25519"
+            try:
+                subprocess.run(
+                    ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", f"realvm-{fleet_id[:8]}", "-f", str(key)],
+                    check=True,
+                    capture_output=True,
+                    stdin=subprocess.DEVNULL,
+                    timeout=30,
+                )
+            except (OSError, subprocess.SubprocessError):
+                _fail("Could not create the upgrade run's SSH key. Check that ssh-keygen is installed.")
+            os.environ["MERIDIAN_TEST_SSH_KEY"] = f"{key}.pub"
         instances = provision(provider, topology, fleet_id)
-        rc = run_verification(topology, instances)
+        rc = run_verification(topology, instances, upgrade_from=upgrade_from, keep=args.keep, workspace=workspace)
     finally:
-        if args.keep:
-            print("\n  --keep set; leaving VMs alive. Clean up with:")
-            print(f"    python -m tests.realvm.orchestrator down --fleet {fleet_id}\n")
+        if previous_key is None:
+            os.environ.pop("MERIDIAN_TEST_SSH_KEY", None)
         else:
-            destroy_fleet(provider, fleet_id)
+            os.environ["MERIDIAN_TEST_SSH_KEY"] = previous_key
+        try:
+            if args.keep:
+                if workspace is not None:
+                    _kept_workspace(workspace)
+                _print(f"\n  --keep set; leaving VMs alive (fleet prefix {fleet_id[:8]}).")
+                _print("  Use the printed cleanup command, or locate this fleet with `make real-lab-orphans`.\n")
+            else:
+                destroy_fleet(provider, fleet_id)
+        finally:
+            if workspace is not None and not args.keep:
+                shutil.rmtree(workspace)
 
     return rc
 
