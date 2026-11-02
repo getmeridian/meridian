@@ -12,7 +12,7 @@ _RENDERER_MANIFEST = {
     "control-subscriptions": "delivery-stash-lan-v9",
     "control-commands": "cut-off-disclosures-v8",
     "pwa": "delivery-capabilities-v5",
-    "control-service": "lazy-geodata-v55",
+    "control-service": "profile-policy-identifiers-v56",
     "control-api": "delivery-conflict-preview-v44",
     "control-ui": "delivery-preview-v29",
     "firewall": "ufw-comment-v2",
