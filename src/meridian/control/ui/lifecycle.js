@@ -45,21 +45,59 @@
     return empty && !text || /^\d+$/.test(text) && Number(text) >= 1 && Number(text) <= max;
   }
 
+  M.scheduleEditorPreview = function (nodes, preview, read, facts, error) {
+    var timer, turn = 0;
+    function cancel() { clearTimeout(timer); return ++turn; }
+    function saving() { var form = nodes.closest("form"); return form && form.meridianSaving; }
+    function review(body, passiveEdit) {
+      var mine = cancel();
+      return M.api("POST", "api/users/preview", body, { passive: true }).then(function (result) {
+        if (nodes.isConnected && mine === turn) M.mount(preview, facts(result));
+        return result;
+      }, function (failure) {
+        if (!passiveEdit) throw failure;
+        if (nodes.isConnected && mine === turn && !saving()) error.textContent = M.errorText(failure);
+      });
+    }
+    return { update: function () {
+      var mine = cancel(), body;
+      if (saving()) return;
+      error.textContent = "";
+      try { body = read(); } catch (failure) { return; }
+      timer = setTimeout(function () {
+        if (!nodes.isConnected || mine !== turn || saving()) return;
+        review(body, true);
+      }, 250);
+    }, review: review, stop: cancel, refresh: function (schedule) {
+      cancel(); error.textContent = ""; M.mount(preview, facts(schedule));
+    } };
+  };
+
   M.resetAnchorFields = function (user, strategy) {
     var initial = user && user.traffic_reset_anchor_day ? String(user.traffic_reset_anchor_day) : "";
     var anchor = h("input", { name: "traffic_reset_anchor_day", type: "number", min: "1", max: "31",
       step: "1", inputmode: "numeric", value: initial });
     var node = M.field(M.t("lifecycle.reset_day"), anchor, M.t("lifecycle.reset_day_hint"));
+    var error = h("p", { class: "field-error", role: "alert", id: anchor.id + "-error" });
+    anchor.setAttribute("aria-describedby", ((anchor.getAttribute("aria-describedby") || "") + " " + error.id).trim());
+    node.appendChild(error);
     function validate() {
       node.hidden = anchor.disabled = strategy.value !== "month_rolling";
       var valid = anchor.disabled || integer(anchor, 31, true);
       anchor.setCustomValidity(valid ? "" : M.t("lifecycle.invalid_traffic_reset_anchor_day"));
       anchor.setAttribute("aria-invalid", String(!valid));
+      error.textContent = anchor.validationMessage;
       return valid;
     }
     strategy.addEventListener("change", validate); anchor.addEventListener("input", validate); validate();
+    Promise.resolve().then(function () {
+      if (anchor.form) anchor.form.addEventListener("submit", function (event) {
+        if (validate()) return;
+        event.preventDefault(); event.stopImmediatePropagation(); anchor.focus(); anchor.reportValidity();
+      }, true);
+    });
     return { node: node, input: anchor, validate: validate, change: function () {
-      if (!validate()) throw new Error(anchor.validationMessage);
+      if (!validate()) { anchor.focus(); throw new Error(anchor.validationMessage); }
       var body = {};
       if (!anchor.disabled && anchor.value !== initial) body.traffic_reset_anchor_day = anchor.value ? Number(anchor.value) : null;
       return body;
@@ -132,12 +170,12 @@
         if (mode.value === "never") message = M.t("lifecycle.renewal_needs_expiry");
         if (capMode.value === "limited" && !integer(cap, 10000, false)) message = M.t("lifecycle.invalid_renewal_limit");
       }
-      if (ownAnchor && !reset.validate()) message = M.t("lifecycle.invalid_traffic_reset_anchor_day");
+      var validAnchor = !ownAnchor || reset.validate();
       error.textContent = message;
-      return !message && validExpiry;
+      return !message && validExpiry && validAnchor;
     }
     function change() {
-      if (!validate()) throw new Error(error.textContent || expiry.date.validationMessage || expiry.time.validationMessage);
+      if (!validate()) throw new Error(error.textContent || expiry.date.validationMessage || expiry.time.validationMessage || anchor.validationMessage);
       var body = {};
       if (mode.value === "first_use") {
         if (!user || initialMode !== "first_use" || duration.value !== initialDuration) {
@@ -162,21 +200,14 @@
       if (ownAnchor) Object.assign(body, reset.change());
       return body;
     }
-    var timer, turn = 0, latest = M.latestOnly();
-    function update() {
-      var mine = ++turn;
-      clearTimeout(timer);
-      if (!validate()) return;
-      timer = setTimeout(function () {
-        if (!nodes.isConnected || mine !== turn) return;
-        var body = change();
-        if (user) body.username = user.username;
-        if (ownAnchor) body.traffic_limit_strategy = limits.strategy.value;
-        latest(M.api("POST", "api/users/preview", body, { passive: true })).then(function (result) {
-          if (nodes.isConnected && mine === turn) M.mount(preview, facts(result));
-        }, function (e) { if (nodes.isConnected && mine === turn) error.textContent = M.errorText(e); });
-      }, 250);
+    function previewBody(change) {
+      var body = Object.assign({}, change);
+      if (user) body.username = user.username;
+      if (ownAnchor) body.traffic_limit_strategy = limits.strategy.value;
+      return body;
     }
+    var schedulePreview = M.scheduleEditorPreview(nodes, preview, function () { return previewBody(change()); }, facts, error);
+    function update() { schedulePreview.update(); }
     mode.addEventListener("change", function () {
       expiry.never.checked = mode.value !== "fixed";
       expiry.never.dispatchEvent(new Event("change", { bubbles: true }));
@@ -207,7 +238,7 @@
     return { nodes: nodes, change: change, setFixed: function (quiet) {
       mode.value = "fixed";
       if (quiet) {
-        clearTimeout(timer); turn++;
+        schedulePreview.stop();
         expiry.never.checked = false;
         expiry.never.dispatchEvent(new CustomEvent("change", { bubbles: true, detail: { quiet: true } }));
         sync(); error.textContent = "";
@@ -216,14 +247,6 @@
       mode.value = "first_use"; duration.value = String(days);
       mode.dispatchEvent(new Event("change", { bubbles: true }));
       duration.dispatchEvent(new Event("input", { bubbles: true }));
-    }, preview: function (change) {
-      var body = Object.assign({}, change);
-      if (user) body.username = user.username;
-      if (ownAnchor) body.traffic_limit_strategy = limits.strategy.value;
-      return M.api("POST", "api/users/preview", body, { passive: true }).then(function (result) {
-        if (nodes.isConnected) M.mount(preview, facts(result));
-        return result;
-      });
-    } };
+    }, preview: function (change) { return schedulePreview.review(previewBody(change)); }, stop: schedulePreview.stop };
   };
 })();

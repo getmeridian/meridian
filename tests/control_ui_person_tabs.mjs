@@ -13,13 +13,14 @@ const dom = new JSDOM('<!doctype html><html><body><div id="app"></div></body></h
   url: 'https://198.51.100.1/console/' + hash, runScripts: 'outside-only', pretendToBeVisual: true,
 });
 const w = dom.window, document = w.document, events = [], writes = [], report = {};
+const previewWaiters = [], patchWaiters = [];
 document.documentElement.lang = locale;
 document.documentElement.dir = locale === 'fa' ? 'rtl' : 'ltr';
 if (data.mode) w.localStorage.setItem('mrd.mode', data.mode);
 let now = Date.parse('2026-11-02T12:00:00Z'), timerId = 0;
 const timers = new Map();
 w.Date.now = () => now;
-if (scenario === 'person-tabs-refresh') {
+if (scenario === 'person-tabs-refresh' || data.clock) {
   w.setTimeout = (fn, delay = 0) => { const id = ++timerId; timers.set(id, { fn, at: now + delay }); return id; };
   w.clearTimeout = id => timers.delete(id);
 }
@@ -55,9 +56,12 @@ w.fetch = async (url, options = {}) => {
   events.push({ url, method, body, passive: options.headers?.['X-Meridian-Passive'] === '1' });
   if (url === 'auth/state') return reply({ configured: true, owner_exists: true, signed_in: true });
   if (url === 'ui/api/fleet') return reply({ profile_title: 'Test fleet', display_names: { sample: 'Sample person' }, servers: [], declared_users: [] });
-  if (url === 'api/users/preview') return data.failPreview
-    ? reply({ error: { code: 'invalid_request', message: 'Choose a valid account schedule.' } }, 400)
-    : reply({ ...user.schedule, expire_at: body.expire_at === undefined ? user.expire_at : body.expire_at });
+  if (url === 'api/users/preview') {
+    const answer = data.failPreview
+      ? reply({ error: { code: 'invalid_request', message: 'Choose a valid account schedule.' } }, 400)
+      : reply({ ...user.schedule, ...data.schedulePreview, expire_at: body.expire_at === undefined ? user.expire_at : body.expire_at });
+    return data.holdPreview ? new Promise(resolve => previewWaiters.push(() => resolve(answer))) : answer;
+  }
   if (url === 'api/people/bulk/preview') return reply(data.pendingPreview || { people: [{ after: {
     expire_at: null, activation_duration_days: user.activation_duration_days + body.action.months * 30,
   } }] });
@@ -74,7 +78,11 @@ w.fetch = async (url, options = {}) => {
   if (url === 'api/users/sample/delivery-policy') return reply({ override: null, effective: { policy: { id: 'full' }, source: 'fleet' } });
   if (url === 'api/users/sample') {
     if (method === 'PATCH') {
-      writes.push(body); user = { ...user, ...body, schedule: { ...user.schedule, expire_at: body.expire_at === undefined ? user.expire_at : body.expire_at } };
+      writes.push(body);
+      if (data.holdPatch) await new Promise(resolve => patchWaiters.push(resolve));
+      user = { ...user, ...body, schedule: { ...user.schedule,
+        ...(body.traffic_limit_strategy ? data.updatedSchedule : {}),
+        expire_at: body.expire_at === undefined ? user.expire_at : body.expire_at } };
     }
     return reply(user);
   }
@@ -95,6 +103,15 @@ M.renderServers = view => M.mount(view, M.h('h1', { text: 'Servers' }));
 M.renderOverview = view => M.mount(view, M.h('h1', { text: 'Overview' }));
 w.eval(fs.readFileSync(path.join(ui, 'app.js'), 'utf8'));
 const settle = () => new Promise(resolve => setTimeout(resolve, 15));
+async function advance(ms) {
+  const target = now + ms;
+  while (true) {
+    const due = [...timers].filter(([, timer]) => timer.at <= target).sort((a, b) => a[1].at - b[1].at)[0];
+    if (!due) break;
+    now = due[1].at; timers.delete(due[0]); due[1].fn(); await settle();
+  }
+  now = target; await settle();
+}
 await settle(); await settle();
 const view = () => document.getElementById('view');
 const summary = () => view().querySelector('[data-person-summary]');
@@ -293,6 +310,46 @@ if (scenario === 'person-tabs-custom-race') {
   const form = fieldRow('expiry').querySelector('form');
   report.date = form.querySelector('input[type="date"]').value;
   report.mode = form.querySelector('[name="expiry_mode"]').value; report.dirty = M.formDirty(form); report.writes = writes;
+}
+
+if (scenario === 'person-tabs-traffic-preview') {
+  const form = await edit('traffic'), anchor = form.querySelector('[name="traffic_reset_anchor_day"]');
+  const preview = form.querySelector('.lifecycle-preview');
+  const requests = () => events.filter(event => event.url === 'api/users/preview');
+  const errors = () => [...form.querySelectorAll('.field-error')].filter(el => el.textContent.trim()).map(el => el.textContent);
+  report.initialReset = preview.querySelector('bdi')?.title || '';
+  change(form.querySelector('[name="traffic_limit_strategy"]'), 'month_rolling'); change(anchor, '0');
+  form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await settle();
+  report.invalid = { fields: errors(), summary: form.querySelector('.form-error').textContent,
+    focused: document.activeElement === anchor, previews: requests().length, writes: writes.slice() };
+  change(anchor, '15');
+  report.corrected = { fields: errors(), summary: form.querySelector('.form-error').textContent };
+  await advance(250);
+  report.editing = { reset: preview.querySelector('bdi')?.title || '', previews: requests(), writes: writes.slice() };
+  form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await settle(); await settle();
+  report.writes = writes; report.closed = !fieldRow('traffic').querySelector('form');
+}
+
+if (scenario === 'person-tabs-saving-preview') {
+  const sibling = await edit('note'), note = sibling.querySelector('textarea'); change(note, 'Other private draft');
+  const form = await edit('expiry');
+  if (data.firstUse) change(form.querySelector('[name="expiry_mode"]'), 'first_use');
+  else change(form.querySelector('input[type="date"]'), '2032-06-01');
+  change(form.querySelector('[name="renewal_mode"]'), 'months');
+  change(form.querySelector('[name="renewal_interval"]'), '1');
+  change(form.querySelector('[name="renewal_cap_mode"]'), 'limited');
+  change(form.querySelector('[name="renewal_limit"]'), '2');
+  const frozen = () => [...form.querySelectorAll('input, select, textarea')].every(field => field.disabled);
+  form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await settle();
+  report.startedFrozen = frozen(); await advance(300);
+  report.review = { frozen: frozen(), saving: !!form.meridianSaving,
+    previews: events.filter(event => event.url === 'api/users/preview').length };
+  previewWaiters.splice(0).forEach(resolve => resolve()); await settle(); await settle();
+  await advance(300);
+  report.patch = { frozen: frozen(), saving: !!form.meridianSaving, writes: writes.length };
+  patchWaiters.splice(0).forEach(resolve => resolve()); await settle(); await settle();
+  report.closed = !fieldRow('expiry').querySelector('form');
+  report.sibling = { connected: note.isConnected, value: note.value, enabled: !note.disabled };
 }
 
 if (scenario === 'person-tabs-mode') {

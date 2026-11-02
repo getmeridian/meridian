@@ -40,6 +40,8 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Traffic previews start with saved dates** — debounce period and reset-day edits, show and focus the reset field's own error, and clear obsolete form errors on input.
+- **Saving owns the preview timer** — cancel pending previews before the final review, reject timer work during saving, and never validate controls from a delayed callback.
 - **Custom date starts before the draft snapshot** — choose its fixed mode quietly, keep untouched existing editors clean, and let the date field own its single validation alert.
 - **Quiet date choices still cancel presets** — send a silent change through the expiry guard so an earlier calendar reply cannot fill the newly opened custom editor.
 - **Summary extensions follow saved access** — guard pending reviews with edit events rather than validating unfinished drafts, and let a returned calendar preset select Fixed date from any editor mode.

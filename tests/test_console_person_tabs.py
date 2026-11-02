@@ -277,3 +277,35 @@ def test_custom_date_keeps_a_clean_editor_when_an_earlier_month_preview_arrives_
     result = run_console("person-tabs-custom-race", data={"holdCalendar": True})
     assert result["date"] == "2026-12-02" and result["mode"] == "fixed"
     assert not result["dirty"] and result["writes"] == []
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_traffic_editor_previews_while_editing_and_focuses_then_clears_an_invalid_reset_day(locale: str) -> None:
+    result = run_console(
+        "person-tabs-traffic-preview",
+        locale,
+        {"clock": True, "schedulePreview": {"next_reset_at": "2026-11-15T00:00:00Z"}},
+    )
+    assert result["initialReset"] == "2026-12-01T00:00:00Z UTC"
+    assert len(result["invalid"]["fields"]) == 1 and result["invalid"]["focused"]
+    assert result["invalid"]["summary"] == "" and result["invalid"]["previews"] == 0 and result["invalid"]["writes"] == []
+    assert result["corrected"] == {"fields": [], "summary": ""}
+    editing = result["editing"]
+    assert editing["reset"] == "2026-11-15T00:00:00Z UTC" and editing["writes"] == []
+    assert [event["body"] for event in editing["previews"]] == [
+        {"username": "sample", "traffic_limit_strategy": "month_rolling", "traffic_reset_anchor_day": 15}
+    ]
+    assert editing["previews"][0]["method"] == "POST"
+    assert result["writes"] == [{"traffic_limit_strategy": "month_rolling", "traffic_reset_anchor_day": 15}]
+    assert result["closed"]
+
+
+@pytest.mark.parametrize("first_use", [False, True])
+def test_submitting_before_the_preview_debounce_keeps_fields_frozen_through_review_and_patch(first_use: bool) -> None:
+    result = run_console(
+        "person-tabs-saving-preview", data={"clock": True, "holdPreview": True, "holdPatch": True, "firstUse": first_use}
+    )
+    assert result["startedFrozen"]
+    assert result["review"] == {"frozen": True, "saving": True, "previews": 1}
+    assert result["patch"] == {"frozen": True, "saving": True, "writes": 1}
+    assert result["closed"] and result["sibling"] == {"connected": True, "value": "Other private draft", "enabled": True}

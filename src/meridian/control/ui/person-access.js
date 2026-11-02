@@ -91,16 +91,21 @@
             lifecycle.setDuration(after.activation_duration_days);
           });
       }
-      return { nodes: lifecycle.nodes, value: lifecycle.change, review: lifecycle.preview, preset: preset, setFixed: lifecycle.setFixed };
+      return { nodes: lifecycle.nodes, value: lifecycle.change, review: lifecycle.preview, preset: preset,
+        setFixed: lifecycle.setFixed, stop: lifecycle.stop };
     }
     var limits = M.limitFields(user), anchor = M.resetAnchorFields(user, limits.strategy);
-    var preview = h("div", { class: "lifecycle-preview", "aria-live": "polite" });
-    return { nodes: [limits.nodes, anchor.node, preview], value: function () {
-      return Object.assign(limits.value(), anchor.change());
-    }, review: function (change) {
-      return M.api("POST", "api/users/preview", Object.assign({ username: user.username }, change), { passive: true }).then(function (schedule) {
-        if (preview.isConnected) M.mount(preview, M.scheduleFacts(schedule, { compact: true, expiry: false }));
-      });
+    function facts(schedule) { return M.scheduleFacts(schedule, { compact: true, expiry: false }); }
+    var preview = h("div", { class: "lifecycle-preview", "aria-live": "polite" }, facts(user.schedule));
+    var error = h("p", { class: "field-error schedule-error", role: "alert" });
+    var nodes = h("div", { class: "stack-sm traffic-fields" }, limits.nodes, anchor.node, error, preview);
+    function value() { return Object.assign(limits.value(), anchor.change()); }
+    var schedulePreview = M.scheduleEditorPreview(nodes, preview, function () {
+      return Object.assign({ username: user.username }, value());
+    }, facts, error);
+    limits.strategy.addEventListener("change", schedulePreview.update); anchor.input.addEventListener("input", schedulePreview.update);
+    return { nodes: nodes, value: value, stop: schedulePreview.stop, review: function (change) {
+      return schedulePreview.review(Object.assign({ username: user.username }, change));
     } };
   }
 
@@ -110,13 +115,14 @@
     var facts = h("dl", { class: "person-access-facts" }), metadata = h("dl", { class: "person-access-facts" });
     function close(entry, focus) {
       if (!entry.form) return;
+      if (entry.fields.stop) entry.fields.stop();
       M.discardDrafts(entry.form); M.clear(entry.editor); entry.form = null; entry.fields = null;
       entry.edit.setAttribute("aria-expanded", "false");
       if (focus) entry.edit.focus();
     }
     function open(key, months, fixed) {
       var entry = entries[key];
-      if (!entry) return Promise.resolve();
+      if (!entry || entry.form && entry.form.meridianSaving) return Promise.resolve();
       var existing = entry.form;
       if (entry.row.closest("details")) entry.row.closest("details").open = true;
       if (!entry.form) {
@@ -129,6 +135,9 @@
               M.tryLeave(form).then(function (leave) { if (leave && entry.form === form) close(entry, true); });
             } }, M.t("action.cancel"))));
         entry.form = form; entry.fields = controls; M.mount(entry.editor, form); M.trackForm(form);
+        ["input", "change"].forEach(function (name) {
+          form.addEventListener(name, function () { if (!form.meridianSaving) form.querySelector(".form-error").textContent = ""; });
+        });
         entry.edit.setAttribute("aria-expanded", "true");
         form.addEventListener("submit", function (event) {
           event.preventDefault();

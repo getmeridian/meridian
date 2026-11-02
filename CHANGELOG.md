@@ -23,7 +23,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   and language move into an account menu. A person's page keeps a summary with
   Share, Extend, and Disable above tabs, reset and expiry together below usage,
   and each setting edits in place from a clean draft; extensions follow saved access and keep first-use
-  accounts pending. Simple opens Access & limits directly. The Share
+  accounts pending. Date and traffic previews update while editing and keep saving
+  forms locked. Simple opens Access & limits directly. The Share
   dialog presents QR and links under one heading. People
   gets removable filter chips, one scrolling filter row on phones, and compact
   rows with near-quota labels only before
