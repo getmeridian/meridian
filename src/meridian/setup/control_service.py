@@ -27,7 +27,7 @@ from meridian.compiler.models import (
 )
 from meridian.control.client import ControlClient
 from meridian.control.command_models import NodeCommandRecord
-from meridian.control.models import ServiceConfig
+from meridian.control.models import NodeStatus, ServiceConfig
 from meridian.control_artifacts import agent_binary, require_agent_build, service_package
 from meridian.core.cancellation import CancellationToken
 from meridian.core.defaults import DEFAULT_SNI
@@ -48,6 +48,7 @@ from meridian.servers import ServerEntry
 from meridian.ssh import ServerConnection
 
 _ATTESTATION_PATH = f"{CONTROL_SERVICE_STATE_DIR}.attestation"
+NODE_APPLY_WAIT_SECONDS = 90.0
 PersistCluster = Callable[[ClusterConfig], None]
 
 
@@ -277,10 +278,18 @@ def verify_control_service(plan: ResourcePlan, cluster: ClusterConfig) -> tuple[
     with control_client(cluster) as client:
         version = client.health().version
         nodes = [item.payload for item in plan.resources if isinstance(item.payload, NodeWorkloadPayload)]
-        for node in nodes:
-            status = client.node(node.workload_ref)
-            if status is None or not status.in_sync:
-                raise ResourceReconcileError(f"Node {node.workload_ref} has not applied its current document.")
+        # Settings and accounts apply after the workloads they depend on, and each write signs a
+        # new node document; agents long-poll, so a node in step applies it within seconds.
+        behind = [node.workload_ref for node in nodes]
+
+        def applied() -> bool:
+            behind[:] = [ref for ref in behind if not _in_sync(client.node(ref))]
+            return not behind
+
+        try:
+            poll_until_ready(applied, timeout=NODE_APPLY_WAIT_SECONDS, interval=1.0, description="node documents")
+        except ReadinessTimeout:
+            raise ResourceReconcileError(f"Node {behind[0]} has not applied its current document.") from None
         urls: dict[str, str] = {}
         for item in plan.resources:
             if not isinstance(item.payload, ControlUserPayload):
@@ -299,6 +308,10 @@ def verify_control_service(plan: ResourcePlan, cluster: ClusterConfig) -> tuple[
             hint="Run `meridian apply` to reinstall it, then `meridian test` to check every endpoint.",
         )
     return version, len(nodes), urls
+
+
+def _in_sync(status: NodeStatus | None) -> bool:
+    return status is not None and status.in_sync
 
 
 def endpoint_certificate_errors(plan: ResourcePlan) -> list[str]:
