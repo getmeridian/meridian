@@ -98,6 +98,7 @@ class MeridianDriverContext:
     connection_for: Callable[[str], ServerConnection]
     server_addresses: Mapping[str, str]
     agent_binary: Callable[[str], AgentBinary]
+    persist: Callable[[ClusterConfig], None]
     sleep: Callable[[float], None] = time.sleep
     user_cut_off: Mapping[str, list[NodeCommandRecord]] = field(default_factory=dict)
     access_review_hash: str | None = None
@@ -599,8 +600,15 @@ class ServiceSettingsDriver:
     @_uncertain_writes_are_unknown
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
         with self.context.client() as client:
+            settings = self._settings(action)
+            if settings.access_profiles and not self.context.cluster.access_profiles_used:
+                self.context.cluster.access_profiles_used = True
+                try:
+                    self.context.persist(self.context.cluster)
+                except Exception:
+                    self.context.cluster.access_profiles_used = False
+                    raise
             if self.context.access_review_hash is None:
-                settings = self._settings(action)
                 client.put_settings(
                     settings,
                     expected_profile_declarations_hash=(
@@ -608,7 +616,7 @@ class ServiceSettingsDriver:
                     ),
                 )
             else:
-                client.put_settings(self._settings(action), expected_access_hash=self.context.access_review_hash)
+                client.put_settings(settings, expected_access_hash=self.context.access_review_hash)
         return ResourceApplyReceipt(remote_id="settings")
 
     def _settings(self, action: ResourceAction) -> ServiceSettings:

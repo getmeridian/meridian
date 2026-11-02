@@ -1,4 +1,4 @@
-"""Profile use is durable before resource writes, after a fleet fence accepts the apply."""
+"""Profile use records service writes, preserving history through edits and fence refusals."""
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -48,9 +48,10 @@ def test_old_cluster_files_without_profiles_load_as_never_used(tmp_path: Path, i
 
 
 @pytest.mark.parametrize("flag", [None, False], ids=["old-file", "false-flag"])
-def test_a_saved_intent_with_profiles_counts_as_used_even_without_the_flag(tmp_path: Path, flag):
+@pytest.mark.parametrize("committed", [False, True], ids=["bootstrap", "committed"])
+def test_saved_profiles_infer_legacy_use_only_when_the_flag_is_absent(tmp_path: Path, flag, committed):
     path = tmp_path / "cluster.yml"
-    ClusterConfig(topology_intent=profile_intent()).save(path)
+    ClusterConfig(topology_intent=profile_intent(), active_generation=int(committed)).save(path)
     data = yaml.safe_load(path.read_text())
     if flag is None:
         data.pop("access_profiles_used", None)
@@ -58,25 +59,31 @@ def test_a_saved_intent_with_profiles_counts_as_used_even_without_the_flag(tmp_p
         data["access_profiles_used"] = flag
     path.write_text(yaml.safe_dump(data))
     loaded = ClusterConfig.load(path)
-    assert loaded.access_profiles_used is True
+    used = flag is None
+    assert loaded.access_profiles_used is used
     loaded.topology_intent = single_exit_intent()
     loaded.save(path)
-    assert ClusterConfig.load(path).access_profiles_used is True
+    assert ClusterConfig.load(path).access_profiles_used is used
 
 
-def test_an_in_memory_profile_intent_refuses_an_unavailable_review():
-    cluster = ClusterConfig(topology_intent=single_exit_intent())
+@pytest.mark.parametrize("used", [False, True])
+def test_an_in_memory_profile_edit_keeps_the_service_usage_boundary(used: bool):
+    cluster = ClusterConfig(topology_intent=single_exit_intent(), access_profiles_used=used)
     cluster.topology_intent = profile_intent()
-    with pytest.raises(ProfileReviewUnavailableError):
-        profile_review_needed(cluster, single_exit_intent(), allow_bootstrap=True)
+    if used:
+        with pytest.raises(ProfileReviewUnavailableError):
+            profile_review_needed(cluster, single_exit_intent(), allow_bootstrap=True)
+    else:
+        assert profile_review_needed(cluster, single_exit_intent(), allow_bootstrap=True) is False
 
 
-def test_saving_an_in_memory_profile_intent_serializes_effective_usage(tmp_path: Path):
+@pytest.mark.parametrize("used", [False, True])
+def test_saving_an_in_memory_profile_intent_serializes_only_service_usage(tmp_path: Path, used: bool):
     path = tmp_path / "cluster.yml"
-    cluster = ClusterConfig(topology_intent=single_exit_intent())
+    cluster = ClusterConfig(topology_intent=single_exit_intent(), access_profiles_used=used)
     cluster.topology_intent = profile_intent()
     cluster.save(path)
-    assert yaml.safe_load(path.read_text())["access_profiles_used"] is True
+    assert yaml.safe_load(path.read_text())["access_profiles_used"] is used
 
 
 @pytest.mark.parametrize("flag", [None, 0, "false", [], {}], ids=["null", "number", "string", "list", "mapping"])
@@ -89,7 +96,7 @@ def test_malformed_profile_usage_is_refused_instead_of_read_as_unused(tmp_path: 
 
 @pytest.mark.parametrize("entrypoint", ["draft", "intent"])
 @pytest.mark.parametrize("interruption", ["fence", "resource"])
-def test_profile_use_is_saved_with_accepted_intent_before_resources_even_when_apply_fails(
+def test_profile_use_is_not_saved_when_apply_stops_before_service_settings(
     tmp_path: Path, tmp_home: Path, entrypoint: str, interruption: str
 ):
     path = tmp_path / "cluster.yml"
@@ -101,7 +108,7 @@ def test_profile_use_is_saved_with_accepted_intent_before_resources_even_when_ap
     writes: list[str] = []
 
     def remote_write(stage: str):
-        assert ClusterConfig.load(path).has_used_access_profiles is (stage == "resource")
+        assert ClusterConfig.load(path).has_used_access_profiles is False
         writes.append(stage)
         if stage == interruption:
             raise ProvisioningError("The apply was interrupted.")
@@ -131,7 +138,7 @@ def test_profile_use_is_saved_with_accepted_intent_before_resources_even_when_ap
         else:
             runtime.apply_intent(intent, expected_plan_hash=draft.review_hash)
     assert writes == (["fence"] if interruption == "fence" else ["fence", "resource"])
-    assert ClusterConfig.load(path).has_used_access_profiles is (interruption == "resource")
+    assert ClusterConfig.load(path).has_used_access_profiles is False
 
 
 def test_a_profile_usage_save_failure_stops_before_resources(tmp_path: Path, tmp_home: Path):

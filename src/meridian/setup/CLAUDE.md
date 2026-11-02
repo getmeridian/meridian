@@ -13,7 +13,8 @@
 
 ## Pitfalls
 - **Every apply checks profile declarations before the fence** — use `profile_review.py` to compare live intent-level grants; a saved but unapplied edit must not ride the next imperative command, and live maps without a fingerprint need review.
-- **Profile history saves with accepted intent** — set the sticky flag after the fleet fence accepts, in the existing topology save; a separate earlier save persists forgotten bindings even when the fence refuses.
+- **Observed profile history saves with accepted intent** — remember live service use after the fleet fence accepts, in the existing topology save; a separate earlier save persists forgotten bindings even when the fence refuses.
+- **Unsent profiles remain resumable** — save the sticky flag only when it flips, immediately before the named-profile settings request; bootstrap credentials and saved intent alone cannot block a retry, while a lost settings reply keeps history.
 - **Verification waits for node documents signed late** — settings and accounts apply after workloads, and each write signs a new document; a single read failed System Lab's first deploy.
 - **Preserve access profiles through setup selections** — reviewed grants travel with the access draft, including when the wizard re-asks names.
 - **Approve and apply `review_hash`, never `plan.plan_hash`** — a plan hash cannot see what the change removes.

@@ -154,15 +154,15 @@ def test_unreviewed_apply_refuses_saved_profile_edits_before_fence_or_node_write
         assert admin.get_user("person").profiles == ["limited"]
 
 
-@pytest.mark.parametrize("used", [False, True])
-def test_unreviewed_apply_refuses_unavailable_service_for_profile_history_or_new_declarations(
-    tmp_path: Path, tmp_home: Path, used: bool
+@pytest.mark.parametrize("removed", [False, True])
+def test_unreviewed_apply_refuses_unavailable_service_after_profiles_were_sent(
+    tmp_path: Path, tmp_home: Path, removed: bool
 ):
-    wanted = single_exit_intent() if used else profile_intent()
+    wanted = single_exit_intent() if removed else profile_intent()
     cluster = ClusterConfig(
         panel=PanelConfig(url="https://198.51.100.10/control", api_token=ADMIN_TOKEN),
         topology_intent=single_exit_intent(),
-        access_profiles_used=used,
+        access_profiles_used=True,
     )
     fence, persist = MagicMock(), MagicMock()
     runtime = SetupRuntime(
@@ -295,6 +295,7 @@ def test_unreviewed_apply_allows_topology_to_expand_unchanged_exit_and_gateway_g
             context = SimpleNamespace(
                 cluster=cluster,
                 access_review_hash=None,
+                persist=lambda _state: None,
                 client=lambda: ControlClient(url, ADMIN_TOKEN, report_mutations=False),
             )
             ServiceSettingsDriver(context).apply(action, None)
@@ -336,6 +337,7 @@ def test_fresh_apply_bootstraps_and_records_only_named_profile_declarations(
             context = SimpleNamespace(
                 cluster=cluster,
                 access_review_hash=None,
+                persist=lambda _state: None,
                 client=lambda: ControlClient(url, ADMIN_TOKEN, report_mutations=False),
             )
             ServiceSettingsDriver(context).apply(action, None)

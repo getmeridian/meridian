@@ -57,6 +57,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Resume profile setup after failures or cancellation before declarations reach
+  the service. Record profile use immediately before the settings write, keeping
+  later outages protected even when its reply is lost.
 - Preserve deposited profile history when restore keeps local topology, and
   refuse mismatched snapshot profiles before staging, uploading, or installing.
   Pin reviewed declarations through restore checkpoints and fence matching

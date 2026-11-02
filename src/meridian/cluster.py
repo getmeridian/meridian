@@ -288,7 +288,7 @@ class ClusterConfig:
     control_restore: ControlRestore | None = None
     # Workload-scoped topology and durable compiled-resource state.
     topology_intent: SetupIntent | None = None
-    # Sticky fact, saved with allowed topology before applying named access profiles.
+    # Sticky fact, saved immediately before sending named profiles to the service.
     access_profiles_used: bool = False
     workloads: list[WorkloadBinding] = field(default_factory=list)
     managed_bindings: dict[str, ManagedResourceBinding] = field(default_factory=dict)
@@ -315,7 +315,6 @@ class ClusterConfig:
     def __post_init__(self) -> None:
         import threading
 
-        self.access_profiles_used = self.has_used_access_profiles
         if self._lock is None:
             # RLock (reentrant) so handlers that mutate cluster + save() in
             # one locked region don't deadlock against save()'s own lock.
@@ -464,8 +463,8 @@ class ClusterConfig:
 
     @property
     def has_used_access_profiles(self) -> bool:
-        """Saved history or current declarations require live profile evidence."""
-        return self.access_profiles_used or bool(self.topology_intent and self.topology_intent.access_profiles)
+        """Declarations sent to the service require live evidence, even after their removal."""
+        return self.access_profiles_used
 
     @property
     def runs_control_service(self) -> bool:

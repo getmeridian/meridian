@@ -24,15 +24,7 @@ def check_profile_access(cluster: ClusterConfig, intent: SetupIntent, *, access_
     """Refuse declaration changes before the fence; return whether the service has held profiles."""
     if intent.control.backend != "meridian":
         return False
-    if access_review_hash is not None:
-        return True
-    service_exists = bool(
-        cluster.panel.url
-        or cluster.panel.api_token
-        or cluster.active_generation
-        or any(binding.resource_kind == "control_service" for binding in cluster.managed_bindings.values())
-    )
-    evidence_required = cluster.has_used_access_profiles or bool(intent.access_profiles and service_exists)
+    evidence_required = cluster.has_used_access_profiles
     if not cluster.is_configured:
         if evidence_required:
             raise ProfileReviewUnavailableError()
@@ -51,7 +43,11 @@ def check_profile_access(cluster: ClusterConfig, intent: SetupIntent, *, access_
         or live.has_non_default_memberships
         or any(not profile.built_in for profile in live.profiles)
     )
-    if live.declarations_hash == profile_declarations_hash(intent.access_profiles) or not held_profiles:
+    if (
+        access_review_hash is not None
+        or live.declarations_hash == profile_declarations_hash(intent.access_profiles)
+        or not held_profiles
+    ):
         return held_profiles
     raise LocalStateError(t("profiles.review_required"), hint=t("profiles.review_required_hint"))
 

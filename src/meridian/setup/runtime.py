@@ -242,9 +242,7 @@ class SetupRuntime:
         if fence is not None:
             # Refuse a stale copy before its intent edit is saved, not only before the first action.
             fence.ensure(local_fence_view(cluster))
-        if not cluster.access_profiles_used and (
-            cluster.has_used_access_profiles or review.intent.access_profiles or profile_history
-        ):
+        if profile_history and not cluster.access_profiles_used:
             cluster.access_profiles_used = True
         cluster.topology_intent = review.intent
         self._persist(cluster)

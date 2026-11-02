@@ -89,6 +89,7 @@ def _publish(plan: ResourcePlan, cluster: ClusterConfig, url: str) -> dict[str, 
         connection_for=lambda _ref: pytest.fail("publishing endpoints needs no SSH"),
         server_addresses=_addresses(),
         agent_binary=lambda _arch: pytest.fail("publishing endpoints installs no agent"),
+        persist=lambda _state: None,
     )
     driver = ClientEndpointDriver(context)
     published = {}

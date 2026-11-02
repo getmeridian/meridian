@@ -69,6 +69,7 @@ def test_one_apply_stages_references_and_creates_people_without_invalidating_its
             reality_keys=lambda _workload, _generation: keys,
             address=lambda _server: "198.51.100.10",
             access_review_hash=None,
+            persist=lambda _state: None,
         )
         endpoints = ClientEndpointDriver(context)
         for action in build_resource_actions(previous, 1):

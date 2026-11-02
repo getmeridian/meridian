@@ -117,6 +117,7 @@ def meridian_drivers(
             connection_for=connections.__getitem__,
             server_addresses=addresses,
             agent_binary=agent_binary,
+            persist=persist,
             user_cut_off=user_cut_off if user_cut_off is not None else {},
             access_review_hash=access_review_hash,
         )

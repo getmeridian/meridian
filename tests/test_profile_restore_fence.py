@@ -167,6 +167,7 @@ def test_matching_profiles_restore_and_keep_membership_while_adopting_legacy_dec
         context = SimpleNamespace(
             cluster=state.clone(),
             access_review_hash=access.access_hash if access is not None else None,
+            persist=lambda _state: None,
             client=lambda: ControlClient(state.panel.url, state.panel.api_token, report_mutations=False),
         )
         context.cluster.panel.url = "https://198.51.100.13/control"
