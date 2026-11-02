@@ -1,6 +1,7 @@
 # compiler — pure finite topology compilation
 ## Design decisions
 **Topology probes stay separate** — `probes.py` builds verification resources from the reviewed graph; the compile spine only orders them.
+**Named delivery uses one representation** — LAN precedes custom rules and the preset tail; every client renderer preserves conjunctions and reports unsupported geodata without widening a match.
 **Access profiles resolve authentication identities** — exit, gateway, endpoint, and inbound grants compile to stable managed inbounds; unknown references and gateway bridges fail review.
 **Pure and deterministic** — output depends only on `SetupIntent` and a secret-free `DeploymentContract`: no I/O, secrets, clock reads, or randomness (tested). It never holds generated credentials or private Reality keys.
 **Finite, reviewed resources** — only explicitly typed payloads, each with a stable logical ID, sorted dependencies, typed postconditions, an ownership marker, and a payload hash; the plan hash covers the ordered graph, resolved SSH targets, runtime pins, and renderer contract. This is not a generic provider layer.

@@ -9,13 +9,13 @@ from meridian.cli_options import Json, Yes
 
 def fleet_routing_cmd(
     policy: str | None = typer.Argument(
-        None, metavar="POLICY", help="ru-split or full; omit to read the current policy"
+        None, metavar="POLICY", help="ru-split, full, or a reviewed policy name; omit to read the current policy"
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Review the policy change without applying it"),
     yes: Yes = False,
     _json: Json = False,
 ) -> None:
-    """Show or change client routing: ru-split or full
+    """Show or change the reviewed client routing policy
 
     Both policies bypass private/LAN ranges and retain Xray's best-effort
     BitTorrent bypass. A change is reviewed and confirmed before apply.

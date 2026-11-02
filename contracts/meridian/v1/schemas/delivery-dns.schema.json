@@ -1,0 +1,147 @@
+{
+  "$defs": {
+    "DohResolver": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "maxLength": 45,
+          "minLength": 3,
+          "title": "Address",
+          "type": "string"
+        },
+        "path": {
+          "default": "/dns-query",
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "port": {
+          "default": 443,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        },
+        "transport": {
+          "const": "doh",
+          "title": "Transport",
+          "type": "string"
+        }
+      },
+      "required": [
+        "transport",
+        "address"
+      ],
+      "title": "DohResolver",
+      "type": "object"
+    },
+    "DotResolver": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "maxLength": 45,
+          "minLength": 3,
+          "title": "Address",
+          "type": "string"
+        },
+        "port": {
+          "default": 853,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        },
+        "transport": {
+          "const": "dot",
+          "title": "Transport",
+          "type": "string"
+        }
+      },
+      "required": [
+        "transport",
+        "address"
+      ],
+      "title": "DotResolver",
+      "type": "object"
+    },
+    "PlainResolver": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "maxLength": 45,
+          "minLength": 3,
+          "title": "Address",
+          "type": "string"
+        },
+        "port": {
+          "default": 53,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        },
+        "protocol": {
+          "default": "udp",
+          "enum": [
+            "tcp",
+            "udp"
+          ],
+          "title": "Protocol",
+          "type": "string"
+        },
+        "transport": {
+          "const": "plain",
+          "title": "Transport",
+          "type": "string"
+        }
+      },
+      "required": [
+        "transport",
+        "address"
+      ],
+      "title": "PlainResolver",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "fake_ip": {
+      "default": false,
+      "title": "Fake Ip",
+      "type": "boolean"
+    },
+    "resolvers": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "doh": "#/$defs/DohResolver",
+            "dot": "#/$defs/DotResolver",
+            "plain": "#/$defs/PlainResolver"
+          },
+          "propertyName": "transport"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/DohResolver"
+          },
+          {
+            "$ref": "#/$defs/DotResolver"
+          },
+          {
+            "$ref": "#/$defs/PlainResolver"
+          }
+        ]
+      },
+      "maxItems": 4,
+      "minItems": 1,
+      "title": "Resolvers",
+      "type": "array"
+    }
+  },
+  "required": [
+    "resolvers"
+  ],
+  "title": "DeliveryDns",
+  "type": "object"
+}

@@ -423,7 +423,7 @@
   "node_commands.restart_no_units": "На этом узле нет запущенных управляемых служб для выбранного режима.",
   "node_commands.restart_core_confirm": "Перезапустить Xray на сервере {node}? Все соединения любых входов и мостов этого сервера будут разорваны; пользователи переподключатся.",
   "node_commands.restart_all_confirm": "Перезапустить службы на сервере {node}: {units}? Их соединения будут разорваны. Перезапуск Xray затронет все входы и мосты этого сервера.",
-  "fleet_routing.invalid": "Выберите режим маршрутизации на устройствах: ru-split или full.",
+  "fleet_routing.invalid": "Выберите ru-split, full или именованную политику из проверенной конфигурации.",
   "fleet_routing.choose_for_review": "Перед запуском с --dry-run укажите режим: ru-split или full.",
   "fleet_routing.current": "Маршрутизация на устройствах: {policy}",
   "fleet_routing.ru_split": "Российские сайты, российские IP-адреса и локальные сети открываются напрямую; остальной трафик идёт через VPN.",
@@ -824,5 +824,7 @@
   "bulk.field.profiles": "Профили доступа",
   "preview.reason_access_profile": "Профили пользователя не разрешают это подключение",
   "client.label.profiles": "Профили доступа",
-  "profiles.migrate_first": "Профили доступа требуют сервиса управления Meridian. Сначала выполните meridian migrate."
+  "profiles.migrate_first": "Профили доступа требуют сервиса управления Meridian. Сначала выполните meridian migrate.",
+  "fleet_routing.unknown": "Выберите проверенную политику маршрутизации: {choices}.",
+  "fleet_routing.custom": "Политика {policy}: основа — {preset}, правил — {count}."
 }

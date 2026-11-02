@@ -8,6 +8,15 @@ from pydantic import BaseModel
 
 from meridian.control.models import ServiceSettings
 from meridian.core.client_routing import FleetRoutingRequest, FleetRoutingResult
+from meridian.core.delivery_capabilities import DeliveryFormatCapabilities, DeliveryPolicyOmission
+from meridian.core.delivery_matchers import DeliveryDns, DeliveryPortRange
+from meridian.core.delivery_policies import (
+    DeliveryAction,
+    DeliveryPolicy,
+    DeliveryPolicySettings,
+    DeliveryRule,
+    ResolvedDeliveryPolicy,
+)
 from meridian.core.fleet_contact import FleetContactRequest, FleetContactResult
 from meridian.core.owner_contact import OwnerContact
 from meridian.core.schema_envelopes import make_command_envelope
@@ -36,6 +45,15 @@ def delivery_schemas(
         doc="Envelope schema for `meridian fleet contact --json`.",
     )
     return {
+        "delivery-policy": DeliveryPolicy,
+        "delivery-policy-settings": DeliveryPolicySettings,
+        "delivery-rule": DeliveryRule,
+        "delivery-action": DeliveryAction,
+        "delivery-dns": DeliveryDns,
+        "delivery-port-range": DeliveryPortRange,
+        "delivery-format-capabilities": DeliveryFormatCapabilities,
+        "delivery-policy-omission": DeliveryPolicyOmission,
+        "resolved-delivery-policy": ResolvedDeliveryPolicy,
         "fleet-contact-envelope": contact_envelope,
         "fleet-contact": FleetContactResult,
         "fleet-contact-request": FleetContactRequest,

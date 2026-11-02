@@ -185,3 +185,23 @@ def test_routing_dry_run_requires_a_policy(tmp_home: Path) -> None:
     assert result.exit_code == 2, result.output
     schema_model("fleet-routing-envelope").model_validate_json(result.stdout)
     assert "--dry-run" in json.loads(result.stdout)["errors"][0]["message"]
+
+
+def test_named_policy_selection_is_reviewed_and_uses_the_same_intent(tmp_home: Path) -> None:
+    from tests.test_delivery_policies import delivery_data
+
+    current = single_exit_intent(delivery=DeliveryIntent.model_validate(delivery_data()))
+    data = current.to_data()
+    data["delivery"].pop("default_policy")
+    from meridian.core.topology import SetupIntent
+
+    ClusterConfig(topology_intent=SetupIntent.model_validate(data)).save()
+    with (
+        patch("meridian.setup.runtime.SetupRuntime.review", return_value=routing_review()) as review,
+        patch("meridian.setup.runtime.SetupRuntime.apply_intent") as apply,
+    ):
+        result = CliRunner().invoke(app, ["fleet", "routing", "work", "--dry-run", "--json"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["data"]["client_routing"] == "work"
+    assert review.call_args.args[0].to_intent().delivery.default_policy == "work"
+    apply.assert_not_called()

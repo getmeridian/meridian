@@ -87,3 +87,36 @@ That traffic never reaches the exit, so the exit's geo-block stays as it is. Unl
 ## DNS considerations
 
 In Xray JSON subscriptions, names that match no rule are resolved through the VPN tunnel, so foreign lookups don't leak to the local ISP. With `ru-split`, Mihomo matches Russian IP ranges only for connections made by IP and never resolves other names locally. If your app has a separate DNS setting, enable its DNS leak protection for tunneled traffic.
+
+
+## Named policies and DNS
+
+Edit `delivery.delivery_policies` in an exported fleet file and review it with `meridian fleet import`. Each policy has an `id`, a built-in `preset` (`full` or `ru-split`), ordered `rules`, and optional `dns`. Set `delivery.default_policy` to its name, or select it with `meridian fleet routing work --dry-run` and `meridian fleet routing work --yes`. The built-in names cannot be replaced. Existing fleets keep exactly the same preset subscriptions.
+
+```json
+{
+  "delivery_policies": [{
+    "id": "work",
+    "preset": "full",
+    "rules": [{
+      "match": {"kind": "domain_suffix", "values": ["example.test"]},
+      "action": {"kind": "block"}
+    }],
+    "dns": {
+      "resolvers": [{"transport": "doh", "address": "198.51.100.53", "path": "/dns-query"}],
+      "fake_ip": false
+    }
+  }],
+  "default_policy": "work"
+}
+```
+
+This is the `delivery` section, with documentation addresses: replace the resolver with your own. `profile_policies` maps access-profile names, including `default`, to policy names. Profiles without a mapping follow the fleet; multiple mapped profiles must select the same policy. A preset selection through `fleet routing` clears a named fleet default. Removing the optional fields restores the existing preset behavior.
+
+Rules match domain suffixes, full domains, ASCII keywords, pinned `geosite`/`geoip` lists, CIDRs, destination ports, or TCP/UDP. Use `match.kind` values `domain_suffix`, `domain_full`, `domain_keyword`, `geosite`, `geoip`, `cidr`, `port`, and `network`. Port values are objects such as `{"start": 8443, "end": 8445}`; omitting `end` selects one port. Values within a match are alternatives. Optional rule `network` and `ports` conditions narrow the whole match. LAN bypasses come first, custom rules follow in their written order, and the preset's remaining rules follow them. The first match wins.
+
+Actions are `{"kind":"proxy"}`, `{"kind":"direct"}`, `{"kind":"block"}`, or `{"kind":"exit","exit":"west"}` for a declared exit. Exit groups use eligible connections. A delivered profile without that exit blocks the matching destination; it never chooses another exit. Xray's individual and fingerprint profiles retain their isolation. BitTorrent detection remains best-effort and Xray-only.
+
+DNS resolvers use `transport: doh | dot | plain`, a unicast IP `address`, and an optional `port` (443, 853, or 53 by default). DoH accepts a bounded `path`; plain DNS accepts `protocol: udp | tcp`. Encrypted resolvers must have a certificate valid for their IP. Hostname bootstrap, credentials, raw templates, and regex rules are refused. Xray supports DoH/plain but omits DoT and fake-IP; Mihomo and sing-box support all three transports and fake-IP; Stash keeps its native DNS mode and omits fake-IP. Base64 carries neither routing nor DNS settings. An omitted DNS choice is never converted to a weaker transport.
+
+Each policy has at most 128 rules, 64 values per domain/IP match, and four resolvers; the catalog has at most 64 policies. A policy must fit within 64 KiB and the catalog within 256 KiB. Geodata names must exist in the pinned files clients already have. No policy adds remote rule-set fetching; sing-box omits geosite and non-private geoip matches. Refresh the subscription after applying a change.

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from meridian.control.access_memberships import profile_access_hash, read_access_profiles, save_access_profiles
+from meridian.control.delivery_policy_settings import read_delivery_policies, save_delivery_policies
 from meridian.control.delivery_settings import (
     client_routing,
     save_client_routing,
@@ -44,6 +45,7 @@ def save_settings(
         )
         save_access_profiles(store, settings.access_profiles)
         save_profile_declarations_hash(store, settings.access_profile_declarations_hash)
+        save_delivery_policies(store, settings, access_profiles=settings.access_profiles)
         store.set_meta("profile_title", settings.profile_title)
         store.set_meta("public_url", settings.public_url)
         save_update_interval_hours(store, settings.update_interval_hours)
@@ -56,6 +58,7 @@ def save_settings(
 
 
 def read_settings(store: Store) -> ServiceSettings:
+    policies = read_delivery_policies(store)
     return ServiceSettings(
         access_profiles=read_access_profiles(store),
         access_profile_declarations_hash=read_profile_declarations_hash(store),
@@ -63,6 +66,9 @@ def read_settings(store: Store) -> ServiceSettings:
         public_url=store.meta("public_url") or "",
         update_interval_hours=update_interval_hours(store),
         client_routing=client_routing(store),
+        delivery_policies=policies.delivery_policies,
+        default_policy=policies.default_policy,
+        profile_policies=policies.profile_policies,
         servers=server_settings(store),
         **page_settings(store).model_dump(),
     )

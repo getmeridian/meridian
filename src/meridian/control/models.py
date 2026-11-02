@@ -35,6 +35,7 @@ from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES, LimitStrategy, 
 from meridian.core.client_sessions import CredentialGeneration
 from meridian.core.connection_pages import ConnectionPageSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
+from meridian.core.delivery_policies import DeliveryPolicySettings
 from meridian.core.inputs import ServerReferenceValue, TopologyIdValue, validate_ip_address_value
 from meridian.core.languages import Language
 from meridian.core.models import CoreModel
@@ -167,6 +168,7 @@ class ClientEndpoint(CoreModel):
     """
 
     remark: str = Field(min_length=1, max_length=ENDPOINT_REMARK_MAX_LENGTH)
+    exit_ref: TopologyIdValue | Literal[""] = Field(default="", exclude_if=lambda value: not value)
     inbound_ref: InboundReference | Literal[""] = Field(default="", exclude_if=lambda value: not value)
     protocol: ProtocolKind
     address: str = Field(min_length=1, max_length=253)
@@ -376,7 +378,7 @@ class UserImportResult(CoreModel):
     replaced: list[str] = Field(default_factory=list, description="Users a replacing import overwrote.")
 
 
-class ServiceSettings(ConnectionPageSettings):
+class ServiceSettings(ConnectionPageSettings, DeliveryPolicySettings):
     access_profiles: AccessProfileMap = Field(default_factory=dict, exclude_if=lambda value: not value)
     access_profile_declarations_hash: Sha256Hex | None = Field(default=None, exclude_if=lambda value: value is None)
     servers: dict[ServerReferenceValue, ServerAllowanceSpec] = Field(

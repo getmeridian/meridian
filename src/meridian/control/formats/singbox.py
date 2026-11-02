@@ -11,6 +11,7 @@ from typing import Any
 
 from meridian.compiler.delivery import singbox_template
 from meridian.control.formats.capabilities import supported_endpoints
+from meridian.control.formats.delivery_policy import apply_singbox_policy
 from meridian.control.formats.entries import (
     AUTOMATIC,
     PLACEHOLDER_ADDRESS,
@@ -24,6 +25,7 @@ from meridian.control.formats.entries import (
 )
 from meridian.control.models import ClientEndpoint
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING
+from meridian.core.delivery_policies import ResolvedDeliveryPolicy
 from meridian.core.topology import ClientRoutingPolicy
 
 
@@ -34,12 +36,15 @@ def singbox_document(
     *,
     client_routing: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING,
     notices: tuple[str, ...] = (),
+    delivery_policy: ResolvedDeliveryPolicy | None = None,
 ) -> dict[str, Any]:
     """Return the sing-box document for one user.
 
     *notices* are inert outbounds listed last in the selector only, never in the urltest group,
     unless placeholders replace the real entries.
     """
+    if delivery_policy is not None:
+        client_routing = delivery_policy.policy.preset
     endpoints = supported_endpoints(presentation_endpoints(endpoints), "singbox")
     placeholders = availability_placeholders(endpoints, placeholders)
     if placeholders:
@@ -55,6 +60,8 @@ def singbox_document(
         elif outbound["type"] == "urltest":
             outbound["outbounds"] = names
     document["outbounds"] = [*document["outbounds"], *proxies, *(placeholder_outbound(remark) for remark in inert)]
+    if delivery_policy is not None and not delivery_policy.built_in:
+        apply_singbox_policy(document, delivery_policy, [] if placeholders else endpoints)
     return document
 
 

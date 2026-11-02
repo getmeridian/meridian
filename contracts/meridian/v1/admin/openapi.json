@@ -2592,6 +2592,33 @@
         "title": "CapacityValues",
         "type": "object"
       },
+      "CidrMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "cidr",
+            "title": "Kind",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "maxLength": 49,
+              "minLength": 3,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values"
+        ],
+        "title": "CidrMatch",
+        "type": "object"
+      },
       "ClientConnection": {
         "additionalProperties": false,
         "description": "One canonical subscription entry; URI and QR are credentials, never passive output.",
@@ -2821,6 +2848,22 @@
             "description": "False omits this endpoint from delivery; reviewed endpoint apply restores topology settings.",
             "title": "Enabled",
             "type": "boolean"
+          },
+          "exit_ref": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "title": "Exit Ref"
           },
           "fingerprint": {
             "default": "",
@@ -3217,6 +3260,240 @@
         "title": "DeletedResource",
         "type": "object"
       },
+      "DeliveryAction": {
+        "additionalProperties": false,
+        "properties": {
+          "exit": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Exit"
+          },
+          "kind": {
+            "enum": [
+              "proxy",
+              "direct",
+              "block",
+              "exit"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "DeliveryAction",
+        "type": "object"
+      },
+      "DeliveryDns": {
+        "additionalProperties": false,
+        "properties": {
+          "fake_ip": {
+            "default": false,
+            "title": "Fake Ip",
+            "type": "boolean"
+          },
+          "resolvers": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "doh": "#/components/schemas/DohResolver",
+                  "dot": "#/components/schemas/DotResolver",
+                  "plain": "#/components/schemas/PlainResolver"
+                },
+                "propertyName": "transport"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/DohResolver"
+                },
+                {
+                  "$ref": "#/components/schemas/DotResolver"
+                },
+                {
+                  "$ref": "#/components/schemas/PlainResolver"
+                }
+              ]
+            },
+            "maxItems": 4,
+            "minItems": 1,
+            "title": "Resolvers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "resolvers"
+        ],
+        "title": "DeliveryDns",
+        "type": "object"
+      },
+      "DeliveryPolicy": {
+        "additionalProperties": false,
+        "description": "LAN always precedes custom rules; the preset's remaining rules follow them.",
+        "properties": {
+          "dns": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryDns"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "id": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "title": "Id",
+            "type": "string"
+          },
+          "preset": {
+            "default": "full",
+            "enum": [
+              "ru-split",
+              "full"
+            ],
+            "title": "Preset",
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryRule"
+            },
+            "maxItems": 128,
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "DeliveryPolicy",
+        "type": "object"
+      },
+      "DeliveryPortRange": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "anyOf": [
+              {
+                "maximum": 65535,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "End"
+          },
+          "start": {
+            "maximum": 65535,
+            "minimum": 1,
+            "title": "Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "start"
+        ],
+        "title": "DeliveryPortRange",
+        "type": "object"
+      },
+      "DeliveryRule": {
+        "additionalProperties": false,
+        "description": "Values are alternatives; network and ports narrow the whole match with AND.",
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/DeliveryAction"
+          },
+          "match": {
+            "discriminator": {
+              "mapping": {
+                "cidr": "#/components/schemas/CidrMatch",
+                "domain_full": "#/components/schemas/DomainFullMatch",
+                "domain_keyword": "#/components/schemas/DomainKeywordMatch",
+                "domain_suffix": "#/components/schemas/DomainSuffixMatch",
+                "geoip": "#/components/schemas/GeoipMatch",
+                "geosite": "#/components/schemas/GeositeMatch",
+                "network": "#/components/schemas/NetworkMatch",
+                "port": "#/components/schemas/PortMatch"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DomainSuffixMatch"
+              },
+              {
+                "$ref": "#/components/schemas/DomainKeywordMatch"
+              },
+              {
+                "$ref": "#/components/schemas/DomainFullMatch"
+              },
+              {
+                "$ref": "#/components/schemas/GeositeMatch"
+              },
+              {
+                "$ref": "#/components/schemas/GeoipMatch"
+              },
+              {
+                "$ref": "#/components/schemas/CidrMatch"
+              },
+              {
+                "$ref": "#/components/schemas/PortMatch"
+              },
+              {
+                "$ref": "#/components/schemas/NetworkMatch"
+              }
+            ],
+            "title": "Match"
+          },
+          "network": {
+            "anyOf": [
+              {
+                "enum": [
+                  "tcp",
+                  "udp"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Network"
+          },
+          "ports": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPortRange"
+            },
+            "maxItems": 16,
+            "title": "Ports",
+            "type": "array"
+          }
+        },
+        "required": [
+          "match",
+          "action"
+        ],
+        "title": "DeliveryRule",
+        "type": "object"
+      },
       "DeployerStateDeposit": {
         "additionalProperties": false,
         "description": "The deployer's own fleet files, kept so a snapshot alone can rebuild the fleet.\n\n`cluster_yml` carries no admin token (a restore mints a new one); `servers_json` is the\nserver shelf as the deployer saved it.",
@@ -3375,6 +3652,153 @@
           "deleted"
         ],
         "title": "DevicesRemoved",
+        "type": "object"
+      },
+      "DohResolver": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "maxLength": 45,
+            "minLength": 3,
+            "title": "Address",
+            "type": "string"
+          },
+          "path": {
+            "default": "/dns-query",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "port": {
+            "default": 443,
+            "maximum": 65535,
+            "minimum": 1,
+            "title": "Port",
+            "type": "integer"
+          },
+          "transport": {
+            "const": "doh",
+            "title": "Transport",
+            "type": "string"
+          }
+        },
+        "required": [
+          "transport",
+          "address"
+        ],
+        "title": "DohResolver",
+        "type": "object"
+      },
+      "DomainFullMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "domain_full",
+            "title": "Kind",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "maxLength": 253,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values"
+        ],
+        "title": "DomainFullMatch",
+        "type": "object"
+      },
+      "DomainKeywordMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "domain_keyword",
+            "title": "Kind",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "maxLength": 80,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9._-]+$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values"
+        ],
+        "title": "DomainKeywordMatch",
+        "type": "object"
+      },
+      "DomainSuffixMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "domain_suffix",
+            "title": "Kind",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "maxLength": 253,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values"
+        ],
+        "title": "DomainSuffixMatch",
+        "type": "object"
+      },
+      "DotResolver": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "maxLength": 45,
+            "minLength": 3,
+            "title": "Address",
+            "type": "string"
+          },
+          "port": {
+            "default": 853,
+            "maximum": 65535,
+            "minimum": 1,
+            "title": "Port",
+            "type": "integer"
+          },
+          "transport": {
+            "const": "dot",
+            "title": "Transport",
+            "type": "string"
+          }
+        },
+        "required": [
+          "transport",
+          "address"
+        ],
+        "title": "DotResolver",
         "type": "object"
       },
       "EmptyEventDetail": {
@@ -3782,6 +4206,60 @@
           "rule"
         ],
         "title": "FormatRule",
+        "type": "object"
+      },
+      "GeoipMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "geoip",
+            "title": "Kind",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values"
+        ],
+        "title": "GeoipMatch",
+        "type": "object"
+      },
+      "GeositeMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "geosite",
+            "title": "Kind",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values"
+        ],
+        "title": "GeositeMatch",
         "type": "object"
       },
       "GrantedConnection": {
@@ -4341,6 +4819,35 @@
           "interval_millis"
         ],
         "title": "NetworkCapacity",
+        "type": "object"
+      },
+      "NetworkMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "network",
+            "title": "Kind",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "enum": [
+                "tcp",
+                "udp"
+              ],
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values"
+        ],
+        "title": "NetworkMatch",
         "type": "object"
       },
       "NginxArtifactResource": {
@@ -6587,6 +7094,69 @@
         "title": "PersonAttention",
         "type": "object"
       },
+      "PlainResolver": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "maxLength": 45,
+            "minLength": 3,
+            "title": "Address",
+            "type": "string"
+          },
+          "port": {
+            "default": 53,
+            "maximum": 65535,
+            "minimum": 1,
+            "title": "Port",
+            "type": "integer"
+          },
+          "protocol": {
+            "default": "udp",
+            "enum": [
+              "tcp",
+              "udp"
+            ],
+            "title": "Protocol",
+            "type": "string"
+          },
+          "transport": {
+            "const": "plain",
+            "title": "Transport",
+            "type": "string"
+          }
+        },
+        "required": [
+          "transport",
+          "address"
+        ],
+        "title": "PlainResolver",
+        "type": "object"
+      },
+      "PortMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "port",
+            "title": "Kind",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPortRange"
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values"
+        ],
+        "title": "PortMatch",
+        "type": "object"
+      },
       "PreviewEntry": {
         "additionalProperties": false,
         "properties": {
@@ -8239,6 +8809,29 @@
             "title": "Color",
             "type": "string"
           },
+          "default_policy": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Default Policy"
+          },
+          "delivery_policies": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPolicy"
+            },
+            "maxItems": 64,
+            "title": "Delivery Policies",
+            "type": "array"
+          },
           "exit_countries": {
             "items": {
               "maxLength": 2,
@@ -8252,6 +8845,23 @@
           "owner_contact": {
             "$ref": "#/components/schemas/OwnerContact",
             "description": "Optional public owner contact, chosen through reviewed delivery intent."
+          },
+          "profile_policies": {
+            "maxProperties": 64,
+            "patternProperties": {
+              "^[a-z0-9][a-z0-9_-]*$": {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 48,
+              "minLength": 1
+            },
+            "title": "Profile Policies",
+            "type": "object"
           },
           "profile_title": {
             "maxLength": 100,
@@ -8365,6 +8975,29 @@
             "title": "Color",
             "type": "string"
           },
+          "default_policy": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Default Policy"
+          },
+          "delivery_policies": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPolicy"
+            },
+            "maxItems": 64,
+            "title": "Delivery Policies",
+            "type": "array"
+          },
           "exit_countries": {
             "items": {
               "maxLength": 2,
@@ -8406,6 +9039,23 @@
           "owner_contact": {
             "$ref": "#/components/schemas/OwnerContact",
             "description": "Optional public owner contact, chosen through reviewed delivery intent."
+          },
+          "profile_policies": {
+            "maxProperties": 64,
+            "patternProperties": {
+              "^[a-z0-9][a-z0-9_-]*$": {
+                "maxLength": 48,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "type": "string"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 48,
+              "minLength": 1
+            },
+            "title": "Profile Policies",
+            "type": "object"
           },
           "profile_title": {
             "maxLength": 100,

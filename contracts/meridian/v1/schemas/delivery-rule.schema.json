@@ -1,0 +1,365 @@
+{
+  "$defs": {
+    "CidrMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "cidr",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "maxLength": 49,
+            "minLength": 3,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "CidrMatch",
+      "type": "object"
+    },
+    "DeliveryAction": {
+      "additionalProperties": false,
+      "properties": {
+        "exit": {
+          "anyOf": [
+            {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exit"
+        },
+        "kind": {
+          "enum": [
+            "proxy",
+            "direct",
+            "block",
+            "exit"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "DeliveryAction",
+      "type": "object"
+    },
+    "DeliveryPortRange": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
+        },
+        "start": {
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start"
+      ],
+      "title": "DeliveryPortRange",
+      "type": "object"
+    },
+    "DomainFullMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "domain_full",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "DomainFullMatch",
+      "type": "object"
+    },
+    "DomainKeywordMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "domain_keyword",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "maxLength": 80,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "DomainKeywordMatch",
+      "type": "object"
+    },
+    "DomainSuffixMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "domain_suffix",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "DomainSuffixMatch",
+      "type": "object"
+    },
+    "GeoipMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "geoip",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "GeoipMatch",
+      "type": "object"
+    },
+    "GeositeMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "geosite",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "GeositeMatch",
+      "type": "object"
+    },
+    "NetworkMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "network",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "enum": [
+              "tcp",
+              "udp"
+            ],
+            "type": "string"
+          },
+          "maxItems": 2,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "NetworkMatch",
+      "type": "object"
+    },
+    "PortMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "port",
+          "title": "Kind",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "$ref": "#/$defs/DeliveryPortRange"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "values"
+      ],
+      "title": "PortMatch",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Values are alternatives; network and ports narrow the whole match with AND.",
+  "properties": {
+    "action": {
+      "$ref": "#/$defs/DeliveryAction"
+    },
+    "match": {
+      "discriminator": {
+        "mapping": {
+          "cidr": "#/$defs/CidrMatch",
+          "domain_full": "#/$defs/DomainFullMatch",
+          "domain_keyword": "#/$defs/DomainKeywordMatch",
+          "domain_suffix": "#/$defs/DomainSuffixMatch",
+          "geoip": "#/$defs/GeoipMatch",
+          "geosite": "#/$defs/GeositeMatch",
+          "network": "#/$defs/NetworkMatch",
+          "port": "#/$defs/PortMatch"
+        },
+        "propertyName": "kind"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/DomainSuffixMatch"
+        },
+        {
+          "$ref": "#/$defs/DomainKeywordMatch"
+        },
+        {
+          "$ref": "#/$defs/DomainFullMatch"
+        },
+        {
+          "$ref": "#/$defs/GeositeMatch"
+        },
+        {
+          "$ref": "#/$defs/GeoipMatch"
+        },
+        {
+          "$ref": "#/$defs/CidrMatch"
+        },
+        {
+          "$ref": "#/$defs/PortMatch"
+        },
+        {
+          "$ref": "#/$defs/NetworkMatch"
+        }
+      ],
+      "title": "Match"
+    },
+    "network": {
+      "anyOf": [
+        {
+          "enum": [
+            "tcp",
+            "udp"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Network"
+    },
+    "ports": {
+      "items": {
+        "$ref": "#/$defs/DeliveryPortRange"
+      },
+      "maxItems": 16,
+      "title": "Ports",
+      "type": "array"
+    }
+  },
+  "required": [
+    "match",
+    "action"
+  ],
+  "title": "DeliveryRule",
+  "type": "object"
+}

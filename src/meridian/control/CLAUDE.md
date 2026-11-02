@@ -4,6 +4,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 
 ## Design decisions
 - **Profile declarations save with settings** — meta keeps their reviewed fingerprint, included in the access hash; unreviewed settings compare it atomically, and bootstrap requires no fingerprint, grants, or non-default memberships.
+- **Reviewed delivery choices validate membership** — policy catalogs live in settings; profile defaults must agree before a settings or membership write commits.
 - **Profile activation is atomic** — service settings hold the canonical grant map; staged specs carry references, and map or membership changes compose documents with the existing flow-block ledger.
 - **Metrics has its own grant** — cataloged `/metrics` uses `metrics.read` on the existing ingress, with no compatible preset expansion; node series and bounded route-ID/runtime counters expose no person labels.
 - **Capacity stays per node** — `capacity.py` keeps one latest collection, 360 recent ten-second slots, and 168 UTC hourly means/peaks; person privacy settings do not govern these address-free aggregates.
@@ -42,6 +43,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - A proposal whose intent contains a secret-shaped key or value, or a malformed `access` block, is refused and never stored.
 
 ## Pitfalls
+- **Policy writes keep declaration fences** — save catalogs and declaration fingerprints in one settings transaction, so either refusal rolls back both.
 - **Profile writes validate every membership** — previews and settings refuse any non-default profile missing from the proposed map, including memberships whose live declaration has already disappeared.
 - **Receipt row guards stay explicit** — a derived boolean does not narrow an optional SQLite row for static checks.
 - **Username maps hold identifiers** — revision secret checks exempt only declared usernames with a mapping in access creation settings or a string in display names; other keys and every value still undergo the full secret check.

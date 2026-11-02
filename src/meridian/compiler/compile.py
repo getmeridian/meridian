@@ -18,6 +18,7 @@ from meridian.compiler.client_delivery import (
     fingerprint_copy_fields,
 )
 from meridian.compiler.client_ips import forward_client_ips
+from meridian.compiler.delivery import validate_delivery_backend
 from meridian.compiler.deployment import (
     normalized_intent,
     validate_deployment_contract,
@@ -77,6 +78,7 @@ def compile_topology(
 ) -> ResourcePlan:
     """Compile complete setup intent without network, filesystem, or randomness."""
     validate_profile_backend(intent)
+    validate_delivery_backend(intent)
     reviewed_contract = deployment_contract if deployment_contract is not None else DeploymentContract()
     validate_deployment_contract(intent, reviewed_contract)
     validate_geodata_lists(intent)

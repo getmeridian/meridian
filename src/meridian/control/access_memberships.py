@@ -7,6 +7,7 @@ from collections.abc import Sequence
 
 from pydantic import TypeAdapter
 
+from meridian.control.delivery_policy_settings import read_delivery_policies, require_delivery_policy
 from meridian.control.errors import ServiceError
 from meridian.control.models import ClientEndpoint, UserRecord
 from meridian.control.profile_declarations import read_profile_declarations_hash
@@ -48,6 +49,7 @@ def require_profiles(store: Store, profiles: Sequence[str]) -> list[str]:
 def save_memberships(store: Store, user_id: str, profiles: Sequence[str]) -> None:
     """Validate inside the caller's write and preserve memberships during ordinary applies."""
     values = require_profiles(store, profiles)
+    require_delivery_policy(read_delivery_policies(store), values)
     held = [
         row[0]
         for row in store.rows(

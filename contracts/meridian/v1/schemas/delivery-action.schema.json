@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "exit": {
+      "anyOf": [
+        {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Exit"
+    },
+    "kind": {
+      "enum": [
+        "proxy",
+        "direct",
+        "block",
+        "exit"
+      ],
+      "title": "Kind",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind"
+  ],
+  "title": "DeliveryAction",
+  "type": "object"
+}

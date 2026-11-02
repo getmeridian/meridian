@@ -423,7 +423,7 @@
   "node_commands.restart_no_units": "This node has no running managed units in the requested scope.",
   "node_commands.restart_core_confirm": "Restart Xray on {node}? Everyone using any inbound or bridge on this node reconnects.",
   "node_commands.restart_all_confirm": "Restart these managed units on {node}: {units}? Their connections end. Restarting Xray reconnects everyone using any inbound or bridge on this node.",
-  "fleet_routing.invalid": "Choose client routing: ru-split or full.",
+  "fleet_routing.invalid": "Choose ru-split, full, or a named policy in the reviewed intent.",
   "fleet_routing.choose_for_review": "Choose ru-split or full before using --dry-run.",
   "fleet_routing.current": "Client routing: {policy}",
   "fleet_routing.ru_split": "Send Russian destinations and private/LAN ranges directly; tunnel other traffic.",
@@ -824,5 +824,7 @@
   "bulk.field.profiles": "Access profiles",
   "preview.reason_access_profile": "Not granted by this person’s profiles",
   "client.label.profiles": "Access profiles",
-  "profiles.migrate_first": "Access profiles need Meridian's control service. Run meridian migrate first."
+  "profiles.migrate_first": "Access profiles need Meridian's control service. Run meridian migrate first.",
+  "fleet_routing.unknown": "Choose a reviewed delivery policy: {choices}.",
+  "fleet_routing.custom": "{policy}: based on {preset}, {count} ordered rules."
 }

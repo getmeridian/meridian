@@ -1,0 +1,30 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "end": {
+      "anyOf": [
+        {
+          "maximum": 65535,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "End"
+    },
+    "start": {
+      "maximum": 65535,
+      "minimum": 1,
+      "title": "Start",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "start"
+  ],
+  "title": "DeliveryPortRange",
+  "type": "object"
+}

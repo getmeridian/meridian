@@ -15,6 +15,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b9
 
 #### Added
+- Typed named delivery policies with ordered destination rules, validated DNS,
+  reviewed fleet/profile defaults, isolated exit choices, and shared format limits.
+  Built-in routing presets and default subscription bytes remain unchanged (#95).
 - Reviewed access profiles with service-owned membership, enforced inbound grants,
   gain/loss previews, private effective-access views, CLI and console assignment,
   bulk reviews, and snapshot and import preservation. Default access stays full.

@@ -423,7 +423,7 @@
   "node_commands.restart_no_units": "این سرور در محدودهٔ انتخاب‌شده سرویسِ مدیریت‌شدهٔ فعالی ندارد.",
   "node_commands.restart_core_confirm": "Xray در {node} دوباره راه‌اندازی شود؟ همهٔ کاربران هر ورودی یا پل این سرور دوباره وصل می‌شوند.",
   "node_commands.restart_all_confirm": "سرویس‌های {units} در {node} دوباره راه‌اندازی شوند؟ اتصال‌های آن‌ها قطع می‌شود. راه‌اندازی دوبارهٔ Xray همهٔ ورودی‌ها و پل‌های این سرور را دربرمی‌گیرد.",
-  "fleet_routing.invalid": "مسیریابی دستگاه‌ها را انتخاب کنید: ru-split یا full.",
+  "fleet_routing.invalid": "ru-split، full یا یک سیاست نام‌دار از پیکربندی بازبینی‌شده را انتخاب کنید.",
   "fleet_routing.choose_for_review": "پیش از استفاده از --dry-run، حالت ru-split یا full را انتخاب کنید.",
   "fleet_routing.current": "مسیریابی دستگاه‌ها: {policy}",
   "fleet_routing.ru_split": "مقصدهای روسی و بازه‌های خصوصی و شبکهٔ محلی مستقیم می‌روند؛ بقیهٔ ترافیک از VPN می‌گذرد.",
@@ -824,5 +824,7 @@
   "bulk.field.profiles": "پروفایل‌های دسترسی",
   "preview.reason_access_profile": "پروفایل‌های این کاربر این اتصال را مجاز نمی‌کنند",
   "client.label.profiles": "پروفایل‌های دسترسی",
-  "profiles.migrate_first": "پروفایل‌های دسترسی به سرویس کنترل Meridian نیاز دارند. ابتدا meridian migrate را اجرا کنید."
+  "profiles.migrate_first": "پروفایل‌های دسترسی به سرویس کنترل Meridian نیاز دارند. ابتدا meridian migrate را اجرا کنید.",
+  "fleet_routing.unknown": "یک سیاست مسیریابی از پیکربندی بازبینی‌شده انتخاب کنید: {choices}.",
+  "fleet_routing.custom": "سیاست {policy}: بر پایهٔ {preset}، با {count} قانون به‌ترتیب."
 }

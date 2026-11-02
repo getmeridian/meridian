@@ -87,3 +87,38 @@ meridian fleet routing ru-split --yes
 ## DNS 注意事项
 
 在 Xray JSON 订阅中，未命中直连规则的域名会通过 VPN 隧道解析，因此境外域名查询不会泄漏给本地 ISP。使用 `ru-split` 时，Mihomo 仅对直接按 IP 发起的连接匹配俄罗斯 IP 段，不会在本地解析其他域名。如果你的应用带有独立的 DNS 设置，请为隧道流量开启防 DNS 泄漏选项。
+
+
+## 命名策略与 DNS
+
+在导出的服务器配置中编辑 `delivery.delivery_policies`，再通过 `meridian fleet import` 审阅。每项策略包含 `id`、内置 `preset`（`full` 或 `ru-split`）、有序 `rules` 和可选 `dns`。将名称写入 `delivery.default_policy`，或使用 `meridian fleet routing work --dry-run` 和 `meridian fleet routing work --yes` 选择。内置名称不能被替换。现有配置的内置订阅内容保持完全一致。
+
+以下是 `delivery` 部分的示例：
+
+```json
+{
+  "delivery_policies": [{
+    "id": "work",
+    "preset": "full",
+    "rules": [{
+      "match": {"kind": "domain_suffix", "values": ["example.test"]},
+      "action": {"kind": "block"}
+    }],
+    "dns": {
+      "resolvers": [{"transport": "doh", "address": "198.51.100.53", "path": "/dns-query"}],
+      "fake_ip": false
+    }
+  }],
+  "default_policy": "work"
+}
+```
+
+示例 IP 属于文档专用地址，请替换为自己的 DNS 服务器地址。`profile_policies` 将访问配置名称（包括 `default`）映射到策略名称。没有映射的配置使用服务器默认策略；同时属于多个已映射配置的用户，必须获得相同策略。通过 `fleet routing` 选择内置模式会清除命名默认策略。删除可选字段可恢复原有内置行为。
+
+规则可匹配域名后缀、完整域名、ASCII 关键词、固定版本的 `geosite`/`geoip` 列表、CIDR、目标端口或 TCP/UDP。`match.kind` 可选 `domain_suffix`、`domain_full`、`domain_keyword`、`geosite`、`geoip`、`cidr`、`port`、`network`。端口值采用 `{"start": 8443, "end": 8445}`；省略 `end` 表示单个端口。同一匹配中的值是备选项，满足任一项即可；可选 `network` 和 `ports` 条件同时限制整条规则。局域网直连规则最先执行，随后按书写顺序执行自定义规则，再执行内置模式的其余规则。首次匹配决定动作。
+
+动作包括 `{"kind":"proxy"}`（通过 VPN）、`{"kind":"direct"}`（直连）、`{"kind":"block"}`（阻止），以及 `{"kind":"exit","exit":"west"}`（通过已声明的出口）。出口组只包含用户有权使用的连接。如果当前订阅配置没有所需出口，对应目的地会被阻止，不会改用其他出口。Xray 单连接配置及不同 TLS 指纹组保持隔离。BitTorrent 检测仍尽力而为，且仅适用于 Xray。
+
+DNS 使用 `transport: doh | dot | plain`、单播 IP `address` 和可选 `port`，默认端口分别为 443、853、53。DoH 支持受限 `path`，普通 DNS 支持 `protocol: udp | tcp`。加密 DNS 的证书必须对其 IP 有效。需要引导解析的主机名、凭证、任意模板和正则表达式均不接受。Xray 支持 DoH/普通 DNS，省略 DoT 和 fake-IP；Mihomo 与 sing-box 支持三种传输及 fake-IP；Stash 保留原生 DNS 模式并省略 fake-IP。Base64 无法携带路由或 DNS 设置。省略的 DNS 选项不会降级为较弱的传输。
+
+每项策略最多 128 条规则、每个域名/IP 匹配最多 64 个值、最多四个 DNS 服务器；目录最多 64 项策略。单项策略最多 64 KiB，整个目录最多 256 KiB。地理列表名称必须存在于客户端已安装的固定版本文件中。策略不会添加远程规则集下载；sing-box 省略 geosite 和非私有 geoip 匹配。应用更改后刷新订阅。

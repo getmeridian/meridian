@@ -2950,7 +2950,7 @@
       ],
       "command": "fleet.routing",
       "data_schema": "fleet-routing",
-      "description": "Show or change client routing: ru-split or full",
+      "description": "Show or change the reviewed client routing policy",
       "envelope_schema": "fleet-routing-envelope",
       "error_schema": "error",
       "exit_codes": {

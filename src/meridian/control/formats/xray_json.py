@@ -14,6 +14,7 @@ import copy
 from typing import Any
 
 from meridian.compiler.delivery import xray_json_template
+from meridian.control.formats.delivery_policy import apply_xray_policy
 from meridian.control.formats.entries import (
     AUTOMATIC,
     absolute,
@@ -27,6 +28,7 @@ from meridian.control.formats.entries import (
 from meridian.control.formats.links import finalmask
 from meridian.control.models import ClientEndpoint
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING
+from meridian.core.delivery_policies import ResolvedDeliveryPolicy
 from meridian.core.topology import ClientRoutingPolicy
 
 PROXY_TAG = "MERIDIAN_PROXY"
@@ -39,37 +41,58 @@ def xray_json_document(
     *,
     client_routing: ClientRoutingPolicy = DEFAULT_CLIENT_ROUTING,
     notices: tuple[str, ...] = (),
+    delivery_policy: ResolvedDeliveryPolicy | None = None,
 ) -> list[dict[str, Any]]:
     """Automatic first, individual primary profiles, then isolated copy groups (or placeholders).
 
     *notices* become proxy-less configs after the last real one, unless placeholders replace them.
     """
+    if delivery_policy is not None:
+        client_routing = delivery_policy.policy.preset
     endpoints = presentation_endpoints(endpoints)
     placeholders = availability_placeholders(primaries(endpoints), placeholders)
     if placeholders:
-        return [_config([], uuid, remark, client_routing) for remark in placeholders]
+        return [_config([], uuid, remark, client_routing, delivery_policy) for remark in placeholders]
     primary = primaries(endpoints)
-    configs = [_config(primary, uuid, AUTOMATIC, client_routing)]
-    configs += [_config([endpoint], uuid, endpoint.remark, client_routing) for endpoint in primary]
-    configs += [_config(members, uuid, remark, client_routing) for remark, members in copy_groups(endpoints)]
+    configs = [_config(primary, uuid, AUTOMATIC, client_routing, delivery_policy)]
+    configs += [_config([endpoint], uuid, endpoint.remark, client_routing, delivery_policy) for endpoint in primary]
+    configs += [
+        _config(members, uuid, remark, client_routing, delivery_policy) for remark, members in copy_groups(endpoints)
+    ]
     inert = trailing_notices(endpoints, placeholders, notices)
-    configs += [_config([], uuid, remark, client_routing) for remark in inert]
+    configs += [_config([], uuid, remark, client_routing, delivery_policy) for remark in inert]
     return configs
 
 
 def _config(
-    endpoints: list[ClientEndpoint], uuid: str, remark: str, client_routing: ClientRoutingPolicy
+    endpoints: list[ClientEndpoint],
+    uuid: str,
+    remark: str,
+    client_routing: ClientRoutingPolicy,
+    delivery_policy: ResolvedDeliveryPolicy | None,
 ) -> dict[str, Any]:
     config = {
         key: value
         for key, value in copy.deepcopy(xray_json_template(client_routing=client_routing)).items()
         if key != "remnawave"
     }
+    custom = delivery_policy is not None and not delivery_policy.built_in
     proxies = [
-        {"tag": PROXY_TAG if index == 1 else f"{PROXY_TAG}-{index}", **xray_outbound(endpoint, uuid)}
+        {
+            "tag": f"{PROXY_TAG}-{index}." if custom else PROXY_TAG if index == 1 else f"{PROXY_TAG}-{index}",
+            **xray_outbound(endpoint, uuid),
+        }
         for index, endpoint in enumerate(endpoints, start=1)
     ]
     config["outbounds"] = [*proxies, *config["outbounds"]]
+    if custom:
+        assert delivery_policy is not None
+        apply_xray_policy(
+            config,
+            delivery_policy,
+            endpoints,
+            {id(endpoint): proxy["tag"] for endpoint, proxy in zip(endpoints, proxies, strict=True)},
+        )
     config["remarks"] = remark
     return config
 

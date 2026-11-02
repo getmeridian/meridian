@@ -423,7 +423,7 @@
   "node_commands.restart_no_units": "此节点在所选范围内没有正在运行的受管服务。",
   "node_commands.restart_core_confirm": "重启 {node} 上的 Xray？使用此节点任意入站或桥接连接的所有用户都会重连。",
   "node_commands.restart_all_confirm": "重启 {node} 上的服务 {units}？这些服务的连接会断开。重启 Xray 会影响此节点所有入站与桥接连接。",
-  "fleet_routing.invalid": "请选择客户端路由策略：ru-split 或 full。",
+  "fleet_routing.invalid": "请选择 ru-split、full 或已审阅配置中的命名策略。",
   "fleet_routing.choose_for_review": "使用 --dry-run 前，请先选择 ru-split 或 full。",
   "fleet_routing.current": "客户端路由：{policy}",
   "fleet_routing.ru_split": "俄罗斯目的地和私有地址、局域网直连，其他流量通过 VPN。",
@@ -824,5 +824,7 @@
   "bulk.field.profiles": "访问配置",
   "preview.reason_access_profile": "此用户的配置未授权该连接",
   "client.label.profiles": "访问配置",
-  "profiles.migrate_first": "访问配置需要 Meridian 控制服务。请先运行 meridian migrate。"
+  "profiles.migrate_first": "访问配置需要 Meridian 控制服务。请先运行 meridian migrate。",
+  "fleet_routing.unknown": "请选择已审阅的路由策略：{choices}。",
+  "fleet_routing.custom": "{policy}：基于 {preset}，包含 {count} 条有序规则。"
 }

@@ -9,7 +9,8 @@ from meridian import config, console
 from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, require_intent, reviewed_runtime
 from meridian.commands._validation import validate_command_input
 from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_result
-from meridian.core.client_routing import FleetRoutingRequest, FleetRoutingResult
+from meridian.core.client_routing import FleetRoutingRequest, FleetRoutingResult, client_routing_choices
+from meridian.core.delivery_policies import BUILTIN_DELIVERY_POLICIES
 from meridian.core.errors import MeridianError
 from meridian.core.models import OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -37,13 +38,19 @@ def _run(request: FleetRoutingRequest, operation: OperationContext) -> None:
         console.fail(t("fleet_routing.choose_for_review"), hint_type="user")
     cluster = load_topology_cluster()
     current = require_intent(cluster)
-    policy = request.client_routing or current.delivery.client_routing
-    result = FleetRoutingResult(client_routing=policy, dry_run=request.dry_run)
+    previous = current.delivery.default_policy or current.delivery.client_routing
+    policy = request.client_routing or previous
+    choices = client_routing_choices(current.delivery)
+    if policy not in {choice.policy for choice in choices}:
+        console.fail(
+            t("fleet_routing.unknown", choices=", ".join(choice.policy for choice in choices)), hint_type="user"
+        )
+    result = FleetRoutingResult(client_routing=policy, choices=choices, dry_run=request.dry_run)
     if request.client_routing is None:
         _emit(result, operation, status="ok", text="Read client routing policy")
         _print_policy(result)
         return
-    if policy == current.delivery.client_routing:
+    if policy == previous:
         _emit(result, operation, status="no_changes", text="Client routing is unchanged")
         if not console.is_json_mode():
             console.ok(t("fleet_routing.unchanged", policy=policy))
@@ -55,7 +62,11 @@ def _run(request: FleetRoutingRequest, operation: OperationContext) -> None:
         )
 
     data = current.model_dump(mode="json")
-    data["delivery"]["client_routing"] = policy
+    if policy in BUILTIN_DELIVERY_POLICIES:
+        data["delivery"]["client_routing"] = policy
+        data["delivery"].pop("default_policy", None)
+    else:
+        data["delivery"]["default_policy"] = policy
     updated = SetupIntent.model_validate(data)
     registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     try:
@@ -68,10 +79,10 @@ def _run(request: FleetRoutingRequest, operation: OperationContext) -> None:
         review_hash=review.review_hash,
         retiring_resources=[binding.logical_id for binding in review.retiring],
     )
-    result = FleetRoutingResult(client_routing=policy, dry_run=request.dry_run, review=preview)
+    result = FleetRoutingResult(client_routing=policy, choices=choices, dry_run=request.dry_run, review=preview)
     if not console.is_json_mode():
         console.err_console.print()
-        console.info(t("fleet_routing.review_title", old=current.delivery.client_routing, new=policy))
+        console.info(t("fleet_routing.review_title", old=previous, new=policy))
         _print_policy(result)
         console.info(t("fleet_routing.refresh", hours=updated.delivery.update_interval_hours))
         if preview.retiring_resources:
@@ -97,7 +108,7 @@ def _run(request: FleetRoutingRequest, operation: OperationContext) -> None:
     )
     applied = build_compiled_apply_result(execution, exit_code=0, summary="Topology converged.")
     _emit(
-        FleetRoutingResult(client_routing=policy, review=preview, applied=applied),
+        FleetRoutingResult(client_routing=policy, choices=choices, review=preview, applied=applied),
         operation,
         status="changed",
         text="Applied client routing policy",
@@ -113,6 +124,9 @@ def _print_policy(result: FleetRoutingResult) -> None:
     console.info(t("fleet_routing.current", policy=result.client_routing))
     for policy, description in (("ru-split", t("fleet_routing.ru_split")), ("full", t("fleet_routing.full"))):
         console.err_console.print(f"  [bold]{policy}[/bold] — {escape(description)}")
+    for choice in result.choices:
+        if choice.preset is not None:
+            console.info(t("fleet_routing.custom", policy=choice.policy, preset=choice.preset, count=choice.rules))
     for note in (t("fleet_routing.bittorrent"), t("fleet_routing.quic"), t("fleet_routing.base64")):
         console.err_console.print(f"  [dim]{escape(note)}[/dim]")
     if result.client_routing == "full":
