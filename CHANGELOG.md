@@ -22,7 +22,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   navigation scrolls with the active page in view, and theme
   and language move into an account menu. A person's page keeps a summary with
   Share, Extend, and Disable above tabs, and each setting edits in place. People
-  gets removable filter chips and compact rows, and its selection bar appears only
+  gets removable filter chips and compact rows with near-quota labels only before
+  the limit is reached, and its selection bar appears only
   once someone is selected, as one compact row on desktop or a bottom bar on phones (#95).
 - Reviewed subscription response rules by app, with bounded literal User-Agent
   and Accept conditions, ordered format/refusal/policy/header actions, and one

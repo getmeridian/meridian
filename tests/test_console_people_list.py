@@ -1,5 +1,6 @@
 """People keeps common actions visible and selection out of the fresh Simple view."""
 
+import json
 import re
 from typing import get_args
 from urllib.parse import parse_qs
@@ -143,6 +144,16 @@ def test_people_rows_show_compact_usage_and_secondary_facts_and_activate_as_link
     assert result["clicked"]["arg"] == result["keyboard"]["arg"] == "p-a"
     if locale == "en":
         assert re.sub("[\u2066-\u2069]", "", row["caption"]) == "51 of 100 GiB"
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+@pytest.mark.parametrize("percent", [90, 100, 510])
+def test_quota_attention_reads_near_only_before_the_limit_is_reached(locale, percent):
+    rows = people()
+    rows[0].update(used_traffic_bytes=percent * 1024**3, traffic_limit_bytes=100 * 1024**3)
+    result = run_console("people-triage-ux", locale, {"people": rows, "scenario": "row"})
+    label = json.loads((UI_DIR / "locales" / f"{locale}.json").read_text())["attention.reason.quota"]
+    assert (label in result["row"]["reasons"]) is (percent < 100)
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])

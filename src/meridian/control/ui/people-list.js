@@ -265,8 +265,11 @@
         M.mount(entry.usage, [h("span", { class: "usage-text", text: caption }), user.traffic_limit_bytes
           ? M.meter(percent, caption, percent >= 100 ? "danger" : percent >= 80 ? "warn" : "success") : null]);
       }
-      var reasons = (user.attention_reasons || []).join(",");
-      if (reasons !== entry.reasons) M.mount(entry.reasonSlot, (user.attention_reasons || []).map(function (key) { return h("span", { class: "person-reason", text: M.t("attention.reason." + key) }); }));
+      var limited = user.status === "limited" || user.quota_used_percent >= 100 || user.quota_used_percent == null
+        && user.traffic_limit_bytes > 0 && user.used_traffic_bytes >= user.traffic_limit_bytes;
+      var attention = (user.attention_reasons || []).filter(function (key) { return key !== "quota" || !limited; });
+      var reasons = attention.join(",");
+      if (reasons !== entry.reasons) M.mount(entry.reasonSlot, attention.map(function (key) { return h("span", { class: "person-reason", text: M.t("attention.reason." + key) }); }));
       entry.reasons = reasons; entry.user = user;
     }
     function makeEntry(user) {

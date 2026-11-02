@@ -143,6 +143,7 @@ if (data.scenario === 'selection') {
     meter: row.querySelector('meter')?.value, expiry: row.querySelector('.people-expiry')?.textContent,
     exactExpiry: row.querySelector('.people-expiry')?.title, secondary: row.querySelector('.people-secondary')?.textContent,
     notes: visible(row.querySelector('[data-people-note]')), declared: visible(row.querySelector('[data-people-declared]')),
+    reasons: row.querySelector('.people-reasons')?.textContent || '',
     nestedCheckbox: !!row.querySelector('input'), href: row.getAttribute('href') };
   row.querySelector('.person-tag').click(); await settle();
   report.clicked = M.route();
