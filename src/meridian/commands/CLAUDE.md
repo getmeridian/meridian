@@ -24,6 +24,7 @@
 - `client remove|reissue --cut-off` discloses every affected node and other people's reconnects before confirming, and keeps typed per-node outcomes and new links even on failure.
 
 ## Pitfalls
+- **Restore imports keep the destination file guard** — bind the snapshot-derived model to the current context's loaded timestamp before saving; its temporary file's timestamp is not destination evidence.
 - **Empty restores save derived fleet state** — persist snapshot profile history and normalize carried checkpoints before review; declining the remote restore must not leave raw, unfinished state on disk.
 - **Restore profile checks precede target access** — validate the snapshot before resolving or registering its target, and never give changed live declarations an automatic review after installation.
 - **Assignment guards cover both entry points** — single-person and bulk profile assignment require the Meridian backend before directory or service access, even for default membership.

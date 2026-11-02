@@ -57,6 +57,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Bind imported restore state to the current context's file guard, accepting
+  existing cluster files without topology while refusing concurrent file edits.
 - Review non-default profile memberships even when their live declarations and
   fingerprint are missing. Refuse previews and settings writes that would leave
   those memberships pointing at profiles absent from the proposed map.

@@ -678,7 +678,7 @@ After every command that changes the fleet, Meridian saves the control service's
 
 Restore checks the snapshot's fleet before profile compatibility or target access. `--force` keeps this check. Choose this fleet's snapshot, or restore another fleet's snapshot into a different empty context.
 
-An empty context imports validated fleet files before remote-restore confirmation. Saved files keep profile history from the snapshot database and discard a carried unfinished restore. They remain if review fails or you decline confirmation; finished restore records are retained.
+An empty context imports validated fleet files before remote restore confirmation. Saved files keep profile history from the snapshot database and discard a carried unfinished restore. They remain if review fails or you decline confirmation; finished restore records are retained. An existing `cluster.yml` without topology is accepted; changes to that file after loading are refused.
 
 Rebuild a lost or seized control server on another server from a snapshot.
 

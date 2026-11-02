@@ -202,6 +202,7 @@ def _fleet_state(cluster: ClusterConfig, snapshot: Snapshot | None) -> ClusterCo
     restored.control_restore = finished_restore(restored.control_restore)
     profiles = review_restore_profiles(restored, snapshot.database)
     restored.access_profiles_used = profiles.profiles_used
+    restored._loaded_mtime_ns = cluster._loaded_mtime_ns
     restored.save()
     write_private(config.SERVER_PROFILES_FILE, deposited.servers_json)
     info(f"Restored this fleet's cluster.yml and servers.json from the snapshot into {config.HOME_DISPLAY}")
