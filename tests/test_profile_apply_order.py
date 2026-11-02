@@ -45,8 +45,9 @@ def test_settings_follow_workloads_and_endpoints_and_accounts_follow_settings(bu
 
 
 @pytest.mark.parametrize("adding_profiles", [False, True], ids=["remove-last-profile", "add-first-profile"])
+@pytest.mark.parametrize("access_reviewed", [False, True], ids=["plain-apply", "reviewed-apply"])
 def test_one_apply_stages_references_and_creates_people_without_invalidating_its_settings_fence(
-    tmp_path: Path, adding_profiles: bool
+    tmp_path: Path, adding_profiles: bool, access_reviewed: bool
 ):
     profile = AccessProfileIntent(id="limited", grants=["exit:exit-a"])
     before = single_exit_intent(users=["existing"], access_profiles=[] if adding_profiles else [profile])
@@ -83,10 +84,11 @@ def test_one_apply_stages_references_and_creates_people_without_invalidating_its
         admin.put_user("existing")
         wanted_settings = next(row.payload for row in plan.resources if isinstance(row.payload, ServiceSettingsPayload))
         wanted_endpoints = [row for row in plan.resources if isinstance(row.payload, ClientEndpointPayload)]
-        review = admin.preview_access_profiles(
-            AccessProfileReviewRequest(access_profiles=wanted_settings.access_profiles)
-        )
-        context.access_review_hash = review.access_hash
+        if access_reviewed:
+            review = admin.preview_access_profiles(
+                AccessProfileReviewRequest(access_profiles=wanted_settings.access_profiles)
+            )
+            context.access_review_hash = review.access_hash
         for action in build_resource_actions(plan, 2):
             payload = action.resource.payload
             if isinstance(payload, NodeWorkloadPayload):

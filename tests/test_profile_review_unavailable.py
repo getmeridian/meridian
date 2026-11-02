@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import json
-from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner
@@ -20,8 +19,7 @@ from meridian.control.client import ControlClient, ControlServiceError, ControlS
 from meridian.control.models import ServiceSettings, UserCreate
 from meridian.core.errors import LocalStateError
 from meridian.core.topology import AccessProfileIntent, SetupIntent
-from meridian.reconciler.meridian_drivers import MeridianDriverContext, ServiceSettingsDriver
-from meridian.reconciler.resources import ResourceExecutionResult, ResourceReconcileError, build_resource_actions
+from meridian.reconciler.resources import ResourceExecutionResult, build_resource_actions
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.fleet_document import dump_fleet_document, fleet_document
 from tests.support.control_service import ADMIN_TOKEN, serve_control
@@ -154,8 +152,9 @@ def test_apply_without_profiles_can_bootstrap_or_repair_with_unavailable_service
 
 @pytest.mark.parametrize("saved", ["profiles", "unknown", "pending-profiles"])
 @pytest.mark.parametrize("credentials", [False, True])
-def test_apply_leaves_an_unavailable_profile_review_to_the_settings_fence_whatever_history_says(
-    tmp_home: Path, saved: str, credentials: bool
+@pytest.mark.parametrize("used", [False, True], ids=["never-used", "ever-used"])
+def test_apply_refuses_unavailable_profile_review_only_once_profiles_have_been_used(
+    tmp_home: Path, saved: str, credentials: bool, used: bool
 ):
     intent = single_exit_intent()
     plan = compile_topology(intent)
@@ -167,6 +166,7 @@ def test_apply_leaves_an_unavailable_profile_review_to_the_settings_fence_whatev
         active_generation=1,
         active_plan_hash=old_plan.plan_hash if saved == "profiles" else "c" * 64,
     )
+    cluster.access_profiles_used = used
     if saved == "profiles":
         settings = next(row for row in old_plan.resources if isinstance(row.payload, ServiceSettingsPayload))
         cluster.managed_bindings[settings.logical_id + "@1"] = ManagedResourceBinding(
@@ -192,34 +192,64 @@ def test_apply_leaves_an_unavailable_profile_review_to_the_settings_fence_whatev
         )
         runtime.return_value.apply_intent.return_value = ResourceExecutionResult(plan_hash=plan.plan_hash, generation=2)
         reply = CliRunner().invoke(app, ["apply", "--yes", "--json"])
-        assert reply.exit_code == 0, reply.output
-        runtime.return_value.apply_intent.assert_called_once()
-        assert runtime.call_args.kwargs["access_review_hash"] is None
+        if used:
+            assert reply.exit_code == 3, reply.output
+            body = json.loads(reply.stdout)
+            assert "profile" in body["errors"][0]["message"].lower()
+            assert "retry" in body["errors"][0]["hint"].lower()
+            assert body["errors"][0]["retryable"] is True
+            runtime.return_value.apply_intent.assert_not_called()
+        else:
+            assert reply.exit_code == 0, reply.output
+            runtime.return_value.apply_intent.assert_called_once()
+            assert runtime.call_args.kwargs["access_review_hash"] is None
 
 
-@pytest.mark.parametrize(
-    "live", [{}, {"limited": ["inbound:exit-a:reality-a"]}], ids=["unchanged", "unreviewed-profiles"]
-)
-def test_an_unreviewed_settings_write_never_changes_the_live_profile_map(live: dict[str, list[str]]):
-    plan = compile_topology(single_exit_intent())
-    action = next(
-        action for action in build_resource_actions(plan, 1) if action.resource.logical_id == "settings:service"
+@pytest.mark.parametrize("used", [False, True], ids=["never-used", "ever-used"])
+@pytest.mark.parametrize("credentials", [False, True])
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_fleet_import_uses_the_same_profile_outage_gate(
+    tmp_path: Path, tmp_home: Path, used: bool, credentials: bool, dry_run: bool
+):
+    from meridian import config
+
+    intent = single_exit_intent()
+    updated = SetupIntent.model_validate({**intent.to_data(), "delivery": {"client_routing": "full"}})
+    plan = compile_topology(updated)
+    cluster = ClusterConfig(
+        panel=PanelConfig(url="https://198.51.100.10/control", api_token=ADMIN_TOKEN) if credentials else PanelConfig(),
+        topology_intent=intent,
     )
-    context = MagicMock(spec=MeridianDriverContext)
-    context.access_review_hash = None
-    context.cluster = ClusterConfig(panel=PanelConfig(url="https://198.51.100.10/control", sub_path="connect"))
-    client = MagicMock()
-    client.settings.return_value = ServiceSettings(profile_title="Meridian", access_profiles=live)
-    context.client = lambda: nullcontext(client)
-    driver = ServiceSettingsDriver(context)
-    if live:
-        with pytest.raises(ResourceReconcileError, match="did not review"):
-            driver.apply(action, None)
-        client.put_settings.assert_not_called()
-    else:
-        driver.apply(action, None)
-        client.put_settings.assert_called_once()
-        assert "expected_access_hash" not in client.put_settings.call_args.kwargs
+    cluster.access_profiles_used = used
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
+    registry.add(ServerEntry(id="srv-control", host="198.51.100.10"))
+    registry.add(ServerEntry(id="srv-exit", host="198.51.100.20"))
+    source = tmp_path / "fleet.yml"
+    source.write_text(dump_fleet_document(fleet_document(updated, registry)), encoding="utf-8")
+    with (
+        patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
+        patch("meridian.commands.fleet_transfer.reviewed_runtime") as runtime,
+        patch("meridian.commands.fleet_transfer.forget_unreachable_servers"),
+        patch("meridian.commands.fleet_transfer.apply_reviewed_intent") as apply,
+        patch("meridian.commands.profile_review.ControlClient") as client,
+    ):
+        runtime.return_value.review.return_value = review(plan)
+        apply.return_value = ResourceExecutionResult(plan_hash=plan.plan_hash, generation=2)
+        client.return_value.__enter__.return_value.settings.side_effect = ControlServiceError(
+            "The control service cannot be reached.", retryable=True
+        )
+        reply = CliRunner().invoke(
+            app, ["fleet", "import", str(source), "--yes", "--json", *(["--dry-run"] if dry_run else [])]
+        )
+        if used or dry_run:
+            assert reply.exit_code == 3, reply.output
+            error = json.loads(reply.stdout)["errors"][0]
+            assert error["retryable"] is True and "retry" in error["hint"].lower()
+            apply.assert_not_called()
+        else:
+            assert reply.exit_code == 0, reply.output
+            apply.assert_called_once()
+            assert apply.call_args.kwargs["access_review_hash"] is None
 
 
 @pytest.mark.parametrize("in_use", [False, True])

@@ -34,15 +34,14 @@ def profile_review_needed(cluster: ClusterConfig, intent: SetupIntent, *, allow_
     """Removing the last profile still reviews the live service's membership and fences its hash.
 
     With the service unreachable, plan reports unavailable evidence. Apply may proceed
-    unreviewed: the settings driver re-reads the live map before writing and refuses to
-    change profiles nobody reviewed, so an outage never decides what the service holds.
+    without that review only if the fleet has never used named access profiles.
     """
     if intent.control.backend != "meridian":
         return False
     if intent.access_profiles:
         return True
     if not cluster.panel.url or not cluster.panel.api_token:
-        if allow_bootstrap:
+        if allow_bootstrap and not cluster.access_profiles_used:
             return False
         raise ProfileReviewUnavailableError()
     try:
@@ -51,7 +50,7 @@ def profile_review_needed(cluster: ClusterConfig, intent: SetupIntent, *, allow_
     except ControlServiceError as exc:
         if not _unavailable(exc):
             raise
-        if allow_bootstrap:
+        if allow_bootstrap and not cluster.access_profiles_used:
             return False
         raise ProfileReviewUnavailableError() from exc
 

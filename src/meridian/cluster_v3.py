@@ -19,6 +19,7 @@ from meridian.core.topology import SetupIntent
 @dataclass(frozen=True)
 class LoadedClusterV3:
     topology_intent: SetupIntent | None
+    access_profiles_used: bool
     workloads: list[WorkloadBinding]
     managed_bindings: dict[str, ManagedResourceBinding]
     allocations: dict[str, ResourceAllocation]
@@ -34,6 +35,8 @@ def serialize_cluster_v3(config: ClusterConfig) -> dict[str, Any]:
     output: dict[str, Any] = {}
     if config.topology_intent is not None:
         output["topology_intent"] = config.topology_intent.model_dump(mode="json", by_alias=True)
+    if config.access_profiles_used:
+        output["access_profiles_used"] = config.access_profiles_used
     if config.workloads:
         output["workloads"] = [_serialize_dataclass(workload) for workload in config.workloads]
     if config.managed_bindings:
@@ -74,6 +77,9 @@ def load_cluster_v3(data: dict[str, Any]) -> LoadedClusterV3:
 
     return LoadedClusterV3(
         topology_intent=topology_intent,
+        access_profiles_used=bool(
+            data.get("access_profiles_used", False) or (topology_intent is not None and topology_intent.access_profiles)
+        ),
         workloads=workloads,
         managed_bindings=managed_bindings,
         allocations=allocations,
@@ -90,6 +96,10 @@ def validate_cluster_v3_structure(data: dict[str, Any]) -> None:
     topology = data.get("topology_intent")
     if topology is not None and not isinstance(topology, dict):
         raise ValueError(f"topology_intent must be a mapping or null, got {type(topology).__name__}")
+
+    used = data.get("access_profiles_used", False)
+    if not isinstance(used, bool):
+        raise ValueError(f"access_profiles_used must be a boolean, got {type(used).__name__}")
 
     workloads = data.get("workloads", [])
     if not isinstance(workloads, list):

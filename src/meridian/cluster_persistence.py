@@ -285,6 +285,7 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         control_migration=control_migration,
         control_restore=control_restore,
         topology_intent=v3.topology_intent,
+        access_profiles_used=v3.access_profiles_used,
         workloads=v3.workloads,
         managed_bindings=v3.managed_bindings,
         allocations=v3.allocations,

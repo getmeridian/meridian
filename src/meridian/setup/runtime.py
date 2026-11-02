@@ -235,6 +235,7 @@ class SetupRuntime:
         connections = {server_ref: self._connection_builder(entry) for server_ref, entry in entries.items()}
         addresses = {server_ref: entry.host for server_ref, entry in entries.items()}
         refuse_legacy_deployments({ref: connections[ref] for ref in targets}, addresses)
+        self._persist_profile_usage(cluster, review.intent)
         control = control_payload(review.plan)
         fence = self._fence_factory(connections[control.server_ref], cluster, review)
         if fence is not None:
@@ -272,6 +273,12 @@ class SetupRuntime:
             fence=fence,
         )
         return result.model_copy(update={"review_hash": review.review_hash})
+
+    def _persist_profile_usage(self, cluster: ClusterConfig, intent: SetupIntent) -> None:
+        """A failed apply must still record profile use before its first remote write, including the fence."""
+        if intent.access_profiles:
+            cluster.access_profiles_used = True
+            self._persist(cluster)
 
     def _default_fence(self, connection: ServerConnection, cluster: ClusterConfig, review: SetupReview) -> ApplyFence:
         """The control service keeps the fence and records the reviewed apply as a revision."""

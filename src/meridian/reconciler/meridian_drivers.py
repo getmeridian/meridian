@@ -597,20 +597,11 @@ class ServiceSettingsDriver:
 
     @_uncertain_writes_are_unknown
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
-        desired = self._settings(action)
         with self.context.client() as client:
             if self.context.access_review_hash is None:
-                # An apply that skipped the profile review (service unreachable at review
-                # time) may not change the live profile map; it must be reviewed first.
-                if client.settings().access_profiles != desired.access_profiles:
-                    raise ResourceReconcileError(
-                        "The control service holds access profiles this apply did not review.",
-                        hint="Run meridian apply again to review who gains and loses access.",
-                        category="user",
-                    )
-                client.put_settings(desired)
+                client.put_settings(self._settings(action))
             else:
-                client.put_settings(desired, expected_access_hash=self.context.access_review_hash)
+                client.put_settings(self._settings(action), expected_access_hash=self.context.access_review_hash)
         return ResourceApplyReceipt(remote_id="settings")
 
     def _settings(self, action: ResourceAction) -> ServiceSettings:

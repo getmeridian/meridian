@@ -78,7 +78,7 @@ meridian plan [--json]
 
 不要手工编辑 `cluster.yml` 中的拓扑。用 `meridian setup`、`deploy`、`client add`、`node add` 或 `relay add` 变更它。
 
-如果无法读取访问配置设置，`plan` 会保留已编译的计划，在 `observation_errors` 中列出不可用的证据，并以代码 `3` 和错误 `MERIDIAN_PLAN_EVIDENCE_UNAVAILABLE` 退出。只有首次部署，或保存的代次已证明没有访问配置时，应用或导入才可跳过此审核。未完成的配置变更或未知历史需要恢复控制服务访问后重试。导入预览需要服务的实时证据。
+如果无法读取访问配置设置，`plan` 会保留已编译的计划，在 `observation_errors` 中列出不可用的证据，并以代码 `3` 和错误 `MERIDIAN_PLAN_EVIDENCE_UNAVAILABLE` 退出。只有集群从未使用过访问配置时，应用或导入不含访问配置的拓扑才可跳过此审核。应用含访问配置的拓扑时，Meridian 会在任何远程写入之前将 `access_profiles_used: true` 保存到 `cluster.yml`，此后不会清除，即使应用失败或最后一个访问配置已被删除。已保存的拓扑中含有访问配置，也视为使用过。对于这些集群，无法获取审核证据时，应用和导入会以可重试的代码 `3` 退出；请恢复控制服务访问后重试。导入预览始终需要服务的实时证据。
 
 ### meridian apply
 
