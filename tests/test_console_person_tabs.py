@@ -51,6 +51,13 @@ def test_share_dialog_has_one_heading_and_unframed_content_with_its_caption(loca
         assert result["shareActions"] and result["dialogQr"] == 1
 
 
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_enable_and_disable_are_named_actions_without_pressed_toggle_semantics(locale: str) -> None:
+    result = run_console("person-tabs-toggle-action", locale)
+    assert all(state["pressed"] is None and state["expectedAction"] and state["status"] for state in result["states"])
+    assert result["writes"] == [{"status": "disabled"}, {"status": "active"}]
+
+
 @pytest.mark.parametrize("tab", ["", "usage", "devices", "routing", "keys"])
 def test_person_tab_deep_links_select_one_labelled_panel(tab: str) -> None:
     result = run_console("person-tabs-route", data={"tab": tab, "mode": "detailed"})
@@ -68,6 +75,14 @@ def test_simple_access_is_a_direct_panel_and_detailed_restores_aria_tabs(locale:
     assert result["before"]["role"] == "region" and result["before"]["label"] and result["before"]["content"]
     assert not result["after"]["stripHidden"] and result["after"]["tabs"] == 5
     assert result["after"]["role"] == "tabpanel" and result["after"]["labelled"] and result["after"]["samePanel"]
+
+
+@pytest.mark.parametrize("locale", ["en", "fa"])
+@pytest.mark.parametrize("mode", ["simple", "detailed"])
+def test_returning_to_access_focuses_the_panel_when_its_only_tab_disappears(locale: str, mode: str) -> None:
+    result = run_console("person-tabs-access-focus", locale, {"tab": "usage", "mode": mode})
+    assert not result["hiddenFocus"] and result["stripHidden"] is (mode == "simple")
+    assert result["focusedPanel" if mode == "simple" else "focusedTab"] == "access"
 
 
 @pytest.mark.parametrize("locale", ["en", "fa"])

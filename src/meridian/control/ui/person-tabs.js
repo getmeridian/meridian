@@ -74,7 +74,7 @@
       });
       return Promise.resolve(work).then(function () {
         if (selected !== next || !node.isConnected) return false;
-        if (focus) buttons.filter(function (button) { return button.dataset.personTab === next; })[0].focus();
+        if (focus) (list.hidden ? panels[next] : buttons.filter(function (button) { return button.dataset.personTab === next; })[0]).focus();
         return true;
       });
     }

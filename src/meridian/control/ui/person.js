@@ -234,7 +234,6 @@
     screen.reset.title = schedule && schedule.next_reset_at ? schedule.next_reset_at + " UTC" : "";
     screen.receipt.hidden = !(share.flow_blocks && share.flow_blocks.nodes && share.flow_blocks.nodes.length);
     screen.toggle.textContent = M.t(user.status === "disabled" ? "person.enable" : "person.disable");
-    screen.toggle.setAttribute("aria-pressed", String(user.status !== "disabled"));
   }
 
   function usageCard(user, screen) {

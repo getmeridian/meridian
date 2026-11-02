@@ -164,6 +164,19 @@ if (scenario === 'person-tabs-header') {
   report.dir = document.documentElement.dir;
 }
 
+if (scenario === 'person-tabs-toggle-action') {
+  function snapshot() {
+    const button = summary().querySelector('[data-person-action="toggle"]');
+    return { label: button.textContent, pressed: button.getAttribute('aria-pressed'),
+      expectedAction: button.textContent === M.t(user.status === 'disabled' ? 'person.enable' : 'person.disable'),
+      status: summary().querySelector('.status-chip')?.textContent === M.t('status.' + user.status) };
+  }
+  report.states = [snapshot()];
+  summary().querySelector('[data-person-action="toggle"]').click(); await settle(); await settle(); report.states.push(snapshot());
+  summary().querySelector('[data-person-action="toggle"]').click(); await settle(); await settle(); report.states.push(snapshot());
+  report.writes = writes;
+}
+
 if (scenario === 'person-tabs-route') {
   report.tabs = tabs().map(el => el.dataset.personTab); report.selected = selected();
   report.panels = panels().map(el => el.dataset.personPanel);
@@ -182,6 +195,14 @@ if (scenario === 'person-tabs-single') {
   report.after = { tabs: tabs().length, stripHidden: !!view().querySelector('[role="tablist"]')?.hidden,
     role: panel?.getAttribute('role'), labelled: !!document.getElementById(panel?.getAttribute('aria-labelledby')),
     samePanel: panel === panels()[0] };
+}
+
+if (scenario === 'person-tabs-access-focus') {
+  view().querySelector('[data-person-tab="access"]').click(); await settle(); await settle();
+  report.stripHidden = view().querySelector('[role="tablist"]').hidden;
+  report.focusedTab = document.activeElement?.dataset.personTab || null;
+  report.focusedPanel = document.activeElement?.dataset.personPanel || null;
+  report.hiddenFocus = !!document.activeElement?.closest('[hidden]');
 }
 
 if (scenario === 'person-tabs-keyboard') {

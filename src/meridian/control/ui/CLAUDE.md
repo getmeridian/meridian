@@ -40,6 +40,8 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Verb-labelled buttons are actions** — Enable and Disable change their names with the available action and must never announce an inverted pressed state.
+- **Hidden person tab strips hand off focus** — returning to the sole Access panel focuses its region; a visible strip retains tab focus.
 - **Inline refreshes distinguish saved choices from drafts** — reseed changed clean editors with focus, retain edited baselines, refresh sibling schedules, and let summary presets read the current account.
 - **Passive reads keep a draft's reviewed dates** — only edits and saves request a new draft preview, since repeated POST previews would renew the owner's idle activity.
 - **Traffic previews start with saved dates** — debounce period and reset-day edits, show and focus the reset field's own error, and clear obsolete form errors on input.
