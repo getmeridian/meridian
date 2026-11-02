@@ -349,27 +349,26 @@ def run_remove(
             if not names:
                 fail(t("bulk.remove_selection"), hint_type="user")
             cluster = load_topology_cluster()
+            if cut_off and (draft is not None or len(names) > 1 or dry_run):
+                fail(t("bulk.proposal_no_cut_off"), hint_type="user")
             access = require_intent(cluster).access
             if draft is None:
+                # A name no declared person matches is refused whatever the service holds.
                 unknown = [value for value in names if not access.matching_users(value)]
                 for value in unknown:
                     require_plausible_client_name(value, console=cluster.runs_control_service)
+                require_removal_users(unknown, access.users)
                 console_names = _console_names(cluster) if set(names) - set(access.users) else []
                 names = [
                     resolve_client_name(cluster, value, console_people=True, console_names=console_names)
                     for value in names
                 ]
+                require_removal_users(names, access.users)
             if len(names) != len(set(names)):
                 fail(t("bulk.remove_duplicate"), hint_type="user")
-            if cut_off and (draft is not None or len(names) > 1):
-                fail(t("bulk.proposal_no_cut_off"), hint_type="user")
-            if draft is None:
-                require_removal_users(names, access.users)
             if len(names) == 1 and draft is None and not dry_run:
                 run_remove_v4(names[0], cluster, operation, yes=yes, cut_off=cut_off)
             else:
-                if cut_off:
-                    fail(t("bulk.proposal_no_cut_off"), hint_type="user")
                 run_reviewed_removal(names, cluster, operation, yes=yes, dry_run=dry_run, proposal=draft)
         except MeridianError as exc:
             fail(exc)

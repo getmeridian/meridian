@@ -40,24 +40,27 @@ def validate_client_name(name: str) -> None:
 
 
 def resolve_client_name(
-    cluster: ClusterConfig, name: str, *, console_people: bool = False, console_names: Collection[str] = ()
+    cluster: ClusterConfig, name: str, *, console_people: bool = False, console_names: Collection[str] | None = None
 ) -> str:
     """The panel username a typed client name means: a username or a display name (Биба).
 
     `console_people` also accepts a name the control service allows, for a
     person added in its console: such names may hold dots or fall outside Remnawave's lengths.
     `console_names` are the service's usernames: an exact one wins over a case-folded or
-    display-name match, and a name that folds onto two people is refused.
+    display-name match, and a name that folds onto two people is refused. Without them (a
+    pre-check before access opens) two declared matches defer to that exact-name check.
     """
     intent = cluster.topology_intent
     declared = list(intent.access.users) if intent is not None else []
     console = console_people and cluster.runs_control_service
-    if console and (name in declared or name in console_names):
+    if console and (name in declared or name in (console_names or ())):
         return name
     matches = intent.access.matching_users(name) if intent is not None else []
+    if console and console_names is None and len(matches) > 1:
+        return name.strip()
     if console:
         wanted = name.strip().casefold()
-        matches = sorted({*matches, *(user for user in console_names if user.casefold() == wanted)})
+        matches = sorted({*matches, *(user for user in console_names or () if user.casefold() == wanted)})
     if len(matches) > 1:
         fail(
             t("client.name_ambiguous", name=isolate(name), people=", ".join(isolate(user) for user in matches)),

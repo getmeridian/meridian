@@ -403,3 +403,46 @@ def test_an_unknown_name_is_refused_before_reading_the_service_directory(removal
     assert "not one of your fleet's clients" in json.loads(result.stdout)["errors"][0]["message"]
     names.assert_not_called()
     single_apply.assert_not_called()
+
+
+def test_a_pre_check_defers_declared_ambiguity_to_the_service_directory(removal_cli):
+    """Service-owned edits pre-check before reading the directory, where an exact console username still wins."""
+    from meridian.commands.client_handoff import resolve_client_name
+
+    _, cluster = removal_cli
+    data = single_exit_intent(users=["biba", "biba-2"]).model_dump(mode="json")
+    data["access"]["display_names"] = {"biba": "Биба", "biba-2": "Biba"}
+    cluster.topology_intent = SetupIntent.model_validate(data)
+    assert resolve_client_name(cluster, "Biba", console_people=True) == "Biba"
+    assert resolve_client_name(cluster, "Biba", console_people=True, console_names=["Biba", "biba", "biba-2"]) == "Biba"
+
+
+def test_a_proposal_whose_people_left_the_local_intent_reports_the_stale_draft(removal_cli, tmp_path):
+    """An interrupted apply saves the new intent before the generation moves, so only the intent hash differs."""
+    remote, cluster = removal_cli
+    proposal = preview(remote.service, "delete", names=["sample-a"]).proposal
+    cluster.topology_intent = single_exit_intent(users=["sample-b", "sample-kept"])
+    path = tmp_path / "removal.json"
+    path.write_text(proposal.model_dump_json(by_alias=True))
+    result, _, batch_apply, _ = remove_with(cluster, ["client", "remove", "--proposal", str(path), "--yes"])
+    assert result.exit_code == 2, result.output
+    assert "does not match the committed topology" in json.loads(result.stdout)["errors"][0]["message"]
+    batch_apply.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("args", "message"),
+    [
+        (["ghost", "--yes"], "not declared in the topology"),
+        (["Sample-A", "sample-b", "--cut-off", "--yes"], "cut-off"),
+    ],
+    ids=["unknown-ascii", "cut-off-several"],
+)
+def test_removals_refused_by_local_state_never_read_the_service_directory(removal_cli, args, message):
+    _, cluster = removal_cli
+    with patch("meridian.commands.client._console_names", side_effect=AssertionError("service contacted")) as names:
+        result, _, _, single_apply = remove_with(cluster, ["client", "remove", *args])
+    assert result.exit_code == 2, result.output
+    assert message in json.loads(result.stdout)["errors"][0]["message"]
+    names.assert_not_called()
+    single_apply.assert_not_called()

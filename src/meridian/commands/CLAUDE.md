@@ -63,7 +63,8 @@
 - **Role names are server names** — `server set` accepts the exit, gateway, and relay IDs `fleet status` prints, since labs whose saved names are IPs had no other handle.
 - **Profile removal refuses a mapped delivery default first** — intent validation would raise a pydantic error that `profile remove` cannot render; name `delivery.profile_policies` and `fleet import` instead.
 - **Typed names may match two declared people** — resolve through `matching_users()` and refuse more than one; never re-check a declared username against the typed-name pattern, which refuses valid leading `_`/`-`.
-- **A removal draft checks its fence before its people** — a stale draft must say so rather than report an already-removed person as undeclared; unknown typed names are refused before the service directory is read.
+- **A removal draft checks its fence and intent hash before its people** — a stale draft must say so rather than report an already-removed person as undeclared; names no declared person matches, and `--cut-off` misuse, are refused before the service directory is read.
+- **A name pre-check without the directory defers declared ambiguity** — service-owned edits validate before access opens, where an exact console username still wins.
 - **Topology-owned removal and reissue never touch console-only people** — and `client reissue` clears device registrations and makes the new subscription URL the page URL at once.
 - **Flow-block receipts read at commit time are always pending** — re-read them briefly (`node_commands.wait_for_flow_blocks()`) before reporting, since the agent confirms within seconds of applying.
 - **`client enable` reports the status the service answers** (`expired`/`limited` when those still hold), never the requested one.
