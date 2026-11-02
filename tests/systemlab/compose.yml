@@ -40,6 +40,7 @@ services:
       dockerfile: tests/systemlab/images/base/Dockerfile
     hostname: exit-b
     privileged: true
+    cgroup: private
     networks:
       labnet:
         ipv4_address: 172.30.0.11

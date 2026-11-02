@@ -60,6 +60,10 @@ COPY tests/systemlab/fixtures/controller_authorized_keys /root/.ssh/authorized_k
 RUN chmod 600 /root/.ssh/authorized_keys
 
 # ---------- systemd wiring ----------
+RUN mkdir -p /etc/systemd/system.conf.d \
+    && printf '[Manager]\nDefaultMemoryAccounting=yes\n' \
+       > /etc/systemd/system.conf.d/10-systemlab-memory.conf
+
 RUN ln -sf /lib/systemd/system/ssh.service \
        /etc/systemd/system/multi-user.target.wants/ssh.service
 
