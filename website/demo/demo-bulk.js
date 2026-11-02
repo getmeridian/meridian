@@ -112,7 +112,7 @@
       var before = project(actual).user, after = null, warnings = [], cli = false;
       versions[name] = version(actual); originals[name] = before;
       if (action.action === "delete") {
-        cli = D.responses["GET ui/api/fleet"].declared_users.indexOf(name) >= 0;
+        cli = D.isDeclared(name);
         if (cli) { after = before; warnings.push("topology_delete"); }
       } else {
         var effect = applyAction(before, action); after = effect.user;

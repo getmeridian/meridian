@@ -14,7 +14,7 @@ const html = fs.readFileSync(path.join(directory, 'console/index.html'), 'utf8')
 const dom = new JSDOM(html, { url: `https://198.51.100.1/demo/console/?lang=${locale}`, runScripts: 'outside-only', pretendToBeVisual: true });
 const w = dom.window;
 let demoNow;
-if (mode === 'showcase-queries' || mode.startsWith('showcase-schedule-') || mode.startsWith('showcase-undo-') || mode.startsWith('showcase-share-') || mode.startsWith('showcase-token-')) {
+if (mode === 'showcase-queries' || ['schedule', 'undo', 'share', 'token', 'declared'].some(prefix => mode.startsWith('showcase-' + prefix + '-'))) {
   const generated = Date.parse(JSON.parse(fs.readFileSync(path.join(directory, 'console/demo-data.json'), 'utf8')).generated_at);
   demoNow = generated;
   w.Date = class extends Date {
@@ -337,6 +337,20 @@ if (mode === 'showcase-navigation') {
   }
   report.keptTokens = JSON.stringify(await M.api('GET', 'api/tokens')) === tokens;
   report.keptEvents = JSON.stringify(await M.api('GET', 'api/events?after=0&limit=2000')) === events;
+} else if (mode === 'showcase-declared-keys') {
+  report.refusals = [];
+  report.unchanged = [];
+  for (const person of ['Tavi', 'Neri']) {
+    async function snapshot() {
+      return JSON.stringify({ user: await M.api('GET', 'api/users/' + person), share: await M.api('GET', 'ui/api/people/' + person + '/share'),
+        devices: await M.api('GET', 'api/users/' + person + '/devices'), people: await M.api('GET', 'api/people?q=' + person),
+        events: await M.api('GET', 'api/events?after=0&limit=2000') });
+    }
+    const before = await snapshot(), user = await M.api('GET', 'api/users/' + person);
+    try { await M.api('POST', 'api/users/' + person + '/rotate-credentials', { expected_generation: user.credential_generation }); report.refusals.push({ code: null }); }
+    catch (error) { report.refusals.push({ code: error.code, status: error.status, text: M.errorText(error) }); }
+    report.unchanged.push(await snapshot() === before);
+  }
 } else if (mode === 'showcase-unavailable') {
   report.refusals = [];
   report.missing = M.t('error.not_found');

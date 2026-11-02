@@ -163,6 +163,7 @@
     return Array.from(bytes, function (value) { return value.toString(16).padStart(2, "0"); }).join("");
   };
   D.bump = function (user) { D.versions[user.username] = (D.versions[user.username] || 0) + 1; };
+  D.isDeclared = function (name) { return responses["GET ui/api/fleet"].declared_users.indexOf(name) >= 0; };
 
   function emit(kind, subject, detail) {
     events.push({ id: ++nextId, time: now(), kind: kind, actor: "owner", subject: subject, detail: detail || {} });
@@ -236,7 +237,7 @@
         if (entry.protocol !== null) { entry.uri = ""; entry.qr_svg = ""; }
       });
     }
-    view.declared = responses["GET ui/api/fleet"].declared_users.indexOf(user.username) >= 0;
+    view.declared = D.isDeclared(user.username);
     if (D.access && user.status === "active") {
       var allowed = D.access(user).connections.map(function (entry) { return entry.remark; });
       view.connections = view.connections.filter(function (entry) { return allowed.indexOf(entry.remark) >= 0; });
@@ -359,7 +360,7 @@
     }
     if (method === "POST" && suffix === "reissue" || method === "DELETE" && !suffix) {
       if (body.cut_off) return error("demo_unavailable", "unavailable", 409);
-      if (responses["GET ui/api/fleet"].declared_users.indexOf(name) >= 0) return error("declared_user", "declared", 409);
+      if (D.isDeclared(name)) return error("declared_user", "declared", 409);
       if (method === "DELETE") {
         users.splice(users.indexOf(user), 1);
         emit("user.removed", name);

@@ -246,6 +246,7 @@
   D.route("POST", "api/users/{id}/rotate-credentials", function (request) {
     var user = D.person(request.ids[0]);
     if (!user) return D.error("not_found", "missing", 404);
+    if (D.isDeclared(user.username)) return D.error("declared_user", "declared", 409);
     if (request.body.cut_off) return D.error("demo_unavailable", "unavailable", 409);
     if (user.credential_generation !== request.body.expected_generation) D.fail("credentials_changed", 409);
     var recording = D.recording(D.source.key_rotations, user.username);

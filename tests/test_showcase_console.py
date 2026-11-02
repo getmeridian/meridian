@@ -281,6 +281,17 @@ def test_demo_token_preview_and_issue_share_request_validation(demo: Path) -> No
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_demo_refuses_declared_key_rotation_without_changing_people_or_receipts(demo: Path, locale: str) -> None:
+    result = run_console("showcase-declared-keys", locale, {"directory": str(demo)})
+    assert all(
+        reply["code"] == "declared_user" and reply["status"] == 409 and reply["text"] for reply in result["refusals"]
+    )
+    assert all(result["unchanged"])
+    validate_recordings(result["responses"])
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 def test_demo_security_and_remote_actions_show_a_translated_demo_refusal(demo: Path, locale: str) -> None:
     result = run_console("showcase-unavailable", locale, {"directory": str(demo)})
     assert len(result["refusals"]) >= 10
