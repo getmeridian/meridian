@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import typer
 
-from meridian.cluster import ClusterConfig
+from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands._helpers import ReviewedApplyPersistenceError
 from meridian.commands.apply import run as run_apply_command
 from meridian.commands.plan import run as run_plan_command
@@ -25,8 +25,17 @@ from tests.support.topology import reality_path, single_exit_intent
 _PLAN_HASH = "a" * 64
 
 
+@pytest.fixture(autouse=True)
+def resource_only_reviews():
+    with patch("meridian.commands.v4_topology.profile_review_needed", return_value=False):
+        yield
+
+
 def _cluster() -> ClusterConfig:
-    return ClusterConfig(topology_intent=single_exit_intent(paths=[reality_path("reality", "www.microsoft.com")]))
+    return ClusterConfig(
+        panel=PanelConfig(url="https://198.51.100.10/control", api_token="test-token"),
+        topology_intent=single_exit_intent(paths=[reality_path("reality", "www.microsoft.com")]),
+    )
 
 
 def _resource(logical_id: str = "firewall:srv-exit:443") -> SimpleNamespace:

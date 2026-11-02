@@ -78,6 +78,8 @@ meridian plan [--json]
 
 不要手工编辑 `cluster.yml` 中的拓扑。用 `meridian setup`、`deploy`、`client add`、`node add` 或 `relay add` 变更它。
 
+如果无法读取访问配置设置，`plan` 会保留已编译的计划，在 `observation_errors` 中列出不可用的证据，并以代码 `3` 和错误 `MERIDIAN_PLAN_EVIDENCE_UNAVAILABLE` 退出。只有首次部署，或保存的代次已证明没有访问配置时，应用或导入才可跳过此审核。未完成的配置变更或未知历史需要恢复控制服务访问后重试。导入预览需要服务的实时证据。
+
 ### meridian apply
 
 应用 `cluster.yml` 中已审核的拓扑到你的服务器。应用显示计划哈希和资源计数，要求确认，然后应用它显示的确切计划，带检查点。中断的应用从停止的地方恢复。

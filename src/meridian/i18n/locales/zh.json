@@ -782,6 +782,8 @@
   "token.invalid_scope": "请选择 read、propose、approve、people 或 admin。",
   "token.invalid_name": "请输入 1–64 个字符的单行名称。",
   "token.invalid_expiry": "请输入未来的 UTC 时间或 1–3650 个完整天数。",
+  "profiles.evidence_unavailable": "无法获取访问配置设置。控制服务中可能仍有访问配置。",
+  "profiles.evidence_retry": "恢复控制服务访问后，重试此命令。",
   "profiles.title": "访问配置",
   "profiles.review_title": "预览访问变更",
   "profiles.person": "用户",

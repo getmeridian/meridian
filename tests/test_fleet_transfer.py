@@ -169,6 +169,7 @@ def _import(
     with (
         patch("meridian.commands.fleet_transfer.load_topology_cluster", return_value=cluster),
         patch("meridian.commands.fleet_transfer.reviewed_runtime", return_value=runtime),
+        patch("meridian.commands.fleet_transfer.profile_review_needed", return_value=False),
         patch("meridian.commands.fleet_transfer.forget_unreachable_servers"),
         patch("meridian.commands.fleet_transfer.has_tty", return_value=tty),
         patch("meridian.commands.fleet_transfer.confirm", return_value=answer),

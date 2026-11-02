@@ -782,6 +782,8 @@
   "token.invalid_scope": "Choose read, propose, approve, people, or admin.",
   "token.invalid_name": "Use a name of 1–64 characters on one line.",
   "token.invalid_expiry": "Use a future UTC expiry or 1–3650 whole days.",
+  "profiles.evidence_unavailable": "Access profile settings are unavailable. The service may still hold profiles.",
+  "profiles.evidence_retry": "Restore control-service access, then retry this command.",
   "profiles.title": "Access profiles",
   "profiles.review_title": "Review access changes",
   "profiles.person": "Person",

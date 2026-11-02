@@ -782,6 +782,8 @@
   "token.invalid_scope": "یکی از read، propose، approve، people یا admin را انتخاب کنید.",
   "token.invalid_name": "نامی یک‌خطی با ۱ تا ۶۴ نویسه وارد کنید.",
   "token.invalid_expiry": "زمانی در آینده به UTC یا ۱ تا ۳۶۵۰ روز کامل وارد کنید.",
+  "profiles.evidence_unavailable": "تنظیمات پروفایل‌های دسترسی در دسترس نیست. ممکن است پروفایل‌ها هنوز در سرویس مدیریت وجود داشته باشند.",
+  "profiles.evidence_retry": "دسترسی به سرویس مدیریت را برقرار کنید، سپس این فرمان را دوباره اجرا کنید.",
   "profiles.title": "پروفایل‌های دسترسی",
   "profiles.review_title": "بازبینی تغییرات دسترسی",
   "profiles.person": "کاربر",

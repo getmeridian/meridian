@@ -78,6 +78,8 @@ The output shows the plan hash, resource counts by kind, and any resources that 
 
 Don't edit the topology in `cluster.yml` by hand. Change it with `meridian setup`, `deploy`, `client add`, `node add`, or `relay add`.
 
+If access profile settings cannot be read, `plan` preserves the compiled result, lists unavailable evidence in `observation_errors`, and exits `3` with `MERIDIAN_PLAN_EVIDENCE_UNAVAILABLE`. Applying or importing without that review is allowed only for a fresh fleet or proven empty saved generation; pending profile changes and unknown history require restoring control-service access and retrying. Import dry runs require live evidence.
+
 ### meridian apply
 
 Apply the reviewed topology in `cluster.yml` to your servers. Apply shows the plan hash and resource count, asks for confirmation, then applies the exact plan it showed, with checkpoints. An interrupted apply resumes where it stopped.

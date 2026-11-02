@@ -24,6 +24,7 @@ from meridian.commands._helpers import (
 )
 from meridian.commands.profile_review import (
     export_creation_memberships,
+    profile_review_needed,
     profile_review_paths,
     require_profile_backend,
     review_profile_access,
@@ -145,9 +146,16 @@ def _import(source: str, *, dry_run: bool, yes: bool, forget_unreachable: bool, 
         review_hash=review.review_hash,
         retiring_resources=[binding.logical_id for binding in review.retiring],
     )
-    access_review = (
-        review_profile_access(cluster, review.plan) if current.access_profiles or updated.access_profiles else None
-    )
+    try:
+        access_review = (
+            review_profile_access(cluster, review.plan)
+            if profile_review_needed(
+                cluster, updated, allow_bootstrap=not dry_run, reviewed_plan_hash=review.plan.plan_hash
+            )
+            else None
+        )
+    except MeridianError as exc:
+        fail(exc)
     if not is_json_mode():
         _print_review(source, changes, preview)
         if access_review is not None:

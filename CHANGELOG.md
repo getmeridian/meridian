@@ -57,6 +57,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Keep plan results when profile evidence is unavailable, allow control-service
+  bootstrap or repair only with proven empty profile history, and give fleet
+  imports the same profile review and membership fence as plan and apply.
 - Keep unresolved lost inbounds in cut-off reviews after credential rotation,
   reissue, replacing imports, or re-enabling a person with narrower access.
 - Report typed directory failures when assigning a person's profiles and print

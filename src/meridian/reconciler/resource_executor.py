@@ -317,7 +317,7 @@ def inspect_resource_plan(
 ) -> ResourceInspectionResult:
     """Observe every reviewed resource without writing state or mutating it."""
     stall = StallRetry()
-    generation = _inspection_generation(plan, cluster)
+    generation = inspection_generation(plan, cluster)
     inspections: list[ResourceInspection] = []
     for action in build_resource_actions(plan, generation):
         driver = drivers.get(action.resource.payload.kind)
@@ -347,7 +347,7 @@ def inspect_resource_plan(
     )
 
 
-def _inspection_generation(
+def inspection_generation(
     plan: ResourcePlan,
     cluster: ClusterConfig,
 ) -> int:

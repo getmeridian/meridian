@@ -8,13 +8,16 @@ from rich.markup import escape
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import forget_unreachable_servers, require_intent, reviewed_runtime
 from meridian.commands.apply_progress import apply_progress
+from meridian.commands.profile_plan import inspect_profile_plan
 from meridian.commands.profile_review import (
+    ProfileReviewUnavailableError,
     profile_review_needed,
     profile_review_paths,
     require_profile_backend,
     review_profile_access,
     review_profile_resources,
 )
+from meridian.compiler.models import ServiceSettingsPayload
 from meridian.console import confirm, err_console, fail, ok, warn
 from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_result
 from meridian.core.models import ErrorModel, OutputStatus, Summary
@@ -41,7 +44,11 @@ def run_v4_apply(
     registry = ServerRegistry(SERVER_PROFILES_FILE)
     forget_unreachable_servers(cluster, registry, intent, forget=forget_unreachable, yes=yes)
     review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(intent), cluster=cluster)
-    access_review = review_profile_access(cluster, review.plan) if profile_review_needed(cluster, intent) else None
+    access_review = (
+        review_profile_access(cluster, review.plan)
+        if profile_review_needed(cluster, intent, allow_bootstrap=True, reviewed_plan_hash=review.plan.plan_hash)
+        else None
+    )
     if access_review is not None and not json_output:
         from meridian.commands.profiles import print_access_review
 
@@ -164,16 +171,31 @@ def run_v4_plan(
 
     intent = require_intent(cluster)
     require_profile_backend(intent)
-    inspection = SetupRuntime(
-        ServerRegistry(SERVER_PROFILES_FILE),
-        cluster_loader=lambda: cluster,
-    ).inspect_intent(intent)
+    inspection = inspect_profile_plan(
+        cluster, intent, SetupRuntime(ServerRegistry(SERVER_PROFILES_FILE), cluster_loader=lambda: cluster)
+    )
     resources = [item.action.resource for item in inspection.inspections]
-    access_review = review_profile_resources(cluster, resources) if profile_review_needed(cluster, intent) else None
-    observation_errors = [item for item in inspection.inspections if item.error]
+    access_review = None
+    observation_errors = [
+        CompiledPlanDriftResult(logical_id=item.action.resource.logical_id, error=item.error)
+        for item in inspection.inspections
+        if item.error
+    ]
+    try:
+        if profile_review_needed(cluster, intent):
+            access_review = review_profile_resources(cluster, resources)
+    except ProfileReviewUnavailableError as exc:
+        settings_id = next(
+            (row.logical_id for row in resources if isinstance(row.payload, ServiceSettingsPayload)), "access-profiles"
+        )
+        if not any(item.logical_id == settings_id for item in observation_errors):
+            observation_errors.append(CompiledPlanDriftResult(logical_id=settings_id, error=str(exc)))
     drifted = [item for item in inspection.inspections if not item.error and not item.converged]
     converged = (
-        inspection.converged and cluster.active_plan_hash == inspection.plan_hash and not cluster.pending_plan_hash
+        not observation_errors
+        and inspection.converged
+        and cluster.active_plan_hash == inspection.plan_hash
+        and not cluster.pending_plan_hash
     )
     state_changes: list[str] = []
     if cluster.pending_plan_hash:
@@ -213,13 +235,7 @@ def run_v4_plan(
             exit_code=3 if observation_errors else exit_code,
             state_changes=state_changes,
             warnings=[inspection.fence_warning] if inspection.fence_warning else [],
-            observation_errors=[
-                CompiledPlanDriftResult(
-                    logical_id=item.action.resource.logical_id,
-                    error=item.error,
-                )
-                for item in observation_errors
-            ],
+            observation_errors=observation_errors,
             drifted_resources=[
                 CompiledPlanDriftResult(
                     logical_id=item.action.resource.logical_id,
@@ -286,10 +302,8 @@ def run_v4_plan(
             # Unobservable until its dependencies apply; apply re-checks it then.
             waits = item.waiting_on[:2] + ([f"{len(item.waiting_on) - 2} more"] if len(item.waiting_on) > 2 else [])
             err_console.print(f"  [dim]recheck[/dim] {logical_id} — after {escape(', '.join(waits))}")
-        for item in observation_errors:
-            err_console.print(
-                f"  [yellow]unavailable[/yellow] {escape(item.action.resource.logical_id)} — {escape(item.error)}"
-            )
+        for issue in observation_errors:
+            err_console.print(f"  [yellow]unavailable[/yellow] {escape(issue.logical_id)} — {escape(issue.error)}")
         for logical_id in inspection.retiring:
             err_console.print(f"  [red]remove[/red] {escape(logical_id)}")
         for change in state_changes:

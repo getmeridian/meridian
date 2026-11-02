@@ -515,6 +515,8 @@ Removing a profile still used by people is refused with its membership count. Mo
 
 `plan` and `apply` review profiles held by the service as well as those in the proposed topology. Removing the last profile is reviewed and fenced, and is refused while anyone still belongs to it.
 
+`fleet import` uses the same profile check, including when both the saved and imported topology have no profiles. If service settings are unavailable, `plan` still returns its compiled result with unavailable evidence and exit `3`. An apply or import can proceed without the profile review only for a fresh fleet or when saved generation evidence proves no profiles were recorded. Otherwise, restore control-service access and retry. Import dry runs require live evidence.
+
 An apply stores inbound and endpoint references before activating profile grants, then creates accounts. Adding a person in that apply cannot invalidate its own access review, including when removing the last profile.
 
 Membership is private operator data: `people.private` reveals `profiles` in person and revision results. Effective-access and membership-count reads require both `people.read` and `people.private`; policy reviews require `fleet.apply` and `people.private`. Account edits use `people.edit`, and bulk assignment uses `people.batch` and `people.private`. Format previews require `people.read`, plus `people.private` while profiles are configured. The people/admin presets include the necessary private permissions; other presets receive an empty `profiles` list and no creation memberships. Profiles store membership only, with no client IP, device, or connection observations.
