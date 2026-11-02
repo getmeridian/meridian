@@ -20,22 +20,22 @@ newest first; the last is what 4.0 changes compared with 3.x.
   transient matcher test across API, CLI, and console. Private person policies
   take priority; blocked apps receive the exact unknown-token refusal, and
   empty rules preserve existing subscription bytes (#95).
+- Filter people by access profile, including `default`, with contextual membership
+  counts in the API, CLI, and People screen. Paging and bulk selection share the
+  filter (#95).
+- Bulk deletion of topology-declared people returns one secret-free proposal tied
+  to the committed fleet revision. Save it from the console or bulk JSON and apply
+  it with `meridian client remove --proposal FILE` (or name several people): one
+  review, one confirmation, one apply. Stale proposals are refused; service-owned
+  people in the same batch are still deleted atomically (#95).
+
 #### Fixed
 - `meridian plan` before upgrading a fleet from an earlier beta no longer stops as
   inconclusive (exit 3) because access profiles look unavailable: a service that
   answers but predates profiles holds none.
-- Filter people by access profile, including `default`, with contextual membership
-  counts in the API, CLI, and People screen. Paging and bulk selection share the
-  filter; list JSON reports saved memberships without searching private notes (#95).
-- Bulk deletion returns one secret-free proposal for all topology-declared people,
-  tied to the committed fleet revision and plan. Save it from the console or bulk
-  JSON and review it with `client remove --proposal`; several names share one
-  confirmation and apply. Named removals use the service's exact-name and ambiguity
-  rules. Proposal usernames must match exact committed declarations;
-  stale proposals are refused. Saved preview hashes, declared outcomes, and whole
-  JSON envelopes are validated; reads stop at 64 MiB for files and streams alike.
-  Mixed service-owned deletes
-  stay atomic, and session cut-off remains an individual removal choice (#95).
+- `meridian client remove NAME` resolves names like `client show`: a console-only
+  person's exact name is refused instead of folding onto a declared person with a
+  similar name, and an ambiguous name is refused.
 
 ### Since 4.0.0b10
 
