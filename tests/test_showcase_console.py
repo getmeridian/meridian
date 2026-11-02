@@ -68,6 +68,8 @@ def test_a_language_switch_moves_into_the_demo_address_so_reloads_and_shared_lin
     assert result["hash"] and result["state"]
     assert result["banner"] == "/demo/?lang=ru"
     assert result["errors"] == []
+
+
 def test_demo_people_queries_match_service_recordings_and_keep_edits_across_pages(demo: Path) -> None:
     result = run_console("showcase-queries", data={"directory": str(demo)})
     validate_recordings(result["responses"])
