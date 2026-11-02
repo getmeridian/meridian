@@ -51,6 +51,15 @@ def test_person_tab_deep_links_select_one_labelled_panel(tab: str) -> None:
     assert result["content"]
 
 
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_simple_access_is_a_direct_panel_and_detailed_restores_aria_tabs(locale: str) -> None:
+    result = run_console("person-tabs-single", locale)
+    assert result["before"]["stripHidden"] and result["before"]["tabs"] == 0
+    assert result["before"]["role"] == "region" and result["before"]["label"] and result["before"]["content"]
+    assert not result["after"]["stripHidden"] and result["after"]["tabs"] == 5
+    assert result["after"]["role"] == "tabpanel" and result["after"]["labelled"] and result["after"]["samePanel"]
+
+
 @pytest.mark.parametrize("locale", ["en", "fa"])
 def test_person_tabs_support_arrow_home_end_and_keep_the_fragment(locale: str) -> None:
     result = run_console("person-tabs-keyboard", locale, {"mode": "detailed"})
@@ -70,7 +79,7 @@ def test_simple_person_deep_links_offer_the_detailed_switch(tab: str) -> None:
 
 def test_simple_more_reaches_metadata_devices_and_removal_without_changing_mode() -> None:
     result = run_console("person-tabs-more")
-    assert result["tabs"] == ["access"] and result["metadataClosed"]
+    assert result["tabs"] == [] and result["metadataClosed"]
     assert result["notes"] and result["tag"]
     assert result["devicesHash"] == "#/people/sample/devices"
     assert result["keysHash"] == "#/people/sample/keys" and result["removal"]

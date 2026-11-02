@@ -22,7 +22,7 @@ newest first; the last is what 4.0 changes compared with 3.x.
   navigation scrolls with the active page in view, and theme
   and language move into an account menu. A person's page keeps a summary with
   Share, Extend, and Disable above tabs, reset and expiry together below usage,
-  and each setting edits in place. People
+  and each setting edits in place; Simple opens Access & limits directly. People
   gets removable filter chips and compact rows with near-quota labels only before
   the limit is reached, and its selection bar appears only
   once someone is selected, as one compact row on desktop or a bottom bar on phones (#95).

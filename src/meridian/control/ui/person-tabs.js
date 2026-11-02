@@ -40,6 +40,17 @@
       buttons.forEach(function (button, index) {
         button.hidden = M.mode() !== "detailed" && choices[index].id !== "access" && choices[index].id !== selected;
       });
+      var multiple = buttons.filter(function (button) { return !button.hidden; }).length > 1;
+      list.hidden = !multiple;
+      choices.forEach(function (choice, index) {
+        var panel = panels[choice.id];
+        panel.setAttribute("role", multiple ? "tabpanel" : "region");
+        if (multiple) {
+          panel.setAttribute("aria-labelledby", buttons[index].id); panel.removeAttribute("aria-label");
+        } else {
+          panel.removeAttribute("aria-labelledby"); panel.setAttribute("aria-label", M.t(choice.label));
+        }
+      });
       note.hidden = M.mode() === "detailed" || selected === "access";
     }
     function select(value) {

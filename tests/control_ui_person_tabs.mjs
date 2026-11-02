@@ -94,9 +94,9 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 15));
 await settle(); await settle();
 const view = () => document.getElementById('view');
 const summary = () => view().querySelector('[data-person-summary]');
-const tabs = () => [...view().querySelectorAll('[role="tab"]')].filter(el => !el.hidden);
+const tabs = () => [...view().querySelectorAll('[role="tab"]')].filter(el => !el.closest('[hidden]'));
 const selected = () => view().querySelector('[role="tab"][aria-selected="true"]')?.dataset.personTab;
-const panels = () => [...view().querySelectorAll('[role="tabpanel"]')].filter(el => !el.hidden);
+const panels = () => [...view().querySelectorAll('[data-person-panel]')].filter(el => !el.hidden);
 const fieldRow = key => view().querySelector('[data-person-field="' + key + '"]');
 async function edit(key) {
   const row = fieldRow(key);
@@ -148,6 +148,16 @@ if (scenario === 'person-tabs-route') {
     return tab?.getAttribute('aria-controls') === panel.id;
   });
   report.hash = w.location.hash; report.content = panels()[0]?.textContent.trim() || '';
+}
+
+if (scenario === 'person-tabs-single') {
+  const panel = panels()[0];
+  report.before = { tabs: tabs().length, stripHidden: !!view().querySelector('[role="tablist"]')?.hidden,
+    role: panel?.getAttribute('role'), label: panel?.getAttribute('aria-label'), content: panel?.textContent.trim() };
+  await M.chooseMode('detailed'); await settle();
+  report.after = { tabs: tabs().length, stripHidden: !!view().querySelector('[role="tablist"]')?.hidden,
+    role: panel?.getAttribute('role'), labelled: !!document.getElementById(panel?.getAttribute('aria-labelledby')),
+    samePanel: panel === panels()[0] };
 }
 
 if (scenario === 'person-tabs-keyboard') {
