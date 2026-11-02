@@ -919,6 +919,7 @@
   "delivery.source_response_rule": "应用响应规则",
   "bulk.proposal_stale": "此删除草稿与已提交的拓扑不一致。请使用当前服务器配置副本，重新生成批量预览。",
   "bulk.proposal_invalid": "请选择有效的删除提案、批量预览或批量回执 JSON 文件，大小不超过 64 MiB。",
+  "bulk.proposal_review_invalid": "此文件中的提案与批量审核结果不一致。请保存新的批量预览或回执。",
   "bulk.proposal_selection": "请选择客户端名称或 --proposal FILE，两者不能同时使用。",
   "bulk.proposal_no_cut_off": "批量删除和提案不支持 --cut-off。如需检查并关闭现有会话，请逐人使用 --cut-off 删除。",
   "bulk.remove_selection": "请输入一个或多个已在配置中声明的客户端名称，或使用 --proposal FILE。",

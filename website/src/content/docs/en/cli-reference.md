@@ -232,6 +232,8 @@ Declared deletions return one revision-bound `proposal` in the bulk preview and 
 
 Proposal `usernames` must exactly match the committed `topology_intent.access.users`, including case. Display names are not accepted in proposals.
 
+A saved bulk file must describe deletion, and its proposal must list exactly the people marked `cli_required`, with the same count. Preview hashes are checked; when a CLI file contains both preview and receipt, their IDs, hashes, and proposals must agree. A standalone receipt keeps the original preview hash and is checked against its recorded outcomes. CLI envelopes reject unknown fields.
+
 For named removal, an exact service username wins over display-name or case-insensitive matches. A name matching two people is refused; use the exact username from `client list`. Remove console-only people with `client bulk delete`.
 
 `client remove NAME...` also supports several declared names, with `--dry-run` to review without saving. A declined review saves nothing, and at least one declared person must remain. JSON previews return `data.clients`, `data.review_hash`, and `data.applied: false`; applied combined removals keep `clients` and `review_hash` and omit default `applied: true`. Individual results keep `data.client`.

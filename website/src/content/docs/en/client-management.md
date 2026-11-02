@@ -497,6 +497,8 @@ Run `meridian client remove --proposal people-removal.json --dry-run --json` on 
 
 Proposal `usernames` must exactly match the committed `topology_intent.access.users`, including case. Display names are not accepted in proposals.
 
+A saved bulk file must describe deletion, and its proposal must list exactly the people marked `cli_required`, with the same count. Preview hashes are checked; when a CLI file contains both preview and receipt, their IDs, hashes, and proposals must agree. A standalone receipt keeps the original preview hash and is checked against its recorded outcomes. CLI envelopes reject unknown fields.
+
 For named removal, an exact service username wins over display-name or case-insensitive matches. A name matching two people is refused; use the exact username from `client list`. Remove console-only people with `client bulk delete`.
 
 A changed committed revision, generation, plan, fleet, or local intent refuses the draft; the apply fence checks the revision again before server changes, even if the plan stayed the same. A topology change also refuses the whole mixed service commit. If there is no committed service fence, or a selected declaration belongs to an unfinished apply, finish `meridian apply` and preview again.

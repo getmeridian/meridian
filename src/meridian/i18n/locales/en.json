@@ -919,6 +919,7 @@
   "delivery.source_response_rule": "app response rule",
   "bulk.proposal_stale": "This removal draft does not match the committed topology. Use the current fleet copy and create a new bulk preview.",
   "bulk.proposal_invalid": "Read a valid removal proposal, bulk preview, or bulk receipt JSON file, up to 64 MiB.",
+  "bulk.proposal_review_invalid": "This file's proposal does not match its bulk review. Save a new bulk preview or receipt.",
   "bulk.proposal_selection": "Choose client names or --proposal FILE, not both.",
   "bulk.proposal_no_cut_off": "Bulk removal and proposals do not support --cut-off. Remove people individually with --cut-off to review session closure.",
   "bulk.remove_selection": "Give one or more declared client names, or --proposal FILE.",

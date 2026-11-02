@@ -29,6 +29,7 @@
 
 ## Pitfalls
 - **Dynamic validation keys cover every request field** — add each `preview.invalid_<field>` to all four CLI catalogs, or invalid input crashes before the user error can render.
+- **Saved-review errors never echo file contents** — describe the mismatch and recovery without exposing unexpected credential fields from untrusted JSON.
 - **Ambiguous names need native recovery text** — the shared client resolver names every match and asks for the exact service username in each locale.
 - **Bulk reply errors name the operation** — the same receipt recovery handles commit and undo, so text must not assume a commit.
 - Server allowance text must disclose accepted upload/download coverage and excluded overhead, host downloads, and relay forwarding in every locale; unmeasured servers never display a zero usage figure.

@@ -232,6 +232,8 @@ JSON 筛选计数对所有有效标签均保持整数，包括 `TOKEN` 和 `API_
 
 提案中的 `usernames` 必须与已提交的 `topology_intent.access.users` 中的用户名完全一致，包括大小写。提案不接受显示名称。
 
+保存的批量文件必须记录删除操作，提案必须恰好列出结果为 `cli_required` 的人员，且计数一致。CLI 会验证预览哈希；如果文件同时包含预览和回执，两者的 ID、哈希和提案必须一致。独立回执保留原始预览哈希，并根据已记录的结果检查提案。CLI 响应外层对象中的未知字段会被拒绝。
+
 按名称删除时，服务中的完整用户名优先于显示名称或忽略大小写的匹配。如果名称匹配两个人，命令会拒绝删除；请使用 `client list` 中的完整用户名。仅在控制台创建的人员请用 `client bulk delete` 删除。
 
 `client remove NAME...` 也接受多个已声明名称，`--dry-run` 只审核、不保存。取消确认不会保存任何更改，且必须至少保留一名已声明人员。JSON 预览返回 `data.clients`、`data.review_hash` 和 `data.applied: false`。已应用的批量删除保留 `clients` 和 `review_hash`，省略默认值 `applied: true`。单人结果继续使用 `data.client`。

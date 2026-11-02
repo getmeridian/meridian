@@ -17,7 +17,7 @@ from meridian.control.client import ControlClient
 from meridian.core.agent_types import canonical_sha256
 from meridian.core.clients import ClientReference, ClientRemoveResult
 from meridian.core.errors import MeridianError
-from meridian.core.models import Summary
+from meridian.core.models import OutputEnvelope, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.people_bulk import BulkPreview, BulkReceipt, ClientBulkResult
 from meridian.core.people_removal import PeopleRemovalProposal
@@ -31,6 +31,24 @@ from meridian.setup.editor import remove_access_user_from_intent
 MAX_PROPOSAL_FILE_BYTES = 64 * 1024 * 1024
 
 
+def _reviewed_proposal(view: BulkPreview | BulkReceipt) -> PeopleRemovalProposal:
+    proposal = view.proposal
+    if proposal is None:
+        raise ValueError
+    usernames = sorted(person.username for person in view.people if person.outcome == "cli_required")
+    if (
+        view.action.action != "delete"
+        or proposal.usernames != usernames
+        or view.counts.cli_required != len(usernames)
+        or (
+            isinstance(view, BulkPreview)
+            and view.preview_hash != canonical_sha256(view.model_dump(mode="json", exclude={"preview_hash"}))
+        )
+    ):
+        raise MeridianError(t("bulk.proposal_review_invalid"), category="user")
+    return proposal
+
+
 def read_removal_proposal(path: str) -> PeopleRemovalProposal:
     """Accept the saved proposal, API preview/receipt, or CLI bulk output envelope."""
     try:
@@ -41,13 +59,22 @@ def read_removal_proposal(path: str) -> PeopleRemovalProposal:
         if not isinstance(body, dict):
             raise ValueError
         if "data" in body:
-            result = ClientBulkResult.model_validate(body["data"])
-            view = result.receipt or result.preview
-            proposal = view.proposal if view is not None else None
+            envelope = OutputEnvelope.model_validate(body)
+            result = ClientBulkResult.model_validate(envelope.data)
+            preview = _reviewed_proposal(result.preview) if result.preview is not None else None
+            receipt = _reviewed_proposal(result.receipt) if result.receipt is not None else None
+            if (
+                result.preview is not None
+                and result.receipt is not None
+                and (result.preview.id, result.preview.preview_hash, preview)
+                != (result.receipt.id, result.receipt.preview_hash, receipt)
+            ):
+                raise MeridianError(t("bulk.proposal_review_invalid"), category="user")
+            proposal = receipt or preview
         elif "committed_at" in body:
-            proposal = BulkReceipt.model_validate(body).proposal
+            proposal = _reviewed_proposal(BulkReceipt.model_validate(body))
         elif "created_at" in body:
-            proposal = BulkPreview.model_validate(body).proposal
+            proposal = _reviewed_proposal(BulkPreview.model_validate(body))
         else:
             proposal = PeopleRemovalProposal.model_validate(body)
         if proposal is None:
