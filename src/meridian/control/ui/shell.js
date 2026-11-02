@@ -17,7 +17,6 @@
     root.querySelectorAll("[data-mode-section]").forEach(function (section) {
       // Keep an edited form visible and mounted when reducing the amount of detail.
       section.open = detailed || M.hasUnsavedEdits(section);
-      section.querySelector(".mode-caption").hidden = detailed;
     });
     if (M.applyServerMode) M.applyServerMode(root);
   };

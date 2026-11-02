@@ -59,8 +59,7 @@
 
   M.detailedSection = function (label, content, key) {
     return h("details", { class: "mode-disclosure", "data-mode-section": key, open: M.mode() === "detailed" },
-      h("summary", {}, h("span", { text: label }),
-        h("span", { class: "mode-caption muted small", hidden: M.mode() === "detailed", text: M.t("mode.shown_detailed") })),
+      h("summary", { text: label }),
       h("div", { class: "mode-content" }, content));
   };
 })();

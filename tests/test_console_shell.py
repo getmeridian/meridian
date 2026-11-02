@@ -81,10 +81,11 @@ def test_mode_switch_has_radio_keyboard_navigation(locale: str) -> None:
     assert result["radioStates"] == ["false", "true"]
 
 
-def test_simple_disclosures_keep_capacity_open_across_passive_refresh() -> None:
-    result = run_console("shell-server-disclosure", data={"hash": "#/servers/main"})
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_simple_disclosures_keep_capacity_open_across_passive_refresh(locale: str) -> None:
+    result = run_console("shell-server-disclosure", locale, {"hash": "#/servers/main"})
     assert result["initialOpen"] is False and result["afterPollOpen"] is True
-    assert result["capacityNote"] == "Shown in Detailed view"
+    assert result["capacityNote"] is None and result["misleadingDisclosureCaptions"] == 0
     assert result["targetServer"] == "main"
     assert result["moreStayedOpen"]
 
@@ -99,9 +100,11 @@ def test_simple_server_cards_keep_host_facts_in_more_across_modes_and_refresh(lo
     assert result["restartInMenu"] and result["writes"] == []
 
 
-def test_settings_moves_appearance_and_discloses_advanced_sections_without_losing_input() -> None:
-    result = run_console("shell-settings", data={"hash": "#/settings"})
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_settings_moves_appearance_and_discloses_advanced_sections_without_losing_input(locale: str) -> None:
+    result = run_console("shell-settings", locale, {"hash": "#/settings"})
     assert result["appearanceCards"] == 0
     assert result["advancedInitiallyClosed"]
     assert result["samePreviewInput"] and result["previewValue"] == "sample"
     assert result["advancedAfterDetailedOpen"]
+    assert result["misleadingDisclosureCaptions"] == 0

@@ -121,7 +121,6 @@ input::placeholder { color: var(--t3); }
 .sticky-actions { position: sticky; inset-block-end: var(--space-3); z-index: 10; }
 .mode-disclosure > summary, .secondary-actions > summary { cursor: pointer; color: var(--t1); font-weight: 600;
   min-block-size: 44px; padding-block: var(--space-2); overflow-wrap: anywhere; }
-.mode-caption { display: block; font-weight: 400; }
 .mode-content { display: flex; flex-direction: column; gap: var(--space-3); padding-block-start: var(--space-3); }
 .mode-content > .card { border: 0; box-shadow: none; background: none; padding: 0; }
 .mode-content > .server-capacity { border: 0; margin: 0; padding: 0; }

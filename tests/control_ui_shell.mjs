@@ -338,6 +338,8 @@ report.theme = document.documentElement.getAttribute('data-theme');
 report.language = M.i18n.lang; report.dir = document.documentElement.dir;
 function stored(key) { try { return w.localStorage.getItem(key); } catch { return null; } }
 report.storedMode = stored('mrd.mode'); report.storedTheme = stored('mrd.theme'); report.storedLanguage = stored('mrd.lang');
+report.misleadingDisclosureCaptions = [...document.querySelectorAll('[data-mode-section] > summary')]
+  .filter(el => el.textContent.includes(M.t('mode.shown_detailed'))).length;
 report.text = document.getElementById('app').textContent;
 process.stdout.write(JSON.stringify(report));
 dom.window.close();
