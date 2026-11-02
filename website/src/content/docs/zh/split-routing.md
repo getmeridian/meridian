@@ -117,6 +117,8 @@ meridian fleet routing ru-split --yes
 
 规则可匹配域名后缀、完整域名、ASCII 关键词、固定版本的 `geosite`/`geoip` 列表、CIDR、目标端口或 TCP/UDP。`match.kind` 可选 `domain_suffix`、`domain_full`、`domain_keyword`、`geosite`、`geoip`、`cidr`、`port`、`network`。端口值采用 `{"start": 8443, "end": 8445}`；省略 `end` 表示单个端口。同一匹配中的值是备选项，满足任一项即可；可选 `network` 和 `ports` 条件同时限制整条规则。局域网直连规则最先执行，随后按书写顺序执行自定义规则，再执行内置模式的其余规则。首次匹配决定动作。
 
+Stash 使用 `LAN` 表示私有地址范围，包括带有网络和端口条件的逻辑规则。这些 IP 匹配保留 `no-resolve`。
+
 geosite 属性按固定数据中的完整键名匹配。例如，`@!cn` 只选择带有 `!cn` 属性的条目；没有此属性的条目不会匹配。
 
 动作包括 `{"kind":"proxy"}`（通过 VPN）、`{"kind":"direct"}`（直连）、`{"kind":"block"}`（阻止），以及 `{"kind":"exit","exit":"west"}`（通过已声明的出口）。出口组只包含用户有权使用的连接。如果当前订阅配置没有所需出口，对应目的地会被阻止，不会改用其他出口。Xray 单连接配置及不同 TLS 指纹组保持隔离。BitTorrent 检测仍尽力而为，且仅适用于 Xray。

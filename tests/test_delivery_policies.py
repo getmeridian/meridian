@@ -339,3 +339,40 @@ def test_xray_dns_preserves_direct_lan_resolvers_before_the_tunnel_rule() -> Non
         "outboundTag": "DIRECT",
     }
     assert rules[1]["inboundTag"] == ["MERIDIAN_DNS"] and rules[1]["balancerTag"] == "MERIDIAN_AUTO"
+
+
+@pytest.mark.parametrize(
+    "conditions",
+    [
+        {"network": "tcp"},
+        {"ports": [{"start": 8443}]},
+        {"network": "tcp", "ports": [{"start": 8443, "end": 8445}, {"start": 9443}]},
+    ],
+    ids=["network", "port", "network-and-port-alternatives"],
+)
+def test_stash_translates_private_ranges_inside_logical_rules(conditions: dict) -> None:
+    from meridian.core.delivery_policies import resolve_delivery_policy
+
+    data = policy_data()
+    data["rules"] = [
+        {"match": {"kind": "geoip", "values": ["private", "ru"]}, "action": {"kind": "block"}, **conditions}
+    ]
+    settings = ServiceSettings.model_validate(
+        {"profile_title": "Meridian", "delivery_policies": [data], "default_policy": "work"}
+    )
+    policy = resolve_delivery_policy(settings)
+    user = SubscriptionUser(username="person", uuid=UUID, short_id=SHORT_ID)
+    rendered = {
+        document: yaml.safe_load(
+            render_subscription(
+                user, FLEETS["fleet"].endpoints, document, profile_title="Meridian", delivery_policy=policy
+            ).body
+        )
+        for document in ("mihomo", "stash")
+    }
+    logical = [rule for rule in rendered["mihomo"]["rules"] if rule.startswith("AND,")]
+    assert any("(GEOIP,private,no-resolve)" in rule for rule in logical)
+    assert [rule for rule in rendered["stash"]["rules"] if rule.startswith("AND,")] == [
+        rule.replace("GEOIP,private,", "GEOIP,LAN,") for rule in logical
+    ]
+    assert not any("GEOIP,private," in rule for rule in rendered["stash"]["rules"])

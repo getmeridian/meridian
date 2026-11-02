@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 from meridian.control.formats.entries import SubscriptionUser
 from meridian.control.models import ServiceSettings
@@ -18,11 +19,22 @@ from tests.test_control_subscription_corpus import FLEETS, SHORT_ID, UUID
 from tests.test_delivery_policies import policy_data
 
 
-def runtime_document(document: str, *, fake_ip: bool = False, ipv6: bool = False) -> str:
+def runtime_document(
+    document: str, *, fake_ip: bool = False, ipv6: bool = False, qualified_private: bool = False
+) -> str:
     data = policy_data()
     data["dns"]["fake_ip"] = fake_ip
     if ipv6:
         data["dns"]["resolvers"] = [{"transport": "plain", "address": "2001:db8::53"}]
+    if qualified_private:
+        data["rules"].append(
+            {
+                "match": {"kind": "geoip", "values": ["private"]},
+                "action": {"kind": "block"},
+                "network": "tcp",
+                "ports": [{"start": 8443, "end": 8445}, {"start": 9443}],
+            }
+        )
     data["rules"].append(
         {
             "match": {"kind": "domain_suffix", "values": ["service.example.test"]},
@@ -76,8 +88,9 @@ def test_singbox_accepts_named_rules_exit_groups_and_dns(tmp_path: Path, fake_ip
 @pytest.mark.parametrize("document", ["mihomo", "stash"])
 @pytest.mark.parametrize("fake_ip", [False, True])
 @pytest.mark.parametrize("ipv6", [False, True])
+@pytest.mark.parametrize("qualified_private", [False, True])
 def test_mihomo_accepts_named_rules_and_dns_with_local_pinned_geodata(
-    tmp_path: Path, document: str, fake_ip: bool, ipv6: bool
+    tmp_path: Path, document: str, fake_ip: bool, ipv6: bool, qualified_private: bool
 ) -> None:
     binary = os.environ.get("MERIDIAN_TEST_MIHOMO")
     geodata = os.environ.get("MERIDIAN_TEST_MIHOMO_GEODATA")
@@ -88,7 +101,10 @@ def test_mihomo_accepts_named_rules_and_dns_with_local_pinned_geodata(
         if source.exists():
             shutil.copyfile(source, tmp_path / filename)
     path = tmp_path / "config.yaml"
-    path.write_text(runtime_document(document, fake_ip=fake_ip, ipv6=ipv6))
+    body = runtime_document(document, fake_ip=fake_ip, ipv6=ipv6, qualified_private=qualified_private)
+    if document == "stash":
+        assert not any("GEOIP,private," in rule for rule in yaml.safe_load(body)["rules"])
+    path.write_text(body)
     result = subprocess.run(
         [binary, "-t", "-d", str(tmp_path), "-f", str(path)], capture_output=True, text=True, timeout=30
     )

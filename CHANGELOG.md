@@ -102,6 +102,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   their own review.
 - Keep unresolved lost inbounds in cut-off reviews after credential rotation,
   reissue, replacing imports, or re-enabling a person with narrower access.
+- Translate Stash private-range matches to `LAN` inside logical rules too,
+  preserving network and port conditions and `no-resolve` (#95).
 - Match literal geosite attributes in delivery explanations, including `!cn`,
   so untagged domains do not match an attributed list (#95).
 - Route hostnames before resolving them in named Xray policies, so blocked names and

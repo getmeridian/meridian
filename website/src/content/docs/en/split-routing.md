@@ -115,6 +115,8 @@ This is the `delivery` section, with documentation addresses: replace the resolv
 
 Rules match domain suffixes, full domains, ASCII keywords, pinned `geosite`/`geoip` lists, CIDRs, destination ports, or TCP/UDP. Use `match.kind` values `domain_suffix`, `domain_full`, `domain_keyword`, `geosite`, `geoip`, `cidr`, `port`, and `network`. Port values are objects such as `{"start": 8443, "end": 8445}`; omitting `end` selects one port. Values within a match are alternatives. Optional rule `network` and `ports` conditions narrow the whole match. LAN bypasses come first, custom rules follow in their written order, and the preset's remaining rules follow them. The first match wins.
 
+Stash receives private-range matches as `LAN`, including inside rules with network and port conditions. These IP matches retain `no-resolve`.
+
 Geosite attributes select literal keys in the pinned data. For example, `@!cn` matches entries carrying `!cn`; entries without that attribute do not match.
 
 Actions are `{"kind":"proxy"}`, `{"kind":"direct"}`, `{"kind":"block"}`, or `{"kind":"exit","exit":"west"}` for a declared exit. Exit groups use eligible connections. A delivered profile without that exit blocks the matching destination; it never chooses another exit. Xray's individual and fingerprint profiles retain their isolation. BitTorrent detection remains best-effort and Xray-only.

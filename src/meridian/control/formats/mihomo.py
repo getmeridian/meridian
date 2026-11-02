@@ -125,7 +125,7 @@ def _to_stash(document: dict[str, Any], listed: list[ClientEndpoint]) -> None:
         dropped = skipped if group.pop("exclude-filter", None) is not None else xhttp
         group["proxies"] = [name for name in group["proxies"] if name not in dropped]
     old, new = _STASH_PRIVATE_RULE
-    document["rules"] = [new + rule.removeprefix(old) if rule.startswith(old) else rule for rule in document["rules"]]
+    document["rules"] = [rule.replace(old, new) for rule in document["rules"]]
 
 
 def mihomo_proxy(endpoint: ClientEndpoint, uuid: str) -> dict[str, Any]:
