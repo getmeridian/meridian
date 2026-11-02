@@ -143,7 +143,7 @@ def test_pinned_geodata_stays_small_in_memory() -> None:
     import os
     import tracemalloc
 
-    from tests.systemlab.control_memory import EXPLANATION_DESTINATION
+    from tests.systemlab.control_memory import EXPLANATION_DESTINATIONS
 
     binary = os.environ.get("MERIDIAN_TEST_XRAY")
     folder = Path(binary).parent if binary else None
@@ -154,7 +154,7 @@ def test_pinned_geodata_stays_small_in_memory() -> None:
         data = GeoData.from_bytes((folder / "geosite.dat").read_bytes(), (folder / "geoip.dat").read_bytes())
         resolved = resolve_delivery_policy(DeliveryPolicySettings())
         for destination, status, action in (
-            (EXPLANATION_DESTINATION, "default", "proxy"),
+            *((destination, "default", "proxy") for destination in EXPLANATION_DESTINATIONS),
             ("router.lan:443", "matched", "direct"),
             ("198.51.100.10:443", "matched", "direct"),
         ):
@@ -169,5 +169,6 @@ def test_pinned_geodata_stays_small_in_memory() -> None:
         _current, peak = tracemalloc.get_traced_memory()
     finally:
         tracemalloc.stop()
+    assert {"private", "ru"} <= set(data.ips._decoded)  # type: ignore[attr-defined]
     print(f"pinned geodata explanation peak: {peak / 1024**2:.1f} MiB ({peak} bytes)")
     assert peak < 64 * 1024 * 1024, f"Pinned geodata explanation used {peak / 1024**2:.1f} MiB; budget is 64 MiB."

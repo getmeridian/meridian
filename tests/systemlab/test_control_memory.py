@@ -196,3 +196,32 @@ def test_peak_above_the_budget_fails_and_always_prints_the_measurement(
         check_memory_peak(peak, 256 * 1024 * 1024)
     output = capsys.readouterr().out
     assert str(peak) in output and "160.0 MiB" in output and "256.0 MiB" in output
+
+
+def test_memory_stage_waits_for_the_background_geodata_mirror_and_then_fails_loudly() -> None:
+    from types import SimpleNamespace
+
+    from tests.systemlab.control_memory import wait_for_geodata
+
+    answers = iter([False, False, True])
+    calls: list[float] = []
+
+    class Client:
+        def explain_delivery_policy(self, _request: object) -> SimpleNamespace:
+            return SimpleNamespace(geodata_available=next(answers))
+
+    now = [0.0]
+    wait_for_geodata(
+        Client(),
+        timeout=10,
+        sleep=lambda pause: (calls.append(pause), now.__setitem__(0, now[0] + pause)) and None,
+        clock=lambda: now[0],
+    )  # type: ignore[arg-type]
+    assert calls == [2.0, 2.0]
+
+    answers = iter([False] * 10)
+    now = [0.0]
+    with pytest.raises(ValueError, match="unavailable to the control service after 5s"):
+        wait_for_geodata(
+            Client(), timeout=5, sleep=lambda pause: now.__setitem__(0, now[0] + pause), clock=lambda: now[0]
+        )  # type: ignore[arg-type]

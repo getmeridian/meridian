@@ -27,7 +27,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - Idempotency dual-path: `tests/provision/CLAUDE.md`.
 
 ## Pitfalls
-- **Pinned geodata memory guards start cold** — trace file reads and complete explanations, using the reserved example.com destination that reaches category-ru; CI's Xray folder supplies both data files.
+- **Pinned geodata memory guards start cold** — trace file reads and complete explanations, with destinations that reach category-ru and geoip:ru (documentation ranges stop at the private lists); CI's Xray folder supplies both data files.
 - **Restore command doubles supply profile evidence** — a confirmation-only scenario stubs the early compatibility check; profile scenarios use real snapshot and service state.
 - **Import test doubles cover profile discovery** — previews that stub resources also supply evidence of an empty service profile map.
 - **Older fixtures rewind membership before capacity** — shared helpers remove schema 24 before schema 23, preserving capacity when only membership is rewound.

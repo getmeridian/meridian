@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 
@@ -22,7 +23,11 @@ from tests.systemlab.subscription_client import (
 # 160 MiB leaves 96 MiB below MemoryMax and 51 MiB above the observed 109 MiB VM peak.
 CONTROL_MEMORY_BUDGET_BYTES = 160 * 1024 * 1024
 BURST_CONCURRENCY = 4
-EXPLANATION_DESTINATION = "memory-budget.example.com:443"
+# .test is in geosite:private, so this reserved example.com name reaches category-ru; documentation
+# addresses are geoip:private, so a public resolver address walks geoip:private and geoip:ru.
+EXPLANATION_DESTINATIONS = ("memory-budget.example.com:443", "1.1.1.1:443")
+# ctld mirrors the Xray archive in the background after the node spec arrives; the agent may not wait for it.
+GEODATA_WAIT_SECONDS = 180.0
 SUBSCRIPTION_READERS: dict[str, Callable[[str], object]] = {
     "": parse_base64_subscription,
     "json": parse_xray_subscription,
@@ -43,13 +48,26 @@ def require_geodata_explanation(explanation: DeliveryExplanation | None) -> None
         raise ValueError("The memory workload must traverse the ru-split geodata rules to the default proxy.")
 
 
+def wait_for_geodata(
+    client: ControlClient,
+    *,
+    timeout: float = GEODATA_WAIT_SECONDS,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> None:
+    deadline = clock() + timeout
+    request = DeliveryExplainRequest(destination=EXPLANATION_DESTINATIONS[0])
+    while not client.explain_delivery_policy(request).geodata_available:
+        if clock() >= deadline:
+            raise ValueError(f"Pinned Xray geodata is unavailable to the control service after {timeout:.0f}s.")
+        sleep(2.0)
+
+
 def exercise_memory_paths(client: ControlClient, username: str, public: httpx.Client, public_url: str) -> None:
-    # .test is in geosite:private; this reserved example.com subdomain reaches category-ru.
-    require_geodata_explanation(
-        client.explain_delivery_policy(DeliveryExplainRequest(destination=EXPLANATION_DESTINATION))
-    )
+    for destination in EXPLANATION_DESTINATIONS:
+        require_geodata_explanation(client.explain_delivery_policy(DeliveryExplainRequest(destination=destination)))
     preview = client.preview_subscription(
-        SubscriptionPreviewRequest(username=username, suffix="json", destination=EXPLANATION_DESTINATION)
+        SubscriptionPreviewRequest(username=username, suffix="json", destination=EXPLANATION_DESTINATIONS[1])
     )
     require_geodata_explanation(preview.explanation)
     if preview.placeholder is not None or not preview.included:
@@ -108,6 +126,7 @@ def main() -> None:
             user = client.get_user("solo")
             if user is None or not user.sub_token:
                 raise ValueError("The single-server memory workload needs solo's subscription.")
+            wait_for_geodata(client)
             exercise_memory_paths(client, "solo", public, cluster.panel.subscription_url(user.sub_token))
     except (ValueError, ControlServiceError) as error:
         raise SystemExit(str(error)) from None

@@ -23,7 +23,7 @@ uv run pytest tests/systemlab/ -q
 ## Pitfalls
 - **Memory bursts fit the control listener backlog** — use four concurrent fetches across all formats; a full accept queue resets connects before they exercise memory.
 - **Memory evidence belongs to one invocation** — privileged exit B keeps a private writable cgroup with memory accounting; a missing peak or restarted `ctld` fails, never skips.
-- **Reserved .test domains match geosite:private** — use the reserved example.com subdomain and require a ru-split default-proxy result so the workload reaches category-ru.
+- **Memory workloads walk the heavy lists only after the mirror lands** — `ctld` mirrors the Xray archive in the background, so wait for its geodata first; documentation names and addresses match the private lists, so use an example.com name (category-ru) and a public resolver address (geoip:ru).
 - **Stage scripts import Meridian outside pytest** — a moved helper breaks only the Docker run; grep `tests/systemlab/scripts` whenever a public helper moves.
 - **Debug one stage, not the lab** — `SYSTEMLAB_KEEP=1 SYSTEMLAB_STAGES="10-deploy.sh 40-removal.sh"` keeps the fleet up for reruns.
 - **Agents verify the service against WebPKI roots** — bootstrap adds Pebble's issuance root and `NETAGENT_TLS_CA_FILE` before any deploy, or no agent enrolls.
