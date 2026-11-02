@@ -41,6 +41,16 @@ def test_summary_expiry_shares_the_reset_meta_line_and_keeps_its_exact_date(loca
     assert result["expiryFocusable"] and "2026-12-02T12:00:00Z" in result["exactExpiry"]
 
 
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+@pytest.mark.parametrize("public", [True, False])
+def test_share_dialog_has_one_heading_and_unframed_content_with_its_caption(locale: str, public: bool) -> None:
+    result = run_console("person-tabs-header", locale, {"share": {} if public else {"subscription_url": None}})
+    assert result["dialogHeadings"] == 1 and result["dialogCards"] == 0
+    assert result["shareCaption"] and result["connections"]
+    if public:
+        assert result["shareActions"] and result["dialogQr"] == 1
+
+
 @pytest.mark.parametrize("tab", ["", "usage", "devices", "routing", "keys"])
 def test_person_tab_deep_links_select_one_labelled_panel(tab: str) -> None:
     result = run_console("person-tabs-route", data={"tab": tab, "mode": "detailed"})

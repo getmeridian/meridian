@@ -5,11 +5,10 @@
 
   M.shareCard = function (share, username) {
     if (!share.subscription_url) {
-      return h("section", { class: "card" }, h("h2", { text: M.t("person.share") }),
+      return h("div", { class: "stack" },
         h("p", { class: "muted", text: M.t("person.no_public_url") }), M.connectionDisclosure(share));
     }
-    return h("section", { class: "card" },
-      h("h2", { text: M.t("person.share") }),
+    return h("div", { class: "stack" },
       h("p", { class: "muted small", text: M.t("person.share_text") }),
       h("div", { class: "share" },
         h("div", { class: "stack-sm share-qr" },

@@ -133,6 +133,9 @@ if (scenario === 'person-tabs-header') {
   report.pageQr = view().querySelectorAll('.qr').length;
   head?.querySelector('[data-person-action="share"]')?.click(); await settle();
   const dialog = document.querySelector('dialog');
+  report.dialogHeadings = dialog?.querySelectorAll('h2').length || 0;
+  report.dialogCards = dialog?.querySelectorAll('.share-dialog-body .card').length || 0;
+  report.shareCaption = dialog?.textContent.includes(M.t(share.subscription_url ? 'person.share_text' : 'person.no_public_url')) || false;
   report.dialogQr = dialog?.querySelectorAll('.qr').length || 0;
   report.shareActions = !!dialog && ['person.copy_link', 'person.open_page', 'person.copy_page', 'person.download_png', 'person.download_svg']
     .every(key => [...dialog.querySelectorAll('button, a')].some(el => el.textContent.includes(M.t(key))));
