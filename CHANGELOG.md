@@ -30,6 +30,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
   people in the same batch are still deleted atomically (#95).
 
 #### Fixed
+- The public console demo shows People, access profiles, client routing, and
+  reviewed bulk changes from current service recordings. Unsupported security
+  and server actions display a translated demo notice (#95).
 - `meridian plan` before upgrading a fleet from an earlier beta no longer stops as
   inconclusive (exit 3) because access profiles look unavailable: a service that
   answers but predates profiles holds none.

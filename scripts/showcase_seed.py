@@ -7,7 +7,10 @@ from datetime import UTC, datetime, timedelta
 from unittest import mock
 
 from meridian.control.models import (
+    ApplyFenceRecord,
+    ApplyFenceSwap,
     ClientEndpoint,
+    ManagedInbound,
     NodeSpec,
     PrivacySettings,
     RevisionProposal,
@@ -21,6 +24,7 @@ from meridian.control.models import (
 from meridian.control.periods import period_start
 from meridian.control.service import ControlService
 from meridian.control.tokens import ROOT
+from meridian.core.agent_desired import XrayConfigResource
 from meridian.core.agent_protocol import (
     HealthCheck,
     NodeHealth,
@@ -30,8 +34,11 @@ from meridian.core.agent_protocol import (
     UserTraffic,
 )
 from meridian.core.agent_types import NodeStateRef
+from meridian.core.delivery_matchers import DomainSuffixMatch
+from meridian.core.delivery_policies import DeliveryAction, DeliveryPolicy, DeliveryRule
 from meridian.core.notices import Notice, NoticeWrite
 from meridian.core.owner_contact import OwnerContact
+from meridian.core.response_rules import BlockAction, FormatAction, LiteralCondition, ResponseMatcher, ResponseRule
 from meridian.core.server_allowances import ServerAllowanceSpec, ServerMetadata
 from meridian.core.topology import AccessIntent, ControlPlaneIntent, ExitIntent, ProtocolPathIntent, SetupIntent
 
@@ -42,6 +49,10 @@ PAGE_PERSON = "Luma"
 PEOPLE = (PAGE_PERSON, "Tavi", "Neri", "Vela", "Kavi", "Sela")
 NODES = (("de", "DE", "198.51.100.10"), ("nl", "NL", "198.51.100.20"))
 GIB = 1024**3
+PROFILES = {
+    "nearby": [f"inbound:de:{protocol}" for protocol in ("reality", "xhttp", "hysteria2")],
+    "backup": [f"inbound:nl:{protocol}" for protocol in ("reality", "xhttp", "hysteria2")],
+}
 # Uneven daily weights, so the usage chart looks like real use rather than a flat bar.
 DAILY = (3, 5, 2, 6, 4, 7, 3, 8, 5, 4, 9, 6, 5, 7)
 
@@ -66,6 +77,31 @@ def seed_service(service: ControlService, now: datetime) -> None:
         owner_contact=OwnerContact(
             text="Need a hand? Open the owner console to explore this demo.", link=PUBLIC_URL + "/console/"
         ),
+        access_profiles=PROFILES,
+        delivery_policies=[
+            DeliveryPolicy(
+                id="local-sites",
+                rules=[
+                    DeliveryRule(
+                        match=DomainSuffixMatch(kind="domain_suffix", values=["example"]),
+                        action=DeliveryAction(kind="direct"),
+                    )
+                ],
+            )
+        ],
+        profile_policies={"nearby": "local-sites"},
+        response_rules=[
+            ResponseRule(
+                name="demo-blocked",
+                match=ResponseMatcher(user_agent=LiteralCondition(operator="prefix", value="DemoBlocked/")),
+                action=BlockAction(kind="block"),
+            ),
+            ResponseRule(
+                name="demo-clash",
+                match=ResponseMatcher(user_agent=LiteralCondition(operator="prefix", value="DemoClash/")),
+                action=FormatAction(kind="format", format="mihomo", policy="local-sites"),
+            ),
+        ],
         servers={
             "srv-" + node: ServerAllowanceSpec(
                 node_id=node,
@@ -96,13 +132,46 @@ def seed_service(service: ControlService, now: datetime) -> None:
                     traffic_reset_at=stamp(period_start("month", now)),
                     note="Private demo note: " + name + " received a connection link.",
                     tag=("FAMILY", "FAMILY", "TRIAL", "FRIENDS", "TRIAL", "FRIENDS")[index],
+                    profiles=(["default"], ["nearby"], ["nearby"], ["backup"], ["backup", "nearby"], ["default"])[
+                        index
+                    ],
                 )
                 for index, name in enumerate(PEOPLE)
             ]
         )
     )
     for node, country, address in NODES:
-        service.put_node_spec(node, NodeSpec(resources=[]))
+        service.put_node_spec(
+            node,
+            NodeSpec(
+                resources=[
+                    XrayConfigResource(
+                        id="xray",
+                        path="/etc/xray/config.json",
+                        config={
+                            "inbounds": [
+                                {
+                                    "tag": node + "-" + protocol,
+                                    "protocol": "hysteria2" if protocol == "hysteria2" else "vless",
+                                    "settings": {"clients": []},
+                                }
+                                for protocol in ("reality", "xhttp", "hysteria2")
+                            ]
+                        },
+                        api_address="127.0.0.1:10085",
+                    )
+                ],
+                access_profiles=PROFILES,
+                managed_inbounds=[
+                    ManagedInbound(
+                        tag=node + "-" + protocol,
+                        protocol="hysteria2" if protocol == "hysteria2" else "vless",
+                        inbound_ref=f"inbound:{node}:{protocol}",
+                    )
+                    for protocol in ("reality", "xhttp", "hysteria2")
+                ],
+            ),
+        )
         for index, (protocol, fingerprint, copy) in enumerate(
             (
                 ("reality", "chrome", False),
@@ -127,6 +196,8 @@ def seed_service(service: ControlService, now: datetime) -> None:
                     tls_sni=address,
                     path="/demo-xhttp",
                     salamander_password="demo-only-salamander",
+                    exit_ref=node,
+                    inbound_ref=f"inbound:{node}:{protocol}",
                 ),
             )
     intent = SetupIntent(
@@ -148,6 +219,13 @@ def seed_service(service: ControlService, now: datetime) -> None:
     )
     service.revisions.approve(proposal.number, caller=ROOT)
     service.revisions.record_result(proposal.number, RevisionResult(status="applied"))
+    fence = service.revisions.fence()
+    service.revisions.swap_fence(
+        ApplyFenceSwap(
+            expected_version=fence.version,
+            record=ApplyFenceRecord(fleet_id=FLEET_ID, generation=1, plan_hash="1" * 64, revision=proposal.number),
+        )
+    )
     for day in range(14):
         moment = now - timedelta(days=13 - day)
         for node_index, (node, _, _) in enumerate(NODES):

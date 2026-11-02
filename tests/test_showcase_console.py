@@ -25,6 +25,7 @@ def test_demo_opens_people_and_navigates_the_real_screens_without_api_requests(d
     assert result["lang"] == locale
     assert result["dir"] == ("rtl" if locale == "fa" else "ltr")
     assert result["people"] == 6
+    assert result["rendered_people"] == 6
     assert result["person"] == "Luma"
     assert result["connections"] == 8
     assert result["qr"]
@@ -42,6 +43,7 @@ def test_demo_mutations_preserve_current_contracts_and_reset_with_a_new_document
     assert result["notice"] == "Hello Luma"
     assert result["language"] == "zh"
     assert result["reissued"] and result["token_revoked"] and result["removed"]
+    assert result["reissuedGenerationMatches"]
     assert result["guestReissued"], "a person added in the demo can be reissued twice"
     assert result["velaLinks"] > 0, "enabling a disabled person shows working links, not placeholders"
     assert result["week"] == 7 and result["serverDays"] == 7
@@ -60,3 +62,39 @@ def test_a_language_switch_moves_into_the_demo_address_so_reloads_and_shared_lin
     assert result["hash"] and result["state"]
     assert result["banner"] == "/demo/?lang=ru"
     assert result["errors"] == []
+def test_demo_people_queries_match_service_recordings_and_keep_edits_across_pages(demo: Path) -> None:
+    result = run_console("showcase-queries", data={"directory": str(demo)})
+    validate_recordings(result["responses"])
+    assert result["serviceQueries"] >= 25
+    assert result["queryMismatches"] == []
+    assert result["paged"] == result["ordered"]
+    assert result["cursorRejectsChangedQuery"] and result["cursorExcludesNewPeople"]
+    assert result["editedSearch"] == ["Luma"]
+    assert result["editedTag"] == 1 and result["privateFields"] == []
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
+def test_demo_bulk_and_routing_use_reviews_receipts_and_effective_access(demo: Path) -> None:
+    result = run_console("showcase-features", data={"directory": str(demo)})
+    validate_recordings(result["responses"])
+    assert result["previewDoesNotWrite"] and result["commitIdempotent"] and result["undoRestores"]
+    assert result["staleRejected"] and result["expiryReviewed"]
+    assert result["profiles"] and result["accessChanged"] and result["shareChanged"]
+    assert result["policyPreviewDoesNotWrite"] and result["policyConfirmed"] and result["stalePolicyRejected"]
+    assert result["formats"] == ["base64", "browser", "mihomo", "singbox", "stash", "xray-json"]
+    assert result["customRule"] and result["blockedRule"]
+    assert result["passkeys"] == []
+    assert result["rotated"] and result["rotationDevicesIntact"] and result["staleKeysRejected"]
+    assert result["periodReset"] and result["unlimitedDevices"]
+    assert result["declaredKept"] and result["bulkDeleted"] and result["deleteUndoRefused"]
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_demo_security_and_remote_actions_show_a_translated_demo_refusal(demo: Path, locale: str) -> None:
+    result = run_console("showcase-unavailable", locale, {"directory": str(demo)})
+    assert len(result["refusals"]) >= 10
+    assert all(reply["code"] == "demo_unavailable" for reply in result["refusals"])
+    assert all(reply["text"] and reply["text"] != result["missing"] for reply in result["refusals"])
+    assert len({reply["text"] for reply in result["refusals"]}) == 1
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
