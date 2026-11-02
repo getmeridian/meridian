@@ -18,7 +18,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
 - The web panel opens on an Overview: fleet health, what needs attention (expiring,
   near or over quota, disabled, servers or payments due), and quick Add person and
   Share actions. A Simple/Detailed switch, remembered per browser, keeps everyday
-  screens calm and shows revisions, tokens, and full server facts on demand; theme
+  screens calm and shows revisions, tokens, and full server facts on demand; phone
+  navigation scrolls with the active page in view, and theme
   and language move into an account menu. A person's page keeps a summary with
   Share, Extend, and Disable above tabs, and each setting edits in place. People
   gets removable filter chips and compact rows, and its selection bar appears only

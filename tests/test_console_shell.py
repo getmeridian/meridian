@@ -82,6 +82,19 @@ def test_mode_switch_has_radio_keyboard_navigation(locale: str) -> None:
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+@pytest.mark.parametrize("mode", ["simple", "detailed"])
+def test_phone_navigation_keeps_spaced_tabs_and_scrolls_the_active_route_into_view(locale: str, mode: str) -> None:
+    result = run_console("shell-nav", locale, {"hash": "#/people", "storage": {"mrd.mode": mode}})
+    layout = result["navLayout"]
+    assert layout["wrap"] == "nowrap" and layout["overflow"] == "auto"
+    assert layout["gap"] not in ("", "0px") and all(value == "0" for value in layout["shrink"])
+    assert result["initialNavScroll"]["nav"] == "#/people"
+    assert result["routeNavScroll"]["nav"] == result["modeNavScroll"]["nav"] == "#/settings"
+    assert result["modeNavScroll"]["inline"] == result["modeNavScroll"]["block"] == "nearest"
+    assert result["modeNavScroll"]["connected"] and result["writes"] == []
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 def test_simple_disclosures_keep_capacity_open_across_passive_refresh(locale: str) -> None:
     result = run_console("shell-server-disclosure", locale, {"hash": "#/servers/main"})
     assert result["initialOpen"] is False and result["afterPollOpen"] is True

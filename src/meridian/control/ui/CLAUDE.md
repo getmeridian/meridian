@@ -40,6 +40,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Main navigation never shrinks its labels** — keep a spaced scrolling row and reveal the active route after mounting or changing mode, using logical scroll alignment for RTL.
 - **Desktop selection bars set their direction** — override the card's column layout and keep the count and matching offer beside the actions; the phone grid remains separate.
 - **Phone matching selection fills its row** — reset the desktop offer's auto margin at the phone breakpoint so the bottom bar keeps the action across its width.
 - **Inline previews contain their own edits** — an expiry row must leave the traffic strategy to the service, or a sibling save makes its reset preview stale.

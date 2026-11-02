@@ -35,9 +35,10 @@
 .top-brand .brand-mark { width: 28px; height: 28px; }
 .top-title { font-family: var(--heading); font-weight: 600; font-size: 1.0625rem; white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis; }
-.tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; margin-bottom: -1px; }
+.tabs { display: flex; flex: 1; min-inline-size: 0; flex-wrap: nowrap; gap: var(--space-2);
+  overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: none; margin-bottom: -1px; }
 .tabs::-webkit-scrollbar { display: none; }
-.tab { padding: 10px 12px; color: var(--t2); text-decoration: none; font-weight: 600; font-size: .9375rem;
+.tab { flex: 0 0 auto; display: flex; align-items: center; padding: 10px 12px; color: var(--t2); text-decoration: none; font-weight: 600; font-size: .9375rem;
   border-bottom: 2px solid transparent; white-space: nowrap; }
 .tab:hover { color: var(--t1); }
 .tab.active { color: var(--t1); border-bottom-color: var(--ac); }

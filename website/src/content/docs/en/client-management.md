@@ -276,6 +276,8 @@ The control service includes a built-in web panel (also called the management pa
 
 The panel opens on **Overview**. A fresh browser uses **Simple** view: Overview, People, Servers, and Settings. **Detailed** adds Revisions and Tokens, a daily traffic chart, and recent revisions and recorded owner edits. The switch in the header remembers the choice in this browser and only changes what is displayed. Shared routes and drafts stay in place; switching to Simple from Revisions or Tokens returns to Overview. A direct link to either screen still opens in Simple, with **Shown in Detailed view** and a button to switch. In Simple, open the labeled disclosures for server capacity and billing, or client routing and format previews in Settings. Restart sits under **More**. The **Account** menu holds theme, console language, and sign out; the subscription's default language stays in Settings.
 
+On phones, the main navigation scrolls horizontally in both views, with the active page brought into view.
+
 Overview actions sit beside the title on desktop. On phones, a solid bottom bar keeps **Add person** and **Share a link** within reach, with room to scroll the last card clear of it.
 
 Simple server cards put health, country, applied configuration, and counted people traffic first. Open **More** for host metrics and versions; Detailed shows the full fact list. Restart remains under **More** in both views.
