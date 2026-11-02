@@ -42,6 +42,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Scrolling chip rows reveal their selection** — after every route or link, scroll the selected chip into view when the row overflows; a deep link to Security once left its chip cut off at a phone's edge.
 - **Verb-labelled buttons are actions** — Enable and Disable change their names with the available action and must never announce an inverted pressed state.
 - **Hidden person tab strips hand off focus** — returning to the sole Access panel focuses its region; a visible strip retains tab focus.
 - **Inline refreshes distinguish saved choices from drafts** — reseed changed clean editors with focus, retain edited baselines, refresh sibling schedules, and let summary presets read the current account.

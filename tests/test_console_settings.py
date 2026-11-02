@@ -152,3 +152,11 @@ def test_general_has_copyable_commands_and_security_keeps_every_disclosure(local
     assert result["contactIsText"] and result["injected"] is False
     assert result["securityDisclosures"] and result["privacyDisclosures"]
     assert result["learnMore"] >= 2 and result["writes"] == []
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_a_phone_settings_link_scrolls_its_section_chip_into_view(locale: str) -> None:
+    """The chip row overflows on phones, so a deep link to a late section once left its chip cut off at the edge."""
+    result = run("chip-scroll", locale, width=390, section="security")
+    assert result["initial"] == {"section": "security", "inline": "nearest", "block": "nearest"}
+    assert result["afterRoute"]["section"] == "notice"

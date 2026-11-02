@@ -22,7 +22,16 @@ w.localStorage.setItem('mrd.lang', locale);
 if (data.detailed) w.localStorage.setItem('mrd.mode', 'detailed');
 w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
 w.HTMLDialogElement.prototype.close = function () { this.open = false; };
-w.HTMLElement.prototype.scrollIntoView = function () {};
+const sectionScrolls = [];
+w.HTMLElement.prototype.scrollIntoView = function (options) {
+  if (this.dataset.settingsSection) sectionScrolls.push({ section: this.dataset.settingsSection, inline: options?.inline, block: options?.block });
+};
+if (scenario === 'settings-chip-scroll') {
+  Object.defineProperties(w.HTMLElement.prototype, {
+    clientWidth: { get() { return this.classList.contains('settings-sections') ? 362 : 0; } },
+    scrollWidth: { get() { return this.classList.contains('settings-sections') ? 700 : 0; } },
+  });
+}
 let stepUps = 0, reauthenticated = false, privacy = {
   device_limits: data.fullPrivacy ? 'full' : 'off', default_device_limit: 3,
   usage_history: data.fullPrivacy ? 'daily' : 'off', history_days: 90,
@@ -135,6 +144,12 @@ if (scenario === 'settings-routes' || scenario === 'settings-layout') {
     report.targets = tabs.map(node => { const css = w.getComputedStyle(node); return Math.max(parseFloat(css.minHeight) || 0, parseFloat(css.minBlockSize) || 0); });
     report.tabs = visibleTabs();
   }
+}
+if (scenario === 'settings-chip-scroll') {
+  await settle();
+  report.initial = sectionScrolls.at(-1) || null;
+  await M.navigate('#/settings/notice'); await settle();
+  report.afterRoute = sectionScrolls.at(-1) || null;
 }
 if (scenario === 'settings-keyboard') {
   const navigation = view()?.querySelector('.settings-sections');

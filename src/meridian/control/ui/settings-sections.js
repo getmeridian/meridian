@@ -47,6 +47,17 @@
         panels[choices[index].id].hidden = !active;
       });
       mode();
+      reveal();
+    }
+    // The phone chip row scrolls; keep the selected chip in view after links and route changes.
+    var revealTurn = 0;
+    function reveal() {
+      var mine = ++revealTurn;
+      Promise.resolve().then(function () {
+        if (mine !== revealTurn || !list.isConnected || list.scrollWidth <= list.clientWidth) return;
+        var tab = tabs.filter(function (item) { return item.dataset.settingsSection === selected; })[0];
+        if (tab && tab.scrollIntoView) tab.scrollIntoView({ block: "nearest", inline: "nearest" });
+      });
     }
     function request(value, focus) {
       var next = M.settingsSection(value);
