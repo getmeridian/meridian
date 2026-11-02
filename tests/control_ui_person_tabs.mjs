@@ -237,6 +237,12 @@ if (scenario === 'person-tabs-guard') {
 if (scenario === 'person-tabs-extend') {
   if (data.noteDraft) change((await edit('note'))?.querySelector('textarea'), 'Private draft');
   const menu = view().querySelector('[data-person-action="extend"]')?.closest('details');
+  if (data.beforePreset === 'custom') {
+    if (menu) menu.open = true;
+    menu?.querySelector('[data-person-custom-expiry]')?.click(); await settle();
+  } else if (data.beforePreset === 'first_use') {
+    const editor = await edit('expiry'); change(editor?.querySelector('[name="expiry_mode"]'), 'first_use');
+  }
   report.menu = !!menu;
   if (menu) menu.open = true;
   if (data.custom) menu?.querySelector('[data-person-custom-expiry]')?.click();

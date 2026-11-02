@@ -189,7 +189,7 @@
     // Typed dates, time edits, and the +1/+3 month presets (which dispatch input on the date) refresh the preview.
     [expiry.date, expiry.time].forEach(function (input) {
       input.addEventListener("input", function () {
-        if (mode.value !== "first_use") mode.value = expiry.never.checked ? "never" : "fixed";
+        mode.value = expiry.never.checked ? "never" : "fixed";
         update();
       });
     });

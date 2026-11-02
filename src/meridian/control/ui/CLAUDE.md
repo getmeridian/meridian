@@ -40,6 +40,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Summary extensions follow saved access** — guard pending reviews with edit events rather than validating unfinished drafts, and let a returned calendar preset select Fixed date from any editor mode.
 - **Phone filter controls scroll in one row** — keep their fixed panels and the removable active chips outside the clipped scrolling area.
 - **Share dialogs own their heading and frame** — mount the common caption, QR, links, actions, and connections as unframed content, including the missing-public-URL case.
 - **One visible person panel needs no tabs** — hide the strip and label a direct region; restore the tablist and tabpanel relationships when another tab is visible.

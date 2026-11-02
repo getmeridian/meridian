@@ -76,13 +76,16 @@
       var strategy = h("select", {}, h("option", { value: user.traffic_limit_strategy }));
       var lifecycle = M.lifecycleFields(user, expiry, { strategy: strategy }, { inline: true, anchor: false });
       var presetTurn = 0;
+      ["input", "change"].forEach(function (name) {
+        lifecycle.nodes.addEventListener(name, function () { presetTurn++; });
+      });
       function preset(months) {
         if (user.expire_at || !user.activation_duration_days) return expiry.preset(months);
-        var mine = ++presetTurn, before = JSON.stringify(lifecycle.change());
+        var mine = ++presetTurn;
         // The existing service extension review keeps pending first-use access pending.
         return M.api("POST", "api/people/bulk/preview", { usernames: [user.username], action: { action: "extend", months: months } })
           .then(function (review) {
-            if (!lifecycle.nodes.isConnected || mine !== presetTurn || JSON.stringify(lifecycle.change()) !== before) return;
+            if (!lifecycle.nodes.isConnected || mine !== presetTurn) return;
             var after = review.people[0].after;
             if (!after || !Number.isSafeInteger(after.activation_duration_days)) throw new M.ApiError(0, "invalid_request", "");
             lifecycle.setDuration(after.activation_duration_days);

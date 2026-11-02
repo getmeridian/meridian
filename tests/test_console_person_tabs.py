@@ -128,6 +128,27 @@ def test_person_extend_menu_previews_a_draft_before_saving(months: int) -> None:
     assert result["writes"] == [{"expire_at": "2032-06-01T12:00:00Z"}]
 
 
+@pytest.mark.parametrize("months", [1, 3])
+@pytest.mark.parametrize("kind", ["pending", "fixed", "unlimited"])
+def test_summary_extension_uses_the_saved_account_mode_even_when_the_editor_differs(months: int, kind: str) -> None:
+    result = run_console(
+        "person-tabs-extend",
+        data={
+            "months": months,
+            "pending": kind == "pending",
+            "beforePreset": "custom" if kind == "pending" else "first_use",
+            "user": {"expire_at": None, "schedule": {"expire_at": None}} if kind == "unlimited" else {},
+        },
+    )
+    assert result["error"] == "" and result["editor"]
+    if kind == "pending":
+        assert result["pendingReview"] and result["expiryMode"] == "first_use"
+        assert result["writes"] == [{"activation_duration_days": 30 + months * 30, "expire_at": None}]
+    else:
+        assert result["expiryMode"] == "fixed" and result["dateEnabled"]
+        assert result["writes"] == [{"expire_at": "2032-06-01T12:00:00Z"}]
+
+
 def test_person_extend_custom_date_is_reviewed_by_the_service_and_refusals_keep_the_draft() -> None:
     result = run_console("person-tabs-extend", data={"custom": True, "failPreview": True})
     assert result["editor"] and result["reviews"] and result["writes"] == []
