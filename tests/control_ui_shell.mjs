@@ -245,6 +245,8 @@ if (scenario === 'overview-layout') {
 }
 if (scenario === 'overview-visual') {
   loadStyles();
+  const peopleFigure = document.querySelector('[data-overview-active]').parentElement;
+  const trafficFigure = document.querySelector('[data-overview-traffic]').textContent;
   report.visual = {
     background: w.getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
     columns: w.getComputedStyle(document.querySelector('.overview-grid')).gridTemplateColumns,
@@ -255,6 +257,9 @@ if (scenario === 'overview-visual') {
       return Math.max(parseFloat(style.minHeight) || 0, parseFloat(style.minBlockSize) || 0);
     }),
     ageIsolated: document.querySelector('.live-updated').textContent.includes('\u2068'),
+    peopleIsolated: peopleFigure.tagName === 'BDI' && peopleFigure.dir === 'ltr',
+    trafficIsolated: trafficFigure.startsWith('\u2068') && trafficFigure.endsWith('\u2069'),
+    windowIsolated: document.querySelector('[data-overview-window]').textContent.includes('\u2068'),
     meter: !!document.querySelector('.overview-fleet meter[aria-label]'),
   };
 }

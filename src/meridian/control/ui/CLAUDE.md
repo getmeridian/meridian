@@ -35,6 +35,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Isolate count pairs together** — render Overview's active / total as one LTR unit; separate number isolates let RTL reverse the pair around the slash.
 - **Attention links name their disclosure** — open and focus Allowance and payments once after mounting, with room for the sticky header; later refreshes retain the owner's open or closed choice.
 - **Detailed notes belong to routes** — keep the switch note for Detailed-only screens or tabs; disclosures remain available in both modes and need no mode caption.
 - **Server facts follow the mode in place** — move one list of host facts between the card and More; retain card identity and disclosure state across mode changes and passive reads.

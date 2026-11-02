@@ -301,6 +301,7 @@ def test_phone_theme_and_rtl_contracts_cover_the_shared_components(
     assert all(height >= 44 for height in visual["targets"])
     assert result["dir"] == ("rtl" if locale == "fa" else "ltr")
     assert visual["ageIsolated"] and visual["meter"]
+    assert visual["peopleIsolated"] and visual["trafficIsolated"] and visual["windowIsolated"]
 
 
 def test_partial_history_failures_keep_evidence_with_backoff_and_history_off_clears_it() -> None:
