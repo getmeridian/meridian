@@ -91,9 +91,15 @@
           "title": "Platform"
         },
         "user_agent": {
-          "description": "Always null: request User-Agents are not collected.",
-          "title": "User Agent",
-          "type": "null"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "User Agent"
         }
       },
       "required": [

@@ -30,7 +30,7 @@ class ClientDeviceDetails(ClientDevice):
     platform: str | None
     os_version: str | None
     model: str | None
-    user_agent: None = Field(description="Always null: request User-Agents are not collected.")
+    user_agent: str | None
     first_seen_at: Timestamp | None
     last_seen_at: Timestamp | None
 

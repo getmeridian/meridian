@@ -20,9 +20,6 @@ newest first; the last is what 4.0 changes compared with 3.x.
   transient matcher test across API, CLI, and console. Private person policies
   take priority; blocked apps receive the exact unknown-token refusal, and
   empty rules preserve existing subscription bytes (#95).
-#### Changed
-- Device privacy no longer retains User-Agent, including in full mode; the
-  upgrade clears saved values, and restores clear values from older snapshots (#95).
 #### Fixed
 - `meridian plan` before upgrading a fleet from an earlier beta no longer stops as
   inconclusive (exit 3) because access profiles look unavailable: a service that

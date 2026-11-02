@@ -38,7 +38,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - **People triage facts are derived reads** — records expose never-used, exact quota percentage, and default attention reasons from shared predicates; no filter flags or request data are stored.
 
 ## What's done well
-- **Header observations stay transient** — schema 26 clears device User-Agents and the collector leaves that compatibility field null; opt-in device fields never carry the app matcher input.
+- **Matcher headers stay transient** — response rules read User-Agent and Accept per request and store neither; only opt-in `full` device mode records a User-Agent, through the device ledger.
 - **Snapshot profile reads are passive** — deserialize authenticated bytes in memory; never instantiate a service or migrate a database to judge restore compatibility.
 - **Policy previews are transient** — cached geodata verifies archive pins; requests trigger no fetch, and public app limits omit policy names, overrides, and memberships.
 - **Flow events record real transitions** — repeated hellos, reports, and unrelated revisions leave a confirmed receipt and its event history unchanged.

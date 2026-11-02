@@ -26,7 +26,6 @@
 - **Subscription vocabulary** — `subscription_formats.py` owns document and suffix names; `subscription_preview.py` bounds transient headers and explains selection without credentials.
 
 ## What's done well
-- **Device User-Agent stays null** — the retained response field is a null-only compatibility contract, never a second owner of transient app request data.
 - **Capacity preserves missing evidence** — negotiated samples use nullable figures, integer load/rates, and epoch-local host counters without interface or client identities.
 - **Explanations never guess past missing evidence** — pure first-match evaluation reports unavailable geodata or ports, and Xray pin identity lives in core for every reader.
 - **Credential rotation composes existing client status and node outcomes** — its request requires an integer generation, its CLI result carries no credential, and stale retries cannot create another generation.

@@ -472,7 +472,8 @@ def test_encrypted_restore_preserves_rules_and_no_request_history(tmp_path: Path
         restored.close()
 
 
-def test_full_device_privacy_keeps_matcher_headers_transient(tmp_path: Path) -> None:
+def test_matcher_headers_stay_transient_beside_disclosed_device_details(tmp_path: Path) -> None:
+    """Full device mode keeps its disclosed User-Agent; rule matching itself stores no request header."""
     from meridian.control.models import PrivacySettings
 
     service = ControlService(tmp_path / "control.db", fleet_id=FLEET_ID, version="4.0.0")
@@ -484,45 +485,10 @@ def test_full_device_privacy_keeps_matcher_headers_transient(tmp_path: Path) -> 
                 {"profile_title": "Meridian", "response_rules": [app_rule({"kind": "policy", "policy": "full"})]}
             )
         )
-        marker = "Happ/3 transient-header-marker"
+        marker = "text/plain; transient-accept-marker"
         service.subscription(
-            person.sub_token, user_agent=marker, device_headers={"x-hwid": "device-12345", "user-agent": marker}
+            person.sub_token, user_agent="Happ/3", accept=marker, device_headers={"x-hwid": "device-12345"}
         )
-        assert "transient-header-marker" not in "\n".join(service._db.iterdump())
-        assert service.devices.for_user(person, service.privacy()).devices[0].user_agent is None
-    finally:
-        service.close()
-
-
-@pytest.mark.parametrize("restore", [False, True])
-def test_schema_26_clears_legacy_device_agents_without_removing_device_records(tmp_path: Path, restore: bool) -> None:
-    from meridian.control.models import DeviceKeyCreate, PrivacySettings
-    from meridian.control.restore import stage_restored_database
-    from meridian.control.schema import SCHEMA_VERSION
-    from meridian.control.snapshot import decrypt_snapshot, generate_key_pair
-
-    database = tmp_path / "control.db"
-    service = ControlService(database, fleet_id=FLEET_ID, version="4.0.0")
-    key = generate_key_pair()
-    try:
-        person = service.put_user("person")
-        service.set_privacy(PrivacySettings(device_limits="full"), author="operator")
-        service.backups.register_device(DeviceKeyCreate(name="operator", public_key=key.public))
-        service.subscription(person.sub_token, device_headers={"x-hwid": "device-12345", "x-device-model": "model"})
-        with service._store.transaction():
-            service._db.execute("UPDATE devices SET user_agent = 'legacy-agent-marker'")
-            service._store.set_meta("schema_version", str(SCHEMA_VERSION - 1))
-        if restore:
-            snapshot = decrypt_snapshot(service.snapshot(), [key.secret])
-            database = tmp_path / "restored.db"
-            stage_restored_database(snapshot.database, database, fleet_id=FLEET_ID, version="4.0.0")
-    finally:
-        service.close()
-    service = ControlService(database, fleet_id=FLEET_ID, version="4.0.0")
-    try:
-        view = service.user_devices("person")
-        assert view.count == 1 and view.devices[0].device_key == "device-12345"
-        assert view.devices[0].user_agent is None and view.devices[0].model == "model"
-        assert service._store.meta("schema_version") == str(SCHEMA_VERSION)
+        assert "transient-accept-marker" not in "\n".join(service._db.iterdump())
     finally:
         service.close()
