@@ -179,6 +179,36 @@ def test_add_action_uses_the_existing_person_form() -> None:
     assert result["addForm"] and result["writes"] == []
 
 
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+@pytest.mark.parametrize("width", [390, 1440])
+def test_quick_actions_use_the_desktop_header_and_reserve_a_solid_phone_bar(locale: str, width: int) -> None:
+    result = run_console(
+        "overview-layout",
+        locale,
+        {
+            "width": width,
+            "storage": {"mrd.mode": "detailed"},
+            "daily": {
+                "days": 2,
+                "history_days": 7,
+                "daily": [{"day": "2026-11-01", "bytes": 1024}, {"day": "2026-11-02", "bytes": 4096}],
+                "nodes": [],
+            },
+        },
+    )
+    layout = result["layout"]
+    assert layout["singleActionGroup"] and layout["primary"] and layout["headerActions"]
+    assert layout["dates"] == ["2026-11-01", "2026-11-02"] and "4 KiB" in layout["peak"]
+    if width > 640:
+        assert layout["position"] == "static" and layout["headerDisplay"] == "flex"
+    else:
+        assert layout["position"] == "sticky" and layout["headerDisplay"] == "contents"
+        assert layout["order"] == "1"
+        assert "var(--s1)" in layout["surface"] and "solid" in layout["border"] and layout["shadow"]
+        assert "safe-area-inset-bottom" in layout["safePadding"]
+        assert "safe-area-inset-bottom" in layout["pagePadding"] and "44px" in layout["pagePadding"]
+
+
 def test_an_initial_read_failure_keeps_an_honest_state_and_retry_recovers() -> None:
     result = run_console("overview-recover", data={"initialFailure": True})
     assert result["noFalseEmpty"] and result["recovered"]

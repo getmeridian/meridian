@@ -180,11 +180,35 @@ if (scenario === 'shell-settings') {
 const clean = text => String(text || '').replace(/[\u2066-\u2069]/g, '').replace(/[۰-۹]/g, char => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(char)));
 const attention = () => Object.fromEntries([...document.querySelectorAll('.overview-attention a:not([hidden])')]
   .map(el => [el.getAttribute('href'), clean(el.querySelector('[data-attention-count]')?.textContent || '')]));
-if (scenario === 'overview-visual') {
+function loadStyles(width = 390) {
   const css = ['tokens.css', 'styles.css', 'screens.css', 'people.css'].map(name => fs.readFileSync(path.join(ui, name), 'utf8')).join('\n')
-    .replace(/@media\s*\(pointer:\s*coarse\)/g, '@media all')
-    .replace(/@media\s*\(max-width:\s*(\d+)px\)/g, (_, width) => Number(width) >= 390 ? '@media all' : '@media not all');
+    .replace(/@media\s*\(pointer:\s*coarse\)/g, width <= 640 ? '@media all' : '@media not all')
+    .replace(/@media\s*\(max-width:\s*(\d+)px\)/g, (_, limit) => Number(limit) >= width ? '@media all' : '@media not all');
   document.head.appendChild(M.h('style', { text: css }));
+}
+if (scenario === 'overview-layout') {
+  loadStyles(data.width);
+  const actions = document.querySelector('.overview-actions'), header = document.querySelector('.page-head');
+  const style = w.getComputedStyle(actions);
+  const pageStyle = w.getComputedStyle(document.querySelector('.overview-page') || document.querySelector('#view'));
+  report.layout = {
+    singleActionGroup: document.querySelectorAll('.overview-actions').length === 1,
+    headerActions: header.contains(actions),
+    headerDisplay: w.getComputedStyle(header).display,
+    position: style.position || 'static',
+    order: style.order || '0',
+    surface: style.background,
+    border: style.borderBlockStart,
+    shadow: style.boxShadow,
+    safePadding: style.paddingBlockEnd,
+    pagePadding: pageStyle.paddingBlockEnd,
+    dates: [...document.querySelectorAll('.overview-traffic .usage-dates bdi')].map(el => el.textContent),
+    peak: clean(document.querySelector('.overview-traffic svg + p')?.textContent),
+    primary: actions.querySelector('.btn-primary')?.hasAttribute('data-overview-add'),
+  };
+}
+if (scenario === 'overview-visual') {
+  loadStyles();
   report.visual = {
     background: w.getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
     columns: w.getComputedStyle(document.querySelector('.overview-grid')).gridTemplateColumns,

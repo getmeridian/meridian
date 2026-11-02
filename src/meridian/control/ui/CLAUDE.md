@@ -35,6 +35,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Overview actions leave room for cards** — keep the single group in the desktop header; on phones place it after the cards with a solid sticky surface and reserve its height plus the safe area.
 - **Partial reads retain evidence** — failed traffic or recent-change reads keep usable data with retry and backoff; history-off clears the in-memory traffic window.
 - **Picker replies follow the query** — check both search and cursor before drawing, including during the debounce; expired cursors restart at the first page.
 - **Disclosure refresh keeps open state** — retain each server's capacity, history, billing, and action disclosures across passive reads; changing mode must not replace an edited form.

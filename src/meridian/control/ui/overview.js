@@ -30,17 +30,16 @@
     var recentSlot = h("section", { class: "card overview-recent", "data-detailed-only": "", hidden: M.mode() !== "detailed" });
     var cache = null, stop, events = [], revisions = [], eventCursor = 0, recentError = null;
     var attentionKey = null, lastTraffic = null;
-    M.mount(view, [
+    var actions = h("div", { class: "row-actions overview-actions", role: "group", "aria-label": M.t("overview.quick_actions") },
+      h("button", { class: "btn btn-primary", type: "button", "data-overview-add": "", onclick: M.addPerson },
+        M.icon("plus"), M.t("people.add")),
+      h("button", { class: "btn btn-ghost", type: "button", "data-overview-share": "", onclick: M.sharePicker },
+        M.icon("link"), M.t("overview.share")));
+    M.mount(view, h("div", { class: "overview-page" },
       h("div", { class: "page-head" }, h("div", {}, h("h1", { text: M.t("nav.overview") }),
-        h("p", { class: "muted small", text: M.t("overview.lede") }))),
+        h("p", { class: "muted small", text: M.t("overview.lede") })), actions),
       status,
-      h("div", { class: "overview-grid" }, fleetSlot, attentionSlot, trafficSlot, recentSlot),
-      h("div", { class: "action-bar sticky-actions overview-actions", role: "group", "aria-label": M.t("overview.quick_actions") },
-        h("button", { class: "btn btn-primary", type: "button", "data-overview-add": "", onclick: M.addPerson },
-          M.icon("plus"), M.t("people.add")),
-        h("button", { class: "btn btn-ghost", type: "button", "data-overview-share": "", onclick: M.sharePicker },
-          M.icon("link"), M.t("overview.share"))),
-    ]);
+      h("div", { class: "overview-grid" }, fleetSlot, attentionSlot, trafficSlot, recentSlot)));
 
     function draw(data) {
       cache = data;

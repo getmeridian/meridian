@@ -224,6 +224,9 @@
 .server-focused { border-color: var(--ac); scroll-margin-block-start: 12rem; }
 
 /* Overview uses the same cards, read rows, chips, and spacing as the shell. */
+.overview-page { display: flex; flex-direction: column; gap: var(--space-4); }
+.overview-page > .live-status { margin-block: 0; }
+.overview-page .page-head { align-items: center; }
 .overview-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4); align-items: start; }
 .overview-health { display: flex; gap: var(--space-3); align-items: baseline; font-size: 1.0625rem; font-weight: 600; }
 .overview-number { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -244,7 +247,7 @@
   border-block-start: 1px solid var(--b1); color: var(--t1); text-decoration: none; overflow-wrap: anywhere; }
 .recent-row:first-child { border-block-start: 0; }
 .recent-row:hover { color: var(--ac-text); }
-.overview-actions { inline-size: fit-content; }
+.overview-actions { position: static; inline-size: fit-content; }
 .overview-actions .btn { min-block-size: 44px; white-space: normal; }
 .share-picker-list { display: flex; flex-direction: column; gap: var(--space-1); }
 .share-picker-person { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3);
@@ -261,7 +264,12 @@
   .shell-top .top-title { max-inline-size: none; }
   .account-toggle > span { display: none; }
   .mode-note { padding-inline: 14px; }
+  .overview-page { padding-block-end: calc(44px + var(--space-3) + var(--space-3) + var(--space-4) + env(safe-area-inset-bottom)); }
+  .overview-page .page-head { display: contents; }
   .overview-grid { grid-template-columns: minmax(0, 1fr); }
-  .overview-actions { inline-size: 100%; padding-block-end: calc(var(--space-3) + env(safe-area-inset-bottom)); }
+  .overview-actions { position: sticky; inset-block-end: 0; z-index: 10; order: 1;
+    inline-size: calc(100% + 28px); margin-inline: -14px; padding: var(--space-3) 14px;
+    padding-block-end: calc(var(--space-3) + env(safe-area-inset-bottom)); background: var(--s1);
+    border-block-start: 1px solid var(--b1); box-shadow: var(--shadow-md); }
   .overview-actions .btn { flex: 1 1 120px; }
 }
