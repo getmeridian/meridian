@@ -109,6 +109,18 @@ def test_server_management_guidance_is_one_caption_with_a_copyable_command(local
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+@pytest.mark.parametrize("screen", ["servers", "settings"])
+@pytest.mark.parametrize("coarse", [False, True], ids=["mouse", "touch"])
+def test_phone_fields_and_actions_have_44_pixel_targets_with_any_pointer(
+    locale: str, screen: str, coarse: bool
+) -> None:
+    result = run_console("shell-phone-targets", locale, {"hash": "#/" + screen, "coarse": coarse})
+    assert len(result["phoneTargets"]) >= 4
+    assert all(target["height"] >= 44 for target in result["phoneTargets"]), result["phoneTargets"]
+    assert result["copyWidths"] and all(width >= 44 for width in result["copyWidths"])
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 def test_settings_moves_appearance_and_discloses_advanced_sections_without_losing_input(locale: str) -> None:
     result = run_console("shell-settings", locale, {"hash": "#/settings"})
     assert result["appearanceCards"] == 0

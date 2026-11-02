@@ -61,7 +61,7 @@ code { font-family: var(--mono); font-size: .9em; }
 /* -- forms ---------------------------------------------------------------------------------- */
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .field label { font-size: .875rem; font-weight: 600; color: var(--t1); }
-input[type="text"], input[type="password"], input[type="number"], input[type="date"], input[type="search"], select, textarea {
+input[type="text"], input[type="password"], input[type="number"], input[type="date"], input[type="datetime-local"], input[type="search"], select, textarea {
   width: 100%; min-height: 44px; padding: 0 12px; border-radius: var(--r); border: 1px solid var(--b2);
   background: var(--s1); color: var(--t1); font-size: 1rem;
 }
@@ -168,9 +168,11 @@ input::placeholder { color: var(--t3); }
 .toast-ok { background: var(--t1); color: var(--bg); }
 .toast-error { background: var(--err); color: var(--on-err); }
 .i18n-notice { position: fixed; z-index: 200; inset-inline: 1rem; bottom: calc(1rem + env(safe-area-inset-bottom)); display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1rem; width: fit-content; max-width: calc(100% - 2rem); margin-inline: auto; font-size: .875rem; }
-@media (pointer: coarse) {
+@media (pointer: coarse), (max-width: 640px) {
   button, .btn, .btn-sm, .btn-icon, .cmd-copy, [role="button"], .tab, .back, .top-brand, summary { min-height: 44px; min-width: 44px; }
   .btn-icon, .cmd-copy { width: 44px; height: 44px; }
-  summary { display: flex; align-items: center; }
   label:has(input[type="radio"]), label:has(input[type="checkbox"]) { min-height: 44px; }
+}
+@media (pointer: coarse) {
+  summary { display: flex; align-items: center; }
 }

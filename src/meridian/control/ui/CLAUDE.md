@@ -35,6 +35,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Phone targets follow width and pointer** — apply 44 px targets at the phone breakpoint as well as for coarse pointers; include local date inputs and chart selectors, keeping other pointer layout rules separate.
 - **Server guidance stays compact** — keep the copyable meridian command beside one caption so the notice does not dominate phone cards.
 - **Isolate count pairs together** — render Overview's active / total as one LTR unit; separate number isolates let RTL reverse the pair around the slash.
 - **Attention links name their disclosure** — open and focus Allowance and payments once after mounting, with room for the sticky header; later refreshes retain the owner's open or closed choice.

@@ -163,6 +163,7 @@
   .top-inner, .view { padding-inline: 14px; }
   .view { padding-top: 18px; }
   .cards { grid-template-columns: 1fr; }
+  .card-head .field select { min-block-size: 44px; }
   .grid-2 { grid-template-columns: 1fr; }
   .row { align-items: flex-start; }
   .row-side .usage, .usage { min-width: 110px; }

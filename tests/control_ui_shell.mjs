@@ -103,6 +103,9 @@ if (scenario === 'shell-settings') {
   M.formatPreviewSection = () => M.h('section', { class: 'card' }, M.h('h2', { text: M.t('preview.title') }),
     M.h('input', { type: 'text', 'data-format-person': '' }));
 }
+if (scenario === 'shell-phone-targets') {
+  M.languageSection = M.privacySection = M.passkeyCard = M.formatPreviewSection = () => null;
+}
 M.toast = () => {};
 const confirm = M.confirm;
 M.confirm = (...args) => { if (args[0] === M.t('draft.title')) leavePrompts++; return confirm(...args); };
@@ -223,11 +226,22 @@ if (scenario === 'shell-settings') {
 const clean = text => String(text || '').replace(/[\u2066-\u2069]/g, '').replace(/[۰-۹]/g, char => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(char)));
 const attention = () => Object.fromEntries([...document.querySelectorAll('.overview-attention a:not([hidden])')]
   .map(el => [el.getAttribute('href'), clean(el.querySelector('[data-attention-count]')?.textContent || '')]));
-function loadStyles(width = 390) {
+function loadStyles(width = 390, coarse = width <= 640) {
   const css = ['tokens.css', 'styles.css', 'screens.css', 'people.css'].map(name => fs.readFileSync(path.join(ui, name), 'utf8')).join('\n')
-    .replace(/@media\s*\(pointer:\s*coarse\)/g, width <= 640 ? '@media all' : '@media not all')
+    .replace(/@media\s*\(pointer:\s*coarse\)(?:\s*,\s*\(max-width:\s*(\d+)px\))?/g,
+      (_, limit) => coarse || Number(limit) >= width ? '@media all' : '@media not all')
     .replace(/@media\s*\(max-width:\s*(\d+)px\)/g, (_, limit) => Number(limit) >= width ? '@media all' : '@media not all');
   document.head.appendChild(M.h('style', { text: css }));
+}
+if (scenario === 'shell-phone-targets') {
+  loadStyles(390, data.coarse);
+  report.phoneTargets = [...document.querySelectorAll('#view .btn, #view .cmd-copy, #view .card-head select, #view input[type="datetime-local"]')]
+    .map(el => {
+      const style = w.getComputedStyle(el);
+      return { type: el.tagName + ':' + (el.getAttribute('type') || el.className),
+        height: Math.max(parseFloat(style.minHeight) || 0, parseFloat(style.minBlockSize) || 0, parseFloat(style.height) || 0) };
+    });
+  report.copyWidths = [...document.querySelectorAll('#view .cmd-copy')].map(el => parseFloat(w.getComputedStyle(el).width));
 }
 if (scenario === 'overview-layout') {
   loadStyles(data.width);
