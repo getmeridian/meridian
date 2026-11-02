@@ -45,8 +45,12 @@ def compile_access_profiles(intent: SetupIntent, resources: dict[str, CompiledRe
     for profile in sorted(intent.access_profiles, key=lambda item: item.id):
         unknown = sorted(set(profile.grants) - references.keys())
         if unknown:
+            # Exits and inbounds first: endpoint aliases are long and grant the same inbounds.
+            offered = sorted(references, key=lambda ref: (ref.startswith("endpoint:"), ref))
+            listed = ", ".join(offered[:24]) + (", …" if len(offered) > 24 else "")
             raise TopologyCompileError(
-                f"Access profile {profile.id} references unknown or retired grants: {', '.join(unknown)}."
+                f"Access profile {profile.id} references unknown or retired grants: {', '.join(unknown)}. "
+                f"This fleet offers: {listed or 'nothing yet'}."
             )
         result[profile.id] = sorted({ref for grant in profile.grants for ref in references[grant]})
     for username, settings in intent.access.creation_settings.items():

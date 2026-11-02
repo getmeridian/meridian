@@ -33,6 +33,11 @@ def test_unknown_or_retired_grants_fail_compilation_with_the_profile_and_referen
         compile_topology(intent_with_profiles(grant))
 
 
+def test_an_unknown_grant_names_what_the_fleet_offers():
+    with pytest.raises(TopologyCompileError, match=r"offers: exit:exit-a, inbound:exit-a:reality-a"):
+        compile_topology(intent_with_profiles("inbound:nope"))
+
+
 def test_a_public_endpoint_grant_covers_every_alias_of_its_authentication_inbound():
     base = compile_topology(single_exit_intent())
     endpoint = next(row for row in base.resources if isinstance(row.payload, ClientEndpointPayload))
