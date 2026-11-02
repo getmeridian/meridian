@@ -39,6 +39,7 @@
 **Links** — link other pages as `/{locale}/{page}/` (with `#anchor` from that locale's own heading); the build validates every link.
 
 ## Pitfalls
+- **Routing excerpts share client semantics** — update the routing, client, CLI, and connecting guides together when a client's match or DNS pass changes.
 - **Privacy disclosures are source text** — privacy.md explains defaults, seizure costs, downgrade deletion, and private device re-registration after restore in every locale; totals-only claims must say they are the default.
 - **Locale parity** — every guide entry above holds in all four locales, and all four locale directories must have the same filenames. A missing file means that locale won't have that doc page, and the sidebar will show a gap.
 - **AI bundles are English-only** — `scripts/ai-docs.mjs` reads only from `en/`. Translations don't affect the AI-facing docs.

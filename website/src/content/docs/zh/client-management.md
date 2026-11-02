@@ -578,7 +578,7 @@ meridian fleet routing explain chat.example.test:443 --person person --format si
 meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --network tcp --protocol other --json
 ```
 
-`fleet routing explain` 读取服务当前已应用的设置及可选个人私有覆盖，返回首次匹配的规则与动作，例如“此目的地通过出口 west，因为规则 2 匹配”。省略 `--person` 可解释服务器默认策略。`--format` 选择 Xray JSON、Mihomo/Clash、Stash、sing-box 或 Base64。默认假设 TCP 和普通流量；`--protocol bittorrent` 提供模拟的协议检测结果。不发送 DNS、网络或可达性查询。更早的规则需要未知端口或缓存中缺失的固定版本地理数据时，结果显示未知。Xray 规则需要客户端解析后的 IP 时，主机名也保持未知。应用选择与服务器可达性可能改变自动组实际使用的连接。
+`fleet routing explain` 读取服务当前已应用的设置及可选个人私有覆盖，返回首次匹配的规则与动作，例如“此目的地通过出口 west，因为规则 2 匹配”。省略 `--person` 可解释服务器默认策略。`--format` 选择 Xray JSON、Mihomo/Clash、Stash、sing-box 或 Base64。默认假设 TCP 和普通流量；`--protocol bittorrent` 提供模拟的协议检测结果。不发送 DNS、网络或可达性查询。更早的规则需要未知端口或缓存中缺失的固定版本地理数据时，结果显示未知。Xray 使用 `IPIfNonMatch` 先检查域名；最终 TCP/UDP 规则将未匹配的域名送入隧道，路由选择无需本地 DNS 查询。IP 规则匹配以 IP 地址连接的目的地。应用选择与服务器可达性可能改变自动组实际使用的连接。
 
 | 格式 / 应用 | 目的地规则 | DNS | fake-IP | 指定出口 | BitTorrent |
 | --- | --- | --- | --- | --- | --- |
