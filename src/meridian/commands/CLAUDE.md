@@ -23,6 +23,7 @@
 - `client remove|reissue --cut-off` discloses every affected node and other people's reconnects before confirming, and keeps typed per-node outcomes and new links even on failure.
 
 ## Pitfalls
+- **Legacy profile requests stop before I/O** — require the Meridian backend for profile commands and edits; resource reviews without service settings return no profile review instead of querying a legacy panel.
 - **Undo previews are inverse changes** — read the service-validated undo_people before confirmation, including dry runs, so gained/lost access and hard cut-off warnings describe the undo.
 - **The last profile still needs review** — plan and apply check the proposed intent and live service, refuse memberships still in use, and carry the access hash even when the proposed map is empty.
 - **Token clients require a configured control service** — reject missing credentials and Remnawave before constructing the HTTP client.

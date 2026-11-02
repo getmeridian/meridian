@@ -57,6 +57,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Refuse profile definitions and membership on Remnawave fleets with migration
+  guidance, and skip profile API reads for plans without Meridian service settings.
 - Preserve profile grants and fleet-export creation settings for identifiers
   such as token and secret in JSON, while keeping string credentials redacted.
 - Guard bulk undo against changed grants, nodes, and removed profiles, name stale

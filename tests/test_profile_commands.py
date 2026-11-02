@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
+from meridian import i18n
 from meridian.cli import app
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.compiler import compile_topology
@@ -24,7 +25,9 @@ from tests.support.topology import single_exit_intent
 
 
 @pytest.fixture(autouse=True)
-def modes():
+def modes(monkeypatch):
+    monkeypatch.setattr(i18n, "_current", "en")
+    monkeypatch.setattr(i18n, "_requested", None)
     yield
     set_json_mode(False)
     set_quiet_mode(False)

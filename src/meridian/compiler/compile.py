@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from meridian.compiler.access_profiles import validate_profile_backend
 from meridian.compiler.allocations import PortAllocator
 from meridian.compiler.baselines import (
     attach_server_baselines,
@@ -75,6 +76,7 @@ def compile_topology(
     deployment_contract: DeploymentContract | None = None,
 ) -> ResourcePlan:
     """Compile complete setup intent without network, filesystem, or randomness."""
+    validate_profile_backend(intent)
     reviewed_contract = deployment_contract if deployment_contract is not None else DeploymentContract()
     validate_deployment_contract(intent, reviewed_contract)
     validate_geodata_lists(intent)

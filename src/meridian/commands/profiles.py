@@ -12,7 +12,7 @@ from rich.table import Table
 from meridian import config, console
 from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, require_intent, reviewed_runtime
 from meridian.commands.node_command_results import cut_off_disclosure
-from meridian.commands.profile_review import profile_review_paths
+from meridian.commands.profile_review import profile_review_paths, require_profile_backend
 from meridian.control.client import ControlClient
 from meridian.core.access_profile_views import AccessProfileReview
 from meridian.core.access_profiles import DEFAULT_ACCESS_PROFILE, AccessProfileIntent
@@ -51,6 +51,7 @@ def run_list() -> None:
     with console.error_context("profile.list", timer=operation.timer):
         cluster = load_topology_cluster()
         intent = require_intent(cluster)
+        require_profile_backend(intent, requested=True)
         try:
             with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
                 result = ProfileListResult(profiles=intent.access_profiles, catalog=client.access_profiles())
@@ -99,6 +100,7 @@ def run_change(
             console.fail(t("profiles.requires_yes"), hint_type="user")
         cluster = load_topology_cluster()
         current = require_intent(cluster)
+        require_profile_backend(current, requested=True)
         found = next((item for item in current.access_profiles if item.id == name), None)
         if (action == "add") == (found is not None):
             console.fail(t("profiles.exists" if action == "add" else "profiles.unknown", name=name), hint_type="user")

@@ -814,5 +814,6 @@
   "bulk.action.set-profiles": "Назначить профили",
   "bulk.field.profiles": "Профили доступа",
   "preview.reason_access_profile": "Профили пользователя не разрешают это подключение",
-  "client.label.profiles": "Профили доступа"
+  "client.label.profiles": "Профили доступа",
+  "profiles.migrate_first": "Профили доступа требуют сервиса управления Meridian. Сначала выполните meridian migrate."
 }

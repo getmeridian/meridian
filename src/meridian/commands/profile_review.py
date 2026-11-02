@@ -4,11 +4,15 @@ from collections.abc import Sequence
 
 from meridian.cluster import ClusterConfig
 from meridian.compiler import compile_topology
+from meridian.compiler.access_profiles import validate_profile_backend
+from meridian.compiler.errors import TopologyCompileError
 from meridian.compiler.models import CompiledResource, NodeWorkloadPayload, ResourcePlan, ServiceSettingsPayload
+from meridian.console import fail
 from meridian.control.client import ControlClient
 from meridian.core.access_profile_views import AccessProfileReview, AccessProfileReviewRequest, GrantedInbound
 from meridian.core.client_limits import UserCreationSettings
 from meridian.core.topology import SetupIntent
+from meridian.i18n import t
 
 
 def profile_review_paths(review: AccessProfileReview | None) -> frozenset[str]:
@@ -22,12 +26,21 @@ def profile_review_paths(review: AccessProfileReview | None) -> frozenset[str]:
 
 def profile_review_needed(cluster: ClusterConfig, intent: SetupIntent) -> bool:
     """Removing the last profile still reviews the live service's membership and fences its hash."""
+    if intent.control.backend != "meridian":
+        return False
     if intent.access_profiles:
         return True
     if not cluster.panel.url or not cluster.panel.api_token:
         return False
     with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
         return bool(client.settings().access_profiles)
+
+
+def require_profile_backend(intent: SetupIntent, *, requested: bool = False) -> None:
+    try:
+        validate_profile_backend(intent, requested=requested)
+    except TopologyCompileError:
+        fail(t("profiles.migrate_first"), hint_type="user")
 
 
 def review_profile_access(cluster: ClusterConfig, plan: ResourcePlan) -> AccessProfileReview | None:
@@ -39,7 +52,9 @@ def review_profile_resources(
 ) -> AccessProfileReview | None:
     if not cluster.panel.url or not cluster.panel.api_token:
         return None
-    settings = next(row.payload for row in resources if isinstance(row.payload, ServiceSettingsPayload))
+    settings = next((row.payload for row in resources if isinstance(row.payload, ServiceSettingsPayload)), None)
+    if settings is None:
+        return None
     refs = [
         ref
         for row in resources

@@ -22,7 +22,12 @@ from meridian.commands._helpers import (
     require_intent,
     reviewed_runtime,
 )
-from meridian.commands.profile_review import export_creation_memberships, profile_review_paths, review_profile_access
+from meridian.commands.profile_review import (
+    export_creation_memberships,
+    profile_review_paths,
+    require_profile_backend,
+    review_profile_access,
+)
 from meridian.console import confirm, err_console, error_context, fail, has_tty, info, is_json_mode, ok, warn
 from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_result
 from meridian.core.errors import MeridianError
@@ -107,6 +112,7 @@ def _import(source: str, *, dry_run: bool, yes: bool, forget_unreachable: bool, 
     registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     try:
         updated = intent_from_document(parse_fleet_document(text), current, registry)
+        require_profile_backend(updated)
         labels = server_labels(registry, [*intent_server_refs(current), *intent_server_refs(updated)])
     except CoreInputError as exc:
         fail(str(exc), hint=exc.hint, hint_type="user")

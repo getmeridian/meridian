@@ -495,6 +495,8 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 ## 访问配置
 
+访问配置需要 Meridian 控制服务。Remnawave 部署请先运行 `meridian migrate`；新增、导入或应用访问配置会在修改服务器或面板之前被拒绝。
+
 JSON 审核和部署导出会保留 `token`、`secret` 等有效配置 ID 和用户名，包括嵌套的授权及创建设置列表。凭证字段仍会隐藏。
 
 批量撤销在预览或写入前都会检查保存的用户版本、授权和节点。访问权限已变更或配置已删除时，会拒绝整个撤销并列出受影响用户，`--dry-run` 也一样。撤销预览显示反向的新增、失去访问及相应的彻底断开范围。API 可向 `POST /api/people/bulk/undo` 发送 `{"receipt_id":"...","dry_run":true}`，获得预计的 `undo_people`，不修改数据库、不记录事件，也不拉取备份。未保存访问前提条件的旧回执需要重新进行批量审核。

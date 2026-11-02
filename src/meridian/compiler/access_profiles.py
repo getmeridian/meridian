@@ -8,6 +8,16 @@ from meridian.core.access_profiles import DEFAULT_ACCESS_PROFILE
 from meridian.core.topology import SetupIntent
 
 
+def validate_profile_backend(intent: SetupIntent, *, requested: bool = False) -> None:
+    """Legacy compilation exists for migration; it cannot enforce profile membership or grants."""
+    if intent.control.backend != "meridian" and (
+        requested
+        or intent.access_profiles
+        or any(settings.profiles != [DEFAULT_ACCESS_PROFILE] for settings in intent.access.creation_settings.values())
+    ):
+        raise TopologyCompileError("Access profiles need Meridian's control service. Run meridian migrate first.")
+
+
 def compile_access_profiles(intent: SetupIntent, resources: dict[str, CompiledResource]) -> dict[str, list[str]]:
     """An endpoint and its aliases grant the same inbound; gateway bridges never grant person access."""
     references: dict[str, list[str]] = {}

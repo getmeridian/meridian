@@ -814,5 +814,6 @@
   "bulk.action.set-profiles": "تنظیم پروفایل‌ها",
   "bulk.field.profiles": "پروفایل‌های دسترسی",
   "preview.reason_access_profile": "پروفایل‌های این کاربر این اتصال را مجاز نمی‌کنند",
-  "client.label.profiles": "پروفایل‌های دسترسی"
+  "client.label.profiles": "پروفایل‌های دسترسی",
+  "profiles.migrate_first": "پروفایل‌های دسترسی به سرویس کنترل Meridian نیاز دارند. ابتدا meridian migrate را اجرا کنید."
 }

@@ -814,5 +814,6 @@
   "bulk.action.set-profiles": "Set profiles",
   "bulk.field.profiles": "Access profiles",
   "preview.reason_access_profile": "Not granted by this person’s profiles",
-  "client.label.profiles": "Access profiles"
+  "client.label.profiles": "Access profiles",
+  "profiles.migrate_first": "Access profiles need Meridian's control service. Run meridian migrate first."
 }

@@ -11,6 +11,7 @@ from meridian.commands.apply_progress import apply_progress
 from meridian.commands.profile_review import (
     profile_review_needed,
     profile_review_paths,
+    require_profile_backend,
     review_profile_access,
     review_profile_resources,
 )
@@ -36,6 +37,7 @@ def run_v4_apply(
     from meridian.servers import ServerRegistry
 
     intent = require_intent(cluster)
+    require_profile_backend(intent)
     registry = ServerRegistry(SERVER_PROFILES_FILE)
     forget_unreachable_servers(cluster, registry, intent, forget=forget_unreachable, yes=yes)
     review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(intent), cluster=cluster)
@@ -161,6 +163,7 @@ def run_v4_plan(
     from meridian.setup.runtime import SetupRuntime
 
     intent = require_intent(cluster)
+    require_profile_backend(intent)
     inspection = SetupRuntime(
         ServerRegistry(SERVER_PROFILES_FILE),
         cluster_loader=lambda: cluster,
