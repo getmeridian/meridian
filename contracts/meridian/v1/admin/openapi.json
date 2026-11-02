@@ -12868,7 +12868,7 @@
   "info": {
     "description": "Explicit-capability bearer-token operations behind the operator's private console address. Capabilities are declared per action and frozen on tokens. Compatible read/propose/approve/people/admin presets expand to equivalent grants; credentials and private metadata require explicit permissions. Node enrollment, agent, subscription, page, and console-session surfaces are internal or public and are excluded from this document.",
     "title": "Meridian admin API",
-    "version": "4.0.0b10"
+    "version": "4.0.0b11"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",
