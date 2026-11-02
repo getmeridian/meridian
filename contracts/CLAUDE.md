@@ -1,6 +1,7 @@
 # contracts — Generated meridian-core artifacts
 
 ## Design decisions
+- **Server capacity schemas** — current state, derived integer values, bounded recent/hourly history, and measured network duration join node and fleet contracts without person labels.
 - **Agent capacity contracts** — negotiated, nullable CPU/load/memory/process samples and epoch-local NIC counters carry no interface or client identity; the pinned core's inbound connection counts remain null.
 - **People query contracts** — bounded pages and contextual facets expose row versions without notes or credentials.
 - **Reviewed bulk contracts** — frozen hashes, receipts, undo, and named stale refusals use typed people-only boundaries.

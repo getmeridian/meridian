@@ -3,6 +3,7 @@
 Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `formats/CLAUDE.md`.
 
 ## Design decisions
+- **Capacity stays per node** — `capacity.py` keeps one latest collection, 360 recent ten-second slots, and 168 UTC hourly means/peaks; person privacy settings do not govern these address-free aggregates.
 - **People queries share SQL predicates** — cursor pages use monotonic identities, contextual counts, and the same selection across surfaces.
 - **Bulk reviews freeze names and versions** — previews stay in bounded memory; one transaction stores the receipt and composes documents.
 - **Capabilities freeze at issuance** — the route catalog owns base, body-choice, and response-field grants; compatible scopes expand once, while the separate immutable grant can later compose with access-profile bounds. Credentials and private metadata are independent permissions on every typed person result.
@@ -37,6 +38,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - A proposal whose intent contains a secret-shaped key or value, or a malformed `access` block, is refused and never stored.
 
 ## Pitfalls
+- **Capacity receipt age belongs to accepted collections** — replays and retired collection epochs never refresh it; only adjacent received network samples add hourly bytes, split at UTC boundaries.
 - **Capacity fields require negotiation** — reject a populated capacity report unless its session accepted `capacity_telemetry`; older agents keep the field absent.
 - **Retry delays cross every HTTP surface** — emit Retry-After whenever a ServiceError supplies it, including anonymous authentication refusals.
 - **Redaction preserves supplied fields** — copy only changed values, or omitted bulk action parameters become supplied nulls and invalidate the review.

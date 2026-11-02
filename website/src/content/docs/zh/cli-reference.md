@@ -427,6 +427,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 `GET /api/nodes/NODE` 返回持久保存的 `traffic_bytes`、最近报告的活跃统计窗口以及完整计数起点；可通过 `meridian api schema service-node-status` 查看其数据契约。
 
+`fleet status --json` 也返回每个节点的当前 `capacity`：`status`、可为 `null` 的 `sample` 和 `values`、接收时间及样本年龄。未报告、不可用和过期数据都与实测零值区分。`GET /api/nodes/{node_id}/capacity?hours=24` 使用 `fleet.read` 读取当前、近期和小时数据，可选 1–168 个 UTC 小时区间。面板将 CPU、内存、主机网络速率与计入用户用量的流量分开显示；一小时内存样本、七天小时汇总和空白区间的说明见[隐私](/zh/privacy/)。
+
 **`fleet inventory`** — 列出已配置的服务器、角色、节点和中继，并在控制服务可达时附带实时状态。绝不会输出 API 令牌或秘密路径。如果实时状态不可用，仍会显示已配置的清单并附带警告，命令以退出码 `3` 结束。要判断 `apply` 是否有待执行的变更，请使用 `plan --json`。
 
 **`fleet history`** — 控制服务记录的每一次经过审核的应用，最新的在前：编号、时间、作者（机器的令牌名称；CLI 自身的令牌为 `root`，网页面板为 `owner`）、状态（`proposed`、`approved`、`applied` 或 `failed`）以及计划哈希的开头部分。`--json` 返回 `data.revisions[]`。

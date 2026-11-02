@@ -9,6 +9,7 @@ from pydantic import Field
 
 from meridian.control.models import NodeRuntime
 from meridian.core.attention import AttentionThresholds, ServerAttention, derive_server_attention
+from meridian.core.capacity import CapacityCurrent
 from meridian.core.models import CoreModel
 from meridian.core.server_allowances import ServerMetadata, ServerUsage, ServerUsageList
 from meridian.core.topology import ProtocolKind
@@ -224,6 +225,7 @@ class FleetStatusNode(NodeTrafficEvidence):
     live: bool | None = None
     runtime: NodeRuntime | None = None
     runtime_available: bool | None = None
+    capacity: CapacityCurrent | None = Field(default=None, exclude_if=lambda value: value is None)
     in_sync: bool | None = None
     failed: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
@@ -354,6 +356,7 @@ def _status_node(
         live=api_node.is_connected if api_node else None,
         runtime=getattr(api_node, "runtime", None),
         runtime_available=getattr(api_node, "runtime_available", None),
+        capacity=getattr(api_node, "capacity", None),
         in_sync=getattr(api_node, "in_sync", None),
         failed=getattr(api_node, "failed", []),
         errors=getattr(api_node, "errors", []),

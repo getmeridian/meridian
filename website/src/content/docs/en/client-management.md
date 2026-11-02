@@ -302,6 +302,14 @@ Open **Individual connections** beneath the main subscription handoff to copy a 
 
 Person actions name the person in their result. Enabling someone whose access is expired or whose quota is exhausted explains what still prevents connection. A result arriving after you navigate leaves the new screen in place.
 
+### Server capacity
+
+**Servers** shows logical CPUs, load per CPU, used/total memory, host receive/send rates, and Xray process memory and uptime. Expand **Capacity over the last day** for hourly averages and peak markers. Shaded intervals were not measured; a measured zero stays zero. Host traffic includes overhead and other services; **Counted people traffic** remains a separate aggregate. Capacity collection changes no device or personal-history setting.
+
+Reports are current for 180 seconds from the last accepted collection received by the service. Older agents show **Not reported**, collection failures show **Unavailable**, and old evidence shows **Stale**. The charts cover the current UTC hour and its preceding 23 buckets and disclose the measured network duration. One hour of recent samples stays in memory; 168 hourly buckets survive restarts. See [Privacy](/en/privacy/) for retention and snapshots.
+
+`GET /api/nodes/{node_id}/capacity?hours=24` needs `fleet.read` and accepts one `hours` integer from 1 to 168. Unknown or repeated query options are refused. `GET /api/nodes/{node_id}` and `meridian fleet status --json` carry the same current `capacity` projection; use `meridian api schema node-capacity` for the history contract.
+
 ### API tokens
 
 Give each integration its own revocable token. In **Tokens**, select individual actions or a compatible preset, choose an expiry, then click **Review token**. The service shows the effective permissions and exact expiry before **Create token**. Editing the choices requires another review. The secret is shown once and stays out of browser storage; an uncertain response reloads metadata and explains that the secret cannot be recovered.
@@ -335,6 +343,7 @@ Read **OpenAPI 3.1** from `GET /api/openapi.json`, or the generated `contracts/m
 | `GET /api/users/{username}/flow-blocks` | Per-node evidence for blocking new flows; no connection addresses or device data |
 | `GET /api/users` | Every person |
 | `GET /api/traffic` | Traffic totals per person |
+| `GET /api/nodes/{node_id}/capacity` | Current server capacity and bounded recent/hourly history; `fleet.read`, `hours=1..168` |
 | `GET /api/health` | The service's version |
 | `GET /api/openapi.json` | The admin API contract |
 | `GET /api/events` | A bounded page of local lifecycle events |

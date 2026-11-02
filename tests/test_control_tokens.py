@@ -64,6 +64,7 @@ def _mint(fleet: Fleet, scope: str, name: str = "device") -> dict[str, Any]:
 BACKUP_KEY = generate_key_pair().public
 # Samples carry no permissions: every requirement comes directly from server.ROUTES.
 ROUTE_SAMPLES = {
+    "node_capacity": ("/api/nodes/main/capacity", None),
     "token_capabilities": ("/api/token-capabilities", None),
     "preview_token": ("/api/tokens/preview", {"name": "Integration", "scope": "read"}),
     "openapi": ("/api/openapi.json", None),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE
+from meridian.control.capacity import CAPACITY_TABLES
 from meridian.control.commands import COMMAND_TABLES
 from meridian.control.devices import DEVICES_TABLE
 from meridian.control.errors import ServiceError
@@ -19,7 +20,7 @@ from meridian.control.tokens import API_TOKENS_TABLE_V4
 from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPOCH_BASELINES
 from meridian.control.user_flow_blocks import FLOW_BLOCKS_TABLE
 
-SCHEMA_VERSION = 22
+SCHEMA_VERSION = 23
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS secrets (name TEXT PRIMARY KEY, value BLOB NOT NULL);
@@ -74,6 +75,7 @@ SCHEMA += ";\n".join(COMMAND_TABLES) + ";\n"
 SCHEMA += ALLOWANCE_PERIODS_TABLE + ";\n"
 SCHEMA += FLOW_BLOCKS_TABLE + ";\n"
 SCHEMA += ";\n".join(PASSKEY_TABLES) + ";\n"
+SCHEMA += ";\n".join(CAPACITY_TABLES) + ";\n"
 # Statements that bring a database from version N to N + 1 (index N - 1).
 _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (
@@ -137,6 +139,8 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     ),
     # 21 -> 22: local owner passkeys and explicit grants for scoped API tokens.
     (*PASSKEY_TABLES, "ALTER TABLE api_tokens ADD COLUMN capabilities TEXT"),
+    # 22 -> 23: bounded node-only capacity state and hourly rollups.
+    CAPACITY_TABLES,
 )
 
 

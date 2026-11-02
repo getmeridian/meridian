@@ -1,6 +1,7 @@
 # content/docs — Markdown documentation source
 
 ## Design decisions
+**Capacity history** — client, CLI, and privacy guides share receipt freshness, null/zero states, 360 recent slots, 168 hourly buckets, UTC windows, measured intervals, and snapshot behaviour in every locale.
 **Node capacity** — privacy guides distinguish server aggregates from counted personal traffic, nullable collection, epoch resets, and the pinned core's unsupported connection counts in all four locales.
 **Bulk revocation** — client guides describe per-person/node receipts, unchanged credentials, surviving transfers, and post-deletion confirmation in every locale.
 **Reviewed bulk people** — client and CLI guides describe server paging, shared filters, frozen targets, atomic commit, receipts, undo, declared deletion commands, and privacy in all four locales.

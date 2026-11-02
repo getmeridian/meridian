@@ -294,6 +294,7 @@ class ServiceFleetPanel(ServiceAccessPanel):
                         is_connected=live,
                         apply_failed=live and bool(status.failed),
                         runtime=status.runtime,
+                        capacity=status.capacity,
                         traffic_used=status.traffic_bytes,
                         runtime_available=status.runtime_available(),
                         in_sync=status.in_sync,

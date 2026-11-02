@@ -94,6 +94,7 @@ from meridian.core.plan import (
 from meridian.core.relay_check import RelayCheckResult
 from meridian.core.routes import RouteListResult, RouteMutationResult
 from meridian.core.schema_bulk import bulk_envelopes
+from meridian.core.schema_capacity import CAPACITY_SCHEMAS
 from meridian.core.schema_credentials import credential_command_schemas
 from meridian.core.schema_delivery import delivery_schemas
 from meridian.core.schema_delivery_service import service_delivery_schemas
@@ -627,6 +628,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "fleet-event": FleetEvent,
     "fleet-event-query": FleetEventQuery,
     "service-node-status": ServiceNodeStatus,
+    **CAPACITY_SCHEMAS,
     "attention": AttentionList,
     "attention-thresholds": AttentionThresholds,
     "fleet-usage-envelope": FleetUsageOutputEnvelope,

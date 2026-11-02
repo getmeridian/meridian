@@ -15,6 +15,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b9
 
 #### Added
+- Server capacity cards distinguish host traffic from counted people traffic, with
+  nullable current readings, one hour of recent samples, and seven days of bounded
+  SQLite hourly averages and peaks. API and CLI share freshness and zero states (#55).
 - Negotiated node capacity reports with CPU count and load, total/available memory,
   host network counters and rates, and Xray process uptime/memory. Missing evidence
   stays unavailable; counter epochs handle interface changes, resets, and wraparound.

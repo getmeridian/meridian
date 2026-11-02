@@ -1,0 +1,14 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "hours": {
+      "default": 24,
+      "maximum": 168,
+      "minimum": 1,
+      "title": "Hours",
+      "type": "integer"
+    }
+  },
+  "title": "CapacityQuery",
+  "type": "object"
+}

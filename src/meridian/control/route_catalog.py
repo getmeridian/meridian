@@ -8,7 +8,7 @@ are omitted from the published OpenAPI document.
 
 from __future__ import annotations
 
-from meridian.control import delivery_routes, ui_routes
+from meridian.control import capacity_routes, delivery_routes, ui_routes
 from meridian.control.api_models import (
     DeletedResource,
     DeployerStateReceipt,
@@ -62,6 +62,7 @@ from meridian.control.route_metadata import (
 from meridian.control.route_types import WRITE, ApiRoute, ExtraCapability, route
 from meridian.control.ui_models import FleetView, ShareView
 from meridian.core.attention import AttentionList, AttentionThresholds
+from meridian.core.capacity import CapacityQuery, NodeCapacityView
 from meridian.core.client_limits import CalendarExpiryPreview
 from meridian.core.fleet_events import FleetEventPage
 from meridian.core.languages import LanguageSettings, LanguageState
@@ -71,6 +72,19 @@ from meridian.core.subscription_preview import SubscriptionPreview, Subscription
 from meridian.core.token_models import CapabilityCatalog, TokenPreview
 
 API_ROUTES: tuple[ApiRoute, ...] = (
+    route(
+        "GET",
+        "/api/nodes/{node_id}/capacity",
+        "read",
+        capacity_routes.node_capacity,
+        None,
+        NodeCapacityView,
+        "Read current server capacity and bounded recent/hourly history.",
+        credentials=False,
+        capability="fleet.read",
+        query_model=CapacityQuery,
+        refusals=(NOT_FOUND,),
+    ),
     route(
         "GET",
         "/api/token-capabilities",

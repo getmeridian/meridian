@@ -9,6 +9,7 @@ from typing import Any
 
 from meridian.control.models import NodeRuntime
 from meridian.core.account_schedule import AccountSchedulePreview
+from meridian.core.capacity import CapacityCurrent
 from meridian.core.languages import Language
 
 
@@ -73,6 +74,7 @@ class Node:
     apply_failed: bool = False
     runtime: NodeRuntime | None = None
     runtime_available: bool | None = None
+    capacity: CapacityCurrent | None = None
     in_sync: bool | None = None
     failed: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)

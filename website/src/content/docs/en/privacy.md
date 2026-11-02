@@ -13,6 +13,10 @@ Node agents report CPU count and load, total and available memory, host network 
 
 Host network traffic includes protocol overhead and other services; it differs from traffic counted for people. Counters start at zero in each counter epoch and restart after agent restarts, interface changes, resets, wraparound, or the exact-integer ceiling. The first sample has no rate. Failed collection is unavailable, older agents are “not reported,” and a measured zero remains zero.
 
+The service keeps one hour of recent observations in memory, at most one point per 10-second bucket (360 points per node). Agents normally report once a minute. SQLite retains the current UTC hour and the preceding 167 hourly buckets: integer averages and peaks, and network bytes only across adjacent received samples in the same counter epoch. Unmeasured intervals are gaps; zero means a measured zero. Old hourly buckets are pruned every 30 seconds. The latest sample stays while the node exists; deleting a node removes its capacity data.
+
+The Servers screen shows current capacity and the latest 24 UTC hourly buckets, including the incomplete current hour, with measured network duration. A sample becomes stale after 180 seconds without an accepted collection; hellos, polls, and duplicate reports do not refresh it. Recent memory series clear on service restart; hourly rollups survive. Server aggregates ride encrypted snapshots at every privacy level, and restored current samples remain stale until new evidence arrives. A seized service reveals how busy each server was; these series name no people or connections.
+
 ## Device limits
 
 | Level | What Meridian keeps | What you see |

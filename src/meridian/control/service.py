@@ -24,6 +24,7 @@ from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.attention import read_attention
 from meridian.control.background_health import BackgroundHealth
 from meridian.control.backups import BackupLedger
+from meridian.control.capacity import CapacityLedger
 from meridian.control.command_models import CommandRequest, NodeCommandRecord, UserCutOffMutation
 from meridian.control.commands import CommandLedger
 from meridian.control.connection_pages import ConnectionPages
@@ -128,6 +129,8 @@ class ControlService:
         self.commands = CommandLedger(self._store, self.authority, clock=clock, events=self.events)
         self.cutoffs = CutOffLedger(self._store, self.commands)
         self.flow_blocks = FlowBlockLedger(self._store, self.events, clock=clock)
+        self.capacity = CapacityLedger(self._store, clock=clock)
+        self.capacity.prune()
         self.tokens = TokenRegistry(self._store, clock=clock, events=self.events)
         self.revisions = RevisionLedger(self._store, self.tokens, fleet_id, clock=clock)
         self.backups = BackupLedger(self._store, clock=clock)
@@ -236,6 +239,7 @@ class ControlService:
                 # An agent that keeps its state refuses an older revision, so a re-added node continues from here.
                 self._set_meta(_RETIRED_REVISION + node_id, str(row["revision"]))
             self._db.execute("DELETE FROM nodes WHERE node_id = ?", (node_id,))
+            self.capacity.forget(node_id)
             self.events.forget_node(node_id)
             self.commands.expire_node(node_id)
             self.authority.forget_node(node_id)
@@ -288,6 +292,7 @@ class ControlService:
             failed=failed,
             errors=errors,
             runtime=project_runtime(report),
+            capacity=self.capacity.current(node_id),
             **self.traffic.node_accounting(node_id).model_dump(),
         )
 
@@ -361,6 +366,7 @@ class ControlService:
             )
             self.commands.release_ready(node_id, applied)
             self.flow_blocks.report(node_id, report)
+            self.capacity.record(node_id, report.capacity)
         return {"type": "report_ack", "applied_revision": applied.revision if applied else None}
 
     # -- users and endpoints -----------------------------------------------------------
@@ -482,6 +488,7 @@ class ControlService:
         moment = now or utc_now()
         self.commands.maintain()
         self.traffic.prune_history(moment)
+        self.capacity.prune()
         self.events.observe_nodes(self.list_nodes, moment)
         with self._transaction():
             changed = self._enforce(moment)

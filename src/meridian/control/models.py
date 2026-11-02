@@ -28,6 +28,7 @@ from meridian.core.agent_types import (
     Timestamp,
     Version,
 )
+from meridian.core.capacity import CapacityCurrent
 from meridian.core.client_devices import ClientDevicesResult, DeviceCap
 from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES, LimitStrategy, UserCreationSettings
 from meridian.core.client_sessions import CredentialGeneration
@@ -127,6 +128,7 @@ class NodeStatus(NodeTrafficAccounting):
     failed: list[str] = Field(default_factory=list, description="Resource IDs the last report marked failed.")
     errors: list[str] = Field(default_factory=list, description="Operator-facing messages of failed resources.")
     runtime: NodeRuntime | None = Field(default=None, description="The last report's health and version evidence.")
+    capacity: CapacityCurrent = Field(default_factory=CapacityCurrent)
 
     def unseen_seconds(self, now: datetime | None = None) -> float | None:
         """Seconds since the agent last reached the service; None if it never did."""

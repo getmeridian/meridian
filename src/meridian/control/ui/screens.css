@@ -180,6 +180,21 @@
 .server-badges { display: flex; flex-wrap: wrap; gap: .5rem; margin-block-end: 1rem; }
 .health-checks { padding-inline-start: 1.8rem; overflow-wrap: anywhere; }
 .field-error { color: var(--err); font-size: .85rem; margin-block: .25rem 0; }
+.server-capacity { border-block-start: 1px solid var(--b1); padding-block-start: 1rem; margin-block: 1rem; }
+.server-capacity > .card-head { margin-block-end: .25rem; }
+.capacity-history > summary { cursor: pointer; font-weight: 600; padding-block: .5rem; }
+.capacity-history[open] > div { margin-block: .5rem; }
+.capacity-chart { display: block; width: 100%; height: auto; }
+.capacity-legend { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.capacity-legend h4 { font-size: .85rem; }
+.capacity-receive { fill: var(--ac); }
+.capacity-send { fill: var(--t2); }
+.capacity-gap { fill: var(--b1); opacity: .55; }
+.capacity-peak { stroke: var(--t1); stroke-width: 1.5; }
+.capacity-bar:focus { outline: 2px solid var(--ac); }
+.capacity-key::before { content: ""; display: inline-block; width: .7rem; height: .7rem; margin-inline-end: .4rem; border-radius: 2px; }
+.capacity-key-receive::before { background: var(--ac); }
+.capacity-key-send::before { background: var(--t2); }
 .field-error:empty { display: none; }
 .live-status { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .8rem; margin-block: 1rem; }
 .live-trouble:empty { display: none; }
