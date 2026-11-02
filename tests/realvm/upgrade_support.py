@@ -203,6 +203,31 @@ def redact_output(text: str, known: Iterable[str] = ()) -> str:
     return text
 
 
+def _nested_errors(value: object, path: str) -> list[tuple[str, str]]:
+    if isinstance(value, dict):
+        label = value.get("logical_id") or path
+        own = [(str(label), str(value["error"]))] if isinstance(value.get("error"), str) and value["error"] else []
+        return own + [item for key, child in value.items() for item in _nested_errors(child, f"{path}.{key}")]
+    if isinstance(value, list):
+        return [item for index, child in enumerate(value) for item in _nested_errors(child, f"{path}[{index}]")]
+    return []
+
+
+def failure_excerpt(output: str, known: Iterable[str] = (), *, lines: int = 25, width: int = 300) -> str:
+    """A failed command's errors (JSON envelopes) or redacted tail, so a lab failure names its cause."""
+    try:
+        envelope = json.loads(output.split("\n\n", 1)[0] if output.lstrip().startswith("{") else "")
+    except ValueError:
+        envelope = None
+    if isinstance(envelope, dict):
+        found = [f"{item.get('code', 'error')}: {item.get('message', '')}" for item in envelope.get("errors") or []]
+        found += [f"{path}: {error}" for path, error in _nested_errors(envelope.get("data"), "data")]
+        if found:
+            output = "\n".join(found)
+    tail = [line[:width] for line in redact_output(output, known).splitlines() if line.strip()][-lines:]
+    return "\n".join(f"    | {line}" for line in tail)
+
+
 def is_pypi_unreachable(output: str) -> bool:
     """Installer transport failures are external; an unavailable version is a refusal."""
     lowered = output.lower()

@@ -191,3 +191,31 @@ def test_agent_version_is_read_from_runtime_evidence_not_the_xray_version() -> N
     assert support.fleet_agent_version(data) == "0.1.0-build"
     with pytest.raises(ValueError, match="agent"):
         support.fleet_agent_version({"nodes": [{"status": "connected", "xray_version": "26.10.15"}]})
+
+
+def test_failure_excerpt_keeps_the_cause_and_hides_lab_addresses() -> None:
+    from tests.realvm.upgrade_support import failure_excerpt
+
+    output = "\n".join(f"step {index}" for index in range(40))
+    output += "\nCould not observe access-profiles on 198.51.100.7: the service did not answer\n"
+    excerpt = failure_excerpt(output, known=("198.51.100.7",))
+    assert excerpt.endswith("    | Could not observe access-profiles on [REDACTED]: the service did not answer")
+    assert "198.51.100.7" not in excerpt
+    assert "step 15" not in excerpt and len(excerpt.splitlines()) == 25
+
+
+def test_failure_excerpt_lifts_resource_errors_out_of_a_json_envelope() -> None:
+    import json
+
+    from tests.realvm.upgrade_support import failure_excerpt
+
+    envelope = {
+        "data": {"drift": [{"logical_id": "settings", "error": "profiles unavailable on 198.51.100.7"}]},
+        "errors": [{"code": "MERIDIAN_PLAN_INCONCLUSIVE", "message": "plan is inconclusive"}],
+        "summary": {"text": "Could not observe 1 of 18 resources"},
+    }
+    excerpt = failure_excerpt(json.dumps(envelope, indent=2) + "\n\nstderr noise", known=("198.51.100.7",))
+    assert excerpt.splitlines() == [
+        "    | MERIDIAN_PLAN_INCONCLUSIVE: plan is inconclusive",
+        "    | settings: profiles unavailable on [REDACTED]",
+    ]

@@ -36,6 +36,7 @@ from tests.realvm.upgrade_support import (
     command_data,
     compare_subscriptions,
     confirmation_input,
+    failure_excerpt,
     fleet_agent_version,
     is_pypi_unreachable,
     parse_userinfo,
@@ -164,7 +165,10 @@ class UpgradeVerifier:
                 raise VerificationError(
                     "PyPI package downloads could not be reached; no upgrade verdict is possible.", exit_code=75
                 )
-            raise VerificationError(f"{label} failed (exit {result.returncode}).", exit_code=2 if installation else 1)
+            excerpt = failure_excerpt(output, self.known)
+            raise VerificationError(
+                f"{label} failed (exit {result.returncode}).\n{excerpt}", exit_code=2 if installation else 1
+            )
         return result
 
     def json_command(self, args: list[str], *, old: bool = False, allowed: tuple[int, ...] = (0,)) -> dict[str, Any]:
