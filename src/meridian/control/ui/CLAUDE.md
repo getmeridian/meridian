@@ -43,6 +43,7 @@
 - **Pending extensions use the service review** — take the duration from the existing bulk preview; a calendar-expiry preview describes a fixed date and must never activate first-use access.
 - **Person mode changes retain row identity** — move notes and tag into More in Simple, preserving draft inputs and focus; Detailed-only tab links use the same mode note and switch.
 - **Selecting the current person tab is no navigation** — open another inline editor without asking to discard a sibling draft.
+- **Local downloads bind their own URL** — `M.h` refuses Blob hrefs; assign only the URL created locally from the reviewed JSON, as QR export does for images.
 - **Phone targets follow width and pointer** — apply 44 px targets at the phone breakpoint as well as for coarse pointers; include local date inputs and chart selectors, keeping other pointer layout rules separate.
 - **Server guidance stays compact** — keep the copyable meridian command beside one caption so the notice does not dominate phone cards.
 - **Isolate count pairs together** — render Overview's active / total as one LTR unit; separate number isolates let RTL reverse the pair around the slash.

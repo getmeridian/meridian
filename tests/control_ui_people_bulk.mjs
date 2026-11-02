@@ -15,7 +15,9 @@ let downloadedBlob;
 w.Blob = globalThis.Blob;
 w.URL.createObjectURL = blob => { downloadedBlob = blob; return 'blob:local-proposal'; };
 w.URL.revokeObjectURL = () => {};
-w.HTMLAnchorElement.prototype.click = function () { if (this.download) report.downloadName = this.download; };
+w.HTMLAnchorElement.prototype.click = function () {
+  if (this.download) { report.downloadName = this.download; report.downloadHref = this.getAttribute('href'); }
+};
 Object.defineProperty(w.document, 'hidden', { value: false, configurable: true });
 w.Date.now = () => Date.parse('2026-11-01T12:00:00Z');
 w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };

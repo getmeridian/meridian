@@ -19,7 +19,8 @@
         error.textContent = "";
         try {
           var url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
-          var link = h("a", { download: "people-removal.json", href: url });
+          var link = h("a", { download: "people-removal.json" });
+          link.setAttribute("href", url);
           document.body.appendChild(link);
           try { link.click(); } finally { link.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000); }
         } catch (failure) { error.textContent = M.t("bulk.proposal_save_failed"); }

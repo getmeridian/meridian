@@ -30,7 +30,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   counts in the API, CLI, and People screen. Paging and bulk selection share the
   filter (#95).
 - Bulk deletion of topology-declared people returns one secret-free proposal tied
-  to the committed fleet revision. Save it from the console or bulk JSON and apply
+  to the committed fleet revision. Download it from the console with a selectable
+  JSON fallback, or save bulk JSON, and apply
   it with `meridian client remove --proposal FILE` (or name several people): one
   review, one confirmation, one apply. Stale proposals are refused; service-owned
   people in the same batch are still deleted atomically (#95).
