@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -87,6 +88,39 @@ def test_demo_bulk_and_routing_use_reviews_receipts_and_effective_access(demo: P
     assert result["rotated"] and result["rotationDevicesIntact"] and result["staleKeysRejected"]
     assert result["periodReset"] and result["unlimitedDevices"]
     assert result["declaredKept"] and result["bulkDeleted"] and result["deleteUndoRefused"]
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
+@pytest.mark.parametrize(
+    "create,strategy", [(True, "month"), (True, "day"), (True, "week"), (False, "day"), (False, "week")]
+)
+def test_demo_stores_due_period_resets_before_a_later_bulk_commit(demo: Path, create: bool, strategy: str) -> None:
+    result = run_console(
+        "showcase-schedule-catchup", data={"directory": str(demo), "create": create, "strategy": strategy}
+    )
+    assert result["stored"]["traffic_reset_at"] is not None
+    assert result["stored"]["used_traffic_bytes"] == 0
+    assert result["review"]["before"]["traffic_reset_at"] == result["stored"]["traffic_reset_at"]
+    assert result.get("commitError") is None
+    assert result["committed"]["after"]["tag"] == result["after"]["tag"] == "VIP"
+    validate_recordings(result["responses"])
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
+def test_demo_materializes_first_use_expiry_before_status_and_lifecycle_queries(demo: Path) -> None:
+    result = run_console("showcase-schedule-first-use", data={"directory": str(demo)})
+    expiry = datetime.fromisoformat(result["before"]["first_traffic_at"]) + timedelta(days=5)
+    expected = expiry.strftime("%Y-%m-%dT%H:%M:%SZ")
+    assert result["previewKeptUser"]
+    assert (
+        result["preview"]["expire_at"]
+        == result["after"]["expire_at"]
+        == result["after"]["schedule"]["expire_at"]
+        == expected
+    )
+    assert result["after"]["status"] == "expired"
+    assert result["fixed"] == ["Luma"] and result["unlimited"] == []
+    validate_recordings(result["responses"])
     assert result["outside"] == result["nativeApi"] == result["errors"] == []
 
 

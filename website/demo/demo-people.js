@@ -168,9 +168,13 @@
     }
     return date.getTime();
   };
+  function activationExpiry(user) {
+    if (user.expire_at) return Date.parse(user.expire_at);
+    return user.activation_duration_days && user.first_traffic_at
+      ? Math.min(Date.parse(user.first_traffic_at) + user.activation_duration_days * 86400000, Date.UTC(2099, 0, 1) - 1000) : null;
+  }
   D.schedule = function (user) {
-    var moment = Date.now(), expiry = user.expire_at && Date.parse(user.expire_at), completed = user.renewals_completed || 0;
-    if (!expiry && user.activation_duration_days && user.first_traffic_at) expiry = Date.parse(user.first_traffic_at) + user.activation_duration_days * 86400000;
+    var moment = Date.now(), expiry = activationExpiry(user), completed = user.renewals_completed || 0;
     var enabled = !!(user.renewal_interval_days || user.renewal_interval_months);
     var left = enabled && user.renewal_limit !== null ? Math.max(0, user.renewal_limit - completed) : null;
     var anchor = Date.parse(user.renewal_anchor_at) || expiry, due = 0;
@@ -199,6 +203,22 @@
       renewal_enabled: enabled, next_renewal_at: renewal ? D.iso(renewal) : null, renewals_left: left,
       renewals_due: due, renewals_completed: completed + due,
     });
+  };
+  // account_lifecycle.enforce_user_schedules: materialize dates and reset once before status.
+  D.catchUp = function (user, forceReset) {
+    var schedule = D.schedule(user), start = D.periodStart(user, Date.now());
+    var reset = !!(forceReset || schedule.renewals_due || start !== null && (!user.traffic_reset_at || Date.parse(user.traffic_reset_at) < start));
+    if (schedule.renewals_due || schedule.expire_at !== user.expire_at) {
+      var anchor = user.renewal_anchor_at || activationExpiry(user);
+      user.renewal_anchor_at = schedule.renewal_enabled && anchor !== null ? typeof anchor === "string" ? anchor : D.iso(anchor) : null;
+      user.expire_at = schedule.expire_at;
+      user.renewals_completed = schedule.renewals_completed;
+    }
+    if (reset) {
+      user.used_traffic_bytes = 0; user.traffic_reset_at = D.now();
+      Object.keys(user.period_traffic).forEach(function (key) { user.period_traffic[key] = 0; });
+    }
+    return reset;
   };
   D.updateUser = function (user, changes) {
     if (Object.keys(changes).some(function (key) { return key !== "username" && D.source.user_writable_fields.indexOf(key) < 0; })) invalid();
@@ -236,7 +256,6 @@
     if (updated.profiles.some(function (profile) { return catalog.indexOf(profile) < 0; })) D.fail("unknown_profile");
     updated.profiles.sort();
     if (D.resolvePolicy) D.resolvePolicy(updated);
-    D.enforce(updated);
     return updated;
   };
   D.route("POST", "api/users/preview", function (request) {

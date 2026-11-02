@@ -13,11 +13,13 @@ const directory = path.resolve(data.directory);
 const html = fs.readFileSync(path.join(directory, 'console/index.html'), 'utf8');
 const dom = new JSDOM(html, { url: `https://198.51.100.1/demo/console/?lang=${locale}`, runScripts: 'outside-only', pretendToBeVisual: true });
 const w = dom.window;
-if (mode === 'showcase-queries') {
+let demoNow;
+if (mode === 'showcase-queries' || mode.startsWith('showcase-schedule-')) {
   const generated = Date.parse(JSON.parse(fs.readFileSync(path.join(directory, 'console/demo-data.json'), 'utf8')).generated_at);
+  demoNow = generated;
   w.Date = class extends Date {
-    constructor(...args) { super(...(args.length ? args : [generated])); }
-    static now() { return generated; }
+    constructor(...args) { super(...(args.length ? args : [demoNow])); }
+    static now() { return demoNow; }
   };
 }
 const report = { outside: [], nativeApi: [], errors: [], responses: {} };
@@ -232,6 +234,26 @@ if (mode === 'showcase-navigation') {
   report.bulkDeleted = !(await M.api('GET', 'api/users')).users.some(user => user.username === 'DemoGuest');
   try { await M.api('POST', 'api/people/bulk/undo', { receipt_id: deleted.id }); }
   catch (error) { report.deleteUndoRefused = error.code === 'undo_refused'; }
+} else if (mode === 'showcase-schedule-catchup') {
+  const name = data.create ? 'DemoGuest' : 'Luma';
+  report.stored = data.create
+    ? await M.api('POST', 'api/users', { username: name, traffic_limit_strategy: data.strategy })
+    : await M.api('PATCH', 'api/users/' + name, { traffic_limit_strategy: data.strategy });
+  const review = await M.api('POST', 'api/people/bulk/preview', { usernames: [name], action: { action: 'tag', tag: 'VIP' } });
+  report.review = review.people[0];
+  demoNow += 2000;
+  try {
+    const receipt = await M.api('POST', 'api/people/bulk/commit', { preview_id: review.id, preview_hash: review.preview_hash });
+    report.committed = receipt.people[0];
+  } catch (error) { report.commitError = error.code; }
+  report.after = await M.api('GET', 'api/users/' + name);
+} else if (mode === 'showcase-schedule-first-use') {
+  report.before = await M.api('GET', 'api/users/Luma');
+  report.preview = await M.api('POST', 'api/users/preview', { username: 'Luma', activation_duration_days: 5 });
+  report.previewKeptUser = JSON.stringify(await M.api('GET', 'api/users/Luma')) === JSON.stringify(report.before);
+  report.after = await M.api('PATCH', 'api/users/Luma', { activation_duration_days: 5 });
+  report.fixed = (await M.api('GET', 'api/people?q=Luma&lifecycle=fixed')).users.map(user => user.username);
+  report.unlimited = (await M.api('GET', 'api/people?q=Luma&lifecycle=unlimited')).users.map(user => user.username);
 } else if (mode === 'showcase-unavailable') {
   report.refusals = [];
   report.missing = M.t('error.not_found');

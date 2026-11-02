@@ -165,7 +165,8 @@
   }
   function person(name) { return users.find(function (user) { return user.username === name; }); }
   D.person = person; D.emit = emit;
-  function enforce(user) {
+  function enforce(user, forceReset) {
+    var reset = D.catchUp ? D.catchUp(user, forceReset) : false;
     if (user.status !== "disabled") user.status = user.expire_at && Date.parse(user.expire_at) <= Date.now() ? "expired" :
       user.traffic_limit_bytes && user.used_traffic_bytes >= user.traffic_limit_bytes ? "limited" : "active";
     user.quota_used_percent = user.traffic_limit_bytes ? Number(BigInt(user.used_traffic_bytes) * 100n / BigInt(user.traffic_limit_bytes)) : null;
@@ -177,6 +178,7 @@
     if (user.never_used && moment - Date.parse(user.created_at) > 3 * 86400000) user.attention_reasons.push("unused");
     if (user.online_at && moment - Date.parse(user.online_at) > 3 * 86400000) user.attention_reasons.push("stopped");
     if (D.schedule) user.schedule = D.schedule(user);
+    return reset;
   }
   D.enforce = enforce;
   D.flowBlocks = function (user, recorded) {

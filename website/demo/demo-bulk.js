@@ -31,18 +31,8 @@
     if (stale.length) D.fail("stale_people", 409, stale);
   }
   function project(original, reset) {
-    var user = D.clone(original), schedule = D.schedule(user), start = D.periodStart(user, Date.now());
-    reset = !!(reset || schedule.renewals_due || start !== null && (!user.traffic_reset_at || Date.parse(user.traffic_reset_at) < start));
-    if (schedule.renewals_due || schedule.expire_at !== user.expire_at) {
-      user.renewal_anchor_at = user.renewal_interval_days || user.renewal_interval_months ? user.renewal_anchor_at || schedule.next_renewal_at || user.expire_at : null;
-      user.expire_at = schedule.expire_at;
-      user.renewals_completed = schedule.renewals_completed;
-    }
-    if (reset) {
-      user.used_traffic_bytes = 0; user.traffic_reset_at = D.now();
-      Object.keys(user.period_traffic).forEach(function (key) { user.period_traffic[key] = 0; });
-    }
-    D.enforce(user);
+    var user = D.clone(original);
+    reset = D.enforce(user, reset);
     return { user: user, reset: reset };
   }
   function validateAction(action) {
