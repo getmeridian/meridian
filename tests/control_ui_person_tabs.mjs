@@ -7,6 +7,7 @@ const require = createRequire(new URL('../website/package.json', import.meta.url
 const { JSDOM } = require('jsdom');
 const [ui, scenario, locale = 'en', raw = '{}'] = process.argv.slice(2);
 const data = JSON.parse(raw === '-' ? fs.readFileSync(0, 'utf8') : raw) || {};
+const calendarWaiters = [];
 const hash = '#/people/sample' + (data.tab ? '/' + data.tab : '');
 const dom = new JSDOM('<!doctype html><html><body><div id="app"></div></body></html>', {
   url: 'https://198.51.100.1/console/' + hash, runScripts: 'outside-only', pretendToBeVisual: true,
@@ -60,7 +61,10 @@ w.fetch = async (url, options = {}) => {
   if (url === 'api/people/bulk/preview') return reply(data.pendingPreview || { people: [{ after: {
     expire_at: null, activation_duration_days: user.activation_duration_days + body.action.months * 30,
   } }] });
-  if (url.startsWith('ui/api/people/sample/expiry?')) return reply({ expire_at: '2032-06-01T12:00:00Z', months: Number(url.split('=').at(-1)) });
+  if (url.startsWith('ui/api/people/sample/expiry?')) {
+    const answer = reply({ expire_at: '2032-06-01T12:00:00Z', months: Number(url.split('=').at(-1)) });
+    return data.holdCalendar ? new Promise(resolve => calendarWaiters.push(() => resolve(answer))) : answer;
+  }
   if (url === 'ui/api/people/sample/share') return reply(share);
   if (url.startsWith('api/users/sample/usage?')) return reply({ days: 7, history_days: 30, daily: [{ day: '2026-11-01', uplink_bytes: 4, downlink_bytes: 6 }] });
   if (url === 'api/users/sample/devices') return reply({ level: 'private', count: 1, limit: 3, devices: [] });
@@ -262,6 +266,33 @@ if (scenario === 'person-tabs-extend') {
   report.dirty = M.hasUnsavedEdits(view());
   report.pendingReview = events.some(event => event.url === 'api/people/bulk/preview');
   report.prompt = !!guard(); report.noteDraft = fieldRow('note')?.querySelector('textarea')?.value;
+}
+
+if (scenario === 'person-tabs-custom-entry') {
+  if (data.existing) await edit('expiry');
+  const menu = view().querySelector('[data-person-action="extend"]')?.closest('details');
+  if (menu) menu.open = true;
+  menu?.querySelector('[data-person-custom-expiry]')?.click(); await settle();
+  const form = fieldRow('expiry')?.querySelector('form'), date = form?.querySelector('input[type="date"]');
+  const errors = () => [...form.querySelectorAll('[role="alert"]')].filter(el => el.textContent.trim()).map(el => el.textContent);
+  report.initial = { mode: form?.querySelector('[name="expiry_mode"]')?.value, enabled: !date?.disabled,
+    invalid: date?.getAttribute('aria-invalid'), errors: errors(), dirty: M.formDirty(form), focused: document.activeElement === date };
+  if (data.submitEmpty) {
+    form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await settle();
+    report.invalidSave = { errors: errors(), focused: document.activeElement === date, writes: writes.slice() };
+  }
+  form?.querySelector('[data-person-cancel]')?.click(); await settle();
+  report.prompt = !!guard(); report.closed = !fieldRow('expiry')?.querySelector('form');
+}
+
+if (scenario === 'person-tabs-custom-race') {
+  const menu = view().querySelector('[data-person-action="extend"]').closest('details'); menu.open = true;
+  menu.querySelector('[data-months="1"]').click(); await settle(); await settle();
+  menu.open = true; menu.querySelector('[data-person-custom-expiry]').click(); await settle();
+  calendarWaiters.splice(0).forEach(resolve => resolve()); await settle(); await settle();
+  const form = fieldRow('expiry').querySelector('form');
+  report.date = form.querySelector('input[type="date"]').value;
+  report.mode = form.querySelector('[name="expiry_mode"]').value; report.dirty = M.formDirty(form); report.writes = writes;
 }
 
 if (scenario === 'person-tabs-mode') {

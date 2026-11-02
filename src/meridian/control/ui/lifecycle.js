@@ -123,7 +123,7 @@
     function validate() {
       sync();
       var message = "";
-      if (mode.value === "fixed") message = expiry.date.validationMessage || expiry.time.validationMessage;
+      var validExpiry = mode.value !== "fixed" || !expiry.date.validationMessage && !expiry.time.validationMessage;
       if (!["never", "fixed", "first_use"].includes(mode.value)) message = M.t("lifecycle.invalid_expiry_mode");
       if (mode.value === "first_use" && !integer(duration, 3650, false)) message = M.t("lifecycle.invalid_activation_duration_days");
       if (!["off", "days", "months"].includes(renewal.value)) message = M.t("lifecycle.invalid_interval");
@@ -134,10 +134,10 @@
       }
       if (ownAnchor && !reset.validate()) message = M.t("lifecycle.invalid_traffic_reset_anchor_day");
       error.textContent = message;
-      return !message;
+      return !message && validExpiry;
     }
     function change() {
-      if (!validate()) throw new Error(error.textContent);
+      if (!validate()) throw new Error(error.textContent || expiry.date.validationMessage || expiry.time.validationMessage);
       var body = {};
       if (mode.value === "first_use") {
         if (!user || initialMode !== "first_use" || duration.value !== initialDuration) {
@@ -204,8 +204,14 @@
         error.scrollIntoView && error.scrollIntoView({ block: "nearest" });
       }, true);
     });
-    return { nodes: nodes, change: change, setFixed: function () {
-      mode.value = "fixed"; mode.dispatchEvent(new Event("change", { bubbles: true }));
+    return { nodes: nodes, change: change, setFixed: function (quiet) {
+      mode.value = "fixed";
+      if (quiet) {
+        clearTimeout(timer); turn++;
+        expiry.never.checked = false;
+        expiry.never.dispatchEvent(new CustomEvent("change", { bubbles: true, detail: { quiet: true } }));
+        sync(); error.textContent = "";
+      } else mode.dispatchEvent(new Event("change", { bubbles: true }));
     }, setDuration: function (days) {
       mode.value = "first_use"; duration.value = String(days);
       mode.dispatchEvent(new Event("change", { bubbles: true }));

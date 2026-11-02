@@ -117,9 +117,11 @@
     function open(key, months, fixed) {
       var entry = entries[key];
       if (!entry) return Promise.resolve();
+      var existing = entry.form;
       if (entry.row.closest("details")) entry.row.closest("details").open = true;
       if (!entry.form) {
         var controls = fields(key, user);
+        if (fixed && controls.setFixed) controls.setFixed(true);
         var form = h("form", { class: "stack person-inline-editor", novalidate: true, "aria-labelledby": entry.labelId },
           controls.nodes, h("p", { class: "form-error", role: "alert" }),
           h("div", { class: "row-actions" }, h("button", { class: "btn btn-primary btn-sm", type: "submit" }, M.t("action.save")),
@@ -144,7 +146,10 @@
           });
         });
       }
-      if (fixed && entry.fields.setFixed) entry.fields.setFixed();
+      if (fixed && existing && entry.fields.setFixed) {
+        var clean = !M.formDirty(entry.form);
+        entry.fields.setFixed(true); if (clean) M.resetDraft(entry.form);
+      }
       var first = entry.form.querySelector(fixed ? "input[type=date]" : "input:not(:disabled), select:not(:disabled), textarea");
       if (first) first.focus();
       return months && entry.fields.preset ? M.busy(entry.form, function () { return entry.fields.preset(months); }) : Promise.resolve();

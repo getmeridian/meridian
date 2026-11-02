@@ -51,7 +51,8 @@
       var d = moment();
       return never.checked ? null : d ? d.toISOString().replace(/\.\d{3}Z$/, "Z") : null;
     }
-    function validate() {
+    function validate(showErrors) {
+      if (showErrors === undefined) showErrors = true;
       date.disabled = time.disabled = never.checked;
       var d = moment(), message = "", target = date;
       if (!never.checked) {
@@ -61,17 +62,17 @@
       }
       date.setCustomValidity(target === date ? message : "");
       time.setCustomValidity(target === time ? message : "");
-      date.setAttribute("aria-invalid", date.validationMessage ? "true" : "false");
-      time.setAttribute("aria-invalid", time.validationMessage ? "true" : "false");
-      error.textContent = message;
+      date.setAttribute("aria-invalid", showErrors && date.validationMessage ? "true" : "false");
+      time.setAttribute("aria-invalid", showErrors && time.validationMessage ? "true" : "false");
+      error.textContent = showErrors ? message : "";
       utc.textContent = never.checked ? M.t("people.no_expiry") : value() || "—";
       return !message;
     }
     [date, time, never].forEach(function (input) {
-      input.addEventListener(input === never ? "change" : "input", function () {
+      input.addEventListener(input === never ? "change" : "input", function (event) {
         turn++;
         if (input === date && date.value) never.checked = false;
-        validate();
+        validate(!(event.detail && event.detail.quiet));
       });
     });
     function preset(months) {

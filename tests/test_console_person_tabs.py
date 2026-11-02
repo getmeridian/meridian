@@ -253,3 +253,27 @@ def test_custom_extension_opens_a_fixed_date_draft_for_unlimited_and_pending_acc
     if duration:
         expected["activation_duration_days"] = None
     assert result["writes"] == [expected]
+
+
+@pytest.mark.parametrize("duration", [None, 30])
+@pytest.mark.parametrize("existing", [False, True])
+def test_custom_date_opens_a_clean_quiet_editor_and_reports_an_empty_save_once(duration: int | None, existing: bool) -> None:
+    result = run_console(
+        "person-tabs-custom-entry",
+        data={
+            "existing": existing,
+            "submitEmpty": True,
+            "user": {"expire_at": None, "activation_duration_days": duration, "schedule": {"expire_at": None}},
+        },
+    )
+    initial = result["initial"]
+    assert initial["mode"] == "fixed" and initial["enabled"] and initial["focused"]
+    assert initial["invalid"] != "true" and initial["errors"] == [] and not initial["dirty"]
+    assert len(result["invalidSave"]["errors"]) == 1 and result["invalidSave"]["focused"]
+    assert result["invalidSave"]["writes"] == [] and not result["prompt"] and result["closed"]
+
+
+def test_custom_date_keeps_a_clean_editor_when_an_earlier_month_preview_arrives_late() -> None:
+    result = run_console("person-tabs-custom-race", data={"holdCalendar": True})
+    assert result["date"] == "2026-12-02" and result["mode"] == "fixed"
+    assert not result["dirty"] and result["writes"] == []
