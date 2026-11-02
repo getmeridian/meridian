@@ -11,8 +11,9 @@ from rich.markup import escape
 from rich.table import Table
 
 from meridian.cli_people import people_query
-from meridian.commands._helpers import load_topology_cluster
+from meridian.commands._helpers import load_topology_cluster, require_intent
 from meridian.commands.client_limits import parse_limit_options
+from meridian.commands.profile_review import require_profile_backend
 from meridian.console import confirm, err_console, error_context, fail, is_json_mode, ok, warn
 from meridian.control.access_limits import limit_update
 from meridian.control.client import ControlClient, ControlServiceError, ControlServiceUncertain
@@ -182,6 +183,8 @@ def run_bulk(action: BulkActionName, options: dict[str, Any]) -> None:
         if is_json_mode() and not yes and not dry_run:
             fail(t("bulk.json_confirm"), hint_type="user")
         cluster = load_topology_cluster()
+        if action == "set-profiles":
+            require_profile_backend(require_intent(cluster), requested=True)
         try:
             with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
                 review = client.preview_bulk(request)

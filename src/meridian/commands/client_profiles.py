@@ -5,10 +5,11 @@ from __future__ import annotations
 import typer
 from pydantic import ValidationError
 
-from meridian.commands._helpers import load_topology_cluster
+from meridian.commands._helpers import load_topology_cluster, require_intent
 from meridian.commands.client_bulk import preview_table, reconcile_receipt, result_paths
 from meridian.commands.client_handoff import resolve_client_mutation_name, resolve_client_name
 from meridian.commands.client_limits import print_client_usage
+from meridian.commands.profile_review import require_profile_backend
 from meridian.console import confirm, fail, is_json_mode, ok, warn
 from meridian.control.client import ControlClient, ControlServiceUncertain
 from meridian.control_access import access_panel
@@ -30,6 +31,7 @@ def run_set_profiles(name: str, profiles: list[str], *, dry_run: bool, yes: bool
     if is_json_mode() and not yes and not dry_run:
         fail(t("profiles.requires_yes"), hint_type="user")
     cluster = load_topology_cluster()
+    require_profile_backend(require_intent(cluster), requested=True)
     try:
         resolve_client_name(cluster, name, console_people=True)
         with access_panel(cluster) as panel:

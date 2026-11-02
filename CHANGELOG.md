@@ -57,6 +57,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Refuse single-person and bulk profile assignment on Remnawave before directory
+  or service access, including dry runs and default membership.
 - Accept usernames such as token, secret, and api_key in revision and apply
   checks while still rejecting secret fields and values in their settings.
 - Keep plan results when profile evidence is unavailable, allow control-service

@@ -497,6 +497,8 @@ Profiles are reviewed topology; membership belongs to the operator in the servic
 
 Access profiles require Meridian's control service. On a Remnawave fleet, run `meridian migrate` first; adding, importing, or applying profiles is refused before server or panel changes.
 
+Single-person `client set --profile` and bulk `client bulk set-profiles` also refuse Remnawave before looking up people or contacting a service, including `--dry-run` and assignment to `default`.
+
 Create or replace grants with `meridian profile add|set`; `profile list` shows grants and membership counts. References are `exit:ID`, `gateway:ID`, or the compiler's stable `inbound:...` and `endpoint:...` IDs. Unknown and retired references fail review. Gateway bridge inbounds cannot be assigned to people. A public endpoint grants its authentication inbound, so every other public connection sharing that inbound is granted too. `--empty` creates a profile with no connections.
 
 Use `client set person --profile limited --yes`, repeating `--profile` for every membership to keep. This replaces the membership list; choose `default` to restore full access. Profile edits have their own review, separate from account limits, notes, and language. The console's access-profile card shows granted connections and the profiles that permit them, preserves unsaved choices, and opens the same frozen review. **Set profiles** is also a bulk action; its preview shows gained and lost inbounds and rejects changed people or topology at commit.

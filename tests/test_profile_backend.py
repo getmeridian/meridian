@@ -110,3 +110,39 @@ def test_legacy_profile_commands_fail_with_migration_guidance_before_runtime_or_
         for runtime in (profiles, importer, apply, planner):
             runtime.assert_not_called()
         client.assert_not_called()
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+@pytest.mark.parametrize("command", ["single", "bulk"])
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_legacy_profile_assignment_refuses_before_directory_or_service_access(
+    tmp_home: Path, locale: str, command: str, dry_run: bool
+):
+    cluster = ClusterConfig(
+        panel=PanelConfig(url="https://198.51.100.10/console", api_token=ADMIN_TOKEN), topology_intent=legacy_intent()
+    )
+    argv = (
+        ["client", "set", "default", "--profile", "default"]
+        if command == "single"
+        else ["client", "bulk", "set-profiles", "--person", "default", "--profile", "default"]
+    )
+    with (
+        patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
+        patch(
+            "meridian.commands.client_profiles.resolve_client_name", side_effect=AssertionError("Directory I/O ran.")
+        ) as directory,
+        patch("meridian.commands.client_profiles.access_panel", side_effect=AssertionError("Panel I/O ran.")) as panel,
+        patch(
+            "meridian.commands.client_profiles.ControlClient", side_effect=AssertionError("Service I/O ran.")
+        ) as single,
+        patch("meridian.commands.client_bulk.ControlClient", side_effect=AssertionError("Service I/O ran.")) as bulk,
+    ):
+        reply = CliRunner().invoke(
+            app, ["--lang", locale, *argv, "--yes", "--json", *(["--dry-run"] if dry_run else [])]
+        )
+        assert reply.exit_code == 2, str(reply.exception)
+        result = json.loads(reply.stdout)
+        assert result["errors"][0]["category"] == "user"
+        assert result["errors"][0]["message"] == t("profiles.migrate_first")
+        for boundary in (directory, panel, single, bulk):
+            boundary.assert_not_called()

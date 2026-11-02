@@ -499,6 +499,8 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 访问配置需要 Meridian 控制服务。Remnawave 部署请先运行 `meridian migrate`；新增、导入或应用访问配置会在修改服务器或面板之前被拒绝。
 
+单人分配命令 `client set --profile` 和批量分配命令 `client bulk set-profiles` 也会在 Remnawave 上被拒绝，且拒绝发生在查询用户或联系服务之前。这包括 `--dry-run` 和分配 `default` 配置。
+
 使用 `meridian profile add|set` 创建或替换授权，`profile list` 显示授权及成员数量。支持 `exit:ID`、`gateway:ID`，以及编译器的稳定 `inbound:...` 和 `endpoint:...` 引用。未知或已移除的引用会在审核时被拒绝。网关与出口之间的内部桥接入站不能授权给用户。授权公开连接实际授权其认证入站，因此通向同一入站的其他公开连接也会被授权。`--empty` 可创建不允许任何连接的配置。
 
 使用 `client set person --profile limited --yes` 替换配置列表，为每个需要保留的配置重复 `--profile`。选择 `default` 可恢复完整访问。配置成员变更单独审核，与账户限额、备注及语言分开修改。控制台的访问配置卡显示已授权连接及授权原因，保留未保存的选择，并打开相同的固定预览。批量操作 **设置访问配置** 显示新增和失去的入站访问；提交时若用户或拓扑发生变化，整个操作会被拒绝。
