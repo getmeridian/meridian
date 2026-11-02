@@ -7268,6 +7268,13 @@
             "title": "Never",
             "type": "integer"
           },
+          "profile": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Profile",
+            "type": "object"
+          },
           "quota": {
             "default": 0,
             "title": "Quota",
@@ -7494,6 +7501,18 @@
           },
           "period_traffic": {
             "$ref": "#/components/schemas/PeriodTraffic"
+          },
+          "profiles": {
+            "items": {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Profiles",
+            "type": "array"
           },
           "quota_used_percent": {
             "anyOf": [
@@ -7769,6 +7788,13 @@
             ],
             "default": null,
             "title": "Order"
+          },
+          "profile": {
+            "default": "",
+            "maxLength": 48,
+            "pattern": "^$|^[a-z0-9][a-z0-9_-]*$",
+            "title": "Profile",
+            "type": "string"
           },
           "q": {
             "default": "",
@@ -16847,7 +16873,7 @@
     },
     "/api/people": {
       "get": {
-        "description": "Requires people.query and people.private capabilities. Compatible presets: people, including scopes that cover them. Case-folded username/display-name search; missing dates sort last. Cursors exclude later insertions and expire after 15 minutes.",
+        "description": "Requires people.query and people.private capabilities. Compatible presets: people, including scopes that cover them. Case-folded username/display-name search; missing dates sort last. profile matches a saved access membership, including default; profile facets count each person once per membership while applying the other filters. Cursors exclude later insertions and expire after 15 minutes.",
         "operationId": "query_people",
         "parameters": [
           {
@@ -16886,6 +16912,18 @@
               "default": "",
               "maxLength": 16,
               "title": "Tag",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "profile",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 48,
+              "pattern": "^$|^[a-z0-9][a-z0-9_-]*$",
+              "title": "Profile",
               "type": "string"
             }
           },

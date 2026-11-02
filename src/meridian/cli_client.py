@@ -22,7 +22,20 @@ from meridian.cli_options import (
     TrafficResetPeriod,
     Yes,
 )
-from meridian.cli_people import Attention, Expiring, Lifecycle, Never, Order, Quota, Reason, Search, Sort, Status, Tag
+from meridian.cli_people import (
+    Attention,
+    Expiring,
+    Lifecycle,
+    Never,
+    Order,
+    Profile,
+    Quota,
+    Reason,
+    Search,
+    Sort,
+    Status,
+    Tag,
+)
 
 client_app = typer.Typer(
     help="Manage who can connect: add, show, list, limit, reissue, enable, disable, remove", no_args_is_help=True
@@ -99,6 +112,7 @@ def client_list_cmd(
     q: Search = "",
     status: Status = "",
     tag: Tag = None,
+    match_profile: Profile = "",
     expiring: Expiring = None,
     quota: Quota = None,
     never: Never = False,

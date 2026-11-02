@@ -129,7 +129,7 @@ meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DA
 meridian client show NAME [--connections] [--json]
 meridian client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX] [--json]
 meridian client usage NAME [--days N] [--json]
-meridian client list [--attention] [--tag TAG|none] [--json]
+meridian client list [--profile PROFILE] [--attention] [--tag TAG|none] [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
@@ -199,6 +199,8 @@ Private metadata: `client set NAME --note TEXT --tag TAG` edits only the supplie
 
 `client list` shows the first 100 matches. `--limit 1–500` sets page size; `--cursor VALUE` continues the same query. JSON adds `total`, contextual `facets`, and optional `next_cursor`; summary counts describe the returned page. `client bulk ACTION` uses the same query, freezes a preview, shows a table, confirms, and commits atomically. `--dry-run` returns the preview only; JSON commit and undo require `--yes`. Exact `--person USERNAME` selection cannot be combined with filters. Read receipts with `client bulk receipt ID`; undo unchanged reversible fields with `client bulk undo ID`. A lost commit reply is resolved by reading the receipt.
 
+`client list --profile PROFILE` filters saved access membership, including `default`; bulk actions use `--match-profile PROFILE` so `set-profiles --profile` remains the membership to assign. JSON includes contextual `facets.profile` counts and each row's saved `profiles`. A multi-profile person is counted once per profile and once in the list. The empty facet key counts all matching people, independently of the active profile filter. Unknown valid profile IDs match nobody; invalid IDs are refused before service access.
+
 A lost commit or undo reply is checked by reading the receipt; undo is confirmed only when the receipt records that it was undone. The console keeps that updated receipt and reads it again when you reopen it. `client bulk undo ID --dry-run` checks that the receipt is reversible, has not been undone, and is still within its undo window without sending a write; the final undo also checks live people and inbound capacity.
 
 JSON facet counts stay integers for every valid tag, including tags such as `TOKEN` or `API_KEY`.
@@ -222,7 +224,7 @@ Undo writes the original choices, then enforces expiry and quota rules just like
 | `meridian client bulk undo ID` | Undo reversible fields within ten minutes |
 | `meridian client bulk receipt ID` | Read a durable receipt |
 
-Shared filters: `--search TEXT`, `--status STATUS`, `--tag TAG`, `--expiring-within DAYS`, `--quota-at-least PERCENT`, `--never-used`, `--attention`, `--attention-reason REASON`, `--lifecycle STATE`, `--sort name|usage|expiry|activity`, `--order asc|desc`. Use either `--attention` (any default reason) or `--attention-reason`. Lifecycle choices: `pending`, `renewing`, `fixed`, `unlimited`. Names sort by case-folded display name, then exact username. See [client management](/en/client-management/) for review and privacy rules.
+Shared filters: `--search TEXT`, `--status STATUS`, `--tag TAG`, `--match-profile PROFILE`, `--expiring-within DAYS`, `--quota-at-least PERCENT`, `--never-used`, `--attention`, `--attention-reason REASON`, `--lifecycle STATE`, `--sort name|usage|expiry|activity`, `--order asc|desc`. Use either `--attention` (any default reason) or `--attention-reason`. Lifecycle choices: `pending`, `renewing`, `fixed`, `unlimited`. Names sort by case-folded display name, then exact username. See [client management](/en/client-management/) for review and privacy rules.
 
 `meridian client bulk extend --months 1 --person sample-a --dry-run --json`
 

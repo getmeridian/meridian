@@ -952,5 +952,8 @@
   "response_rules.action_policy": "Выбрать политику маршрутизации",
   "response_rules.action_headers": "Изменить заголовки ответа для приложения",
   "preview.rule_custom": "Проверенное правило приложения",
-  "delivery.source_response_rule": "правило ответа для приложения"
+  "delivery.source_response_rule": "правило ответа для приложения",
+  "people.filter_profile": "Профиль доступа",
+  "people.any_profile": "Все профили",
+  "people.default_profile": "default — полный доступ"
 }

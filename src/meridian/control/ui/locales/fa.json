@@ -952,5 +952,8 @@
   "response_rules.action_policy": "انتخاب سیاست مسیریابی",
   "response_rules.action_headers": "تغییر سرآیندهای پاسخ برنامه",
   "preview.rule_custom": "قانون بازبینی‌شده برنامه",
-  "delivery.source_response_rule": "قانون پاسخ برنامه"
+  "delivery.source_response_rule": "قانون پاسخ برنامه",
+  "people.filter_profile": "پروفایل دسترسی",
+  "people.any_profile": "همهٔ پروفایل‌ها",
+  "people.default_profile": "default (دسترسی کامل)"
 }

@@ -24,6 +24,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
 - `meridian plan` before upgrading a fleet from an earlier beta no longer stops as
   inconclusive (exit 3) because access profiles look unavailable: a service that
   answers but predates profiles holds none.
+- Filter people by access profile, including `default`, with contextual membership
+  counts in the API, CLI, and People screen. Paging and bulk selection share the
+  filter; list JSON reports saved memberships without searching private notes (#95).
 
 ### Since 4.0.0b10
 

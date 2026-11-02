@@ -129,7 +129,7 @@ meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DA
 meridian client show NAME [--connections] [--json]
 meridian client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX] [--json]
 meridian client usage NAME [--days N] [--json]
-meridian client list [--attention] [--tag TAG|none] [--json]
+meridian client list [--profile PROFILE] [--attention] [--tag TAG|none] [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
@@ -199,6 +199,8 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 `client list` 返回前 100 个匹配人员。`--limit 1–500` 设置页面大小，`--cursor VALUE` 继续同一查询。JSON 新增 `total`、`facets` 与可选的 `next_cursor`，摘要针对返回页面。`client bulk ACTION` 使用相同查询，随后冻结预览、显示表格、确认并原子提交。`--dry-run` 仅预览，JSON 提交和撤销需要 `--yes`。精确 `--person USERNAME` 不能与筛选合用。使用 `client bulk receipt ID` 读回执，使用 `client bulk undo ID` 撤销。提交回复丢失时读取回执确认结果。
 
+`client list --profile PROFILE` 按已分配的访问配置筛选，包括 `default`。批量操作使用 `--match-profile PROFILE`，因此 `set-profiles --profile` 继续表示要分配的配置。JSON 包含考虑其他筛选的 `facets.profile` 计数和每行已保存的 `profiles`。属于多个配置的人员在每个配置中各计一次，在列表中只出现一次。空计数键表示不受当前配置筛选影响的所有匹配人数。格式有效但未知的配置 ID 没有匹配结果；格式无效的 ID 在访问服务前被拒绝。
+
 提交或撤销回复丢失时，会读取回执核实结果；只有回执记录已撤销时，才会报告撤销成功。控制台保留更新后的回执，并在重新打开时再次读取。`client bulk undo ID --dry-run` 不发送写入请求，只检查操作是否可撤销、尚未撤销且仍在撤销期限内；最终撤销还会检查人员当前状态和入站容量。
 
 JSON 筛选计数对所有有效标签均保持整数，包括 `TOKEN` 和 `API_KEY`。
@@ -222,7 +224,7 @@ JSON 筛选计数对所有有效标签均保持整数，包括 `TOKEN` 和 `API_
 | `meridian client bulk undo ID` | 十分钟内撤销可逆字段 |
 | `meridian client bulk receipt ID` | 读取持久回执 |
 
-共享筛选：`--search TEXT`、`--status STATUS`、`--tag TAG`、`--expiring-within DAYS`、`--quota-at-least PERCENT`、`--never-used`、`--attention`、`--attention-reason REASON`、`--lifecycle STATE`、`--sort name|usage|expiry|activity` 与 `--order asc|desc`。`--attention` 匹配任何原因，不能与 `--attention-reason` 同用。周期状态：`pending`、`renewing`、`fixed`、`unlimited`。先按忽略大小写的显示名称，再按完整用户名排序。规则见[客户端管理](/zh/client-management/)。
+共享筛选：`--search TEXT`、`--status STATUS`、`--tag TAG`、`--match-profile PROFILE`、`--expiring-within DAYS`、`--quota-at-least PERCENT`、`--never-used`、`--attention`、`--attention-reason REASON`、`--lifecycle STATE`、`--sort name|usage|expiry|activity` 与 `--order asc|desc`。`--attention` 匹配任何原因，不能与 `--attention-reason` 同用。周期状态：`pending`、`renewing`、`fixed`、`unlimited`。先按忽略大小写的显示名称，再按完整用户名排序。规则见[客户端管理](/zh/client-management/)。
 
 `meridian client bulk extend --months 1 --person sample-a --dry-run --json`
 

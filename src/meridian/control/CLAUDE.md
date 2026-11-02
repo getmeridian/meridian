@@ -48,6 +48,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 
 ## Pitfalls
 - **App blocks cover personal page files and legacy redirects** — use the shared decision before rendering or redirecting, or support/config routes reveal a valid token through a blocked app.
+- **Profile facet totals count people** — omit only the profile predicate, count each membership once, and compute the all-profiles count separately from overlapping memberships.
 - **Policy writes keep declaration fences** — save catalogs and declaration fingerprints in one settings transaction, so either refusal rolls back both.
 - **Profile writes validate every membership** — previews and settings refuse any non-default profile missing from the proposed map, including memberships whose live declaration has already disappeared.
 - **Receipt row guards stay explicit** — a derived boolean does not narrow an optional SQLite row for static checks.

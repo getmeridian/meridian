@@ -952,5 +952,8 @@
   "response_rules.action_policy": "选择交付策略",
   "response_rules.action_headers": "修改应用响应头",
   "preview.rule_custom": "已审阅的应用规则",
-  "delivery.source_response_rule": "应用响应规则"
+  "delivery.source_response_rule": "应用响应规则",
+  "people.filter_profile": "访问配置",
+  "people.any_profile": "所有配置",
+  "people.default_profile": "default（完整访问）"
 }

@@ -952,5 +952,8 @@
   "response_rules.action_policy": "Choose a delivery policy",
   "response_rules.action_headers": "Change app response headers",
   "preview.rule_custom": "Reviewed app rule",
-  "delivery.source_response_rule": "app response rule"
+  "delivery.source_response_rule": "app response rule",
+  "people.filter_profile": "Access profile",
+  "people.any_profile": "All profiles",
+  "people.default_profile": "default (full access)"
 }

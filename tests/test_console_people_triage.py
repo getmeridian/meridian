@@ -162,3 +162,23 @@ def test_a_non_default_sort_alone_opens_the_filter_card() -> None:
 def test_filter_edits_before_any_list_arrives_never_claim_there_are_no_people() -> None:
     result = run_console("people-triage", data={"people": people(), "failUsers": True, "change": {"q": "p"}})
     assert "No people yet" not in result["text"] and "Showing 0 of 0" not in result["text"]
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+@pytest.mark.parametrize(("profile", "expected"), [("limited", ["p-a", "p-c"]), ("default", ["p-b", "p-d"])])
+def test_profile_filter_keeps_fragment_counts_and_reload(locale: str, profile: str, expected: list[str]) -> None:
+    rows = people()
+    rows[0]["profiles"] = ["limited"]
+    rows[2]["profiles"] = ["limited", "other"]
+    result = run_console(
+        "people-triage-reload",
+        locale,
+        {"people": rows, "profiles": {"limited": [], "other": [], "unused": []}, "change": {"profile": profile}},
+    )
+    assert result.get("missing") is None
+    assert result["shown"] == result["afterReload"] == expected
+    assert parse_qs(result["hash"].split("?", 1)[1])["profile"] == [profile]
+    digits = str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")
+    counts = {option["value"]: option["text"].translate(digits) for option in result["selects"]["profile"]}
+    assert "(4)" in counts[""] and "(2)" in counts["default"] and "(0)" in counts["unused"]
+    assert result["stored"] == []

@@ -20,6 +20,8 @@ PEOPLE_ROUTES: tuple[ApiRoute, ...] = (
         query_model=PeopleQuery,
         description=(
             "Case-folded username/display-name search; missing dates sort last. "
+            "profile matches a saved access membership, including default; profile facets count each person once "
+            "per membership while applying the other filters. "
             "Cursors exclude later insertions and expire after 15 minutes."
         ),
     ),

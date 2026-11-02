@@ -17,6 +17,7 @@
 **Workload secrets** — `reconciler/workloads.py` allocates complete Reality key triples and persists them before remote mutation; `xray_workload.py` renders only reviewed protocols and egress.
 ## What's done well
 - **Response rules are reviewed settings** — fleet exports, service payloads, and apply observations carry one typed rule list; requests never become local fleet state.
+- **List memberships come from query rows** — the directory adapter must never reconstruct a named membership as default while keeping the person metadata view.
 - **Forward-compatible YAML** — unknown keys land inertly in `_extra` (never store load-bearing state there); pre-topology files are refused with rebuild guidance.
 - **Applied kinds are explicit** — `core/resources.APPLIED_KINDS` lists what plan/apply drives; a leftover panel binding fails closed outside migrate's cut-over.
 - **One owner per state** — the service owns users, `cluster.yml` owns topology, and the fence stops a stale or foreign copy from applying.

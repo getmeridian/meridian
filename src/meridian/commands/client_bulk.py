@@ -178,7 +178,7 @@ def run_bulk(action: BulkActionName, options: dict[str, Any]) -> None:
             persons = options.get("persons")
             if persons and any(
                 query.selection_data()[key]
-                for key in ("q", "status", "tag", "expires", "quota", "never", "attention", "lifecycle")
+                for key in ("q", "status", "tag", "profile", "expires", "quota", "never", "attention", "lifecycle")
             ):
                 fail(t("bulk.selection_conflict"), hint_type="user")
             request = BulkPreviewRequest(action=parsed, usernames=persons, query=None if persons else query)

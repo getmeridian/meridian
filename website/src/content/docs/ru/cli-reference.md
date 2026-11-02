@@ -129,7 +129,7 @@ meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DA
 meridian client show NAME [--connections] [--json]
 meridian client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX] [--json]
 meridian client usage NAME [--days N] [--json]
-meridian client list [--attention] [--tag TAG|none] [--json]
+meridian client list [--profile PROFILE] [--attention] [--tag TAG|none] [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
@@ -199,6 +199,8 @@ TCP-поток, начатый до отзыва ключа, UDP-сеанс Hyst
 
 `client list` показывает первые 100 найденных людей. `--limit 1–500` задаёт размер страницы, `--cursor VALUE` продолжает тот же запрос. В JSON добавлены `total`, счётчики `facets` и необязательный `next_cursor`; сводка относится к возвращённой странице. `client bulk ACTION` использует те же фильтры, фиксирует проверку, показывает таблицу, запрашивает подтверждение и применяет всё одной транзакцией. `--dry-run` возвращает только проверку; для применения и отмены в JSON нужен `--yes`. Выбор точных имён через `--person USERNAME` нельзя совмещать с фильтрами. Квитанцию читает `client bulk receipt ID`; отмену выполняет `client bulk undo ID`. Потерянный ответ на применение проверяется по квитанции.
 
+`client list --profile PROFILE` фильтрует по назначенному профилю доступа, включая `default`. В групповых операциях используйте `--match-profile PROFILE`: флаг `set-profiles --profile` по-прежнему задаёт назначаемый профиль. JSON содержит счётчики `facets.profile` с учётом остальных фильтров и сохранённые `profiles` каждой строки. Пользователь с несколькими профилями считается один раз в каждом профиле и один раз в списке. Пустой ключ счётчика показывает всех найденных пользователей без учёта выбранного профиля. Допустимое имя неизвестного профиля даёт пустую выборку; неверное имя отклоняется до обращения к сервису.
+
 Если ответ на применение или отмену потерян, результат проверяется по квитанции; отмена считается завершённой только при наличии соответствующей записи. Панель сохраняет обновлённую квитанцию и перечитывает её при открытии. `client bulk undo ID --dry-run` без записи в сервис проверяет, что операция обратима, ещё не отменена и срок отмены не истёк; сама отмена дополнительно проверяет текущие данные пользователей и лимит входящих подключений.
 
 В JSON счётчики фильтров остаются целыми числами для любых допустимых меток, в том числе `TOKEN` и `API_KEY`.
@@ -222,7 +224,7 @@ TCP-поток, начатый до отзыва ключа, UDP-сеанс Hyst
 | `meridian client bulk undo ID` | Отменить обратимые поля в течение десяти минут |
 | `meridian client bulk receipt ID` | Прочитать квитанцию |
 
-Общие фильтры: `--search TEXT`, `--status STATUS`, `--tag TAG`, `--expiring-within DAYS`, `--quota-at-least PERCENT`, `--never-used`, `--attention`, `--attention-reason REASON`, `--lifecycle STATE`, `--sort name|usage|expiry|activity`, `--order asc|desc`. Используйте либо `--attention` (любая причина), либо `--attention-reason`. Состояния срока: `pending`, `renewing`, `fixed`, `unlimited`. Сортировка по имени не учитывает регистр, затем используется точное имя пользователя. Правила проверки и приватности — в [управлении клиентами](/ru/client-management/).
+Общие фильтры: `--search TEXT`, `--status STATUS`, `--tag TAG`, `--match-profile PROFILE`, `--expiring-within DAYS`, `--quota-at-least PERCENT`, `--never-used`, `--attention`, `--attention-reason REASON`, `--lifecycle STATE`, `--sort name|usage|expiry|activity`, `--order asc|desc`. Используйте либо `--attention` (любая причина), либо `--attention-reason`. Состояния срока: `pending`, `renewing`, `fixed`, `unlimited`. Сортировка по имени не учитывает регистр, затем используется точное имя пользователя. Правила проверки и приватности — в [управлении клиентами](/ru/client-management/).
 
 `meridian client bulk extend --months 1 --person sample-a --dry-run --json`
 

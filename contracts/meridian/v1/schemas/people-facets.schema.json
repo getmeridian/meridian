@@ -25,6 +25,13 @@
       "title": "Never",
       "type": "integer"
     },
+    "profile": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Profile",
+      "type": "object"
+    },
     "quota": {
       "default": 0,
       "title": "Quota",

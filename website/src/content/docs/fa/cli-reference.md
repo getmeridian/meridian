@@ -129,7 +129,7 @@ meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DA
 meridian client show NAME [--connections] [--json]
 meridian client preview NAME --user-agent UA [--accept TYPE] [--suffix SUFFIX] [--json]
 meridian client usage NAME [--days N] [--json]
-meridian client list [--attention] [--tag TAG|none] [--json]
+meridian client list [--profile PROFILE] [--attention] [--tag TAG|none] [--json]
 meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N\|default] [--note TEXT] [--tag TAG|none] [--language en|ru|fa|zh|default] [--json]
 meridian client reset-traffic NAME [--json]
 meridian client extend NAME --days N [--json]
@@ -199,6 +199,8 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 
 `client list` نخستین ۱۰۰ فرد مطابق را نشان می‌دهد. `--limit 1–500` اندازه صفحه و `--cursor VALUE` ادامه همان پرس‌وجو است. JSON شامل `total`، شمارش‌های `facets` و `next_cursor` اختیاری است؛ خلاصه برای صفحه برگشتی است. `client bulk ACTION` همان پرس‌وجو را با پیش‌نمایش ثابت، جدول، تأیید و ثبت اتمی اجرا می‌کند. `--dry-run` تنها پیش‌نمایش است؛ ثبت و برگشت در JSON به `--yes` نیاز دارند. `--person USERNAME` با فیلتر ترکیب نمی‌شود. رسید را با `client bulk receipt ID` بخوانید و با `client bulk undo ID` برگردانید. گم شدن پاسخ ثبت با خواندن رسید پیگیری می‌شود.
 
+`client list --profile PROFILE` بر اساس پروفایل دسترسی اختصاص‌یافته، از جمله `default`، فیلتر می‌کند. عملیات گروهی از `--match-profile PROFILE` استفاده می‌کنند تا `set-profiles --profile` همچنان پروفایل موردنظر برای اختصاص را مشخص کند. JSON شامل شمارش‌های `facets.profile` با لحاظ سایر فیلترها و `profiles` ذخیره‌شدهٔ هر ردیف است. فرد دارای چند پروفایل در هر پروفایل یک بار و در فهرست یک بار شمرده می‌شود. کلید خالی شمارش همهٔ افراد مطابق را بدون فیلتر پروفایل نشان می‌دهد. نام معتبر ولی ناشناخته نتیجه‌ای ندارد؛ نام نامعتبر پیش از تماس با سرویس رد می‌شود.
+
 اگر پاسخ ثبت یا برگشت گم شود، نتیجه با خواندن رسید بررسی می‌شود؛ برگشت فقط وقتی تأیید می‌شود که رسید انجام آن را ثبت کرده باشد. پنل رسید به‌روز را نگه می‌دارد و هنگام باز کردن دوباره، آن را از سرویس می‌خواند. `client bulk undo ID --dry-run` بدون ارسال تغییر، بررسی می‌کند که عملیات قابل برگشت است، قبلاً برگشت داده نشده و مهلتش پایان نیافته است؛ اجرای نهایی، وضعیت فعلی افراد و ظرفیت ورودی را نیز بررسی می‌کند.
 
 شمارش‌های فیلتر در JSON برای همهٔ برچسب‌های معتبر، از جمله `TOKEN` و `API_KEY`، عدد صحیح می‌مانند.
@@ -222,7 +224,7 @@ meridian client remove NAME [--cut-off] [--yes] [--json]
 | `meridian client bulk undo ID` | برگشت فیلدها تا ده دقیقه |
 | `meridian client bulk receipt ID` | خواندن رسید ماندگار |
 
-فیلترهای مشترک: `--search TEXT`، `--status STATUS`، `--tag TAG`، `--expiring-within DAYS`، `--quota-at-least PERCENT`، `--never-used`، `--attention`، `--attention-reason REASON`، `--lifecycle STATE`، `--sort name|usage|expiry|activity` و `--order asc|desc`. از `--attention` (هر دلیل) یا `--attention-reason` استفاده کنید. حالت‌ها: `pending`، `renewing`، `fixed`، `unlimited`. نام نمایشی بدون تفاوت حروف بزرگ و کوچک و سپس نام کاربری دقیق ترتیب را تعیین می‌کند. قواعد در [مدیریت کلاینت‌ها](/fa/client-management/) آمده است.
+فیلترهای مشترک: `--search TEXT`، `--status STATUS`، `--tag TAG`، `--match-profile PROFILE`، `--expiring-within DAYS`، `--quota-at-least PERCENT`، `--never-used`، `--attention`، `--attention-reason REASON`، `--lifecycle STATE`، `--sort name|usage|expiry|activity` و `--order asc|desc`. از `--attention` (هر دلیل) یا `--attention-reason` استفاده کنید. حالت‌ها: `pending`، `renewing`، `fixed`، `unlimited`. نام نمایشی بدون تفاوت حروف بزرگ و کوچک و سپس نام کاربری دقیق ترتیب را تعیین می‌کند. قواعد در [مدیریت کلاینت‌ها](/fa/client-management/) آمده است.
 
 `meridian client bulk extend --months 1 --person sample-a --dry-run --json`
 
