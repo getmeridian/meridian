@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from meridian.control.models import TokenCreate
+from meridian.control.token_capabilities import permission, requested_capabilities
 from scripts.build_showcase import export_showcase, validate_recordings
 from tests.support.console_dom import needs_console_dom, run_console
 
@@ -197,6 +199,84 @@ def test_demo_repeated_key_changes_keep_receipts_for_the_newly_revoked_generatio
             }
         )
     assert result["card"]
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_demo_console_token_review_and_issuance_match_current_models(demo: Path, locale: str) -> None:
+    result = run_console("showcase-token-console", locale, {"directory": str(demo)})
+    validate_recordings(result["responses"])
+    assert result["preview"]["capabilities"] == result["issued"]["capabilities"] == ["people.read"]
+    assert result["preview"]["expires_at"] == result["issued"]["expires_at"]
+    assert all(set(permission) == {"capability", "labels"} for permission in result["preview"]["permissions"])
+    assert "token" not in result["metadata"]
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
+def test_demo_token_preview_and_issue_refuse_every_non_delegable_owner_grant(demo: Path) -> None:
+    result = run_console("showcase-token-refusals", data={"directory": str(demo)})
+    assert len(result["refusals"]) >= 14
+    assert all(reply["code"] == "insufficient_scope" and reply["status"] == 403 for reply in result["refusals"])
+    assert result["keptTokens"] and result["keptEvents"]
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"scope": "read"},
+        {"scope": "propose", "expires_in_days": 7},
+        {"scope": "approve", "expires_in_days": 30},
+        {"scope": "people", "never_expires": True},
+        {"capabilities": ["people.edit", "api.read"], "expires_in_days": None, "never_expires": True},
+        {"capabilities": ["people.edit", "api.read"], "expires_at": "2098-01-01T00:00:00Z"},
+    ],
+)
+def test_demo_valid_owner_token_requests_keep_service_grants_and_expiry(demo: Path, body: dict) -> None:
+    body = {"name": "Demo reader", **body}
+    request = TokenCreate.model_validate(body)
+    result = run_console("showcase-token-api", data={"directory": str(demo), "body": body})
+    grants = sorted(requested_capabilities(request))
+    assert result["preview"]["capabilities"] == result["issued"]["capabilities"] == grants
+    assert result["preview"]["permissions"] == [permission(grant).to_data() for grant in grants]
+    expiry = request.expires_at
+    if request.expires_in_days is not None:
+        expiry = (
+            datetime.fromisoformat(result["issued"]["created_at"]) + timedelta(days=request.expires_in_days)
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+    assert result["preview"]["expires_at"] == result["issued"]["expires_at"] == expiry
+    validate_recordings(result["responses"])
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
+def test_demo_token_preview_and_issue_share_request_validation(demo: Path) -> None:
+    base = {"name": "Demo reader", "scope": "read"}
+    bodies = [
+        {**base, "name": ""},
+        {**base, "name": "Demo\nreader"},
+        {**base, "scope": "unknown"},
+        {"name": "Demo reader"},
+        {**base, "capabilities": ["api.read"]},
+        {"name": "Demo reader", "capabilities": []},
+        {"name": "Demo reader", "capabilities": ["unknown"]},
+        {"name": "Demo reader", "capabilities": ["api.read", "api.read"]},
+        {**base, "expires_in_days": 0},
+        {**base, "expires_in_days": "7"},
+        {**base, "expires_in_days": True},
+        {**base, "expires_in_days": 3651},
+        {**base, "expires_in_days": None},
+        {**base, "never_expires": "true"},
+        {**base, "never_expires": True, "expires_in_days": 7},
+        {**base, "never_expires": True, "expires_at": "2098-01-01T00:00:00Z"},
+        {**base, "expires_at": "2098-01-01T00:00:00Z", "expires_in_days": 7},
+        {**base, "expires_at": "2020-01-01T00:00:00Z"},
+        {**base, "expires_at": "2098-02-30T00:00:00Z"},
+        {**base, "expires_at": "2098-01-01T00:00:00+00:00"},
+        {**base, "extra": True},
+    ]
+    result = run_console("showcase-token-refusals", data={"directory": str(demo), "bodies": bodies})
+    assert all(reply["code"] == "invalid_request" and reply["status"] == 400 for reply in result["refusals"])
+    assert result["keptTokens"] and result["keptEvents"]
     assert result["outside"] == result["nativeApi"] == result["errors"] == []
 
 

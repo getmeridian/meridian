@@ -79,6 +79,8 @@ The console demo uses invented people, access profiles, and client routing. Edit
 
 The demo keeps disabled and over-limit share placeholders and their revocation receipts. Repeated key rotation or link reissue keeps receipts for revoked keys and clears those for a restored key.
 
+Token reviews and issuance use the owner's delegation limits and the service's request bounds. Administration and other permissions that require the CLI are refused before any demo token is created.
+
 External app, documentation, and support links open only when you follow them. They do not make the page fetch those sites in the background.
 
 ## Download verification

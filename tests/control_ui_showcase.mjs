@@ -14,7 +14,7 @@ const html = fs.readFileSync(path.join(directory, 'console/index.html'), 'utf8')
 const dom = new JSDOM(html, { url: `https://198.51.100.1/demo/console/?lang=${locale}`, runScripts: 'outside-only', pretendToBeVisual: true });
 const w = dom.window;
 let demoNow;
-if (mode === 'showcase-queries' || mode.startsWith('showcase-schedule-') || mode.startsWith('showcase-undo-') || mode.startsWith('showcase-share-')) {
+if (mode === 'showcase-queries' || mode.startsWith('showcase-schedule-') || mode.startsWith('showcase-undo-') || mode.startsWith('showcase-share-') || mode.startsWith('showcase-token-')) {
   const generated = Date.parse(JSON.parse(fs.readFileSync(path.join(directory, 'console/demo-data.json'), 'utf8')).generated_at);
   demoNow = generated;
   w.Date = class extends Date {
@@ -302,6 +302,41 @@ if (mode === 'showcase-navigation') {
   await M.go('people', data.person);
   await until(() => w.document.querySelector('#view h1')?.textContent === data.person, 'rotated person');
   report.card = !!w.document.querySelector('.flow-block-status');
+} else if (mode === 'showcase-token-console') {
+  await M.go('tokens');
+  await until(() => [...w.document.querySelectorAll('#view button')].some(button => button.textContent === M.t('tokens.create')), 'tokens');
+  [...w.document.querySelectorAll('#view button')].find(button => button.textContent === M.t('tokens.create')).click();
+  await until(() => w.document.querySelector('dialog form'), 'token form');
+  const form = w.document.querySelector('dialog form');
+  const name = form.querySelector('input[type=text]');
+  name.value = 'Demo reader'; name.dispatchEvent(new w.Event('input', { bubbles: true }));
+  form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await until(() => form.querySelector('[type=submit]').textContent === M.t('tokens.create'), 'token review');
+  report.preview = report.responses['POST api/tokens/preview'];
+  form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await until(() => report.responses['POST api/tokens'], 'token issuance');
+  report.issued = report.responses['POST api/tokens'];
+  report.metadata = (await M.api('GET', 'api/tokens')).tokens.find(token => token.id === report.issued.id);
+} else if (mode === 'showcase-token-api') {
+  report.preview = await M.api('POST', 'api/tokens/preview', data.body);
+  report.issued = await M.api('POST', 'api/tokens', data.body);
+} else if (mode === 'showcase-token-refusals') {
+  const catalog = await M.api('GET', 'api/token-capabilities');
+  const bodies = data.bodies || [
+    { name: 'Demo admin', scope: 'admin', expires_in_days: 7 },
+    ...catalog.capabilities.filter(row => !row.console_delegable).map(row => ({ name: 'Demo grant', capabilities: [row.capability], expires_in_days: 7 })),
+  ];
+  const tokens = JSON.stringify(await M.api('GET', 'api/tokens'));
+  const events = JSON.stringify(await M.api('GET', 'api/events?after=0&limit=2000'));
+  report.refusals = [];
+  for (const body of bodies) {
+    for (const route of ['api/tokens/preview', 'api/tokens']) {
+      try { await M.api('POST', route, body); report.refusals.push({ route, code: null }); }
+      catch (error) { report.refusals.push({ route, code: error.code, status: error.status }); }
+    }
+  }
+  report.keptTokens = JSON.stringify(await M.api('GET', 'api/tokens')) === tokens;
+  report.keptEvents = JSON.stringify(await M.api('GET', 'api/events?after=0&limit=2000')) === events;
 } else if (mode === 'showcase-unavailable') {
   report.refusals = [];
   report.missing = M.t('error.not_found');

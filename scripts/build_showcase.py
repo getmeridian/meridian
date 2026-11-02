@@ -219,7 +219,7 @@ def write_recordings(directory: Path, client: httpx.Client, service: ControlServ
     console = directory / "console"
     console.mkdir(exist_ok=True)
     shutil.copytree(UI_DIR, console / "ui", dirs_exist_ok=True, ignore=shutil.ignore_patterns("CLAUDE.md"))
-    for name in ("demo.js", "demo-people.js", "demo-bulk.js", "demo-delivery.js", "demo.css"):
+    for name in ("demo.js", "demo-people.js", "demo-bulk.js", "demo-delivery.js", "demo-tokens.js", "demo.css"):
         shutil.copy2(ROOT / "website/demo" / name, console / name)
     shell = (UI_DIR / "index.html").read_text()
     shell = shell.replace(
@@ -229,6 +229,7 @@ def write_recordings(directory: Path, client: httpx.Client, service: ControlServ
         '  <script src="demo-people.js"></script>\n'
         '  <script src="demo-bulk.js"></script>\n'
         '  <script src="demo-delivery.js"></script>\n'
+        '  <script src="demo-tokens.js"></script>\n'
         '  <script src="ui/boot.js">',
     )
     (console / "index.html").write_text(shell)
@@ -242,6 +243,7 @@ def write_recordings(directory: Path, client: httpx.Client, service: ControlServ
                 "rotations": rotations,
                 "key_rotations": key_rotations,
                 "active_shares": active_shares,
+                "token_create_schema": TokenCreate.model_json_schema(),
                 **templates,
             },
             ensure_ascii=False,

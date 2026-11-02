@@ -34,7 +34,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   reviewed bulk changes from current service recordings. Person edits catch up
   UTC resets and first-use expiry before reviews; bulk undo restores the reviewed
   enforced state and leaves unchanged people alone. Inactive shares and repeated
-  key changes retain revocation receipts. Unsupported security
+  key changes retain revocation receipts; token reviews and issuance enforce
+  owner delegation and request validation. Unsupported security
   and server actions display a translated demo notice (#95).
 - `meridian plan` before upgrading a fleet from an earlier beta no longer stops as
   inconclusive (exit 3) because access profiles look unavailable: a service that
