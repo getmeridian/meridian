@@ -116,6 +116,15 @@ if (mode === 'showcase-navigation') {
   report.events = (await M.api('GET', 'api/events?after=0&limit=2000')).events.map(event => event.kind);
   await M.api('DELETE', 'api/users/DemoGuest', { cut_off: false });
   report.removed = !(await M.api('GET', 'api/users')).users.some(user => user.username === 'DemoGuest');
+} else if (mode === 'showcase-language') {
+  const state = w.history.state;
+  const hash = w.location.hash;
+  w.document.documentElement.lang = 'ru';
+  await until(() => w.location.search.includes('lang=ru'), 'language in the address');
+  report.search = w.location.search;
+  report.hash = w.location.hash === hash;
+  report.state = JSON.stringify(w.history.state) === JSON.stringify(state);
+  report.banner = w.document.querySelector('#demo-banner a').getAttribute('href');
 } else if (mode === 'showcase-reset') {
   report.note = (await M.api('GET', 'api/users/Luma')).note;
   report.language = (await M.api('GET', 'api/language')).language;

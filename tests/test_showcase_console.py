@@ -51,3 +51,12 @@ def test_demo_mutations_preserve_current_contracts_and_reset_with_a_new_document
     reset = run_console("showcase-reset", data={"directory": str(demo)})
     assert reset["note"] != result["edited"]
     assert reset["language"] == "auto" and reset["devices"] == 2
+
+
+def test_a_language_switch_moves_into_the_demo_address_so_reloads_and_shared_links_keep_it(demo: Path) -> None:
+    """Demo storage lives in memory, so `?lang=` is the only thing a reload or a shared link carries."""
+    result = run_console("showcase-language", "en", {"directory": str(demo)})
+    assert result["search"] == "?lang=ru"
+    assert result["hash"] and result["state"]
+    assert result["banner"] == "/demo/?lang=ru"
+    assert result["errors"] == []

@@ -28,6 +28,7 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 - **The landing video is a file, not an embed** — keep `preload="none"`, and never embed a player from another origin.
 - **The demo shim mirrors service shapes exactly** — byte counts as decimal strings, statuses upper case; other shapes made the page reject its own account panel.
 - **A demo link never reaches a real app** — app-import links show a notice, or a visitor's VPN app would fetch the demo's URL.
+- **The demo address carries the language** — demo storage is memory, so a language switch rewrites `?lang=` with `replaceState` (keeping history state and fragment); a reload or shared link otherwise fell back to the first language.
 - **Demo dates shift by whole months and keep the `2099-12-31` sentinel** — pages test the sentinel literally, and periods keep their day of the month.
 - **Screenshots pin UTC and `en-US`** — the browser's own zone once leaked into a screenshot.
 - **Keep `sharp` an explicit dependency** for Astro image optimization.

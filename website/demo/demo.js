@@ -493,10 +493,18 @@
     actions.appendChild(link);
     inner.append(text, actions); aside.appendChild(inner);
     document.body.insertBefore(aside, document.body.firstChild);
+    var first = document.documentElement.lang;
     function translate() {
+      var lang = document.documentElement.lang;
       text.textContent = copy().banner;
       link.textContent = inConsole ? copy().page : copy().console;
-      link.href = (inConsole ? demoRoot : consoleRoot) + "?lang=" + document.documentElement.lang;
+      link.href = (inConsole ? demoRoot : consoleRoot) + "?lang=" + lang;
+      // Demo storage is memory, so the address is what a reload or a shared link keeps.
+      var address = new URL(location.href);
+      if (languages.indexOf(lang) >= 0 && (address.searchParams.has("lang") || lang !== first) && address.searchParams.get("lang") !== lang) {
+        address.searchParams.set("lang", lang);
+        history.replaceState(history.state, "", address.href);
+      }
     }
     translate();
     new MutationObserver(translate).observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
