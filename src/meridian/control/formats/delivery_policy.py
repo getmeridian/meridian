@@ -64,7 +64,6 @@ def apply_xray_policy(
         routing["rules"].insert(
             0, {"type": "field", "inboundTag": ["MERIDIAN_DNS"], "ip": ["geoip:private"], "outboundTag": "DIRECT"}
         )
-        routing["domainStrategy"] = "IPOnDemand"
         for outbound in document["outbounds"]:
             if outbound["protocol"] == "freedom":
                 outbound["settings"] = {"domainStrategy": "UseIP"}

@@ -14,12 +14,44 @@ from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.console import set_json_mode
 from meridian.control.models import ServiceSettings, TokenCreate
 from meridian.control.tokens import ROOT
+from meridian.core.delivery_explain import DeliveryExplainRequest, explain_delivery_policy
+from meridian.core.delivery_geodata import GeoData, GeoDomain
+from meridian.core.delivery_policies import DeliveryPolicySettings, resolve_delivery_policy
 from meridian.core.subscription_preview import SubscriptionPreviewRequest
 from tests.support.control_service import ADMIN_TOKEN
 from tests.support.token_service import serve_tokens, token_request
 from tests.support.topology import single_exit_intent
 from tests.test_control_subscription_corpus import FLEETS
 from tests.test_delivery_policies import delivery_data
+
+
+@pytest.mark.parametrize("with_dns", [False, True])
+@pytest.mark.parametrize(
+    "destination, protocol, status, action, rule",
+    [
+        ("router.lan:443", "other", "matched", "direct", 1),
+        ("chat.example.test:443", "other", "matched", "block", 2),
+        ("video.example.org:443", "other", "matched", "direct", 4),
+        ("198.51.100.10:443", "other", "matched", "direct", 5),
+        ("peer.example.org:443", "other", "default", "proxy", None),
+        ("peer.example.org:6881", "bittorrent", "matched", "direct", 9),
+    ],
+)
+def test_xray_explains_the_name_pass_and_catchall_without_resolving_ips(
+    with_dns: bool, destination: str, protocol: str, status: str, action: str, rule: int | None
+) -> None:
+    data = delivery_data()
+    if not with_dns:
+        data["delivery_policies"][0]["dns"] = None
+    result = explain_delivery_policy(
+        resolve_delivery_policy(DeliveryPolicySettings.model_validate(data)),
+        DeliveryExplainRequest.model_validate({"destination": destination, "protocol": protocol}),
+        available_exits={"west"},
+        geodata=GeoData(sites={"private": (GeoDomain(2, "lan"),)}, ips={"private": ((), False)}),
+    )
+    assert result.status == status
+    assert result.action is not None and result.action.kind == action
+    assert result.rule == rule
 
 
 def test_subscription_preview_shows_the_effective_policy_and_all_format_omissions(tmp_path: Path) -> None:

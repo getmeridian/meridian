@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 
 from pydantic import Field, model_validator
 
-from meridian.core.delivery_capabilities import DeliveryPolicyOmission, represent_policy_dns, represent_policy_routes
+from meridian.core.delivery_capabilities import DeliveryPolicyOmission, represent_policy_routes
 from meridian.core.delivery_geodata import GeoData, IpAddress
 from meridian.core.delivery_matchers import DeliveryNetwork, domain_value
 from meridian.core.delivery_policies import DeliveryAction, ResolvedDeliveryPolicy
@@ -136,14 +136,10 @@ def explain_delivery_policy(
             omitted=omitted,
             geodata_available=geodata is not None,
         )
+    # Xray's IPIfNonMatch scans names first. The generated TCP/UDP catch-all
+    # always matches that pass, so it never reaches a second pass with DNS IPs.
     for route in routes:
-        matched, missing = route_matches(
-            route,
-            destination,
-            request.format,
-            geodata,
-            resolve_ips=request.format == "xray-json" and bool(represent_policy_dns(resolved, request.format)[0]),
-        )
+        matched, missing = route_matches(route, destination, request.format, geodata)
         if matched is None:
             return DeliveryExplanation(
                 destination=destination,
@@ -186,8 +182,6 @@ def route_matches(
     destination: DeliveryDestination,
     document: DocumentFormat,
     geodata: GeoData | None,
-    *,
-    resolve_ips: bool = False,
 ) -> tuple[bool | None, ExplanationReason | None]:
     if route.network and destination.network not in route.network.split(","):
         return False, None
@@ -217,9 +211,7 @@ def route_matches(
             missing = "geodata_unavailable"
     for matcher in route.ips:
         if address is None:
-            matches.append(None if resolve_ips else False)
-            if resolve_ips:
-                missing = "ip_required"
+            matches.append(False)
         elif matcher == "geoip:private" and document == "singbox":
             matches.append(singbox_private(address))
         elif matcher.startswith("geoip:"):

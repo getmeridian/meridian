@@ -106,6 +106,7 @@ def test_every_structured_format_compiles_the_same_ordered_policy(document: str)
             assert any(r.get("domain") == ["full:chat.example.test"] for r in rules)
             assert any(r.get("domain") == ["keyword:video"] for r in rules)
             assert config["dns"]["servers"] == ["https://198.51.100.53/dns-query"]
+            assert config["routing"]["domainStrategy"] == "IPIfNonMatch"
     elif document in ("mihomo", "stash"):
         config = yaml.safe_load(response.body)
         assert config["rules"].index("DOMAIN-SUFFIX,example.test,REJECT") < config["rules"].index(
