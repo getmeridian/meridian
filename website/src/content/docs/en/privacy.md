@@ -7,6 +7,12 @@ Meridian starts with **device limits off** and **usage history off**. You opt in
 
 The control service already holds people's accounts and connection credentials, lifetime traffic totals, and last seen. Someone who takes it can read that state. These settings decide which device details and daily records are added to it.
 
+## Server capacity
+
+Node agents report CPU count and load, total and available memory, host network counters and rates, and Xray process uptime and resident memory. These are server aggregates, independent of device limits and personal usage history. No client addresses, device details, interface identifiers, or per-person connections are collected. The pinned core cannot supply safe aggregate connection counts, so those stay unavailable.
+
+Host network traffic includes protocol overhead and other services; it differs from traffic counted for people. Counters start at zero in each counter epoch and restart after agent restarts, interface changes, resets, wraparound, or the exact-integer ceiling. The first sample has no rate. Failed collection is unavailable, older agents are “not reported,” and a measured zero remains zero.
+
 ## Device limits
 
 | Level | What Meridian keeps | What you see |

@@ -15,6 +15,10 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b9
 
 #### Added
+- Negotiated node capacity reports with CPU count and load, total/available memory,
+  host network counters and rates, and Xray process uptime/memory. Missing evidence
+  stays unavailable; counter epochs handle interface changes, resets, and wraparound.
+  No client addresses or per-person connection data are collected (#55).
 - Server-side people queries with contextual counts, row versions, and stable
   cursor pages without notes or credentials.
 - Bulk previews freeze targets and versions, commit atomically, retain durable

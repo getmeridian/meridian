@@ -591,6 +591,8 @@ class _Handler(BaseHTTPRequestHandler):
         report = ObservedStateReport.model_validate_json(body)
         if report.user_flow_blocking is not None and "user_flow_blocking" not in session.capabilities:
             raise agent_error("invalid_request", "The user flow blocking capability was not negotiated.")
+        if report.capacity is not None and "capacity_telemetry" not in session.capabilities:
+            raise agent_error("invalid_request", "The capacity telemetry capability was not negotiated.")
         return service.report(session.node_id, report, raw)
 
     def agent_stats(self, _match: re.Match[str]) -> Any:

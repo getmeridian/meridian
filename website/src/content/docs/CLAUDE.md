@@ -1,6 +1,7 @@
 # content/docs — Markdown documentation source
 
 ## Design decisions
+**Node capacity** — privacy guides distinguish server aggregates from counted personal traffic, nullable collection, epoch resets, and the pinned core's unsupported connection counts in all four locales.
 **Bulk revocation** — client guides describe per-person/node receipts, unchanged credentials, surviving transfers, and post-deletion confirmation in every locale.
 **Reviewed bulk people** — client and CLI guides describe server paging, shared filters, frozen targets, atomic commit, receipts, undo, declared deletion commands, and privacy in all four locales.
 **Receipt evidence** — client guides describe the same-epoch minimum revision, service receipt freshness, unchanged hello/unrelated-revision evidence, and transition-only events in every locale.

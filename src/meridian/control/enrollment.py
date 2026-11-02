@@ -76,6 +76,7 @@ SERVICE_CAPABILITIES: tuple[Capability, ...] = (
     "user_flow_blocking",
     "binary_pins",
     "traffic_stats",
+    "capacity_telemetry",
     "blob_fetch",
     *COMMAND_CAPABILITIES,
 )

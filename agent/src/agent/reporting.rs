@@ -80,12 +80,25 @@ impl Agent<'_> {
             ),
             versions: report::versions(&self.opts.root, &self.resources, &self.observations),
             observed_at: now_rfc3339(),
+            capacity: self
+                .session
+                .as_ref()
+                .filter(|session| session.uses("capacity_telemetry"))
+                .and_then(|_| self.capacity.latest.clone()),
             user_flow_blocking,
         }
     }
 
     pub fn send_report(&mut self) -> Result<(), HttpError> {
         self.connect()?;
+        if self
+            .session
+            .as_ref()
+            .is_some_and(|session| session.uses("capacity_telemetry"))
+        {
+            self.capacity
+                .collect(&self.opts.root, self.exec, &self.resources);
+        }
         let report = self.build_report();
         if let Some(guard) = &report.user_flow_blocking {
             self.flow_error = guard.error.clone();
@@ -94,6 +107,9 @@ impl Agent<'_> {
             let mut report = report.clone();
             if !session.uses("user_flow_blocking") {
                 report.user_flow_blocking = None;
+            }
+            if !session.uses("capacity_telemetry") {
+                report.capacity = None;
             }
             client.call("report", &report)
         })?;

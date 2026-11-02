@@ -1,5 +1,7 @@
 //! enroll → hello → poll → verify → apply → report → stats against an in-process fake service.
 
+#[path = "roundtrip/capacity.rs"]
+mod capacity;
 #[path = "roundtrip/commands.rs"]
 mod commands;
 mod common;

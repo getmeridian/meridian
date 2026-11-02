@@ -105,6 +105,7 @@ pub struct Agent<'a> {
     observations: Vec<ResourceObservation>,
     flow_error: Option<ResourceError>,
     command_state: CommandState,
+    capacity: crate::telemetry::CapacityCollector,
 }
 
 fn typed<T: DeserializeOwned>(body: Value, expected: &str) -> Result<T, HttpError> {
@@ -177,6 +178,7 @@ impl<'a> Agent<'a> {
             observations: Vec::new(),
             flow_error: None,
             command_state,
+            capacity: crate::telemetry::CapacityCollector::new()?,
         };
         if let Some(identity) = identity {
             agent.adopt(identity);
