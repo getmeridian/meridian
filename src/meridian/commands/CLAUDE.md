@@ -28,6 +28,7 @@
 - `client remove|reissue --cut-off` discloses every affected node and other people's reconnects before confirming, and keeps typed per-node outcomes and new links even on failure.
 
 ## Pitfalls
+- **Fleet JSON keeps reviewed delivery verbatim** — reveal every nested delivery path and each delivery diff's before/after strings, or URL masking corrupts exports and hides the applied change.
 - **Restore imports keep the destination file guard** — bind the snapshot-derived model to the current context's loaded timestamp before saving; its temporary file's timestamp is not destination evidence.
 - **Empty restores save derived fleet state** — persist snapshot profile history and normalize carried checkpoints before review; declining the remote restore must not leave raw, unfinished state on disk.
 - **Restore profile checks precede target access** — validate the snapshot before resolving or registering its target, and never give changed live declarations an automatic review after installation.
