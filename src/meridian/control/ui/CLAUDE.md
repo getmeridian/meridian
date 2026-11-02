@@ -4,6 +4,8 @@
 - **Custom expiry selects a fixed draft** — Extend focuses Date for its custom choice; ordinary Edit keeps the person's saved activation mode.
 - **Person tabs keep one screen** — fragments select one labelled panel; only its contents scroll below the summary, and tab changes use the shared navigation guard.
 - **Person rows own separate drafts** — create editors on Edit, preview date and traffic choices in the service, PATCH only that row's edited fields, and close only the saved editor.
+- **People selection follows the view** — Detailed shows checkboxes; Simple's Select toggle reveals them, and mode changes preserve an existing selection. The action bar appears only with selected people; the last receipt stays in the list header.
+- **People filters have individual chips** — native panels share the fragment query; removing a chip clears selection and returns focus to its control, while passive reads retain panels and rows.
 - **Screen metadata is shared** — `M.consoleScreens` owns rendering, navigation, and Detailed-only route checks in one registry.
 - **Display mode is browser-local** — `M.mode()` reads Simple or Detailed; `M.chooseMode()` emits `meridian:mode` after an accepted change. Shared routes and drafts stay mounted, while leaving a Detailed-only route goes to Overview through the navigation guard.
 - **Overview composes owner reads** — bounded people queries, fleet health, opt-in UTC daily traffic, revisions, and recorded owner events provide its figures; unavailable history stays unavailable, and visible refreshes are passive.
@@ -44,6 +46,8 @@
 - **Person mode changes retain row identity** — move notes and tag into More in Simple, preserving draft inputs and focus; Detailed-only tab links use the same mode note and switch.
 - **Selecting the current person tab is no navigation** — open another inline editor without asking to discard a sibling draft.
 - **Local downloads bind their own URL** — `M.h` refuses Blob hrefs; assign only the URL created locally from the reviewed JSON, as QR export does for images.
+- **Matching selection follows a full page** — offer it inside the selected bar only after every visible row is selected; phone padding reserves the extra action above the safe area.
+- **Percentage chips isolate the unit too** — format the percent with the active locale and isolate the whole value, or RTL can move its sign away from the number.
 - **Phone targets follow width and pointer** — apply 44 px targets at the phone breakpoint as well as for coarse pointers; include local date inputs and chart selectors, keeping other pointer layout rules separate.
 - **Server guidance stays compact** — keep the copyable meridian command beside one caption so the notice does not dominate phone cards.
 - **Isolate count pairs together** — render Overview's active / total as one LTR unit; separate number isolates let RTL reverse the pair around the slash.

@@ -72,14 +72,15 @@ M.renderServers = view => M.mount(view, M.h('p', { text: 'Servers' }));
 load('app.js');
 const settle = () => new Promise(resolve => setTimeout(resolve, 180));
 await settle();
+w.document.querySelector('[data-people-select]')?.click();
 const rows = [...w.document.querySelectorAll('a.row-link')];
 const row = w.document.querySelector('input[data-person]');
 
 if (mode === 'people-bulk-refresh') {
   const view = w.document.getElementById('view');
-  const action = view.querySelector('[name="bulk-action"]');
+  const action = view.querySelector('[data-bulk-action="extend"]');
   const matching = view.querySelector('[data-select-matching]');
-  const preview = view.querySelector('[data-bulk-preview]');
+  const preview = view.querySelector('[data-bulk-action="disable"]');
   const pageSelect = view.querySelector('[name="select-page"]');
   const [previous, next] = view.querySelector('.people-pager').querySelectorAll('button');
   const controls = [pageSelect, matching, action, preview, previous, next];
@@ -89,7 +90,7 @@ if (mode === 'people-bulk-refresh') {
   row.checked = true; row.dispatchEvent(new w.Event('change', { bubbles: true }));
   const original = states();
   report.passiveControls = true; report.passiveFocus = true;
-  for (const control of [pageSelect, matching, action, preview, next]) {
+  for (const control of [pageSelect, action, preview, next]) {
     control.focus();
     view.meridianLiveStop.refresh(true);
     await settle();
@@ -99,6 +100,15 @@ if (mode === 'people-bulk-refresh') {
     report.passiveControls &&= same(states(), original);
     report.passiveFocus &&= w.document.activeElement === control;
   }
+  pageSelect.checked = true; pageSelect.dispatchEvent(new w.Event('change', { bubbles: true }));
+  const fullPage = states();
+  matching.focus(); view.meridianLiveStop.refresh(true); await settle();
+  report.passiveControls &&= same(states(), fullPage);
+  pendingRead(false); await settle();
+  report.passiveControls &&= same(states(), fullPage);
+  report.passiveFocus &&= w.document.activeElement === matching;
+  pageSelect.checked = false; pageSelect.dispatchEvent(new w.Event('change', { bubbles: true }));
+  row.checked = true; row.dispatchEvent(new w.Event('change', { bubbles: true }));
   preview.focus();
   view.meridianLiveStop.refresh(true); await settle();
   report.failedRefreshControls = same(states(), original);
@@ -131,11 +141,13 @@ if (mode === 'people-bulk-refresh') {
   // jsdom does not implement Space's native checkbox click.
   if (!row.checked) { row.checked = true; row.dispatchEvent(new w.Event('change', { bubbles: true })); }
   report.keyboard = w.document.activeElement === row;
+  const pageSelect = w.document.querySelector('[name="select-page"]');
+  pageSelect.checked = true; pageSelect.dispatchEvent(new w.Event('change', { bubbles: true }));
   w.document.querySelector('[data-select-matching]').click();
   report.selected = Number(w.document.querySelector('[data-bulk-count]').getAttribute('data-bulk-count'));
-  const action = w.document.querySelector('[name="bulk-action"]');
-  action.value = data.action || 'disable'; action.dispatchEvent(new w.Event('change', { bubbles: true }));
-  w.document.querySelector('[data-bulk-preview]').click();
+  const action = data.action || 'disable';
+  if (!['extend', 'disable'].includes(action)) w.document.querySelector('.people-bulk-more > summary').click();
+  w.document.querySelector('[data-bulk-action="' + action + '"]').click();
   await settle();
   if (data.action === 'delete') {
     report.previewProposals = w.document.querySelectorAll('[data-removal-proposal]').length;
@@ -157,7 +169,7 @@ if (mode === 'people-bulk-refresh') {
     report.undoDisabled = w.document.querySelector('[data-bulk-undo]')?.disabled;
     if (report.lastReceiptUndone || !data.uncertainUndo) {
       w.document.querySelector('.dialog-head button').click(); await settle();
-      [...w.document.querySelectorAll('.people-bulk-bar button')].find(button => button.textContent === M.t('bulk.receipt_title')).click();
+      w.document.querySelector('[data-bulk-receipt]').click();
       await settle();
       report.reopenedUndoHidden = w.document.querySelector('[data-bulk-undo]')?.hidden;
     }

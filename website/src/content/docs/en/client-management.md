@@ -53,6 +53,8 @@ This prints the personal URL, plus status, traffic, expiry, and when the client 
 
 ## List clients
 
+In **People**, search and filter chips sit together. Open a chip to choose its filter; remove an active chip with its × button, or use **Clear filters** to reset the view. Rows show the name, tag, status, compact period usage, and expiry in words. Last activity, note presence, **From your computer**, and attention reasons sit on a second line. Click anywhere in a row or focus it and press Enter to open the person. Phones show cards. **Add person** stays visible in both views; an empty list offers it too, while no matches offers **Clear filters**.
+
 ```
 meridian client list
 ```
@@ -499,6 +501,8 @@ The subscription preview also identifies reviewed app rules, their conditions, a
 
 ## Review changes for many people
 
+In **Simple** view, click **Select** to show checkboxes; **Done selecting** clears the selection and hides them. **Detailed** shows checkboxes directly. The action bar appears only after selection: at the top of the list on desktop and at the bottom on phones, with space reserved above the safe area. **Extend** and **Disable** are direct actions; the other bulk actions sit under **More**. Select every row on the page before **Select all N matching** appears. Mode switches and background refreshes keep the selection. The **Operation receipt** button stays in the list header after selection clears.
+
 Use Tab and Space to select rows; Shift+Space extends the selection on the current page. **Select all matching** includes other pages. Changing filters clears selection. Choose an action, review each person's before/after and warnings in pages of 100, and inspect the count of changed node documents. A preview freezes exact people and row versions for ten minutes; new matches are excluded. Any changed person, enforcement result, or node specification refuses the whole commit. Stale people are named. Every change and receipt lands in one transaction, with one document composition for the batch.
 
 For bulk expiry changes, choose **No end date** to clear the expiry. When that choice is unchecked, the date and time must be valid, in the future, and before 2099; a blank or invalid value stops the preview and never clears anyone's expiry.
@@ -526,6 +530,8 @@ At least one declared person must remain. The proposal includes no notes, tags, 
 `GET /api/people` requires people/admin or an owner session. It returns `users`, `total`, `population`, contextual `facets`, and `next_cursor`. Query keys: `q`, `status`, `tag`, `profile`, `expires`, `quota`, `never` (0/1), `attention`, `lifecycle`, `sort`, `order`, `limit` (1–500), `cursor`. Keep filters and order when continuing a cursor. The plain `GET /api/users` route remains available. Query responses omit credentials and private notes; CLI JSON retains its existing note view through the authorized per-person read.
 
 When bulk disabling, deletion, or an expiry change removes access, the service records the same flow-block receipts for each person and affected node as an individual edit. Connection keys and subscription URLs stay unchanged. New streams are blocked after the node confirms the applied document; transfers and UDP sessions started earlier may continue. Deleting an account keeps its revocation receipts so later node reports can confirm blocking.
+
+`has_notes` in `GET /api/people` rows reports private note presence with a boolean; missing or null means presence was not reported. The query never returns note text and needs no extra person reads.
 
 ## Access profiles
 

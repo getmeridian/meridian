@@ -68,6 +68,9 @@ class PeoplePerson(UserTrafficEvidence, AccountLifecycleState):
     user_id: str
     display_name: str
     declared: bool
+    has_notes: bool | None = Field(
+        default=None, description="Private operator note presence when reported; its text is never returned."
+    )
     row_version: int = Field(ge=1)
     status: Literal["active", "disabled", "expired", "limited"]
     created_at: Timestamp

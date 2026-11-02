@@ -1,6 +1,7 @@
 # core — Meridian API contracts
 
 ## Design decisions
+- **People note indicators carry presence only** — bounded private queries derive `has_notes`; omitted older evidence stays unknown without per-person reads or note text.
 - **App decisions are finite** — named literal User-Agent/Accept rules reject duplicates and proven shadows; one policy resolver orders person, app, profile, named fleet, and preset choices.
 - **Removal proposals carry identity only** — bounded declared usernames and committed fleet/revision/generation/plan/intent hashes travel without private person fields or cut-off choices.
 - **Profile selection names saved membership** — the optional typed profile ID joins the same query and cursor identity; default is an explicit membership.

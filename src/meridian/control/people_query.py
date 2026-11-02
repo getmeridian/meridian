@@ -276,11 +276,12 @@ class PeopleQueryEngine:
         return [
             PeoplePerson(
                 **records[name].model_dump(
-                    include=set(PeoplePerson.model_fields) - {"display_name", "row_version", "declared"}
+                    include=set(PeoplePerson.model_fields) - {"display_name", "row_version", "declared", "has_notes"}
                 ),
                 display_name=intent.names.get(name, name),
                 row_version=versions[name],
                 declared=name in intent.declared,
+                has_notes=bool(records[name].note),
             )
             for name in names
         ]

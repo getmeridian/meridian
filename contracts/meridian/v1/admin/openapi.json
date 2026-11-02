@@ -7464,6 +7464,19 @@
             "description": "When the service first accepted traffic growth; unknown for historical use.",
             "title": "First Traffic At"
           },
+          "has_notes": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Private operator note presence when reported; its text is never returned.",
+            "title": "Has Notes"
+          },
           "language": {
             "anyOf": [
               {

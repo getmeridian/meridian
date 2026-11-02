@@ -20,7 +20,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
   Share actions. A Simple/Detailed switch, remembered per browser, keeps everyday
   screens calm and shows revisions, tokens, and full server facts on demand; theme
   and language move into an account menu. A person's page keeps a summary with
-  Share, Extend, and Disable above tabs, and each setting edits in place (#95).
+  Share, Extend, and Disable above tabs, and each setting edits in place. People
+  gets removable filter chips and compact rows, and its selection bar appears only
+  once someone is selected (#95).
 - Reviewed subscription response rules by app, with bounded literal User-Agent
   and Accept conditions, ordered format/refusal/policy/header actions, and one
   transient matcher test across API, CLI, and console. Private person policies

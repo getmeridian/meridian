@@ -380,7 +380,7 @@ if (mode.startsWith('live-')) {
   const liveData = () => (view.querySelector('.live-data') || view).textContent;
   if (mode === 'live-fleet-failure') {
     report.names = [...view.querySelectorAll('.name')].map(el => el.textContent);
-    report.declared = view.querySelectorAll('.tag').length;
+    report.declared = view.querySelectorAll('.tag:not([hidden])').length;
     report.initial = liveData();
     await advance(interval);
     report.afterPoll = liveData();

@@ -157,8 +157,14 @@ if (mode === 'showcase-navigation') {
   const recording = JSON.parse(fs.readFileSync(path.join(directory, 'console/demo-data.json'), 'utf8'));
   report.serviceQueries = 0;
   report.queryMismatches = [];
-  function summary(page) {
-    return { users: page.users, total: page.total, population: page.population, facets: page.facets };
+  function summary(page, reported = page) {
+    const unreported = new Set(reported.users.filter(user => user.has_notes == null).map(user => user.username));
+    return { users: page.users.map(user => {
+      const row = { ...user };
+      // Older replies make no claim about this optional indicator. Reported booleans still compare exactly.
+      if (unreported.has(user.username)) delete row.has_notes;
+      return row;
+    }), total: page.total, population: page.population, facets: page.facets };
   }
   function canonical(value) {
     if (Array.isArray(value)) return value.map(canonical);
@@ -169,7 +175,7 @@ if (mode === 'showcase-navigation') {
     if (!key.startsWith('GET api/people') || key.includes('/bulk/') || key.includes('cursor=')) continue;
     const actual = await M.api('GET', key.slice(4));
     report.serviceQueries++;
-    if (JSON.stringify(canonical(summary(actual))) !== JSON.stringify(canonical(summary(expected)))) report.queryMismatches.push({ key, actual: summary(actual), expected: summary(expected) });
+    if (JSON.stringify(canonical(summary(actual))) !== JSON.stringify(canonical(summary(expected, actual)))) report.queryMismatches.push({ key, actual: summary(actual), expected: summary(expected, actual) });
   }
   const first = await M.api('GET', 'api/people?sort=usage&limit=2');
   report.ordered = (await M.api('GET', 'api/people?sort=usage')).users.map(user => user.username);

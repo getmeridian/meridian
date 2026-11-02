@@ -151,12 +151,12 @@ def test_quota_filter_uses_the_exact_service_share_instead_of_rounded_javascript
 def test_a_tag_from_the_fragment_keeps_alphabetical_options_once_people_load() -> None:
     result = run_console("people-triage", data={"people": people(), "hash": "#/people?tag=GROUP_B"})
     assert [option["value"] for option in result["selects"]["tag"]] == ["", "none", "GROUP_A", "GROUP_B"]
-    assert result["shown"] == ["p-b"] and result["filtersOpen"]
+    assert result["shown"] == ["p-b"] and result["activeFilters"] == ["tag"]
 
 
-def test_a_non_default_sort_alone_opens_the_filter_card() -> None:
+def test_a_non_default_sort_alone_shows_a_removable_chip() -> None:
     result = run_console("people-triage", data={"people": people(), "hash": "#/people?sort=usage"})
-    assert result["filtersOpen"]
+    assert result["activeFilters"] == ["sort"]
 
 
 def test_filter_edits_before_any_list_arrives_never_claim_there_are_no_people() -> None:
