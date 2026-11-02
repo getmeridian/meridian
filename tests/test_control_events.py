@@ -266,7 +266,7 @@ def test_event_api_is_read_scoped_and_paginates_with_secret_free_token_events(tm
         cursor = page["next_cursor"]
         second = httpx.get(url + f"/api/events?after={cursor}&limit=1", headers=headers).json()
         assert second["events"][0]["kind"] == "token.created"
-        assert second["events"][0]["detail"] == {"name": "reader", "scope": "read"}
+        assert second["events"][0]["detail"] == {"name": "reader", "scope": "read", "capabilities": read.capabilities}
         admin.revoke_token(read.id)
         admin.revoke_token(read.id)
         final = httpx.get(url + f"/api/events?after={second['next_cursor']}", headers=root_headers).json()
@@ -384,6 +384,27 @@ def test_events_command_help_exposes_cursor_limit_and_json() -> None:
     assert "--since" in output and "--limit" in output and "--json" in output
 
 
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_custom_token_events_show_native_capability_labels_instead_of_none(
+    tmp_path: Path, tmp_home: Path, monkeypatch: pytest.MonkeyPatch, locale: str
+) -> None:
+    from meridian.cluster import ClusterConfig, PanelConfig
+    from meridian.commands import fleet_events
+    from meridian.control.token_capabilities import permission
+
+    with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN) as admin:
+        admin.create_token("Reader", capabilities=["people.read", "people.private"])
+        cluster = ClusterConfig(panel=PanelConfig(url=url, api_token=ADMIN_TOKEN))
+        monkeypatch.setattr(fleet_events, "load_topology_cluster", lambda: cluster)
+        monkeypatch.setattr(fleet_events.err_console, "width", 300)
+        result = CliRunner().invoke(app, ["--lang", locale, "fleet", "events"])
+    assert result.exit_code == 0, result.output
+    output = unstyle(result.output)
+    assert "None" not in output
+    for capability in ("people.read", "people.private"):
+        assert permission(capability).labels[locale] in output
+
+
 def test_events_command_json_continues_the_cursor_and_invalid_flags_have_an_envelope(
     tmp_path: Path, tmp_home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -450,7 +471,11 @@ def test_expiring_people_token_events_use_registry_time_and_keep_only_names_and_
     issued = service.tokens.issue(TokenCreate(name="people-tool", scope="people", expires_in_days=1), issuer=ROOT)
     created = service.events.list().events[-1]
     assert created.kind == "token.created" and created.time == issued.created_at == NOW
-    assert created.to_data()["detail"] == {"name": "people-tool", "scope": "people"}
+    assert created.to_data()["detail"] == {
+        "name": "people-tool",
+        "scope": "people",
+        "capabilities": issued.capabilities,
+    }
     assert issued.expires_at == "2026-11-02T12:00:00Z"
     clock[0] += 86400
     with pytest.raises(ServiceError, match="Authentication required"):

@@ -5,6 +5,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 ## Design decisions
 - **People queries share SQL predicates** — cursor pages use monotonic identities, contextual counts, and the same selection across surfaces.
 - **Bulk reviews freeze names and versions** — previews stay in bounded memory; one transaction stores the receipt and composes documents.
+- **Capabilities freeze at issuance** — the route catalog owns base, body-choice, and response-field grants; compatible scopes expand once, while the separate immutable grant can later compose with access-profile bounds. Credentials and private metadata are independent permissions on every typed person result.
 - **Person routes have one catalog** — `person_route_catalog.py` owns account declarations; `route_metadata.py` keeps shared refusals and credential annotations.
 - **Service owns users, deployer owns topology** — the reconciler PUTs node specs, endpoints, and users over the admin API; the service composes each node's whole document (`node_documents.py`), signs it, and serves it to that node's agent. Client-IP forwarding is not ported yet, so `--client-ips` is hidden.
 - **Stdlib HTTP on loopback** — `ThreadingHTTPServer` behind nginx's secret path (stripped, so routes are `/api`, `/agent/v1`, `/sub`); a thread per long-poll is cheap at Meridian's fleet sizes, and `control/` never imports the deployer. `route_catalog.py` declares every `/api` operation (scopes, models, errors, credential marker) and drives dispatch, authorization, and `openapi.py`; `route_table.py` owns matching.
@@ -14,6 +15,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - **Flow-block receipts follow identities** — each node/generation keeps private per-inbound key fingerprints and the required revision; a restored key clears only matching receipts, and newer receipts retire older confirmed ones.
 - **VLESS hard cuts restart the core** — accepted TCP/mux flows survive listener resets; queue one revision-gated core restart per affected node, preserving older agents' restart capability and disclosing all-node reconnects.
 - **Connection-key rotation keeps delivery identity** — compare the current credential generation inside the write, preserve the subscription token and devices, and share replacement logic with reissue; imports advance the generation only when a connection key changes.
+- **Owner credentials stay local** — passkeys and their opaque owner handle are excluded from snapshots alongside passwords and sessions; token grant storage upgrades in the same self-contained schema step.
 - **Scoped API tokens** — one revocable token per device or agent (`tokens.py`): `read` < `propose` < `approve` < `admin`, plus a separate `people` capability for user reads and edits. Whatever applying does is `admin`. Lower scopes see user credentials blank, because those credentials connect as the user. The config's admin token is the unlisted root.
 - **Revisions record every reviewed apply** — `revisions.py` keeps author, secret-free intent, plan and review hashes, and status; only an `admin` token approves its own proposal (the one-person path). The apply fence is one compare-and-swap row: the service stores what `reconciler/fence.py` decides and never judges leases itself.
 - **Fleet CA and agent sessions** — `NodeAuthority` keeps an Ed25519 CA and signing key; enrollment trades a single-use token and CSR for a node certificate and revokes the node's earlier ones; `hello` checks chain, revocation, SAN, clock, and nonce before opening a session. Tokens are stored only as SHA-256, and protocol skew follows `core/version_skew.py`.
@@ -35,12 +37,16 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - A proposal whose intent contains a secret-shaped key or value, or a malformed `access` block, is refused and never stored.
 
 ## Pitfalls
+- **Retry delays cross every HTTP surface** — emit Retry-After whenever a ServiceError supplies it, including anonymous authentication refusals.
+- **Redaction preserves supplied fields** — copy only changed values, or omitted bulk action parameters become supplied nulls and invalidate the review.
+- **Bulk grants keep legacy boundaries** — query and batch grants stay separate from reads and credential imports; their tag-bearing views also require private metadata permission.
 - **Bulk deletion carries every retired identity** — compose once with all removed records so each node queues the same receipts as a single deletion, without rotating keys.
 - **Undo shares bulk enforcement** — restore requested choices before judging status, and check managed inbound capacity before composing.
 - **Bulk before is enforced** — project both sides from one account clock, re-check every target before writing, and catch up due resets before schedule edits.
 - **Bulk after stays reviewed** — re-check the projected result at commit; a newly due action schedule needs a fresh review.
 - **Bulk applies use canonical enforcement** — write validated requested fields before enforcing, or quota restoration emits the wrong event and cap edits lose their renewal interval.
 - **Credential text matters to Hysteria2** — imported UUID case changes its auth even when VLESS treats the UUID as equal; advance the generation on the actual stored key change.
+- **Delegation re-reads its issuer** — minting must re-check revocation, permissions, expiry, and owner step-up in the insert transaction; preview emits no secret, event, or backup pull.
 - **Schedules share directional baselines** — renewal and rolling resets clear both directions and carried period use; imports initialize the same projection before enforcement, preserving lifetime totals.
 - **First use means accepted traffic** — subscription and page reads never activate; renewal progress, period offsets, and effective status change in the traffic transaction before new growth.
 - **Renewal anchors survive short months** — expiry or interval edits start a new series, cap edits keep progress, and missed renewals consume the cap with one period reset.

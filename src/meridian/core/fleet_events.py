@@ -11,12 +11,13 @@ from typing import Literal, TypeAlias, get_args
 
 from pydantic import Field, model_validator
 
-from meridian.control.models import TokenScope, UserStatus
+from meridian.control.models import UserStatus
 from meridian.core.agent_protocol import CommandEffect, CommandKind, CommandResultStatus
 from meridian.core.agent_types import MAX_SAFE_INTEGER, CommandId, Timestamp
 from meridian.core.client_sessions import CredentialGeneration, FlowBlockStatus
 from meridian.core.models import CoreModel
 from meridian.core.people_bulk import BulkActionName
+from meridian.core.token_models import TokenCapability, TokenScope
 
 MAX_EVENTS = 2000
 EVENT_RETENTION_DAYS = 180
@@ -118,7 +119,8 @@ class CommandResultDetail(CommandIssuedDetail):
 
 class TokenEventDetail(CoreModel):
     name: str = Field(min_length=1, max_length=64, pattern=_NAME_PATTERN)
-    scope: TokenScope
+    scope: TokenScope | None
+    capabilities: list[TokenCapability] = Field(default_factory=list, exclude_if=lambda value: not value)
 
 
 class BulkEventDetail(CoreModel):

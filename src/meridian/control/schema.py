@@ -8,6 +8,7 @@ from meridian.control.devices import DEVICES_TABLE
 from meridian.control.errors import ServiceError
 from meridian.control.events import EVENT_TABLES
 from meridian.control.owner import UI_TABLES
+from meridian.control.passkey_tables import PASSKEY_TABLES
 from meridian.control.people_schema import PEOPLE_SCHEMA
 from meridian.control.period_usage import DIRECTIONAL_PERIOD_MIGRATION
 from meridian.control.privacy import PRIVACY_TABLES
@@ -18,7 +19,7 @@ from meridian.control.tokens import API_TOKENS_TABLE_V4
 from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPOCH_BASELINES
 from meridian.control.user_flow_blocks import FLOW_BLOCKS_TABLE
 
-SCHEMA_VERSION = 21
+SCHEMA_VERSION = 22
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS secrets (name TEXT PRIMARY KEY, value BLOB NOT NULL);
@@ -72,6 +73,7 @@ SCHEMA += "\n".join(PRIVACY_TABLES) + "\n" + DEVICES_TABLE + ";\n"
 SCHEMA += ";\n".join(COMMAND_TABLES) + ";\n"
 SCHEMA += ALLOWANCE_PERIODS_TABLE + ";\n"
 SCHEMA += FLOW_BLOCKS_TABLE + ";\n"
+SCHEMA += ";\n".join(PASSKEY_TABLES) + ";\n"
 # Statements that bring a database from version N to N + 1 (index N - 1).
 _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (
@@ -133,6 +135,8 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "ALTER TABLE nodes ADD COLUMN report_seen_at TEXT",
         FLOW_BLOCKS_TABLE,
     ),
+    # 21 -> 22: local owner passkeys and explicit grants for scoped API tokens.
+    (*PASSKEY_TABLES, "ALTER TABLE api_tokens ADD COLUMN capabilities TEXT"),
 )
 
 

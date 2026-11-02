@@ -23,6 +23,12 @@ newest first; the last is what 4.0 changes compared with 3.x.
   explicit JSON confirmation, and receipt recovery after an uncertain reply.
 - People selection by keyboard or across all matching pages, with bounded
   server reads, preserved rows, bulk reviews, receipts, and undo in the console.
+- API tokens can grant individual action families, with shared permission and
+  expiry previews in the API, console, and `meridian token`. Existing tokens keep
+  equivalent frozen grants and their expiry; new tokens default to 90 days (#95).
+- Owner passkeys on reviewed HTTPS domains, with local ES256/Ed25519 verification,
+  named keys in Settings, sign-in and step-up, and unchanged root-only recovery.
+  Removing a key signs out other sessions; bare-IP panels keep password/TOTP (#95).
 - Account anniversary resets, durations from first traffic, and automatic
   expiry renewal with optional caps. API, CLI, panel, connection pages, and
   refill headers share UTC dates; migration keeps rolling-month anchors.
@@ -38,6 +44,14 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Show explicit token capabilities in fleet events and refuse token commands
+  without configured Meridian control service access.
+- Token CLI cancellations exit 1, and issuance keeps the reviewed absolute expiry.
+- Accept authenticator responses with an empty owner handle in the console.
+- Preserve passkey registration proofs through a renewed identity check or a
+  full-key-list refusal, and check session liveness before consuming confirmation proofs.
+- Anonymous passkey requests cannot exhaust owner registration or confirmation;
+  full login pools replace their oldest requests, and service retry delays reach HTTP headers.
 - Keep every bulk-deleted person in per-node flow-block receipts without rotating connection keys or subscription URLs (#95).
 - Bulk expiry validates dates before preview, so blank or invalid input never clears expiry; clearing it requires the explicit No end date choice.
 - CLI and console reconcile lost undo replies through receipts, retain the updated console receipt, and reject unavailable undo dry runs.

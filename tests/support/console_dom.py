@@ -25,6 +25,8 @@ needs_console_dom = pytest.mark.skipif(
 
 def run_console(mode: str, locale: str = "en", data: Any = None) -> dict[str, Any]:
     runners = {
+        "token-expiry-": "control_ui_tokens.mjs",
+        "passkey-": "control_ui_passkeys.mjs",
         "page-": "control_ui_page.mjs",
         "people-bulk-expiry": "control_ui_bulk_expiry.mjs",
         "people-bulk": "control_ui_people_bulk.mjs",
@@ -40,6 +42,11 @@ def run_console(mode: str, locale: str = "en", data: Any = None) -> dict[str, An
 
         data = with_people_replies(data)
     mode = mode.removeprefix("command-")
+    if mode.startswith("token-"):
+        from meridian.control.token_capabilities import capability_catalog
+
+        data = {**(data or {}), "capability_catalog": capability_catalog().to_data()}
+    mode = mode.removeprefix("token-expiry-")
     # The scenario travels on stdin: Linux caps a single argument at 128 KiB.
     result = subprocess.run(
         ["node", str(ROOT / "tests" / runner), str(UI_DIR), mode, locale, "-"],

@@ -1,7 +1,58 @@
 {
   "additionalProperties": false,
-  "description": "Mint one device's or agent's API token; the scope may not exceed the caller's.",
+  "description": "Choose one compatible preset or an explicit nonempty grant; new tokens expire by default.",
   "properties": {
+    "capabilities": {
+      "anyOf": [
+        {
+          "items": {
+            "enum": [
+              "api.read",
+              "fleet.read",
+              "topology.read",
+              "fleet.apply",
+              "nodes.enroll",
+              "people.read",
+              "people.query",
+              "people.batch",
+              "people.private",
+              "people.edit",
+              "people.credentials",
+              "people.reset",
+              "people.reissue",
+              "people.remove",
+              "people.devices",
+              "people.bulk",
+              "commands.read",
+              "commands.restart",
+              "commands.run",
+              "commands.cut_off",
+              "backup.read",
+              "backup.edit",
+              "settings.edit",
+              "tokens.read",
+              "tokens.issue",
+              "tokens.revoke",
+              "revisions.read",
+              "revisions.propose",
+              "revisions.approve",
+              "revisions.approve_own",
+              "owner.read",
+              "console.read"
+            ],
+            "type": "string"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Capabilities"
+    },
     "expires_at": {
       "anyOf": [
         {
@@ -15,7 +66,7 @@
         }
       ],
       "default": null,
-      "description": "Optional UTC expiry; use either this or expires_in_days. Null or omitted means never.",
+      "description": "Future UTC expiry instead of expires_in_days.",
       "title": "Expires At"
     },
     "expires_in_days": {
@@ -29,8 +80,8 @@
           "type": "null"
         }
       ],
-      "default": null,
-      "description": "Whole days from issuance, measured by the service clock; null or omitted means never.",
+      "default": 90,
+      "description": "Whole days from issuance; defaults to 90. Null needs never_expires=true.",
       "title": "Expires In Days"
     },
     "name": {
@@ -40,21 +91,34 @@
       "title": "Name",
       "type": "string"
     },
+    "never_expires": {
+      "default": false,
+      "description": "Explicitly opt out of expiry; cannot accompany an expiry value.",
+      "title": "Never Expires",
+      "type": "boolean"
+    },
     "scope": {
-      "enum": [
-        "read",
-        "propose",
-        "approve",
-        "people",
-        "admin"
+      "anyOf": [
+        {
+          "enum": [
+            "read",
+            "propose",
+            "approve",
+            "people",
+            "admin"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
       ],
-      "title": "Scope",
-      "type": "string"
+      "default": null,
+      "title": "Scope"
     }
   },
   "required": [
-    "name",
-    "scope"
+    "name"
   ],
   "title": "TokenCreate",
   "type": "object"

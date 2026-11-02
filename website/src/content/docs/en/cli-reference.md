@@ -433,6 +433,8 @@ The `active` column counts people with growth in the last report, with its colle
 
 **`fleet events`** — local lifecycle changes and node outages/recovery, oldest first after `--since ID` (default `0`). `--limit N` returns 1–2000 events, default 100. JSON returns `data.events[]`, `next_cursor`, and `has_more`; continue with the returned cursor. Each entry has a UTC time, kind, actor (token name, `root`, `owner`, or `system`), subject, and small details such as changed field names, token scope, or a privacy audit row ID. Credentials, raw errors, client addresses, and device data are excluded. The service keeps at most 2,000 events or 180 days, whichever is smaller, and includes them in snapshots. `GET /api/events?after=ID&limit=N` needs `read` scope and also admits the signed-in owner.
 
+Custom token events show the effective capability labels in your CLI language; compatible preset tokens retain their scope label.
+
 **`fleet upgrade`** — brings the fleet up to date in one reviewed apply. The control service and every node agent move to the build this Meridian ships, and each agent upgrades in place, keeping its node's identity; run `meridian update` first to get newer ones. Relays move to the newest Realm release without waiting for a Meridian update: GitHub's newest release in the tested major, recorded in `cluster.yml` with the sha256 GitHub publishes for each archive, which every relay checks before installing. It shows what each server runs as `current` or `upgrade`, then, after you confirm, applies the reviewed plan and runs `meridian check` on every server. A version that cannot be read stops the command with exit `3` before anything changes.
 
 **`fleet routing`** — reads the current client policy from local topology and explains both choices. `ru-split` (default) sends matched Russian destinations and private/LAN ranges directly; `full` tunnels internet traffic, including Russian destinations, and keeps private/LAN ranges direct. Both retain QUIC blocking and Xray JSON's best-effort BitTorrent direct rule to reduce abuse complaints against exits. Pass a policy to edit the intent, review it, confirm, and apply exactly that review. Without a terminal or with `--json`, a change requires `--yes`; `--dry-run` shows the review without applying it. JSON returns `data.client_routing`, `choices[]`, and the review and apply when present. Apps receive the choice on their next subscription refresh or a manual refresh. The web panel shows it read-only in Settings. Exit geo-blocking stays separate; Base64 links carry no routing rules. See [Client routing](/en/split-routing/) for format limits and how to allow Russian destinations at an exit.
@@ -574,6 +576,23 @@ Every line passes through the same redaction as `meridian doctor`: tokens, passw
 
 A server without a fleet role, or a `--component` it doesn't run, exits `2` before connecting. A log that can't be read (a missing service, a lost SSH connection) is shown as unavailable and the command exits `3`.
 
+### meridian token
+
+Issue tokens with explicit action permissions. Review first; the secret is shown once.
+
+```bash
+meridian token capabilities [--json]
+meridian token list [--json]
+meridian token create NAME [--capability ACTION ... | --scope PRESET] [--expires-days DAYS | --expires-at UTC | --never-expires] [--dry-run] [--yes] [--json]
+meridian token revoke TOKEN_ID [--yes] [--json]
+```
+
+Use one preset or repeat --capability. New tokens default to 90 days; --never-expires is explicit. --dry-run creates no token. --yes is required for JSON mutations. Creation JSON keeps the review under data.preview and reveals only data.issued.token in the producing output.
+
+Declining creation or revocation, or running either without a terminal and without --yes, exits 1 and changes no token. Creation uses the exact expiry shown in the service preview; waiting at confirmation never extends it. If that instant has passed, request a new preview.
+
+Listing, creation, and revocation require a configured Meridian control service. A missing saved service URL or credential exits 2 with deployment guidance; a Remnawave fleet points to `meridian migrate`. The local capability catalog remains available without a fleet.
+
 ### meridian panel
 
 Show the web panel's address, and a one-time setup link while it has no owner.
@@ -584,7 +603,7 @@ meridian panel [--setup-link]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--setup-link` | | Print a reset link even though the panel has an owner: it sets a new password, turns the sign-in code off, and signs out every device |
+| `--setup-link` | | Print a reset link even though the panel has an owner: it sets a new password, turns the sign-in code off, removes every passkey, and signs out every device |
 
 The setup link works once, for 15 minutes; open it to choose the owner's password. Once the panel has an owner, `panel` prints the address and whether a sign-in code is on. Treat both the address and a setup link like passwords. In the web panel you manage people, notices, language, privacy, and API tokens; servers, revisions, and topology settings are read-only there. See [Web panel](/en/client-management/#web-panel).
 

@@ -4,12 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-import threading
-import time
-import urllib.error
-import urllib.request
 from collections.abc import Iterator
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -31,11 +26,13 @@ from meridian.control.models import (
     UserUpdate,
     scope_covers,
 )
-from meridian.control.server import ROUTES, ControlServer
+from meridian.control.server import ROUTES
 from meridian.control.service import SCHEMA_VERSION, ControlService
 from meridian.control.snapshot import generate_key_pair
 from meridian.control.tokens import LAST_USED_RESOLUTION_SECONDS, ROOT, Caller
 from tests.support.control_service import drop_device_privacy_schema, drop_operations_schema
+from tests.support.token_service import Fleet, serve_tokens
+from tests.support.token_service import token_request as _request
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
 ADMIN_TOKEN = "admin-token-for-tests-only-0123456789"
@@ -52,46 +49,10 @@ ENDPOINT = ClientEndpoint(
 ).model_dump(mode="json")
 
 
-class Clock:
-    def __init__(self) -> None:
-        self.now = float(int(time.time()))
-
-    def __call__(self) -> float:
-        return self.now
-
-
-@dataclass
-class Fleet:
-    url: str
-    service: ControlService
-    clock: Clock
-
-
 @pytest.fixture
 def fleet(tmp_path: Path) -> Iterator[Fleet]:
-    clock = Clock()
-    service = ControlService(tmp_path / "control.db", fleet_id=FLEET_ID, version="4.0.0", clock=clock)
-    server = ControlServer(("127.0.0.1", 0), service, token_sha256(ADMIN_TOKEN))
-    # A short poll keeps shutdown quick across the scope matrix's many servers.
-    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
-    thread.start()
-    yield Fleet(f"http://127.0.0.1:{server.server_address[1]}", service, clock)
-    server.shutdown()
-    server.server_close()
-
-
-def _request(
-    url: str, method: str = "GET", body: Any = None, token: str = "", headers: dict[str, str] | None = None
-) -> tuple[int, Any]:
-    data = json.dumps(body).encode() if body is not None else None
-    request = urllib.request.Request(url, data=data, method=method, headers=headers or {})
-    if token:
-        request.add_header("Authorization", f"Bearer {token}")
-    try:
-        with urllib.request.urlopen(request, timeout=10) as response:
-            return response.status, json.loads(response.read() or b"null")
-    except urllib.error.HTTPError as exc:
-        return exc.code, json.loads(exc.read() or b"null")
+    with serve_tokens(tmp_path) as result:
+        yield result
 
 
 def _mint(fleet: Fleet, scope: str, name: str = "device") -> dict[str, Any]:
@@ -103,6 +64,8 @@ def _mint(fleet: Fleet, scope: str, name: str = "device") -> dict[str, Any]:
 BACKUP_KEY = generate_key_pair().public
 # Samples carry no permissions: every requirement comes directly from server.ROUTES.
 ROUTE_SAMPLES = {
+    "token_capabilities": ("/api/token-capabilities", None),
+    "preview_token": ("/api/tokens/preview", {"name": "Integration", "scope": "read"}),
     "openapi": ("/api/openapi.json", None),
     "health": ("/api/health", None),
     "get_settings": ("/api/settings", None),
@@ -221,6 +184,32 @@ def test_every_api_route_has_a_matching_permission_sample() -> None:
             assert pattern.fullmatch(ROUTE_SAMPLES[handler.__name__][0].format(victim="0123456789ab")), handler.__name__
 
 
+def test_a_token_can_read_people_without_receiving_keys_or_editing_them(fleet: Fleet) -> None:
+    fleet.service.put_user("sample")
+    fleet.service.update_user("sample", UserUpdate(note="Private note", tag="TRIAL"))
+    status, issued = _request(
+        fleet.url + "/api/tokens",
+        "POST",
+        {
+            "name": "Account reader",
+            "capabilities": ["people.read"],
+            "expires_in_days": 30,
+        },
+        ADMIN_TOKEN,
+    )
+    assert status == 200, issued
+    status, account = _request(fleet.url + "/api/users/sample", token=issued["token"])
+    assert status == 200
+    assert (account["uuid"], account["sub_token"], account["note"], account["tag"]) == ("", "", "", "")
+    assert _request(fleet.url + "/api/users/sample", "PATCH", {"status": "disabled"}, issued["token"])[0] == 403
+
+
+def test_new_tokens_expire_by_default(fleet: Fleet) -> None:
+    issued = _mint(fleet, "read")
+    assert issued["expires_at"] is not None
+    assert datetime.fromisoformat(issued["expires_at"]).timestamp() == pytest.approx(fleet.clock.now + 90 * 86400)
+
+
 def test_people_access_is_declared_only_on_user_routes() -> None:
     for _method, pattern, needed, handler in ROUTES:
         if needed is None:
@@ -228,7 +217,7 @@ def test_people_access_is_declared_only_on_user_routes() -> None:
         requirements = (needed,) if isinstance(needed, str) else needed
         manages_people = (
             pattern.pattern.startswith(("/api/users", "/api/people")) and handler.__name__ != "cut_off_scope"
-        ) or handler.__name__ == "openapi"
+        ) or handler.__name__ in {"openapi", "token_capabilities"}
         assert any(scope_covers("people", scope) for scope in requirements) == manages_people
         assert all(scope_covers("admin", scope) for scope in requirements)
 
@@ -388,7 +377,7 @@ def test_people_reads_credentials_and_edits_people_without_fleet_access(fleet: F
     )
     assert status == 200 and (updated["status"], updated["traffic_limit_bytes"]) == ("disabled", 1000)
     for method, path, body, _needed in SCOPE_MATRIX:
-        if path.startswith(("/api/users", "/api/people")) or path == "/api/openapi.json":
+        if path.startswith(("/api/users", "/api/people")) or path in {"/api/openapi.json", "/api/token-capabilities"}:
             continue
         status, answer = _request(fleet.url + path.format(victim="0123456789ab"), method, body, token)
         assert (status, answer["error"]["code"]) == (403, "insufficient_scope"), path
@@ -510,7 +499,7 @@ def test_token_expiry_refuses_at_the_boundary_like_revocation(fleet: Fleet) -> N
 @pytest.mark.parametrize("days", [1, 3650, None])
 def test_client_token_expiry_uses_the_registry_clock_and_supports_never(fleet: Fleet, days: int | None) -> None:
     with ControlClient(fleet.url, ADMIN_TOKEN) as client:
-        issued = client.create_token("temporary", "read", expires_in_days=days)
+        issued = client.create_token("temporary", "read", expires_in_days=days, never_expires=days is None)
     expected = datetime.fromtimestamp(fleet.clock.now, UTC) + timedelta(days=days or 0)
     assert issued.expires_at == (expected.strftime("%Y-%m-%dT%H:%M:%SZ") if days is not None else None)
     assert fleet.service.tokens.get(issued.id).expires_at == issued.expires_at

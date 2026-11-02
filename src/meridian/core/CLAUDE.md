@@ -3,6 +3,7 @@
 ## Design decisions
 - **People queries have one typed request** — paging controls never change which people match a selection.
 - **Bulk contracts separate selection from mutation** — before/after fields and receipts omit credentials and private notes.
+- **Token grants are independent of presets** — frozen explicit capabilities compose separately from identity and future resource bounds; token schemas and command envelopes live in `schema_tokens.py`.
 - **One account clock** — `account_schedule.py` computes UTC activation, anniversary refills, and clamped renewal catch-up; billing shares `calendar.monthly_period()`.
 - **No CLI globals** — core never imports Typer, Rich, console, config, or command modules (tested); the CLI and the control service are adapters. Constants live in `core/defaults.py`.
 - **Envelope first** — JSON clients get one stable `meridian.output/v1` shape with command data under `data`; `schema_envelopes.py` builds command envelopes from the catalog, and `schema.py` composes contract families from their owning modules.

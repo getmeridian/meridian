@@ -433,6 +433,8 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 **`fleet events`** — 查看本地用户、令牌和隐私变更，以及节点离线和恢复事件。从 `--since ID` 之后按时间顺序显示（默认 `0`）。`--limit N` 返回 1–2000 条事件，默认 100 条。JSON 包含 `data.events[]`、`next_cursor` 和 `has_more`；继续读取时使用返回的游标。每条事件包含 UTC 时间、类型、执行者（令牌名称、`root`、`owner` 或 `system`）、对象，以及更改的字段名、令牌权限范围或隐私审计记录 ID 等简短详情。不会记录凭据、原始错误、客户端地址或设备数据。最多保留最近 180 天内的 2,000 条事件，并纳入快照。`GET /api/events?after=ID&limit=N` 需要 `read` 权限，也允许已登录的所有者访问。
 
+自定义令牌的事件使用 CLI 当前语言显示实际权限名称；兼容预设令牌仍显示其权限范围标签。
+
 **`fleet upgrade`** — 通过一次已审核的应用让集群保持最新。控制服务和每个节点 agent 会升级到当前 Meridian 附带的构建，每个 agent 就地升级并保留其节点身份；要获取更新的构建，请先运行 `meridian update`。中继无需等待 Meridian 更新即可升级到最新的 Realm 版本：选用 GitHub 上已测试主版本内的最新版本，连同 GitHub 为每个压缩包发布的 sha256 一起记录到 `cluster.yml`，每个中继在安装前都会校验。它会显示每台服务器上运行的版本并标为 `current` 或 `upgrade`，确认后应用已审核的计划，并在每台服务器上运行 `meridian check`。如果某个版本无法读取，命令会在任何改动之前以退出码 `3` 结束。
 
 **`fleet routing`** — 从本地拓扑读取当前客户端路由策略，并解释两种选项。`ru-split`（默认）让匹配规则的俄罗斯目的地、私有地址和局域网直连；`full` 让互联网流量通过 VPN，包括俄罗斯目的地，同时保留私有地址和局域网直连。两种策略均保留 QUIC 封锁，以及 Xray JSON 对已识别 BitTorrent 对等连接的直连规则，以减少针对出口服务器的滥用投诉。传入策略即可编辑拓扑、审核、确认，并应用此次审核的内容。没有终端或使用 `--json` 时，更改需要 `--yes`；`--dry-run` 显示审核结果而不应用。JSON 返回 `data.client_routing`、`choices[]` 以及适用的审核和应用结果。应用会在下次刷新订阅或手动刷新后收到策略。网页面板在“设置”中只读显示策略。出口地理封锁单独设置；Base64 链接不携带路由规则。有关格式限制及如何在出口允许俄罗斯目的地，请参见[客户端路由](/zh/split-routing/)。
@@ -574,6 +576,23 @@ meridian logs [SERVER] [--lines N] [--grep TEXT] [--component NAME]
 
 没有集群角色的服务器，或其未运行的 `--component`，会在连接之前以 `2` 退出。无法读取的日志（服务缺失、SSH 连接丢失）会显示为不可用，命令以 `3` 退出。
 
+### meridian token
+
+按具体操作签发令牌。先预览权限，令牌秘密只显示一次。
+
+```bash
+meridian token capabilities [--json]
+meridian token list [--json]
+meridian token create NAME [--capability ACTION ... | --scope PRESET] [--expires-days DAYS | --expires-at UTC | --never-expires] [--dry-run] [--yes] [--json]
+meridian token revoke TOKEN_ID [--yes] [--json]
+```
+
+选择一个 --scope 预设，或重复 --capability。默认有效期为 90 天；不过期必须明确使用 --never-expires。--dry-run 不签发令牌，JSON 修改需要 --yes。JSON 的 data.preview 保留权限预览，只有签发输出中的 data.issued.token 显示秘密。
+
+拒绝创建或撤销，或在没有终端且没有 --yes 的情况下执行，都会以代码 1 退出，不修改任何令牌。创建使用服务预览中显示的确切到期时间，等待确认不会延长有效期。若该时间已过，请获取新的预览。
+
+列出、创建和撤销令牌需要已配置的 Meridian 控制服务。未保存服务 URL 或访问凭证时，命令以代码 2 退出并提示部署步骤；Remnawave 服务器会提示运行 `meridian migrate`。本地权限目录在未配置服务器时仍可查看。
+
 ### meridian panel
 
 显示网页面板的地址；在面板还没有所有者时，同时显示一次性设置链接。
@@ -584,7 +603,7 @@ meridian panel [--setup-link]
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
-| `--setup-link` | | 即使面板已有所有者，也打印一个重置链接：它会设置新密码、关闭登录验证码，并让所有设备退出登录 |
+| `--setup-link` | | 即使面板已有所有者，也打印恢复链接：它会设置新密码、关闭登录验证码、移除所有通行密钥，并让所有设备退出登录 |
 
 设置链接只能使用一次，有效期 15 分钟；打开它来设置所有者的密码。面板有所有者之后，`panel` 会打印地址以及是否已开启登录验证码。请像保护密码一样保护地址和设置链接。在网页面板中你可以管理用户、通知、语言、隐私和 API 令牌；服务器、修订和拓扑设置在那里是只读的。详见[网页面板](/zh/client-management/#网页面板)。
 

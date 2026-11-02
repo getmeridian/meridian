@@ -58,6 +58,8 @@ NOT_SNAPSHOTTED = (
     "ui_owner",
     "ui_sessions",
     "ui_setup_links",
+    "ui_passkeys",
+    "ui_passkey_owner",
 )
 _RECOVERY = "recovery_key"
 _DEPLOYER = "deployer_state"

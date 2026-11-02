@@ -99,6 +99,20 @@ def _route_mutation(success: str) -> list[CommandOutcome]:
 
 # Every public command, keyed by its dotted path; None means human output only.
 COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
+    "token.capabilities": CommandOutput(
+        data_schema="token-capabilities", outcomes=[_ok("capabilities listed"), *_FAILURES], stability="preview"
+    ),
+    "token.list": CommandOutput(
+        data_schema="token-list", outcomes=[_ok("token metadata listed"), *_FAILURES], stability="preview"
+    ),
+    "token.create": CommandOutput(
+        data_schema="token-create-result",
+        outcomes=[_ok("token issued", status="changed"), _ok("token permissions previewed"), *_FAILURES],
+        stability="preview",
+    ),
+    "token.revoke": CommandOutput(
+        data_schema="token-record", outcomes=[_ok("token revoked"), *_FAILURES], stability="preview"
+    ),
     "setup": None,
     "deploy": CommandOutput(
         data_schema="deploy-command-data",

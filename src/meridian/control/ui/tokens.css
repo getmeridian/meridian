@@ -1,0 +1,6 @@
+/* Token choices share the console palette and keep full rows easy to tap. */
+.token-choices { border: 1px solid var(--b1); border-radius: var(--r2); padding: .75rem; min-width: 0; }
+.token-choices legend { color: var(--t2); font-weight: 600; padding-inline: .25rem; }
+.token-choices .check-row { display: flex; align-items: center; gap: .75rem; min-height: 44px; cursor: pointer; }
+.token-choices input[type="checkbox"] { width: 1.15rem; height: 1.15rem; margin: 0; flex: 0 0 auto; accent-color: var(--ac); }
+.token-choices span { overflow-wrap: anywhere; }

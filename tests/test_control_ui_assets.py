@@ -13,6 +13,7 @@ from meridian.control.models import USERNAME_PATTERN, LimitStrategy, RevisionSta
 from meridian.control.server import ALL_ROUTES, OWNER_ROUTES
 from meridian.control.ui_models import PasskeyState, ServerView
 from meridian.control.ui_routes import UI_DIR
+from meridian.core.token_models import TOKEN_CAPABILITIES
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "meridian" / "control"
 INDEX = (UI_DIR / "index.html").read_text(encoding="utf-8")
@@ -114,6 +115,8 @@ def test_every_literal_key_the_scripts_use_exists() -> None:
         for literal in re.findall(r'"([a-z_]+\.[a-z_.]*[a-z])"', source)
         if literal.split(".", 1)[0] in namespaces
     }
+    literal_translations = {key for source in JS.values() for key in re.findall(r'M\.t\("([^"]+)"', source)}
+    used -= set(TOKEN_CAPABILITIES) - literal_translations
     assert used and sorted(used - set(ENGLISH)) == []
 
 
@@ -136,7 +139,15 @@ def test_every_value_the_service_sends_has_a_label(prefix: str, values: tuple[st
 
 def test_every_refusal_the_sign_in_routes_raise_has_a_message() -> None:
     codes = set()
-    for module in ("owner.py", "ui_routes.py", "login_limits.py", "tokens.py", "server.py"):
+    for module in (
+        "owner.py",
+        "ui_routes.py",
+        "login_limits.py",
+        "tokens.py",
+        "server.py",
+        "passkeys.py",
+        "webauthn.py",
+    ):
         source = (SRC / module).read_text(encoding="utf-8")
         codes |= set(re.findall(r'(?:ServiceError|super\(\)\.__init__)\(\s*"([a-z_]+)"', source))
     assert codes and sorted(code for code in codes if f"error.{code}" not in ENGLISH) == []

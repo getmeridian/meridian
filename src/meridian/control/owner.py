@@ -3,12 +3,12 @@
 - **Setup links** — the root admin token (the deployer's CLI) issues a single-use
   token valid for 15 minutes; issuing one voids any earlier unused link. A `setup`
   link works only while no owner exists; a `reset` link (`meridian panel
-  --setup-link`) also replaces an owner's password, turns TOTP off, and ends every
+  --setup-link`) also replaces an owner's password, turns TOTP off, removes passkeys, and ends every
   session, so whoever holds the deployer's machine can always recover.
 - **Sessions** — a random token in an `HttpOnly` cookie; only its SHA-256 is
   stored. A session ends after `IDLE_SECONDS` without use or `ABSOLUTE_SECONDS`
-  after sign-in, whichever comes first. Sensitive changes need the password (and
-  code) again within `CONFIRM_SECONDS` (`require_recent`).
+  after sign-in, whichever comes first. Sensitive changes need password/TOTP or a
+  verified passkey within `CONFIRM_SECONDS` (`require_recent`).
 - **No addresses** — sessions keep only times; guess limits live in memory
   (`login_limits.py`), per bucket: sign-in, setup links, and each session's own
   password or code re-checks, so failures at one never lock another.
@@ -32,6 +32,7 @@ from meridian.control.enrollment import token_sha256
 from meridian.control.errors import ServiceError
 from meridian.control.login_limits import LoginLimiter
 from meridian.control.models import OwnerStatus, SetupLinkGrant
+from meridian.control.passkey_tables import PASSKEY_TABLES
 from meridian.control.passwords import (
     PasswordPolicyError,
     check_password_policy,
@@ -110,7 +111,7 @@ class OwnerAuth:
         self._store = store
         self._clock = clock
         self.limiter = limiter or LoginLimiter()
-        for table in UI_TABLES:
+        for table in (*UI_TABLES, *PASSKEY_TABLES):
             store.create(table)
 
     # -- owner -----------------------------------------------------------------------
@@ -174,7 +175,9 @@ class OwnerAuth:
                 (password_hash, now, now),
             )
             self._store.db.execute("DELETE FROM ui_sessions")
-            session = self._new_session(now)
+            self._store.db.execute("DELETE FROM ui_passkeys")
+            self._store.db.execute("DELETE FROM ui_passkey_owner")
+            session = self.new_session(now)
         self.limiter.succeeded(SETUP_BUCKET)
         self.limiter.succeeded(OWNER_BUCKET)  # the new password must not inherit the old one's lockout
         return session
@@ -182,20 +185,24 @@ class OwnerAuth:
     # -- sign-in -----------------------------------------------------------------------
 
     def login(self, password: str, code: str) -> OwnerSession:
-        return self._verify(password, code, bucket=OWNER_BUCKET, then=self._new_session)
+        return self._verify(password, code, bucket=OWNER_BUCKET, then=self.new_session)
 
     def confirm(self, session: OwnerSession, password: str, code: str) -> None:
         """Prove the owner is still at the keyboard; sensitive changes need it within `CONFIRM_SECONDS`."""
 
         def mark(now: int) -> None:
-            cursor = self._store.db.execute(
-                "UPDATE ui_sessions SET confirmed_at = ? WHERE session_id = ? AND last_seen_at > ? AND created_at > ?",
-                (now, session.session_id, now - IDLE_SECONDS, now - ABSOLUTE_SECONDS),
-            )
-            if cursor.rowcount != 1:
-                raise unauthenticated()  # signed out, reset, or expired while the password hashed
+            self.confirm_verified(session)
 
         self._verify(password, code, bucket=session_bucket(session), then=mark)
+
+    def confirm_verified(self, session: OwnerSession) -> None:
+        """Inside the proof's transaction: confirm a live session after password/TOTP or a verified passkey."""
+        self.hold_live(session)
+        now = self._now()
+        self._store.db.execute(
+            "UPDATE ui_sessions SET confirmed_at = ?, last_seen_at = ? WHERE session_id = ?",
+            (now, now, session.session_id),
+        )
 
     def _verify(self, password: str, code: str, *, bucket: str, then: Callable[[int], T]) -> T:
         """Check password and code together and, in the same transaction, run `then`; any failure reads the same.
@@ -282,7 +289,7 @@ class OwnerAuth:
         return int(cursor.rowcount)
 
     def require_recent(self, session: OwnerSession) -> None:
-        """Refuse a sensitive change unless the owner confirmed their password within `CONFIRM_SECONDS`."""
+        """Refuse a sensitive change unless password/TOTP or a passkey confirmed it within `CONFIRM_SECONDS`."""
         if self._now() - session.confirmed_at > CONFIRM_SECONDS:
             raise _reauth_required()
 
@@ -377,7 +384,7 @@ class OwnerAuth:
 
     # -- helpers -----------------------------------------------------------------------
 
-    def _new_session(self, now: int) -> OwnerSession:
+    def new_session(self, now: int) -> OwnerSession:
         """Insert a session (inside a transaction), dropping expired ones and the least recent beyond the cap."""
         db = self._store.db
         db.execute(
@@ -418,7 +425,7 @@ def session_bucket(session: OwnerSession) -> str:
 
 
 def _reauth_required() -> ServiceError:
-    return ServiceError("reauth_required", "Confirm your password to continue.", 403)
+    return ServiceError("reauth_required", "Confirm your identity to continue.", 403)
 
 
 def _dead_link() -> ServiceError:

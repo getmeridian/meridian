@@ -16,19 +16,15 @@ from meridian.control.command_models import (
     UserCutOffRequest,
 )
 from meridian.control.models import (
-    IssuedToken,
+    NodeStatus as ServiceNodeStatus,
+)
+from meridian.control.models import (
     PrivacySettings,
     PrivacyState,
     PrivacyUpdateResult,
     RevisionList,
-    TokenCreate,
-    TokenList,
-    TokenRecord,
     TrafficDailySummary,
     UserUsage,
-)
-from meridian.control.models import (
-    NodeStatus as ServiceNodeStatus,
 )
 from meridian.core.apply import (
     ApplyCommandData,
@@ -104,6 +100,7 @@ from meridian.core.schema_delivery_service import service_delivery_schemas
 from meridian.core.schema_envelopes import make_command_envelope
 from meridian.core.schema_people import PEOPLE_SCHEMAS
 from meridian.core.schema_servers import SERVER_SCHEMAS, server_command_schemas
+from meridian.core.schema_tokens import TOKEN_SCHEMAS, token_command_schemas
 from meridian.core.schema_topology import TOPOLOGY_SCHEMAS
 from meridian.core.verification import (
     FleetTestResult,
@@ -583,10 +580,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "privacy-state": PrivacyState,
     "privacy-update": PrivacyUpdateResult,
     "traffic-daily": TrafficDailySummary,
-    "token-create": TokenCreate,
-    "token-record": TokenRecord,
-    "token-issued": IssuedToken,
-    "token-list": TokenList,
+    **TOKEN_SCHEMAS,
     "client-add-envelope": ClientAddOutputEnvelope,
     "client-remove-envelope": ClientRemoveOutputEnvelope,
     "client-reissue-envelope": ClientReissueOutputEnvelope,
@@ -664,6 +658,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     **SERVER_SCHEMAS,
     **credential_command_schemas(_ContractEnvelope, EmptyData),
     **server_command_schemas(_ContractEnvelope, EmptyData),
+    **token_command_schemas(_ContractEnvelope, EmptyData),
     **TOPOLOGY_SCHEMAS,
     "node-add-request": NodeAddRequest,
     "node-target-request": NodeTargetRequest,

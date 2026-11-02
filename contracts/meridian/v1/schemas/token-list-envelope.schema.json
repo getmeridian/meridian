@@ -1,0 +1,417 @@
+{
+  "$defs": {
+    "EmptyData": {
+      "additionalProperties": false,
+      "description": "Empty data object used by envelopes without command-specific failure data.",
+      "properties": {},
+      "title": "EmptyData",
+      "type": "object"
+    },
+    "ErrorModel": {
+      "additionalProperties": false,
+      "description": "Structured error safe for JSON/API clients.",
+      "properties": {
+        "category": {
+          "enum": [
+            "user",
+            "system",
+            "bug",
+            "cancelled"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "cause": {
+          "additionalProperties": true,
+          "title": "Cause",
+          "type": "object"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "exit_code": {
+          "default": 1,
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "hint": {
+          "default": "",
+          "title": "Hint",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "message"
+      ],
+      "title": "MeridianError",
+      "type": "object"
+    },
+    "Summary": {
+      "additionalProperties": false,
+      "description": "Structured summary shown in JSON envelopes and UI dashboards.",
+      "properties": {
+        "changed": {
+          "default": false,
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "Summary",
+      "type": "object"
+    },
+    "TokenList": {
+      "additionalProperties": false,
+      "properties": {
+        "tokens": {
+          "items": {
+            "$ref": "#/$defs/TokenRecord"
+          },
+          "title": "Tokens",
+          "type": "array"
+        }
+      },
+      "required": [
+        "tokens"
+      ],
+      "title": "TokenList",
+      "type": "object"
+    },
+    "TokenRecord": {
+      "additionalProperties": false,
+      "description": "Metadata only. A null scope is an explicit grant; stored grants never expand implicitly.",
+      "properties": {
+        "capabilities": {
+          "items": {
+            "enum": [
+              "api.read",
+              "fleet.read",
+              "topology.read",
+              "fleet.apply",
+              "nodes.enroll",
+              "people.read",
+              "people.query",
+              "people.batch",
+              "people.private",
+              "people.edit",
+              "people.credentials",
+              "people.reset",
+              "people.reissue",
+              "people.remove",
+              "people.devices",
+              "people.bulk",
+              "commands.read",
+              "commands.restart",
+              "commands.run",
+              "commands.cut_off",
+              "backup.read",
+              "backup.edit",
+              "settings.edit",
+              "tokens.read",
+              "tokens.issue",
+              "tokens.revoke",
+              "revisions.read",
+              "revisions.propose",
+              "revisions.approve",
+              "revisions.approve_own",
+              "owner.read",
+              "console.read"
+            ],
+            "type": "string"
+          },
+          "title": "Capabilities",
+          "type": "array"
+        },
+        "created_at": {
+          "description": "RFC 3339 timestamp in UTC, ending in Z.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Created At",
+          "type": "string"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        },
+        "id": {
+          "pattern": "^[0-9a-f]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "last_used_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Coarse: updated at most once a minute.",
+          "title": "Last Used At"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "revoked_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in Z.",
+              "maxLength": 40,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revoked At"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "enum": [
+                "read",
+                "propose",
+                "approve",
+                "people",
+                "admin"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Scope"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "scope",
+        "created_at"
+      ],
+      "title": "TokenRecord",
+      "type": "object"
+    },
+    "_TokenListSuccessEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "token.list",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/TokenList"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "maxItems": 0,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "ok",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_TokenListSuccessEnvelope",
+      "type": "object"
+    },
+    "_TokenListTerminalEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "token.list",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/EmptyData"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "minItems": 1,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "failed",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_TokenListTerminalEnvelope",
+      "type": "object"
+    }
+  },
+  "description": "Envelope schema for meridian token list --json.",
+  "discriminator": {
+    "mapping": {
+      "failed": "#/$defs/_TokenListTerminalEnvelope",
+      "ok": "#/$defs/_TokenListSuccessEnvelope"
+    },
+    "propertyName": "status"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/_TokenListSuccessEnvelope"
+    },
+    {
+      "$ref": "#/$defs/_TokenListTerminalEnvelope"
+    }
+  ],
+  "title": "TokenListOutputEnvelope"
+}

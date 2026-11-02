@@ -7,6 +7,8 @@
 **Revocation receipts** — client guides explain per-generation causes, private key fingerprints, restored-key clearing, and confirmed-history cleanup in every locale.
 **Core command safety** — CLI guides describe shared applied-document/config checks, retryable refusals, and new-command retries in every locale.
 **Live revocation** — client guides explain identity-only blocks, preserved DNS/IP routing, restart and re-enable cleanup, and the bounded-rule recovery request in every locale.
+**Capability tokens** — token guides describe independent action and credential grants, service previews, default expiry, explicit no-expiry, compatible frozen presets, delegation limits, and CLI producing output in every locale.
+**Owner passkeys** — client, security, and panel CLI guides describe reviewed-domain verification, recent identity checks, session bounds, lost-key removal, root recovery, and snapshot exclusion in all four locales.
 **Account schedules** — client and CLI guides document UTC anniversaries, first-traffic durations, capped renewal catch-up, previews, pending extension, and preservation; connecting guides explain first use and the page's dates in every locale.
 **Connection-key rotation** — client guides distinguish refresh with the same URL from reissue after a leaked link, document generation preconditions, device preservation, declared ownership, and optional hard cut-off in every locale.
 **Session revocation guides** — client and CLI guides describe per-node blocking, surviving TCP/UDP/XUDP associations, removal/reissue/rotation consent, all-inbound/bridge core restarts, listed-inbound resets, and failure fallbacks in every locale.

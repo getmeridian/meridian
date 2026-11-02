@@ -14,7 +14,7 @@
       M.formatPreviewSection(),
       M.privacySection(),
       h("h2", { class: "section-title", text: M.t("settings.security") }),
-      h("div", { class: "cards" }, passwordCard(), totpCard(), passkeyCard(), sessionsCard()),
+      h("div", { class: "cards" }, passwordCard(), totpCard(), M.passkeyCard(), sessionsCard()),
       M.cliHint(),
     ]);
   };
@@ -138,13 +138,6 @@
       h("p", { class: "muted small", text: M.t("totp.offer_why") }),
       h("p", { class: "muted small", text: M.t(on ? "totp.on_text" : "totp.off_hint") }),
       h("div", { class: "row-actions" }, button));
-  }
-
-  function passkeyCard() {
-    var state = (M.state.auth && M.state.auth.passkeys) || { reason: "no_domain" };
-    return h("section", { class: "card" },
-      h("div", { class: "card-head" }, h("h2", { text: M.t("passkeys.title") }), M.pill("muted", M.t("passkeys.unavailable"))),
-      h("p", { class: "muted small", text: M.t("passkeys." + state.reason) }));
   }
 
   function sessionsCard() {

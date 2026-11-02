@@ -32,6 +32,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - **People-query fixtures use real service pages** — DOM scenarios receive backend replies; rewound databases drop people indices and triggers before removing columns.
 - **Report freshness uses service receipt time** — advancing a hello timestamp must never renew an older runtime report; pin both the receipt clock and revision in evidence tests.
 - **Pinned Xray blocks private targets in freedom by default** — loopback session tests need an explicit final allow, or a target refusal can masquerade as successful revocation.
+- **Capability IDs are data, not translation keys** — asset scans exclude catalog IDs from broad string matching but still require every literal `M.t()` call to resolve.
 - **`tmp_home` must patch both** the env var and `meridian.config` attributes; patch `meridian.config.NAME`, never a module's copy.
 - **The suite isolates the cache and drops `FORCE_COLOR`** — throttled banners would otherwise make output depend on test order, and Rich would turn plain-text assertions into ANSI escapes.
 - **Reset JSON mode after each CLI invocation** — a leaked JSON mode made a later confirmation require `--yes`; read JSON from stdout apart from backup notices.

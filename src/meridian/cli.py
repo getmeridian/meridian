@@ -43,6 +43,7 @@ from meridian.cli_options import (
     enable_json_output,
 )
 from meridian.cli_privacy import privacy_app
+from meridian.cli_token import token_app
 from meridian.config import DISABLE_UPDATE_CHECK
 from meridian.console import banner, banner_due
 
@@ -58,7 +59,7 @@ _HELP_LAYOUT: tuple[tuple[str, tuple[str, ...]], ...] = (
     (CLIENTS, ("client",)),
     (SERVERS, ("node", "relay", "route", "fleet", "server", "context")),
     (CHECK_AND_FIX, ("check", "test", "probe", "doctor", "logs", "plan", "apply", "backup", "restore")),
-    (ADVANCED, ("panel", "privacy", "scan", "update", "migrate", "teardown", "api")),
+    (ADVANCED, ("panel", "token", "privacy", "scan", "update", "migrate", "teardown", "api")),
 )
 # Option panels inside `deploy --help`.
 SERVER_ACCESS = "Server access"
@@ -193,6 +194,7 @@ app.add_typer(route_app, name="route", rich_help_panel=SERVERS)
 app.add_typer(fleet_app, name="fleet", rich_help_panel=SERVERS)
 app.add_typer(context_app, name="context", rich_help_panel=SERVERS)
 app.add_typer(api_app, name="api", rich_help_panel=ADVANCED)
+app.add_typer(token_app, name="token", rich_help_panel=ADVANCED)
 app.add_typer(dev_app, name="dev", hidden=True)
 app.add_typer(backup_app, name="backup", rich_help_panel=CHECK_AND_FIX)
 app.add_typer(privacy_app, name="privacy", rich_help_panel=ADVANCED)

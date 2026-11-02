@@ -2,6 +2,7 @@
 
 ## Design decisions
 - **People pages are bounded service reads** — rows and fragment filters survive refresh; selection sends usernames or the same query, then a frozen review and receipt.
+- **Token review uses the service** — labels come from the shared four-language capability catalog; review locks the effective expiry, edits require another review, and the one-time secret never enters browser storage.
 - **Account dates come from the service** — lifecycle forms preview the shared UTC calculator, show browser time beside UTC, and send only edited choices.
 - **Served by the service, under the secret path** — `ui_routes.py` serves `index.html` at `/` and assets at `/ui/<name>`; the API lives in the same process, so there is no CORS, no build step, and no outside request (system fonts, local icons, QR codes as SVG data URIs from `segno`).
 - **Vanilla JS on one namespace** — `boot.js` sets theme and direction before paint; `core.js` owns `M.h` (the only DOM builder), `M.api`, dialogs, and formatting; each screen file adds `M.screens.*`; `app.js` runs the state machine (setup link → no owner → sign in → shell).
@@ -12,7 +13,7 @@
 - **Person drafts live only in memory** — changed forms guard navigation and dismissal with Leave/Stay, and visible reads refresh passively without replacing edits.
 - **People triage lives in the fragment** — validated filters and sorting survive reloads and person navigation; rows stay mounted, and facet counts apply the other active filters and search.
 - **Same locale approach as the PWA** — `locales/{en,ru,fa,zh}.json`, English fallback, `fa` sets `dir="rtl"`, numbers and sizes bidi-isolated.
-- **Passkeys are a seam** — `PasskeyState` reports `no_domain` on a bare IP and `not_built` otherwise; py_webauthn would add pyOpenSSL, pyasn1, and cbor2 to every CLI install, and attestation is never parsed by hand.
+- **Passkeys verify locally** — reviewed `public_url` fixes RP/origin; required user verification, none attestation, bounded CBOR, and existing cryptography verify ES256/Ed25519 without identity lookup or a new dependency. Passkeys satisfy session step-up; add/rename/remove require it, and removal ends other sessions.
 
 ## What's done well
 - **Connection keys and leaked links have separate actions** — rotation preserves the subscription URL, sends the displayed generation, and locks confirmation and submission; declared people receive the CLI command.
@@ -24,11 +25,15 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Empty WebAuthn owner handles are null** — zero-length ArrayBuffers are truthy; never encode them as empty strings.
+- **Recoverable refusals precede challenge consumption** — check recent identity and key capacity in the write transaction before taking a registration proof; confirmation checks session liveness first.
+- **Challenge capacity belongs to its caller** — anonymous login evicts only its oldest bounded requests; registration and confirmation keep one challenge per kind and live session, so anonymous traffic never blocks an owner.
 - **Bulk expiry validates before reading** — a deferred submit listener cannot guard direct values; clearing expiry requires the explicit No end date choice.
 - **Undo replies can be uncertain** — read the receipt before reporting success, keep its latest state, and never enable a blind retry after a lost reply.
 - **People refreshes keep usable controls** — passive reads never disable selections or the pager; failed page requests restore the last accepted cursor and controls.
 - **Cut-off scope comes from each node's effect** — core restarts reconnect all Xray inbounds and bridges; reset captions name the affected tags and the whole-core fallback.
 - **One node can have several revoked generations** — show the key version and cause beside each receipt; repeated node names alone hide which identity is pending.
+- **Challenges bind purpose, owner handle, session, and reviewed origin** — consume once before verification; five-minute expiry and a global cap bound memory, while root recovery clears keys and changes the handle.
 - **Settle a form's disabled state before `M.trackForm()`** — a field disabled after the snapshot reads as edited, and the device editor once asked to discard changes nobody made.
 - **Device caps have three choices** — inherit, unlimited, or 1–100; saving another field preserves an exemption.
 - **Scope the session cookie to `ServiceConfig.public_path`** — a `/` cookie would ride every subscription request; without a path, sign-in is refused (`ui_unconfigured`), and so is a setup link.

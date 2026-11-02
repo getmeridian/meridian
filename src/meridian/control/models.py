@@ -7,7 +7,7 @@ these models are what the deployer stores and reads over `/api`.
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
-from typing import Annotated, Any, Literal, TypeAlias
+from typing import Annotated, Any, Literal
 
 from pydantic import BeforeValidator, Field, field_validator, model_validator
 
@@ -39,6 +39,30 @@ from meridian.core.models import CoreModel
 from meridian.core.person_activity import PersonAttentionReason
 from meridian.core.person_metadata import PersonTag, PrivateNote
 from meridian.core.server_allowances import ServerAllowanceSpec
+from meridian.core.token_models import (
+    TOKEN_SCOPES as TOKEN_SCOPES,
+)
+from meridian.core.token_models import (
+    IssuedToken as IssuedToken,
+)
+from meridian.core.token_models import (
+    ScopeRequirement as ScopeRequirement,
+)
+from meridian.core.token_models import (
+    TokenCreate as TokenCreate,
+)
+from meridian.core.token_models import (
+    TokenList as TokenList,
+)
+from meridian.core.token_models import (
+    TokenRecord as TokenRecord,
+)
+from meridian.core.token_models import (
+    TokenScope as TokenScope,
+)
+from meridian.core.token_models import (
+    scope_covers as scope_covers,
+)
 from meridian.core.topology import ClientRoutingPolicy, ProtocolKind, SubscriptionUpdateIntervalHours
 from meridian.core.traffic import NodeTrafficAccounting, PeriodTraffic, UserTrafficEvidence
 
@@ -464,69 +488,6 @@ class UserTrafficTotal(CoreModel):
 
 class TrafficSummary(CoreModel):
     users: list[UserTrafficTotal]
-
-
-TokenScope = Literal["read", "propose", "approve", "people", "admin"]
-# People is separate from read < propose < approve; admin includes both capabilities.
-TOKEN_SCOPES: tuple[TokenScope, ...] = ("read", "propose", "approve", "people", "admin")
-ScopeRequirement: TypeAlias = TokenScope | tuple[TokenScope, ...]
-
-
-def scope_covers(held: TokenScope, needed: TokenScope) -> bool:
-    """Whether a token holding `held` may do what `needed` guards."""
-    if held == "admin" or held == needed:
-        return True
-    if held == "people" or needed == "people":
-        return False
-    return TOKEN_SCOPES.index(held) >= TOKEN_SCOPES.index(needed)
-
-
-class TokenCreate(CoreModel):
-    """Mint one device's or agent's API token; the scope may not exceed the caller's."""
-
-    name: str = Field(min_length=1, max_length=64, pattern=r"^[^\x00-\x1f\x7f]+$")
-    scope: TokenScope
-    expires_at: Timestamp | None = Field(
-        default=None,
-        exclude_if=lambda value: value is None,
-        description="Optional UTC expiry; use either this or expires_in_days. Null or omitted means never.",
-    )
-    expires_in_days: int | None = Field(
-        default=None,
-        ge=1,
-        le=3650,
-        strict=True,
-        exclude_if=lambda value: value is None,
-        description="Whole days from issuance, measured by the service clock; null or omitted means never.",
-    )
-
-    @model_validator(mode="after")
-    def _expiry_choice(self) -> TokenCreate:
-        if self.expires_at is not None and self.expires_in_days is not None:
-            raise ValueError("Choose either expires_at or expires_in_days.")
-        return self
-
-
-class TokenRecord(CoreModel):
-    """One API token's metadata; never its secret, hash, or where it was used from."""
-
-    id: str = Field(pattern=r"^[0-9a-f]{12}$")
-    name: str
-    scope: TokenScope
-    created_at: Timestamp
-    last_used_at: Timestamp | None = Field(default=None, description="Coarse: updated at most once a minute.")
-    revoked_at: Timestamp | None = None
-    expires_at: Timestamp | None = None
-
-
-class IssuedToken(TokenRecord):
-    """A freshly minted token: the only response that ever carries its secret."""
-
-    token: OpaqueToken
-
-
-class TokenList(CoreModel):
-    tokens: list[TokenRecord]
 
 
 class OwnerStatus(CoreModel):

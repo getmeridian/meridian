@@ -16,6 +16,7 @@ PEOPLE_ROUTES: tuple[ApiRoute, ...] = (
         PeoplePage,
         "Find people with shared filters, stable cursor pages, and contextual counts.",
         credentials=False,
+        capability=("people.query", "people.private"),
         query_model=PeopleQuery,
         description=(
             "Case-folded username/display-name search; missing dates sort last. "
@@ -31,6 +32,7 @@ PEOPLE_ROUTES: tuple[ApiRoute, ...] = (
         BulkPreview,
         "Freeze a bulk selection and review every before/after without writing.",
         credentials=False,
+        capability=("people.batch", "people.private"),
         refusals=(NOT_FOUND,),
         description=(
             "Previews write no database rows or events. They expire after 10 minutes or a service restart. "
@@ -46,6 +48,7 @@ PEOPLE_ROUTES: tuple[ApiRoute, ...] = (
         BulkReceipt,
         "Commit the frozen review atomically and return a durable receipt.",
         credentials=False,
+        capability=("people.batch", "people.private"),
         refusals=(ErrorResponse(409, ("stale_people", "preview_expired", "preview_mismatch")),),
         description=(
             "Requires the preview ID and hash. "
@@ -61,6 +64,7 @@ PEOPLE_ROUTES: tuple[ApiRoute, ...] = (
         BulkReceipt,
         "Read a completed bulk receipt without notes or credentials.",
         credentials=False,
+        capability=("people.batch", "people.private"),
         refusals=(NOT_FOUND,),
     ),
     route(
@@ -72,6 +76,7 @@ PEOPLE_ROUTES: tuple[ApiRoute, ...] = (
         BulkReceipt,
         "Undo reversible field changes while every person is unchanged.",
         credentials=False,
+        capability=("people.batch", "people.private"),
         refusals=(NOT_FOUND, ErrorResponse(409, ("stale_people", "undo_refused"))),
         description=(
             "Undo lasts 10 minutes, survives service restarts, and is single-use. Reset and delete cannot be undone."

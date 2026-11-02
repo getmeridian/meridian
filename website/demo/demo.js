@@ -366,13 +366,22 @@
     }
     if (path === "api/tokens" && method === "POST") {
       var token = clone(responses["POST api/tokens"]);
-      Object.assign(token, { id: (++newId).toString(16).padStart(12, "0"), name: body.name, scope: body.scope, created_at: now(), last_used_at: null, revoked_at: null,
-        expires_at: body.expires_in_days ? iso(Date.now() + body.expires_in_days * 86400000) : null });
+      var grantCatalog = responses["GET api/token-capabilities"];
+      Object.assign(token, { id: (++newId).toString(16).padStart(12, "0"), name: body.name, scope: body.scope || null,
+        capabilities: body.capabilities || grantCatalog.presets[body.scope], created_at: now(), last_used_at: null, revoked_at: null,
+        expires_at: body.never_expires ? null : body.expires_at || iso(Date.now() + (body.expires_in_days || 90) * 86400000) });
       token.token = "demo-only-token-" + token.id + "-never-authorizes-anything";
       var metadata = clone(token); delete metadata.token;
       responses["GET api/tokens"].tokens.push(metadata);
       emit("token.created", token.name, { name: token.name, scope: token.scope });
       return reply(token);
+    }
+    if (path === "api/tokens/preview" && method === "POST") {
+      var catalog = responses["GET api/token-capabilities"];
+      var grants = body.capabilities || catalog.presets[body.scope];
+      return reply({ scope: body.scope || null, capabilities: grants,
+        permissions: grants.map(function (capability) { return catalog.capabilities.find(function (row) { return row.capability === capability; }); }),
+        expires_at: body.never_expires ? null : body.expires_at || iso(Date.now() + (body.expires_in_days || 90) * 86400000) });
     }
     if (path.indexOf("api/tokens/") === 0 && method === "DELETE") {
       var token = responses["GET api/tokens"].tokens.find(function (item) { return item.id === path.slice(11); });

@@ -14,6 +14,7 @@ from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.control.client import ControlClient, ControlServiceNotFound, add_mutation_listener
 from meridian.control.models import OwnerStatus
 from tests.support.control_service import ADMIN_TOKEN, serve_control
+from tests.support.text import unstyle
 
 runner = CliRunner()
 
@@ -109,6 +110,17 @@ def test_panel_with_an_owner_prints_no_link_unless_asked(tmp_home, monkeypatch) 
         assert "#setup=" not in quiet
         assert asked.exit_code == 0
         assert _check_link(url, _setup_token(_plain(asked.output)))["purpose"] in ("setup", "reset")
+
+
+def test_panel_does_not_call_an_owner_without_totp_password_only(tmp_home, monkeypatch) -> None:
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    monkeypatch.setattr(ControlClient, "owner_status", lambda self: OwnerStatus(exists=True, totp_enabled=False))
+    with serve_control(tmp_home, public_path="/s3cret") as url:
+        _save_service_fleet(monkeypatch, url)
+        result = runner.invoke(app, ["panel"])
+    assert result.exit_code == 0
+    assert "sign-in code off" in unstyle(result.output)
+    assert "password only" not in unstyle(result.output)
 
 
 def test_panel_on_a_service_without_the_console_asks_for_an_apply(tmp_home, monkeypatch) -> None:

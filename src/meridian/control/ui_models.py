@@ -45,10 +45,11 @@ class TotpCode(CoreModel):
 
 
 class PasskeyState(CoreModel):
-    """Passkeys need a domain (a WebAuthn RP ID is never an IP) and a WebAuthn backend, which is not built yet."""
+    """Availability follows the reviewed control domain; registered reveals no credential IDs or device facts."""
 
     available: bool = False
-    reason: Literal["no_domain", "not_built"]
+    reason: Literal["no_domain", "ready"]
+    registered: bool = False
 
 
 class AuthState(CoreModel):

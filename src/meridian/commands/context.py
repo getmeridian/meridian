@@ -74,6 +74,8 @@ READS_ONLY = frozenset(
         "plan",
         "probe",
         "privacy.show",
+        "token.capabilities",
+        "token.list",
         "relay.list",
         "route.list",
         "scan",

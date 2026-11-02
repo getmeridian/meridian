@@ -272,6 +272,18 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 
 控制服务内置了一个网页面板（也称管理面板或管理控制台），你可以在任何浏览器（包括手机）中管理用户。`meridian panel` 会打印它的地址；第一次还会打印一个一次性设置链接，用来设置所有者的密码。之后可以在 **Settings** 中添加来自身份验证器应用的登录验证码。
 
+**通行密钥：**面板使用配置中已确认的 HTTPS 域名时，打开 **设置 → 通行密钥 → 添加通行密钥**，输入名称并在设备上解锁密钥。最多可保存十个密钥，支持重命名，并显示添加和上次使用时间。保存密钥后，登录页会提供 **使用通行密钥登录**。必须通过 PIN、指纹或面容识别验证；已保存的密钥也可确认敏感操作。添加、重命名和移除密钥都需要五分钟内的身份确认。
+
+密钥域名来自已确认的服务器配置，不读取请求标头。浏览器不允许在纯 IP 地址上使用通行密钥；这种情况下仍使用密码和可选的验证器代码。更换域名后，需要为新域名保存密钥。每个请求有效期为五分钟且只能使用一次。服务只保存凭证 ID、公钥、计数器、自选名称和时间，不保存设备身份或地址，也不发送外部请求。
+
+同时出现大量登录尝试时，最早的匿名通行密钥请求可能会失效；请重新开始登录。已登录会话中的密钥注册和身份确认仍可使用。每个会话为每种操作保留自己的当前请求。
+
+如果在设备提示期间身份确认过期，请重新确认；面板会在五分钟挑战仍有效时重试已完成的请求。如果另一把密钥使列表达到上限，也可在删除一把不再需要的密钥后，于同一期限内重试该请求。
+
+验证器未返回账户标识时，通行密钥仍可用于登录和身份确认。
+
+移除密钥会阻止使用该密钥再次登录，并让其他浏览器会话全部退出。密码和登录验证码仍可使用。如果丢失所有登录方式，请在管理机器上运行 `meridian panel --setup-link`：仅根令牌可签发的一次性恢复链接会替换密码、关闭 TOTP、移除全部通行密钥并结束全部会话。所有者凭证（包括通行密钥）不会进入快照；恢复后的服务需要新的设置链接。
+
 | 在网页面板中修改 | 只读显示（用 `meridian` 修改） |
 |---|---|
 | **People**：添加用户、分享链接和二维码、启用或禁用、设置到期时间、流量限额和重置周期、设备上限、语言、私有备注和标签、重置流量、清除设备、签发新链接、删除（可选立即切断会话） | **Servers**：每个出口、中继和网关，其 agent 是否在线、是否已应用最新配置、版本、流量、每月额度和付款日期；在节点上点击 **Restart Xray** |
@@ -280,7 +292,7 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 
 在网页面板和 CLI 中所做的修改是同一回事：`meridian client list` 也会显示在网页面板中添加的用户，而无论在哪边设置的状态、限额或到期时间，应用都不会撤销。用 `meridian client add` 添加的用户仍归 CLI 管理：网页面板可以修改他们的限额和状态，但删除他们或签发新链接时，会显示相应的 `meridian client` 命令，因为这些用户属于已审核的拓扑。每个人都能在自己的订阅 URL 打开连接页面，包括在网页面板中添加的用户。
 
-网页面板不保存任何 SSH 密钥，因此被盗的会话无法修改你的服务器。每次登录在闲置 30 分钟后过期，最长 12 小时；创建令牌时会再次要求输入密码。
+网页面板不保存任何 SSH 密钥，因此被盗的会话无法修改你的服务器。每次登录在闲置 30 分钟后过期，最长 12 小时；创建令牌需要近期使用密码与 TOTP 或通行密钥确认身份。
 
 人员或密码表单有更改时，在页面跳转、浏览器后退、退出登录或关闭对话框前，会显示 **离开** 和 **留下**。恢复原值后不再询问；保存只清除该表单的未保存状态。草稿仅保存在内存中，不写入浏览器存储。人员状态和用量在页面可见时每 30 秒刷新一次，保留正在编辑的输入及焦点。自动刷新不会延长所有者会话的空闲时限。
 
@@ -294,23 +306,34 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 
 ### API 令牌
 
-脚本和社区机器人（例如告知用户剩余流量的 Telegram 机器人）通过控制服务的 API 通信。请为每个机器人单独创建令牌：
+为每个集成签发可单独撤销的令牌。在 **令牌** 中选择具体操作或兼容预设，设置到期时间，然后点击 **预览令牌**。服务会在 **创建令牌** 前显示实际权限和准确到期时间。修改选项后必须重新预览。令牌秘密只显示一次，不写入浏览器存储；响应不确定时会刷新元数据，并说明秘密无法找回。
 
-1. 打开网页面板（`meridian panel` 会打印地址），进入 **Tokens**，选择 **Create token**。
-2. 以机器人的名字命名令牌，并选择 **Read**。网页面板只显示一次令牌；请将其与机器人的密钥一起保存。
-3. 将机器人指向面板地址，并以 `Authorization: Bearer <token>` 发送令牌。API 路径位于该地址之下，例如 `https://198.51.100.10/<secret-path>/api/users/alice`。该地址包含秘密路径，因此要像令牌一样严格保密。
+在管理机器上：
+
+```bash
+meridian token capabilities
+meridian token create "Account reader" --capability people.read --expires-days 30 --dry-run --json
+meridian token create "Account reader" --capability people.read --expires-days 30 --yes --json
+meridian token list --json
+meridian token revoke TOKEN_ID --yes --json
+```
+
+权限相互独立。`people.read` 读取账户状态及隐私级别允许的设备记录，不提供连接密钥或私人备注。`people.private` 读取备注和标签；`people.credentials` 读取密钥、订阅链接及单独连接。`people.edit`、`people.reset`、`people.reissue`、`people.remove`、`people.devices`、`people.bulk` 分别允许账户编辑、周期流量重置、凭证轮换、账户删除、设备注册移除和凭证导入。修改响应与读取使用相同的凭证隐藏规则。
+
+用户查询需要 `people.query` 和 `people.private`；批量预览、提交、回执和撤销需要 `people.batch` 和 `people.private`，因为这些视图包含标签。凭证导入仍使用独立的 `people.bulk` 权限。people/admin 预设保留原有的查询和批量操作权限；read/propose/approve 预设无法调用这些接口。
+
+`commands.restart` 允许重启 Xray；其他维护命令需要 `commands.run`。使用 `cut_off: true` 删除或重新签发时，还需要 `commands.cut_off`。删除或重新签发拓扑中声明的用户需要 `fleet.apply`；面板所有者使用 CLI。`settings.edit` 修改隐私、通知和页面语言；已确认的拓扑设置需要 `fleet.apply`。`backup.read` 下载加密快照并读取备份公钥，不能添加密钥或解密快照；`backup.edit` 管理备份密钥和保存的服务器文件。提出变更、批准他人、批准自己及应用相互独立：`revisions.propose`、`revisions.approve`、`revisions.approve_own`、`fleet.apply`。批准自己的提案还需要普通批准权限。
+
+面板可签发现有 read/propose/approve/people 预设，以及自身运营设置和重启操作的窄权限。拓扑管理和备份权限通过 CLI 或获授权的 API 令牌签发。创建需要近期密码与 TOTP 或通行密钥确认。令牌只能转授自身拥有的权限，不能比签发它的令牌更晚到期；已撤销或过期的签发者不能利用先前验证的请求创建新令牌。
+
+新 API、CLI 和面板令牌默认有效期为 **90 天**。`expires_in_days` 接受 1–3650，也可指定未来 UTC 时间 `expires_at`。不过期必须明确选择 `never_expires: true` 或 `--never-expires`，单独的 `null` 会被拒绝。已有到期时间保持不变。兼容 `read`、`propose`、`approve`、`people`、`admin` 预设仅展开一次并保存等效权限，目录更新不会重新扩展已签发令牌。read 保留现有节点及端点访问（包括端点凭证），用户 UUID 和订阅令牌仍为空。自选令牌使用 `scope: null`，每条记录的 `capabilities` 列出实际权限。到期和撤销会使下一次请求返回 `401 unauthenticated`。包含凭证权限的令牌应像密码一样保护。
 
 #### OpenAPI 契约
 
-在面板地址下请求 **`GET /api/openapi.json`**，并发送相同的 `Authorization: Bearer <token>` 请求头。所有有效的 API 令牌都能读取该文档，包括 `people`；已过期或撤销的令牌会收到 `401`。这是英文的 **OpenAPI 3.1** 契约，包含已安装服务的版本、请求与响应模式、错误和所需权限。仓库中的副本位于 `contracts/meridian/v1/admin/openapi.json`；使用该副本时，请将客户端的基础 URL 设置为面板地址，包含秘密路径。
+通过 `GET /api/openapi.json` 或生成文件 `contracts/meridian/v1/admin/openapi.json` 读取 **OpenAPI 3.1**。发送 `Authorization: Bearer <token>`。必须拥有全部 `x-meridian-capabilities`；请求体条件由 `x-meridian-conditional-capabilities` 描述，凭证/私人字段及自我批准条件在 `x-meridian-extra-capabilities` 中。`x-meridian-scopes` 和 `x-meridian-capability-grants` 描述兼容预设。`x-meridian-credentials: true` 表示响应可能包含凭证，请保密且不要记录。agent 注册与协议、订阅、页面和面板认证使用独立接口。
 
-`x-meridian-scopes` 列出可选的所需权限。操作及其成功响应上的 `x-meridian-credentials: true` 表示响应可能包含凭据：请妥善保密，不要写入日志。用户连接凭据仅对 `people` 或 `admin` 返回；只读令牌收到的 UUID 和订阅令牌为空。连接端点响应可能包含传输混淆密码，加密快照也包含凭据。agent 注册与协议、订阅、连接页面和网页面板会话使用独立接口，不包含在此文档中。
-
-下方操作表会与契约核对。只读令牌可以看到：
-
-| 端点 | 返回 |
+| 操作 | 用途 |
 |---|---|
-| `GET /api/users/{username}` | 某个用户的状态、已用流量和限额、重置周期以及到期时间 |
 | `GET /api/users/{username}/flow-blocks` | 按节点返回阻止新数据流的结果；不含连接地址或设备数据 |
 | `GET /api/users` | 所有用户 |
 | `GET /api/traffic` | 每个用户的流量总计 |
@@ -318,18 +341,18 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 | `GET /api/openapi.json` | 管理 API 契约 |
 | `GET /api/events` | 有数量上限的本地事件分页 |
 | `GET /api/attention` | 根据当前状态计算的账户、节点和服务器警告 |
+| `GET /api/token-capabilities` | 操作、兼容预设及四种语言的权限说明 |
+| `POST /api/tokens/preview` | 实际权限及到期时间，不创建令牌、事件或拉取备份 |
+| `POST /api/tokens` | 使用 `name` 和一个 `scope` 或非空 `capabilities` 数组签发 |
+| `GET /api/tokens` | 无秘密的元数据；`tokens.read` |
+| `DELETE /api/tokens/{token_id}` | 撤销；`tokens.revoke` |
+| `GET /api/users/{username}` | 账户状态；`people.read`，私人/凭证字段需单独授权 |
+| `PATCH /api/users/{username}` | 修改账户字段；`people.edit` |
+| `POST /api/users/{username}/reset-traffic` | 重置周期流量；`people.reset` |
+| `POST /api/users/{username}/reissue` | 轮换凭证；`people.reissue` |
+| `DELETE /api/users/{username}` | 删除；`people.remove` |
 
-只读令牌看不到用户的密钥或订阅 ID。如果机器人需要管理账户并分发连接凭据，请选择**用户**权限。创建这种令牌与创建其他网页面板令牌一样，需要再次确认密码。
-
-| 权限 | 允许的操作 |
-|---|---|
-| `read` | 查看服务器和用户，不包含连接凭据 |
-| `propose` | 只读权限，以及提交修订提案 |
-| `approve` | 提案权限，以及批准其他调用者的修订 |
-| `people` | 查看和管理用户，包括 UUID 和订阅令牌 |
-| `admin` | 包含两组权限，还可修改拓扑、注册 agent、管理令牌和备份；通过部署者的 API 管理权限签发 |
-
-`people` 独立于 read → propose → approve 权限链。它可以访问 `/api/users` 并读取 `/api/openapi.json`，无法访问节点、连接端点、应用锁、修订、备份、agent 注册、API 令牌、隐私或设置。Admin 包含 people 权限。
+通过 `meridian api schema NAME` 查看 `token-create`、`token-record`、`token-issued`、`token-list`、`token-preview` 和 `token-capabilities` 模式。CLI 签发 JSON 包含 `data.preview`，签发后包含 `data.issued.token`；后续响应无法恢复秘密。独立不可变权限模型可在未来组合访问配置边界；目前这类边界不会被接受或静默忽略。
 
 | 用户 API 端点 | 操作 |
 |---|---|
@@ -350,15 +373,11 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 | `DELETE /api/users/{username}/devices` | 清除全部注册 |
 | `DELETE /api/users/{username}/devices/{device_key}` | 删除一项注册 |
 
-先从 `GET /api/users/{username}` 读取 `credential_generation`，再向 `POST /api/users/{username}/rotate-credentials` 发送 `{"expected_generation": N}`。过期代次返回 `409 credentials_changed`，防止响应不确定时重试而再次更换密钥。响应包含 `user`、`subscription_preserved: true`、`flow_blocks` 和 `commands`。添加 `"cut_off": true` 需要 admin 权限，并排队执行与重新签发相同的版本门控完整终止操作。所有者会话和 people 令牌不能更换配置文件声明的用户的密钥。
+先从 `GET /api/users/{username}` 读取 `credential_generation`，再以 `people.reissue` 权限向 `POST /api/users/{username}/rotate-credentials` 发送 `{"expected_generation": N}`。过期代次返回 `409 credentials_changed`，防止响应不确定时重试而再次更换密钥。响应包含 `user`、`subscription_preserved: true`、`flow_blocks` 和 `commands`；用户字段遵循与读取相同的凭证及私人数据权限。添加 `"cut_off": true` 需要 `commands.cut_off`，并排队执行与重新签发相同的版本门控完整终止操作。轮换配置文件声明的用户还需要 `fleet.apply`；所有者会话使用 CLI。
 
 People 令牌无法删除服务器配置文件中声明的用户，也无法为他们重新签发连接凭据。API 会返回 `409 declared_user` 和需要运行的 CLI 命令。已经批准或失败的应用仍声明该用户时，这项限制同样有效；未经批准的提案不会声明任何用户。状态、限额、到期时间和设备上限仍可修改。
 
-重新签发和删除接受可选的 `{"cut_off": true}`；凭据轮换会将该选项与 `expected_generation` 一起发送。按 `x-meridian-conditional-scopes`，这需要 `admin` 权限。请逐个节点检查范围：核心重启影响所有 Xray 入站与桥接连接，入站重置只影响列出的入站，失败时会回退到整个核心重启。重新签发与删除未选择切断时保留普通响应，选择后包含排队命令；凭据轮换始终返回命令列表与回执。
-
-可以选择 **7、30 或 90 天**，或**永不过期**；网页面板新令牌默认有效期为 90 天。列表会显示到期时间并标记已过期令牌。到期和撤销都会在下一次请求时返回相同的 `401 unauthenticated` 响应。现有令牌仍保持无到期时间。请像保护密码一样保护 people 令牌，因为它可以读取用户的连接凭据。
-
-`POST /api/tokens` 接受 1–3650 的 `expires_in_days`，或用 `null` 表示永不过期。省略该字段也表示永不过期。也可改为传入将来的 UTC 时间 `expires_at`；只能选择一个到期字段。响应总会包含 `TokenRecord.expires_at`，无到期时间时为 `null`。管理令牌需要 admin API 权限或网页面板所有者会话；在网页面板创建令牌还需要再次确认密码。People 令牌无法签发令牌。可通过 `meridian api schema NAME` 查看 `token-create`、`token-record`、`token-issued` 和 `token-list` 模式。
+重新签发和删除接受可选的 `{"cut_off": true}`；凭据轮换会将该选项与 `expected_generation` 一起发送。按 `x-meridian-conditional-capabilities`，这需要 `commands.cut_off`；admin 预设包含此权限。请逐个节点检查范围：核心重启影响所有 Xray 入站与桥接连接，入站重置只影响列出的入站，失败时会回退到整个核心重启。重新签发与删除未选择切断时保留普通响应，选择后包含排队命令；凭据轮换始终返回命令列表与回执。
 
 ## 连接页面上的所有者联系信息
 

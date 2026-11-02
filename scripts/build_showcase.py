@@ -126,6 +126,7 @@ def write_recordings(directory: Path, client: httpx.Client, service: ControlServ
         "api/language",
         "api/notice",
         "api/tokens",
+        "api/token-capabilities",
         "api/revisions",
         "api/events",
         "api/traffic/daily?days=30",

@@ -96,6 +96,11 @@
       code ? M.field(M.t("auth.code"), code, M.t("auth.code_hint")) : null,
       error,
       h("button", { class: "btn btn-primary btn-block", type: "submit" }, M.t("auth.sign_in")));
+    if (auth.passkeys && auth.passkeys.available && auth.passkeys.registered) {
+      form.appendChild(M.passkeySupported() ? h("button", { class: "btn btn-ghost btn-block", type: "button", onclick: function () {
+        M.saveDraft(form, function () { return M.usePasskey(false); }).then(done, function () { /* shown in the form */ });
+      } }, M.t("passkeys.sign_in")) : h("p", { class: "muted small", text: M.t("error.passkey_browser") }));
+    }
     M.trackForm(form);
     form.addEventListener("submit", function (e) {
       e.preventDefault();
@@ -119,11 +124,13 @@
   /* Ask for the password (and code) again before a sensitive change; resolves once confirmed. */
   M.confirmIdentity = function () {
     var totp = M.state.auth && M.state.auth.totp_enabled;
+    var passkeys = M.state.auth && M.state.auth.passkeys;
+    var usePasskey = passkeys && passkeys.available && passkeys.registered && M.passkeySupported();
     return M.dialog(M.t("reauth.title"), function (close) {
       var password = passwordInput("current-password");
       var code = totp ? codeInput() : null;
       var form = h("form", { class: "stack", novalidate: true },
-        h("p", { class: "muted", text: M.t("reauth.text") }),
+        h("p", { class: "muted", text: M.t(usePasskey ? "reauth.text_passkey" : "reauth.text") }),
         M.field(M.t("auth.password"), password),
         code ? M.field(M.t("auth.code"), code) : null,
         h("p", { class: "form-error", role: "alert" }),
@@ -131,6 +138,11 @@
           h("button", { class: "btn btn-ghost", type: "button", onclick: function () { close(false); } },
             M.t("action.cancel")),
           h("button", { class: "btn btn-primary", type: "submit" }, M.t("reauth.submit"))));
+      if (usePasskey) {
+        form.insertBefore(h("button", { class: "btn btn-ghost btn-block", type: "button", onclick: function () {
+          M.saveDraft(form, function () { return M.usePasskey(true); }).then(function () { close(true); }, function () { /* shown in the form */ });
+        } }, M.t("passkeys.confirm")), form.querySelector(".actions"));
+      }
       M.trackForm(form);
       form.addEventListener("submit", function (e) {
         e.preventDefault();
