@@ -247,6 +247,9 @@
       mode.value = "first_use"; duration.value = String(days);
       mode.dispatchEvent(new Event("change", { bubbles: true }));
       duration.dispatchEvent(new Event("input", { bubbles: true }));
-    }, preview: function (change) { return schedulePreview.review(previewBody(change)); }, stop: schedulePreview.stop };
+    }, preview: function (change) { return schedulePreview.review(previewBody(change)); }, stop: schedulePreview.stop,
+    refresh: function (changed, dirty, active) {
+      if (dirty && active) schedulePreview.update(); else if (!dirty) schedulePreview.refresh(changed.schedule);
+    } };
   };
 })();

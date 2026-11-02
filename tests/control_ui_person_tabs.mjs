@@ -352,6 +352,53 @@ if (scenario === 'person-tabs-saving-preview') {
   report.sibling = { connected: note.isConnected, value: note.value, enabled: !note.disabled };
 }
 
+if (scenario === 'person-tabs-sibling-refresh') {
+  const expiry = await edit('expiry'), date = expiry.querySelector('input[type="date"]');
+  if (data.dirty) change(date, '2032-06-01');
+  date.focus();
+  const traffic = await edit('traffic'); change(traffic.querySelector('[name="traffic_limit_strategy"]'), 'week');
+  traffic.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await settle(); await settle();
+  await advance(300);
+  const current = fieldRow('expiry').querySelector('form');
+  report.expiry = { sameForm: current === expiry, sameDate: current.querySelector('input[type="date"]') === date,
+    date: date.value, dirty: M.formDirty(current), reset: current.querySelector('.lifecycle-preview bdi')?.title || '' };
+  report.writes = writes; report.trafficClosed = !fieldRow('traffic').querySelector('form');
+}
+
+if (scenario === 'person-tabs-clean-refresh') {
+  const key = data.field, before = await edit(key);
+  const old = before.querySelector(key === 'note' ? 'textarea' : '[name="expiry_mode"]');
+  old.focus(); if (key === 'note') old.setSelectionRange(1, 2);
+  if (key === 'note') user = { ...user, note: 'New' };
+  else user = { ...user, expire_at: '2026-12-02T12:00:00Z',
+    schedule: { ...user.schedule, expire_at: '2026-12-02T12:00:00Z', activation_pending: false } };
+  view().meridianLiveStop.refresh(true); await settle(); await settle();
+  const form = fieldRow(key).querySelector('form'), field = form.querySelector(key === 'note' ? 'textarea' : '[name="expiry_mode"]');
+  report.refreshed = { value: field.value, dirty: M.formDirty(form), focused: document.activeElement === field,
+    selection: key === 'note' ? [field.selectionStart, field.selectionEnd] : null,
+    date: form.querySelector('input[type="date"]')?.value || '' };
+  if (key === 'note') change(field, 'Old');
+  else {
+    const menu = view().querySelector('[data-person-action="extend"]').closest('details'); menu.open = true;
+    menu.querySelector('[data-months="1"]').click(); await settle(); await settle();
+  }
+  fieldRow(key).querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await settle(); await settle();
+  report.writes = writes; report.pendingReview = events.some(event => event.url === 'api/people/bulk/preview');
+  report.calendarReview = events.some(event => event.url?.includes('/expiry?'));
+  report.passive = events.filter(event => event.url === 'api/users/sample' && event.method === 'GET').at(-1)?.passive;
+}
+
+if (scenario === 'person-tabs-passive-draft') {
+  const form = await edit('expiry'), date = form.querySelector('input[type="date"]');
+  change(date, '2032-06-01'); await advance(300);
+  const previews = () => events.filter(event => event.url === 'api/users/preview').length;
+  report.before = previews(); await advance(31000);
+  report.after = previews(); report.sameField = date === fieldRow('expiry').querySelector('input[type="date"]');
+  report.draft = date.value; report.dirty = M.formDirty(form);
+  report.passive = events.filter(event => event.url === 'api/users/sample' && event.method === 'GET').at(-1)?.passive;
+}
+
 if (scenario === 'person-tabs-mode') {
   const field = view().querySelector('[name="device_mode"]');
   if (data.dirty) change(field, 'unlimited');

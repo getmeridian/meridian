@@ -1,7 +1,10 @@
-/* Each read row owns one inline draft; refreshes update facts, never open editors. */
+/* Each read row owns one inline draft; live facts refresh clean editors and preserve edits. */
 (function () {
   "use strict";
   var M = window.M, h = M.h, sequence = 0;
+  var owned = { expiry: ["expire_at", "activation_duration_days", "renewal_interval_days", "renewal_interval_months", "renewal_limit"],
+    traffic: ["traffic_limit_bytes", "traffic_limit_strategy", "traffic_reset_anchor_day"],
+    language: ["language"], note: ["note"], tag: ["tag"] };
 
   function date(value) {
     return value ? h("bdi", { tabindex: "0", title: value + " UTC", text: M.date(value) }) : M.t("people.no_expiry");
@@ -59,7 +62,7 @@
     } };
   }
 
-  function fields(key, user) {
+  function fields(key, user, currentUser) {
     if (key === "note" || key === "tag") return textFields(key, user);
     if (key === "language") {
       var original = user.language || "default";
@@ -80,19 +83,22 @@
         lifecycle.nodes.addEventListener(name, function () { presetTurn++; });
       });
       function preset(months) {
-        if (user.expire_at || !user.activation_duration_days) return expiry.preset(months);
+        var account = currentUser();
+        if (account.expire_at || !account.activation_duration_days) return expiry.preset(months);
         var mine = ++presetTurn;
         // The existing service extension review keeps pending first-use access pending.
-        return M.api("POST", "api/people/bulk/preview", { usernames: [user.username], action: { action: "extend", months: months } })
+        return M.api("POST", "api/people/bulk/preview", { usernames: [account.username], action: { action: "extend", months: months } })
           .then(function (review) {
             if (!lifecycle.nodes.isConnected || mine !== presetTurn) return;
+            var latest = currentUser();
+            if (latest.expire_at !== account.expire_at || latest.activation_duration_days !== account.activation_duration_days) return;
             var after = review.people[0].after;
             if (!after || !Number.isSafeInteger(after.activation_duration_days)) throw new M.ApiError(0, "invalid_request", "");
             lifecycle.setDuration(after.activation_duration_days);
           });
       }
       return { nodes: lifecycle.nodes, value: lifecycle.change, review: lifecycle.preview, preset: preset,
-        setFixed: lifecycle.setFixed, stop: lifecycle.stop };
+        setFixed: lifecycle.setFixed, stop: lifecycle.stop, refresh: lifecycle.refresh };
     }
     var limits = M.limitFields(user), anchor = M.resetAnchorFields(user, limits.strategy);
     function facts(schedule) { return M.scheduleFacts(schedule, { compact: true, expiry: false }); }
@@ -104,7 +110,9 @@
       return Object.assign({ username: user.username }, value());
     }, facts, error);
     limits.strategy.addEventListener("change", schedulePreview.update); anchor.input.addEventListener("input", schedulePreview.update);
-    return { nodes: nodes, value: value, stop: schedulePreview.stop, review: function (change) {
+    return { nodes: nodes, value: value, stop: schedulePreview.stop, refresh: function (changed, dirty, active) {
+      if (dirty && active) schedulePreview.update(); else if (!dirty) schedulePreview.refresh(changed.schedule);
+    }, review: function (change) {
       return schedulePreview.review(Object.assign({ username: user.username }, change));
     } };
   }
@@ -116,17 +124,17 @@
     function close(entry, focus) {
       if (!entry.form) return;
       if (entry.fields.stop) entry.fields.stop();
-      M.discardDrafts(entry.form); M.clear(entry.editor); entry.form = null; entry.fields = null;
+      M.discardDrafts(entry.form); M.clear(entry.editor); entry.form = null; entry.fields = null; entry.source = null;
       entry.edit.setAttribute("aria-expanded", "false");
       if (focus) entry.edit.focus();
     }
-    function open(key, months, fixed) {
+    function open(key, months, fixed, focus) {
       var entry = entries[key];
       if (!entry || entry.form && entry.form.meridianSaving) return Promise.resolve();
       var existing = entry.form;
       if (entry.row.closest("details")) entry.row.closest("details").open = true;
       if (!entry.form) {
-        var controls = fields(key, user);
+        var controls = fields(key, user, function () { return user; });
         if (fixed && controls.setFixed) controls.setFixed(true);
         var form = h("form", { class: "stack person-inline-editor", novalidate: true, "aria-labelledby": entry.labelId },
           controls.nodes, h("p", { class: "form-error", role: "alert" }),
@@ -134,7 +142,7 @@
             h("button", { class: "btn btn-ghost btn-sm", type: "button", "data-person-cancel": "", onclick: function () {
               M.tryLeave(form).then(function (leave) { if (leave && entry.form === form) close(entry, true); });
             } }, M.t("action.cancel"))));
-        entry.form = form; entry.fields = controls; M.mount(entry.editor, form); M.trackForm(form);
+        entry.form = form; entry.fields = controls; entry.source = user; M.mount(entry.editor, form); M.trackForm(form);
         ["input", "change"].forEach(function (name) {
           form.addEventListener(name, function () { if (!form.meridianSaving) form.querySelector(".form-error").textContent = ""; });
         });
@@ -160,7 +168,7 @@
         entry.fields.setFixed(true); if (clean) M.resetDraft(entry.form);
       }
       var first = entry.form.querySelector(fixed ? "input[type=date]" : "input:not(:disabled), select:not(:disabled), textarea");
-      if (first) first.focus();
+      if (first && focus !== false) first.focus();
       return months && entry.fields.preset ? M.busy(entry.form, function () { return entry.fields.preset(months); }) : Promise.resolve();
     }
     Object.keys(labels).forEach(function (key) {
@@ -198,6 +206,20 @@
       Object.keys(entries).forEach(function (key) {
         var entry = entries[key]; M.mount(entry.value, read(key, user));
         if (entry.form && entry.form === savedForm) close(entry, entry.form.contains(document.activeElement));
+        else if (entry.form && !entry.form.meridianSaving) {
+          var dirty = M.formDirty(entry.form);
+          if (!dirty && owned[key].some(function (field) { return entry.source[field] !== user[field]; })) {
+            var focused = document.activeElement;
+            var index = Array.from(entry.form.querySelectorAll("input, select, textarea, button")).indexOf(focused);
+            var selection = index >= 0 && typeof focused.selectionStart === "number" ? [focused.selectionStart, focused.selectionEnd] : null;
+            close(entry, false); open(key, null, false, false);
+            if (index >= 0) {
+              var next = entry.form.querySelectorAll("input, select, textarea, button")[index];
+              if (!next || next.disabled) next = entry.form.querySelector("input:not(:disabled), select:not(:disabled), textarea");
+              if (next) { next.focus(); if (selection && typeof next.selectionStart === "number") next.setSelectionRange(selection[0], selection[1]); }
+            }
+          } else if (entry.fields.refresh) entry.fields.refresh(user, dirty, !!savedForm);
+        }
       });
       mode();
     }

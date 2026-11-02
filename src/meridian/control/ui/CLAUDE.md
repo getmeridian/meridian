@@ -40,6 +40,8 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Inline refreshes distinguish saved choices from drafts** — reseed changed clean editors with focus, retain edited baselines, refresh sibling schedules, and let summary presets read the current account.
+- **Passive reads keep a draft's reviewed dates** — only edits and saves request a new draft preview, since repeated POST previews would renew the owner's idle activity.
 - **Traffic previews start with saved dates** — debounce period and reset-day edits, show and focus the reset field's own error, and clear obsolete form errors on input.
 - **Saving owns the preview timer** — cancel pending previews before the final review, reject timer work during saving, and never validate controls from a delayed callback.
 - **Custom date starts before the draft snapshot** — choose its fixed mode quietly, keep untouched existing editors clean, and let the date field own its single validation alert.

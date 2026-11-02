@@ -309,3 +309,39 @@ def test_submitting_before_the_preview_debounce_keeps_fields_frozen_through_revi
     assert result["review"] == {"frozen": True, "saving": True, "previews": 1}
     assert result["patch"] == {"frozen": True, "saving": True, "writes": 1}
     assert result["closed"] and result["sibling"] == {"connected": True, "value": "Other private draft", "enabled": True}
+
+
+@pytest.mark.parametrize("dirty", [False, True])
+def test_sibling_traffic_save_refreshes_an_open_expiry_preview_and_preserves_its_draft(dirty: bool) -> None:
+    schedule = {"next_reset_at": "2026-11-09T00:00:00Z"}
+    result = run_console(
+        "person-tabs-sibling-refresh", data={"clock": True, "dirty": dirty, "updatedSchedule": schedule, "schedulePreview": schedule}
+    )
+    assert result["expiry"]["reset"] == "2026-11-09T00:00:00Z UTC"
+    assert result["expiry"]["sameForm"] and result["expiry"]["sameDate"]
+    assert result["expiry"]["date"] == ("2032-06-01" if dirty else "2026-12-02")
+    assert result["expiry"]["dirty"] is dirty and result["trafficClosed"]
+    assert result["writes"] == [{"traffic_limit_strategy": "week"}]
+
+
+@pytest.mark.parametrize("field", ["note", "expiry"])
+def test_passive_refresh_reseeds_a_clean_editor_and_uses_the_current_saved_baseline(field: str) -> None:
+    result = run_console(
+        "person-tabs-clean-refresh", data={"field": field, "pending": field == "expiry", "user": {"note": "Old"}}
+    )
+    refreshed = result["refreshed"]
+    assert refreshed["value"] == ("New" if field == "note" else "fixed")
+    assert not refreshed["dirty"] and refreshed["focused"] and result["passive"]
+    if field == "note":
+        assert refreshed["selection"] == [1, 2] and result["writes"] == [{"note": "Old"}]
+    else:
+        assert refreshed["date"] == "2026-12-02"
+        assert result["calendarReview"] and not result["pendingReview"]
+        assert result["writes"] == [{"expire_at": "2032-06-01T12:00:00Z"}]
+
+
+def test_passive_polling_keeps_a_draft_without_starting_active_preview_posts() -> None:
+    result = run_console("person-tabs-passive-draft", data={"clock": True})
+    assert result["before"] == result["after"] == 1
+    assert result["passive"] and result["sameField"] and result["dirty"]
+    assert result["draft"] == "2032-06-01"
