@@ -8,16 +8,19 @@
   var root = null;
   var setupToken = "";
   var stopScreen = null;
+  var header = null, modeNote = null;
   var activeHash = null, position = 0, navigationTurn = 0, ignoreHash = null;
   var restoring = null, allowedTraversal = false;
 
   var SCREENS = [
+    { name: "overview", render: function (view) { return M.renderOverview(view); } },
     { name: "people", render: function (view, route) { return route.arg ? M.renderPerson(view, route.arg) : M.renderPeople(view); } },
-    { name: "servers", render: function (view) { return M.renderServers(view); } },
-    { name: "revisions", render: function (view, route) { return M.renderRevisions(view, route.arg); } },
-    { name: "tokens", render: function (view) { return M.renderTokens(view); } },
+    { name: "servers", render: function (view, route) { return M.renderServers(view, route.arg, route.extra); } },
+    { name: "revisions", detailed: true, render: function (view, route) { return M.renderRevisions(view, route.arg); } },
+    { name: "tokens", detailed: true, render: function (view) { return M.renderTokens(view); } },
     { name: "settings", render: function (view) { return M.renderSettings(view); } },
   ];
+  M.consoleScreens = SCREENS;
 
   function refreshAuth() {
     return M.rawApi("GET", "auth/state").then(function (auth) { M.state.auth = auth; return auth; });
@@ -50,6 +53,7 @@
 
   function renderNow() {
     if (stopScreen) { stopScreen(); stopScreen = null; }
+    if (header) { header.stop(); header = null; }
     M.discardDrafts(root);
     var auth = M.state.auth;
     document.title = (M.state.fleet && M.state.fleet.profile_title) || "Meridian";
@@ -73,7 +77,7 @@
         setupToken = "";
         refreshAuth().then(refreshFleet).then(function () {
           if (purpose === "setup" || !M.state.auth.totp_enabled) {
-            M.renderTotpOffer(root, function () { M.go("people"); });
+            M.renderTotpOffer(root, function () { M.go("overview"); });
           } else {
             M.render();
           }
@@ -94,23 +98,17 @@
     var route = M.route();
     var screen = SCREENS.filter(function (s) { return s.name === route.name; })[0] || SCREENS[0];
     var view = h("main", { id: "view", class: "view", tabindex: "-1" });
-    var nav = h("nav", { class: "tabs", "aria-label": M.t("nav.label") }, SCREENS.map(function (s) {
-      return h("a", { href: "#/" + s.name, class: "tab" + (s === screen ? " active" : ""),
-        "aria-current": s === screen ? "page" : null }, M.t("nav." + s.name));
-    }));
-    M.mount(root, [
-      h("header", { class: "top" },
-        h("div", { class: "top-inner" },
-          h("a", { class: "top-brand", href: "#/people" }, h("img", { src: "ui/icon.svg", alt: "", class: "brand-mark" }),
-            h("span", { class: "top-title", text: (M.state.fleet && M.state.fleet.profile_title) || "Meridian" })),
-          h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": M.t("auth.sign_out"),
-            onclick: signOut }, M.icon("out"),
-            h("span", { class: "hide-sm", text: M.t("auth.sign_out") }))),
-        h("div", { class: "top-inner" }, nav)),
-      view,
-    ]);
+    header = M.shellHeader(screen.name, signOut);
+    modeNote = M.modeNote();
+    M.mount(root, [header.node, h("div", { class: "shell-body" }, modeNote, view)]);
+    syncMode();
     var cleanup = screen.render(view, route);
     stopScreen = typeof cleanup === "function" ? cleanup : null;
+  }
+
+  function syncMode() {
+    if (header) header.update();
+    if (modeNote) modeNote.hidden = M.mode() === "detailed" || !M.isDetailedRoute(M.route().name);
   }
 
   function remember(hash, nextPosition) {
@@ -200,6 +198,7 @@
     setupToken = M.takeSetupToken();
     window.addEventListener("hashchange", hashChanged);
     window.addEventListener("popstate", traversed);
+    window.addEventListener("meridian:mode", syncMode);
     document.addEventListener("click", routeClick);
     M.i18n.load().then(refreshAuth).then(function (auth) {
       return auth.signed_in ? refreshFleet() : null;

@@ -60,9 +60,10 @@ w.fetch = async (url, options = {}) => {
   return { ok: status === 200, status, headers: { get: () => null }, text: async () => JSON.stringify(body) };
 };
 const load = name => { if (fs.existsSync(path.join(ui, name))) w.eval(fs.readFileSync(path.join(ui, name), 'utf8')); };
-['core.js', 'drafts.js', 'expiry.js', 'lifecycle.js', 'people.js', 'people-bulk.js', 'people-bulk-fields.js', 'people-list.js'].forEach(load);
+['core.js', 'drafts.js', 'components.js', 'shell.js', 'expiry.js', 'lifecycle.js', 'people.js', 'people-bulk.js', 'people-bulk-fields.js', 'people-list.js'].forEach(load);
 const M = w.M;
-M.i18n = { locale: () => locale === 'zh' ? 'zh-CN' : locale, load: async () => {} };
+M.i18n = { locale: () => locale === 'zh' ? 'zh-CN' : locale, load: async () => {}, lang: locale,
+  langs: ['en', 'ru', 'fa', 'zh'], names: { en: 'English', ru: 'Русский', fa: 'فارسی', zh: '中文' } };
 M.t = (key, params = {}) => (catalog[key] || key).replace(/\{(\w+)\}/g, (_, key) => String(params[key] ?? ''));
 M.takeSetupToken = () => '';
 M.renderServers = view => M.mount(view, M.h('p', { text: 'Servers' }));

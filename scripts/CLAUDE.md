@@ -25,5 +25,7 @@
 
 ## Pitfalls
 
+- **Demo token bounds come from `TokenCreate`** — export its schema with recordings, so preview and issuance use the same names, capabilities, and expiry choices as the service.
+- **Demo routes follow console calls** — every `M.api` or `M.rawApi` path needs a registered handler or explicit refusal in `website/demo/`; record new replies against their current models and run the showcase route guard before exporting.
 - Allowlist only real false positives in `dead_code_allowlist.txt`, each with a `# reason`; delete genuine dead code (and the tests keeping it alive) instead. Teach the analyzer a recurring reference pattern rather than allowlisting every name it hides.
 - Hatch drops gitignored files, so a generated file the package needs goes in `[tool.hatch.build] artifacts`; `ai-reference.md` was built in every release and shipped in none.

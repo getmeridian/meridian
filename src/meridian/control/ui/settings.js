@@ -1,4 +1,4 @@
-/* Meridian console: Settings: the fleet's title, appearance, and the owner's security
+/* Meridian console: Settings: the fleet's information and the owner's security
  * (password, the optional sign-in code, passkeys, and signed-in devices). */
 (function () {
   "use strict";
@@ -8,10 +8,10 @@
   M.renderSettings = function (view) {
     M.mount(view, [
       h("div", { class: "page-head" }, h("div", {}, h("h1", { text: M.t("nav.settings") }))),
-      h("div", { class: "cards" }, fleetCard(), appearanceCard()),
+      fleetCard(),
       M.noticeSection(),
       M.languageSection(),
-      M.formatPreviewSection(),
+      M.detailedSection(M.t("preview.title"), M.formatPreviewSection(), "formats"),
       M.privacySection(),
       h("h2", { class: "section-title", text: M.t("settings.security") }),
       h("div", { class: "cards" }, passwordCard(), totpCard(), M.passkeyCard(), sessionsCard()),
@@ -50,52 +50,14 @@
       h("h2", { text: M.t("settings.fleet") }),
       h("p", { class: "label", text: M.t("settings.title") }), title,
       h("p", { class: "muted small", text: M.t("settings.title_hint") }),
-      h("p", { class: "label", text: M.t("settings.client_routing") }), routing, routingExplanation,
-      h("p", { class: "label", text: M.t("response_rules.title") }), responseRules,
-      h("p", { class: "muted small", text: M.t("response_rules.reviewed_hint") }),
-      h("p", { class: "muted small" }, M.t("settings.routing_hint"), " ", routingCommand), error,
+      M.detailedSection(M.t("settings.client_routing"), [routing, routingExplanation,
+        h("p", { class: "label", text: M.t("response_rules.title") }), responseRules,
+        h("p", { class: "muted small", text: M.t("response_rules.reviewed_hint") }),
+        h("p", { class: "muted small" }, M.t("settings.routing_hint"), " ", routingCommand)], "routing"), error,
       h("p", { class: "label", text: M.t("settings.public_url") }), publicUrl,
       h("p", { class: "muted small", text: M.t("settings.public_url_hint") }),
       h("p", { class: "label", text: M.t("settings.owner_contact") }), contactText, contactLink,
       h("p", { class: "muted small" }, M.t("settings.contact_hint"), " ", h("code", { dir: "ltr", text: "meridian fleet contact" })));
-  }
-
-  function appearanceCard() {
-    var theme = "auto";
-    try { theme = localStorage.getItem("mrd.theme") || "auto"; } catch (e) { /* storage disabled */ }
-    var themes = h("div", { class: "segmented", role: "radiogroup", "aria-label": M.t("settings.theme") },
-      ["auto", "light", "dark"].map(function (value) {
-        return h("button", { type: "button", role: "radio", "aria-checked": String(theme === value),
-          class: theme === value ? "active" : "", onclick: function () { setTheme(value); } },
-          M.t("theme." + value));
-      }));
-    var langs = h("div", { class: "segmented", role: "radiogroup", "aria-label": M.t("settings.language") },
-      M.i18n.langs.map(function (code) {
-        return h("button", { type: "button", role: "radio", lang: code, "aria-checked": String(M.i18n.lang === code),
-          class: M.i18n.lang === code ? "active" : "", onclick: function () {
-            M.tryLeave().then(function (leave) {
-              if (leave) M.i18n.choose(code).then(function () { M.render(true); });
-            });
-          } }, M.i18n.names[code]);
-      }));
-    return h("section", { class: "card" },
-      h("h2", { text: M.t("settings.appearance") }),
-      h("p", { class: "label", text: M.t("settings.theme") }), themes,
-      h("p", { class: "label", text: M.t("settings.language") }), langs);
-  }
-
-  function setTheme(value) {
-    M.tryLeave().then(function (leave) { if (leave) applyTheme(value); });
-  }
-
-  function applyTheme(value) {
-    try {
-      if (value === "auto") localStorage.removeItem("mrd.theme");
-      else localStorage.setItem("mrd.theme", value);
-    } catch (e) { /* storage disabled: this page only */ }
-    if (value === "auto") document.documentElement.removeAttribute("data-theme");
-    else document.documentElement.setAttribute("data-theme", value);
-    M.render(true);
   }
 
   function passwordCard() {

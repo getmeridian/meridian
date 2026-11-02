@@ -79,8 +79,8 @@
 
 /* -- cards ---------------------------------------------------------------------------------- */
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
-.card { background: var(--s1); border: 1px solid var(--b1); border-radius: var(--r2); padding: 18px;
-  box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card, .view > .mode-disclosure { background: var(--s1); border: 1px solid var(--b1); border-radius: var(--r2); padding: var(--space-4);
+  box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .card-head .field { flex-direction: row; align-items: center; }
 .card-head .field select { width: auto; min-height: 36px; }
@@ -113,10 +113,9 @@
 .card-slot > .card { height: 100%; }
 .server-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .server-name h2 { font-size: 1rem; overflow-wrap: anywhere; }
-.cli-hint { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 16px; border-radius: var(--r2);
+.cli-hint { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; padding: var(--space-2) var(--space-3); border-radius: var(--r2);
   background: var(--band); border: 1px dashed var(--b2); color: var(--t2); }
-.cli-hint > div { flex: 1; min-width: 200px; }
-.cli-hint .strong { color: var(--t1); }
+.cli-hint > span:not(.cmd) { flex: 1; min-inline-size: 0; overflow-wrap: anywhere; }
 
 /* -- revision diff -------------------------------------------------------------------------- */
 .diff-list { list-style: none; display: flex; flex-direction: column; gap: 2px; font-family: var(--mono); font-size: .8125rem;
@@ -164,6 +163,7 @@
   .top-inner, .view { padding-inline: 14px; }
   .view { padding-top: 18px; }
   .cards { grid-template-columns: 1fr; }
+  .card-head .field select { min-block-size: 44px; }
   .grid-2 { grid-template-columns: 1fr; }
   .row { align-items: flex-start; }
   .row-side .usage, .usage { min-width: 110px; }
@@ -201,3 +201,76 @@
 .live-retry[hidden] { display: none; }
 /* Dynamic browser chrome and notches leave the sign-in controls in the usable viewport. */
 .auth { min-height: 100dvh; padding-block: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-bottom)); }
+
+/* The shared shell keeps the display choice and account preferences within reach. */
+.shell-top { flex-wrap: wrap; padding-block: var(--space-3); }
+.shell-top .top-brand { flex: 1 1 260px; gap: var(--space-2); }
+.shell-top .top-title { max-inline-size: 24rem; }
+.shell-controls { display: flex; align-items: center; gap: var(--space-3); flex: 0 0 auto; }
+.mode-switch { flex-wrap: nowrap; }
+.mode-switch button { min-block-size: 44px; }
+.account-menu { position: relative; flex: 0 0 auto; }
+.account-toggle { display: flex; align-items: center; gap: var(--space-2); list-style: none; cursor: pointer;
+  min-block-size: 44px; padding-inline: var(--space-3); border: 1px solid var(--b1); border-radius: var(--r); font-size: .875rem; font-weight: 600; }
+.account-toggle::-webkit-details-marker { display: none; }
+.account-toggle:hover, .account-menu[open] .account-toggle { background: var(--s2); }
+.account-panel { position: absolute; inset-inline-end: 0; inset-block-start: calc(100% + var(--space-2));
+  inline-size: min(320px, calc(100vw - 28px)); box-shadow: var(--shadow-lg); }
+.account-panel .segmented button { min-block-size: 44px; flex: 1; }
+.account-panel .btn { min-block-size: 44px; }
+.mode-note { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-4);
+  max-inline-size: 1040px; margin-inline: auto; padding: var(--space-3) 20px 0; }
+.mode-note .btn { min-block-size: 44px; white-space: normal; }
+.server-focused { border-color: var(--ac); }
+.server-focused, .server-focused > .mode-disclosure { scroll-margin-block-start: 12rem; }
+
+/* Overview uses the same cards, read rows, chips, and spacing as the shell. */
+.overview-page { display: flex; flex-direction: column; gap: var(--space-4); }
+.overview-page > .live-status { margin-block: 0; }
+.overview-page .page-head { align-items: center; }
+.overview-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+.overview-health { display: flex; gap: var(--space-3); align-items: baseline; font-size: 1.0625rem; font-weight: 600; }
+.overview-number { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.overview-facts .kv-row { padding-block: var(--space-4); }
+.attention-list { display: flex; flex-direction: column; }
+.attention-row { display: flex; align-items: center; gap: var(--space-3); justify-content: space-between;
+  min-block-size: 44px; padding-block: var(--space-3); border-block-start: 1px solid var(--b1); color: var(--t1); text-decoration: none; }
+.attention-row:first-child { border-block-start: 0; }
+.attention-row:hover .attention-label { color: var(--ac-text); }
+.attention-label { min-inline-size: 0; overflow-wrap: anywhere; }
+.attention-row .icon { transform: scaleX(-1); color: var(--t2); }
+[dir="rtl"] .attention-row .icon { transform: none; }
+.traffic-sparkline { display: block; inline-size: 100%; block-size: auto; margin-block: var(--space-3); }
+.sparkline-line { fill: none; stroke: var(--ac-text); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.sparkline-point { fill: var(--ac-text); }
+.recent-list { display: flex; flex-direction: column; }
+.recent-row { display: flex; flex-direction: column; gap: var(--space-1); padding-block: var(--space-3);
+  border-block-start: 1px solid var(--b1); color: var(--t1); text-decoration: none; overflow-wrap: anywhere; }
+.recent-row:first-child { border-block-start: 0; }
+.recent-row:hover { color: var(--ac-text); }
+.overview-actions { position: static; inline-size: fit-content; }
+.overview-actions .btn { min-block-size: 44px; white-space: normal; }
+.share-picker-list { display: flex; flex-direction: column; gap: var(--space-1); }
+.share-picker-person { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3);
+  min-block-size: 44px; padding: var(--space-3); border: 1px solid var(--b1); border-radius: var(--r);
+  background: var(--s1); text-align: start; cursor: pointer; }
+.share-picker-person:hover { background: var(--s2); border-color: var(--ac); }
+.share-picker-person bdi { min-inline-size: 0; overflow-wrap: anywhere; }
+.share-picker-pages { justify-content: space-between; }
+.share-dialog-body .share { flex-direction: column; align-items: center; }
+.share-dialog-body .share-links { inline-size: 100%; }
+@media (max-width: 640px) {
+  .shell-top .top-brand { flex-basis: 100%; }
+  .shell-controls { inline-size: 100%; justify-content: space-between; gap: var(--space-2); }
+  .shell-top .top-title { max-inline-size: none; }
+  .account-toggle > span { display: none; }
+  .mode-note { padding-inline: 14px; }
+  .overview-page { padding-block-end: calc(44px + var(--space-3) + var(--space-3) + var(--space-4) + env(safe-area-inset-bottom)); }
+  .overview-page .page-head { display: contents; }
+  .overview-grid { grid-template-columns: minmax(0, 1fr); }
+  .overview-actions { position: sticky; inset-block-end: 0; z-index: 10; order: 1;
+    inline-size: calc(100% + 28px); margin-inline: -14px; padding: var(--space-3) 14px;
+    padding-block-end: calc(var(--space-3) + env(safe-area-inset-bottom)); background: var(--s1);
+    border-block-start: 1px solid var(--b1); box-shadow: var(--shadow-md); }
+  .overview-actions .btn { flex: 1 1 120px; }
+}

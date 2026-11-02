@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -38,6 +39,18 @@ def test_showcase_copies_the_real_console_and_loads_the_shim_before_startup(show
     assert html.index('src="demo.js"') < html.index('src="ui/app.js"')
     assert (showcase / "console/demo.js").is_file()
     assert "noindex" in html
+    for adapter in (ROOT / "website/demo").glob("*.js"):
+        assert (showcase / "console" / adapter.name).read_bytes() == adapter.read_bytes()
+        assert html.index(f'src="{adapter.name}"') < html.index('src="ui/boot.js"')
+
+
+def test_every_registered_recorded_route_has_a_validated_service_reply(showcase: Path) -> None:
+    responses = recordings(showcase)["responses"]
+    validate_recordings(responses)
+    for adapter in (ROOT / "website/demo").glob("*.js"):
+        for method, path in re.findall(r'D\.recorded\("([A-Z]+)", "([^"]+)"', adapter.read_text()):
+            pattern = re.escape(method + " " + path).replace(r"\{id\}", r"[^/]+")
+            assert any(re.fullmatch(pattern, key.split("?", 1)[0]) for key in responses), (method, path)
 
 
 def test_recorded_responses_validate_against_current_models_and_reject_drift(showcase: Path) -> None:
@@ -46,6 +59,32 @@ def test_recorded_responses_validate_against_current_models_and_reject_drift(sho
     data["responses"]["GET api/users"]["users"][0]["status"] = "imaginary"
     with pytest.raises(ValidationError):
         validate_recordings(data["responses"])
+
+
+@pytest.mark.parametrize(
+    "route",
+    [
+        "GET api/people",
+        "GET api/access-profiles",
+        "GET api/users/Luma/access",
+        "GET api/delivery-policies",
+        "GET api/users/Luma/delivery-policy",
+        "PUT api/users/Luma/delivery-policy",
+        "POST api/people/bulk/preview",
+        "POST api/people/bulk/commit",
+        "POST api/people/bulk/undo",
+        "POST api/subscription/preview",
+        "POST api/response-rules/test",
+        "GET auth/passkeys",
+    ],
+)
+def test_new_console_features_have_service_recordings_checked_against_their_models(showcase: Path, route: str) -> None:
+    responses = recordings(showcase)["responses"]
+    matches = [key for key in responses if key.split("?", 1)[0] == route]
+    assert matches, "Record the real service reply for " + route
+    for key in matches:
+        with pytest.raises(ValidationError):
+            validate_recordings({key: {"unexpected_demo_shape": True}})
 
 
 def test_both_demos_share_people_individual_connections_notice_and_contact(showcase: Path) -> None:

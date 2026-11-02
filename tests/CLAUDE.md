@@ -28,6 +28,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - Idempotency dual-path: `tests/provision/CLAUDE.md`.
 
 ## Pitfalls
+- **Demo route scans refuse unknown paths** — parse scoped constants initialized before the call and helper returns; pin opaque-ID exceptions to the complete source, and never drop a suffix or turn an unresolved expression into a wildcard.
 - **Pinned geodata memory guards start cold** — trace file reads and complete explanations, with destinations that reach category-ru and geoip:ru (documentation ranges stop at the private lists); CI's Xray folder supplies both data files.
 - **CLI locales are test-local** — reset current and requested language before each scenario, or a prior translated command makes later scripted English prompts fail.
 - **CLI test state resets together** — current and requested language plus JSON and quiet modes must not survive into later command assertions.

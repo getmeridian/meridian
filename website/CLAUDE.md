@@ -19,6 +19,9 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 
 ## Pitfalls
 
+- **Demo person writes catch up traffic periods** — store due resets before returning create or update, using the same projection as bulk reviews, or a later commit invents a different reset time.
+- **Demo first-use expiry is stored before status** — materialize the first-traffic duration before enforcement and lifecycle filters; schedule previews alone leave expired people classified as unlimited.
+- **Demo refusals carry their own code** — use `demo_unavailable` with the local four-language copy; the console translates `not_found` into a missing-record error.
 - **Theme and language cross the docs boundary** — the landing and Starlight use different storage keys; ThemeToggle writes both on click, or switching sections flips the theme. Only a language link writes the language; reading a page is not a choice.
 - **Astro builds every `.md` under `src/pages`** — the `drop-contributor-notes` integration deletes the pages folder notes would produce.
 - **Links are validated** — the build fails on a broken docs link or anchor; translated headings have translated anchors.

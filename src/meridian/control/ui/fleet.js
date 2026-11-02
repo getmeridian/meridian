@@ -7,8 +7,8 @@
   var h = M.h;
 
   M.cliHint = function () {
-    return h("div", { class: "cli-hint" }, M.icon("terminal"),
-      h("div", {}, h("p", { class: "strong", text: M.t("cli.title") }), h("p", { class: "muted small", text: M.t("cli.text") })),
+    return h("p", { class: "cli-hint muted small" }, M.icon("terminal"),
+      h("span", { text: M.t("cli.title") }),
       M.command("meridian"));
   };
 
@@ -24,7 +24,8 @@
 
   // -- servers --------------------------------------------------------------------------------
 
-  M.renderServers = function (view) {
+  M.renderServers = function (view, selectedServer, selectedSection) {
+    var disclosureState = new Map(), firstDraw = true;
     var status = h("div", { class: "live-status" });
     var cards = h("div", { class: "live-data" }, h("div", { class: "empty" }, h("span", { class: "spinner" })));
     M.mount(view, [
@@ -37,6 +38,14 @@
       load: function (passive) { return M.api("GET", "ui/api/fleet", undefined, { passive: passive }); },
       draw: function (fleet) {
         M.state.fleet = fleet;
+        if (M.updateFleetTitle) M.updateFleetTitle();
+        cards.querySelectorAll("[data-server]").forEach(function (card) {
+          var states = {};
+          card.querySelectorAll("[data-mode-section], .capacity-history, .secondary-actions").forEach(function (detail) {
+            states[detail.dataset.modeSection || (detail.classList.contains("capacity-history") ? "history" : "actions")] = detail.open;
+          });
+          disclosureState.set(card.dataset.server, states);
+        });
         var servers = fleet.servers || [];
         var usage = fleet.server_usage || [];
         var attention = fleet.server_attention || [];
@@ -51,11 +60,44 @@
         usage.filter(function (item) {
           return !item.node_id || !servers.some(function (server) { return server.node_id === item.node_id; });
         }).forEach(function (item) { all.push(billingCard(item, reasons(item))); });
+        all.forEach(function (card) {
+          var states = disclosureState.get(card.dataset.server);
+          if (states) card.querySelectorAll("[data-mode-section], .capacity-history, .secondary-actions").forEach(function (detail) {
+            var key = detail.dataset.modeSection || (detail.classList.contains("capacity-history") ? "history" : "actions");
+            if (M.has(states, key)) detail.open = states[key];
+          });
+          if (selectedServer === card.dataset.server) {
+            card.classList.add("server-focused");
+            card.tabIndex = -1;
+            if (firstDraw) {
+              var detail = selectedSection === "allowance" ? card.querySelector('[data-mode-section="allowance"]') : null;
+              if (detail) detail.open = true;
+              var target = detail || card, focus = detail ? detail.querySelector("summary") : card;
+              requestAnimationFrame(function () {
+                if (!target.isConnected) return;
+                focus.focus({ preventScroll: true }); target.scrollIntoView({ block: "start" });
+              });
+            }
+          }
+        });
         M.mount(cards, all.length ? h("div", { class: "cards" }, all)
           : h("div", { class: "empty" }, h("p", { text: M.t("servers.empty") })));
+        firstDraw = false;
       },
       empty: function () { M.clear(cards); },
     });
+  };
+
+  function placeHostFacts(card) {
+    var host = card.querySelector("[data-server-host-facts]");
+    if (!host) return;
+    var facts = card.querySelector("[data-server-facts]"), more = card.querySelector(".secondary-actions");
+    if (M.mode() === "detailed") card.insertBefore(host, facts.nextSibling);
+    else more.insertBefore(host, more.querySelector(".row-actions"));
+  }
+
+  M.applyServerMode = function (root) {
+    root.querySelectorAll(".server").forEach(placeHostFacts);
   };
 
   function serverCard(server, usage, attention) {
@@ -71,7 +113,21 @@
     if (healthStatus === "healthy" && faults.length) healthStatus = "degraded";
     var coreUptime = checks.find(function (check) { return check.name === "xray.uptime"; });
     var up = coreUptime && /^up (\d+)\s*s$/.exec(coreUptime.message);
-    return h("section", { class: "card server" },
+    var hostFacts = h("dl", { class: "facts", "data-server-host-facts": "" },
+      h("dt", { text: M.t("servers.version") }), h("dd", { class: "mono", dir: "ltr", text: server.agent_version || "—" }),
+      health && (!server.capacity || server.capacity.status === "not_reported") ? [
+        h("dt", { text: M.t("servers.memory") }), h("dd", { text: M.bytes(health.memory_available_bytes) }),
+        h("dt", { text: M.t("servers.load") }), h("dd", { dir: "ltr", text: M.count(health.load1_milli / 1000) }),
+      ] : null,
+      health ? [
+        h("dt", { text: M.t("servers.disk") }), h("dd", { text: M.bytes(health.disk_free_bytes) }),
+        h("dt", { text: M.t("servers.uptime") }), h("dd", { text: M.uptime(health.uptime_seconds) }),
+        coreUptime ? [h("dt", { text: M.t("servers.core_uptime") }),
+          h("dd", { text: up ? M.uptime(Number(up[1])) : coreUptime.message })] : null,
+        h("dt", { text: M.t("servers.core_version") }),
+        h("dd", { class: "mono", dir: "ltr", text: "Xray " + (runtime.versions.xray || "—") }),
+      ] : null);
+    var card = h("section", { class: "card server", "data-server": server.node_id },
       h("div", { class: "card-head" },
         h("div", { class: "server-name" },
           h("span", { class: "dot " + (server.live ? "dot-ok" : "dot-err"), "aria-hidden": "true" }),
@@ -81,28 +137,15 @@
         M.pill(server.live ? "ok" : "muted", M.t(server.live ? "servers.online" : "servers.offline")),
         M.pill({ healthy: "ok", degraded: "warn", unhealthy: "err", unavailable: "muted" }[healthStatus],
           M.t("servers.health_" + healthStatus)), sync),
-      h("dl", { class: "facts" },
+      h("dl", { class: "facts", "data-server-facts": "" },
         server.region ? [h("dt", { text: M.t("servers.country") }), h("dd", { text: country(server.region) })] : null,
         h("dt", { text: M.t("servers.agent") }),
         h("dd", {}, M.t(server.live ? "servers.online" : "servers.offline"), " · ",
           M.t("servers.seen", { when: M.ago(server.last_seen_at) })),
-        h("dt", { text: M.t("servers.version") }), h("dd", { class: "mono", text: server.agent_version || "—" }),
         h("dt", { text: M.t("servers.revision") }),
         h("dd", {}, M.t("servers.revisions", {
           applied: M.count(server.applied_revision), current: M.count(server.revision) })),
-        h("dt", { text: M.t("servers.traffic") }), h("dd", { text: M.bytes(server.traffic_bytes) }),
-        health && (!server.capacity || server.capacity.status === "not_reported") ? [
-          h("dt", { text: M.t("servers.memory") }), h("dd", { text: M.bytes(health.memory_available_bytes) }),
-          h("dt", { text: M.t("servers.load") }), h("dd", { dir: "ltr", text: M.count(health.load1_milli / 1000) }),
-        ] : null,
-        health ? [
-          h("dt", { text: M.t("servers.disk") }), h("dd", { text: M.bytes(health.disk_free_bytes) }),
-          h("dt", { text: M.t("servers.uptime") }), h("dd", { text: M.uptime(health.uptime_seconds) }),
-          coreUptime ? [h("dt", { text: M.t("servers.core_uptime") }),
-            h("dd", { text: up ? M.uptime(Number(up[1])) : coreUptime.message })] : null,
-          h("dt", { text: M.t("servers.core_version") }),
-          h("dd", { class: "mono", text: "Xray " + (runtime.versions.xray || "—") }),
-        ] : null),
+        h("dt", { text: M.t("servers.traffic") }), h("dd", { text: M.bytes(server.traffic_bytes) })),
       !runtime ? h("p", { class: "notice notice-warn small", text: M.t("servers.health_unavailable") }) : null,
       faults.length ? h("ul", { class: "notice notice-warn health-checks" }, faults.map(function (check) {
         return h("li", {}, h("strong", { text: check.name === "stats" ? M.t("servers.stats_stalled") + " (stats)" : check.name }),
@@ -114,18 +157,23 @@
           return h("li", { class: "mono small", text: line });
         })))
         : null,
-      M.serverCapacity(server.capacity),
-      usage ? allowanceDetails(usage, attention) : h("p", { class: "muted small", text: M.t("server_allowance.approximate") }),
-      h("div", { class: "row-actions" }, h("button", { class: "btn btn-ghost btn-sm", type: "button",
-        onclick: function () { M.restartNode(server.node_id); } }, M.t("commands.restart"))));
+      M.detailedSection(M.t("capacity.title"), M.serverCapacity(server.capacity), "capacity"),
+      usage ? M.detailedSection(M.t("server_allowance.title"), allowanceDetails(usage, attention), "allowance")
+        : h("p", { class: "muted small", text: M.t("server_allowance.approximate") }),
+      h("details", { class: "secondary-actions" }, h("summary", { text: M.t("action.more") }),
+        hostFacts,
+        h("div", { class: "row-actions" }, h("button", { class: "btn btn-ghost btn-sm", type: "button",
+          onclick: function () { M.restartNode(server.node_id); } }, M.t("commands.restart")))));
+    placeHostFacts(card);
+    return card;
   }
 
   function billingDate(value) { return "\u2066" + String(value || "").slice(0, 10) + "\u2069"; }
 
   function billingCard(usage, attention) {
-    return h("section", { class: "card server" },
+    return h("section", { class: "card server", "data-server": usage.server_ref },
       h("div", { class: "card-head" }, h("h2", { class: "mono", text: usage.server_ref })),
-      allowanceDetails(usage, attention));
+      M.detailedSection(M.t("server_allowance.title"), allowanceDetails(usage, attention), "allowance"));
   }
 
   function allowanceDetails(usage, attention) {

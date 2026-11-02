@@ -15,6 +15,11 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b11
 
 #### Added
+- The web panel opens on an Overview: fleet health, what needs attention (expiring,
+  near or over quota, disabled, servers or payments due), and quick Add person and
+  Share actions. A Simple/Detailed switch, remembered per browser, keeps everyday
+  screens calm and shows revisions, tokens, and full server facts on demand; theme
+  and language move into an account menu (#95).
 - Reviewed subscription response rules by app, with bounded literal User-Agent
   and Accept conditions, ordered format/refusal/policy/header actions, and one
   transient matcher test across API, CLI, and console. Private person policies
@@ -30,6 +35,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
   people in the same batch are still deleted atomically (#95).
 
 #### Fixed
+- The public panel demo works end to end again: People, access profiles, client
+  routing, bulk changes with undo, and token reviews follow a real service's rules,
+  and actions a demo cannot perform say so (#95).
 - `meridian plan` before upgrading a fleet from an earlier beta no longer stops as
   inconclusive (exit 3) because access profiles look unavailable: a service that
   answers but predates profiles holds none.

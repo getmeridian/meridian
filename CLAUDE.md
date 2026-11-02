@@ -79,6 +79,7 @@ tests/CLAUDE.md                         — testing philosophy, MockConnection
     └── providers/CLAUDE.md             — CloudProvider abstract + Hetzner impl
 
 website/CLAUDE.md                       — Astro + Starlight docs, agent endpoints
+├── demo/CLAUDE.md                      — public console adapter: owner rules, reviews, recordings
 ├── src/components/CLAUDE.md            — composition pattern
 ├── src/content/docs/CLAUDE.md          — locale parity, frontmatter schema
 ├── src/i18n/CLAUDE.md                  — asymmetric i18n, detection cascade

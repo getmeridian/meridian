@@ -25,14 +25,21 @@ sys.path[:0] = [str(ROOT / "src"), str(ROOT)]
 from meridian import __version__  # noqa: E402
 from meridian.control.enrollment import token_sha256  # noqa: E402
 from meridian.control.models import TokenCreate, UserCreate, UserUpdate  # noqa: E402
+from meridian.control.passkey_models import PasskeyList  # noqa: E402
 from meridian.control.route_catalog import API_ROUTES  # noqa: E402
 from meridian.control.route_types import path_pattern  # noqa: E402
 from meridian.control.server import ControlServer  # noqa: E402
 from meridian.control.service import ControlService  # noqa: E402
 from meridian.control.ui_models import AuthState, FleetView, SessionList, ShareView  # noqa: E402
 from meridian.control.ui_routes import SESSION_COOKIE, UI_DIR  # noqa: E402
+from meridian.core.account_schedule import FINITE_EXPIRY_YEAR  # noqa: E402
 from meridian.core.client_limits import CalendarExpiryPreview  # noqa: E402
 from meridian.pwa import load_pwa_assets  # noqa: E402
+from scripts.showcase_recordings import (  # noqa: E402
+    record_interactive_templates,
+    record_people_queries,
+    record_person_features,
+)
 from scripts.showcase_seed import (  # noqa: E402
     ADMIN_TOKEN,
     FLEET_ID,
@@ -60,6 +67,8 @@ def validate_recordings(responses: dict[str, Any]) -> None:
             AuthState.model_validate(body)
         elif method == "GET" and path == "/auth/sessions":
             SessionList.model_validate(body)
+        elif method == "GET" and path == "/auth/passkeys":
+            PasskeyList.model_validate(body)
         elif path == "/ui/api/fleet":
             FleetView.model_validate(body)
         elif path.startswith("/ui/api/people/") and path.endswith("/share"):
@@ -119,6 +128,7 @@ def write_recordings(directory: Path, client: httpx.Client, service: ControlServ
     for path in (
         "auth/state",
         "auth/sessions",
+        "auth/passkeys",
         "ui/api/fleet",
         "api/settings",
         "api/users",
@@ -131,8 +141,11 @@ def write_recordings(directory: Path, client: httpx.Client, service: ControlServ
         "api/events",
         "api/traffic/daily?days=30",
         "api/attention",
+        "api/access-profiles",
+        "api/delivery-policies",
     ):
         record(path)
+    record_people_queries(record)
     for summary in responses["GET api/revisions"]["revisions"]:
         record(f"api/revisions/{summary['number']}")
     for name in PEOPLE:
@@ -143,6 +156,7 @@ def write_recordings(directory: Path, client: httpx.Client, service: ControlServ
         record(f"api/users/{name}/connections")
         record(f"api/users/{name}/usage?days=30")
         record(f"api/users/{name}/cut-off")
+        record_person_features(record, name)
         if user["status"] == "active":
             for index, platform in enumerate(("Android", "Windows")):
                 response = client.get(
@@ -171,37 +185,53 @@ def write_recordings(directory: Path, client: httpx.Client, service: ControlServ
     record("api/users/DemoTemplate/devices")
     record("api/users/DemoTemplate/usage?days=30")
     record("api/users/DemoTemplate/cut-off")
+    templates = record_interactive_templates(record, service)
     # Disabled or over-limit people get placeholder links; record their working ones too, so
     # enabling them in the demo shows real entries. A second credential set carries correctly
     # generated QR codes for reissue demonstrations.
     active_shares: dict[str, Any] = {}
     rotations: dict[str, Any] = {}
+    key_rotations: dict[str, Any] = {}
     for name in (*PEOPLE, "DemoTemplate"):
         initial_share = responses[f"GET ui/api/people/{name}/share"]
         before = service.get_user(name)
         assert before is not None
-        if before.status != "active":
-            service.update_user(name, UserUpdate(status="active", traffic_limit_bytes=0))
-            active_shares[name] = record(f"ui/api/people/{name}/share")
+        service.update_user(name, UserUpdate(status="active", traffic_limit_bytes=0, profiles=["default"]))
+        active_shares[name] = record(f"ui/api/people/{name}/share")
+        current = service.get_user(name)
+        assert current is not None
+        key_rotations[name] = {
+            "result": record(
+                f"api/users/{name}/rotate-credentials", "POST", {"expected_generation": current.credential_generation}
+            ),
+            "share": record(f"ui/api/people/{name}/share"),
+        }
         service.reissue_user(name)
         user = service.get_user(name)
         assert user is not None
         rotations[name] = {"user": user.model_dump(mode="json"), "share": record(f"ui/api/people/{name}/share")}
-        if before.status != "active":
-            status = "disabled" if before.status == "disabled" else "active"
-            service.update_user(name, UserUpdate(status=status, traffic_limit_bytes=before.traffic_limit_bytes))
-            service.enforce()
+        status = "disabled" if before.status == "disabled" else "active"
+        service.update_user(
+            name, UserUpdate(status=status, traffic_limit_bytes=before.traffic_limit_bytes, profiles=before.profiles)
+        )
+        service.enforce()
         responses[f"GET ui/api/people/{name}/share"] = initial_share
     validate_recordings(responses)
     console = directory / "console"
     console.mkdir(exist_ok=True)
     shutil.copytree(UI_DIR, console / "ui", dirs_exist_ok=True, ignore=shutil.ignore_patterns("CLAUDE.md"))
-    for name in ("demo.js", "demo.css"):
+    for name in ("demo.js", "demo-people.js", "demo-bulk.js", "demo-delivery.js", "demo-tokens.js", "demo.css"):
         shutil.copy2(ROOT / "website/demo" / name, console / name)
     shell = (UI_DIR / "index.html").read_text()
     shell = shell.replace(
         '  <script src="ui/boot.js">',
-        '  <link rel="stylesheet" href="demo.css">\n  <script src="demo.js"></script>\n  <script src="ui/boot.js">',
+        '  <link rel="stylesheet" href="demo.css">\n'
+        '  <script src="demo.js"></script>\n'
+        '  <script src="demo-people.js"></script>\n'
+        '  <script src="demo-bulk.js"></script>\n'
+        '  <script src="demo-delivery.js"></script>\n'
+        '  <script src="demo-tokens.js"></script>\n'
+        '  <script src="ui/boot.js">',
     )
     (console / "index.html").write_text(shell)
     (console / "demo-data.json").write_text(
@@ -212,7 +242,11 @@ def write_recordings(directory: Path, client: httpx.Client, service: ControlServ
                 "page_person": PAGE_PERSON,
                 "responses": responses,
                 "rotations": rotations,
+                "key_rotations": key_rotations,
                 "active_shares": active_shares,
+                "token_create_schema": TokenCreate.model_json_schema(),
+                "finite_expiry_year": FINITE_EXPIRY_YEAR,
+                **templates,
             },
             ensure_ascii=False,
             separators=(",", ":"),

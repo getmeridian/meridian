@@ -3,6 +3,7 @@
  * No browser address, device identifier, password, or API secret is collected or persisted. */
 (function () {
   "use strict";
+  var D = (window.MeridianDemo = {}), routes = [];
   var nativeFetch = window.fetch.bind(window);
   var script = new URL(document.currentScript.src, location.href);
   var consoleRoot = new URL("./", script).pathname;
@@ -38,46 +39,86 @@
       banner: "Demo: nothing here is real, changes reset when you reload.",
       console: "Owner console", page: "Connection page",
       unavailable: "This action is unavailable in the demo.",
+      exists: "A person with this name already exists.",
       missing: "This person is no longer in the demo. Reload to reset.",
       declared: "This person is managed by the CLI. Choose a person added in the console.",
       load: "Demo data could not be loaded. Reload this page.",
+      scheduleRange: "The schedule must end before 2099. Use a shorter interval.",
+      firstUseUnknown: "First use is unknown for this account. Set a fixed expiry.",
     },
     ru: {
       imports: "В демо приложения ничего не импортируют: эти ссылки ведут на вымышленные серверы.",
       banner: "Демо: все данные вымышлены. После перезагрузки страницы изменения сбросятся.",
       console: "Консоль владельца", page: "Страница подключения",
       unavailable: "Это действие недоступно в демо.",
+      exists: "Человек с таким именем уже есть.",
       missing: "Этого человека больше нет в демо. Перезагрузите страницу, чтобы вернуть исходные данные.",
       declared: "Этим человеком управляют через CLI. Выберите человека, добавленного в консоли.",
       load: "Не удалось загрузить данные демо. Перезагрузите страницу.",
+      scheduleRange: "Срок доступа должен заканчиваться до 2099 года. Выберите меньший интервал.",
+      firstUseUnknown: "Неизвестно, когда этот аккаунт впервые использовали. Укажите дату окончания доступа.",
     },
     fa: {
       imports: "در نسخهٔ نمایشی برنامه\u200cها چیزی وارد نمی\u200cکنند: این پیوندها به سرورهای ساختگی اشاره دارند.",
       banner: "نسخهٔ نمایشی: هیچ داده‌ای واقعی نیست؛ با بارگیری دوبارهٔ صفحه، تغییرات پاک می‌شوند.",
       console: "کنسول مالک", page: "صفحهٔ اتصال",
       unavailable: "این کار در نسخهٔ نمایشی در دسترس نیست.",
+      exists: "شخصی با این نام از قبل وجود دارد.",
       missing: "این شخص دیگر در نسخهٔ نمایشی نیست. برای بازنشانی، صفحه را دوباره بارگیری کنید.",
       declared: "این شخص با CLI مدیریت می‌شود. شخصی را انتخاب کنید که در کنسول افزوده شده است.",
       load: "داده‌های نمایشی بارگیری نشدند. صفحه را دوباره بارگیری کنید.",
+      scheduleRange: "زمان‌بندی باید پیش از سال ۲۰۹۹ پایان یابد. بازهٔ کوتاه‌تری انتخاب کنید.",
+      firstUseUnknown: "زمان نخستین استفادهٔ این حساب مشخص نیست. تاریخ انقضای ثابتی تعیین کنید.",
     },
     zh: {
       imports: "演示中应用不会导入任何内容：这些链接指向虚构的服务器。",
       banner: "演示：所有数据都是虚构的，重新加载页面后更改会重置。",
       console: "管理控制台", page: "连接页面",
       unavailable: "此操作在演示中不可用。",
+      exists: "已存在同名用户。",
       missing: "此用户已从演示中删除。重新加载页面即可重置。",
       declared: "此用户由 CLI 管理。请选择在控制台中添加的用户。",
       load: "无法加载演示数据，请重新加载页面。",
+      scheduleRange: "计划必须在 2099 年之前结束。请选择更短的间隔。",
+      firstUseUnknown: "无法确定此用户的首次使用时间。请设置固定的到期时间。",
     },
   };
   function copy() { return COPY[document.documentElement.lang.split("-")[0]] || COPY.en; }
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function reply(body, status) { return new Response(JSON.stringify(body), { status: status || 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } }); }
   function error(code, label, status) { return reply({ error: { code: code, message: copy()[label] || label } }, status || 400); }
+  D.clone = clone; D.reply = reply; D.error = error;
+  D.fail = function (code, status, subjects, label) { throw { demoCode: code, status: status || 400, subjects: subjects || [], label: label }; };
+  // The same literal registrations drive dispatch and the CI route-coverage guard.
+  D.route = function (method, path, handler) {
+    var pattern = path.split("{id}").map(function (part) { return part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }).join("([^/]+)");
+    routes.push({ method: method, path: path, pattern: new RegExp("^" + pattern + "$"), handler: handler });
+  };
+  D.recorded = function (method, path) {
+    D.route(method, path, function (request) {
+      var view = responses[request.method + " " + request.path];
+      return view ? reply(view) : error("demo_unavailable", "unavailable", 409);
+    });
+  };
+  D.unavailable = function (method, path) {
+    D.route(method, path, function () { return error("demo_unavailable", "unavailable", 409); });
+  };
+  D.dispatch = function (method, path, params, body) {
+    var route = routes.find(function (entry) { return entry.method === method && entry.pattern.test(path); });
+    if (!route) return error("demo_unavailable", "unavailable", 409);
+    try {
+      return route.handler({ method: method, path: path, params: params, body: body, ids: route.pattern.exec(path).slice(1).map(decodeURIComponent) });
+    } catch (failure) {
+      if (!failure.demoCode) throw failure;
+      return reply({ error: { code: failure.demoCode, message: copy()[failure.label] || copy().unavailable, subjects: failure.subjects } }, failure.status);
+    }
+  };
   // The service writes whole-second UTC timestamps; keep the same spelling.
   function iso(ms) { return new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z"); }
   function now() { return iso(Date.now()); }
-  var source, initial, responses, users, events, nextId, signedIn = true, rotations = {}, activeShares = {}, rotating = {}, pages = [], newId = 0;
+  D.iso = iso; D.now = now;
+  var source, initial, responses, users, events, nextId, signedIn = true, rotations = {}, activeShares = {}, rotating = Object.create(null), pages = [], newId = 0;
+  var receiptCredentials = Object.create(null);
   var ready = nativeFetch(new URL("demo-data.json", script), { cache: "no-store" }).then(function (response) {
     if (!response.ok) throw new Error(copy().load);
     return response.json();
@@ -95,7 +136,7 @@
       if (typeof value !== "string") return value;
       // 2099-12-31 is the service's "never expires" sentinel; pages test for it literally.
       if (/^\d{4}-\d\d-\d\dT/.test(value) && !/^2099-12-31T/.test(value)) {
-        if (key === "period_start" || key === "period_end" || key === "counting_since" || key === "traffic_reset_at") {
+        if (key === "period_start" || key === "period_end" || key === "counting_since" || key === "traffic_reset_at" || key === "next_reset_at") {
           var period = new Date(value), current = new Date(), generated = new Date(data.generated_at);
           period.setUTCMonth(period.getUTCMonth() + (current.getUTCFullYear() - generated.getUTCFullYear()) * 12 + current.getUTCMonth() - generated.getUTCMonth());
           return iso(period.getTime());
@@ -115,40 +156,115 @@
     users = responses["GET api/users"].users;
     events = responses["GET api/events"].events;
     nextId = events.reduce(function (max, event) { return Math.max(max, event.id); }, 0);
+    D.source = source; D.responses = responses; D.users = users;
+    D.currentShares = Object.create(null); D.initial = initial;
+    users.forEach(function (user) {
+      var keys = receiptCredentials[user.username] = Object.create(null);
+      initial["GET ui/api/people/" + user.username + "/share"].flow_blocks.nodes.forEach(function (node) { keys[node.credential_generation] = user.uuid; });
+    });
+    D.versions = Object.create(null);
+    responses["GET api/people"].users.forEach(function (user) { D.versions[user.username] = user.row_version; });
   });
+  D.id = function () {
+    var bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, function (value) { return value.toString(16).padStart(2, "0"); }).join("");
+  };
+  D.bump = function (user) { D.versions[user.username] = (D.versions[user.username] || 0) + 1; };
+  D.isDeclared = function (name) { return responses["GET ui/api/fleet"].declared_users.indexOf(name) >= 0; };
 
   function emit(kind, subject, detail) {
     events.push({ id: ++nextId, time: now(), kind: kind, actor: "owner", subject: subject, detail: detail || {} });
     if (events.length > 2000) events.shift();
   }
   function person(name) { return users.find(function (user) { return user.username === name; }); }
-  function enforce(user) {
-    if (user.status === "disabled") return;
-    user.status = user.expire_at && Date.parse(user.expire_at) <= Date.now() ? "expired" :
+  D.person = person; D.emit = emit;
+  function enforce(user, forceReset) {
+    var reset = D.catchUp ? D.catchUp(user, forceReset) : false;
+    if (user.status !== "disabled") user.status = user.expire_at && Date.parse(user.expire_at) <= Date.now() ? "expired" :
       user.traffic_limit_bytes && user.used_traffic_bytes >= user.traffic_limit_bytes ? "limited" : "active";
+    user.quota_used_percent = user.traffic_limit_bytes ? Number(BigInt(user.used_traffic_bytes) * 100n / BigInt(user.traffic_limit_bytes)) : null;
+    user.never_used = !user.first_traffic_at && !user.online_at && !user.lifetime_traffic_bytes;
+    var moment = Date.now(), expiry = Date.parse(user.expire_at);
+    user.attention_reasons = [];
+    if (expiry >= moment && expiry <= moment + 7 * 86400000) user.attention_reasons.push("expiring");
+    if (user.quota_used_percent !== null && user.quota_used_percent >= 80) user.attention_reasons.push("quota");
+    if (user.never_used && moment - Date.parse(user.created_at) > 3 * 86400000) user.attention_reasons.push("unused");
+    if (user.online_at && moment - Date.parse(user.online_at) > 3 * 86400000) user.attention_reasons.push("stopped");
+    if (D.schedule) user.schedule = D.schedule(user);
+    return reset;
   }
+  D.enforce = enforce;
+  D.flowBlocks = function (user, recorded) {
+    var view = clone(recorded), seen = new Set();
+    view.nodes = view.nodes.filter(function (node) {
+      if (view.username !== user.username && node.reason !== "credentials") return false;
+      var keys = receiptCredentials[user.username];
+      if (user.status === "active" && keys && keys[node.credential_generation] === user.uuid) return false;
+      node.credential_generation = Math.min(node.credential_generation, user.credential_generation - (node.reason === "credentials" ? 1 : 0));
+      var key = [node.node_id, node.credential_generation, node.reason, node.inbound_tags.join(",")].join("/");
+      if (node.credential_generation < 1 || seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+    view.username = user.username; view.credential_generation = user.credential_generation;
+    return view;
+  };
+  D.recording = function (records, name) { return Object.hasOwn(records, name) ? records[name] : records.DemoTemplate; };
+  D.replaceShare = function (user, before, keep, next, recorded) {
+    var keys = receiptCredentials[user.username] || (receiptCredentials[user.username] = Object.create(null));
+    var nodes = clone(keep.flow_blocks.nodes), latest = new Map();
+    if (before.status === "active" && before.uuid !== user.uuid) {
+      keys[before.credential_generation] = before.uuid;
+      recorded.nodes.forEach(function (node) {
+        var previous = latest.get(node.node_id);
+        if (node.reason === "credentials" && (!previous || previous.credential_generation < node.credential_generation)) latest.set(node.node_id, clone(node));
+      });
+      var inbounds = D.access(before).inbounds;
+      latest.forEach(function (node) {
+        node.credential_generation = before.credential_generation;
+        node.inbound_tags = inbounds.filter(function (inbound) { return inbound.node_id === node.node_id; }).map(function (inbound) { return inbound.inbound_tag; }).sort();
+        if (node.inbound_tags.length) nodes.push(node);
+      });
+    }
+    next.flow_blocks = D.flowBlocks(user, { username: user.username, credential_generation: user.credential_generation, nodes: nodes });
+    D.currentShares[user.username] = next;
+  };
   function share(user) {
-    var view = clone(responses["GET ui/api/people/" + user.username + "/share"] || responses["GET ui/api/people/DemoTemplate/share"]);
+    var view = clone(D.currentShares[user.username] || responses["GET ui/api/people/" + user.username + "/share"] || responses["GET ui/api/people/DemoTemplate/share"]);
     var working = view.connections.some(function (entry) { return entry.available; });
     // People recorded while disabled or over their limit carry placeholders; enabling them shows real links.
-    var spare = rotating[user.username] ? rotations[user.username] && rotations[user.username].share : activeShares[user.username];
-    if (user.status === "active" && !working && spare) view = clone(spare);
+    var spare = rotating[user.username] ? D.recording(rotations, user.username).share : D.recording(activeShares, user.username);
+    if (user.status === "active" && !working && spare) {
+      var receipts = view.flow_blocks;
+      view = clone(spare); view.flow_blocks = receipts;
+    }
     view.username = user.username;
     if (user.status !== "active") {
-      view.connections.forEach(function (entry) { entry.available = false; entry.uri = ""; entry.qr_svg = ""; });
+      view.connections.forEach(function (entry) {
+        entry.available = false;
+        if (entry.protocol !== null) { entry.uri = ""; entry.qr_svg = ""; }
+      });
     }
+    view.declared = D.isDeclared(user.username);
+    if (D.access && user.status === "active") {
+      var allowed = D.access(user).connections.map(function (entry) { return entry.remark; });
+      view.connections = view.connections.filter(function (entry) { return allowed.indexOf(entry.remark) >= 0; });
+    }
+    if (view.flow_blocks) view.flow_blocks = D.flowBlocks(user, view.flow_blocks);
     return view;
   }
+  D.share = share;
   function devices(user) {
     var view = clone(responses["GET api/users/" + user.username + "/devices"] || responses["GET api/users/DemoTemplate/devices"]);
     view.username = user.username;
     view.level = responses["GET api/privacy"].settings.device_limits;
-    view.limit = user.device_limit || responses["GET api/privacy"].settings.default_device_limit;
+    view.limit = user.device_limit === null ? responses["GET api/privacy"].settings.default_device_limit : user.device_limit;
     if (view.level === "off") view.devices = [];
     if (view.level === "private") view.devices = view.devices.map(function (device) { return { device_key: device.device_key }; });
     view.count = view.devices.length;
     return view;
   }
+  D.devices = devices;
   // notices.usage_text: six significant digits in binary units.
   function byteText(bytes) {
     var units = ["B", "KiB", "MiB", "GiB", "TiB"];
@@ -231,8 +347,9 @@
       if (suffix === "cut-off") return reply(responses["GET api/users/" + name + "/cut-off"] || responses["GET api/users/DemoTemplate/cut-off"]);
     }
     if (method === "PATCH" && !suffix) {
+      var changed = D.updateUser(user, body);
       var fields = Object.keys(body).filter(function (field) { return field !== "username"; });
-      fields.forEach(function (field) { if (Object.hasOwn(user, field)) user[field] = body[field]; });
+      Object.assign(user, changed); D.bump(user);
       enforce(user);
       // As the service: status changes are their own events; notes and tags emit none.
       if (fields.indexOf("status") >= 0) emit(body.status === "disabled" ? "user.disabled" : "user.enabled", name);
@@ -242,27 +359,33 @@
     }
     if (method === "POST" && suffix === "reset-traffic") {
       user.used_traffic_bytes = 0;
+      Object.keys(user.period_traffic).forEach(function (field) { user.period_traffic[field] = 0; });
       user.traffic_reset_at = now();
       enforce(user);
+      D.bump(user);
       emit("user.traffic_reset", name);
       return reply(user);
     }
     if (method === "POST" && suffix === "reissue" || method === "DELETE" && !suffix) {
-      if (responses["GET ui/api/fleet"].declared_users.indexOf(name) >= 0) return error("declared_user", "declared", 409);
+      if (body.cut_off) return error("demo_unavailable", "unavailable", 409);
+      if (D.isDeclared(name)) return error("declared_user", "declared", 409);
       if (method === "DELETE") {
         users.splice(users.indexOf(user), 1);
         emit("user.removed", name);
         return reply(body.cut_off ? { user: null, commands: [] } : { deleted: name });
       }
       rotating[name] = !rotating[name];
+      var before = clone(user), keep = share(user);
       // Alternate between two real credential sets; people added here borrow the template's.
-      var alternate = rotating[name] ? rotations[name] || rotations.DemoTemplate
+      var alternate = rotating[name] ? D.recording(rotations, name)
         : { user: initial["GET api/users/" + name], share: initial["GET ui/api/people/" + name + "/share"] };
       if (alternate && alternate.user && alternate.share) {
         user.uuid = alternate.user.uuid;
         user.sub_token = alternate.user.sub_token;
         responses["GET ui/api/people/" + name + "/share"] = Object.assign(clone(alternate.share), { username: name });
       }
+      user.credential_generation++; D.bump(user);
+      D.replaceShare(user, before, keep, clone(alternate.share), D.recording(rotations, name).share.flow_blocks);
       responses["GET api/users/" + name + "/devices"] = Object.assign(devices(user), { devices: [], count: 0 });
       emit("user.reissued", name);
       return reply(body.cut_off ? { user: user, commands: [] } : user);
@@ -275,7 +398,7 @@
       responses["GET api/users/" + name + "/devices"] = list;
       return reply({ deleted: before - list.count });
     }
-    return error("not_found", "unavailable", 404);
+    return error("demo_unavailable", "unavailable", 409);
   }
 
   function privacy(body) {
@@ -319,20 +442,23 @@
     if (path === "auth/logout") { signedIn = false; return reply({ signed_in: false }); }
     if (path === "auth/login" || path === "auth/setup") { signedIn = true; return reply({ signed_in: true }); }
     if (path === "auth/confirm") return reply({ confirmed: true });
-    if (path === "auth/password") return reply({ changed: true });
     if (path === "auth/sessions/revoke-others") return reply({ revoked: 0 });
     if (path === "auth/setup/check") return reply({ purpose: "setup" });
     if (path === "api/users" && method === "GET") return reply({ users: users });
     if (path === "api/users" && method === "POST") {
-      if (person(body.username)) return error("user_exists", "A person with this name already exists.", 409);
+      if (person(body.username)) return error("user_exists", "exists", 409);
       var user = clone(responses["POST api/users"]);
-      Object.assign(user, body, { created_at: now(), username: body.username });
+      Object.assign(user, D.updateUser(user, body), { created_at: now(), username: body.username });
       user.user_id = "demo-person-" + (++newId);
       user.used_traffic_bytes = user.lifetime_traffic_bytes = 0;
+      user.first_traffic_at = user.online_at = user.last_traffic_node = null;
+      Object.keys(user.period_traffic).forEach(function (field) { user.period_traffic[field] = 0; });
+      enforce(user); D.bump(user);
       users.push(user);
       var view = clone(responses["GET ui/api/people/DemoTemplate/share"]);
       view.username = user.username;
       responses["GET ui/api/people/" + user.username + "/share"] = view;
+      D.currentShares[user.username] = clone(view);
       initial["GET api/users/" + user.username] = clone(user);
       initial["GET ui/api/people/" + user.username + "/share"] = clone(view);
       emit("user.created", user.username);
@@ -364,25 +490,6 @@
       var page = pending.slice(0, limit);
       return reply({ events: page, next_cursor: page.length ? page[page.length - 1].id : after, has_more: pending.length > limit });
     }
-    if (path === "api/tokens" && method === "POST") {
-      var token = clone(responses["POST api/tokens"]);
-      var grantCatalog = responses["GET api/token-capabilities"];
-      Object.assign(token, { id: (++newId).toString(16).padStart(12, "0"), name: body.name, scope: body.scope || null,
-        capabilities: body.capabilities || grantCatalog.presets[body.scope], created_at: now(), last_used_at: null, revoked_at: null,
-        expires_at: body.never_expires ? null : body.expires_at || iso(Date.now() + (body.expires_in_days || 90) * 86400000) });
-      token.token = "demo-only-token-" + token.id + "-never-authorizes-anything";
-      var metadata = clone(token); delete metadata.token;
-      responses["GET api/tokens"].tokens.push(metadata);
-      emit("token.created", token.name, { name: token.name, scope: token.scope });
-      return reply(token);
-    }
-    if (path === "api/tokens/preview" && method === "POST") {
-      var catalog = responses["GET api/token-capabilities"];
-      var grants = body.capabilities || catalog.presets[body.scope];
-      return reply({ scope: body.scope || null, capabilities: grants,
-        permissions: grants.map(function (capability) { return catalog.capabilities.find(function (row) { return row.capability === capability; }); }),
-        expires_at: body.never_expires ? null : body.expires_at || iso(Date.now() + (body.expires_in_days || 90) * 86400000) });
-    }
     if (path.indexOf("api/tokens/") === 0 && method === "DELETE") {
       var token = responses["GET api/tokens"].tokens.find(function (item) { return item.id === path.slice(11); });
       if (!token) return error("not_found", "unavailable", 404);
@@ -393,19 +500,75 @@
       if (responses["GET api/privacy"].settings.usage_history === "off") return error("history_off", "unavailable", 409);
       return reply(fit(clone(responses["GET api/traffic/daily?days=30"]), params));
     }
-    if (method === "GET" && responses[method + " " + path]) return reply(responses[method + " " + path]);
-    return error("not_found", "unavailable", 404);
+    return error("demo_unavailable", "unavailable", 409);
   }
+
+  function legacy(request) { return handle(request.method, request.path, request.params, request.body); }
+  D.route("GET", "auth/state", legacy);
+  D.route("POST", "auth/logout", legacy);
+  D.route("POST", "auth/login", legacy);
+  D.route("POST", "auth/setup", legacy);
+  D.route("POST", "auth/setup/check", legacy);
+  D.route("POST", "auth/confirm", legacy);
+  D.route("POST", "auth/sessions/revoke-others", legacy);
+  D.recorded("GET", "auth/sessions");
+  D.recorded("GET", "auth/passkeys");
+  D.unavailable("POST", "auth/password");
+  D.unavailable("POST", "auth/totp/begin");
+  D.unavailable("POST", "auth/totp/enable");
+  D.unavailable("POST", "auth/totp/disable");
+  D.unavailable("POST", "auth/passkeys/register/begin");
+  D.unavailable("POST", "auth/passkeys/register/finish");
+  D.unavailable("POST", "auth/passkeys/login/begin");
+  D.unavailable("POST", "auth/passkeys/login/finish");
+  D.unavailable("POST", "auth/passkeys/confirm/begin");
+  D.unavailable("POST", "auth/passkeys/confirm/finish");
+  D.unavailable("PATCH", "auth/passkeys/{id}");
+  D.unavailable("DELETE", "auth/passkeys/{id}");
+  D.unavailable("GET", "api/nodes/{id}/command-targets");
+  D.unavailable("POST", "api/nodes/{id}/commands");
+  D.unavailable("GET", "api/nodes/{id}/commands/{id}");
+  D.recorded("GET", "ui/api/fleet");
+  D.recorded("GET", "api/settings");
+  D.recorded("GET", "api/revisions");
+  D.recorded("GET", "api/revisions/{id}");
+  D.recorded("GET", "api/token-capabilities");
+  D.recorded("GET", "api/tokens");
+  D.recorded("GET", "api/language");
+  D.recorded("GET", "api/privacy");
+  D.route("GET", "api/users", legacy);
+  D.route("POST", "api/users", legacy);
+  D.route("PATCH", "api/users", legacy);
+  D.route("GET", "api/users/{id}", legacy);
+  D.route("PATCH", "api/users/{id}", legacy);
+  D.route("DELETE", "api/users/{id}", legacy);
+  D.route("GET", "api/users/{id}/devices", legacy);
+  D.route("DELETE", "api/users/{id}/devices", legacy);
+  D.route("DELETE", "api/users/{id}/devices/{id}", legacy);
+  D.route("GET", "api/users/{id}/usage", legacy);
+  D.route("GET", "api/users/{id}/connections", legacy);
+  D.route("GET", "api/users/{id}/cut-off", legacy);
+  D.route("POST", "api/users/{id}/reset-traffic", legacy);
+  D.route("POST", "api/users/{id}/reissue", legacy);
+  D.route("GET", "ui/api/people/{id}/share", legacy);
+  D.route("GET", "ui/api/people/{id}/expiry", legacy);
+  D.route("GET", "api/notice", legacy);
+  D.route("PUT", "api/notice", legacy);
+  D.route("PUT", "api/language", legacy);
+  D.route("PUT", "api/privacy", legacy);
+  D.route("GET", "api/events", legacy);
+  D.route("DELETE", "api/tokens/{id}", legacy);
+  D.route("GET", "api/traffic/daily", legacy);
 
   window.fetch = function (input, options) {
     var url = new URL(typeof input === "string" || input instanceof URL ? input : input.url, location.href);
     var method = (options && options.method || input.method || "GET").toUpperCase();
     // Even an unknown API request is answered locally; it can never reach a service or another origin.
-    if (url.origin !== location.origin) return Promise.resolve(error("not_found", "unavailable", 404));
+    if (url.origin !== location.origin) return Promise.resolve(error("demo_unavailable", "unavailable", 409));
     var path = url.pathname.indexOf(consoleRoot) === 0 ? url.pathname.slice(consoleRoot.length) : "";
     if (/^(?:api|auth|ui\/api)\//.test(path)) {
       var body = options && options.body ? JSON.parse(options.body) : {};
-      return ready.then(function () { return handle(method, path, url.searchParams, body); }, function () { return error("demo_unavailable", "load", 503); });
+      return ready.then(function () { return D.dispatch(method, path, url.searchParams, body); }, function () { return error("demo_unavailable", "load", 503); });
     }
     var sub = url.pathname.match(/\/sub\/([^/]+)\/(info|config\.json)$/);
     if (sub) return ready.then(function () {
