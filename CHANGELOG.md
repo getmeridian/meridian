@@ -12,6 +12,13 @@ describes your whole fleet; a small agent on every server applies it; and no
 server needs Docker. The first sections list what changed in each beta,
 newest first; the last is what 4.0 changes compared with 3.x.
 
+### Since 4.0.0b11
+
+#### Fixed
+- `meridian plan` before upgrading a fleet from an earlier beta no longer stops as
+  inconclusive (exit 3) because access profiles look unavailable: a service that
+  answers but predates profiles holds none.
+
 ### Since 4.0.0b10
 
 #### Added

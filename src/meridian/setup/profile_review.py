@@ -69,7 +69,7 @@ def profile_review_needed(cluster: ClusterConfig, intent: SetupIntent, *, allow_
     except ControlServiceError as exc:
         if not _unavailable(exc):
             raise
-        if allow_bootstrap and not cluster.has_used_access_profiles:
+        if not cluster.has_used_access_profiles and (allow_bootstrap or _predates_profiles(cluster, exc)):
             return False
         raise ProfileReviewUnavailableError() from exc
 
@@ -84,6 +84,18 @@ def _held_profiles(live: AccessProfileCatalog) -> bool:
 
 def _unavailable(exc: ControlServiceError) -> bool:
     return exc.category == "system" or isinstance(exc, ControlServiceNotFound)
+
+
+def _predates_profiles(cluster: ClusterConfig, exc: ControlServiceError) -> bool:
+    """A service that answers health but has no profile route is older than profiles, so it holds none."""
+    if not isinstance(exc, ControlServiceNotFound):
+        return False
+    try:
+        with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
+            client.health()
+    except ControlServiceError:
+        return False
+    return True
 
 
 def review_profile_access(cluster: ClusterConfig, plan: ResourcePlan) -> AccessProfileReview | None:
