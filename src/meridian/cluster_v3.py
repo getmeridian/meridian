@@ -35,8 +35,8 @@ def serialize_cluster_v3(config: ClusterConfig) -> dict[str, Any]:
     output: dict[str, Any] = {}
     if config.topology_intent is not None:
         output["topology_intent"] = config.topology_intent.model_dump(mode="json", by_alias=True)
-    if config.access_profiles_used:
-        output["access_profiles_used"] = config.access_profiles_used
+    if config.has_used_access_profiles:
+        output["access_profiles_used"] = True
     if config.workloads:
         output["workloads"] = [_serialize_dataclass(workload) for workload in config.workloads]
     if config.managed_bindings:
@@ -77,9 +77,7 @@ def load_cluster_v3(data: dict[str, Any]) -> LoadedClusterV3:
 
     return LoadedClusterV3(
         topology_intent=topology_intent,
-        access_profiles_used=bool(
-            data.get("access_profiles_used", False) or (topology_intent is not None and topology_intent.access_profiles)
-        ),
+        access_profiles_used=data.get("access_profiles_used", False),
         workloads=workloads,
         managed_bindings=managed_bindings,
         allocations=allocations,

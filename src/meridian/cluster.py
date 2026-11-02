@@ -314,6 +314,7 @@ class ClusterConfig:
     def __post_init__(self) -> None:
         import threading
 
+        self.access_profiles_used = self.has_used_access_profiles
         if self._lock is None:
             # RLock (reentrant) so handlers that mutate cluster + save() in
             # one locked region don't deadlock against save()'s own lock.
@@ -453,6 +454,11 @@ class ClusterConfig:
         from meridian.cluster_persistence import backup_cluster
 
         backup_cluster(path)
+
+    @property
+    def has_used_access_profiles(self) -> bool:
+        """Saved history or current declarations require live profile evidence."""
+        return self.access_profiles_used or bool(self.topology_intent and self.topology_intent.access_profiles)
 
     @property
     def runs_control_service(self) -> bool:

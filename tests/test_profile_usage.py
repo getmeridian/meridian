@@ -7,6 +7,7 @@ import pytest
 import yaml
 
 from meridian.cluster import ClusterConfig
+from meridian.commands.profile_review import ProfileReviewUnavailableError, profile_review_needed
 from meridian.core.errors import LocalStateCorruptedError, LocalStateError, ProvisioningError
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import AccessProfileIntent
@@ -59,6 +60,21 @@ def test_a_saved_intent_with_profiles_counts_as_used_even_without_the_flag(tmp_p
     loaded.topology_intent = single_exit_intent()
     loaded.save(path)
     assert ClusterConfig.load(path).access_profiles_used is True
+
+
+def test_an_in_memory_profile_intent_refuses_an_unavailable_review():
+    cluster = ClusterConfig(topology_intent=single_exit_intent())
+    cluster.topology_intent = profile_intent()
+    with pytest.raises(ProfileReviewUnavailableError):
+        profile_review_needed(cluster, single_exit_intent(), allow_bootstrap=True)
+
+
+def test_saving_an_in_memory_profile_intent_serializes_effective_usage(tmp_path: Path):
+    path = tmp_path / "cluster.yml"
+    cluster = ClusterConfig(topology_intent=single_exit_intent())
+    cluster.topology_intent = profile_intent()
+    cluster.save(path)
+    assert yaml.safe_load(path.read_text())["access_profiles_used"] is True
 
 
 @pytest.mark.parametrize("flag", [None, 0, "false", [], {}], ids=["null", "number", "string", "list", "mapping"])

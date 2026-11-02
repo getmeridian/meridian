@@ -41,7 +41,7 @@ def profile_review_needed(cluster: ClusterConfig, intent: SetupIntent, *, allow_
     if intent.access_profiles:
         return True
     if not cluster.panel.url or not cluster.panel.api_token:
-        if allow_bootstrap and not cluster.access_profiles_used:
+        if allow_bootstrap and not cluster.has_used_access_profiles:
             return False
         raise ProfileReviewUnavailableError()
     try:
@@ -50,7 +50,7 @@ def profile_review_needed(cluster: ClusterConfig, intent: SetupIntent, *, allow_
     except ControlServiceError as exc:
         if not _unavailable(exc):
             raise
-        if allow_bootstrap and not cluster.access_profiles_used:
+        if allow_bootstrap and not cluster.has_used_access_profiles:
             return False
         raise ProfileReviewUnavailableError() from exc
 
