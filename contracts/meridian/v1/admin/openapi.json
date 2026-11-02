@@ -1832,6 +1832,7 @@
               }
             ],
             "default": null,
+            "description": "Projected or completed inverse changes; a dry run leaves undone_at null.",
             "title": "Undo People"
           },
           "undo_until": {
@@ -1880,6 +1881,12 @@
       "BulkUndoRequest": {
         "additionalProperties": false,
         "properties": {
+          "dry_run": {
+            "default": false,
+            "description": "Validate all undo preconditions and return inverse changes without writing.",
+            "title": "Dry Run",
+            "type": "boolean"
+          },
           "receipt_id": {
             "pattern": "^[0-9a-f]{32}$",
             "title": "Receipt Id",
@@ -15152,7 +15159,7 @@
     },
     "/api/people/bulk/undo": {
       "post": {
-        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Undo lasts 10 minutes, survives service restarts, and is single-use. Reset and delete cannot be undone.",
+        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Undo lasts 10 minutes, survives service restarts, and is single-use. Reset and delete cannot be undone. dry_run=true checks people, grants, nodes, and restored profiles without writing, returning undo_people.",
         "operationId": "undo_people_bulk",
         "requestBody": {
           "content": {

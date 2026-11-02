@@ -57,6 +57,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Guard bulk undo against changed grants, nodes, and removed profiles, name stale
+  people, and show validated inverse access and cut-off previews in dry runs too.
 - Review and fence removal of the last service-held access profile in plan and
   apply, refusing profiles still assigned to people.
 - Stage workload and endpoint references before profile activation, and create

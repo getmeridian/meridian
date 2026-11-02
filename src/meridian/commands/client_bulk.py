@@ -82,7 +82,7 @@ def field_value(fields: BulkFields | None, name: str) -> str:
     return t("bulk.none") if value is None or value == "" else str(value)
 
 
-def preview_table(people: list[BulkPersonChange], *, undo: bool = False) -> None:
+def preview_table(people: list[BulkPersonChange]) -> None:
     table = Table(title=t("bulk.preview_title"), show_lines=True)
     for key in ("person", "field", "before", "after"):
         table.add_column(t("bulk." + key))
@@ -93,12 +93,11 @@ def preview_table(people: list[BulkPersonChange], *, undo: bool = False) -> None
             table.add_row(escape(person.display_name), t("bulk.unchanged"), "", "")
         else:
             for index, field in enumerate(person.changes):
-                left, right = (person.after, person.before) if undo else (person.before, person.after)
                 table.add_row(
                     escape(person.display_name) if index == 0 else "",
                     t(f"bulk.field.{field}"),
-                    escape(field_value(left, field)),
-                    escape(field_value(right, field)),
+                    escape(field_value(person.before, field)),
+                    escape(field_value(person.after, field)),
                 )
         for warning in person.warnings:
             warn(t(f"bulk.warning.{warning}"))
@@ -238,8 +237,10 @@ def run_receipt(receipt_id: str, *, undo: bool = False, yes: bool = False, dry_r
                 receipt = client.bulk_receipt(receipt_id)
                 if undo:
                     require_undo_eligible(receipt)
+                    receipt = client.preview_bulk_undo(receipt_id)
                 if not is_json_mode():
-                    preview_table(receipt.people, undo=undo)
+                    people = receipt.undo_people if undo else receipt.people
+                    preview_table(people or [])
                 if undo and not dry_run:
                     if not yes and not confirm(t("bulk.undo_confirm", count=receipt.counts.changed)):
                         raise typer.Exit(1)

@@ -189,10 +189,15 @@ def test_bulk_undo_dry_run_checks_receipt_eligibility(people_service, tmp_home, 
     with (
         patch("meridian.commands.client_bulk.load_topology_cluster", return_value=cluster),
         patch.object(ControlClient, "bulk_receipt", return_value=receipt),
+        patch.object(ControlClient, "preview_bulk_undo", return_value=receipt) as review_undo,
         patch.object(ControlClient, "undo_bulk") as undo,
     ):
         result = CliRunner().invoke(app, ["client", "bulk", "undo", receipt.id, "--dry-run", "--json"])
     undo.assert_not_called()
+    if case == "eligible":
+        review_undo.assert_called_once_with(receipt.id)
+    else:
+        review_undo.assert_not_called()
     assert result.exit_code == (0 if case == "eligible" else 2), result.output
     if case == "eligible":
         payload = json.loads(result.stdout)

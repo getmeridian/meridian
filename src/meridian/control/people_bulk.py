@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import hmac
-import json
 import secrets
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -14,6 +13,7 @@ from meridian.control.access_memberships import read_access_profiles, require_pr
 from meridian.control.access_profiles import AccessProfileLedger
 from meridian.control.account_lifecycle import enforce_user_schedules
 from meridian.control.bulk_effects import BulkEffect, prepare_effect, prepare_undo, project_effect
+from meridian.control.bulk_preconditions import BulkPreconditions
 from meridian.control.errors import ServiceError
 from meridian.control.events import EventLedger
 from meridian.control.models import NodeSpec, UserRecord
@@ -261,6 +261,39 @@ class BulkLedger:
                 subjects=stale,
             )
 
+    def _refuse_changed_nodes(self, expected: str, names: Iterable[str]) -> None:
+        if self._nodes() != expected:
+            subjects = list(names)
+            raise ServiceError(
+                "stale_people",
+                "Access profiles or managed nodes changed since review. "
+                + ("Affected people: " + ", ".join(subjects) + ". " if subjects else "")
+                + "Preview again.",
+                409,
+                subjects=subjects,
+            )
+
+    def _require_undo_profiles(self, people: list[BulkPersonChange]) -> None:
+        refused: dict[str, str] = {}
+        for person in people:
+            try:
+                require_profiles(self.store, person.before.profiles)
+            except ServiceError as exc:
+                if exc.code != "unknown_profile":
+                    raise
+                refused[person.username] = str(exc)
+        if refused:
+            raise ServiceError(
+                "stale_people",
+                "Cannot undo for "
+                + ", ".join(refused)
+                + ": "
+                + " ".join(dict.fromkeys(refused.values()))
+                + " Preview a new change.",
+                409,
+                subjects=list(refused),
+            )
+
     def _enforce(self, users: list[UserRecord], now: str) -> None:
         enforce_user_schedules(
             self.store,
@@ -309,8 +342,7 @@ class BulkLedger:
             if datetime.fromisoformat(now) > datetime.fromisoformat(review.expires_at):
                 raise ServiceError("preview_expired", "This preview expired. Preview again.", 409)
             self._refuse_stale(frozen.versions)
-            if self._nodes() != frozen.nodes:
-                raise ServiceError("stale_people", "The managed nodes changed since review. Preview again.", 409)
+            self._refuse_changed_nodes(frozen.nodes, frozen.versions)
             declared = self.people.intent().declared
             users = {person.username: self.read_user(person.username) for person in review.people}
             baselines = {name: project_effect(user, now) for name, user in users.items()}
@@ -402,14 +434,20 @@ class BulkLedger:
                 if review.reversible and committed_counts.changed
                 else None,
             )
-            versions = {
-                person.username: self.people.row_version(person.username)
-                for person in outcomes
-                if person.outcome == "changed" and person.after is not None
-            }
+            versions: dict[str, tuple[str, int]] = {}
+            for person in outcomes:
+                if person.outcome == "changed" and person.after is not None:
+                    version = self.people.row_version(person.username)
+                    assert version is not None
+                    versions[person.username] = version
             self.store.db.execute(
                 "INSERT INTO bulk_receipts VALUES (?, ?, ?, ?)",
-                (receipt.id, receipt.preview_hash, receipt.model_dump_json(), json.dumps(versions)),
+                (
+                    receipt.id,
+                    receipt.preview_hash,
+                    receipt.model_dump_json(),
+                    BulkPreconditions(people=versions, nodes=self._nodes()).model_dump_json(),
+                ),
             )
             self.events.append(
                 "people.bulk",
@@ -420,7 +458,7 @@ class BulkLedger:
         self._previews.pop(request.preview_id, None)
         return receipt
 
-    def undo(self, receipt_id: str) -> BulkReceipt:
+    def undo(self, receipt_id: str, *, dry_run: bool = False) -> BulkReceipt:
         with self.store.transaction():
             receipt = self.receipt(receipt_id)
             now = format_timestamp(self.clock())
@@ -432,9 +470,17 @@ class BulkLedger:
                 raise ServiceError("undo_refused", "The undo window expired.", 409)
             row = self.store.row("SELECT versions FROM bulk_receipts WHERE id = ?", (receipt_id,))
             assert row is not None
-            versions = {name: (value[0], value[1]) for name, value in json.loads(row[0]).items()}
+            try:
+                preconditions = BulkPreconditions.model_validate_json(row[0])
+            except ValueError as exc:
+                raise ServiceError(
+                    "undo_refused", "This receipt has no access preconditions. Preview a new bulk change.", 409
+                ) from exc
+            versions = preconditions.people
             self._refuse_stale(versions)
             people = [person for person in receipt.people if person.outcome == "changed"]
+            self._require_undo_profiles(people)
+            self._refuse_changed_nodes(preconditions.nodes, versions)
             users = {person.username: self.read_user(person.username) for person in people}
             effects = {}
             for person in people:
@@ -461,8 +507,11 @@ class BulkLedger:
             outcomes = []
             for person in people:
                 user = users[person.username]
-                actual = self._apply_effect(user, effects[person.username], now)
-                before, after = BulkFields.from_user(user), BulkFields.from_user(actual)
+                restored = effects[person.username].user
+                before, after = BulkFields.from_user(user), BulkFields.from_user(restored)
+                access_change = (
+                    self.access.changed_membership(user, restored) if receipt.action.action == "set-profiles" else None
+                )
                 outcomes.append(
                     BulkPersonChange(
                         username=person.username,
@@ -472,8 +521,14 @@ class BulkLedger:
                         after=after,
                         changes=changed_fields(before, after),
                         outcome="changed",
+                        access=access_change,
+                        cut_off=self.access.loss_scope(access_change.lost) if access_change is not None else None,
                     )
                 )
+            if dry_run:
+                return BulkReceipt.model_validate({**receipt.model_dump(), "undo_people": outcomes})
+            for person in people:
+                self._apply_effect(users[person.username], effects[person.username], now)
             self.compose()
             updated = BulkReceipt.model_validate({**receipt.model_dump(), "undone_at": now, "undo_people": outcomes})
             self.store.db.execute(

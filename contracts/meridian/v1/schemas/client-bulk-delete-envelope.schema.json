@@ -712,6 +712,7 @@
             }
           ],
           "default": null,
+          "description": "Projected or completed inverse changes; a dry run leaves undone_at null.",
           "title": "Undo People"
         },
         "undo_until": {

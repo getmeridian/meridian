@@ -333,6 +333,12 @@ class ControlClient:
             self._call("POST", "api/people/bulk/undo", BulkUndoRequest(receipt_id=receipt_id).model_dump())
         )
 
+    def preview_bulk_undo(self, receipt_id: str) -> BulkReceipt:
+        request = BulkUndoRequest(receipt_id=receipt_id, dry_run=True)
+        return BulkReceipt.model_validate(
+            self._request("POST", "api/people/bulk/undo", request.to_data(), mutation_method="GET").json()
+        )
+
     def list_users(self) -> list[UserRecord]:
         return [UserRecord.model_validate(item) for item in self._call("GET", "api/users")["users"]]
 

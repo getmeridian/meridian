@@ -40,6 +40,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - A proposal whose intent contains a secret-shaped key or value, or a malformed `access` block, is refused and never stored.
 
 ## Pitfalls
+- **Undo keeps the resource fence** — receipts retain account versions and the grant/node hash; validate restored profiles and inverse effects before either a dry run or a write, naming stale people.
 - **Cut-off reviews include unresolved access losses** — require people.read and people.private, and combine signed current users with fresh access-change receipts before choosing reset or core restart.
 - **Root identities cover current capabilities** — the unlisted root and bounded owner identity can issue new explicit grants; stored preset grants never grow with the catalog.
 - **Metric labels are fixed data** — derive route IDs from the catalog or handler names, share one unknown bucket, and omit unavailable/stale numeric values rather than inventing zero.

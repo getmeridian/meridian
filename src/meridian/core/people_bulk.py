@@ -195,6 +195,12 @@ class BulkCommitRequest(CoreModel):
 
 class BulkUndoRequest(CoreModel):
     receipt_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    dry_run: bool = Field(
+        default=False,
+        strict=True,
+        exclude_if=lambda value: not value,
+        description="Validate all undo preconditions and return inverse changes without writing.",
+    )
 
 
 class BulkReceipt(CoreModel):
@@ -207,7 +213,10 @@ class BulkReceipt(CoreModel):
     changed_nodes: int = Field(ge=0)
     undo_until: Timestamp | None
     undone_at: Timestamp | None = None
-    undo_people: list[BulkPersonChange] | None = None
+    undo_people: list[BulkPersonChange] | None = Field(
+        default=None,
+        description="Projected or completed inverse changes; a dry run leaves undone_at null.",
+    )
 
 
 class ClientBulkResult(CoreModel):

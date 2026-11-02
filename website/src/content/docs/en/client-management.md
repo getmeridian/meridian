@@ -493,6 +493,8 @@ When bulk disabling, deletion, or an expiry change removes access, the service r
 
 ## Access profiles
 
+Bulk undo checks the saved people, grants, and nodes before previewing or writing. Changed access or a deleted profile refuses the whole undo and names the affected people, including with `--dry-run`. Undo previews show the reversed gains, losses, and hard cut-off scope. The API accepts `{"receipt_id":"...","dry_run":true}` at `POST /api/people/bulk/undo`, returning projected `undo_people` without a database change, event, or backup pull. Older receipts without saved access preconditions require a new bulk review.
+
 `plan` and `apply` review profiles held by the service as well as those in the proposed topology. Removing the last profile is reviewed and fenced, and is refused while anyone still belongs to it.
 
 An apply stores inbound and endpoint references before activating profile grants, then creates accounts. Adding a person in that apply cannot invalidate its own access review, including when removing the last profile.
