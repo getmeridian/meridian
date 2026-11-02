@@ -40,6 +40,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - A proposal whose intent contains a secret-shaped key or value, or a malformed `access` block, is refused and never stored.
 
 ## Pitfalls
+- **Receipt row guards stay explicit** — a derived boolean does not narrow an optional SQLite row for static checks.
 - **Username maps hold identifiers** — revision secret checks exempt only usernames declared in `access.users`, and only as keys of access creation settings and display names; undeclared keys and every value still undergo the full secret check.
 - **Cut-off scope follows every unresolved receipt** — later rotation, import, or suspension may replace its reason while lost inbound tags still need a cut-off; a confirmed receipt's identities never carry into the next one, or a narrow reset widens into a core restart.
 - **Undo keeps the resource fence** — receipts retain account versions and the grant/node hash; validate restored profiles and inverse effects before either a dry run or a write, naming stale people.

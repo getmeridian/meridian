@@ -12,7 +12,7 @@ _RENDERER_MANIFEST = {
     "control-subscriptions": "access-profiles-v4",
     "control-commands": "cut-off-disclosures-v8",
     "pwa": "access-profiles-v4",
-    "control-service": "profile-undo-v38",
+    "control-service": "profile-undo-v39",
     "control-api": "profile-undo-v35",
     "control-ui": "access-profiles-v26",
     "firewall": "ufw-comment-v2",

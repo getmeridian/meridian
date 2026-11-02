@@ -115,8 +115,11 @@ class FlowBlockLedger:
             )
             # Only an unconfirmed receipt carries over: a confirmed one already blocked its
             # identities, and folding them back in would widen the next cut-off.
-            unresolved = previous is not None and evidence.status(self._required(previous)) != "blocked"
-            identities = json.loads(previous["identities"]) if unresolved else {}
+            identities = (
+                json.loads(previous["identities"])
+                if previous is not None and evidence.status(self._required(previous)) != "blocked"
+                else {}
+            )
             identities.update(lost_identities[user_id])
             self._store.db.execute(
                 "INSERT INTO user_flow_blocks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
