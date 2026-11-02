@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from typer.testing import CliRunner
@@ -19,7 +20,8 @@ from meridian.control.client import ControlClient, ControlServiceError, ControlS
 from meridian.control.models import ServiceSettings, UserCreate
 from meridian.core.errors import LocalStateError
 from meridian.core.topology import AccessProfileIntent, SetupIntent
-from meridian.reconciler.resources import ResourceExecutionResult, build_resource_actions
+from meridian.reconciler.meridian_drivers import MeridianDriverContext, ServiceSettingsDriver
+from meridian.reconciler.resources import ResourceExecutionResult, ResourceReconcileError, build_resource_actions
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.fleet_document import dump_fleet_document, fleet_document
 from tests.support.control_service import ADMIN_TOKEN, serve_control
@@ -152,7 +154,7 @@ def test_apply_without_profiles_can_bootstrap_or_repair_with_unavailable_service
 
 @pytest.mark.parametrize("saved", ["profiles", "unknown", "pending-profiles"])
 @pytest.mark.parametrize("credentials", [False, True])
-def test_apply_refuses_unavailable_profile_review_when_saved_history_is_not_proven_empty(
+def test_apply_leaves_an_unavailable_profile_review_to_the_settings_fence_whatever_history_says(
     tmp_home: Path, saved: str, credentials: bool
 ):
     intent = single_exit_intent()
@@ -188,13 +190,36 @@ def test_apply_refuses_unavailable_profile_review_when_saved_history_is_not_prov
         client.return_value.__enter__.return_value.settings.side_effect = ControlServiceError(
             "The control service cannot be reached.", retryable=True
         )
+        runtime.return_value.apply_intent.return_value = ResourceExecutionResult(plan_hash=plan.plan_hash, generation=2)
         reply = CliRunner().invoke(app, ["apply", "--yes", "--json"])
-        assert reply.exit_code == 3, reply.output
-        body = json.loads(reply.stdout)
-        assert "profile" in body["errors"][0]["message"].lower()
-        assert "retry" in body["errors"][0]["hint"].lower()
-        assert body["errors"][0]["retryable"] is True
-        runtime.return_value.apply_intent.assert_not_called()
+        assert reply.exit_code == 0, reply.output
+        runtime.return_value.apply_intent.assert_called_once()
+        assert runtime.call_args.kwargs["access_review_hash"] is None
+
+
+@pytest.mark.parametrize(
+    "live", [{}, {"limited": ["inbound:exit-a:reality-a"]}], ids=["unchanged", "unreviewed-profiles"]
+)
+def test_an_unreviewed_settings_write_never_changes_the_live_profile_map(live: dict[str, list[str]]):
+    plan = compile_topology(single_exit_intent())
+    action = next(
+        action for action in build_resource_actions(plan, 1) if action.resource.logical_id == "settings:service"
+    )
+    context = MagicMock(spec=MeridianDriverContext)
+    context.access_review_hash = None
+    context.cluster = ClusterConfig(panel=PanelConfig(url="https://198.51.100.10/control", sub_path="connect"))
+    client = MagicMock()
+    client.settings.return_value = ServiceSettings(profile_title="Meridian", access_profiles=live)
+    context.client = lambda: nullcontext(client)
+    driver = ServiceSettingsDriver(context)
+    if live:
+        with pytest.raises(ResourceReconcileError, match="did not review"):
+            driver.apply(action, None)
+        client.put_settings.assert_not_called()
+    else:
+        driver.apply(action, None)
+        client.put_settings.assert_called_once()
+        assert "expected_access_hash" not in client.put_settings.call_args.kwargs
 
 
 @pytest.mark.parametrize("in_use", [False, True])

@@ -61,9 +61,10 @@ newest first; the last is what 4.0 changes compared with 3.x.
   or service access, including dry runs and default membership.
 - Accept usernames such as token, secret, and api_key in revision and apply
   checks while still rejecting secret fields and values in their settings.
-- Keep plan results when profile evidence is unavailable, allow control-service
-  bootstrap or repair only with proven empty profile history, and give fleet
-  imports the same profile review and membership fence as plan and apply.
+- Keep plan results when profile evidence is unavailable, let apply bootstrap or
+  repair an unreachable control service while the settings write refuses to
+  change profiles nobody reviewed, and give fleet imports the same profile review
+  and membership fence as plan and apply.
 - Keep unresolved lost inbounds in cut-off reviews after credential rotation,
   reissue, replacing imports, or re-enabling a person with narrower access.
 - Report typed directory failures when assigning a person's profiles and print

@@ -46,7 +46,7 @@ def run_v4_apply(
     review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(intent), cluster=cluster)
     access_review = (
         review_profile_access(cluster, review.plan)
-        if profile_review_needed(cluster, intent, allow_bootstrap=True, reviewed_plan_hash=review.plan.plan_hash)
+        if profile_review_needed(cluster, intent, allow_bootstrap=True)
         else None
     )
     if access_review is not None and not json_output:

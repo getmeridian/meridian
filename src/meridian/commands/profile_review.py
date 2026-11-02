@@ -30,20 +30,19 @@ class ProfileReviewUnavailableError(InfrastructureEvidenceUnavailableError):
         super().__init__(t("profiles.evidence_unavailable"), hint=t("profiles.evidence_retry"))
 
 
-def profile_review_needed(
-    cluster: ClusterConfig,
-    intent: SetupIntent,
-    *,
-    allow_bootstrap: bool = False,
-    reviewed_plan_hash: str = "",
-) -> bool:
-    """Removing the last profile still reviews the live service's membership and fences its hash."""
+def profile_review_needed(cluster: ClusterConfig, intent: SetupIntent, *, allow_bootstrap: bool = False) -> bool:
+    """Removing the last profile still reviews the live service's membership and fences its hash.
+
+    With the service unreachable, plan reports unavailable evidence. Apply may proceed
+    unreviewed: the settings driver re-reads the live map before writing and refuses to
+    change profiles nobody reviewed, so an outage never decides what the service holds.
+    """
     if intent.control.backend != "meridian":
         return False
     if intent.access_profiles:
         return True
     if not cluster.panel.url or not cluster.panel.api_token:
-        if allow_bootstrap and _empty_profile_history(cluster, intent, reviewed_plan_hash):
+        if allow_bootstrap:
             return False
         raise ProfileReviewUnavailableError()
     try:
@@ -52,55 +51,13 @@ def profile_review_needed(
     except ControlServiceError as exc:
         if not _unavailable(exc):
             raise
-        if allow_bootstrap and _empty_profile_history(cluster, intent, reviewed_plan_hash):
+        if allow_bootstrap:
             return False
         raise ProfileReviewUnavailableError() from exc
 
 
 def _unavailable(exc: ControlServiceError) -> bool:
     return exc.category == "system" or isinstance(exc, ControlServiceNotFound)
-
-
-def _empty_profile_history(cluster: ClusterConfig, intent: SetupIntent, reviewed_plan_hash: str) -> bool:
-    """Prove empty settings from the saved generation, never from the proposed empty map alone."""
-    previous = cluster.topology_intent
-    if previous is None or previous.access_profiles:
-        return False
-    settings = next(
-        (row for row in compile_topology(previous).resources if isinstance(row.payload, ServiceSettingsPayload)), None
-    )
-    if settings is None:
-        return False
-    same_review = previous == intent and bool(reviewed_plan_hash)
-    if cluster.pending_plan_hash:
-        if cluster.pending_generation <= 0:
-            return False
-        pending_empty = same_review and cluster.pending_plan_hash == reviewed_plan_hash
-        pending_empty = pending_empty or any(
-            checkpoint.resource_id == settings.logical_id
-            and checkpoint.generation == cluster.pending_generation
-            and checkpoint.expected_hash == settings.desired_hash
-            for checkpoint in cluster.action_checkpoints.values()
-        )
-        if not pending_empty:
-            return False
-    elif cluster.pending_generation:
-        return False
-    if cluster.active_generation == 0:
-        return not cluster.active_plan_hash and all(
-            binding.generation == cluster.pending_generation and cluster.pending_generation > 0
-            for binding in cluster.managed_bindings.values()
-        )
-    if same_review and cluster.active_plan_hash == reviewed_plan_hash:
-        return True
-    return any(
-        binding.logical_id == settings.logical_id
-        and binding.resource_kind == "service_settings"
-        and binding.active
-        and binding.generation == cluster.active_generation
-        and binding.desired_hash == settings.desired_hash
-        for binding in cluster.managed_bindings.values()
-    )
 
 
 def require_profile_backend(intent: SetupIntent, *, requested: bool = False) -> None:

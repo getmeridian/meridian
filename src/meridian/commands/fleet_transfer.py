@@ -149,9 +149,7 @@ def _import(source: str, *, dry_run: bool, yes: bool, forget_unreachable: bool, 
     try:
         access_review = (
             review_profile_access(cluster, review.plan)
-            if profile_review_needed(
-                cluster, updated, allow_bootstrap=not dry_run, reviewed_plan_hash=review.plan.plan_hash
-            )
+            if profile_review_needed(cluster, updated, allow_bootstrap=not dry_run)
             else None
         )
     except MeridianError as exc:
