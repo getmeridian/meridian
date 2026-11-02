@@ -57,6 +57,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Save profile history with accepted topology after the fleet fence check,
+  preserving local intent and forgotten bindings when a stale copy is refused.
 - Recognize access-profile use in current configuration edits and save it as
   permanent history, so an outage cannot bypass review before a reload.
 - Refuse single-person and bulk profile assignment on Remnawave before directory

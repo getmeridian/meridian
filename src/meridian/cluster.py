@@ -287,7 +287,7 @@ class ClusterConfig:
     control_restore: ControlRestore | None = None
     # Workload-scoped topology and durable compiled-resource state.
     topology_intent: SetupIntent | None = None
-    # Sticky fact, persisted before applying any intent with named access profiles.
+    # Sticky fact, saved with allowed topology before applying named access profiles.
     access_profiles_used: bool = False
     workloads: list[WorkloadBinding] = field(default_factory=list)
     managed_bindings: dict[str, ManagedResourceBinding] = field(default_factory=dict)

@@ -12,6 +12,7 @@
 - `plan` and `apply` run the same compiler and runtime as setup.
 
 ## Pitfalls
+- **Profile history saves with accepted intent** — set the sticky flag after the fleet fence accepts, in the existing topology save; a separate earlier save persists forgotten bindings even when the fence refuses.
 - **Verification waits for node documents signed late** — settings and accounts apply after workloads, and each write signs a new document; a single read failed System Lab's first deploy.
 - **Preserve access profiles through setup selections** — reviewed grants travel with the access draft, including when the wizard re-asks names.
 - **Approve and apply `review_hash`, never `plan.plan_hash`** — a plan hash cannot see what the change removes.

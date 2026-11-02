@@ -519,6 +519,8 @@ Removing a profile still used by people is refused with its membership count. Mo
 
 Meridian remembers that your fleet has used named profiles. Saving a configuration with profiles records this fact, and removing the last profile does not reset it. Current configuration edits also count when checking whether an outage requires review.
 
+If another managing copy causes an apply to refuse, local topology and forgotten-server records stay unchanged. Once an apply is accepted, Meridian remembers profile use even if a later deployment step fails.
+
 `fleet import` uses the same profile check, including when both the saved and imported topology have no profiles. If service settings are unavailable, `plan` still returns its compiled result with unavailable evidence and exit `3`. An apply or import can proceed without the profile review only for a fresh fleet or when saved generation evidence proves no profiles were recorded. Otherwise, restore control-service access and retry. Import dry runs require live evidence.
 
 An apply stores inbound and endpoint references before activating profile grants, then creates accounts. Adding a person in that apply cannot invalidate its own access review, including when removing the last profile.

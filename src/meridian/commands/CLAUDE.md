@@ -24,7 +24,7 @@
 
 ## Pitfalls
 - **Assignment guards cover both entry points** — single-person and bulk profile assignment require the Meridian backend before directory or service access, even for default membership.
-- **Profile outages keep their uncertainty** — plan retains unavailable evidence; apply and fleet import may skip an unavailable review only before profiles have ever been used. The shared runtime persists `access_profiles_used` before any remote write of a profiled intent and never clears it, including failed applies.
+- **Profile outages keep their uncertainty** — plan retains unavailable evidence; apply and fleet import may skip an unavailable review only before profiles have ever been used.
 - **Profile lookups may translate errors** — catch MeridianError around the directory adapter as well as API calls; the shared preview table owns the revocation warning.
 - **Legacy profile requests stop before I/O** — require the Meridian backend for profile commands and edits; resource reviews without service settings return no profile review instead of querying a legacy panel.
 - **Undo previews are inverse changes** — read the service-validated undo_people before confirmation, including dry runs, so gained/lost access and hard cut-off warnings describe the undo.
