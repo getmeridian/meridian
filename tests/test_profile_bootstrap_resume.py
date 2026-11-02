@@ -183,3 +183,44 @@ def test_reviewed_apply_keeps_observed_profile_history_when_no_settings_write_is
         ):
             runtime.apply_intent(intent)
         assert ClusterConfig.load(path).access_profiles_used is True
+
+
+def test_a_reviewed_removal_of_unsent_profiles_records_use_and_plans_converged(tmp_path: Path):
+    """A reviewed write stamps the empty declarations fingerprint, so later unreviewed reads must expect it."""
+    from meridian.compiler import compile_topology
+    from meridian.control.client import ControlClient
+    from meridian.core.access_profile_views import AccessProfileReviewRequest
+    from tests.support.control_service import ADMIN_TOKEN, serve_control
+
+    path = tmp_path / "cluster.yml"
+    intent = single_exit_intent()
+    plan = compile_topology(intent)
+    action = next(row for row in build_resource_actions(plan, 1) if row.resource.logical_id == "settings:service")
+    with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN, report_mutations=False) as admin:
+        review = admin.preview_access_profiles(AccessProfileReviewRequest(access_profiles={}))
+        cluster = ClusterConfig(panel=PanelConfig(url=url, api_token=ADMIN_TOKEN), topology_intent=intent)
+        cluster.save(path)
+
+        def drivers(access_review_hash: str | None):
+            with patch(
+                "meridian.setup.control_service.control_client",
+                side_effect=lambda state: ControlClient(url, ADMIN_TOKEN, report_mutations=False),
+            ):
+                return meridian_drivers(
+                    plan,
+                    cluster,
+                    persist=lambda state: state.save(path),
+                    connections={},
+                    addresses={},
+                    access_review_hash=access_review_hash,
+                )["service_settings"]
+
+        reviewed = drivers(review.access_hash)
+        with patch(
+            "meridian.setup.control_service.control_client",
+            side_effect=lambda state: ControlClient(url, ADMIN_TOKEN, report_mutations=False),
+        ):
+            reviewed.apply(action, None)
+            assert admin.settings().access_profile_declarations_hash is not None
+            assert ClusterConfig.load(path).access_profiles_used is True
+            assert drivers(None).observe(action, None).exists

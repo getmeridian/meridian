@@ -601,7 +601,7 @@ class ServiceSettingsDriver:
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
         with self.context.client() as client:
             settings = self._settings(action)
-            if settings.access_profiles and not self.context.cluster.access_profiles_used:
+            if settings.access_profile_declarations_hash is not None and not self.context.cluster.access_profiles_used:
                 self.context.cluster.access_profiles_used = True
                 try:
                     self.context.persist(self.context.cluster)
