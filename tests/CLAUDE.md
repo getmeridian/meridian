@@ -28,6 +28,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - Idempotency dual-path: `tests/provision/CLAUDE.md`.
 
 ## Pitfalls
+- **Console drivers wait for enabled controls** — a visible button may still be loading its catalog; clicking it early is ignored and leaves a test waiting for a form that never opened.
 - **Person doubles distinguish previews** — POST `/api/users/preview` is a read; counting it as a saved edit hides the changed-field assertion.
 - **DOM facts count visible markers** — retained hidden badges keep row identity; count visible declarations rather than every mounted tag.
 - **Demo route scans refuse unknown paths** — parse scoped constants initialized before the call and helper returns; pin opaque-ID exceptions to the complete source, and never drop a suffix or turn an unresolved expression into a wildcard.

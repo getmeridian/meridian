@@ -328,8 +328,10 @@ if (mode === 'showcase-navigation') {
   report.card = !!w.document.querySelector('.flow-block-status');
 } else if (mode === 'showcase-token-console') {
   await M.go('tokens');
-  await until(() => [...w.document.querySelectorAll('#view button')].some(button => button.textContent === M.t('tokens.create')), 'tokens');
-  [...w.document.querySelectorAll('#view button')].find(button => button.textContent === M.t('tokens.create')).click();
+  const create = () => [...w.document.querySelectorAll('#view button')]
+    .find(button => button.textContent === M.t('tokens.create') && !button.disabled);
+  await until(create, 'token catalog');
+  create().click();
   await until(() => w.document.querySelector('dialog form'), 'token form');
   const form = w.document.querySelector('dialog form');
   const name = form.querySelector('input[type=text]');
