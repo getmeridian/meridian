@@ -171,17 +171,17 @@
   function activationExpiry(user) {
     if (user.expire_at) return Date.parse(user.expire_at);
     return user.activation_duration_days && user.first_traffic_at
-      ? Math.min(Date.parse(user.first_traffic_at) + user.activation_duration_days * 86400000, Date.UTC(2099, 0, 1) - 1000) : null;
+      ? Math.min(Date.parse(user.first_traffic_at) + user.activation_duration_days * 86400000, Date.UTC(D.source.finite_expiry_year, 0, 1) - 1000) : null;
   }
+  function renewed(user, anchor, index) { return user.renewal_interval_days ? anchor + index * user.renewal_interval_days * 86400000 : D.monthsAfter(anchor, index * user.renewal_interval_months); }
   D.schedule = function (user) {
     var moment = Date.now(), expiry = activationExpiry(user), completed = user.renewals_completed || 0;
     var enabled = !!(user.renewal_interval_days || user.renewal_interval_months);
     var left = enabled && user.renewal_limit !== null ? Math.max(0, user.renewal_limit - completed) : null;
     var anchor = Date.parse(user.renewal_anchor_at) || expiry, due = 0;
-    function renewed(index) { return user.renewal_interval_days ? anchor + index * user.renewal_interval_days * 86400000 : D.monthsAfter(anchor, index * user.renewal_interval_months); }
     if (enabled && expiry) {
-      while (expiry <= moment && (left === null || due < left) && new Date(renewed(completed + due + 1)).getUTCFullYear() < 2099) {
-        due++; expiry = renewed(completed + due);
+      while (expiry <= moment && (left === null || due < left) && new Date(renewed(user, anchor, completed + due + 1)).getUTCFullYear() < D.source.finite_expiry_year) {
+        due++; expiry = renewed(user, anchor, completed + due);
       }
     }
     var periodic = D.periodStart(user, moment), nextPeriod = null;
@@ -195,7 +195,7 @@
       }
     }
     if (left !== null) left -= due;
-    var renewal = enabled && expiry && (left === null || left > 0) && new Date(renewed(completed + due + 1)).getUTCFullYear() < 2099 ? expiry : null;
+    var renewal = enabled && expiry && (left === null || left > 0) && new Date(renewed(user, anchor, completed + due + 1)).getUTCFullYear() < D.source.finite_expiry_year ? expiry : null;
     var refills = [nextPeriod, renewal].filter(function (value) { return value !== null; });
     return Object.assign(D.clone(D.responses["POST api/users/preview"]), {
       activation_pending: !expiry && !!user.activation_duration_days, activation_duration_days: user.activation_duration_days,
@@ -204,6 +204,17 @@
       renewals_due: due, renewals_completed: completed + due,
     });
   };
+  function validateSchedule(user) {
+    if (user.activation_duration_days !== null && user.expire_at === null && user.first_traffic_at === null) {
+      if (user.lifetime_traffic_bytes > 0) D.fail("invalid_request", 400, [], "firstUseUnknown");
+      if (new Date(Date.now() + user.activation_duration_days * 86400000).getUTCFullYear() >= D.source.finite_expiry_year) D.fail("invalid_request", 400, [], "scheduleRange");
+    }
+    if (user.renewals_completed && !user.renewal_anchor_at) invalid();
+    if ((user.renewal_interval_days || user.renewal_interval_months) && user.renewal_anchor_at && user.expire_at &&
+        renewed(user, Date.parse(user.renewal_anchor_at), user.renewals_completed) !== Date.parse(user.expire_at)) invalid();
+    var preview = D.schedule(user);
+    if (preview.renewal_enabled && preview.expire_at && preview.next_renewal_at === null && preview.renewals_left !== 0) D.fail("invalid_request", 400, [], "scheduleRange");
+  }
   // account_lifecycle.enforce_user_schedules: materialize dates and reset once before status.
   D.catchUp = function (user, forceReset) {
     var schedule = D.schedule(user), start = D.periodStart(user, Date.now());
@@ -235,7 +246,7 @@
     [["activation_duration_days", 3650], ["renewal_interval_days", 3650], ["renewal_interval_months", 120], ["renewal_limit", 10000], ["traffic_reset_anchor_day", 31]].forEach(function (pair) {
       if (updated[pair[0]] !== null && !integer(updated[pair[0]], 1, pair[1])) invalid();
     });
-    if (updated.expire_at !== null && (!Number.isFinite(Date.parse(updated.expire_at)) || new Date(updated.expire_at).getUTCFullYear() >= 2099)) invalid();
+    if (updated.expire_at !== null && (!Number.isFinite(Date.parse(updated.expire_at)) || new Date(updated.expire_at).getUTCFullYear() >= D.source.finite_expiry_year)) invalid();
     if (changes.activation_duration_days !== null && Object.hasOwn(changes, "activation_duration_days")) {
       if (changes.expire_at) invalid(); updated.expire_at = null;
     } else if (Object.hasOwn(changes, "expire_at")) updated.activation_duration_days = null;
@@ -255,6 +266,7 @@
     var catalog = D.responses["GET api/access-profiles"].profiles.map(function (profile) { return profile.id; });
     if (updated.profiles.some(function (profile) { return catalog.indexOf(profile) < 0; })) D.fail("unknown_profile");
     updated.profiles.sort();
+    validateSchedule(updated);
     if (D.resolvePolicy) D.resolvePolicy(updated);
     return updated;
   };

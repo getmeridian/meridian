@@ -81,6 +81,8 @@ The demo keeps disabled and over-limit share placeholders and their revocation r
 
 Token reviews and issuance use the owner's delegation limits and the service's request bounds. Administration and other permissions that require the CLI are refused before any demo token is created.
 
+Person previews and saves refuse activation or renewal reaching 2099. If traffic exists but its first-use date is unknown, choose a fixed expiry.
+
 External app, documentation, and support links open only when you follow them. They do not make the page fetch those sites in the background.
 
 ## Download verification

@@ -32,7 +32,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
 #### Fixed
 - The public console demo shows People, access profiles, client routing, and
   reviewed bulk changes from current service recordings. Person edits catch up
-  UTC resets and first-use expiry before reviews; bulk undo restores the reviewed
+  UTC resets and first-use expiry before reviews and refuse schedules beyond 2098
+  or unknown first use; bulk undo restores the reviewed
   enforced state and leaves unchanged people alone. Inactive shares and repeated
   key changes retain revocation receipts; token reviews and issuance enforce
   owner delegation and request validation. Declared people's key rotation stays

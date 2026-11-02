@@ -7,8 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from meridian.control.models import TokenCreate
+from meridian.control.account_lifecycle import merge_user_update
+from meridian.control.errors import ServiceError
+from meridian.control.models import TokenCreate, UserRecord, UserUpdate
 from meridian.control.token_capabilities import permission, requested_capabilities
+from meridian.core.account_schedule import calculate_schedule
 from scripts.build_showcase import export_showcase, validate_recordings
 from tests.support.console_dom import needs_console_dom, run_console
 
@@ -287,6 +290,85 @@ def test_demo_refuses_declared_key_rotation_without_changing_people_or_receipts(
         reply["code"] == "declared_user" and reply["status"] == 409 and reply["text"] for reply in result["refusals"]
     )
     assert all(result["unchanged"])
+    validate_recordings(result["responses"])
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
+@pytest.mark.parametrize(
+    "person,changes,now,unknown",
+    [
+        (
+            None,
+            {"expire_at": "2098-06-01T00:00:00Z", "renewal_interval_months": 12, "renewal_limit": None},
+            None,
+            False,
+        ),
+        (
+            "Luma",
+            {"expire_at": "2098-06-01T00:00:00Z", "renewal_interval_months": 12, "renewal_limit": None},
+            None,
+            False,
+        ),
+        (None, {"activation_duration_days": 2}, "2098-12-30T00:00:00Z", False),
+        ("Sela", {"activation_duration_days": 2}, "2098-12-30T00:00:00Z", False),
+        ("Luma", {"activation_duration_days": 5}, None, True),
+    ],
+)
+def test_demo_schedule_preview_and_writes_refuse_service_invalid_dates(
+    demo: Path, person: str | None, changes: dict, now: str | None, unknown: bool
+) -> None:
+    result = run_console(
+        "showcase-schedule-validation",
+        data={"directory": str(demo), "person": person, "changes": changes, "now": now, "unknownFirstUse": unknown},
+    )
+    if person:
+        user = UserRecord.model_validate(
+            {key: value for key, value in result["before"].items() if key in UserRecord.model_fields}
+        )
+    else:
+        user = UserRecord(
+            username="DemoGuest",
+            user_id="demo-person",
+            uuid="",
+            sub_token="",
+            status="active",
+            created_at=result["now"],
+        )
+    with pytest.raises(ServiceError, match="First use is unknown" if unknown else "before 2099") as service:
+        merge_user_update(user, UserUpdate.model_validate(changes), result["now"])
+    assert all(
+        reply["code"] == service.value.code == "invalid_request" and reply["status"] == 400
+        for reply in result["refusals"]
+    )
+    assert result["keptUsers"] and result["keptEvents"]
+    validate_recordings(result["responses"])
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
+@pytest.mark.parametrize(
+    "changes,now",
+    [
+        ({"expire_at": "2098-12-31T23:59:59Z"}, None),
+        ({"activation_duration_days": 1}, "2098-12-30T00:00:00Z"),
+        ({"activation_duration_days": 5, "renewal_interval_days": 30}, None),
+        (
+            {"expire_at": "2097-06-01T00:00:00Z", "renewal_interval_months": 12, "renewal_limit": 1},
+            "2098-08-01T00:00:00Z",
+        ),
+    ],
+)
+def test_demo_valid_schedule_previews_match_the_service_calculator(demo: Path, changes: dict, now: str | None) -> None:
+    result = run_console("showcase-schedule-valid", data={"directory": str(demo), "changes": changes, "now": now})
+    user = UserRecord(
+        username="DemoGuest", user_id="demo-person", uuid="", sub_token="", status="active", created_at=result["now"]
+    )
+    merged = merge_user_update(user, UserUpdate.model_validate(changes), result["now"])
+    expected = calculate_schedule(merged, datetime.fromisoformat(result["now"]))
+    assert result["preview"] == expected.to_data()
+    assert result["previewKeptUsers"]
+    assert result["after"]["expire_at"] == expected.expire_at
+    assert result["after"]["renewals_completed"] == expected.renewals_completed
+    assert result["after"]["schedule"]["renewals_due"] == 0
     validate_recordings(result["responses"])
     assert result["outside"] == result["nativeApi"] == result["errors"] == []
 

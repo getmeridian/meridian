@@ -16,7 +16,7 @@ const w = dom.window;
 let demoNow;
 if (mode === 'showcase-queries' || ['schedule', 'undo', 'share', 'token', 'declared'].some(prefix => mode.startsWith('showcase-' + prefix + '-'))) {
   const generated = Date.parse(JSON.parse(fs.readFileSync(path.join(directory, 'console/demo-data.json'), 'utf8')).generated_at);
-  demoNow = generated;
+  demoNow = data.now ? Date.parse(data.now) : generated;
   w.Date = class extends Date {
     constructor(...args) { super(...(args.length ? args : [demoNow])); }
     static now() { return demoNow; }
@@ -35,6 +35,15 @@ w.fetch = async input => {
   if (/\/(api|auth)\//.test(url.pathname)) report.nativeApi.push(url.pathname);
   const filename = path.join(directory, url.pathname.replace(/^\/demo\//, ''));
   if (!fs.existsSync(filename)) return new Response('{}', { status: 404 });
+  if (data.unknownFirstUse && filename.endsWith('demo-data.json')) {
+    const fixture = JSON.parse(fs.readFileSync(filename, 'utf8'));
+    for (const response of Object.values(fixture.responses)) {
+      for (const user of response.users || [response]) {
+        if (user.username === 'Luma' && Object.hasOwn(user, 'first_traffic_at')) user.first_traffic_at = null;
+      }
+    }
+    return new Response(JSON.stringify(fixture), { headers: { 'Content-Type': 'application/json' } });
+  }
   return new Response(fs.readFileSync(filename), { headers: { 'Content-Type': 'application/json' } });
 };
 for (const script of dom.window.document.querySelectorAll('script[src]')) {
@@ -351,6 +360,27 @@ if (mode === 'showcase-navigation') {
     catch (error) { report.refusals.push({ code: error.code, status: error.status, text: M.errorText(error) }); }
     report.unchanged.push(await snapshot() === before);
   }
+} else if (mode === 'showcase-schedule-validation') {
+  report.now = new Date(demoNow).toISOString().replace('.000Z', 'Z');
+  if (data.person) report.before = await M.api('GET', 'api/users/' + data.person);
+  const users = JSON.stringify(await M.api('GET', 'api/users'));
+  const events = JSON.stringify(await M.api('GET', 'api/events?after=0&limit=2000'));
+  report.refusals = [];
+  for (const [method, route, body] of [
+    ['POST', 'api/users/preview', { ...data.changes, ...(data.person ? { username: data.person } : {}) }],
+    [data.person ? 'PATCH' : 'POST', data.person ? 'api/users/' + data.person : 'api/users', { ...data.changes, ...(data.person ? {} : { username: 'DemoGuest' }) }],
+  ]) {
+    try { await M.api(method, route, body); report.refusals.push({ code: null }); }
+    catch (error) { report.refusals.push({ code: error.code, status: error.status, message: error.message }); }
+  }
+  report.keptUsers = JSON.stringify(await M.api('GET', 'api/users')) === users;
+  report.keptEvents = JSON.stringify(await M.api('GET', 'api/events?after=0&limit=2000')) === events;
+} else if (mode === 'showcase-schedule-valid') {
+  report.now = new Date(demoNow).toISOString().replace('.000Z', 'Z');
+  const before = JSON.stringify(await M.api('GET', 'api/users'));
+  report.preview = await M.api('POST', 'api/users/preview', data.changes);
+  report.previewKeptUsers = JSON.stringify(await M.api('GET', 'api/users')) === before;
+  report.after = await M.api('POST', 'api/users', { username: 'DemoGuest', ...data.changes });
 } else if (mode === 'showcase-unavailable') {
   report.refusals = [];
   report.missing = M.t('error.not_found');

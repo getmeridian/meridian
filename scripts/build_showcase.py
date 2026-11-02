@@ -32,6 +32,7 @@ from meridian.control.server import ControlServer  # noqa: E402
 from meridian.control.service import ControlService  # noqa: E402
 from meridian.control.ui_models import AuthState, FleetView, SessionList, ShareView  # noqa: E402
 from meridian.control.ui_routes import SESSION_COOKIE, UI_DIR  # noqa: E402
+from meridian.core.account_schedule import FINITE_EXPIRY_YEAR  # noqa: E402
 from meridian.core.client_limits import CalendarExpiryPreview  # noqa: E402
 from meridian.pwa import load_pwa_assets  # noqa: E402
 from scripts.showcase_recordings import (  # noqa: E402
@@ -244,6 +245,7 @@ def write_recordings(directory: Path, client: httpx.Client, service: ControlServ
                 "key_rotations": key_rotations,
                 "active_shares": active_shares,
                 "token_create_schema": TokenCreate.model_json_schema(),
+                "finite_expiry_year": FINITE_EXPIRY_YEAR,
                 **templates,
             },
             ensure_ascii=False,

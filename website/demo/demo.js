@@ -43,6 +43,8 @@
       missing: "This person is no longer in the demo. Reload to reset.",
       declared: "This person is managed by the CLI. Choose a person added in the console.",
       load: "Demo data could not be loaded. Reload this page.",
+      scheduleRange: "The schedule must end before 2099. Use a shorter interval.",
+      firstUseUnknown: "First use is unknown for this account. Set a fixed expiry.",
     },
     ru: {
       imports: "В демо приложения ничего не импортируют: эти ссылки ведут на вымышленные серверы.",
@@ -53,6 +55,8 @@
       missing: "Этого человека больше нет в демо. Перезагрузите страницу, чтобы вернуть исходные данные.",
       declared: "Этим человеком управляют через CLI. Выберите человека, добавленного в консоли.",
       load: "Не удалось загрузить данные демо. Перезагрузите страницу.",
+      scheduleRange: "Срок доступа должен заканчиваться до 2099 года. Выберите меньший интервал.",
+      firstUseUnknown: "Неизвестно, когда этот аккаунт впервые использовали. Укажите дату окончания доступа.",
     },
     fa: {
       imports: "در نسخهٔ نمایشی برنامه\u200cها چیزی وارد نمی\u200cکنند: این پیوندها به سرورهای ساختگی اشاره دارند.",
@@ -63,6 +67,8 @@
       missing: "این شخص دیگر در نسخهٔ نمایشی نیست. برای بازنشانی، صفحه را دوباره بارگیری کنید.",
       declared: "این شخص با CLI مدیریت می‌شود. شخصی را انتخاب کنید که در کنسول افزوده شده است.",
       load: "داده‌های نمایشی بارگیری نشدند. صفحه را دوباره بارگیری کنید.",
+      scheduleRange: "زمان‌بندی باید پیش از سال ۲۰۹۹ پایان یابد. بازهٔ کوتاه‌تری انتخاب کنید.",
+      firstUseUnknown: "زمان نخستین استفادهٔ این حساب مشخص نیست. تاریخ انقضای ثابتی تعیین کنید.",
     },
     zh: {
       imports: "演示中应用不会导入任何内容：这些链接指向虚构的服务器。",
@@ -73,6 +79,8 @@
       missing: "此用户已从演示中删除。重新加载页面即可重置。",
       declared: "此用户由 CLI 管理。请选择在控制台中添加的用户。",
       load: "无法加载演示数据，请重新加载页面。",
+      scheduleRange: "计划必须在 2099 年之前结束。请选择更短的间隔。",
+      firstUseUnknown: "无法确定此用户的首次使用时间。请设置固定的到期时间。",
     },
   };
   function copy() { return COPY[document.documentElement.lang.split("-")[0]] || COPY.en; }
@@ -80,7 +88,7 @@
   function reply(body, status) { return new Response(JSON.stringify(body), { status: status || 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } }); }
   function error(code, label, status) { return reply({ error: { code: code, message: copy()[label] || label } }, status || 400); }
   D.clone = clone; D.reply = reply; D.error = error;
-  D.fail = function (code, status, subjects) { throw { demoCode: code, status: status || 400, subjects: subjects || [] }; };
+  D.fail = function (code, status, subjects, label) { throw { demoCode: code, status: status || 400, subjects: subjects || [], label: label }; };
   // The same literal registrations drive dispatch and the CI route-coverage guard.
   D.route = function (method, path, handler) {
     var pattern = path.split("{id}").map(function (part) { return part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }).join("([^/]+)");
@@ -102,7 +110,7 @@
       return route.handler({ method: method, path: path, params: params, body: body, ids: route.pattern.exec(path).slice(1).map(decodeURIComponent) });
     } catch (failure) {
       if (!failure.demoCode) throw failure;
-      return reply({ error: { code: failure.demoCode, message: copy().unavailable, subjects: failure.subjects } }, failure.status);
+      return reply({ error: { code: failure.demoCode, message: copy()[failure.label] || copy().unavailable, subjects: failure.subjects } }, failure.status);
     }
   };
   // The service writes whole-second UTC timestamps; keep the same spelling.
