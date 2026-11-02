@@ -2,81 +2,67 @@
 
 from __future__ import annotations
 
+import json
 import re
+import subprocess
 from pathlib import Path
 
+import pytest
+
 from meridian.control.ui_routes import UI_DIR
+from tests.support.console_dom import needs_console_dom
 
 ROOT = Path(__file__).resolve().parents[1]
-CALL = re.compile(r"\bM\.(?:rawApi|api)\s*\(")
-STRING = re.compile(r"^([\"'])(.*?)\1$", re.DOTALL)
 REGISTRATION = re.compile(r'D\.(?:route|recorded|unavailable)\("([A-Z]+)", "([^"]+)"')
+pytestmark = needs_console_dom
 
-
-def expression(source: str, start: int, delimiters: str = ",;") -> tuple[str, int]:
-    """Read an argument without treating a comma inside a helper call as its end."""
-    depth, quote, escaped = 0, "", False
-    for index in range(start, len(source)):
-        char = source[index]
-        if quote:
-            if escaped:
-                escaped = False
-            elif char == "\\":
-                escaped = True
-            elif char == quote:
-                quote = ""
-        elif char in "\"'`":
-            quote = char
-        elif depth == 0 and char in delimiters:
-            return source[start:index].strip(), index
-        elif char in "([{":
-            depth += 1
-        elif char in ")]}":
-            if depth == 0:
-                return source[start:index].strip(), index
-            depth -= 1
-    assert not quote and not depth, "Unfinished JavaScript API argument"
-    return source[start:].strip(), len(source)
-
-
-def request_paths(value: str, source: str) -> set[str]:
-    if re.fullmatch(r"[\w$]+", value):
-        assignment = re.search(r"\b" + re.escape(value) + r"\s*=\s*", source)
-        assert assignment, f"Resolve the console route variable {value!r} in the demo guard"
-        assigned, _ = expression(source, assignment.end())
-        if "?" in assigned and not assigned.startswith(('"', "'")):
-            choices = re.findall(r'["\']([^"\']+)["\']', assigned)
-            assert choices and all("/" in choice for choice in choices), assigned
-            return set(choices)
-        return request_paths(assigned, source)
-    if value.startswith("commandPath("):
-        return {"api/nodes/{id}/commands/{id}"}
-    if value.startswith("path("):
-        arguments, end = expression(value, value.index("(") + 1)
-        if value[end] == ",":
-            suffix_value, _ = expression(value, end + 1)
-            return request_paths('"api/users/{id}" + ' + suffix_value, source)
-        return {"api/users/{id}"}
-    assert value.startswith(('"', "'")), f"Resolve the console route expression {value!r} in the demo guard"
-    parts, start = [], 0
-    while start < len(value):
-        part, end = expression(value, start, "+")
-        literal = STRING.fullmatch(part)
-        parts.append(literal[2] if literal else "{id}")
-        start = end + 1
-    return {"".join(parts).split("?", 1)[0]}
+# These unencoded IDs come from typed service records or locale choices. Pin their source so
+# changing a binding or adding another call cannot silently inherit an opaque-ID exception.
+REVIEWED = {
+    "fleet.js": {
+        "sha256": "97494969c6b558b6424fe8d4915995aa9f2199af2caf6989aee57324e6058b92",
+        "paths": {
+            'GET "api/revisions/" + number': ["api/revisions/{id}"],
+            'GET "api/revisions/" + chosen': ["api/revisions/{id}"],
+        },
+    },
+    "people-bulk.js": {
+        "sha256": "06f99f2c1b0773d3f53295121b41bf4af3cb5f602fa8bc128434799046efcef9",
+        "paths": {
+            'GET "api/people/bulk/receipts/" + receipt.id': ["api/people/bulk/receipts/{id}"],
+            'GET "api/people/bulk/receipts/" + review.id': ["api/people/bulk/receipts/{id}"],
+            'GET "api/people/bulk/receipts/" + M.lastBulkReceipt.id': ["api/people/bulk/receipts/{id}"],
+        },
+    },
+    "tokens.js": {
+        "sha256": "24efe670013a7d1de8a8e13e4721aa8071aec31d126e5e9337bd49f763617f55",
+        "paths": {'DELETE "api/tokens/" + token.id': ["api/tokens/{id}"]},
+    },
+    "i18n.js": {
+        "sha256": "2e2276da38f1961d6264b307263a699bb3082e8fd9d37f7063f96b7428751319",
+        "paths": {'GET "ui/locales/" + code + ".json"': ["ui/locales/{id}.json"]},
+    },
+}
+PERSON_PATH = (
+    'function path(username, suffix) { return "api/users/" + encodeURIComponent(username) + (suffix || ""); }\n'
+)
 
 
 def console_requests(scripts: dict[str, str]) -> set[tuple[str, str]]:
-    requests = set()
-    for name, source in scripts.items():
-        for call in CALL.finditer(source):
-            method, end = expression(source, call.end())
-            literal = STRING.fullmatch(method)
-            assert literal, f"Resolve the console request method in {name}: {method}"
-            path, _ = expression(source, end + 1)
-            requests.update((literal[2], path) for path in request_paths(path, source))
-    return requests
+    process = subprocess.run(
+        ["node", str(ROOT / "tests/showcase_route_parser.mjs")],
+        cwd=ROOT,
+        input=json.dumps({"scripts": scripts, "reviewed": REVIEWED}),
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=30,
+    )
+    result = json.loads(process.stdout)
+    assert not result["unresolved"], "Resolve console route expressions or explicitly review their source: " + str(
+        result["unresolved"]
+    )
+    return {tuple(request) for request in result["requests"]}
 
 
 def missing_requests(scripts: dict[str, str]) -> set[tuple[str, str]]:
@@ -88,7 +74,14 @@ def missing_requests(scripts: dict[str, str]) -> set[tuple[str, str]]:
     # Locale catalogs are copied from the console and fetched as same-origin static files.
     assert all((UI_DIR / "locales" / f"{locale}.json").is_file() for locale in ("en", "ru", "fa", "zh"))
     registered.add(("GET", "ui/locales/{id}.json"))
-    return console_requests(scripts) - registered
+    return {
+        (method, path)
+        for method, path in console_requests(scripts)
+        if not any(
+            method == registered_method and re.fullmatch(re.escape(registered_path).replace(r"\{id\}", "[^/]+"), path)
+            for registered_method, registered_path in registered
+        )
+    }
 
 
 def test_every_console_route_is_emulated_or_deliberately_unavailable_in_the_demo() -> None:
@@ -103,5 +96,67 @@ def test_every_console_route_is_emulated_or_deliberately_unavailable_in_the_demo
 def test_demo_guard_catches_a_request_added_by_a_later_console_sweep() -> None:
     assert ("GET", "api/future-overview") in missing_requests({"overview.js": 'M.api("GET", "api/future-overview");'})
     assert ("POST", "api/users/{id}/future-action") in missing_requests(
-        {"person.js": 'M.api("POST", path(username, "/future-action"), {});'}
+        {"person.js": PERSON_PATH + 'M.api("POST", path(username, "/future-action"), {});'}
     )
+
+
+@pytest.mark.parametrize("prefix", ["path(username)", 'path(username, "/access")'])
+def test_demo_guard_keeps_suffixes_outside_person_path_helpers(prefix: str) -> None:
+    expected = "api/users/{id}" + ("/access" if "/access" in prefix else "") + "/unimplemented"
+    assert ("GET", expected) in missing_requests(
+        {"person.js": PERSON_PATH + f'M.api("GET", {prefix} + "/unimplemented");'}
+    )
+
+
+def test_demo_guard_resolves_route_variables_in_each_function_scope() -> None:
+    source = """
+      function settings() { var endpoint = "api/settings"; M.api("GET", endpoint); }
+      function future() { var endpoint = "api/unimplemented"; M.api("GET", endpoint); }
+    """
+    assert ("GET", "api/unimplemented") in missing_requests({"screen.js": source})
+
+
+def test_demo_guard_does_not_read_comparisons_as_route_assignments() -> None:
+    source = """
+      function future() {
+        if (endpoint === "api/settings") return;
+        var endpoint = "api/unimplemented";
+        M.api("GET", endpoint);
+      }
+    """
+    assert ("GET", "api/unimplemented") in missing_requests({"screen.js": source})
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'function future(endpoint) { M.api("GET", endpoint); }',
+        'var endpoint = "api/settings"; endpoint += "/unimplemented"; M.api("GET", endpoint);',
+        'var endpoint = "api/settings"; ({ endpoint } = config); M.api("GET", endpoint);',
+        PERSON_PATH + 'function future(path) { M.api("GET", path(username)); }',
+        'M.api("GET", "api/users/" + unknownSuffix);',
+        'M.api("GET", unknownRoute(username));',
+    ],
+)
+def test_demo_guard_refuses_route_expressions_it_cannot_prove(source: str) -> None:
+    with pytest.raises(AssertionError, match="Resolve console route expressions"):
+        console_requests({"screen.js": source})
+
+
+def test_demo_guard_reads_the_helper_body_and_keeps_queries_after_the_complete_path() -> None:
+    source = PERSON_PATH + 'M.api("GET", path(username, "/usage") + "?days=" + chosen);'
+    assert console_requests({"screen.js": source}) == {("GET", "api/users/{id}/usage")}
+    changed = source.replace('"api/users/"', '"api/unimplemented/"')
+    assert ("GET", "api/unimplemented/{id}/usage") in missing_requests({"screen.js": changed})
+
+
+@pytest.mark.parametrize("name", list(REVIEWED))
+def test_demo_guard_needs_an_explicit_review_when_an_opaque_id_source_changes(name: str) -> None:
+    source = (UI_DIR / name).read_text() + "\n// Changed caller.\n"
+    with pytest.raises(AssertionError, match="Resolve console route expressions"):
+        console_requests({name: source})
+
+
+def test_demo_guard_refuses_a_route_binding_initialized_after_the_call() -> None:
+    with pytest.raises(AssertionError, match="initialized before use"):
+        console_requests({"screen.js": 'M.api("GET", endpoint); var endpoint = "api/settings";'})
