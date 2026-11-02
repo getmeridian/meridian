@@ -57,6 +57,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Keep unresolved lost inbounds in cut-off reviews after credential rotation,
+  reissue, replacing imports, or re-enabling a person with narrower access.
 - Report typed directory failures when assigning a person's profiles and print
   the access-loss warning once per review.
 - Refuse profile definitions and membership on Remnawave fleets with migration

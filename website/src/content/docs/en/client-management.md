@@ -509,6 +509,8 @@ Losing a grant removes the connection from every subscription format, individual
 
 `GET /api/users/{username}/cut-off` requires `people.read` and `people.private`. Its review includes inbounds lost through a profile change while their flow-block receipts remain unresolved, even if the person is still active. A subsequent `--cut-off` resets those inbounds too.
 
+Every unresolved receipt contributes its inbounds, regardless of its current reason. Rotating connection keys, reissuing a link, replacing keys and profiles together through import, or re-enabling a person after narrowing access keeps lost inbounds in the cut-off review until blocking is confirmed or the same key regains access.
+
 Removing a profile still used by people is refused with its membership count. Move those people to other profiles first. Ordinary applies never replace membership. Snapshots preserve every person's memberships; a replacing user import preserves them when `profiles` is omitted. Fleet export carries declared people's current memberships as creation-only settings, so a new fleet can recreate them while existing people retain their operator-owned choices. Console-only people remain service data in the snapshot.
 
 `plan` and `apply` review profiles held by the service as well as those in the proposed topology. Removing the last profile is reviewed and fenced, and is refused while anyone still belongs to it.

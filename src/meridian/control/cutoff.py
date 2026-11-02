@@ -47,7 +47,7 @@ class CutOffLedger:
                 raise ServiceError("not_found", "Unknown user.", 404)
             unresolved: dict[str, set[str]] = {}
             for receipt in self._read_flow_blocks(username).nodes:
-                if receipt.reason == "access_changed" and receipt.status != "blocked":
+                if receipt.status != "blocked":
                     unresolved.setdefault(receipt.node_id, set()).update(receipt.inbound_tags)
             nodes: list[CutOffNode] = []
             for row in self._store.rows(

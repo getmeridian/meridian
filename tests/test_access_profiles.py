@@ -11,7 +11,15 @@ import pytest
 from pydantic import ValidationError
 
 from meridian.control.errors import ServiceError
-from meridian.control.models import ClientEndpoint, NodeSpec, ServiceSettings, UserCreate, UserImportBatch, UserUpdate
+from meridian.control.models import (
+    ClientEndpoint,
+    NodeSpec,
+    ServiceSettings,
+    UserCreate,
+    UserImport,
+    UserImportBatch,
+    UserUpdate,
+)
 from meridian.control.node_documents import with_users
 from meridian.control.service import SCHEMA_VERSION, ControlService
 from meridian.core.people_bulk import BulkCommitRequest, BulkPreviewRequest
@@ -126,6 +134,49 @@ def test_membership_loss_removes_only_the_lost_inbound_and_records_flow_blocking
     service.update_user("person", UserUpdate.model_validate({"profiles": ["limited", "udp"]}))
     assert service.user_flow_blocks("person").nodes == []
     assert service.put_user("person").profiles == ["limited", "udp"]
+
+
+@pytest.mark.parametrize("change", ["rotate", "reissue", "import", "re-enable"])
+def test_cut_off_keeps_lost_inbounds_when_a_later_change_replaces_the_receipt_reason(
+    service: ControlService, change: str
+):
+    configure_profiles(service)
+    person = service.put_user("person")
+    if change == "import":
+        service.import_users(
+            UserImportBatch(
+                users=[
+                    UserImport(
+                        username=person.username,
+                        uuid="11111111-2222-4333-8444-555555555555",
+                        sub_token=person.sub_token,
+                        profiles=["udp"],
+                    )
+                ],
+                replace=True,
+            )
+        )
+    else:
+        service.update_user("person", UserUpdate(profiles=["udp"]))
+        assert service.user_flow_blocks("person").nodes[0].reason == "access_changed"
+        if change == "rotate":
+            service.rotate_credentials("person", expected_generation=person.credential_generation)
+        elif change == "reissue":
+            service.reissue_user("person")
+        else:
+            service.update_user("person", UserUpdate(status="disabled"))
+            service.update_user("person", UserUpdate(status="active"))
+    assert users_by_tag(service) == {"vless": [], "hy2": [person.user_id]}
+    receipts = service.user_flow_blocks("person").nodes
+    assert receipts[0].reason == ("disabled" if change == "re-enable" else "credentials")
+    assert receipts[0].status == "pending_node" and "vless" in receipts[0].inbound_tags
+    writes = service._db.total_changes
+    scope = service.cutoffs.scope("person")
+    assert service._db.total_changes == writes
+    assert [(node.node_id, node.inbound_tags, node.effect) for node in scope.nodes] == [
+        ("main", ["hy2", "vless"], "core_restart")
+    ]
+    assert service._store.row("SELECT COUNT(*) FROM commands")[0] == 0
 
 
 @pytest.mark.parametrize("suffix", ["", "info", "json", "mihomo", "stash", "singbox"])
