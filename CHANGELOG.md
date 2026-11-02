@@ -33,7 +33,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
 - The public console demo shows People, access profiles, client routing, and
   reviewed bulk changes from current service recordings. Person edits catch up
   UTC resets and first-use expiry before reviews; bulk undo restores the reviewed
-  enforced state and leaves unchanged people alone. Unsupported security
+  enforced state and leaves unchanged people alone. Inactive shares and repeated
+  key changes retain revocation receipts. Unsupported security
   and server actions display a translated demo notice (#95).
 - `meridian plan` before upgrading a fleet from an earlier beta no longer stops as
   inconclusive (exit 3) because access profiles look unavailable: a service that

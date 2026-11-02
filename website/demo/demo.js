@@ -109,7 +109,8 @@
   function iso(ms) { return new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z"); }
   function now() { return iso(Date.now()); }
   D.iso = iso; D.now = now;
-  var source, initial, responses, users, events, nextId, signedIn = true, rotations = {}, activeShares = {}, rotating = {}, pages = [], newId = 0;
+  var source, initial, responses, users, events, nextId, signedIn = true, rotations = {}, activeShares = {}, rotating = Object.create(null), pages = [], newId = 0;
+  var receiptCredentials = Object.create(null);
   var ready = nativeFetch(new URL("demo-data.json", script), { cache: "no-store" }).then(function (response) {
     if (!response.ok) throw new Error(copy().load);
     return response.json();
@@ -148,7 +149,11 @@
     events = responses["GET api/events"].events;
     nextId = events.reduce(function (max, event) { return Math.max(max, event.id); }, 0);
     D.source = source; D.responses = responses; D.users = users;
-    D.currentShares = clone(activeShares); D.initial = initial;
+    D.currentShares = Object.create(null); D.initial = initial;
+    users.forEach(function (user) {
+      var keys = receiptCredentials[user.username] = Object.create(null);
+      initial["GET ui/api/people/" + user.username + "/share"].flow_blocks.nodes.forEach(function (node) { keys[node.credential_generation] = user.uuid; });
+    });
     D.versions = Object.create(null);
     responses["GET api/people"].users.forEach(function (user) { D.versions[user.username] = user.row_version; });
   });
@@ -185,6 +190,8 @@
     var view = clone(recorded), seen = new Set();
     view.nodes = view.nodes.filter(function (node) {
       if (view.username !== user.username && node.reason !== "credentials") return false;
+      var keys = receiptCredentials[user.username];
+      if (user.status === "active" && keys && keys[node.credential_generation] === user.uuid) return false;
       node.credential_generation = Math.min(node.credential_generation, user.credential_generation - (node.reason === "credentials" ? 1 : 0));
       var key = [node.node_id, node.credential_generation, node.reason, node.inbound_tags.join(",")].join("/");
       if (node.credential_generation < 1 || seen.has(key)) return false;
@@ -193,18 +200,44 @@
     view.username = user.username; view.credential_generation = user.credential_generation;
     return view;
   };
+  D.recording = function (records, name) { return Object.hasOwn(records, name) ? records[name] : records.DemoTemplate; };
+  D.replaceShare = function (user, before, keep, next, recorded) {
+    var keys = receiptCredentials[user.username] || (receiptCredentials[user.username] = Object.create(null));
+    var nodes = clone(keep.flow_blocks.nodes), latest = new Map();
+    if (before.status === "active" && before.uuid !== user.uuid) {
+      keys[before.credential_generation] = before.uuid;
+      recorded.nodes.forEach(function (node) {
+        var previous = latest.get(node.node_id);
+        if (node.reason === "credentials" && (!previous || previous.credential_generation < node.credential_generation)) latest.set(node.node_id, clone(node));
+      });
+      var inbounds = D.access(before).inbounds;
+      latest.forEach(function (node) {
+        node.credential_generation = before.credential_generation;
+        node.inbound_tags = inbounds.filter(function (inbound) { return inbound.node_id === node.node_id; }).map(function (inbound) { return inbound.inbound_tag; }).sort();
+        if (node.inbound_tags.length) nodes.push(node);
+      });
+    }
+    next.flow_blocks = D.flowBlocks(user, { username: user.username, credential_generation: user.credential_generation, nodes: nodes });
+    D.currentShares[user.username] = next;
+  };
   function share(user) {
     var view = clone(D.currentShares[user.username] || responses["GET ui/api/people/" + user.username + "/share"] || responses["GET ui/api/people/DemoTemplate/share"]);
     var working = view.connections.some(function (entry) { return entry.available; });
     // People recorded while disabled or over their limit carry placeholders; enabling them shows real links.
-    var spare = rotating[user.username] ? rotations[user.username] && rotations[user.username].share : activeShares[user.username];
-    if (user.status === "active" && !working && spare) view = clone(spare);
+    var spare = rotating[user.username] ? D.recording(rotations, user.username).share : D.recording(activeShares, user.username);
+    if (user.status === "active" && !working && spare) {
+      var receipts = view.flow_blocks;
+      view = clone(spare); view.flow_blocks = receipts;
+    }
     view.username = user.username;
     if (user.status !== "active") {
-      view.connections.forEach(function (entry) { entry.available = false; entry.uri = ""; entry.qr_svg = ""; });
+      view.connections.forEach(function (entry) {
+        entry.available = false;
+        if (entry.protocol !== null) { entry.uri = ""; entry.qr_svg = ""; }
+      });
     }
     view.declared = responses["GET ui/api/fleet"].declared_users.indexOf(user.username) >= 0;
-    if (D.access) {
+    if (D.access && user.status === "active") {
       var allowed = D.access(user).connections.map(function (entry) { return entry.remark; });
       view.connections = view.connections.filter(function (entry) { return allowed.indexOf(entry.remark) >= 0; });
     }
@@ -333,16 +366,17 @@
         return reply(body.cut_off ? { user: null, commands: [] } : { deleted: name });
       }
       rotating[name] = !rotating[name];
+      var before = clone(user), keep = share(user);
       // Alternate between two real credential sets; people added here borrow the template's.
-      var alternate = rotating[name] ? rotations[name] || rotations.DemoTemplate
+      var alternate = rotating[name] ? D.recording(rotations, name)
         : { user: initial["GET api/users/" + name], share: initial["GET ui/api/people/" + name + "/share"] };
       if (alternate && alternate.user && alternate.share) {
         user.uuid = alternate.user.uuid;
         user.sub_token = alternate.user.sub_token;
         responses["GET ui/api/people/" + name + "/share"] = Object.assign(clone(alternate.share), { username: name });
-        D.currentShares[name] = clone(alternate.share);
       }
       user.credential_generation++; D.bump(user);
+      D.replaceShare(user, before, keep, clone(alternate.share), D.recording(rotations, name).share.flow_blocks);
       responses["GET api/users/" + name + "/devices"] = Object.assign(devices(user), { devices: [], count: 0 });
       emit("user.reissued", name);
       return reply(body.cut_off ? { user: user, commands: [] } : user);

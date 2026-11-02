@@ -159,6 +159,47 @@ def test_demo_undo_ignores_people_unchanged_by_the_commit(demo: Path) -> None:
     assert result["outside"] == result["nativeApi"] == result["errors"] == []
 
 
+@pytest.mark.parametrize("person,reason", [("Vela", "disabled"), ("Kavi", "limited")])
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_demo_keeps_recorded_inactive_share_receipts_and_placeholders(
+    demo: Path, person: str, reason: str, locale: str
+) -> None:
+    result = run_console("showcase-share-initial", locale, {"directory": str(demo), "person": person})
+    assert result["recorded"]["flow_blocks"]["nodes"]
+    assert result["share"]["flow_blocks"] == result["recorded"]["flow_blocks"]
+    assert all(node["reason"] == reason for node in result["share"]["flow_blocks"]["nodes"])
+    assert result["share"]["connections"] == result["recorded"]["connections"]
+    assert result["card"]
+    validate_recordings(result["responses"])
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
+@pytest.mark.parametrize("person", ["Luma", "DemoGuest", "constructor", "toString"])
+@pytest.mark.parametrize("action", ["rotate-credentials", "reissue"])
+def test_demo_repeated_key_changes_keep_receipts_for_the_newly_revoked_generation(
+    demo: Path, person: str, action: str
+) -> None:
+    result = run_console("showcase-share-rotations", data={"directory": str(demo), "person": person, "action": action})
+    for change in result["changes"]:
+        user = change["result"]["user"] if action == "rotate-credentials" else change["result"]
+        receipts = change["share"]["flow_blocks"]
+        assert receipts["credential_generation"] == user["credential_generation"]
+        assert {node["credential_generation"] for node in receipts["nodes"]} == {
+            change["before"]["credential_generation"]
+        }
+        assert all(node["reason"] == "credentials" for node in receipts["nodes"])
+        if action == "rotate-credentials":
+            assert change["result"]["flow_blocks"] == receipts
+        validate_recordings(
+            {
+                f"GET ui/api/people/{person}/share": change["share"],
+                f"POST api/users/{person}/{action}": change["result"],
+            }
+        )
+    assert result["card"]
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 def test_demo_security_and_remote_actions_show_a_translated_demo_refusal(demo: Path, locale: str) -> None:
     result = run_console("showcase-unavailable", locale, {"directory": str(demo)})

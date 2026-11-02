@@ -14,7 +14,7 @@ const html = fs.readFileSync(path.join(directory, 'console/index.html'), 'utf8')
 const dom = new JSDOM(html, { url: `https://198.51.100.1/demo/console/?lang=${locale}`, runScripts: 'outside-only', pretendToBeVisual: true });
 const w = dom.window;
 let demoNow;
-if (mode === 'showcase-queries' || mode.startsWith('showcase-schedule-') || mode.startsWith('showcase-undo-')) {
+if (mode === 'showcase-queries' || mode.startsWith('showcase-schedule-') || mode.startsWith('showcase-undo-') || mode.startsWith('showcase-share-')) {
   const generated = Date.parse(JSON.parse(fs.readFileSync(path.join(directory, 'console/demo-data.json'), 'utf8')).generated_at);
   demoNow = generated;
   w.Date = class extends Date {
@@ -282,6 +282,26 @@ if (mode === 'showcase-navigation') {
     report.restored = (await M.api('GET', 'api/users/Luma')).tag === review.people[0].before.tag;
   } catch (error) { report.undoError = error.code; }
   report.untouched = (await M.api('GET', 'api/users/Sela')).tag;
+} else if (mode === 'showcase-share-initial') {
+  const recording = JSON.parse(fs.readFileSync(path.join(directory, 'console/demo-data.json'), 'utf8'));
+  report.recorded = recording.responses['GET ui/api/people/' + data.person + '/share'];
+  report.share = await M.api('GET', 'ui/api/people/' + data.person + '/share');
+  await M.go('people', data.person);
+  await until(() => w.document.querySelector('#view h1')?.textContent === data.person, 'inactive person');
+  report.card = !!w.document.querySelector('.flow-block-status');
+} else if (mode === 'showcase-share-rotations') {
+  if (data.person !== 'Luma') await M.api('POST', 'api/users', { username: data.person });
+  report.changes = [];
+  for (let i = 0; i < 3; i++) {
+    const before = await M.api('GET', 'api/users/' + data.person);
+    const result = await M.api('POST', 'api/users/' + data.person + '/' + data.action,
+      data.action === 'rotate-credentials' ? { expected_generation: before.credential_generation } : {});
+    const share = await M.api('GET', 'ui/api/people/' + data.person + '/share');
+    report.changes.push({ before, result, share });
+  }
+  await M.go('people', data.person);
+  await until(() => w.document.querySelector('#view h1')?.textContent === data.person, 'rotated person');
+  report.card = !!w.document.querySelector('.flow-block-status');
 } else if (mode === 'showcase-unavailable') {
   report.refusals = [];
   report.missing = M.t('error.not_found');
