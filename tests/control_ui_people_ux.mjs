@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { queryKey } from './console_people_page.mjs';
+import { loadStyles } from './support/console_styles.mjs';
 const require = createRequire(new URL('../website/package.json', import.meta.url));
 const { JSDOM } = require('jsdom');
 const [ui, mode, locale, raw] = process.argv.slice(2);
@@ -95,6 +96,20 @@ if (data.scenario === 'selection') {
   report.cleared = snapshot();
   view().querySelector('[data-people-select]')?.click();
   report.finished = snapshot();
+} else if (data.scenario === 'bar-layout') {
+  const page = view().querySelector('[name="select-page"]');
+  page.checked = true; page.dispatchEvent(new w.Event('change', { bubbles: true }));
+  loadStyles(w, ui, ['tokens.css', 'styles.css', 'screens.css', 'people.css'], data.width);
+  const bar = view().querySelector('.people-bulk-bar'), style = w.getComputedStyle(bar);
+  report.layout = {
+    visible: visible(bar), position: style.position, direction: style.flexDirection, wrap: style.flexWrap,
+    display: style.display, actionsDisplay: w.getComputedStyle(bar.querySelector('.people-bulk-actions')).display,
+    countGrows: w.getComputedStyle(bar.querySelector('[role="status"]')).flexGrow,
+    matchingBasis: w.getComputedStyle(bar.querySelector('[data-select-matching]')).flexBasis,
+    matchingMargin: w.getComputedStyle(bar.querySelector('[data-select-matching]')).marginInlineStart,
+    matchingSize: w.getComputedStyle(bar.querySelector('[data-select-matching]')).inlineSize,
+    matchingVisible: visible(bar.querySelector('[data-select-matching]')),
+  };
 } else if (data.scenario === 'chips') {
   view().querySelector('[data-people-select]')?.click();
   const checkbox = view().querySelector('[data-person]');

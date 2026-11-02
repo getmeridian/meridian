@@ -22,7 +22,7 @@ newest first; the last is what 4.0 changes compared with 3.x.
   and language move into an account menu. A person's page keeps a summary with
   Share, Extend, and Disable above tabs, and each setting edits in place. People
   gets removable filter chips and compact rows, and its selection bar appears only
-  once someone is selected (#95).
+  once someone is selected, as one compact row on desktop or a bottom bar on phones (#95).
 - Reviewed subscription response rules by app, with bounded literal User-Agent
   and Accept conditions, ordered format/refusal/policy/header actions, and one
   transient matcher test across API, CLI, and console. Private person policies

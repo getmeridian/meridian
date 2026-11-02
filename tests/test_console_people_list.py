@@ -48,6 +48,32 @@ def test_detailed_people_exposes_selection_without_an_empty_bulk_toolbar(locale)
     assert result["addVisible"]
 
 
+@pytest.mark.parametrize("locale", ["en", "fa"])
+def test_desktop_selection_keeps_the_count_actions_and_matching_offer_in_one_compact_row(locale):
+    rows = people() + [{**people()[2], "username": f"p-extra-{index:03d}"} for index in range(100)]
+    result = run_console(
+        "people-triage-ux",
+        locale,
+        {"people": rows, "displayMode": "detailed", "scenario": "bar-layout", "width": 1040},
+    )
+    layout = result["layout"]
+    assert layout["visible"] and layout["matchingVisible"] and layout["position"] == "sticky"
+    assert layout["direction"] == "row" and layout["wrap"] == "nowrap"
+    assert layout["countGrows"] == "0" and layout["matchingBasis"] != "100%"
+
+
+def test_phone_selection_keeps_its_count_above_four_actions():
+    rows = people() + [{**people()[2], "username": f"p-extra-{index:03d}"} for index in range(100)]
+    result = run_console(
+        "people-triage-ux",
+        data={"people": rows, "displayMode": "detailed", "scenario": "bar-layout", "width": 390},
+    )
+    assert result["layout"]["position"] == "fixed"
+    assert result["layout"]["display"] == result["layout"]["actionsDisplay"] == "grid"
+    assert result["layout"]["matchingVisible"] and result["layout"]["matchingMargin"] == "0px"
+    assert result["layout"]["matchingSize"] == "100%"
+
+
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 @pytest.mark.parametrize(
     ("key", "value"),
