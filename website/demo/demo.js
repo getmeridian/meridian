@@ -136,7 +136,7 @@
       if (typeof value !== "string") return value;
       // 2099-12-31 is the service's "never expires" sentinel; pages test for it literally.
       if (/^\d{4}-\d\d-\d\dT/.test(value) && !/^2099-12-31T/.test(value)) {
-        if (key === "period_start" || key === "period_end" || key === "counting_since" || key === "traffic_reset_at") {
+        if (key === "period_start" || key === "period_end" || key === "counting_since" || key === "traffic_reset_at" || key === "next_reset_at") {
           var period = new Date(value), current = new Date(), generated = new Date(data.generated_at);
           period.setUTCMonth(period.getUTCMonth() + (current.getUTCFullYear() - generated.getUTCFullYear()) * 12 + current.getUTCMonth() - generated.getUTCMonth());
           return iso(period.getTime());

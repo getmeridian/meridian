@@ -83,6 +83,8 @@ Token reviews and issuance use the owner's delegation limits and the service's r
 
 Person previews and saves refuse activation or renewal reaching 2099. If traffic exists but its first-use date is unknown, choose a fixed expiry.
 
+Monthly demo resets stay on the first day of the month at 00:00 UTC, including direct person URLs and the connection page.
+
 External app, documentation, and support links open only when you follow them. They do not make the page fetch those sites in the background.
 
 ## Download verification

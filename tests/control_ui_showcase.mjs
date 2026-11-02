@@ -11,12 +11,12 @@ const [, , , mode, locale, input] = process.argv;
 const data = JSON.parse(input === '-' ? fs.readFileSync(0, 'utf8') : input);
 const directory = path.resolve(data.directory);
 const html = fs.readFileSync(path.join(directory, 'console/index.html'), 'utf8');
-const dom = new JSDOM(html, { url: `https://198.51.100.1/demo/console/?lang=${locale}`, runScripts: 'outside-only', pretendToBeVisual: true });
+const dom = new JSDOM(html, { url: `https://198.51.100.1/demo/console/?lang=${locale}${data.route ? '#' + data.route : ''}`, runScripts: 'outside-only', pretendToBeVisual: true });
 const w = dom.window;
 let demoNow;
-if (mode === 'showcase-queries' || ['schedule', 'undo', 'share', 'token', 'declared'].some(prefix => mode.startsWith('showcase-' + prefix + '-'))) {
+if (mode === 'showcase-queries' || ['schedule', 'undo', 'share', 'token', 'declared', 'calendar'].some(prefix => mode.startsWith('showcase-' + prefix + '-'))) {
   const generated = Date.parse(JSON.parse(fs.readFileSync(path.join(directory, 'console/demo-data.json'), 'utf8')).generated_at);
-  demoNow = data.now ? Date.parse(data.now) : generated;
+  demoNow = (data.now ? Date.parse(data.now) : generated) + (data.offsetSeconds || 0) * 1000;
   w.Date = class extends Date {
     constructor(...args) { super(...(args.length ? args : [demoNow])); }
     static now() { return demoNow; }
@@ -71,7 +71,7 @@ async function until(check, label) {
 }
 const M = w.M;
 try {
-await until(() => w.document.querySelector('#view .list'), 'people');
+await until(() => w.document.querySelector(data.route ? '#view h1' : '#view .list'), 'initial screen');
 await until(() => w.document.querySelector('#view')?.getAttribute('aria-busy') !== 'true', 'people query');
 report.lang = w.document.documentElement.lang;
 report.dir = w.document.documentElement.dir;
@@ -381,6 +381,11 @@ if (mode === 'showcase-navigation') {
   report.preview = await M.api('POST', 'api/users/preview', data.changes);
   report.previewKeptUsers = JSON.stringify(await M.api('GET', 'api/users')) === before;
   report.after = await M.api('POST', 'api/users', { username: 'DemoGuest', ...data.changes });
+} else if (mode === 'showcase-calendar-reset') {
+  report.now = new Date(demoNow).toISOString().replace('.000Z', 'Z');
+  report.user = await M.api('GET', 'api/users/Luma');
+  report.info = await (await w.fetch('/demo/sub/' + report.user.sub_token + '/info')).json();
+  report.person = w.document.querySelector('#view h1').textContent;
 } else if (mode === 'showcase-unavailable') {
   report.refusals = [];
   report.missing = M.t('error.not_found');

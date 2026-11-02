@@ -373,6 +373,28 @@ def test_demo_valid_schedule_previews_match_the_service_calculator(demo: Path, c
     assert result["outside"] == result["nativeApi"] == result["errors"] == []
 
 
+@pytest.mark.parametrize("offset", [5 * 86400 + 3 * 3600, 40 * 86400 + 3 * 3600])
+def test_demo_calendar_refills_stay_on_utc_month_boundaries_in_direct_person_and_page_reads(
+    demo: Path, offset: int
+) -> None:
+    result = run_console(
+        "showcase-calendar-reset", data={"directory": str(demo), "route": "/people/Luma", "offsetSeconds": offset}
+    )
+    user = UserRecord.model_validate(
+        {key: value for key, value in result["user"].items() if key in UserRecord.model_fields}
+    )
+    expected = calculate_schedule(user, datetime.fromisoformat(result["now"])).next_reset_at
+    assert result["person"] == "Luma"
+    assert (
+        result["user"]["schedule"]["next_reset_at"]
+        == result["info"]["user"]["accountSchedule"]["next_reset_at"]
+        == expected
+    )
+    assert expected is not None and expected[8:] == "01T00:00:00Z"
+    validate_recordings(result["responses"])
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 def test_demo_security_and_remote_actions_show_a_translated_demo_refusal(demo: Path, locale: str) -> None:
     result = run_console("showcase-unavailable", locale, {"directory": str(demo)})
