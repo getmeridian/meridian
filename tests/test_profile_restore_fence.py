@@ -176,12 +176,14 @@ def test_empty_context_keeps_derived_snapshot_state_after_restore_is_declined_or
 
 @pytest.mark.parametrize("profiles", ["same", "different"])
 @pytest.mark.parametrize("resuming", [False, True], ids=["new-restore", "legacy-resume"])
+@pytest.mark.parametrize("local_fleet", ["0f1e2d3c-4b5a-4968-8776-655443322111", ""], ids=["other-fleet", "unfenced"])
 def test_foreign_snapshot_is_refused_before_profile_checks_or_target_access(
-    fleet, new_server: NewServer, monkeypatch: pytest.MonkeyPatch, profiles: str, resuming: bool
+    fleet, new_server: NewServer, monkeypatch: pytest.MonkeyPatch, profiles: str, resuming: bool, local_fleet: str
 ):
+    """A local intent saved before its first fence has no fleet ID, so no snapshot can be its own."""
     cluster, path = fleet
     snapshot = open_snapshot(path)
-    cluster.fleet_id = "0f1e2d3c-4b5a-4968-8776-655443322111"
+    cluster.fleet_id = local_fleet
     if profiles == "different":
         cluster.topology_intent = local_profile_intent(cluster.topology_intent)
     if resuming:

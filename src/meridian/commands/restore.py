@@ -63,7 +63,7 @@ def run(
     else:
         source = _open_snapshot(snapshot, recovery_key=recovery_key)
     try:
-        if source.snapshot is not None and cluster.fleet_id:
+        if source.snapshot is not None and (cluster.fleet_id or cluster.topology_intent is not None or staged_resume):
             check_snapshot_fleet(source, cluster.fleet_id)
         if not staged_resume:
             cluster = _fleet_state(cluster, source.snapshot)
