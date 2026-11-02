@@ -230,6 +230,8 @@ JSON 筛选计数对所有有效标签均保持整数，包括 `TOKEN` 和 `API_
 
 删除已声明人员会在批量预览和回执中返回一个绑定修订的 `proposal`。保存控制台的 **people-removal.json**，或将完整 API 批量预览、回执或 CLI 批量 JSON 结果文件传给 `client remove --proposal FILE`。文件上限为 64 MiB。CLI 验证服务器集合、已提交的修订、代次、计划及本地意图，一起审核所有删除，只确认一次，并应用一次意图更改。应用栅栏在服务器修改前再次拒绝旧修订。
 
+提案中的 `usernames` 必须与已提交的 `topology_intent.access.users` 中的用户名完全一致，包括大小写。提案不接受显示名称。
+
 `client remove NAME...` 也接受多个已声明名称，`--dry-run` 只审核、不保存。取消确认不会保存任何更改，且必须至少保留一名已声明人员。JSON 预览返回 `data.clients`、`data.review_hash` 和 `data.applied: false`。已应用的批量删除保留 `clients` 和 `review_hash`，省略默认值 `applied: true`。单人结果继续使用 `data.client`。
 
 提案不含人员私人字段或会话切断选项。批量删除拒绝 `--cut-off`，单人 `client remove NAME --cut-off` 保留原有确认和逐节点结果。混合批次中，服务管理的人员仍以原子事务删除；已声明人员等待本地应用，拓扑变化会拒绝整个服务提交。

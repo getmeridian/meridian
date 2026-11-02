@@ -497,6 +497,8 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 在部署者电脑上使用当前配置副本，先运行 `meridian client remove --proposal people-removal.json --dry-run --json`，再运行 `meridian client remove --proposal people-removal.json`：所有删除只需一次共同审核、一次确认和一次应用。也可直接使用 `meridian client remove sample-a sample-b`。`--proposal` 能读取完整的 API 批量预览或回执 JSON，以及 CLI 批量 JSON 输出，文件大小上限为 64 MiB。名称和提案文件不能同时提供。
 
+提案中的 `usernames` 必须与已提交的 `topology_intent.access.users` 中的用户名完全一致，包括大小写。提案不接受显示名称。
+
 已提交的修订、代次、计划、服务器集合或本地意图发生变化时，草稿会被拒绝；应用栅栏在修改服务器前再次检查修订，即使计划未变也会拒绝旧修订。拓扑变化也会拒绝整个混合服务提交。服务没有已提交的拓扑栅栏，或所选声明属于未完成的应用时，请先完成 `meridian apply`，再重新预览。
 
 必须至少保留一名已声明人员。提案不包含备注、标签、连接凭据、设备数据或会话切断选项。批量删除拒绝 `--cut-off`；如需原有的会话关闭审核，请逐人运行 `meridian client remove NAME --cut-off`。否则之前开始的传输可能继续。

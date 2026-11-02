@@ -23,7 +23,7 @@ from meridian.core.people_bulk import BulkPreview, BulkReceipt, ClientBulkResult
 from meridian.core.people_removal import PeopleRemovalProposal
 from meridian.core.setup import SetupDraft
 from meridian.i18n import isolate, t
-from meridian.people_removal import require_removal_fence
+from meridian.people_removal import require_removal_fence, require_removal_revision, require_removal_users
 from meridian.renderers import emit_json
 from meridian.servers import ServerRegistry
 from meridian.setup.editor import remove_access_user_from_intent
@@ -65,6 +65,7 @@ def require_current_removal(cluster: ClusterConfig, proposal: PeopleRemovalPropo
         plan_hash=cluster.active_plan_hash,
         revision=proposal.revision,
     )
+    require_removal_users(proposal, require_intent(cluster).access.users)
     if canonical_sha256(require_intent(cluster).model_dump(mode="json")) != proposal.intent_sha256:
         fail(t("bulk.proposal_stale"), hint_type="user")
     with ControlClient(cluster.panel.url, cluster.panel.api_token, report_mutations=False) as client:
@@ -77,14 +78,7 @@ def require_current_removal(cluster: ClusterConfig, proposal: PeopleRemovalPropo
             plan_hash=record.plan_hash if record else None,
             revision=record.revision if record else None,
         )
-        revision = client.revision(proposal.revision)
-        if (
-            revision is None
-            or revision.status != "applied"
-            or revision.intent_sha256 != proposal.intent_sha256
-            or revision.plan_hash != proposal.plan_hash
-        ):
-            fail(t("bulk.proposal_stale"), hint_type="user")
+        require_removal_revision(proposal, client.revision(proposal.revision))
 
 
 def run_reviewed_removal(

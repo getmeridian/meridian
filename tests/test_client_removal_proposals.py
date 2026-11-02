@@ -14,6 +14,8 @@ from meridian.control.models import UserCreate
 from meridian.core.agent_types import canonical_sha256
 from meridian.core.output import command_envelope
 from meridian.core.people_bulk import ClientBulkResult
+from meridian.core.people_removal import PeopleRemovalProposal
+from meridian.core.topology import SetupIntent
 from meridian.reconciler.fence import FleetFenceError, local_fence_view
 from meridian.service_fence import ControlServiceFence
 from tests.support.fence_host import FenceHost
@@ -54,6 +56,76 @@ def review_runtime():
     runtime = MagicMock()
     runtime.review.return_value = SimpleNamespace(review_hash="f" * 64, retiring=[])
     return runtime
+
+
+@pytest.fixture(params=["casefold", "display_name"])
+def colliding_removal(removal_cli, request):
+    remote, cluster = removal_cli
+    console_name = "SAMPLE-A" if request.param == "casefold" else "sample-display"
+    data = cluster.topology_intent.model_dump(mode="json")
+    if request.param == "display_name":
+        data["access"]["display_names"] = {"sample-a": console_name}
+    cluster.topology_intent = SetupIntent.model_validate(data)
+    commit_topology(remote.service, cluster.topology_intent)
+    remote.service.create_user(UserCreate(username=console_name))
+    proposal = preview(remote.service, "delete", names=["sample-a"]).proposal
+    forged = PeopleRemovalProposal.model_validate({**proposal.to_data(), "usernames": [console_name]})
+    return remote, cluster, forged
+
+
+def test_proposal_usernames_cannot_resolve_to_another_declared_person(colliding_removal, tmp_path):
+    _, cluster, proposal = colliding_removal
+    path = tmp_path / "removal.json"
+    path.write_text(proposal.model_dump_json(by_alias=True))
+    with (
+        patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
+        patch("meridian.commands.client_removal.reviewed_runtime", return_value=review_runtime()) as runtime,
+        patch("meridian.commands.client_removal.apply_reviewed_intent") as apply,
+        patch.object(ClusterConfig, "save") as save,
+    ):
+        result = CliRunner().invoke(app, ["client", "remove", "--proposal", str(path), "--yes", "--json"])
+    assert result.exit_code == 2, result.output
+    assert "not declared in the topology" in json.loads(result.stdout)["errors"][0]["message"]
+    runtime.assert_not_called()
+    apply.assert_not_called()
+    save.assert_not_called()
+
+
+def test_current_removal_requires_exact_declared_usernames(colliding_removal):
+    from meridian.commands.client_removal import require_current_removal
+
+    _, cluster, proposal = colliding_removal
+    with pytest.raises(FleetFenceError, match="not declared in the topology"):
+        require_current_removal(cluster, proposal)
+
+
+@pytest.mark.parametrize("action", ["ensure", "acquire"])
+def test_removal_fence_requires_exact_committed_usernames(colliding_removal, action):
+    remote, cluster, proposal = colliding_removal
+    fence = ControlServiceFence(
+        FenceHost(), cluster, client_factory=remote.client, cli_version="4.0.0", removal_proposal=proposal
+    )
+    before = remote.service.revisions.fence()
+    with pytest.raises(FleetFenceError, match="not declared in the topology"):
+        getattr(fence, action)(local_fence_view(cluster))
+    assert remote.service.revisions.fence() == before
+
+
+def test_removal_fence_reads_the_committed_intent_after_the_local_removal_is_saved(removal_cli):
+    from meridian.setup.editor import remove_access_user_from_intent
+
+    remote, cluster = removal_cli
+    proposal = preview(remote.service, "delete", names=["sample-a"]).proposal
+    fence = ControlServiceFence(
+        FenceHost(), cluster, client_factory=remote.client, cli_version="4.0.0", removal_proposal=proposal
+    )
+    local = local_fence_view(cluster)
+    fence.ensure(local)
+    cluster.topology_intent = remove_access_user_from_intent(cluster.topology_intent, "sample-a")
+    try:
+        assert fence.acquire(local) == cluster.fleet_id
+    finally:
+        fence.release()
 
 
 def test_multiple_names_are_one_dry_run_review_and_do_not_save_intent(removal_cli):

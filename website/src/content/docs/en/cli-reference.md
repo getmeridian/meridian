@@ -230,6 +230,8 @@ Shared filters: `--search TEXT`, `--status STATUS`, `--tag TAG`, `--match-profil
 
 Declared deletions return one revision-bound `proposal` in the bulk preview and receipt. Save the console's **people-removal.json**, or pass the API bulk preview/receipt or CLI bulk JSON result file to `client remove --proposal FILE`. Files are limited to 64 MiB. The CLI verifies fleet, committed revision/generation/plan, and local intent, reviews every removal together, confirms once, and applies one intent edit. The apply fence rejects an older revision again before server mutation.
 
+Proposal `usernames` must exactly match the committed `topology_intent.access.users`, including case. Display names are not accepted in proposals.
+
 `client remove NAME...` also supports several declared names, with `--dry-run` to review without saving. A declined review saves nothing, and at least one declared person must remain. JSON previews return `data.clients`, `data.review_hash`, and `data.applied: false`; applied combined removals keep `clients` and `review_hash` and omit default `applied: true`. Individual results keep `data.client`.
 
 Proposals omit private person fields and session cut-off. Bulk removal refuses `--cut-off`; individual `client remove NAME --cut-off` keeps its existing consent and node outcomes. In a mixed batch, service-owned deletions still commit atomically; declared deletions wait for local apply, and a changed topology refuses the entire service commit.

@@ -346,7 +346,8 @@ def run_remove(
             if not names:
                 fail(t("bulk.remove_selection"), hint_type="user")
             cluster = load_topology_cluster()
-            names = [resolve_client_name(cluster, value) for value in names]
+            if draft is None:
+                names = [resolve_client_name(cluster, value) for value in names]
             for value in names:
                 validate_client_name(value)
             if len(names) != len(set(names)):

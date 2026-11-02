@@ -44,7 +44,7 @@ from meridian.core.errors import LocalStateError
 from meridian.core.people_removal import PeopleRemovalProposal
 from meridian.core.topology import SetupIntent
 from meridian.core.version_skew import newer_service_hint, service_skew
-from meridian.people_removal import require_removal_fence
+from meridian.people_removal import require_removal_fence, require_removal_revision
 from meridian.reconciler.fence import (
     RENEW_AFTER,
     FenceRecord,
@@ -309,6 +309,8 @@ class ControlServiceFence:
                 plan_hash=remote.plan_hash if remote else None,
                 revision=located.committed_revision,
             )
+            proposal = self._removal_proposal
+            require_removal_revision(proposal, self._call(lambda client: client.revision(proposal.revision)))
 
     def _decide(self, located: _Located, local: LocalFenceView, *, new_fleet_id: str) -> FenceRecord:
         return decide_acquire(

@@ -1,7 +1,10 @@
-"""The deployer's exact revision precondition for a declared-people removal draft."""
+"""The deployer's committed revision and username guards for a people-removal draft."""
 
+from collections.abc import Collection
+
+from meridian.control.models import RevisionRecord
 from meridian.core.people_removal import PeopleRemovalProposal
-from meridian.i18n import t
+from meridian.i18n import isolate, t
 from meridian.reconciler.fence import FleetFenceError
 
 
@@ -16,3 +19,24 @@ def require_removal_fence(
     expected = (proposal.fleet_id, proposal.generation, proposal.plan_hash, proposal.revision)
     if (fleet_id, generation, plan_hash, revision) != expected:
         raise FleetFenceError(t("bulk.proposal_stale"), category="user")
+
+
+def require_removal_users(proposal: PeopleRemovalProposal, usernames: Collection[str]) -> None:
+    """Saved proposal usernames must be exact declarations, without display-name resolution."""
+    unknown = sorted(set(proposal.usernames) - set(usernames))
+    if unknown:
+        raise FleetFenceError(
+            t("bulk.remove_undeclared", people=", ".join(isolate(name) for name in unknown)), category="user"
+        )
+
+
+def require_removal_revision(proposal: PeopleRemovalProposal, revision: RevisionRecord | None) -> None:
+    """Check the recorded intent, including its exact usernames, before a removal can proceed."""
+    if (
+        revision is None
+        or revision.status != "applied"
+        or revision.intent_sha256 != proposal.intent_sha256
+        or revision.plan_hash != proposal.plan_hash
+    ):
+        raise FleetFenceError(t("bulk.proposal_stale"), category="user")
+    require_removal_users(proposal, revision.intent.get("access", {}).get("users", []))
