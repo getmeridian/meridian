@@ -10,6 +10,7 @@ uv run pytest tests/systemlab/ -q
 **Deterministic topology** — a fixed bridge subnet keeps host keys, targets, the local Pebble CA, and relay routing repeatable.
 **Small fail-fast stages** — `scripts/stages/` run bootstrap, deploys, subscription, golden, resilience, and removal; Make always tears Compose down.
 **Golden subscription corpus** — `golden/` is the frozen record of what Remnawave served each User-Agent; `scripts/diff-golden.py` replays it against the live fleet through the unit corpus test's expectations and named deviations.
+**Control memory stays below 160 MiB** — the single-server workload covers cold pinned-geodata explanation, person preview, and 32 fetches across four formats, leaving 96 MiB below MemoryMax.
 
 ## What's done well
 - Fresh deploy checks every unit, `fleet status`, a no-op second apply, and that no unit, process, or `/opt` name reveals proxy software.
@@ -20,6 +21,9 @@ uv run pytest tests/systemlab/ -q
 - Exit DNS privacy is proven on the wire: no plain DNS question leaves exit A during a proxied fetch.
 
 ## Pitfalls
+- **Memory bursts fit the control listener backlog** — use four concurrent fetches across all formats; a full accept queue resets connects before they exercise memory.
+- **Memory evidence belongs to one invocation** — privileged exit B keeps a private writable cgroup with memory accounting; a missing peak or restarted `ctld` fails, never skips.
+- **Memory workloads walk the heavy lists only after the mirror lands** — `ctld` mirrors the Xray archive in the background, so wait for its geodata first; documentation names and addresses match the private lists, so use an example.com name (category-ru) and a public resolver address (geoip:ru).
 - **Stage scripts import Meridian outside pytest** — a moved helper breaks only the Docker run; grep `tests/systemlab/scripts` whenever a public helper moves.
 - **Debug one stage, not the lab** — `SYSTEMLAB_KEEP=1 SYSTEMLAB_STAGES="10-deploy.sh 40-removal.sh"` keeps the fleet up for reruns.
 - **Agents verify the service against WebPKI roots** — bootstrap adds Pebble's issuance root and `NETAGENT_TLS_CA_FILE` before any deploy, or no agent enrolls.

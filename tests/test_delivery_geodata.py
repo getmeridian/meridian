@@ -143,18 +143,32 @@ def test_pinned_geodata_stays_small_in_memory() -> None:
     import os
     import tracemalloc
 
+    from tests.systemlab.control_memory import EXPLANATION_DESTINATIONS
+
     binary = os.environ.get("MERIDIAN_TEST_XRAY")
     folder = Path(binary).parent if binary else None
     if folder is None or not (folder / "geosite.dat").is_file() or not (folder / "geoip.dat").is_file():
         pytest.skip("pinned geodata beside MERIDIAN_TEST_XRAY is not available")
-    sites, ips = (folder / "geosite.dat").read_bytes(), (folder / "geoip.dat").read_bytes()
     tracemalloc.start()
     try:
-        data = GeoData.from_bytes(sites, ips)
-        assert data.domain_matches("private", "router.lan") is True
-        assert data.ip_matches("private", [ipaddress.ip_address("10.0.0.1")]) is True
-        assert data.domain_matches("category-ru", "yandex.ru") is True
+        data = GeoData.from_bytes((folder / "geosite.dat").read_bytes(), (folder / "geoip.dat").read_bytes())
+        resolved = resolve_delivery_policy(DeliveryPolicySettings())
+        for destination, status, action in (
+            *((destination, "default", "proxy") for destination in EXPLANATION_DESTINATIONS),
+            ("router.lan:443", "matched", "direct"),
+            ("198.51.100.10:443", "matched", "direct"),
+        ):
+            result = explain_delivery_policy(
+                resolved,
+                DeliveryExplainRequest(destination=destination),
+                available_exits={"west"},
+                geodata=data,
+            )
+            assert result.geodata_available and result.action is not None
+            assert (result.status, result.action.kind) == (status, action)
         _current, peak = tracemalloc.get_traced_memory()
     finally:
         tracemalloc.stop()
-    assert peak < 64 * 1024 * 1024
+    assert {"private", "ru"} <= set(data.ips._decoded)  # type: ignore[attr-defined]
+    print(f"pinned geodata explanation peak: {peak / 1024**2:.1f} MiB ({peak} bytes)")
+    assert peak < 64 * 1024 * 1024, f"Pinned geodata explanation used {peak / 1024**2:.1f} MiB; budget is 64 MiB."

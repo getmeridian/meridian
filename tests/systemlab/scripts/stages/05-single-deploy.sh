@@ -3,6 +3,7 @@
 # live verification, then a full teardown before the multi-server stages.
 set -euo pipefail
 
+# shellcheck source=tests/systemlab/scripts/stages/common.sh
 source /workspace/tests/systemlab/scripts/stages/common.sh
 
 DEPLOY_LOG=/tmp/meridian-single-deploy.log
@@ -14,6 +15,8 @@ pass "single-server deploy converged, verified, and carried real traffic"
 require_command "control service running on the single server" ssh root@"$EXIT_B_IP" systemctl is-active --quiet ctld
 wait_for_agent "$EXIT_B_IP"
 pass "node agent and core running on the single server"
+
+bash "$SYSTEMLAB_ROOT/scripts/stages/06-control-memory.sh"
 
 python3 <<'PYEOF'
 import httpx

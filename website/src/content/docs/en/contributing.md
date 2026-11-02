@@ -68,3 +68,5 @@ The node agent is a Rust crate in `agent/` at the repository root; its builds sh
 ## Testing
 
 CI validates: Python tests, ruff lint, mypy types, template rendering, and shell script syntax. For full deployment testing, run `make system-lab` (deploys a multi-node fleet in Docker containers and checks real traffic) or test on a real VPS (`make real-lab`).
+
+Use `make real-lab TOPO=upgrade` to verify upgrading a published PyPI release to the checkout with `meridian apply`. It compares each person's subscription bytes and usage headers, preserves limits and expiry, checks the current schema and built agent, then tests real traffic. Run `uv sync --extra dev --group realvm` and `make agent` first, and export `HCLOUD_TOKEN`. The default starting version is the newest published release below `VERSION`, including pre-releases; `REALVM_UPGRADE_FROM` pins one explicitly. The VM is destroyed when verification ends. This runs locally only, never in CI; exit 75 means PyPI was unreachable or Let's Encrypt rate-limited certificate issuance. See `tests/realvm/README.md` for commands and cleanup.

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 import subprocess
 import tomllib
 from argparse import Namespace
@@ -11,6 +12,7 @@ import pytest
 import yaml
 
 from tests.realvm import orchestrator
+from tests.realvm.providers.base import VMInstance
 
 _ROOT = Path(__file__).parents[1]
 
@@ -253,3 +255,164 @@ def test_realvm_refuses_a_checkout_without_an_agent_build_before_provider_access
         orchestrator.cmd_up(Namespace(topology="domain", keep=False))
 
     assert exc_info.value.code == 2
+
+
+@pytest.mark.parametrize("missing", ["mapping", "script"])
+def test_realvm_refuses_an_unwired_verifier_before_provider_access(
+    missing: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    if missing == "mapping":
+        monkeypatch.delitem(orchestrator.VERIFIERS, "single")
+    else:
+        monkeypatch.setitem(orchestrator.VERIFIERS, "single", "missing.sh")
+    monkeypatch.setattr(orchestrator, "require_agent_build", lambda: None)
+    monkeypatch.setattr(orchestrator, "make_provider", lambda _name: pytest.fail("the provider was reached"))
+
+    with pytest.raises(SystemExit) as exc_info:
+        orchestrator.cmd_up(Namespace(topology="single", keep=False))
+
+    assert exc_info.value.code == 2
+
+
+def test_realvm_refuses_ci_before_provider_access(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CI", "true")
+    monkeypatch.setattr(orchestrator, "require_agent_build", lambda: None)
+    monkeypatch.setattr(orchestrator, "make_provider", lambda _name: pytest.fail("the provider was reached"))
+
+    with pytest.raises(SystemExit) as exc_info:
+        orchestrator.cmd_up(Namespace(topology="single", keep=False))
+
+    assert exc_info.value.code == 2
+
+
+def test_realvm_verification_isolates_home_outside_checkout_and_redacts_streamed_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    topology = orchestrator.load_topology("single")
+    record = tmp_path / "home-path"
+    script = tmp_path / "verify.sh"
+    script.write_text(
+        f'printf "%s" "$MERIDIAN_HOME" > {shlex.quote(str(record))}\n'
+        'echo "https://198.51.100.10/sub/opaque-token $HCLOUD_TOKEN"\nexit 75\n'
+    )
+    monkeypatch.setitem(orchestrator.VERIFIERS, "single", str(script))
+    monkeypatch.setattr(orchestrator, "__file__", str(tmp_path / "orchestrator.py"))
+    monkeypatch.setenv("HCLOUD_TOKEN", "provider-token")
+    instance = VMInstance(
+        id="vm-1",
+        name="test-exit",
+        status="running",
+        public_ipv4="198.51.100.10",
+        public_ipv6=None,
+        region="nbg1",
+        labels={orchestrator.FLEET_ID_LABEL: "test-fleet"},
+        provider="stub",
+    )
+
+    assert orchestrator.run_verification(topology, [instance]) == 75
+    home = Path(record.read_text())
+    assert not home.is_relative_to(tmp_path)
+    assert not home.exists()
+    output = capsys.readouterr().out
+    assert "198.51.100.10" not in output
+    assert "opaque-token" not in output
+    assert "provider-token" not in output
+
+
+def test_realvm_keep_retains_a_private_fleet_id_for_usable_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    topology = orchestrator.load_topology("single")
+    record = tmp_path / "home-path"
+    script = tmp_path / "verify.sh"
+    script.write_text(f'printf "%s" "$MERIDIAN_HOME" > {shlex.quote(str(record))}\nexit 0\n')
+    monkeypatch.setitem(orchestrator.VERIFIERS, "single", str(script))
+    fleet_id = "01234567-89ab-cdef-0123-456789abcdef"
+    instance = VMInstance(
+        id="vm-1",
+        name="test-exit",
+        status="running",
+        public_ipv4="198.51.100.10",
+        public_ipv6=None,
+        region="nbg1",
+        labels={orchestrator.FLEET_ID_LABEL: fleet_id},
+        provider="stub",
+    )
+    try:
+        assert orchestrator.run_verification(topology, [instance], keep=True) == 0
+        home = Path(record.read_text())
+        assert home.exists()
+        assert (home.parent / "fleet-id").read_text().strip() == fleet_id
+        assert "$(cat " in capsys.readouterr().out
+    finally:
+        if record.exists():
+            import shutil
+
+            shutil.rmtree(Path(record.read_text()).parent)
+
+
+@pytest.mark.parametrize("verdict", [0, 1, 75, "crash"])
+def test_upgrade_tears_down_in_finally_on_every_verifier_outcome(
+    verdict: int | str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tests.realvm import upgrade_verifier
+
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.setattr(orchestrator, "require_agent_build", lambda: None)
+    monkeypatch.setattr(upgrade_verifier, "preflight_upgrade", lambda _root, _env: ("4.0.0b10", "0.1.0"))
+    monkeypatch.setattr(orchestrator, "make_provider", lambda _name: object())
+    monkeypatch.setattr(orchestrator, "confirm_cost", lambda *args, **kwargs: None)
+    monkeypatch.setattr(orchestrator, "provision", lambda *args: [])
+    destroyed: list[str] = []
+    monkeypatch.setattr(orchestrator, "destroy_fleet", lambda _provider, fleet_id: destroyed.append(fleet_id))
+
+    def verify(_topology: object, _instances: object, **kwargs: object) -> int:
+        assert kwargs["upgrade_from"] == "4.0.0b10"
+        if verdict == "crash":
+            raise RuntimeError("verifier crashed")
+        return int(verdict)
+
+    monkeypatch.setattr(orchestrator, "run_verification", verify)
+    if verdict == "crash":
+        with pytest.raises(RuntimeError, match="verifier crashed"):
+            orchestrator.cmd_up(Namespace(topology="upgrade", keep=False))
+    else:
+        assert orchestrator.cmd_up(Namespace(topology="upgrade", keep=False)) == verdict
+    assert len(destroyed) == 1
+
+
+def test_upgrade_uses_a_fresh_ssh_key_and_removes_it_after_teardown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tests.realvm import upgrade_verifier
+
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.delenv("MERIDIAN_TEST_SSH_KEY", raising=False)
+    monkeypatch.setattr(orchestrator, "require_agent_build", lambda: None)
+    monkeypatch.setattr(upgrade_verifier, "preflight_upgrade", lambda _root, _env: ("4.0.0b10", "0.1.0"))
+    monkeypatch.setattr(orchestrator, "make_provider", lambda _name: object())
+    monkeypatch.setattr(orchestrator, "confirm_cost", lambda *args, **kwargs: None)
+    observed: list[Path] = []
+
+    def keygen(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        private = Path(args[-1])
+        private.write_text("private-test-key")
+        private.with_suffix(".pub").write_text("ssh-ed25519 dummy-key")
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    def provision(*args: object) -> list[VMInstance]:
+        key = os.environ.get("MERIDIAN_TEST_SSH_KEY", "")
+        assert key, "the upgrade run did not create its own SSH key"
+        observed.append(Path(key))
+        assert observed[-1].exists()
+        return []
+
+    monkeypatch.setattr(orchestrator.subprocess, "run", keygen)
+    monkeypatch.setattr(orchestrator, "provision", provision)
+    monkeypatch.setattr(orchestrator, "run_verification", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(orchestrator, "destroy_fleet", lambda *args: None)
+    assert orchestrator.cmd_up(Namespace(topology="upgrade", keep=False)) == 0
+    assert len(observed) == 1 and not observed[0].exists()
+    assert "MERIDIAN_TEST_SSH_KEY" not in os.environ

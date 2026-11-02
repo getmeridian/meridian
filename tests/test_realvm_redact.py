@@ -48,6 +48,7 @@ pytestmark = pytest.mark.skipif(shutil.which("sed") is None, reason="needs sed")
         ),
         ('"password": "S2", obfs-password: S3', '"password": "<p>", obfs-password: <p>'),
         ("SECRET.Example.com www.example.xn--p1ai domain.xyz", "<host> <host> <host>"),
+        ("export HCLOUD_TOKEN=provider-token", "export HCLOUD_TOKEN=<provider-token>"),
     ],
     ids=[
         "sentence-dots",
@@ -61,6 +62,7 @@ pytestmark = pytest.mark.skipif(shutil.which("sed") is None, reason="needs sed")
         "salamander-link",
         "salamander-config",
         "case-and-tlds",
+        "provider-token-assignment",
     ],
 )
 def test_secrets_and_addresses_are_masked(raw: str, masked: str) -> None:

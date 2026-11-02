@@ -5,6 +5,7 @@ Provisions real cloud VMs (Hetzner via `hcloud-python`), deploys Meridian agains
 ## Design decisions
 - **Never in CI** — `HCLOUD_TOKEN` is never a GitHub secret (a misbehaving workflow would burn budget silently); harness files live outside `.github/workflows/`; `pyproject.toml` `norecursedirs = ["realvm"]` keeps `pytest` from collecting. Runs only via `make real-lab` locally.
 - **Topology per YAML file** — YAML declares provider / region / size / nodes, but `up` rejects any topology or verification manifest without an implemented verifier before provider access; `single` and `domain` are the implemented ones.
+- **Upgrade evidence precedes traffic** — `upgrade` installs a pinned PyPI CLI with its bundled agent in an external venv; capture each person/app separately, compare fixed expiry as-is, then test traffic after checkout apply.
 - **Inconclusive is not failed** — `domain` needs real DNS, so `verify/domain.sh` exits 75 when Let's Encrypt rate-limits issuance; `domain_support.py` holds its pure decisions (panel name, intent, path switch, rate-limit match).
 - **Executable claims only** — Tier α covers LE issuer, optional nmap, SSH, fail2ban, fleet, client CRUD, plan, and subscription HTTP (`single`), plus panel-domain certificates (`domain`); planned CDN/interactive tiers stay out of manifests until implemented.
 - **Labs are for journeys, `up` is for claims** — `lab.py` keeps named VMs up with a per-lab key, pinned host keys, ssh wrappers, and `env.sh`; `journey.sh`, `drive_wizard.py`, and `pwa_shots.py` run against it. Only `orchestrator up` verifies topology manifests.
@@ -14,6 +15,7 @@ Provisions real cloud VMs (Hetzner via `hcloud-python`), deploys Meridian agains
 - **Safety rails**: pre-provider verifier gate, `HCLOUD_TOKEN` gate, cost prompt, 5-VM cap, `try/finally` teardown, and label-based orphan sweep.
 
 ## Pitfalls
+- **A verifier registry entry is not a script** — check its file before provider access; CI environments must refuse provisioning too.
 - **Always teardown in `finally`** — the orchestrator does it; verify scripts must not hold the VM open on failure (except `--keep` explicitly).
 - **Hetzner server types deprecate** — CX22 was deprecated in 2025; harness defaults to `cx23`. Refresh topology YAMLs and `providers/hetzner.py::_HOURLY_EUR` when upstream sunsets a generation.
 - **Rich console ANSI in captured output** — `meridian fleet status` renders colors; prefer `meridian --json fleet status` in verify scripts for stable field access.

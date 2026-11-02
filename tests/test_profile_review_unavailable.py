@@ -85,6 +85,8 @@ def test_plan_keeps_compiled_results_when_profile_evidence_is_unavailable(
             )
         client.return_value.__enter__.return_value.access_profiles.side_effect = error
         client.return_value.__enter__.return_value.preview_access_profiles.side_effect = error
+        # An outage reaches health too; only a service that answers health while missing the route predates profiles.
+        client.return_value.__enter__.return_value.health.side_effect = error
         reply = CliRunner().invoke(app, ["plan", *(["--json"] if json_output else [])])
     assert reply.exit_code == 3, reply.output
     if json_output:

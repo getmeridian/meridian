@@ -157,3 +157,34 @@ def test_cli_review_refuses_missing_profile_memberships_before_applying(tmp_path
         assert admin.settings().access_profiles == {}
         assert admin.access_profiles().declarations_hash is None
         assert admin.get_user("person") == person
+
+
+@pytest.mark.parametrize("health", ["answers", "unreachable"])
+@pytest.mark.parametrize("used", [False, True])
+def test_a_service_older_than_profiles_needs_no_review_only_while_it_answers_health(
+    tmp_path: Path, health: str, used: bool
+):
+    """Plan before an upgrade meets a service without profile routes; only a live 404 proves it holds none."""
+    from meridian.control.client import ControlServiceError, ControlServiceNotFound
+    from meridian.setup.profile_review import ProfileReviewUnavailableError
+
+    def no_route(_client):
+        raise ControlServiceNotFound("Not found")
+
+    def down(_client):
+        raise ControlServiceError("The control service did not answer", category="system")
+
+    intent = single_exit_intent()
+    with serve_control(tmp_path) as url:
+        cluster = ClusterConfig(
+            panel=PanelConfig(url=url, api_token=ADMIN_TOKEN), topology_intent=intent, access_profiles_used=used
+        )
+        with (
+            patch.object(ControlClient, "access_profiles", no_route),
+            patch.object(ControlClient, "health", ControlClient.health if health == "answers" else down),
+        ):
+            if health == "answers" and not used:
+                assert profile_review_needed(cluster, intent) is False
+            else:
+                with pytest.raises(ProfileReviewUnavailableError):
+                    profile_review_needed(cluster, intent)

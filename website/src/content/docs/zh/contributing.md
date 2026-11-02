@@ -68,3 +68,5 @@ CLI 是一个 Python 包（`src/meridian/`），通过 PyPI 分发为 `meridian-
 ## 测试
 
 CI 会验证：Python 测试、ruff 代码检查、mypy 类型检查、模板渲染以及 shell 脚本语法。如需完整测试部署流程，可运行 `make system-lab`（在 Docker 容器中部署多节点集群并验证真实流量）或在真实 VPS 上测试（`make real-lab`）。
+
+运行 `make real-lab TOPO=upgrade`，可验证通过 `meridian apply` 从 PyPI 已发布版本升级到当前检出代码的过程。验证会逐一比较用户的订阅内容和流量响应头，确认流量上限与到期时间保持不变，检查数据库结构版本和构建的节点代理版本，最后测试真实流量。请先运行 `uv sync --extra dev --group realvm` 和 `make agent`，并设置 `HCLOUD_TOKEN`。默认选择低于 `VERSION` 的最新已发布版本，包括预发布版本；也可用 `REALVM_UPGRADE_FROM` 明确指定起始版本。验证结束后会销毁虚拟机。此验证仅限本地运行，绝不在 CI 中运行；退出码 75 表示无法访问 PyPI，或 Let's Encrypt 限制了证书签发。具体命令和清理方法见 `tests/realvm/README.md`。

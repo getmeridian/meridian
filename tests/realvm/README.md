@@ -48,6 +48,7 @@ Topology files live in `tests/realvm/topologies/*.yml`.
 |---|---|---|
 | `single` | 1 | Baseline — LE issuer, optional nmap, SSH, fleet status, client CRUD, declarative plan, subscription HTTP 200 |
 | `domain` | 1 | Web panel on its own domain beside an exit on the IP (#110) — both certificates served and kept apart, `test`/`check`/`plan` clean, then exit paths moved onto the domain and the IP certificate retired |
+| `upgrade` | 1 | Published PyPI release upgraded in place to the checkout — unchanged subscription bytes and headers, preserved account limits and expiry, current control schema and built agent, converged plan, end-to-end traffic |
 | (future) `chain-2hop` | 2 | Domestic relay → foreign exit (tests chain correctness) |
 | (future) `chain-3hop` | 3 | Full chain — client → ingress → middle → exit |
 | (future) `dual-ip` | 1 | Node with 2 Primary IPs (ingress IP ≠ egress IP) |
@@ -59,8 +60,65 @@ Run a non-default topology:
 make real-lab TOPO=single
 ```
 
-`single` and `domain` have automated verifiers today. Definitions without one
+`single`, `domain`, and `upgrade` have automated verifiers today. Definitions without one
 are rejected before provider access, so they cannot create paid resources.
+
+### The `upgrade` topology
+
+From the checkout you want to verify, with `HCLOUD_TOKEN` already exported:
+
+```bash
+uv sync --extra dev --group realvm
+make agent AGENT_TARGETS=x86_64-unknown-linux-musl
+make real-lab TOPO=upgrade
+
+# Reproduce the published b10 -> checkout run, even while VERSION still names b10:
+REALVM_UPGRADE_FROM=4.0.0b10 make real-lab TOPO=upgrade
+```
+
+Automatic selection uses the newest published, not fully yanked PyPI release
+strictly below the checkout's `VERSION`, including pre-releases. No older
+release means refusal. `REALVM_UPGRADE_FROM` selects an exact version and can
+equal `VERSION` when the checkout has unreleased changes. The checkout must
+have an editable installation and an x86 agent build with its `.version`
+sidecar; these checks and release selection happen before provider access.
+
+The verifier installs the release in its own temporary venv outside the
+checkout, then runs that venv's CLI against an isolated `MERIDIAN_HOME`.
+It deploys a single exit on the bare IP with the default camouflage SNI;
+there is no sslip.io domain issuance. A fresh SSH key avoids concurrent
+Hetzner key collisions unless `MERIDIAN_TEST_SSH_KEY` explicitly selects a
+key. Host keys are pinned in the run's workspace, not your `known_hosts`.
+
+It creates `bob` with a 50GB limit and a fixed UTC expiry 30 days ahead,
+detecting whether the old `client set` supports `--yes` and answering stdin
+otherwise. Every person's original subscription URL is captured with
+`v2rayNG/1.10.20`, `Happ/1.0`, `clash-verge/v2.2`, `Stash/3.0`, and
+`SFA/1.12.0`. v2rayNG and Happ remain separate cases even when both receive
+Xray JSON. Documents and all four `subscription-userinfo` fields are compared
+exactly; fixed `expire=` values are never masked.
+
+The checkout runs `plan` and `apply --yes`, then verifies the control database's
+`meta.schema_version` over SSH using `host_runtime` names, a converged JSON
+plan, unchanged people and subscription URLs/bytes/headers, bob's limit,
+expiry and usage metadata, and the node's fresh runtime agent version against
+the built agent. `meridian test` runs last, so its traffic cannot alter the
+usage headers being compared.
+
+**Exit 75 is inconclusive:** PyPI cannot be reached or Let's Encrypt refuses
+issuance because of a rate limit, even if setup reports a self-signed fallback.
+Product failures exit 1; invalid pins, missing builds, and unsupported old
+options refuse with 2. The orchestrator preserves these codes and tears down
+in `finally`. `make` itself reports a failed recipe as exit 2; to read the
+verifier's exact code, use `uv run --group realvm python -m
+tests.realvm.orchestrator up upgrade`.
+
+Terminal output masks addresses and credentials; mismatch summaries name the
+person/app format and byte counts/offsets without printing document content
+or tokens. The old venv, raw command logs, and captured documents are deleted
+on every verdict. `make real-lab-keep TOPO=upgrade` explicitly retains the VM,
+fleet home, and SSH wrappers; use the printed `source` and fleet-specific
+cleanup commands. Remove the retained workspace after destroying that VM.
 
 ### The `domain` topology
 
@@ -69,7 +127,7 @@ Needs real DNS for the panel's domain. By default the verifier uses
 so any VM gets a name with no setup. To use your own name instead, set
 `REALVM_PANEL_DOMAIN=panel.example.org`; the verifier waits up to
 `REALVM_DNS_WAIT` seconds (default 120) for it to resolve to the new VM, so
-create the A record once the run prints the VM's address.
+find the VM by its harness name in the provider dashboard and create the A record there.
 
 **Rate limits make a run inconclusive.** sslip.io is not on the Public Suffix
 List, so every sslip.io name shares Let's Encrypt's per-domain limits with the
@@ -92,7 +150,7 @@ Tier alpha runs by default with no user involvement.
 - `meridian plan` exits 0 or 2 (converged or changes pending — both OK)
 - Subscription URL returns HTTP 200
 
-The `domain` topology's claims are listed in `topologies/domain.yml`.
+The `domain` and `upgrade` claims are listed in their topology YAMLs.
 CDN and interactive mobile checks remain planned. Environment variables
 do not enable those tiers until their orchestrator paths and verifiers exist.
 
@@ -155,14 +213,16 @@ care if you have multiple ongoing runs (unlikely in practice).
 
 ## What gets created (Hetzner)
 
-Per run, for topology=single (`domain` creates the same, named `meridian-realvm-domain-exit-1-<fleet-id>`):
+`single`, `domain`, and `upgrade` each create one VM, named
+`meridian-realvm-<topology>-exit-1-<fleet-id>`:
 
 - 1 SSH key: `meridian-realvm-<fleet-id>` (public-key material from your
-  `~/.ssh/id_ed25519.pub` or `MERIDIAN_TEST_SSH_KEY`)
+  `~/.ssh/id_ed25519.pub` or `MERIDIAN_TEST_SSH_KEY`; `upgrade` generates a
+  fresh per-run key by default)
 - 1 server: `meridian-realvm-single-exit-1-<fleet-id>` (CX23, Ubuntu 24.04, Nuremberg)
 
 All tagged with `meridian-realvm-test=1`, `meridian-fleet-id=<uuid>`,
-`meridian-topology=single`.
+`meridian-topology=<topology>`.
 
 Destroy path:
 - VMs: deleted via API (instant)
@@ -191,6 +251,9 @@ destroy the fleet and re-run — a fresh VM usually gets a different IP.
 **Exit 75 from `up domain`** — Let's Encrypt rate-limited the panel's name (see
 "The `domain` topology" above); not a product failure. Retry later or use your
 own domain.
+
+**Exit 75 from `up upgrade`** — PyPI is unreachable or Let's Encrypt
+rate-limited the bare-IP certificate. Retry later or use a fresh VM IP.
 
 **Stuck with orphan VMs after a crash** — `make real-lab-orphans` to list,
 `make real-lab-down` to destroy.
