@@ -220,9 +220,12 @@ def test_people_access_is_declared_on_person_routes_and_private_profile_reviews(
         if needed is None:
             continue
         requirements = (needed,) if isinstance(needed, str) else needed
-        manages_people = (
-            pattern.pattern.startswith(("/api/users", "/api/people")) and handler.__name__ != "cut_off_scope"
-        ) or handler.__name__ in {"openapi", "token_capabilities", "access_profile_catalog", "subscription_preview"}
+        manages_people = (pattern.pattern.startswith(("/api/users", "/api/people"))) or handler.__name__ in {
+            "openapi",
+            "token_capabilities",
+            "access_profile_catalog",
+            "subscription_preview",
+        }
         assert any(scope_covers("people", scope) for scope in requirements) == manages_people
         assert all(scope_covers("admin", scope) for scope in requirements)
 

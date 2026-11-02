@@ -207,14 +207,16 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
     route(
         "GET",
         "/api/users/{username}/cut-off",
-        "read",
+        "people",
         "cut_off_scope",
         None,
         CutOffPlan,
         "List inbounds affected by a session cut-off.",
         credentials=False,
-        capability="commands.read",
+        capability=("people.read", "people.private"),
         refusals=(NOT_FOUND,),
+        description="Includes current grants and unresolved access-change receipts; "
+        "membership is private operator data.",
     ),
     route(
         "POST",

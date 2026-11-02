@@ -18274,7 +18274,7 @@
     },
     "/api/users/{username}/cut-off": {
       "get": {
-        "description": "Requires commands.read capabilities. Compatible presets: read, including scopes that cover them.",
+        "description": "Requires people.read and people.private capabilities. Compatible presets: people, including scopes that cover them. Includes current grants and unresolved access-change receipts; membership is private operator data.",
         "operationId": "cut_off_scope",
         "parameters": [
           {
@@ -18362,13 +18362,14 @@
           "users"
         ],
         "x-meridian-capabilities": [
-          "commands.read"
+          "people.read",
+          "people.private"
         ],
         "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
-          "read"
+          "people"
         ]
       }
     },

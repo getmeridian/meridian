@@ -495,6 +495,8 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 ## 访问配置
 
+`GET /api/users/{username}/cut-off` 需要 `people.read` 与 `people.private`。配置变更导致用户失去的入站访问，只要流阻断回执仍未确认，就会保留在预览中，即使账户仍处于活跃状态。后续执行 `--cut-off` 也会重置这些入站。
+
 配置授权属于已审核的拓扑；用户的配置成员关系由服务保存并归运营者管理。内置 `default` 配置允许访问所有出口和路径，包括未来新增的连接。用户可属于多个配置，权限取并集。未定义命名配置的部署保持原有节点文档和订阅输出。
 
 使用 `meridian profile add|set` 创建或替换授权，`profile list` 显示授权及成员数量。支持 `exit:ID`、`gateway:ID`，以及编译器的稳定 `inbound:...` 和 `endpoint:...` 引用。未知或已移除的引用会在审核时被拒绝。网关与出口之间的内部桥接入站不能授权给用户。授权公开连接实际授权其认证入站，因此通向同一入站的其他公开连接也会被授权。`--empty` 可创建不允许任何连接的配置。

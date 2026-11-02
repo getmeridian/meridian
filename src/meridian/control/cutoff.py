@@ -21,6 +21,7 @@ from meridian.control.models import NodeSpec, UserRecord
 from meridian.control.store import Store
 from meridian.core.agent_protocol import CommandEffect
 from meridian.core.agent_types import NodeStateRef
+from meridian.core.client_sessions import UserFlowBlocks
 
 
 @dataclass
@@ -31,9 +32,12 @@ class PendingCutOff:
 
 
 class CutOffLedger:
-    def __init__(self, store: Store, commands: CommandLedger) -> None:
+    def __init__(
+        self, store: Store, commands: CommandLedger, *, read_flow_blocks: Callable[[str], UserFlowBlocks]
+    ) -> None:
         self._store = store
         self._commands = commands
+        self._read_flow_blocks = read_flow_blocks
         self._local = threading.local()
 
     def scope(self, username: str) -> CutOffPlan:
@@ -41,6 +45,10 @@ class CutOffLedger:
             user = self._store.row("SELECT user_id, uuid, status FROM users WHERE username = ?", (username,))
             if user is None:
                 raise ServiceError("not_found", "Unknown user.", 404)
+            unresolved: dict[str, set[str]] = {}
+            for receipt in self._read_flow_blocks(username).nodes:
+                if receipt.reason == "access_changed" and receipt.status != "blocked":
+                    unresolved.setdefault(receipt.node_id, set()).update(receipt.inbound_tags)
             nodes: list[CutOffNode] = []
             for row in self._store.rows(
                 "SELECT node_id, spec, document FROM nodes WHERE spec IS NOT NULL ORDER BY node_id"
@@ -57,7 +65,7 @@ class CutOffLedger:
                             client["user_id"] == user["user_id"] for client in resource["users"]
                         ):
                             carried.add(resource["inbound_tag"])
-                    tags &= carried
+                    tags &= carried | unresolved.get(row["node_id"], set())
                 # Inactive people can still have sessions from before rmu removed them.
                 if tags:
                     effect: CommandEffect = (

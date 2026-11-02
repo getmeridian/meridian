@@ -493,6 +493,8 @@ When bulk disabling, deletion, or an expiry change removes access, the service r
 
 ## Access profiles
 
+`GET /api/users/{username}/cut-off` requires `people.read` and `people.private`. Its review includes inbounds lost through a profile change while their flow-block receipts remain unresolved, even if the person is still active. A subsequent `--cut-off` resets those inbounds too.
+
 Profiles are reviewed topology; membership belongs to the operator in the service. The built-in `default` profile grants every exit and path, including future additions. A person may belong to several profiles; their grants are combined. Fleets without named profiles keep the same node documents and subscriptions.
 
 Create or replace grants with `meridian profile add|set`; `profile list` shows grants and membership counts. References are `exit:ID`, `gateway:ID`, or the compiler's stable `inbound:...` and `endpoint:...` IDs. Unknown and retired references fail review. Gateway bridge inbounds cannot be assigned to people. A public endpoint grants its authentication inbound, so every other public connection sharing that inbound is granted too. `--empty` creates a profile with no connections.
