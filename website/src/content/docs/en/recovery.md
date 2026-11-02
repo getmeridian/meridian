@@ -85,13 +85,14 @@ meridian restore --to 198.51.100.30
 
 Every machine that manages the fleet saves an encrypted snapshot of the control service after each change, so the newest one is already on your machine. Restore reviews what it will do, installs the control service on the new server from that snapshot, and applies the fleet: every exit's agent enrolls with the new server, and clients keep their accounts, limits, and traffic.
 
-Restore keeps your local intent when its committed generation is at least as new as the snapshot's deposited copy. It also keeps the snapshot's record of earlier profile use, even if the last profile has since been removed.
+Restore uses the fleet files on this machine when they are at least as new as the copy inside the snapshot, and the snapshot's copy otherwise.
 
-Restore checks the snapshot's fleet before profile compatibility or target access. `--force` keeps this check. Choose this fleet's snapshot, or restore another fleet's snapshot into a different empty context.
+Before it touches the new server, restore refuses two kinds of snapshot, even with `--force`:
 
-In an empty context, local fleet files are imported before remote restore confirmation. Meridian saves profile use history from the authenticated snapshot database and clears any unfinished restore carried from the depositing machine. If review fails or you decline, these corrected local files remain. Finished restore records are retained. An existing `cluster.yml` without topology is accepted; changes to that file after loading are refused.
+- **Another fleet's snapshot.** Pick this fleet's snapshot, or restore the other fleet into a new context (`--context NAME`).
+- **Different access profiles.** If the snapshot's profiles differ from the ones on this machine, pick a snapshot that matches, or restore into a new context and review the profile change with `meridian apply` afterwards.
 
-Access profiles must match before the snapshot is staged or the target is contacted. A saved declaration fingerprint compares profile IDs and grants; changes in how an unchanged grant expands remain covered by the topology review. Without a fingerprint, the compiled grant maps must match exactly. A mismatch is refused even with `--force`: choose a matching snapshot, or restore into a new context (`--context NAME`) using the snapshot's matching fleet files, then review the desired saved change with `meridian apply` after restore. Restore checkpoints retain the reviewed declarations, so a resumed restore cannot apply a later profile edit. Older checkpoints without this review need the original snapshot again.
+On a machine that didn't have this fleet's files, Meridian keeps the ones it read from the snapshot even if you stop at the review, so the next run starts from the same point.
 
 - **Links**: on a bare IP, every subscription URL contains the control server's address, so each link changes; restore prints every client's new link to send. With a domain, links stay the same once you point its DNS record at the new server; the review names the records.
 - **Old server**: restore refuses while the old control server still answers, because two control services would split the fleet. If it answers but you no longer trust it (seized, for example), pass `--force`.
