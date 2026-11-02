@@ -7,14 +7,23 @@ from pydantic import TypeAdapter
 from meridian.control.errors import ServiceError
 from meridian.control.models import ServiceSettings
 from meridian.control.store import Store
-from meridian.core.access_profiles import DEFAULT_ACCESS_PROFILE, profile_declarations_hash
+from meridian.core.access_profiles import DEFAULT_ACCESS_PROFILE, AccessProfileMap, profile_declarations_hash
 from meridian.core.agent_types import Sha256Hex
+from meridian.core.models import CoreModel
 
 DECLARATIONS_META = "access_profile_declarations_hash"
 _HASH = TypeAdapter(Sha256Hex)
 _REVIEW_HINT = (
     "Edit profiles with meridian profile or meridian fleet import, or run meridian apply to review a saved change."
 )
+
+
+class SnapshotProfileAccess(CoreModel):
+    """Profile evidence read from a snapshot without opening a service or migrating its database."""
+
+    access_profiles: AccessProfileMap
+    declarations_hash: Sha256Hex | None
+    has_non_default_memberships: bool
 
 
 def read_profile_declarations_hash(store: Store) -> str | None:

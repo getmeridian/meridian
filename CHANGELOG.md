@@ -57,6 +57,10 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Preserve deposited profile history when restore keeps local topology, and
+  refuse mismatched snapshot profiles before staging, uploading, or installing.
+  Pin reviewed declarations through restore checkpoints and fence matching
+  legacy profile adoption without approving later live edits.
 - Fence setup and every imperative apply against reviewed profile declarations
   before local saves or remote writes. Keep topology expansion of unchanged
   grants working, and re-check the fingerprint atomically with service settings.

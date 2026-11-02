@@ -35,6 +35,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - **People triage facts are derived reads** — records expose never-used, exact quota percentage, and default attention reasons from shared predicates; no filter flags or request data are stored.
 
 ## What's done well
+- **Snapshot profile reads are passive** — deserialize authenticated bytes in memory; never instantiate a service or migrate a database to judge restore compatibility.
 - **Flow events record real transitions** — repeated hellos, reports, and unrelated revisions leave a confirmed receipt and its event history unchanged.
 - A revision is signed only when the resources' hash or the signing certificate changes, so repeated applies never wake agents.
 - A token's public ID finds its row, so its hash is compared once in constant time (against a dummy when none matches); a refused CSR rolls back and never burns the enrollment token.

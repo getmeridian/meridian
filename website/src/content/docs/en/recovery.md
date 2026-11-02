@@ -85,6 +85,10 @@ meridian restore --to 198.51.100.30
 
 Every machine that manages the fleet saves an encrypted snapshot of the control service after each change, so the newest one is already on your machine. Restore reviews what it will do, installs the control service on the new server from that snapshot, and applies the fleet: every exit's agent enrolls with the new server, and clients keep their accounts, limits, and traffic.
 
+Restore keeps your local intent when its committed generation is at least as new as the snapshot's deposited copy. It also keeps the snapshot's record of earlier profile use, even if the last profile has since been removed.
+
+Access profiles must match before the snapshot is staged or the target is contacted. A saved declaration fingerprint compares profile IDs and grants; changes in how an unchanged grant expands remain covered by the topology review. Without a fingerprint, the compiled grant maps must match exactly. A mismatch is refused even with `--force`: choose a matching snapshot, or restore into a new context (`--context NAME`) using the snapshot's matching fleet files, then review the desired saved change with `meridian apply` after restore. Restore checkpoints retain the reviewed declarations, so a resumed restore cannot apply a later profile edit. Older checkpoints without this review need the original snapshot again.
+
 - **Links**: on a bare IP, every subscription URL contains the control server's address, so each link changes; restore prints every client's new link to send. With a domain, links stay the same once you point its DNS record at the new server; the review names the records.
 - **Old server**: restore refuses while the old control server still answers, because two control services would split the fleet. If it answers but you no longer trust it (seized, for example), pass `--force`.
 - **Keys**: the new server gets a new fleet authority and new signing keys, so a seized server can't sign anything your nodes accept. The web panel owner sets a new password through the link `meridian panel` prints.

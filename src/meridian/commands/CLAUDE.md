@@ -24,6 +24,7 @@
 - `client remove|reissue --cut-off` discloses every affected node and other people's reconnects before confirming, and keeps typed per-node outcomes and new links even on failure.
 
 ## Pitfalls
+- **Restore profile checks precede target access** — validate the snapshot before resolving or registering its target, and never give changed live declarations an automatic review after installation.
 - **Assignment guards cover both entry points** — single-person and bulk profile assignment require the Meridian backend before directory or service access, even for default membership.
 - **Profile outages keep their uncertainty** — plan retains unavailable evidence; apply and fleet import may skip an unavailable review only before profiles have ever been used.
 - **Profile lookups may translate errors** — catch MeridianError around the directory adapter as well as API calls; the shared preview table owns the revocation warning.

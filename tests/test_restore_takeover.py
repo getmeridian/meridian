@@ -276,6 +276,7 @@ def test_the_takeover_needs_yes_or_a_terminal(
         restore_command, "_open_snapshot", lambda explicit, *, recovery_key: SimpleNamespace(snapshot=None)
     )
     monkeypatch.setattr(restore_command, "_fleet_state", lambda cluster, snapshot: cluster)
+    monkeypatch.setattr(restore_command, "review_restore_profiles", lambda cluster, database: None)
     monkeypatch.setattr(restore_command, "_render", lambda review, registry: None)
     monkeypatch.setattr(restore_command, "_done", lambda outcome: None)
     monkeypatch.setattr(restore_command, "has_tty", lambda: tty)

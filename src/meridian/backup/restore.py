@@ -28,6 +28,11 @@ from pathlib import Path
 
 from meridian import __version__, config
 from meridian.backup import BackupError
+from meridian.backup.profile_restore import (
+    RestoreProfileReview,
+    refuse_profile_restore_mismatch,
+    review_restore_profiles,
+)
 from meridian.backup.pull import saved_snapshots
 from meridian.cluster import ClusterConfig, ControlRestore, RestoreStep
 from meridian.compiler.deployment import deployment_server_refs
@@ -36,6 +41,7 @@ from meridian.contexts import Superseded, context_home, mark_superseded, superse
 from meridian.control.client import ControlClient, ControlServiceAuthError, ControlServiceError
 from meridian.control.restore import stage_restored_database
 from meridian.control.snapshot import Snapshot, SnapshotError, SnapshotHeader, read_header
+from meridian.core.access_profiles import profile_declarations_hash
 from meridian.core.errors import LocalStateError
 from meridian.core.inputs import is_ip
 from meridian.core.setup import SetupDraft
@@ -90,6 +96,7 @@ class RestoreReview:
     epoch_floor: int = 0  # the newest epoch this machine has seen; the restore goes one above it
     # Other contexts holding a copy of this fleet on these servers (name -> hosts): superseded once it runs.
     takeover: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    profile_access: RestoreProfileReview | None = None
 
     @property
     def header(self) -> SnapshotHeader | None:
@@ -151,8 +158,12 @@ class ControlRestorer:
         from_ref = restore.from_server_ref if restore is not None else intent.control.server_ref
         from_entry = self._registry.find(from_ref)
         from_address = restore.from_address if restore is not None else self._address(from_entry)
-        if restore is None or not restore.reached("staged"):
+        if source.snapshot is not None or restore is None or not restore.reached("staged"):
             self._check_snapshot(source)
+        profile_access = review_restore_profiles(
+            self.cluster, source.snapshot.database if source.snapshot is not None else None
+        )
+        if restore is None or not restore.reached("staged"):
             if not force and service_answers(self.cluster.panel.url, self.cluster.panel.api_token):
                 raise BackupError(
                     "The old control service still answers.",
@@ -207,6 +218,7 @@ class ControlRestorer:
             fleet_epoch=restore.fleet_epoch if restore is not None and restore.reached("staged") else 0,
             epoch_floor=self._highest_known_epoch(source),
             takeover={name: tuple(held) for name, held in takeover.items()},
+            profile_access=profile_access,
         )
 
     def _highest_known_epoch(self, source: RestoreSource) -> int:
@@ -241,7 +253,15 @@ class ControlRestorer:
     # -- run ------------------------------------------------------------------------------
 
     def run(self, review: RestoreReview, apply: ApplyIntent) -> RestoreOutcome:
-        restore = self._start(review)
+        profile_access = review_restore_profiles(
+            self.cluster, review.source.snapshot.database if review.source.snapshot is not None else None
+        )
+        if profile_access.declarations_hash != profile_declarations_hash(review.intent.access_profiles) or (
+            review.profile_access is not None
+            and profile_access.declarations_hash != review.profile_access.declarations_hash
+        ):
+            refuse_profile_restore_mismatch()
+        restore = self._start(review, profile_access)
         self._take_over(review)
         conn = self._connection(review.target)
         target = review.target.name or review.target.host
@@ -299,8 +319,12 @@ class ControlRestorer:
             if superseded(home) is None:
                 mark_superseded(home, Superseded(by=config.CONTEXT, at=at))
 
-    def _start(self, review: RestoreReview) -> ControlRestore:
+    def _start(self, review: RestoreReview, profiles: RestoreProfileReview) -> ControlRestore:
         restore = self.in_progress
+        changed = False
+        if profiles.profiles_used and not self.cluster.access_profiles_used:
+            self.cluster.access_profiles_used = True
+            changed = True
         if restore is None:
             restore = ControlRestore(
                 started_at=_iso(self._now()),
@@ -309,8 +333,14 @@ class ControlRestorer:
                 from_address=review.from_address,
                 to_server_ref=review.target.id,
                 links_change=review.links_change,
+                profile_declarations_hash=profiles.declarations_hash,
             )
             self.cluster.control_restore = restore
+            changed = True
+        elif not restore.profile_declarations_hash:
+            restore.profile_declarations_hash = profiles.declarations_hash
+            changed = True
+        if changed:
             self._persist(self.cluster)
         return restore
 

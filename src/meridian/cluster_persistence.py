@@ -365,7 +365,7 @@ def _validate_cluster_structure(data: dict[str, Any]) -> None:
 
     for key in ("panel", "branding"):
         _require_mapping(data, key)
-    for key in ("subscription_page", "telegram", "control_migration"):
+    for key in ("subscription_page", "telegram", "control_migration", "control_restore"):
         _require_mapping(data, key, nullable=True)
 
     validate_cluster_v3_structure(data)

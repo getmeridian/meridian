@@ -515,6 +515,8 @@ Every unresolved receipt contributes its inbounds, regardless of its current rea
 
 Removing a profile still used by people is refused with its membership count. Move those people to other profiles first. Ordinary applies never replace membership. Snapshots preserve every person's memberships; a replacing user import preserves them when `profiles` is omitted. Fleet export carries declared people's current memberships as creation-only settings, so a new fleet can recreate them while existing people retain their operator-owned choices. Console-only people remain service data in the snapshot.
 
+Restore also preserves earlier profile use and refuses snapshot profiles that differ from local intent before staging or target access. It compares stored declarations, or the exact compiled map for an unstamped snapshot. Restore matching state first, then review the desired saved change with `meridian apply`; `--force` cannot bypass the match. See [Recovery](/en/recovery/).
+
 `plan` and `apply` review profiles held by the service as well as those in the proposed topology. Removing the last profile is reviewed and fenced, and is refused while anyone still belongs to it.
 
 Every apply path, including `setup --intent`, restarting setup, and imperative commands such as `client add` or `fleet contact`, checks declared profile IDs and grants against the service before saving topology or writing to servers. A saved but unapplied profile edit is refused: edit profiles with `meridian profile` or `meridian fleet import`, or run `meridian apply` to review the saved change. Changing protocols or relay camouflage may expand an unchanged `exit:` or `gateway:` grant; the topology command's own review covers that change.

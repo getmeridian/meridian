@@ -10,17 +10,19 @@ copy of `cluster.yml` and `servers.json` is restored into the context first.
 from __future__ import annotations
 
 import getpass
-import json
 import sys
-import tempfile
 from pathlib import Path
 
 import typer
 from rich.markup import escape
 
 from meridian import config
-from meridian.backup import BackupError
 from meridian.backup.keys import load_device_key, write_private
+from meridian.backup.profile_restore import (
+    load_deposited_cluster,
+    review_restore_profiles,
+    review_restored_profile_access,
+)
 from meridian.backup.pull import finished_restore, newer_saved_snapshot, saved_snapshots
 from meridian.backup.restore import ControlRestorer, RestoreOutcome, RestoreReview, RestoreSource
 from meridian.cluster import ClusterConfig
@@ -28,9 +30,11 @@ from meridian.commands._helpers import apply_reviewed_intent, load_cluster, pers
 from meridian.console import confirm, err_console, fail, has_tty, info, ok, warn
 from meridian.control.restore import read_deployer_state
 from meridian.control.snapshot import Snapshot, decrypt_snapshot
-from meridian.core.errors import LocalStateError, MeridianError
+from meridian.core.errors import MeridianError
+from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
 from meridian.servers import ServerRegistry
+from meridian.setup.runtime import SetupRuntime
 
 
 def run(
@@ -50,10 +54,21 @@ def run(
     cluster = load_cluster()
     resuming = cluster.control_restore is not None and cluster.control_restore.step != "done"
     if resuming and cluster.control_restore is not None and cluster.control_restore.reached("staged"):
-        source = RestoreSource(Path(cluster.control_restore.snapshot), None)
+        source = (
+            RestoreSource(Path(cluster.control_restore.snapshot), None)
+            if cluster.control_restore.profile_declarations_hash
+            else _open_snapshot(snapshot or cluster.control_restore.snapshot, recovery_key=recovery_key)
+        )
     else:
         source = _open_snapshot(snapshot, recovery_key=recovery_key)
-        cluster = _fleet_state(cluster, source.snapshot)
+        try:
+            cluster = _fleet_state(cluster, source.snapshot)
+        except MeridianError as exc:
+            fail(exc)
+    try:
+        review_restore_profiles(cluster, source.snapshot.database if source.snapshot is not None else None)
+    except MeridianError as exc:
+        fail(exc)
     registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     target = register_server(registry, resolve_server(registry, explicit_ip=to, user=user, port=ssh_port), name=name)
     restorer = ControlRestorer(cluster, registry, persist=persist_reviewed_apply, on_step=info)
@@ -71,12 +86,19 @@ def run(
         raise typer.Exit(1)
 
     def apply(state: ClusterConfig, intent: SetupIntent) -> None:
+        try:
+            setup = SetupRuntime(registry, cluster_loader=lambda: state).review(SetupDraft.from_intent(intent))
+            access_review = review_restored_profile_access(state, setup.plan)
+        except MeridianError as exc:
+            fail(exc)
         apply_reviewed_intent(
             state,
             registry,
             intent,
             failure="The restored fleet did not finish applying",
             hint="Run the same `meridian restore` again; it continues from here.",
+            expected_plan_hash=setup.review_hash,
+            access_review_hash=access_review.access_hash if access_review is not None else None,
         )
 
     try:
@@ -160,6 +182,8 @@ def _fleet_state(cluster: ClusterConfig, snapshot: Snapshot | None) -> ClusterCo
                     "meridian restore --to NEW-SERVER --context NAME",
                     hint_type="user",
                 )
+            carried = load_deposited_cluster(deposited.cluster_yml, deposited.servers_json, snapshot.header.fleet_id)
+            cluster.access_profiles_used = cluster.has_used_access_profiles or carried.has_used_access_profiles
         return cluster
     if deposited is None:
         fail(
@@ -173,7 +197,9 @@ def _fleet_state(cluster: ClusterConfig, snapshot: Snapshot | None) -> ClusterCo
             hint="Restore into an empty context: meridian restore --to NEW-SERVER --context NAME",
             hint_type="user",
         )
-    _check_deposit(deposited.cluster_yml, deposited.servers_json, snapshot.header.fleet_id)
+    restored = load_deposited_cluster(deposited.cluster_yml, deposited.servers_json, snapshot.header.fleet_id)
+    restored.control_restore = finished_restore(restored.control_restore)
+    review_restore_profiles(restored, snapshot.database)
     write_private(config.CLUSTER_CONFIG, deposited.cluster_yml)
     write_private(config.SERVER_PROFILES_FILE, deposited.servers_json)
     info(f"Restored this fleet's cluster.yml and servers.json from the snapshot into {config.HOME_DISPLAY}")
@@ -181,20 +207,6 @@ def _fleet_state(cluster: ClusterConfig, snapshot: Snapshot | None) -> ClusterCo
     # Snapshots from before deposits dropped it may carry the depositing machine's unfinished restore.
     restored.control_restore = finished_restore(restored.control_restore)
     return restored
-
-
-def _check_deposit(cluster_yml: str, servers_json: str, fleet_id: str) -> None:
-    """Refuse fleet files that would not load, or name another fleet, before writing them into the context."""
-    with tempfile.TemporaryDirectory() as scratch:
-        staged = Path(scratch) / "cluster.yml"
-        staged.write_text(cluster_yml, encoding="utf-8")
-        try:
-            deposited = ClusterConfig.load(staged)
-            json.loads(servers_json)
-        except (LocalStateError, ValueError) as exc:
-            raise BackupError(f"The snapshot's fleet files do not load: {exc}", category="bug") from exc
-    if deposited.fleet_id != fleet_id:
-        raise BackupError("The snapshot's fleet files name another fleet.", category="bug")
 
 
 def _render(review: RestoreReview, registry: ServerRegistry) -> None:

@@ -234,6 +234,7 @@ class ControlRestore:
     fleet_epoch: int = 0  # the epoch the restored service starts at
     staged_database: str = ""
     staged_sha256: str = ""
+    profile_declarations_hash: str = ""  # reviewed profile declarations, retained after the staged database goes
     links_change: bool = False  # bare-IP control: every subscription URL names the new address
     _extra: dict[str, Any] = field(default_factory=dict, repr=False)
 
@@ -446,6 +447,12 @@ class ClusterConfig:
             errors.append(f"control_migration.step is unknown: {self.control_migration.step}")
         if self.control_restore is not None and self.control_restore.step not in RESTORE_STEPS:
             errors.append(f"control_restore.step is unknown: {self.control_restore.step}")
+        if self.control_restore is not None:
+            declarations = self.control_restore.profile_declarations_hash
+            if not isinstance(declarations, str) or (
+                declarations and re.fullmatch(r"[0-9a-f]{64}", declarations) is None
+            ):
+                errors.append("control_restore.profile_declarations_hash must be empty or a SHA-256 hash")
 
         return errors
 
