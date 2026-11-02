@@ -179,6 +179,29 @@ def test_cut_off_keeps_lost_inbounds_when_a_later_change_replaces_the_receipt_re
     assert service._store.row("SELECT COUNT(*) FROM commands")[0] == 0
 
 
+@pytest.mark.parametrize("change", ["rotate", "reissue", "narrow-again"])
+def test_a_confirmed_profile_loss_never_rejoins_a_later_cut_off(service: ControlService, change: str):
+    from tests.test_user_flow_blocks import acknowledge
+
+    configure_profiles(service)
+    service.node_seen("main", "0.2.11", capabilities=["user_flow_blocking"])
+    person = service.put_user("person")
+    service.update_user("person", UserUpdate(profiles=["udp"]))
+    acknowledge(service)
+    assert [node.status for node in service.user_flow_blocks("person").nodes] == ["blocked"]
+    if change == "rotate":
+        service.rotate_credentials("person", expected_generation=person.credential_generation)
+    elif change == "reissue":
+        service.reissue_user("person")
+    else:
+        service.update_user("person", UserUpdate(profiles=["limited"]))
+    scope = service.cutoffs.scope("person")
+    lost_now = ["hy2"] if change != "narrow-again" else ["hy2", "vless"]
+    assert [(node.node_id, sorted(node.inbound_tags)) for node in scope.nodes] == [("main", lost_now)]
+    if change != "narrow-again":
+        assert scope.nodes[0].effect == "inbound_reset"
+
+
 @pytest.mark.parametrize("suffix", ["", "info", "json", "mihomo", "stash", "singbox"])
 def test_every_delivery_format_and_individual_links_exclude_ungranted_connections(service: ControlService, suffix: str):
     configure_profiles(service)
