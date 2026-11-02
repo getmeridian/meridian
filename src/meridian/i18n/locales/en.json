@@ -580,6 +580,7 @@
   "preview.invalid_user_agent": "Use a User-Agent of up to 512 characters, without line breaks or control characters.",
   "preview.invalid_accept": "Use an Accept header of up to 256 characters, without line breaks or control characters.",
   "preview.invalid_suffix": "Choose info, json, v2ray-json, mihomo, clash, stash, or singbox for the suffix.",
+  "preview.invalid_person": "Use an account name of 1 to 64 characters.",
   "preview.title": "{name}: subscription format",
   "language.auto": "Follow each person's browser",
   "language.confirm_json": "Pass --yes to change the default language in JSON mode.",

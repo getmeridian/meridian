@@ -580,6 +580,7 @@
   "preview.invalid_user_agent": "User-Agent должен содержать до 512 символов без переносов строк и управляющих символов.",
   "preview.invalid_accept": "Заголовок Accept должен содержать до 256 символов без переносов строк и управляющих символов.",
   "preview.invalid_suffix": "Для суффикса укажите info, json, v2ray-json, mihomo, clash, stash или singbox.",
+  "preview.invalid_person": "Имя аккаунта должно содержать от 1 до 64 символов.",
   "preview.title": "{name}: формат подписки",
   "language.auto": "По языку браузера пользователя",
   "language.confirm_json": "Чтобы изменить язык по умолчанию в режиме JSON, укажите флаг --yes.",

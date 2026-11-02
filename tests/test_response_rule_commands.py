@@ -6,17 +6,46 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from typer.testing import CliRunner
 
 from meridian.cli import app
 from meridian.cluster import ClusterConfig, PanelConfig
+from meridian.console import set_json_mode
 from meridian.control.models import ServiceSettings
+from meridian.core.languages import LANGUAGES, Language
 from meridian.core.schema import schema_model
+from meridian.i18n import catalog
 from tests.support.control_service import ADMIN_TOKEN
 from tests.support.text import unstyle
 from tests.support.token_service import serve_tokens
 from tests.support.topology import single_exit_intent
 from tests.test_response_rules import app_rule
+
+
+@pytest.mark.parametrize("locale", LANGUAGES)
+@pytest.mark.parametrize("person", ["", "x" * 65], ids=["empty", "too-long"])
+@pytest.mark.parametrize("json_mode", [False, True], ids=["human", "json"])
+def test_invalid_person_is_a_localized_user_error_before_fleet_access(
+    tmp_home: Path, locale: Language, person: str, json_mode: bool
+) -> None:
+    argv = ["--lang", locale, "fleet", "response-rules", "test", "--person", person]
+    if json_mode:
+        argv.append("--json")
+    with patch("meridian.commands.response_rules.load_topology_cluster") as load_cluster:
+        try:
+            result = CliRunner().invoke(app, argv)
+        finally:
+            set_json_mode(False)
+    load_cluster.assert_not_called()
+    assert result.exit_code == 2, repr(result.exception)
+    if json_mode:
+        envelope = json.loads(result.stdout)
+        schema_model("fleet-response-rules-test-envelope").model_validate_json(result.stdout)
+        assert envelope["errors"][0]["category"] == "user"
+        assert envelope["errors"][0]["message"] == catalog(locale)["preview.invalid_person"]
+    else:
+        assert catalog(locale)["preview.invalid_person"] in unstyle(result.output)
 
 
 def test_response_rule_command_reads_applied_rules_in_a_typed_json_envelope(tmp_home: Path) -> None:

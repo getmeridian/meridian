@@ -580,6 +580,7 @@
   "preview.invalid_user_agent": "User-Agent 最多 512 个字符，不可包含换行或控制字符。",
   "preview.invalid_accept": "Accept 响应类型最多 256 个字符，不可包含换行或控制字符。",
   "preview.invalid_suffix": "后缀请选择 info、json、v2ray-json、mihomo、clash、stash 或 singbox。",
+  "preview.invalid_person": "账户名应为 1 至 64 个字符。",
   "preview.title": "{name}：订阅格式",
   "language.auto": "跟随每个人的浏览器语言",
   "language.confirm_json": "在 JSON 模式下更改默认语言，请添加 --yes。",

@@ -522,7 +522,7 @@ meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --net
 `POST /api/delivery-policies/explain` 接受 `destination`、可选 `person`、`format`、`port`、`network`、`protocol`。需要 `delivery.explain`；指定用户时还需要 `people.read` 和 `people.private`。订阅预览中的策略详情或目的地解释需要私有权限，较低权限仅返回原有元数据。连接页面的 `/info` 可包含 `user.deliveryCapabilities`：格式名称、支持标志与省略代码，不含策略名称、个人覆盖、成员关系、目的地或连接详情。页面仅在内存中保留这些新鲜数据。
 
 
-**`fleet response-rules test`** 使用 `--user-agent UA`、可选的 `--accept TYPE`、`--person NAME`、`--suffix SUFFIX` 及 `--json` 读取已应用的应用规则，解释首个自定义或内置匹配、格式或拒绝、策略来源和脱敏后的响应头修改。输入临时保留，限 512/256 个字符；不会获取订阅、查询 DNS、注册设备或写入状态。规则在 `delivery.response_rules` 中编辑，通过 `fleet export` 导出并用 `fleet import` 审阅。[路由指南](/zh/split-routing/)说明字段、优先级和拒绝行为。
+**`fleet response-rules test`** 使用 `--user-agent UA`、可选的 `--accept TYPE`、`--person NAME`、`--suffix SUFFIX` 及 `--json` 读取已应用的应用规则，解释首个自定义或内置匹配、格式或拒绝、策略来源和脱敏后的响应头修改。输入临时保留，限 512/256 个字符；不会获取订阅、查询 DNS、注册设备或写入状态。`--person` 接受 1–64 个字符的账户名或显示名；空值或超长值会返回输入错误（退出码 2）。规则在 `delivery.response_rules` 中编辑，通过 `fleet export` 导出并用 `fleet import` 审阅。[路由指南](/zh/split-routing/)说明字段、优先级和拒绝行为。
 
 ### meridian context
 
