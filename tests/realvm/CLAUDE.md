@@ -14,6 +14,7 @@ Provisions real cloud VMs (Hetzner via `hcloud-python`), deploys Meridian agains
 - **Safety rails**: pre-provider verifier gate, `HCLOUD_TOKEN` gate, cost prompt, 5-VM cap, `try/finally` teardown, and label-based orphan sweep.
 
 ## Pitfalls
+- **A verifier registry entry is not a script** — check its file before provider access; CI environments must refuse provisioning too.
 - **Always teardown in `finally`** — the orchestrator does it; verify scripts must not hold the VM open on failure (except `--keep` explicitly).
 - **Hetzner server types deprecate** — CX22 was deprecated in 2025; harness defaults to `cx23`. Refresh topology YAMLs and `providers/hetzner.py::_HOURLY_EUR` when upstream sunsets a generation.
 - **Rich console ANSI in captured output** — `meridian fleet status` renders colors; prefer `meridian --json fleet status` in verify scripts for stable field access.

@@ -253,3 +253,31 @@ def test_realvm_refuses_a_checkout_without_an_agent_build_before_provider_access
         orchestrator.cmd_up(Namespace(topology="domain", keep=False))
 
     assert exc_info.value.code == 2
+
+
+@pytest.mark.parametrize("missing", ["mapping", "script"])
+def test_realvm_refuses_an_unwired_verifier_before_provider_access(
+    missing: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    if missing == "mapping":
+        monkeypatch.delitem(orchestrator.VERIFIERS, "single")
+    else:
+        monkeypatch.setitem(orchestrator.VERIFIERS, "single", "missing.sh")
+    monkeypatch.setattr(orchestrator, "require_agent_build", lambda: None)
+    monkeypatch.setattr(orchestrator, "make_provider", lambda _name: pytest.fail("the provider was reached"))
+
+    with pytest.raises(SystemExit) as exc_info:
+        orchestrator.cmd_up(Namespace(topology="single", keep=False))
+
+    assert exc_info.value.code == 2
+
+
+def test_realvm_refuses_ci_before_provider_access(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CI", "true")
+    monkeypatch.setattr(orchestrator, "require_agent_build", lambda: None)
+    monkeypatch.setattr(orchestrator, "make_provider", lambda _name: pytest.fail("the provider was reached"))
+
+    with pytest.raises(SystemExit) as exc_info:
+        orchestrator.cmd_up(Namespace(topology="single", keep=False))
+
+    assert exc_info.value.code == 2

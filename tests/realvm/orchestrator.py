@@ -182,6 +182,9 @@ def require_supported_topology(topology: Topology) -> None:
             f"Topology {topology.name!r} has no automated verifier; refusing to provision. "
             f"Supported: {', '.join(sorted(SUPPORTED_TOPOLOGIES))}"
         )
+    verifier = VERIFIERS.get(topology.name)
+    if not verifier or not (Path(__file__).parent / "verify" / verifier).is_file():
+        _fail(f"Topology {topology.name!r} has no verifier script; refusing to provision.")
     roles = [str(node.get("role", "")) for node in topology.nodes]
     if roles != TOPOLOGY_ROLES[topology.name]:
         _fail(f"Topology {topology.name!r} must define exactly one exit node; refusing to provision.")
@@ -384,6 +387,8 @@ def _fail(msg: str) -> NoReturn:
 
 
 def cmd_up(args: argparse.Namespace) -> int:
+    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+        _fail("Real-VM provisioning is local-only and cannot run in CI.")
     topology = load_topology(args.topology)
     require_supported_topology(topology)
     require_agent_build()
