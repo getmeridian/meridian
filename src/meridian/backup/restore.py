@@ -77,6 +77,18 @@ class RestoreSource:
     snapshot: Snapshot | None
 
 
+def check_snapshot_fleet(source: RestoreSource, fleet_id: str) -> None:
+    """Refuse a foreign snapshot before interpreting its deposited or service state."""
+    if source.snapshot is None:
+        raise BackupError("No snapshot to restore from.", category="user")
+    if source.snapshot.header.fleet_id != fleet_id:
+        raise BackupError(
+            f"{source.path.name} belongs to another fleet.",
+            hint="Pick this fleet's snapshot with --snapshot, or restore into another context (--context).",
+            category="user",
+        )
+
+
 @dataclass(frozen=True)
 class RestoreReview:
     """What `meridian restore` will do, shown before anything changes."""
@@ -240,15 +252,7 @@ class ControlRestorer:
         return max(epochs, default=0)
 
     def _check_snapshot(self, source: RestoreSource) -> None:
-        if source.snapshot is None:
-            raise BackupError("No snapshot to restore from.", category="user")
-        header = source.snapshot.header
-        if header.fleet_id != self.cluster.fleet_id:
-            raise BackupError(
-                f"{source.path.name} belongs to another fleet.",
-                hint="Pick this fleet's snapshot with --snapshot, or restore into another context (--context).",
-                category="user",
-            )
+        check_snapshot_fleet(source, self.cluster.fleet_id)
 
     # -- run ------------------------------------------------------------------------------
 

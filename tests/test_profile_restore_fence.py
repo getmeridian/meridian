@@ -174,6 +174,45 @@ def test_empty_context_keeps_derived_snapshot_state_after_restore_is_declined_or
     assert new_server.uploads == 0 and new_server.server is None
 
 
+@pytest.mark.parametrize("profiles", ["same", "different"])
+@pytest.mark.parametrize("resuming", [False, True], ids=["new-restore", "legacy-resume"])
+def test_foreign_snapshot_is_refused_before_profile_checks_or_target_access(
+    fleet, new_server: NewServer, monkeypatch: pytest.MonkeyPatch, profiles: str, resuming: bool
+):
+    cluster, path = fleet
+    snapshot = open_snapshot(path)
+    cluster.fleet_id = "0f1e2d3c-4b5a-4968-8776-655443322111"
+    if profiles == "different":
+        cluster.topology_intent = local_profile_intent(cluster.topology_intent)
+    if resuming:
+        cluster.control_restore = ControlRestore(step="staged", snapshot=str(path), to_server_ref="srv-b")
+    cluster.save()
+    saved = config.CLUSTER_CONFIG.read_bytes()
+    foreign = RestoreSource(path.with_name("another.snapshot"), snapshot)
+    monkeypatch.setattr(restore_command, "_open_snapshot", lambda *_args, **_kwargs: foreign)
+    with (
+        patch.object(
+            restore_command, "review_restore_profiles", wraps=restore_command.review_restore_profiles
+        ) as review,
+        patch.object(restore_command, "read_deployer_state", wraps=restore_command.read_deployer_state) as deposit,
+        patch("meridian.commands.resolve.resolve_server") as resolve,
+        patch("meridian.commands.server.register_server") as register,
+    ):
+        reply = CliRunner().invoke(
+            app, ["restore", "--to", "198.51.100.13", "--snapshot", str(foreign.path), "--force", "--yes"]
+        )
+    assert reply.exit_code == 2, reply.output
+    text = " ".join(unstyle(reply.output).split())
+    assert "another.snapshot belongs to another fleet" in text
+    assert "--snapshot" in text and "--context" in text
+    review.assert_not_called()
+    deposit.assert_not_called()
+    resolve.assert_not_called()
+    register.assert_not_called()
+    assert config.CLUSTER_CONFIG.read_bytes() == saved
+    assert new_server.uploads == 0 and new_server.server is None
+
+
 @pytest.mark.parametrize("mismatch", ["legacy-map", "empty-service-fingerprint", "same-map-different-declarations"])
 def test_restore_refuses_snapshot_profile_mismatch_before_staging_upload_or_install(
     fleet, new_server: NewServer, mismatch: str

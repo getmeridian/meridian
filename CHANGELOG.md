@@ -57,6 +57,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   for a leaked link, and optional `--cut-off` ends existing flows too.
 
 #### Fixed
+- Refuse another fleet's snapshot before profile checks or target registration,
+  preserving the existing user-facing restore error on fresh and resumed runs.
 - Keep snapshot profile history and clear carried unfinished checkpoints when
   importing fleet files into an empty restore context, even if review fails
   or the remote restore is declined.

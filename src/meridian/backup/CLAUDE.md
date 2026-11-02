@@ -13,6 +13,7 @@
 - The pull's own client never reports its writes, so a pull cannot trigger another.
 
 ## Pitfalls
+- **Restore checks fleet identity first** — share the foreign-snapshot refusal with the CLI before parsing deposits or profiles, and before registering or contacting a target.
 - **Restore reviews capture scalar fingerprints** — frozen intents still contain mutable grant lists; compare the reviewed fingerprint again before starting, rather than hashing only the current review object.
 - **Restore keeps profile declarations reviewed** — compare the snapshot fingerprint before staging or target registration; unstamped snapshots need the same compiled grants, and checkpoints pin declarations through every resume.
 - **Retained local intent inherits profile history** — OR the deposited cluster's effective usage into the local flag; matching legacy maps adopt a fingerprint under their unchanged access hash, while fingerprinted restores keep the runtime's declaration fence.

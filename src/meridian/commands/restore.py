@@ -24,7 +24,7 @@ from meridian.backup.profile_restore import (
     review_restored_profile_access,
 )
 from meridian.backup.pull import finished_restore, newer_saved_snapshot, saved_snapshots
-from meridian.backup.restore import ControlRestorer, RestoreOutcome, RestoreReview, RestoreSource
+from meridian.backup.restore import ControlRestorer, RestoreOutcome, RestoreReview, RestoreSource, check_snapshot_fleet
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import apply_reviewed_intent, load_cluster, persist_reviewed_apply
 from meridian.console import confirm, err_console, fail, has_tty, info, ok, warn
@@ -52,20 +52,21 @@ def run(
     from meridian.commands.server import register_server
 
     cluster = load_cluster()
-    resuming = cluster.control_restore is not None and cluster.control_restore.step != "done"
-    if resuming and cluster.control_restore is not None and cluster.control_restore.reached("staged"):
+    restore = cluster.control_restore
+    staged_resume = restore is not None and restore.step != "done" and restore.reached("staged")
+    if staged_resume and restore is not None:
         source = (
-            RestoreSource(Path(cluster.control_restore.snapshot), None)
-            if cluster.control_restore.profile_declarations_hash
-            else _open_snapshot(snapshot or cluster.control_restore.snapshot, recovery_key=recovery_key)
+            RestoreSource(Path(restore.snapshot), None)
+            if restore.profile_declarations_hash
+            else _open_snapshot(snapshot or restore.snapshot, recovery_key=recovery_key)
         )
     else:
         source = _open_snapshot(snapshot, recovery_key=recovery_key)
-        try:
-            cluster = _fleet_state(cluster, source.snapshot)
-        except MeridianError as exc:
-            fail(exc)
     try:
+        if source.snapshot is not None and cluster.fleet_id:
+            check_snapshot_fleet(source, cluster.fleet_id)
+        if not staged_resume:
+            cluster = _fleet_state(cluster, source.snapshot)
         review_restore_profiles(cluster, source.snapshot.database if source.snapshot is not None else None)
     except MeridianError as exc:
         fail(exc)
