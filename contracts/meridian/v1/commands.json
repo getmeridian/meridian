@@ -1130,6 +1130,77 @@
       "argv": [
         "client",
         "bulk",
+        "set-profiles"
+      ],
+      "command": "client.bulk.set-profiles",
+      "data_schema": "client-bulk",
+      "description": "Review profile membership and lost access for the same frozen selection.",
+      "envelope_schema": "client-bulk-set-profiles-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "review or durable receipt returned",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--profile",
+        "--search",
+        "--status",
+        "--tag",
+        "--expiring-within",
+        "--quota-at-least",
+        "--never-used",
+        "--attention",
+        "--attention-reason",
+        "--lifecycle",
+        "--sort",
+        "--order",
+        "--person",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "review or durable receipt returned",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "bulk",
         "tag"
       ],
       "command": "client.bulk.tag",
@@ -1912,6 +1983,7 @@
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
+        "--profile",
         "--limit",
         "--reset",
         "--expires",
@@ -3449,6 +3521,295 @@
       "stability": "stable",
       "statuses": [
         "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "profile",
+        "add",
+        "PROFILE"
+      ],
+      "command": "profile.add",
+      "data_schema": "profile-edit",
+      "description": "Add a named profile after reviewing its authentication grants.",
+      "envelope_schema": "profile-add-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "access profiles were read or reviewed; no grants changed; reviewed grants were applied",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--grant",
+        "--empty",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "access profiles were read or reviewed",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "no grants changed",
+          "status": "no_changes"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "reviewed grants were applied",
+          "status": "changed"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "no_changes",
+        "changed",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "profile",
+        "list"
+      ],
+      "command": "profile.list",
+      "data_schema": "profile-list",
+      "description": "List reviewed grants and service-owned membership counts.",
+      "envelope_schema": "profile-list-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "access profiles were read or reviewed; no grants changed; reviewed grants were applied",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "access profiles were read or reviewed",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "no grants changed",
+          "status": "no_changes"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "reviewed grants were applied",
+          "status": "changed"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "no_changes",
+        "changed",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "profile",
+        "remove",
+        "PROFILE"
+      ],
+      "command": "profile.remove",
+      "data_schema": "profile-edit",
+      "description": "Remove an unused profile; default always grants the whole fleet.",
+      "envelope_schema": "profile-remove-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "access profiles were read or reviewed; no grants changed; reviewed grants were applied",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "access profiles were read or reviewed",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "no grants changed",
+          "status": "no_changes"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "reviewed grants were applied",
+          "status": "changed"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "no_changes",
+        "changed",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "profile",
+        "set",
+        "PROFILE"
+      ],
+      "command": "profile.set",
+      "data_schema": "profile-edit",
+      "description": "Replace a profile's grants; every member's effective access is reviewed.",
+      "envelope_schema": "profile-set-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "access profiles were read or reviewed; no grants changed; reviewed grants were applied",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--grant",
+        "--empty",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "access profiles were read or reviewed",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "no grants changed",
+          "status": "no_changes"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "reviewed grants were applied",
+          "status": "changed"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "no_changes",
+        "changed",
         "failed"
       ]
     },

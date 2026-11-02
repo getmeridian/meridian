@@ -8,7 +8,8 @@ from pydantic import BaseModel
 
 from meridian.control.enrollment import token_sha256
 from meridian.control.errors import ServiceError
-from meridian.control.models import ScopeRequirement, UserRecord
+from meridian.control.models import RevisionRecord, ScopeRequirement, UserRecord
+from meridian.control.profile_privacy import visible_profile_revision
 from meridian.control.route_types import ApiRoute
 from meridian.control.tokens import ROOT, WEB_OWNER, Caller, unauthenticated
 from meridian.control.ui_routes import UiRequest, owner_session
@@ -81,11 +82,11 @@ def authorize_body(request: AuthRequest, body: BaseModel) -> None:
 
 
 def visible_user(user: UserRecord, caller: Caller) -> UserRecord:
-    changes: dict[str, str] = {}
+    changes: dict[str, Any] = {}
     if not caller.allows("people.credentials"):
         changes.update(uuid="", sub_token="")
     if not caller.allows("people.private"):
-        changes.update(note="", tag="")
+        changes.update(note="", tag="", profiles=[])
     return user.model_copy(update=changes) if changes else user
 
 
@@ -93,6 +94,8 @@ def visible_result(value: Any, caller: Caller) -> Any:
     """Apply the same credential rules to people nested in any typed API read or mutation result."""
     if isinstance(value, UserRecord):
         return visible_user(value, caller)
+    if isinstance(value, RevisionRecord):
+        return visible_profile_revision(value, private_allowed=caller.allows("people.private"))
     if isinstance(value, BaseModel):
         changes = {}
         for name in type(value).model_fields:

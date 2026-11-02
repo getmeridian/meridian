@@ -15,7 +15,9 @@ from meridian.core.topology import ProtocolKind
 USER_AGENT_MAX_LENGTH = 512
 ACCEPT_MAX_LENGTH = 256
 UserAgentFamily = Literal["mihomo", "stash", "singbox", "clash", "xray-json"]
-OmissionReason = Literal["unsupported_format", "disabled_endpoint", "status_placeholder", "availability_placeholder"]
+OmissionReason = Literal[
+    "unsupported_format", "disabled_endpoint", "status_placeholder", "availability_placeholder", "access_profile"
+]
 EndpointRestriction = Literal["protocol", "fingerprint_copy"]
 ResponseKind = Literal["subscription", "page", "account_info"]
 StaleClient = Literal["outdated", "abandoned"]

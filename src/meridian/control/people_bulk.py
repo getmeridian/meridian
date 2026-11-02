@@ -10,6 +10,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
+from meridian.control.access_memberships import read_access_profiles, require_profiles
+from meridian.control.access_profiles import AccessProfileLedger
 from meridian.control.account_lifecycle import enforce_user_schedules
 from meridian.control.bulk_effects import BulkEffect, prepare_effect, prepare_undo, project_effect
 from meridian.control.errors import ServiceError
@@ -81,18 +83,23 @@ class BulkLedger:
         read_users: Callable[[], list[UserRecord]],
         compose: NodeDocumentComposer,
         clock: Callable[[], float],
+        access: AccessProfileLedger,
     ) -> None:
         self.store, self.people, self.events, self.traffic = store, people, events, traffic
         self.read_user, self.read_users, self.compose, self.clock = read_user, read_users, compose, clock
         self._previews: OrderedDict[str, FrozenPreview] = OrderedDict()
+        self.access = access
 
     def _nodes(self) -> str:
         return canonical_sha256(
             [
-                tuple(row)
-                for row in self.store.rows(
-                    "SELECT node_id, spec_sha256 FROM nodes WHERE spec IS NOT NULL ORDER BY node_id"
-                )
+                read_access_profiles(self.store),
+                [
+                    tuple(row)
+                    for row in self.store.rows(
+                        "SELECT node_id, spec_sha256 FROM nodes WHERE spec IS NOT NULL ORDER BY node_id"
+                    )
+                ],
             ]
         )
 
@@ -107,9 +114,13 @@ class BulkLedger:
             NodeSpec.model_validate_json(row[0])
             for row in self.store.rows("SELECT spec FROM nodes WHERE spec IS NOT NULL")
         ]
-        if (
-            any(spec.managed_inbounds for spec in specs)
-            and sum(user.status == "active" for user in after) > MAX_USERS_PER_INBOUND
+        policy = read_access_profiles(self.store)
+        after_documents = [with_users(spec, after, profiles=policy) for spec in specs]
+        if any(
+            len(resource["users"]) > MAX_USERS_PER_INBOUND
+            for document in after_documents
+            for resource in document
+            if resource["kind"] in ("xray_users", "hysteria2_users")
         ):
             raise ServiceError(
                 "invalid_request",
@@ -118,12 +129,15 @@ class BulkLedger:
                 400,
             )
         return sum(
-            canonical_sha256(with_users(spec, before)) != canonical_sha256(with_users(spec, after)) for spec in specs
+            canonical_sha256(with_users(spec, before, profiles=policy)) != canonical_sha256(document)
+            for spec, document in zip(specs, after_documents, strict=True)
         )
 
     def preview(self, request: BulkPreviewRequest) -> BulkPreview:
         request = BulkPreviewRequest.model_validate(request.model_dump(mode="json", exclude_unset=True))
         with self.store.lock:
+            if request.action.action == "set-profiles":
+                require_profiles(self.store, request.action.profiles)
             now = format_timestamp(self.clock())
             if request.usernames is not None:
                 names = request.usernames
@@ -170,6 +184,11 @@ class BulkLedger:
                             "expiry_blocks_enable" if effect.user.status == "expired" else "quota_blocks_enable"
                         )
                 fields = changed_fields(before, after)
+                access_change = (
+                    self.access.changed_membership(user, effects[name].user)
+                    if request.action.action == "set-profiles"
+                    else None
+                )
                 outcome: BulkOutcome = "cli_required" if command else "changed" if fields else "unchanged"
                 changes.append(
                     BulkPersonChange(
@@ -182,6 +201,8 @@ class BulkLedger:
                         outcome=outcome,
                         cli_command=command,
                         warnings=warnings,
+                        access=access_change,
+                        cut_off=self.access.loss_scope(access_change.lost) if access_change is not None else None,
                     )
                 )
             warnings = []

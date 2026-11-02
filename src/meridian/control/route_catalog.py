@@ -9,6 +9,8 @@ are omitted from the published OpenAPI document.
 from __future__ import annotations
 
 from meridian.control import capacity_routes, delivery_routes, metrics_routes, ui_routes
+from meridian.control.access_profile_models import ServiceSettingsWrite
+from meridian.control.access_profile_routes import ACCESS_PROFILE_ROUTES
 from meridian.control.api_models import (
     DeletedResource,
     DeployerStateReceipt,
@@ -59,8 +61,9 @@ from meridian.control.route_metadata import (
     CONFLICT,
     HISTORY_OFF,
     NOT_FOUND,
+    REVISION_RESPONSE_CAPABILITIES,
 )
-from meridian.control.route_types import WRITE, ApiRoute, ExtraCapability, route
+from meridian.control.route_types import WRITE, ApiRoute, ErrorResponse, ExtraCapability, route
 from meridian.control.ui_models import FleetView, ShareView
 from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.capacity import CapacityQuery, NodeCapacityView
@@ -159,11 +162,12 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         "/api/settings",
         WRITE,
         "put_settings",
-        ServiceSettings,
+        ServiceSettingsWrite,
         ServiceSettings,
         "Replace reviewed delivery and server settings.",
         credentials=False,
         capability="fleet.apply",
+        refusals=(ErrorResponse(409, ("profile_in_use", "stale_access")),),
     ),
     route(
         "GET",
@@ -308,6 +312,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
     ),
     *PERSON_ROUTES,
     *PEOPLE_ROUTES,
+    *ACCESS_PROFILE_ROUTES,
     route(
         "GET",
         "/api/endpoints/{endpoint_id}",
@@ -400,6 +405,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         "Propose a reviewed fleet revision without secrets.",
         credentials=False,
         capability="revisions.propose",
+        extra_capabilities=REVISION_RESPONSE_CAPABILITIES,
     ),
     route(
         "GET",
@@ -412,6 +418,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         credentials=False,
         capability="revisions.read",
         refusals=(NOT_FOUND,),
+        extra_capabilities=REVISION_RESPONSE_CAPABILITIES,
     ),
     route(
         "POST",
@@ -423,7 +430,10 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         "Approve a proposed fleet revision.",
         credentials=False,
         capability="revisions.approve",
-        extra_capabilities=(ExtraCapability("self_approval", "revisions.approve_own", "admin"),),
+        extra_capabilities=(
+            ExtraCapability("self_approval", "revisions.approve_own", "admin"),
+            *REVISION_RESPONSE_CAPABILITIES,
+        ),
         refusals=(NOT_FOUND, CONFLICT),
         description="Only an admin token may approve a revision proposed by the same caller.",
     ),
@@ -437,6 +447,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         "Record an approved revision's apply outcome.",
         credentials=False,
         capability="fleet.apply",
+        extra_capabilities=REVISION_RESPONSE_CAPABILITIES,
         refusals=(NOT_FOUND, CONFLICT),
     ),
     route(
@@ -595,13 +606,14 @@ API_ROUTES: tuple[ApiRoute, ...] = (
     route(
         "POST",
         "/api/subscription/preview",
-        "read",
+        ("read", "people"),
         delivery_routes.subscription_preview,
         SubscriptionPreviewRequest,
         SubscriptionPreview,
         "Explain which format a client would receive, without credentials.",
         credentials=False,
-        capability="fleet.read",
+        capability="people.read",
+        extra_capabilities=(ExtraCapability("access_profiles", "people.private", "people"),),
         refusals=(NOT_FOUND,),
     ),
     route(

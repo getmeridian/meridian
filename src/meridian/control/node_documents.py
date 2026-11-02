@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Any, Protocol
 
 from meridian.control.errors import ServiceError
 from meridian.control.models import ManagedInbound, NodeSpec, UserRecord, users_resource_id
+from meridian.core.access_profiles import may_use_inbound
 
 RetiredUsers = UserRecord | list[UserRecord] | None
 
@@ -14,7 +16,9 @@ class NodeDocumentComposer(Protocol):
     def __call__(self, *, retired: RetiredUsers = None) -> None: ...
 
 
-def with_users(spec: NodeSpec, users: list[UserRecord]) -> list[dict[str, Any]]:
+def with_users(
+    spec: NodeSpec, users: list[UserRecord], *, profiles: Mapping[str, Sequence[str]] | None = None
+) -> list[dict[str, Any]]:
     """Insert one users resource per managed inbound right after the Xray config."""
     resources = [resource.model_dump(mode="json") for resource in spec.resources]
     configs = [index for index, resource in enumerate(resources) if resource["kind"] == "xray_config"]
@@ -24,7 +28,13 @@ def with_users(spec: NodeSpec, users: list[UserRecord]) -> list[dict[str, Any]]:
         raise ServiceError("invalid_request", "Managed inbounds need exactly one xray_config resource.", 400)
     config_id = resources[configs[0]]["id"]
     active = [user for user in users if user.status == "active"]
-    inserted = [users_resource(inbound, active, config_id) for inbound in spec.managed_inbounds]
+    policy = spec.access_profiles if profiles is None else profiles
+    inserted = [
+        users_resource(
+            inbound, [user for user in active if may_use_inbound(user.profiles, policy, inbound.inbound_ref)], config_id
+        )
+        for inbound in spec.managed_inbounds
+    ]
     return [*resources[: configs[0] + 1], *inserted, *resources[configs[0] + 1 :]]
 
 

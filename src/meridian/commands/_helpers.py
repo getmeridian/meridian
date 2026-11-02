@@ -121,6 +121,7 @@ def reviewed_runtime(
     *,
     fence_holder: str | None = None,
     user_cut_off: Mapping[str, list[NodeCommandRecord]] | None = None,
+    access_review_hash: str | None = None,
 ) -> SetupRuntime:
     """A setup runtime bound to an already-loaded cluster that persists every checkpoint."""
     from meridian.setup.runtime import SetupRuntime
@@ -132,6 +133,7 @@ def reviewed_runtime(
         reporter=reporter,
         fence_holder=fence_holder,
         user_cut_off=user_cut_off,
+        access_review_hash=access_review_hash,
     )
 
 
@@ -146,6 +148,7 @@ def apply_reviewed_intent(
     on_unsaved: Callable[[ReviewedApplyPersistenceError], NoReturn] | None = None,
     fence_holder: str | None = None,
     user_cut_off: Mapping[str, list[NodeCommandRecord]] | None = None,
+    access_review_hash: str | None = None,
 ) -> ResourceExecutionResult:
     """Apply an edited intent with progress, failing with ``failure`` unless every resource converged.
 
@@ -155,7 +158,12 @@ def apply_reviewed_intent(
     try:
         with apply_progress(registry=registry) as reporter:
             result = reviewed_runtime(
-                registry, cluster, reporter, fence_holder=fence_holder, user_cut_off=user_cut_off
+                registry,
+                cluster,
+                reporter,
+                fence_holder=fence_holder,
+                user_cut_off=user_cut_off,
+                access_review_hash=access_review_hash,
             ).apply_intent(intent, expected_plan_hash=expected_plan_hash)
     except MeridianError as exc:
         if on_unsaved is not None and isinstance(exc, ReviewedApplyPersistenceError):

@@ -17,7 +17,12 @@
   M.bulkActionFields = function (kind) {
     var nodes = h("div", { class: "stack" }), error = h("p", { class: "form-error", role: "alert" }), read;
     function invalid(key) { error.textContent = M.t(key); return null; }
-    if (kind === "extend") {
+    if (kind === "set-profiles") {
+      var profiles = M.profileChoices([]);
+      nodes.appendChild(profiles.nodes);
+      profiles.ready.catch(function () {});
+      read = function () { var chosen = profiles.value(); return chosen ? { profiles: chosen } : null; };
+    } else if (kind === "extend") {
       var unit = choose("extend-unit", [["days", M.t("bulk.days")], ["months", M.t("bulk.months")]]);
       var amount = number("extend-amount", 3650);
       unit.addEventListener("change", function () { amount.max = unit.value === "days" ? "3650" : "120"; });

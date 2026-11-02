@@ -268,6 +268,33 @@ def bulk_renewal(
     run_bulk("renewal", locals())
 
 
+@bulk_app.command("set-profiles", rich_help_panel="Reviewed changes")
+def bulk_set_profiles(
+    profile: list[str] | None = typer.Option(
+        None, "--profile", metavar="PROFILE", help="Replace memberships; repeat for every profile to keep"
+    ),
+    q: Search = "",
+    status: Status = "",
+    tag: Tag = None,
+    expiring: Expiring = None,
+    quota: Quota = None,
+    never: Never = False,
+    attention: Attention = False,
+    reason: Reason = "",
+    lifecycle: Lifecycle = "",
+    sort: Sort = "name",
+    order: Order = None,
+    persons: Persons = None,
+    dry_run: DryRun = False,
+    yes: Yes = False,
+    _json: Json = False,
+) -> None:
+    """Review profile membership and lost access for the same frozen selection."""
+    from meridian.commands.client_bulk import run_bulk
+
+    run_bulk("set-profiles", locals())
+
+
 @bulk_app.command("delete", rich_help_panel="Reviewed changes")
 def bulk_delete(
     q: Search = "",

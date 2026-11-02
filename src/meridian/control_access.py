@@ -37,6 +37,7 @@ from meridian.control.models import (
     UserUpdate,
     UserUsage,
 )
+from meridian.core.access_profile_views import PersonAccess
 from meridian.core.account_schedule import LIFECYCLE_FIELDS, AccountLifecycleState, AccountSchedulePreview
 from meridian.core.attention import AttentionList
 from meridian.core.client_devices import DevicesRemoved
@@ -164,6 +165,9 @@ class ServiceAccessPanel:
     def user_connections(self, username: str) -> ClientConnections:
         return _translated(lambda: self._client.user_connections(username))
 
+    def user_access(self, username: str) -> PersonAccess:
+        return _translated(lambda: self._client.user_access(username))
+
     def attention(self) -> AttentionList:
         return _translated(self._client.attention)
 
@@ -237,6 +241,7 @@ class ServiceAccessPanel:
             id=record.user_id,
             short_uuid=record.sub_token,
             username=record.username,
+            profiles=record.profiles,
             vless_uuid=record.uuid,
             status=record.status.upper(),
             used_traffic_bytes=record.used_traffic_bytes,

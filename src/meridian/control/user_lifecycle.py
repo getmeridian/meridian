@@ -7,6 +7,7 @@ import uuid as uuid_module
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
+from meridian.control.access_memberships import save_memberships
 from meridian.control.account_lifecycle import validate_user_schedule
 from meridian.control.errors import ServiceError
 from meridian.control.models import UserCreate, UserRecord
@@ -79,3 +80,4 @@ def insert_user(store: Store, create: UserCreate, *, now: Callable[[], str]) -> 
         f"INSERT INTO users ({columns}) VALUES ({placeholders})",
         tuple(getattr(initial, field) for field in USER_FIELDS),
     )
+    save_memberships(store, initial.user_id, create.profiles)

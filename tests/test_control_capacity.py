@@ -173,7 +173,12 @@ def test_capacity_queries_fail_with_plain_validation_errors(tmp_path: Path, quer
 
 def test_capacity_migration_is_one_self_contained_step_from_22(tmp_path: Path) -> None:
     store = Store(tmp_path / "migration.db")
-    store.create("CREATE TABLE meta(key TEXT PRIMARY KEY,value TEXT); CREATE TABLE nodes(node_id TEXT PRIMARY KEY);")
+    store.create(
+        "CREATE TABLE meta(key TEXT PRIMARY KEY,value TEXT);"
+        "CREATE TABLE nodes(node_id TEXT PRIMARY KEY);"
+        "CREATE TABLE users(user_id TEXT PRIMARY KEY);"
+        "CREATE TABLE people_versions(user_id TEXT PRIMARY KEY, version INTEGER NOT NULL);"
+    )
     with store.transaction():
         store.set_meta("schema_version", "22")
         migrate(store)

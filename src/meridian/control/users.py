@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any
 
@@ -36,14 +37,26 @@ USER_SELECT = (
     " COALESCE(t.uplink_bytes, 0), COALESCE(t.downlink_bytes, 0),"
     " u.traffic_upload_offset_bytes, u.traffic_download_offset_bytes, u.traffic_period_carried_bytes,"
     " t.last_seen_at, t.first_traffic_at, t.last_traffic_node"
+    ", (SELECT json_group_array(profile) FROM (SELECT profile FROM user_access_memberships m"
+    " WHERE m.user_id = u.user_id ORDER BY profile))"
     " FROM users u LEFT JOIN traffic_totals t ON t.user_id = u.user_id"
 )
 
 
 def user_record(row: Any, *, now: datetime) -> UserRecord:
-    *stored, lifetime, up, down, up_offset, down_offset, carried, online_at, first_traffic_at, last_traffic_node = (
-        tuple(row)
-    )
+    (
+        *stored,
+        lifetime,
+        up,
+        down,
+        up_offset,
+        down_offset,
+        carried,
+        online_at,
+        first_traffic_at,
+        last_traffic_node,
+        profiles,
+    ) = tuple(row)
     usage = period_usage(up, down, upload_offset=up_offset, download_offset=down_offset, carried_bytes=carried)
     record = UserRecord.model_validate(
         {
@@ -54,6 +67,7 @@ def user_record(row: Any, *, now: datetime) -> UserRecord:
             "online_at": online_at,
             "first_traffic_at": first_traffic_at,
             "last_traffic_node": last_traffic_node,
+            "profiles": json.loads(profiles),
         }
     )
     return UserRecord.model_validate(

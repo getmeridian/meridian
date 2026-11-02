@@ -12,6 +12,7 @@ panel probes have no equivalent. Once Remnawave is gone the compiler emits these
 
 from __future__ import annotations
 
+from meridian.compiler.access_profiles import compile_access_profiles
 from meridian.compiler.builder import PlanBuilder
 from meridian.compiler.client_delivery import ALT_FINGERPRINT_TAG
 from meridian.compiler.errors import TopologyCompileError
@@ -72,6 +73,7 @@ def validate_meridian_backend(intent: SetupIntent) -> None:
 def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilder:
     """Return a builder whose panel-shaped resources are replaced by Meridian's own kinds."""
     old = builder.resources
+    access_profiles = compile_access_profiles(intent, old)
     renamed: dict[str, str | None] = {}
     replacements: dict[str, tuple[ResourcePayload, list[str], list[ResourcePostcondition]]] = {}
 
@@ -120,6 +122,7 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
                     server_ref=payload.server_ref,
                     agent_ref=agent_id,
                     profile=profile,
+                    access_profiles=access_profiles,
                 ),
                 [f"profile:{exit_id}", f"binding:{exit_id}", logical_id, *profile.inbound_refs],
                 extra=[agent_id],
@@ -136,6 +139,7 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
                     owner_ref=payload.owner_ref,
                     # A relay owns its Host, but the keys belong to the exit whose node serves it.
                     workload_ref=_workload_of(payload, old),
+                    inbound_ref=payload.inbound_ref if access_profiles else "",
                     remark=payload.remark,
                     protocol=payload.protocol,
                     address_server_ref=payload.address_server_ref,
@@ -157,7 +161,7 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
                 ControlUserPayload(
                     username=payload.username, creation_settings=intent.access.creation_settings.get(payload.username)
                 ),
-                [CONTROL_SERVICE_ID],
+                [CONTROL_SERVICE_ID, *([SERVICE_SETTINGS_ID] if access_profiles else [])],
                 _exists(account_id),
             )
         elif isinstance(payload, SubscriptionSettingsPayload):
@@ -165,6 +169,7 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
             replacements[SERVICE_SETTINGS_ID] = (
                 ServiceSettingsPayload(
                     owner_contact=intent.delivery.owner_contact,
+                    access_profiles=access_profiles,
                     servers=_server_settings(intent),
                     profile_title=payload.profile_title,
                     update_interval_hours=payload.update_interval_hours,

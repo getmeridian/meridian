@@ -15,6 +15,7 @@ from meridian.cluster import RealityKeyBinding
 from meridian.compiler.models import ConfigProfilePayload
 from meridian.config import XRAY_ARCHIVE_BYTES, XRAY_ASSET_MAP, XRAY_GITHUB_URL, XRAY_SHA256, XRAY_VERSION
 from meridian.control.models import ManagedInbound, NodeSpec, users_resource_id
+from meridian.core.access_profiles import AccessProfileMap
 from meridian.host_runtime import AGENT_LIB_DIR, CORE_BINARY, CORE_CONFIG, CORE_UNIT
 from meridian.reconciler.resources import ResourceReconcileError
 from meridian.xray_workload import ServiceRouteCredential, bridge_client_uuid, render_workload_config
@@ -33,15 +34,16 @@ _PINS = (
 _VISION: Final = "xtls-rprx-vision"
 
 
-def managed_inbounds(profile: ConfigProfilePayload) -> list[ManagedInbound]:
+def managed_inbounds(profile: ConfigProfilePayload, *, profiles: bool = False) -> list[ManagedInbound]:
     """The inbounds whose clients are the service's users: every one but gateway bridges."""
     return [
         ManagedInbound(
+            inbound_ref=ref if profiles else "",
             tag=inbound.tag,
             protocol="hysteria2" if inbound.protocol == "hysteria2" else "vless",
             flow=_VISION if inbound.protocol == "reality" else "",
         )
-        for inbound in profile.inbounds
+        for ref, inbound in zip(profile.inbound_refs, profile.inbounds, strict=True)
         if inbound.purpose != "bridge"
     ]
 
@@ -52,6 +54,7 @@ def build_node_spec(
     service_credentials: dict[str, ServiceRouteCredential] | None = None,
     *,
     arch: str,
+    access_profiles: AccessProfileMap | None = None,
 ) -> NodeSpec:
     """Return the agent resources for one workload on an `arch` machine; a gateway passes its edges' credentials."""
     asset = XRAY_LINUX_ASSETS.get(arch)
@@ -61,7 +64,7 @@ def build_node_spec(
             hint=f"Use a server with one of: {', '.join(sorted(XRAY_LINUX_ASSETS))}.",
             category="user",
         )
-    inbounds = managed_inbounds(profile)
+    inbounds = managed_inbounds(profile, profiles=bool(access_profiles))
     users = [users_resource_id(inbound.tag) for inbound in inbounds]
     pins = [pin[0] for pin in _PINS]
     resources: list[dict[str, Any]] = [
@@ -103,7 +106,9 @@ def build_node_spec(
             "restart_on": [*pins, "core-config", *users],
         }
     )
-    return NodeSpec.model_validate({"resources": resources, "managed_inbounds": inbounds})
+    return NodeSpec.model_validate(
+        {"resources": resources, "managed_inbounds": inbounds, "access_profiles": access_profiles or {}}
+    )
 
 
 def _with_bridge_clients(

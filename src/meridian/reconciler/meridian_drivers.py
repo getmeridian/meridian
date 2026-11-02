@@ -99,6 +99,7 @@ class MeridianDriverContext:
     agent_binary: Callable[[str], AgentBinary]
     sleep: Callable[[float], None] = time.sleep
     user_cut_off: Mapping[str, list[NodeCommandRecord]] = field(default_factory=dict)
+    access_review_hash: str | None = None
     _architectures: dict[str, str] = field(default_factory=dict, repr=False)
 
     def architecture(self, server_ref: str) -> str:
@@ -422,7 +423,13 @@ class NodeWorkloadDriver:
         credentials = self.context.service_credentials(payload.profile, action.generation)
         if (keys is None and _needs_keys(payload.profile)) or credentials is None:
             return _observation(action, exists=False, connected=False, remote_id="")
-        spec = build_node_spec(payload.profile, keys, credentials, arch=self.context.architecture(payload.server_ref))
+        spec = build_node_spec(
+            payload.profile,
+            keys,
+            credentials,
+            arch=self.context.architecture(payload.server_ref),
+            access_profiles=payload.access_profiles,
+        )
         with self.context.client() as client:
             status = client.node(payload.workload_ref)
         stored = status is not None and status.spec_sha256 == _spec_hash(spec)
@@ -446,7 +453,13 @@ class NodeWorkloadDriver:
                 f"Routing gateway {payload.workload_ref} dials an exit that has no Reality keys yet.",
                 hint="Apply the plan again; the exit workloads it routes to come first.",
             )
-        spec = build_node_spec(payload.profile, keys, credentials, arch=self.context.architecture(payload.server_ref))
+        spec = build_node_spec(
+            payload.profile,
+            keys,
+            credentials,
+            arch=self.context.architecture(payload.server_ref),
+            access_profiles=payload.access_profiles,
+        )
         with self.context.client() as client:
             status = client.put_node(payload.workload_ref, spec)
             deadline = time.monotonic() + WORKLOAD_APPLY_TIMEOUT
@@ -511,6 +524,7 @@ class ClientEndpointDriver:
             return None
         address = payload.address or self.context.address(payload.address_server_ref)
         return ClientEndpoint(
+            inbound_ref=payload.inbound_ref,
             remark=payload.remark,
             protocol=payload.protocol,
             address=address,
@@ -584,12 +598,16 @@ class ServiceSettingsDriver:
     @_uncertain_writes_are_unknown
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
         with self.context.client() as client:
-            client.put_settings(self._settings(action))
+            if self.context.access_review_hash is None:
+                client.put_settings(self._settings(action))
+            else:
+                client.put_settings(self._settings(action), expected_access_hash=self.context.access_review_hash)
         return ResourceApplyReceipt(remote_id="settings")
 
     def _settings(self, action: ResourceAction) -> ServiceSettings:
         payload = payload_of(action, ServiceSettingsPayload)
         return ServiceSettings(
+            access_profiles=payload.access_profiles,
             owner_contact=payload.owner_contact,
             profile_title=payload.profile_title,
             servers=payload.servers,

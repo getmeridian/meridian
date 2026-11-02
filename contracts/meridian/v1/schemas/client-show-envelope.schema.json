@@ -342,6 +342,17 @@
           "title": "Note",
           "type": "string"
         },
+        "profiles": {
+          "description": "Operator-owned access memberships; people/admin only.",
+          "items": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "type": "string"
+          },
+          "title": "Profiles",
+          "type": "array"
+        },
         "renewal_anchor_at": {
           "anyOf": [
             {
@@ -518,6 +529,17 @@
       "additionalProperties": false,
       "description": "Result for showing one client.",
       "properties": {
+        "access": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PersonAccess"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "client": {
           "$ref": "#/$defs/ClientDetail"
         },
@@ -617,6 +639,135 @@
         "message"
       ],
       "title": "MeridianError",
+      "type": "object"
+    },
+    "GrantedConnection": {
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "title": "Available",
+          "type": "boolean"
+        },
+        "granted_by": {
+          "items": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "type": "string"
+          },
+          "title": "Granted By",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "inbound_ref": {
+          "title": "Inbound Ref",
+          "type": "string"
+        },
+        "protocol": {
+          "enum": [
+            "reality",
+            "xhttp",
+            "wss",
+            "hysteria2"
+          ],
+          "title": "Protocol",
+          "type": "string"
+        },
+        "remark": {
+          "title": "Remark",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "remark",
+        "protocol",
+        "inbound_ref",
+        "granted_by",
+        "available"
+      ],
+      "title": "GrantedConnection",
+      "type": "object"
+    },
+    "GrantedInbound": {
+      "additionalProperties": false,
+      "properties": {
+        "granted_by": {
+          "items": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "type": "string"
+          },
+          "title": "Granted By",
+          "type": "array"
+        },
+        "inbound_ref": {
+          "title": "Inbound Ref",
+          "type": "string"
+        },
+        "inbound_tag": {
+          "title": "Inbound Tag",
+          "type": "string"
+        },
+        "node_id": {
+          "title": "Node Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "inbound_tag",
+        "inbound_ref",
+        "granted_by"
+      ],
+      "title": "GrantedInbound",
+      "type": "object"
+    },
+    "PersonAccess": {
+      "additionalProperties": false,
+      "properties": {
+        "connections": {
+          "items": {
+            "$ref": "#/$defs/GrantedConnection"
+          },
+          "title": "Connections",
+          "type": "array"
+        },
+        "inbounds": {
+          "items": {
+            "$ref": "#/$defs/GrantedInbound"
+          },
+          "title": "Inbounds",
+          "type": "array"
+        },
+        "profiles": {
+          "items": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Profiles",
+          "type": "array"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "profiles",
+        "inbounds",
+        "connections"
+      ],
+      "title": "PersonAccess",
       "type": "object"
     },
     "SubscriptionFormatUrl": {

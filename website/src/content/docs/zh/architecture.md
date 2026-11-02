@@ -174,3 +174,7 @@ agent 是适用于 x86-64 和 ARM64 服务器的静态程序。新版本带来�
 该目录在设置了 `$XDG_CONFIG_HOME` 时跟随它，`MERIDIAN_HOME` 则会覆盖它。在 `~/.config/meridian/` 不存在期间，若 `~/.meridian-v4/` 或 `~/.meridian/` 中存有集群（含有 `servers.json`），Meridian 也会使用它们。`~/.meridian/` 中的 Meridian 3.x 状态不会被触碰。
 
 一台电脑可以用上下文（`meridian context`）保存多组服务器。该目录就是 `default` 上下文；其他上下文在 `contexts/NAME/` 中保存自己的 `cluster.yml`、其备份、`servers.json`、`setup.json`、快照和设备密钥，而 SSH 密钥、更新检查缓存、语言选择和本地 Xray 运行时是共用的。选择顺序为 `--context`、`MERIDIAN_CONTEXT`、已保存的 `current-context`；`MERIDIAN_HOME` 固定使用单独一组。
+
+## 访问配置
+
+命名访问配置属于已审核拓扑，编译为稳定的认证入站引用。服务在独立表中保存成员关系，节点合成、订阅交付及预览使用同一个权威授权映射。apply 保留成员关系，default 授权整个部署。共享入站的公开连接共享认证权限。失去访问使用现有按密钥代次记录的流阻断回执，不保存连接观察数据。

@@ -113,6 +113,7 @@ class SetupRuntime:
         fence_factory: FenceFactory | None = None,
         fence_holder: str | None = None,
         user_cut_off: Mapping[str, list[NodeCommandRecord]] | None = None,
+        access_review_hash: str | None = None,
     ) -> None:
         self._registry = registry
         self._cluster_loader = cluster_loader
@@ -125,6 +126,7 @@ class SetupRuntime:
         # A caller already holding the lease (`meridian migrate`) applies under the same holder.
         self._fence_holder = fence_holder
         self._user_cut_off = user_cut_off if user_cut_off is not None else {}
+        self._access_review_hash = access_review_hash
         self._control_bootstrap = control_bootstrap or partial(
             bootstrap_reviewed_control_service,
             cancellation=cancellation,
@@ -309,6 +311,7 @@ class SetupRuntime:
                 connections=connections,
                 addresses=addresses,
                 user_cut_off=self._user_cut_off,
+                access_review_hash=self._access_review_hash,
             )
         )
         assert_complete_driver_registry(drivers)

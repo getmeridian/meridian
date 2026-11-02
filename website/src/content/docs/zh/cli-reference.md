@@ -100,6 +100,9 @@ JSON `data` 包含 `plan_hash`、`generation` 和 `actions[]` 带 `status: "conv
 
 ### meridian client
 
+`client set NAME --profile PROFILE` 在服务预览后替换配置成员关系；为每个需保留的配置重复 `--profile`。`--dry-run` 只预览，JSON 写入需要 `--yes`。限额、备注或语言请单独修改。`client bulk set-profiles --profile PROFILE` 使用其他批量操作相同的筛选及固定提交机制，包括可重复的 `--person`、`--search` 和 `--tag`。
+
+
 以下时间安排选项适用于 `client add` 和 `client set`。初始设置仅在创建时应用，后续 apply 会保留管理员修改。`client show` 的 JSON 包含类型明确的字段和服务计算的 `schedule`。`client set --dry-run` 返回 `data.schedule_preview` 与 `applied: false`；JSON 模式保存时间安排需添加 `--yes`。`client extend --days N` 对待激活账户只增加有效天数，不开始计时；激活后延长到期时间，并开始新一轮续期。
 
 | 选项 | 含义 |
@@ -246,6 +249,22 @@ meridian privacy set [--devices off|private|full] [--device-limit N] [--history 
 | `--json` | | 输出 `meridian.output/v1` envelope |
 
 单独运行 `privacy` 等同于 `privacy show`：显示设置、隐私说明和最近 50 次变更。`set` 只更改传入选项，说明提高级别会保存什么、降低级别会删除什么，并要求确认。相同值不会产生变更。JSON 的 `data` 包含设置和变更；`set` 还报告 `deleted` 中的删除记录数和 `rekeyed_devices` 中的转换数。日志保存令牌名称、`owner` 或 `root`、时间和前后值。恢复后清空私密设备记录，因为指纹密钥永远不包含在快照中。
+
+### meridian profile
+
+审核每个配置允许的出口与路径。`default` 始终允许全部访问，不能编辑或删除。
+
+```bash
+meridian profile add limited --grant exit:main --dry-run --json
+meridian profile add limited --grant exit:main --yes --json
+meridian profile set limited --grant inbound:main:main-reality --yes
+meridian profile set limited --empty --yes
+meridian profile list --json
+meridian profile remove limited --dry-run --json
+meridian profile remove limited --yes --json
+```
+
+重复 `--grant` 可组合 `exit:`、`gateway:`、`inbound:` 和 `endpoint:` 引用。`set` 替换整个授权列表，`--empty` 清空授权。预览列出获得或失去访问的用户、共享入站及会话断开范围。配置仍有成员时无法删除，须先调整成员关系。apply 保留现有成员关系、密钥和 URL。启用配置后，`plan`、`apply` 和部署导入都包含相同的访问预览。
 
 ### meridian server
 

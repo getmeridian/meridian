@@ -275,6 +275,17 @@
           "title": "Note",
           "type": "string"
         },
+        "profiles": {
+          "description": "Operator-owned access memberships; people/admin only.",
+          "items": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "type": "string"
+          },
+          "title": "Profiles",
+          "type": "array"
+        },
         "renewal_anchor_at": {
           "anyOf": [
             {

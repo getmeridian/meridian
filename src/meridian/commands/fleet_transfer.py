@@ -22,6 +22,7 @@ from meridian.commands._helpers import (
     require_intent,
     reviewed_runtime,
 )
+from meridian.commands.profile_review import export_creation_memberships, profile_review_paths, review_profile_access
 from meridian.console import confirm, err_console, error_context, fail, has_tty, info, is_json_mode, ok, warn
 from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_result
 from meridian.core.errors import MeridianError
@@ -58,10 +59,12 @@ def run_export() -> None:
 
     operation = OperationContext()
     with error_context(EXPORT_COMMAND, timer=operation.timer):
-        intent = require_intent(load_topology_cluster())
+        cluster = load_topology_cluster()
+        intent = require_intent(cluster)
         registry = ServerRegistry(config.SERVER_PROFILES_FILE)
         try:
             document = fleet_document(intent, registry)
+            export_creation_memberships(cluster, document)
             unsaved = [ref for ref in intent_server_refs(intent) if registry.find(ref) is None]
         except MeridianError as exc:
             fail(exc)
@@ -75,7 +78,11 @@ def run_export() -> None:
                     summary=Summary(text="Exported the fleet document", changed=False),
                     timer=operation.timer,
                 ),
-                reveal=_REVEALED_KEYS,
+                reveal=_REVEALED_KEYS
+                | {
+                    f"data.document.access.creation_settings.{name}"
+                    for name in document["access"].get("creation_settings", {})
+                },
             )
             return
         sys.stdout.write(dump_fleet_document(document))
@@ -132,10 +139,21 @@ def _import(source: str, *, dry_run: bool, yes: bool, forget_unreachable: bool, 
         review_hash=review.review_hash,
         retiring_resources=[binding.logical_id for binding in review.retiring],
     )
+    access_review = (
+        review_profile_access(cluster, review.plan) if current.access_profiles or updated.access_profiles else None
+    )
     if not is_json_mode():
         _print_review(source, changes, preview)
+        if access_review is not None:
+            from meridian.commands.profiles import print_access_review
+
+            print_access_review(access_review)
     if dry_run:
-        _emit_result(FleetImportResult(dry_run=True, changes=changes, review=preview), operation, text="Dry run")
+        _emit_result(
+            FleetImportResult(dry_run=True, changes=changes, review=preview, access_review=access_review),
+            operation,
+            text="Dry run",
+        )
         if not is_json_mode():
             info(t("fleet_import.dry_run", file=source))
         return
@@ -149,11 +167,12 @@ def _import(source: str, *, dry_run: bool, yes: bool, forget_unreachable: bool, 
         failure=t("fleet_import.failed"),
         hint=t("fleet_import.failed_hint"),
         expected_plan_hash=review.review_hash,
+        access_review_hash=access_review.access_hash if access_review is not None else None,
     )
     summary = t("fleet_import.applied", file=source, count=len(changes))
     applied = build_compiled_apply_result(result, exit_code=0, summary="Topology converged.")
     _emit_result(
-        FleetImportResult(changes=changes, review=preview, applied=applied),
+        FleetImportResult(changes=changes, review=preview, applied=applied, access_review=access_review),
         operation,
         text=f"Applied {len(changes)} changes",  # JSON stays English; the human line is translated
         changed=True,
@@ -287,7 +306,7 @@ def _emit_result(
             warnings=warnings or None,
             timer=operation.timer,
         ),
-        reveal=_REVEALED_KEYS | contact_paths,
+        reveal=_REVEALED_KEYS | contact_paths | profile_review_paths(result.access_review),
     )
 
 

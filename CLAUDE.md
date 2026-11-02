@@ -22,6 +22,7 @@ Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
 - **Roles:** relays are L4 TCP forwarders (Realm); one server can hold several roles, such as relay and exit.
 - **Contexts:** one machine keeps several fleets (`meridian context`); the home is the `default` one, others live in `contexts/NAME/`, and the SSH key is shared.
 - **Plan and apply:** every fleet is a reviewed `topology_intent` in `cluster.yml`; `meridian plan` / `apply` compile it and reconcile resource drivers.
+- **Access profiles:** topology owns named grants to stable inbounds; the service owns membership, and one eligibility rule serves node users, subscriptions, links, pages, and reviews. The built-in default grants the whole fleet.
 - **Control service (#95):** `meridian serve` (`ctld`) keeps users, traffic, revisions, and operator-owned privacy in SQLite (device limits and daily history default off), serves subscriptions and the owner's web console, and signs documents that each server's Rust agent (`netagent`) pulls over HTTPS; every change pulls an encrypted snapshot to the deployer (`meridian backup`, `restore`). `meridian migrate` moves a Remnawave fleet from an earlier beta onto it in place, keeping every link.
 - **Website:** Astro, with docs on Starlight (every page also served as Markdown for agents).
 - **Connection pages:** `ctld` serves every person's subscription URL as browser HTML or app configs, including console invitees; branding and exit countries travel through its settings, and shared PWA assets come from the installed package.

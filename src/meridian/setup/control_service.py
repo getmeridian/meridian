@@ -105,6 +105,7 @@ def meridian_drivers(
     connections: Mapping[str, ServerConnection],
     addresses: Mapping[str, str],
     user_cut_off: Mapping[str, list[NodeCommandRecord]] | None = None,
+    access_review_hash: str | None = None,
 ) -> ResourceDrivers:
     return build_meridian_drivers(
         MeridianDriverContext(
@@ -116,6 +117,7 @@ def meridian_drivers(
             server_addresses=addresses,
             agent_binary=agent_binary,
             user_cut_off=user_cut_off if user_cut_off is not None else {},
+            access_review_hash=access_review_hash,
         )
     )
 

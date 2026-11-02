@@ -84,8 +84,15 @@
       screen.shareSlot = h("div"); screen.usageSlot = h("div", { class: "card-slot" });
       screen.accessSlot = h("div", { class: "card-slot" }); screen.metadataSlot = h("div"); screen.dangerSlot = h("div");
       screen.flowSlot = h("div");
+      screen.profileSlot = h("div");
+      if (M.personProfiles) {
+        screen.profileCard = M.personProfiles(user, function (changed) {
+          completed(screen, changed, "person.saved_toast", M.displayName(name));
+        });
+        screen.profileSlot.appendChild(screen.profileCard.node);
+      }
       M.mount(screen.view, [back(), screen.head, screen.liveStatus, screen.shareSlot,
-        h("div", { class: "cards" }, screen.usageSlot, screen.accessSlot), screen.flowSlot, screen.metadataSlot,
+        h("div", { class: "cards" }, screen.usageSlot, screen.accessSlot), screen.profileSlot, screen.flowSlot, screen.metadataSlot,
         M.personHistory(name), M.devicesCard(user, function (changed) {
           if (!current(screen)) return;
           screen.version++;
@@ -93,6 +100,7 @@
         }), screen.dangerSlot]);
     }
     M.mount(screen.head, heading(user));
+    if (previous && screen.profileCard) screen.profileCard.refresh(user);
     M.mount(screen.flowSlot, flowCard(share.flow_blocks));
     M.mount(screen.usageSlot, usageCard(user, screen));
     if (!oldShare || JSON.stringify(oldShare) !== JSON.stringify(share)) {

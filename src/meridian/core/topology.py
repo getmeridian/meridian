@@ -9,6 +9,7 @@ from typing import Annotated, Final, Literal, Self
 
 from pydantic import Field, HttpUrl, ValidationInfo, field_validator, model_validator
 
+from meridian.core.access_profiles import AccessProfileIntent
 from meridian.core.client_limits import UserCreationSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import (
@@ -406,6 +407,9 @@ class SetupIntent(CoreModel):
     routes: list[OrderedRouteIntent] = Field(default_factory=list)
     default_egress_ref: TopologyIdValue
     access: AccessIntent
+    access_profiles: list[AccessProfileIntent] = Field(
+        default_factory=list, max_length=64, exclude_if=lambda profiles: not profiles
+    )
     delivery: DeliveryIntent = Field(default_factory=DeliveryIntent)
     harden: bool = True  # SSH key-only auth + fail2ban; off when other services share the servers
     # Pass each client's real address to Xray and the panel (PROXY protocol, X-Forwarded-For).
@@ -441,6 +445,9 @@ class SetupIntent(CoreModel):
 
     @model_validator(mode="after")
     def validate_references(self) -> Self:
+        profile_ids = [profile.id for profile in self.access_profiles]
+        if len(profile_ids) != len(set(profile_ids)):
+            raise ValueError("Access profile names must be unique.")
         unknown_servers = sorted(self.server_metadata.keys() - set(self.declared_server_refs()))
         if unknown_servers:
             raise ValueError("Server metadata refers to undeclared servers: " + ", ".join(unknown_servers) + ".")

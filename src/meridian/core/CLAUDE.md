@@ -1,6 +1,7 @@
 # core — Meridian API contracts
 
 ## Design decisions
+- **Access grants and membership have separate owners** — topology compiles named grants; service membership is nonempty and private, with default granting every managed inbound.
 - **Capacity has one projection** — `capacity.py` owns freshness, nullable current evidence, integer derived values, and recent/hourly bounds for service, fleet JSON, and console.
 - **Connection vocabulary stays in core** — session cut-off scopes and protocol names must not import service records, or shared apply contracts cycle through topology.
 - **People queries have one typed request** — paging controls never change which people match a selection.

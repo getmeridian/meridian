@@ -27,6 +27,8 @@ from pydantic import BaseModel, ValidationError
 
 from meridian import __version__
 from meridian.control import ui_routes
+from meridian.control.access_profile_models import ServiceSettingsWrite
+from meridian.control.access_profile_routes import ACCESS_PROFILE_OWNER_ROUTES
 from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.api_auth import authorize_api, authorize_body, bearer_token, visible_result, visible_user
 from meridian.control.api_models import DeletedResource, DeployerStateReceipt, UserList
@@ -326,7 +328,11 @@ class _Handler(BaseHTTPRequestHandler):
         return self._service.settings()
 
     def put_settings(self, _match: re.Match[str]) -> Any:
-        return self._service.put_settings(self._model(ServiceSettings))
+        request = self._model(ServiceSettingsWrite)
+        return self._service.put_settings(
+            ServiceSettings.model_validate(request.model_dump(exclude={"expected_access_hash"})),
+            expected_access_hash=request.expected_access_hash,
+        )
 
     def get_privacy(self, _match: re.Match[str]) -> Any:
         return self._service.privacy_state()
@@ -659,6 +665,7 @@ OWNER_STEP_UP: frozenset[Callable[..., Any]] = frozenset({_Handler.create_token,
 # take credentials, and a route added later stays closed to the console until it is listed here.
 OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
     {
+        *ACCESS_PROFILE_OWNER_ROUTES,
         _Handler.get_settings,
         _Handler.get_privacy,
         _Handler.put_privacy,

@@ -477,7 +477,7 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 响应头经过脱敏：URL 被替换，编码后的配置名称和通知只保留 `base64:` 前缀。预览不返回订阅正文、URI、密钥、私有备注或标签。User-Agent 最多 512 个 Unicode 字符，Accept 最多 256 个字符，两者均为单行。输入仅用于本次请求，不保存或回显，不注册设备，也不触发备份写入。
 
-`POST /api/subscription/preview` 需要 read 权限或管理者会话。发送 `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`，省略的请求头默认为空字符串。网页面板设置提供同样的表单，不接受 HWID 或设备请求头。对于通过 API 管理的端点，`enabled: false` 会将保存的端点从订阅中排除，并显示原因为 `disabled_endpoint`；默认值为 true，序列化时省略。经过审核的端点应用操作会恢复拓扑规定的连接提供方式。
+`POST /api/subscription/preview` 接受 read 或 people 权限，或管理者会话。配置了访问配置后，需要 people/admin 权限或管理者会话。发送 `{"username":"person","user_agent":"Hiddify/2","accept":"application/json","suffix":""}`，省略的请求头默认为空字符串。网页面板设置提供同样的表单，不接受 HWID 或设备请求头。对于通过 API 管理的端点，`enabled: false` 会将保存的端点从订阅中排除，并显示原因为 `disabled_endpoint`；默认值为 true，序列化时省略。经过审核的端点应用操作会恢复拓扑规定的连接提供方式。
 
 ## 审核批量更改
 
@@ -492,3 +492,26 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 `GET /api/people` 需要 people/admin 或所有者会话，返回 `users`、`total`、`population`、分类 `facets` 与 `next_cursor`。查询键：`q`、`status`、`tag`、`expires`、`quota`、`never`（0/1）、`attention`、`lifecycle`、`sort`、`order`、`limit`（1–500）、`cursor`。继续游标时保持相同筛选和排序。原有 `GET /api/users` 保留。查询响应不含凭据与私人备注；CLI 的 JSON 通过现有授权单人读取接口保留备注。
 
 批量停用、删除或到期变更使用户失去访问权限时，服务会为每位用户和每个受影响节点记录与单个用户操作相同的流阻断回执。连接密钥和订阅链接保持不变。节点确认已应用配置后才会阻断新流；已经开始的传输和 UDP 会话可能继续。删除用户记录后，回执仍保留，以便后续节点报告确认阻断。
+
+## 访问配置
+
+配置授权属于已审核的拓扑；用户的配置成员关系由服务保存并归运营者管理。内置 `default` 配置允许访问所有出口和路径，包括未来新增的连接。用户可属于多个配置，权限取并集。未定义命名配置的部署保持原有节点文档和订阅输出。
+
+使用 `meridian profile add|set` 创建或替换授权，`profile list` 显示授权及成员数量。支持 `exit:ID`、`gateway:ID`，以及编译器的稳定 `inbound:...` 和 `endpoint:...` 引用。未知或已移除的引用会在审核时被拒绝。网关与出口之间的内部桥接入站不能授权给用户。授权公开连接实际授权其认证入站，因此通向同一入站的其他公开连接也会被授权。`--empty` 可创建不允许任何连接的配置。
+
+使用 `client set person --profile limited --yes` 替换配置列表，为每个需要保留的配置重复 `--profile`。选择 `default` 可恢复完整访问。配置成员变更单独审核，与账户限额、备注及语言分开修改。控制台的访问配置卡显示已授权连接及授权原因，保留未保存的选择，并打开相同的固定预览。批量操作 **设置访问配置** 显示新增和失去的入站访问；提交时若用户或拓扑发生变化，整个操作会被拒绝。
+
+失去授权会从所有订阅格式、独立连接链接和连接页面移除该连接，同时从节点入站删除该用户。节点应用新版本后，现有的逐用户流阻断机制会阻止新连接及已打开会话中的新流。连接密钥、订阅 URL 和设备注册保持不变。已经开始的传输及 UDP 关联可能继续。预览列出受影响节点及彻底断开的范围：VLESS 会重启 Xray，让该节点上的所有入站和桥接连接重新连接；入站重置只影响所列入站，失败时可能退回整个 Xray 重启。经过审核的 `meridian node restart NODE --core --yes` 会通过让所有人重新连接来结束该节点上的现有传输。
+
+仍有成员的配置无法删除，错误会报告人数。请先将用户移到其他配置。普通 apply 不会覆盖成员关系。快照保留所有用户的配置；替换式用户导入在省略 `profiles` 时保留现有成员关系。部署导出将已声明用户的当前配置保存为仅用于创建的设置，新部署可据此创建用户，已存在用户继续保留运营者的选择。只在控制台创建的用户仍保存在服务快照中。
+
+成员关系属于运营者的私有数据：`people.private` 允许在用户和配置版本响应中读取 `profiles`。实际访问权限和成员数量需要 `people.read` 与 `people.private`；授权审核需要 `fleet.apply` 与 `people.private`。账户编辑使用 `people.edit`，批量分配使用 `people.batch` 与 `people.private`。订阅格式预览需要 `people.read`，启用配置后还需要 `people.private`。people/admin 预设包含所需私有权限；其他预设收到空的 `profiles` 列表，初始成员关系也会隐藏。配置仅保存成员关系，不保存客户端 IP、设备信息或连接观察数据。
+
+| 操作 | 含义 |
+| --- | --- |
+| `GET /api/access-profiles` | 已审核授权与私有成员数量；`people.read` 与 `people.private` |
+| `GET /api/users/{username}/access` | 含 `granted_by` 的实际入站与连接；`people.read` 与 `people.private`，不含密钥 |
+| `POST /api/access-profiles/preview` | 预览 `access_profiles` 映射及未来 `inbound_refs`；`fleet.apply` 与 `people.private`，不写入数据 |
+| `PATCH /api/users/{username}` | 使用 `people.edit` 设置非空 `profiles` 列表；省略字段会保留成员关系 |
+
+固定分配请向 `POST /api/people/bulk/preview` 发送 `{"usernames":["person"],"action":{"action":"set-profiles","profiles":["limited"]}}`，再提交其 ID 和哈希。配置预览返回 `access_hash`；`PUT /api/settings` 通过 `expected_access_hash` 接收该值，若成员关系已变化则拒绝应用。可选的 `existing_inbounds` 在升级旧节点规格时提供当前节点和标签的引用。预览请求数据不会持久保存。

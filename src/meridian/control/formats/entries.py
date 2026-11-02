@@ -75,6 +75,11 @@ def ordered(endpoints: list[ClientEndpoint]) -> list[ClientEndpoint]:
     return sorted(endpoints, key=lambda endpoint: (endpoint.position, endpoint.remark, endpoint.model_dump_json()))
 
 
+def presentation_pairs(endpoints: list[ClientEndpoint]) -> list[tuple[ClientEndpoint, ClientEndpoint]]:
+    """Pair each stored endpoint with the canonical name delivery assigns, including disabled entries."""
+    return list(zip(ordered(endpoints), presentation_endpoints(endpoints, include_disabled=True), strict=True))
+
+
 def presentation_endpoints(endpoints: list[ClientEndpoint], *, include_disabled: bool = False) -> list[ClientEndpoint]:
     """Unique, bounded display names in stable order, without changing stored endpoints."""
     listed = ordered(endpoints)

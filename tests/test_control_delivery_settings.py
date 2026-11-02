@@ -61,6 +61,7 @@ def test_settings_driver_carries_the_reviewed_interval_to_subscription_headers(t
     )
     cluster = ClusterConfig(panel=PanelConfig(url="https://198.51.100.10/control", sub_path="connect"))
     context = MagicMock(spec=MeridianDriverContext)
+    context.access_review_hash = None
     context.cluster = cluster
     with serve_control(tmp_path) as url:
         context.client = lambda: ControlClient(url, ADMIN_TOKEN, report_mutations=False)
@@ -121,6 +122,7 @@ def test_page_settings_driver_carries_branding_and_exit_countries(tmp_path: Path
         topology_intent=intent,
     )
     context = MagicMock(spec=MeridianDriverContext)
+    context.access_review_hash = None
     context.cluster = cluster
     with serve_control(tmp_path) as url:
         context.client = lambda: ControlClient(url, ADMIN_TOKEN, report_mutations=False)

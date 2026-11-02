@@ -19,6 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from meridian.control.access_profiles import AccessProfileLedger
 from meridian.control.account_lifecycle import enforce_user_schedules, preview_user_schedule
 from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.attention import read_attention
@@ -142,6 +143,7 @@ class ControlService:
         self.notices = NoticeLedger(self._store, self.events, read_user=self.get_user, clock=clock)
         self.languages = LanguageLedger(self._store, self.events)
         self.people = PeopleQueryEngine(self._store, clock=clock)
+        self.access = AccessProfileLedger(self._store, read_user=self._require_user, read_users=self.list_users)
         self.bulk = BulkLedger(
             self._store,
             self.people,
@@ -151,6 +153,7 @@ class ControlService:
             read_users=self.list_users,
             compose=self._compose_all,
             clock=clock,
+            access=self.access,
         )
         self.pages = ConnectionPages(self._store, self)
         with self._transaction():
@@ -177,8 +180,10 @@ class ControlService:
         """Checks every transaction in the block runs before its write (`Store.conditions`)."""
         return self._store.conditions(*checks)
 
-    def put_settings(self, settings: ServiceSettings) -> ServiceSettings:
-        return save_settings(self._store, settings)
+    def put_settings(self, settings: ServiceSettings, *, expected_access_hash: str | None = None) -> ServiceSettings:
+        return save_settings(
+            self._store, settings, compose=self._compose_all, expected_access_hash=expected_access_hash
+        )
 
     def settings(self) -> ServiceSettings:
         return read_settings(self._store)
@@ -632,7 +637,7 @@ class ControlService:
         if row is None or not row["spec"]:
             return
         spec = NodeSpec.model_validate_json(row["spec"])
-        resources = with_users(spec, self.list_users())
+        resources = with_users(spec, self.list_users(), profiles=self.settings().access_profiles)
         resources_sha = canonical_sha256(resources)
         held = json.loads(row["document"]) if row["document"] else None
         signed = (held["signature"]["key_id"], held["fleet_epoch"]) if held else None

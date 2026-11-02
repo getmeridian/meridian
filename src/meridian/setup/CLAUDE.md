@@ -12,6 +12,7 @@
 - `plan` and `apply` run the same compiler and runtime as setup.
 
 ## Pitfalls
+- **Preserve access profiles through setup selections** — reviewed grants travel with the access draft, including when the wizard re-asks names.
 - **Approve and apply `review_hash`, never `plan.plan_hash`** — a plan hash cannot see what the change removes.
 - **Control bootstrap values come from the exit on the control server** — the first exit in plan order changed whenever an earlier-sorting exit was added, re-running the bootstrap with another server's ports.
 - **A self-steal exit bootstraps with the default SNI** — the operator's own name would point the server at itself.

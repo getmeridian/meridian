@@ -100,6 +100,7 @@ from meridian.core.schema_delivery import delivery_schemas
 from meridian.core.schema_delivery_service import service_delivery_schemas
 from meridian.core.schema_envelopes import make_command_envelope
 from meridian.core.schema_people import PEOPLE_SCHEMAS
+from meridian.core.schema_profiles import PROFILE_SCHEMAS, profile_command_schemas
 from meridian.core.schema_servers import SERVER_SCHEMAS, server_command_schemas
 from meridian.core.schema_tokens import TOKEN_SCHEMAS, token_command_schemas
 from meridian.core.schema_topology import TOPOLOGY_SCHEMAS
@@ -554,6 +555,8 @@ _, _, ApiWorkflowOutputEnvelope = _make_command_envelope(
 
 
 _SCHEMAS: dict[str, type[BaseModel]] = {
+    **PROFILE_SCHEMAS,
+    **profile_command_schemas(_ContractEnvelope, EmptyData),
     **PEOPLE_SCHEMAS,
     **bulk_envelopes(envelope_base=_ContractEnvelope, failure_data_type=EmptyData),
     "output-envelope": OutputEnvelope,

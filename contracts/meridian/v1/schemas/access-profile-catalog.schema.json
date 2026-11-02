@@ -1,0 +1,62 @@
+{
+  "$defs": {
+    "AccessProfileSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "built_in": {
+          "default": false,
+          "title": "Built In",
+          "type": "boolean"
+        },
+        "id": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "inbound_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Inbound Refs",
+          "type": "array"
+        },
+        "members": {
+          "minimum": 0,
+          "title": "Members",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "inbound_refs",
+        "members"
+      ],
+      "title": "AccessProfileSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "access_hash": {
+      "description": "Lowercase hex SHA-256 digest.",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Access Hash",
+      "type": "string"
+    },
+    "profiles": {
+      "items": {
+        "$ref": "#/$defs/AccessProfileSummary"
+      },
+      "title": "Profiles",
+      "type": "array"
+    }
+  },
+  "required": [
+    "profiles",
+    "access_hash"
+  ],
+  "title": "AccessProfileCatalog",
+  "type": "object"
+}

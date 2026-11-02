@@ -12,6 +12,7 @@ from typing import Any, Final, Literal
 
 from pydantic import BaseModel, Field
 
+from meridian.core.access_profile_views import AccessProfileReview
 from meridian.core.apply import CompiledApplyPreview, CompiledApplyResult
 from meridian.core.models import CoreModel
 from meridian.core.server_allowances import ServerMetadata
@@ -25,6 +26,7 @@ ChangeAction = Literal["add", "change", "remove"]
 
 # Top-level intent lists keyed by ID, with the noun a change line uses for one item.
 _COLLECTIONS: Final[dict[str, str]] = {
+    "access_profiles": "profile",
     "exits": "exit",
     "transparent_relays": "relay",
     "routing_gateways": "gateway",
@@ -63,6 +65,7 @@ class FleetImportResult(CoreModel):
     """`meridian fleet import`: what the file changes, its review, and the apply when it ran."""
 
     dry_run: bool = False
+    access_review: AccessProfileReview | None = Field(default=None, exclude_if=lambda value: value is None)
     changes: list[IntentChange] = Field(default_factory=list)
     review: CompiledApplyPreview | None = None
     applied: CompiledApplyResult | None = None

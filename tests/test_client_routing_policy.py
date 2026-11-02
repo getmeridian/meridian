@@ -83,6 +83,7 @@ def test_settings_driver_applies_the_reviewed_policy_and_detects_a_later_change(
         action for action in build_resource_actions(plan, 1) if action.resource.logical_id == "settings:service"
     )
     context = MagicMock(spec=MeridianDriverContext)
+    context.access_review_hash = None
     context.cluster = ClusterConfig(panel=PanelConfig(url="https://198.51.100.10/control", sub_path="connect"))
     with serve_control(tmp_path) as url:
         context.client = lambda: ControlClient(url, ADMIN_TOKEN, report_mutations=False)

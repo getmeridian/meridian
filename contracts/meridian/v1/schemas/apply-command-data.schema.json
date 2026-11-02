@@ -1,5 +1,108 @@
 {
   "$defs": {
+    "AccessChange": {
+      "additionalProperties": false,
+      "properties": {
+        "gained": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Gained",
+          "type": "array"
+        },
+        "lost": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Lost",
+          "type": "array"
+        },
+        "profiles": {
+          "items": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Profiles",
+          "type": "array"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "profiles",
+        "gained",
+        "lost"
+      ],
+      "title": "AccessChange",
+      "type": "object"
+    },
+    "AccessProfileReview": {
+      "additionalProperties": false,
+      "properties": {
+        "access_hash": {
+          "description": "Lowercase hex SHA-256 digest.",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Access Hash",
+          "type": "string"
+        },
+        "access_profiles": {
+          "maxProperties": 64,
+          "patternProperties": {
+            "^[a-z0-9][a-z0-9_-]*$": {
+              "items": {
+                "pattern": "^inbound:[a-z0-9][a-z0-9:_.-]{0,191}$",
+                "type": "string"
+              },
+              "maxItems": 10000,
+              "type": "array"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 48,
+            "minLength": 1
+          },
+          "title": "Access Profiles",
+          "type": "object"
+        },
+        "cut_off": {
+          "$ref": "#/$defs/CutOffPlan"
+        },
+        "gained_people": {
+          "minimum": 0,
+          "title": "Gained People",
+          "type": "integer"
+        },
+        "lost_people": {
+          "minimum": 0,
+          "title": "Lost People",
+          "type": "integer"
+        },
+        "people": {
+          "items": {
+            "$ref": "#/$defs/AccessChange"
+          },
+          "title": "People",
+          "type": "array"
+        }
+      },
+      "required": [
+        "access_hash",
+        "access_profiles",
+        "people",
+        "gained_people",
+        "lost_people",
+        "cut_off"
+      ],
+      "title": "AccessProfileReview",
+      "type": "object"
+    },
     "ApplyCounts": {
       "additionalProperties": false,
       "description": "Aggregate counts for apply execution.",
@@ -71,11 +174,80 @@
       ],
       "title": "CompiledApplyActionResult",
       "type": "object"
+    },
+    "CutOffNode": {
+      "additionalProperties": false,
+      "properties": {
+        "effect": {
+          "default": "inbound_reset",
+          "description": "A core restart reconnects every Xray inbound and bridge on this node; an inbound reset reconnects the listed inbounds, with whole-core fallback on failure.",
+          "enum": [
+            "inbound_reset",
+            "core_restart"
+          ],
+          "title": "Effect",
+          "type": "string"
+        },
+        "inbound_tags": {
+          "items": {
+            "description": "Xray inbound tag.",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "title": "Inbound Tags",
+          "type": "array"
+        },
+        "node_id": {
+          "description": "Node identifier: the server's lowercase topology ID, unique within the fleet.",
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Node Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "inbound_tags"
+      ],
+      "title": "CutOffNode",
+      "type": "object"
+    },
+    "CutOffPlan": {
+      "additionalProperties": false,
+      "description": "Every managed inbound that may hold the person's open sessions; contains no person or credential.",
+      "properties": {
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/CutOffNode"
+          },
+          "title": "Nodes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "nodes"
+      ],
+      "title": "CutOffPlan",
+      "type": "object"
     }
   },
   "additionalProperties": false,
   "description": "Success data returned by apply execution.",
   "properties": {
+    "access_review": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AccessProfileReview"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "actions": {
       "items": {
         "$ref": "#/$defs/CompiledApplyActionResult"

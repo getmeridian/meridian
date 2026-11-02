@@ -27,6 +27,8 @@ uv run pytest tests/ -k "test_name"    # by pattern
 - Idempotency dual-path: `tests/provision/CLAUDE.md`.
 
 ## Pitfalls
+- **Older fixtures rewind membership before capacity** — shared helpers remove schema 24 before schema 23, preserving capacity when only membership is rewound.
+- **Profile migration fixtures drop membership triggers first** — their row-version references otherwise prevent rewinding people tables; schema 24 is one self-contained membership step after capacity schema 23.
 - **Bulk and flow migrations stay ordered** — schema 20 owns people queries; schema 21 owns generations and receipts, and older fixtures rewind both.
 - **Terminal test readers use poll or selectors** — full suites allocate descriptors above select's fixed limit, breaking pexpect and pipe-key reads.
 - **People-query fixtures use real service pages** — DOM scenarios receive backend replies; rewound databases drop people indices and triggers before removing columns.

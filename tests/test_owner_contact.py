@@ -135,6 +135,7 @@ def test_service_settings_driver_carries_exactly_the_reviewed_contact(tmp_path: 
             if isinstance(action.resource.payload, ServiceSettingsPayload)
         )
         context = MagicMock(spec=MeridianDriverContext)
+        context.access_review_hash = None
         context.cluster = cluster
         context.client = lambda: ControlClient(url, ADMIN_TOKEN, report_mutations=False)
         driver = ServiceSettingsDriver(context)

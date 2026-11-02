@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var M = window.M, h = M.h;
-  var ACTIONS = ["extend", "expiry", "quota", "reset-traffic", "enable", "disable", "tag", "devices", "renewal", "delete"];
+  var ACTIONS = ["extend", "expiry", "quota", "reset-traffic", "enable", "disable", "tag", "devices", "renewal", "set-profiles", "delete"];
 
   function errorText(error) {
     if (error && error.subjects && error.subjects.length) return M.t("bulk.stale", { people: error.subjects.join(", ") });
@@ -11,6 +11,7 @@
   function value(fields, key) {
     if (!fields) return M.t("bulk.deleted");
     var chosen = fields[key];
+    if (key === "profiles") return (chosen || []).join(", ");
     if (key === "status") return M.t("status." + chosen);
     if (key === "device_limit") return chosen === null ? M.t("devices.inherit") : chosen === 0 ? M.t("devices.unlimited") : M.count(chosen);
     if (key === "traffic_limit_bytes") return chosen ? String(chosen) + " B" : M.t("people.unlimited");
@@ -40,6 +41,7 @@
               h("bdi", { text: value(person.after, key) })));
         })));
         (person.warnings || []).forEach(function (code) { content.push(h("p", { class: "hint", text: M.t("bulk.warning." + code) })); });
+        if (M.accessChangeDisclosure) content = content.concat(M.accessChangeDisclosure(person));
         return h("section", { class: "card bulk-person" }, content);
       }));
       count.textContent = M.t("bulk.review_count", { shown: M.count(Math.min(size, people.length - page * size)), total: M.count(people.length) });
@@ -143,6 +145,8 @@
       Promise.resolve().then(load); return body;
     }, { wide: true });
   }
+
+  M.reviewPeople = openReview;
 
   function action(kind, selection, done) {
     if (["enable", "disable", "delete", "reset-traffic"].indexOf(kind) >= 0) {

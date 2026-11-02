@@ -9,6 +9,7 @@ from urllib.parse import quote, urlencode
 
 import httpx
 
+from meridian.control.access_profile_models import ServiceSettingsWrite
 from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.command_models import (
     CommandRequest,
@@ -61,6 +62,12 @@ from meridian.control.models import (
     UserRecord,
     UserUpdate,
     UserUsage,
+)
+from meridian.core.access_profile_views import (
+    AccessProfileCatalog,
+    AccessProfileReview,
+    AccessProfileReviewRequest,
+    PersonAccess,
 )
 from meridian.core.account_schedule import AccountSchedulePreview
 from meridian.core.attention import AttentionList, AttentionThresholds
@@ -206,8 +213,22 @@ class ControlClient:
     def server_usage(self) -> ServerUsageList:
         return ServerUsageList.model_validate(self._call("GET", "api/servers"))
 
-    def put_settings(self, settings: ServiceSettings) -> ServiceSettings:
-        return ServiceSettings.model_validate(self._call("PUT", "api/settings", settings.model_dump(mode="json")))
+    def put_settings(self, settings: ServiceSettings, *, expected_access_hash: str | None = None) -> ServiceSettings:
+        request = ServiceSettingsWrite.model_validate(
+            {**settings.to_data(), "expected_access_hash": expected_access_hash}
+        )
+        return ServiceSettings.model_validate(self._call("PUT", "api/settings", request.to_data()))
+
+    def access_profiles(self) -> AccessProfileCatalog:
+        return AccessProfileCatalog.model_validate(self._call("GET", "api/access-profiles"))
+
+    def preview_access_profiles(self, request: AccessProfileReviewRequest) -> AccessProfileReview:
+        return AccessProfileReview.model_validate(
+            self._request("POST", "api/access-profiles/preview", request.to_data(), mutation_method="GET").json()
+        )
+
+    def user_access(self, username: str) -> PersonAccess:
+        return PersonAccess.model_validate(self._call("GET", f"api/users/{quote(username, safe='')}/access"))
 
     def privacy(self) -> PrivacyState:
         return PrivacyState.model_validate(self._call("GET", "api/privacy"))

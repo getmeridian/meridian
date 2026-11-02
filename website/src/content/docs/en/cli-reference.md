@@ -100,6 +100,9 @@ Every apply is recorded in the control service as a revision (see `meridian flee
 
 ### meridian client
 
+`client set NAME --profile PROFILE` replaces profile membership after a service review; repeat `--profile` for every profile to keep. `--dry-run` previews without saving and JSON writes need `--yes`. Use a separate command for account limits, notes, or language. `client bulk set-profiles --profile PROFILE` uses the same selection flags and frozen commit as other bulk actions, including repeated `--person`, `--search`, and `--tag`.
+
+
 The schedule options below work with `client add` and `client set`. New settings are applied only at creation; later applies preserve operator edits. `client show` carries the typed fields and the service’s computed `schedule` in JSON. `client set --dry-run` returns `data.schedule_preview` and `applied: false`; schedule changes in JSON need `--yes`. `client extend --days N` adds days to a pending first-use duration without activating it; after activation it extends the expiry and starts a new renewal series.
 
 | Option | Meaning |
@@ -246,6 +249,22 @@ meridian privacy set [--devices off|private|full] [--device-limit N] [--history 
 | `--json` | | Emit a `meridian.output/v1` envelope |
 
 Bare `privacy` is `privacy show`: settings, disclosures, and the last 50 changes. `set` changes only options you pass, shows what a raised level stores and what a lowered one removes, and asks for confirmation. Identical values are a no-op. JSON `data` includes the settings and changes; a set also reports `deleted` row counts and `rekeyed_devices`. The change records the token's name, `owner`, or `root`, the time, and before/after values. Private records are cleared after a restore because the fleet fingerprint key is never snapshotted.
+
+### meridian profile
+
+Review which exits and paths each profile grants. `default` always grants everything and cannot be edited or removed.
+
+```bash
+meridian profile add limited --grant exit:main --dry-run --json
+meridian profile add limited --grant exit:main --yes --json
+meridian profile set limited --grant inbound:main:main-reality --yes
+meridian profile set limited --empty --yes
+meridian profile list --json
+meridian profile remove limited --dry-run --json
+meridian profile remove limited --yes --json
+```
+
+Repeat `--grant` to combine `exit:`, `gateway:`, `inbound:`, and `endpoint:` references. `set` replaces the whole grant list. `--empty` grants nothing. The review lists people gaining and losing access, shared-inbound aliases, and the cut-off scope. Used-profile removal reports the count and refuses until membership is moved. Applies keep existing memberships, keys, and URLs. `plan`, `apply`, and fleet import include the same access review for profiled fleets.
 
 ### meridian server
 

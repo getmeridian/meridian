@@ -3,6 +3,7 @@
 Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `formats/CLAUDE.md`.
 
 ## Design decisions
+- **Profile activation is atomic** — service settings hold the canonical grant map; staged specs carry references, and map or membership changes compose documents with the existing flow-block ledger.
 - **Metrics has its own grant** — cataloged `/metrics` uses `metrics.read` on the existing ingress, with no compatible preset expansion; node series and bounded route-ID/runtime counters expose no person labels.
 - **Capacity stays per node** — `capacity.py` keeps one latest collection, 360 recent ten-second slots, and 168 UTC hourly means/peaks; person privacy settings do not govern these address-free aggregates.
 - **People queries share SQL predicates** — cursor pages use monotonic identities, contextual counts, and the same selection across surfaces.
@@ -46,6 +47,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - **Retry delays cross every HTTP surface** — emit Retry-After whenever a ServiceError supplies it, including anonymous authentication refusals.
 - **Redaction preserves supplied fields** — copy only changed values, or omitted bulk action parameters become supplied nulls and invalidate the review.
 - **Bulk grants keep legacy boundaries** — query and batch grants stay separate from reads and credential imports; their tag-bearing views also require private metadata permission.
+- **Membership stays private in indirect reads** — person and revision results hide profiles without people.private; effective access and configured format previews require it too.
 - **Bulk deletion carries every retired identity** — compose once with all removed records so each node queues the same receipts as a single deletion, without rotating keys.
 - **Undo shares bulk enforcement** — restore requested choices before judging status, and check managed inbound capacity before composing.
 - **Bulk before is enforced** — project both sides from one account clock, re-check every target before writing, and catch up due resets before schedule edits.

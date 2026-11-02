@@ -75,3 +75,7 @@ If your app is too old to use everything the service offers, or is no longer mai
 ## When an app shows a different list
 
 Apps receive the format they support, so their lists can differ. If a method is missing, tell the owner which app and version you use. The owner can preview the format and see why an entry was omitted without sharing your connection keys. Refresh the subscription after the owner changes the settings.
+
+## Granted connections
+
+Your page and every app subscription list only the connections your operator grants. Several profiles can combine access, but their names and membership remain private operator data. When access changes, refresh the subscription; the page uses the current granted list. Losing a connection also removes its authentication access after the node applies the change. Existing transfers may continue until they finish or the operator performs a shared-node cut-off. Your subscription URL and connection keys stay the same.

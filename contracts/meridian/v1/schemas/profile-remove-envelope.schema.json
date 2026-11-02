@@ -1,0 +1,722 @@
+{
+  "$defs": {
+    "AccessChange": {
+      "additionalProperties": false,
+      "properties": {
+        "gained": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Gained",
+          "type": "array"
+        },
+        "lost": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Lost",
+          "type": "array"
+        },
+        "profiles": {
+          "items": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Profiles",
+          "type": "array"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "profiles",
+        "gained",
+        "lost"
+      ],
+      "title": "AccessChange",
+      "type": "object"
+    },
+    "AccessProfileIntent": {
+      "additionalProperties": false,
+      "description": "A named set of reviewed exits, gateways, public endpoints, or authentication inbounds.",
+      "properties": {
+        "grants": {
+          "items": {
+            "pattern": "^(?:exit|gateway|inbound|endpoint):[a-z0-9][a-z0-9:_.-]{0,191}$",
+            "type": "string"
+          },
+          "maxItems": 10000,
+          "title": "Grants",
+          "type": "array"
+        },
+        "id": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "grants"
+      ],
+      "title": "AccessProfileIntent",
+      "type": "object"
+    },
+    "AccessProfileReview": {
+      "additionalProperties": false,
+      "properties": {
+        "access_hash": {
+          "description": "Lowercase hex SHA-256 digest.",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Access Hash",
+          "type": "string"
+        },
+        "access_profiles": {
+          "maxProperties": 64,
+          "patternProperties": {
+            "^[a-z0-9][a-z0-9_-]*$": {
+              "items": {
+                "pattern": "^inbound:[a-z0-9][a-z0-9:_.-]{0,191}$",
+                "type": "string"
+              },
+              "maxItems": 10000,
+              "type": "array"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 48,
+            "minLength": 1
+          },
+          "title": "Access Profiles",
+          "type": "object"
+        },
+        "cut_off": {
+          "$ref": "#/$defs/CutOffPlan"
+        },
+        "gained_people": {
+          "minimum": 0,
+          "title": "Gained People",
+          "type": "integer"
+        },
+        "lost_people": {
+          "minimum": 0,
+          "title": "Lost People",
+          "type": "integer"
+        },
+        "people": {
+          "items": {
+            "$ref": "#/$defs/AccessChange"
+          },
+          "title": "People",
+          "type": "array"
+        }
+      },
+      "required": [
+        "access_hash",
+        "access_profiles",
+        "people",
+        "gained_people",
+        "lost_people",
+        "cut_off"
+      ],
+      "title": "AccessProfileReview",
+      "type": "object"
+    },
+    "ApplyCounts": {
+      "additionalProperties": false,
+      "description": "Aggregate counts for apply execution.",
+      "properties": {
+        "actions": {
+          "title": "Actions",
+          "type": "integer"
+        },
+        "failed": {
+          "title": "Failed",
+          "type": "integer"
+        },
+        "skipped": {
+          "title": "Skipped",
+          "type": "integer"
+        },
+        "succeeded": {
+          "title": "Succeeded",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "actions",
+        "succeeded",
+        "failed",
+        "skipped"
+      ],
+      "title": "ApplyCounts",
+      "type": "object"
+    },
+    "CompiledApplyActionResult": {
+      "additionalProperties": false,
+      "description": "Execution result for one V4 compiler resource.",
+      "properties": {
+        "changed": {
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "error": {
+          "default": "",
+          "title": "Error",
+          "type": "string"
+        },
+        "resource_id": {
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "converged",
+            "applied",
+            "failed",
+            "unknown",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "success": {
+          "title": "Success",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "resource_id",
+        "status",
+        "success",
+        "changed"
+      ],
+      "title": "CompiledApplyActionResult",
+      "type": "object"
+    },
+    "CompiledApplyPreview": {
+      "additionalProperties": false,
+      "description": "Reviewed V4 compiler-plan metadata returned before confirmation.",
+      "properties": {
+        "access_review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AccessProfileReview"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "plan_hash": {
+          "title": "Plan Hash",
+          "type": "string"
+        },
+        "resource_count": {
+          "minimum": 0,
+          "title": "Resource Count",
+          "type": "integer"
+        },
+        "retiring_resources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Retiring Resources",
+          "type": "array"
+        },
+        "review_hash": {
+          "default": "",
+          "description": "Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed.",
+          "title": "Review Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_hash",
+        "resource_count"
+      ],
+      "title": "CompiledApplyPreview",
+      "type": "object"
+    },
+    "CompiledApplyResult": {
+      "additionalProperties": false,
+      "description": "Apply result for one generation-scoped V4 compiler plan.",
+      "properties": {
+        "access_review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AccessProfileReview"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/CompiledApplyActionResult"
+          },
+          "title": "Actions",
+          "type": "array"
+        },
+        "all_succeeded": {
+          "title": "All Succeeded",
+          "type": "boolean"
+        },
+        "changed": {
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "counts": {
+          "$ref": "#/$defs/ApplyCounts"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "generation": {
+          "minimum": 0,
+          "title": "Generation",
+          "type": "integer"
+        },
+        "plan_hash": {
+          "title": "Plan Hash",
+          "type": "string"
+        },
+        "retired_resources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Retired Resources",
+          "type": "array"
+        },
+        "retirement_errors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Retirement Errors",
+          "type": "array"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_hash",
+        "generation",
+        "all_succeeded",
+        "changed",
+        "summary",
+        "exit_code",
+        "counts"
+      ],
+      "title": "CompiledApplyResult",
+      "type": "object"
+    },
+    "CutOffNode": {
+      "additionalProperties": false,
+      "properties": {
+        "effect": {
+          "default": "inbound_reset",
+          "description": "A core restart reconnects every Xray inbound and bridge on this node; an inbound reset reconnects the listed inbounds, with whole-core fallback on failure.",
+          "enum": [
+            "inbound_reset",
+            "core_restart"
+          ],
+          "title": "Effect",
+          "type": "string"
+        },
+        "inbound_tags": {
+          "items": {
+            "description": "Xray inbound tag.",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "title": "Inbound Tags",
+          "type": "array"
+        },
+        "node_id": {
+          "description": "Node identifier: the server's lowercase topology ID, unique within the fleet.",
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Node Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "inbound_tags"
+      ],
+      "title": "CutOffNode",
+      "type": "object"
+    },
+    "CutOffPlan": {
+      "additionalProperties": false,
+      "description": "Every managed inbound that may hold the person's open sessions; contains no person or credential.",
+      "properties": {
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/CutOffNode"
+          },
+          "title": "Nodes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "nodes"
+      ],
+      "title": "CutOffPlan",
+      "type": "object"
+    },
+    "EmptyData": {
+      "additionalProperties": false,
+      "description": "Empty data object used by envelopes without command-specific failure data.",
+      "properties": {},
+      "title": "EmptyData",
+      "type": "object"
+    },
+    "ErrorModel": {
+      "additionalProperties": false,
+      "description": "Structured error safe for JSON/API clients.",
+      "properties": {
+        "category": {
+          "enum": [
+            "user",
+            "system",
+            "bug",
+            "cancelled"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "cause": {
+          "additionalProperties": true,
+          "title": "Cause",
+          "type": "object"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "exit_code": {
+          "default": 1,
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "hint": {
+          "default": "",
+          "title": "Hint",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "message"
+      ],
+      "title": "MeridianError",
+      "type": "object"
+    },
+    "ProfileEditResult": {
+      "additionalProperties": false,
+      "properties": {
+        "access_review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AccessProfileReview"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "applied": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CompiledApplyResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "dry_run": {
+          "default": false,
+          "title": "Dry Run",
+          "type": "boolean"
+        },
+        "profile": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AccessProfileIntent"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "removed": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Removed"
+        },
+        "review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CompiledApplyPreview"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "ProfileEditResult",
+      "type": "object"
+    },
+    "Summary": {
+      "additionalProperties": false,
+      "description": "Structured summary shown in JSON envelopes and UI dashboards.",
+      "properties": {
+        "changed": {
+          "default": false,
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "Summary",
+      "type": "object"
+    },
+    "_ProfileRemoveSuccessEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "profile.remove",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/ProfileEditResult"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "maxItems": 0,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "changed",
+            "no_changes"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_ProfileRemoveSuccessEnvelope",
+      "type": "object"
+    },
+    "_ProfileRemoveTerminalEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "profile.remove",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/EmptyData"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "minItems": 1,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "failed",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_ProfileRemoveTerminalEnvelope",
+      "type": "object"
+    }
+  },
+  "description": "Envelope for meridian profile remove --json.",
+  "discriminator": {
+    "mapping": {
+      "changed": "#/$defs/_ProfileRemoveSuccessEnvelope",
+      "failed": "#/$defs/_ProfileRemoveTerminalEnvelope",
+      "no_changes": "#/$defs/_ProfileRemoveSuccessEnvelope",
+      "ok": "#/$defs/_ProfileRemoveSuccessEnvelope"
+    },
+    "propertyName": "status"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/_ProfileRemoveSuccessEnvelope"
+    },
+    {
+      "$ref": "#/$defs/_ProfileRemoveTerminalEnvelope"
+    }
+  ],
+  "title": "ProfileRemoveOutputEnvelope"
+}

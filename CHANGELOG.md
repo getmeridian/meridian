@@ -15,6 +15,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b9
 
 #### Added
+- Reviewed access profiles with service-owned membership, enforced inbound grants,
+  gain/loss previews, private effective-access views, CLI and console assignment,
+  bulk reviews, and snapshot and import preservation. Default access stays full.
 - Authenticated Prometheus metrics on the existing private control ingress with
   an explicit read-only `metrics.read` grant, node-only capacity/traffic series,
   route-ID request counters and latency, background health, and SQLite size (#55).

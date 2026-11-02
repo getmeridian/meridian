@@ -37,7 +37,9 @@ from meridian.renderers import emit_json
 
 
 def parse_bulk_action(action: BulkActionName, options: dict[str, Any]) -> BulkAction:
-    if action == "extend":
+    if action == "set-profiles":
+        params = {"profiles": options.get("profile")}
+    elif action == "extend":
         params = {
             name: bounded_integer(options[name], "--" + name, 1, 3650 if name == "days" else 120)
             for name in ("days", "months")
@@ -69,6 +71,8 @@ def field_value(fields: BulkFields | None, name: str) -> str:
     value = getattr(fields, name, None)
     if name == "status":
         return t(f"bulk.status.{fields.status}")
+    if name == "profiles":
+        return ", ".join(fields.profiles)
     if name == "device_limit":
         return t("bulk.inherit") if value is None else t("bulk.unlimited") if value == 0 else str(value)
     if name == "traffic_limit_bytes":
@@ -98,6 +102,17 @@ def preview_table(people: list[BulkPersonChange], *, undo: bool = False) -> None
                 )
         for warning in person.warnings:
             warn(t(f"bulk.warning.{warning}"))
+        if person.access is not None:
+            for key, refs in (("gained", person.access.gained), ("lost", person.access.lost)):
+                if refs:
+                    err_console.print(escape(t("profiles." + key)) + ": " + escape(", ".join(refs)))
+            if person.access.lost:
+                from meridian.commands.node_command_results import cut_off_disclosure
+
+                warn(t("profiles.revocation"))
+                if person.cut_off is not None:
+                    err_console.print(escape(t("profiles.hard_cut_scope")))
+                    err_console.print(escape(cut_off_disclosure(person.cut_off)))
     err_console.print(table)
 
 

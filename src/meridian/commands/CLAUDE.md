@@ -1,6 +1,7 @@
 # commands — One module per subcommand
 
 ## Design decisions
+**Profile reviews include people** — `profile`, `plan`, `apply`, and fleet import review effective gains/losses and fence the service membership hash; assignment uses the existing bulk receipt.
 **Bulk reviews** — `client bulk` and `client list` use the service query; commit only the returned ID/hash, and read the receipt after an uncertain reply.
 **Token issuance** — `token` reviews the same typed permissions and expiry as the console; mutations require JSON `--yes`, and only the producing create envelope reveals `data.issued.token`.
 **Client registration** — `cli_client.py` owns the client group so lifecycle options do not grow `cli_groups.py`.

@@ -11,6 +11,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BeforeValidator, Field, field_validator, model_validator
 
+from meridian.core.access_profiles import AccessProfileMap, InboundReference, ProfileMembership, default_profiles
 from meridian.core.account_schedule import AccountLifecycleSettings, AccountLifecycleState, AccountSchedulePreview
 from meridian.core.agent_desired import AgentResource
 from meridian.core.agent_protocol import NodeHealth, NodeVersions
@@ -34,7 +35,7 @@ from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES, LimitStrategy, 
 from meridian.core.client_sessions import CredentialGeneration
 from meridian.core.connection_pages import ConnectionPageSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
-from meridian.core.inputs import ServerReferenceValue, validate_ip_address_value
+from meridian.core.inputs import ServerReferenceValue, TopologyIdValue, validate_ip_address_value
 from meridian.core.languages import Language
 from meridian.core.models import CoreModel
 from meridian.core.person_activity import PersonAttentionReason
@@ -74,6 +75,7 @@ class ManagedInbound(CoreModel):
     tag: InboundTag
     protocol: Literal["vless", "hysteria2"]
     flow: Literal["", "xtls-rprx-vision"] = ""
+    inbound_ref: InboundReference | Literal[""] = Field(default="", exclude_if=lambda value: not value)
 
 
 def users_resource_id(tag: str) -> str:
@@ -85,6 +87,7 @@ class NodeSpec(CoreModel):
     """What the deployer asks one node to run; the service adds user resources and signs."""
 
     resources: list[AgentResource] = Field(max_length=1000)
+    access_profiles: AccessProfileMap = Field(default_factory=dict, exclude_if=lambda value: not value)
     managed_inbounds: list[ManagedInbound] = Field(
         default_factory=list,
         max_length=64,
@@ -164,6 +167,7 @@ class ClientEndpoint(CoreModel):
     """
 
     remark: str = Field(min_length=1, max_length=ENDPOINT_REMARK_MAX_LENGTH)
+    inbound_ref: InboundReference | Literal[""] = Field(default="", exclude_if=lambda value: not value)
     protocol: ProtocolKind
     address: str = Field(min_length=1, max_length=253)
     port: int = Field(ge=1, le=65535)
@@ -232,6 +236,9 @@ class UserRecord(UserTrafficEvidence, AccountLifecycleState):
     """
 
     username: str
+    profiles: list[TopologyIdValue] = Field(
+        default_factory=default_profiles, description="Operator-owned access membership; people.private reads it."
+    )
     user_id: str
     credential_generation: CredentialGeneration = 1
     uuid: str
@@ -280,6 +287,7 @@ class UserUpdate(AccountLifecycleSettings):
     """A partial change: omitted fields keep their value; null clears expiry or selects the default device cap."""
 
     status: Literal["active", "disabled"] | None = None
+    profiles: ProfileMembership = Field(default_factory=default_profiles)
     expire_at: Timestamp | None = None
     traffic_limit_bytes: int | None = Field(default=None, ge=0, le=MAX_TRAFFIC_LIMIT_BYTES)
     traffic_limit_strategy: LimitStrategy | None = None
@@ -323,6 +331,11 @@ class UserImport(AccountLifecycleState):
     """
 
     username: str = Field(pattern=rf"^{USERNAME_PATTERN}$")
+    profiles: ProfileMembership | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Omitted preserves existing membership, or selects default for a new person.",
+    )
     uuid: str = Field(pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
     sub_token: str = Field(pattern=SUB_TOKEN_PATTERN)
     status: UserStatus = "active"
@@ -364,6 +377,7 @@ class UserImportResult(CoreModel):
 
 
 class ServiceSettings(ConnectionPageSettings):
+    access_profiles: AccessProfileMap = Field(default_factory=dict, exclude_if=lambda value: not value)
     servers: dict[ServerReferenceValue, ServerAllowanceSpec] = Field(
         default_factory=dict, exclude_if=lambda servers: not servers
     )

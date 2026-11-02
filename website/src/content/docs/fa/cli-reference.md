@@ -100,6 +100,9 @@ JSON `data` شامل `plan_hash`، `generation` و `actions[]` با `status: "co
 
 ### meridian client
 
+`client set NAME --profile PROFILE` عضویت را پس از بازبینی سرویس جایگزین می‌کند؛ برای هر پروفایل باقی‌مانده `--profile` را تکرار کنید. `--dry-run` بدون ذخیره پیش‌نمایش می‌دهد و نوشتن در JSON به `--yes` نیاز دارد. سقف، یادداشت و زبان را جدا تغییر دهید. `client bulk set-profiles --profile PROFILE` همان انتخاب و اعمال ثابت سایر اقدامات گروهی، از جمله `--person` تکراری، `--search` و `--tag` را دارد.
+
+
 گزینه‌های زیر با `client add` و `client set` کار می‌کنند. تنظیمات اولیه فقط هنگام ایجاد حساب اعمال می‌شوند و اعمال بعدی تغییرات مدیر را حفظ می‌کنند. `client show` فیلدهای نوع‌دار و `schedule` محاسبه‌شدهٔ سرویس را در JSON می‌دهد. `client set --dry-run` مقدار `data.schedule_preview` و `applied: false` می‌دهد؛ تغییر زمان‌بندی در JSON به `--yes` نیاز دارد. `client extend --days N` روزها را به مدتِ در انتظار اولین استفاده اضافه می‌کند و حساب را فعال نمی‌کند؛ پس از فعال‌سازی تاریخ پایان را تمدید و سری جدیدی از تمدیدها آغاز می‌کند.
 
 | گزینه | کاربرد |
@@ -246,6 +249,22 @@ meridian privacy set [--devices off|private|full] [--device-limit N] [--history 
 | `--json` | | خروجی envelope از نوع `meridian.output/v1` |
 
 `privacy` بدون زیردستور همان `privacy show` است: تنظیمات، توضیح افشای اطلاعات و 50 تغییر آخر. `set` فقط گزینه‌های داده‌شده را تغییر می‌دهد، اطلاعات ذخیره‌شده در سطح بالاتر و حذف‌شده در سطح پایین‌تر را توضیح می‌دهد و تأیید می‌گیرد. مقادیر یکسان تغییری ایجاد نمی‌کنند. `data` در JSON تنظیمات و تغییرات را دارد؛ `set` تعداد رکوردهای حذف‌شده در `deleted` و تبدیل‌شده در `rekeyed_devices` را نیز می‌دهد. نام توکن، `owner` یا `root`، زمان و مقادیر قبل/بعد ثبت می‌شوند. رکوردهای خصوصی دستگاه پس از بازیابی پاک می‌شوند، چون کلید اثر انگشت هرگز در اسنپ‌شات نیست.
+
+### meridian profile
+
+سرورهای خروجی و مسیرهای مجاز هر پروفایل را بازبینی کنید. `default` همیشه همه را مجاز می‌کند و قابل ویرایش یا حذف نیست.
+
+```bash
+meridian profile add limited --grant exit:main --dry-run --json
+meridian profile add limited --grant exit:main --yes --json
+meridian profile set limited --grant inbound:main:main-reality --yes
+meridian profile set limited --empty --yes
+meridian profile list --json
+meridian profile remove limited --dry-run --json
+meridian profile remove limited --yes --json
+```
+
+برای ترکیب مرجع‌های `exit:`، `gateway:`، `inbound:` و `endpoint:`، `--grant` را تکرار کنید. `set` کل فهرست را جایگزین می‌کند؛ `--empty` هیچ دسترسی‌ای نمی‌دهد. بازبینی، کاربران با دسترسی اضافه یا حذف‌شده، ورودی‌های مشترک و محدودهٔ قطع نشست را نشان می‌دهد. پروفایل دارای عضو تا انتقال عضویت حذف نمی‌شود. apply عضویت موجود، کلیدها و URLها را نگه می‌دارد. در ناوگان دارای پروفایل، `plan`، `apply` و واردسازی ناوگان همان بازبینی دسترسی را دارند.
 
 ### meridian server
 

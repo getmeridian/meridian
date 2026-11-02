@@ -7,7 +7,10 @@ from typing import Annotated, Any, Literal, cast
 from pydantic import Field, GetJsonSchemaHandler, SerializerFunctionWrapHandler, model_serializer, model_validator
 from pydantic_core import CoreSchema
 
+from meridian.control.command_models import CutOffPlan
 from meridian.control.models import USERNAME_PATTERN, UserRecord, UserStatus
+from meridian.core.access_profile_views import AccessChange
+from meridian.core.access_profiles import ProfileMembership, default_profiles
 from meridian.core.account_schedule import AccountLifecycleState
 from meridian.core.agent_types import Sha256Hex, Timestamp
 from meridian.core.client_devices import DeviceCap
@@ -18,7 +21,17 @@ from meridian.core.person_metadata import PersonTag
 from meridian.core.traffic import PeriodTraffic
 
 BulkActionName = Literal[
-    "extend", "expiry", "quota", "reset-traffic", "enable", "disable", "tag", "devices", "renewal", "delete"
+    "extend",
+    "expiry",
+    "quota",
+    "reset-traffic",
+    "enable",
+    "disable",
+    "tag",
+    "devices",
+    "renewal",
+    "delete",
+    "set-profiles",
 ]
 BulkOutcome = Literal["changed", "unchanged", "cli_required"]
 BulkWarning = Literal[
@@ -46,6 +59,7 @@ class BulkAction(CoreModel):
     renewal_interval_days: int | None = Field(default=None, ge=1, le=3650, strict=True)
     renewal_interval_months: int | None = Field(default=None, ge=1, le=120, strict=True)
     renewal_limit: int | None = Field(default=None, ge=1, le=10000, strict=True)
+    profiles: ProfileMembership = Field(default_factory=default_profiles)
 
     def model_post_init(self, _context: Any) -> None:
         self.action_parameters()
@@ -58,12 +72,13 @@ class BulkAction(CoreModel):
             "tag": {"tag"},
             "devices": {"device_limit"},
             "renewal": {"renewal_interval_days", "renewal_interval_months", "renewal_limit"},
+            "set-profiles": {"profiles"},
         }.get(self.action, set())
         if self.model_fields_set - {"action"} - allowed:
             raise ValueError(f"Only {', '.join(sorted(allowed)) or 'no parameters'} apply to {self.action}.")
         if self.action == "extend" and ((self.days is None) == (self.months is None)):
             raise ValueError("Choose days or calendar months for the extension.")
-        required = {"expiry": "expire_at", "tag": "tag", "devices": "device_limit"}
+        required = {"expiry": "expire_at", "tag": "tag", "devices": "device_limit", "set-profiles": "profiles"}
         if self.action in required and required[self.action] not in self.model_fields_set:
             raise ValueError(f"Supply {required[self.action]} explicitly, including when clearing it.")
         if self.action == "quota" and not self.model_fields_set & {
@@ -118,6 +133,7 @@ class BulkPreviewRequest(CoreModel):
 
 
 class BulkFields(AccountLifecycleState):
+    profiles: ProfileMembership = Field(default_factory=default_profiles)
     status: UserStatus
     expire_at: Timestamp | None
     traffic_limit_bytes: int
@@ -148,6 +164,8 @@ class BulkPersonChange(CoreModel):
     outcome: BulkOutcome
     cli_command: str | None = None
     warnings: list[BulkWarning] = Field(default_factory=list)
+    access: AccessChange | None = Field(default=None, exclude_if=lambda value: value is None)
+    cut_off: CutOffPlan | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class BulkCounts(CoreModel):

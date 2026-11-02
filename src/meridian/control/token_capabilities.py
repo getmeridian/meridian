@@ -73,10 +73,10 @@ _LABELS: dict[TokenCapability, tuple[str, str, str, str]] = {
         "审阅并应用批量账户变更，包括删除",
     ),
     "people.private": (
-        "Read private notes and tags",
-        "Читать личные заметки и теги",
-        "خواندن یادداشت‌ها و برچسب‌های خصوصی",
-        "读取私人备注和标签",
+        "Read private notes, tags, and access membership",
+        "Читать личные заметки, теги и назначения профилей доступа",
+        "خواندن یادداشت‌ها، برچسب‌ها و عضویت دسترسی خصوصی",
+        "读取私人备注、标签和访问配置成员关系",
     ),
     "people.edit": (
         "Create people, edit account settings, and extend access",
