@@ -135,7 +135,13 @@ def test_phone_filter_controls_scroll_in_one_row_and_active_chips_stay_removable
     result = run_console(
         "people-triage-ux",
         locale,
-        {"people": people(), "scenario": "chips", "width": 390, "hash": "#/people?status=active&tag=GROUP_A", "remove": "tag"},
+        {
+            "people": people(),
+            "scenario": "chips",
+            "width": 390,
+            "hash": "#/people?status=active&tag=GROUP_A",
+            "remove": "tag",
+        },
     )
     layout = result["filterLayout"]
     assert layout["wrap"] == "nowrap" and layout["overflow"] == "auto"

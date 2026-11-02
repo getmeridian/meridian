@@ -272,7 +272,9 @@ def test_custom_extension_opens_a_fixed_date_draft_for_unlimited_and_pending_acc
 
 @pytest.mark.parametrize("duration", [None, 30])
 @pytest.mark.parametrize("existing", [False, True])
-def test_custom_date_opens_a_clean_quiet_editor_and_reports_an_empty_save_once(duration: int | None, existing: bool) -> None:
+def test_custom_date_opens_a_clean_quiet_editor_and_reports_an_empty_save_once(
+    duration: int | None, existing: bool
+) -> None:
     result = run_console(
         "person-tabs-custom-entry",
         data={
@@ -303,7 +305,9 @@ def test_traffic_editor_previews_while_editing_and_focuses_then_clears_an_invali
     )
     assert result["initialReset"] == "2026-12-01T00:00:00Z UTC"
     assert len(result["invalid"]["fields"]) == 1 and result["invalid"]["focused"]
-    assert result["invalid"]["summary"] == "" and result["invalid"]["previews"] == 0 and result["invalid"]["writes"] == []
+    assert (
+        result["invalid"]["summary"] == "" and result["invalid"]["previews"] == 0 and result["invalid"]["writes"] == []
+    )
     assert result["corrected"] == {"fields": [], "summary": ""}
     editing = result["editing"]
     assert editing["reset"] == "2026-11-15T00:00:00Z UTC" and editing["writes"] == []
@@ -318,19 +322,25 @@ def test_traffic_editor_previews_while_editing_and_focuses_then_clears_an_invali
 @pytest.mark.parametrize("first_use", [False, True])
 def test_submitting_before_the_preview_debounce_keeps_fields_frozen_through_review_and_patch(first_use: bool) -> None:
     result = run_console(
-        "person-tabs-saving-preview", data={"clock": True, "holdPreview": True, "holdPatch": True, "firstUse": first_use}
+        "person-tabs-saving-preview",
+        data={"clock": True, "holdPreview": True, "holdPatch": True, "firstUse": first_use},
     )
     assert result["startedFrozen"]
     assert result["review"] == {"frozen": True, "saving": True, "previews": 1}
     assert result["patch"] == {"frozen": True, "saving": True, "writes": 1}
-    assert result["closed"] and result["sibling"] == {"connected": True, "value": "Other private draft", "enabled": True}
+    assert result["closed"] and result["sibling"] == {
+        "connected": True,
+        "value": "Other private draft",
+        "enabled": True,
+    }
 
 
 @pytest.mark.parametrize("dirty", [False, True])
 def test_sibling_traffic_save_refreshes_an_open_expiry_preview_and_preserves_its_draft(dirty: bool) -> None:
     schedule = {"next_reset_at": "2026-11-09T00:00:00Z"}
     result = run_console(
-        "person-tabs-sibling-refresh", data={"clock": True, "dirty": dirty, "updatedSchedule": schedule, "schedulePreview": schedule}
+        "person-tabs-sibling-refresh",
+        data={"clock": True, "dirty": dirty, "updatedSchedule": schedule, "schedulePreview": schedule},
     )
     assert result["expiry"]["reset"] == "2026-11-09T00:00:00Z UTC"
     assert result["expiry"]["sameForm"] and result["expiry"]["sameDate"]
