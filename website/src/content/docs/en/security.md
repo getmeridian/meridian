@@ -75,7 +75,7 @@ The **agent itself is not downloaded from GitHub by the node**. Meridian's wheel
 - **Web panel:** only its own service origin, for local assets, sign-in, session refresh, API reads/writes, and visible-screen refreshes. Passwords, authenticator codes, session cookies, and edits go to your service. No third-party requests.
 - **Website:** only its own origin, including fonts, search files, Markdown copies, and demo assets. The web panel demo answers its API in the browser. No analytics, external fonts, embeds, or third-party requests.
 
-The console demo uses invented people, access profiles, and client routing. Edits, bulk reviews, and operation receipts stay in the current tab and reset on reload. Person edits apply due UTC traffic resets and expiry from first use before later reviews. Password changes, authenticator and passkey enrollment, server commands, and ending existing connections are unavailable; the demo explains this without contacting a service.
+The console demo uses invented people, access profiles, and client routing. Edits, bulk reviews, and operation receipts stay in the current tab and reset on reload. Person edits apply due UTC traffic resets and expiry from first use before later reviews. Bulk undo restores the reviewed fields and access status of changed people; other people keep their later edits. Password changes, authenticator and passkey enrollment, server commands, and ending existing connections are unavailable; the demo explains this without contacting a service.
 
 External app, documentation, and support links open only when you follow them. They do not make the page fetch those sites in the background.
 

@@ -176,7 +176,7 @@
     if (review.proposal) receipt.proposal = D.clone(review.proposal);
     receipts.set(receipt.id, receipt);
     var versions = {};
-    review.people.forEach(function (person) { var user = D.person(person.username); if (user) versions[person.username] = version(user); });
+    review.people.forEach(function (person) { var user = D.person(person.username); if (person.outcome === "changed" && user) versions[person.username] = version(user); });
     undoVersions.set(receipt.id, versions);
     D.emit("people.bulk", receipt.id, Object.assign({ action: review.action.action }, review.counts));
     return D.reply(receipt);
@@ -191,13 +191,14 @@
     checkVersions(undoVersions.get(receipt.id));
     var outcomes = [], effects = {};
     receipt.people.forEach(function (person) {
+      if (person.outcome !== "changed") return;
       var actual = D.person(person.username), inverse = D.clone(actual), before = fields(actual);
-      if (person.outcome === "changed") {
-        D.source.bulk_writable_fields.forEach(function (key) { if (key !== "status") inverse[key] = D.clone(person.before[key]); });
-        if (receipt.action.action === "enable" || receipt.action.action === "disable") inverse.status = person.before.status === "disabled" ? "disabled" : "active";
-      }
+      D.source.bulk_writable_fields.forEach(function (key) { if (key !== "status") inverse[key] = D.clone(person.before[key]); });
+      if (receipt.action.action === "enable" || receipt.action.action === "disable") inverse.status = person.before.status === "disabled" ? "disabled" : "active";
       var effect = project(inverse);
-      if (effect.reset || effect.user.status !== inverse.status) D.fail("undo_refused", 409);
+      if (effect.reset) D.fail("undo_refused", 409);
+      if (JSON.stringify(fields(project(actual).user)) !== JSON.stringify(person.after) ||
+          JSON.stringify(fields(effect.user)) !== JSON.stringify(person.before)) D.fail("stale_people", 409, [person.username]);
       D.resolvePolicy(effect.user);
       effects[person.username] = effect.user;
       var after = fields(effect.user), changes = changed(before, after);

@@ -14,7 +14,7 @@ const html = fs.readFileSync(path.join(directory, 'console/index.html'), 'utf8')
 const dom = new JSDOM(html, { url: `https://198.51.100.1/demo/console/?lang=${locale}`, runScripts: 'outside-only', pretendToBeVisual: true });
 const w = dom.window;
 let demoNow;
-if (mode === 'showcase-queries' || mode.startsWith('showcase-schedule-')) {
+if (mode === 'showcase-queries' || mode.startsWith('showcase-schedule-') || mode.startsWith('showcase-undo-')) {
   const generated = Date.parse(JSON.parse(fs.readFileSync(path.join(directory, 'console/demo-data.json'), 'utf8')).generated_at);
   demoNow = generated;
   w.Date = class extends Date {
@@ -254,6 +254,34 @@ if (mode === 'showcase-navigation') {
   report.after = await M.api('PATCH', 'api/users/Luma', { activation_duration_days: 5 });
   report.fixed = (await M.api('GET', 'api/people?q=Luma&lifecycle=fixed')).users.map(user => user.username);
   report.unlimited = (await M.api('GET', 'api/people?q=Luma&lifecycle=unlimited')).users.map(user => user.username);
+} else if (mode === 'showcase-undo-status') {
+  if (data.expired) await M.api('PATCH', 'api/users/' + data.person, { expire_at: new Date(demoNow - 86400000).toISOString() });
+  report.before = await M.api('GET', 'api/users/' + data.person);
+  const action = data.action.action === 'expiry' ? { ...data.action, expire_at: new Date(demoNow - 86400000).toISOString() } : data.action;
+  const review = await M.api('POST', 'api/people/bulk/preview', { usernames: [data.person], action });
+  const receipt = await M.api('POST', 'api/people/bulk/commit', { preview_id: review.id, preview_hash: review.preview_hash });
+  report.committed = receipt.people[0];
+  const committedUser = await M.api('GET', 'api/users/' + data.person);
+  try {
+    const dry = await M.api('POST', 'api/people/bulk/undo', { receipt_id: receipt.id, dry_run: true });
+    report.dry = dry.undo_people;
+    report.dryDidNotWrite = JSON.stringify(await M.api('GET', 'api/users/' + data.person)) === JSON.stringify(committedUser);
+    const undone = await M.api('POST', 'api/people/bulk/undo', { receipt_id: receipt.id });
+    report.undone = undone.undo_people;
+    report.after = await M.api('GET', 'api/users/' + data.person);
+  } catch (error) { report.undoError = error.code; }
+} else if (mode === 'showcase-undo-unchanged') {
+  await M.api('PATCH', 'api/users/Sela', { tag: 'VIP' });
+  const review = await M.api('POST', 'api/people/bulk/preview', { usernames: ['Luma', 'Sela'], action: { action: 'tag', tag: 'VIP' } });
+  const receipt = await M.api('POST', 'api/people/bulk/commit', { preview_id: review.id, preview_hash: review.preview_hash });
+  report.outcomes = receipt.people.map(person => person.outcome);
+  await M.api('PATCH', 'api/users/Sela', { tag: 'AFTER' });
+  try {
+    const undone = await M.api('POST', 'api/people/bulk/undo', { receipt_id: receipt.id });
+    report.undone = undone.undo_people.map(person => person.username);
+    report.restored = (await M.api('GET', 'api/users/Luma')).tag === review.people[0].before.tag;
+  } catch (error) { report.undoError = error.code; }
+  report.untouched = (await M.api('GET', 'api/users/Sela')).tag;
 } else if (mode === 'showcase-unavailable') {
   report.refusals = [];
   report.missing = M.t('error.not_found');

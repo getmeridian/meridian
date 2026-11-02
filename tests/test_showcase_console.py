@@ -124,6 +124,41 @@ def test_demo_materializes_first_use_expiry_before_status_and_lifecycle_queries(
     assert result["outside"] == result["nativeApi"] == result["errors"] == []
 
 
+@pytest.mark.parametrize(
+    "person,action,expired",
+    [
+        ("Kavi", {"action": "disable"}, False),
+        ("Luma", {"action": "disable"}, True),
+        ("Kavi", {"action": "quota", "traffic_limit_bytes": 100 * 1024**3}, False),
+        ("Luma", {"action": "quota", "traffic_limit_bytes": 1024**3}, False),
+        ("Luma", {"action": "expiry"}, False),
+        ("Luma", {"action": "extend", "days": 7}, True),
+    ],
+)
+def test_demo_undo_restores_the_reviewed_enforced_status(demo: Path, person: str, action: dict, expired: bool) -> None:
+    result = run_console(
+        "showcase-undo-status", data={"directory": str(demo), "person": person, "action": action, "expired": expired}
+    )
+    assert result["committed"]["outcome"] == "changed"
+    assert result["committed"]["before"]["status"] != result["committed"]["after"]["status"]
+    assert result.get("undoError") is None
+    assert result["dryDidNotWrite"]
+    assert result["dry"][0]["after"] == result["undone"][0]["after"] == result["committed"]["before"]
+    assert result["after"]["status"] == result["before"]["status"]
+    validate_recordings(result["responses"])
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
+def test_demo_undo_ignores_people_unchanged_by_the_commit(demo: Path) -> None:
+    result = run_console("showcase-undo-unchanged", data={"directory": str(demo)})
+    assert result["outcomes"] == ["changed", "unchanged"]
+    assert result.get("undoError") is None
+    assert result["undone"] == ["Luma"] and result["restored"]
+    assert result["untouched"] == "AFTER"
+    validate_recordings(result["responses"])
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 def test_demo_security_and_remote_actions_show_a_translated_demo_refusal(demo: Path, locale: str) -> None:
     result = run_console("showcase-unavailable", locale, {"directory": str(demo)})
