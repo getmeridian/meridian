@@ -11,7 +11,7 @@ _RENDERER_MANIFEST = {
     "agent-spec": "access-profiles-v3",
     "control-subscriptions": "app-response-rules-v10",
     "control-commands": "cut-off-disclosures-v8",
-    "pwa": "app-rule-refusals-v6",
+    "pwa": "pwa-helper-assets-v7",
     "control-service": "people-note-presence-v60",
     "control-api": "people-note-presence-v48",
     "control-ui": "console-tips-v69",

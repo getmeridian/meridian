@@ -44,6 +44,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   people in the same batch are still deleted atomically (#95).
 
 #### Fixed
+- Connection pages load their delivery-capability helper from the service, so
+  supported-app limits appear without a missing-script error (#95).
 - The public panel demo works end to end again: People, access profiles, client
   routing, bulk changes with undo, and token reviews follow a real service's rules,
   and actions a demo cannot perform say so (#95).
