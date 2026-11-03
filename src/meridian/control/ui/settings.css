@@ -7,7 +7,7 @@
   padding: var(--space-2) var(--space-3); border: 1px solid transparent; border-radius: var(--r);
   color: var(--t2); font-size: .875rem; font-weight: 600; text-decoration: none; }
 .settings-section:hover { color: var(--t1); background: var(--s2); }
-.settings-section[aria-selected="true"] { color: var(--ac-text); background: var(--ac2); border-color: var(--ac); }
+.settings-section[aria-selected="true"] { color: var(--ac-text); background: var(--ac2); border-color: var(--ac-text); }
 .settings-panels, .settings-panel { min-inline-size: 0; }
 .settings-panel { scroll-margin-block-start: 8rem; }
 .settings-panel > .section-title { margin-block-start: 0 !important; }

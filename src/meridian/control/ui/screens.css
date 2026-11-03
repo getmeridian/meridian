@@ -41,7 +41,7 @@
 .tab { flex: 0 0 auto; display: flex; align-items: center; padding: 10px 12px; color: var(--t2); text-decoration: none; font-weight: 600; font-size: .9375rem;
   border-bottom: 2px solid transparent; white-space: nowrap; }
 .tab:hover { color: var(--t1); }
-.tab.active { color: var(--t1); border-bottom-color: var(--ac); }
+.tab.active { color: var(--t1); border-bottom-color: var(--ac-text); }
 .view { display: block; max-width: 1040px; margin: 0 auto; padding: 24px 20px 64px; outline: none; }
 .view > * + * { margin-top: 16px; }
 .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
@@ -75,7 +75,7 @@
 .bar { display: block; height: 6px; border-radius: 99px; background: var(--b1); overflow: hidden; width: 100%;
   min-width: 120px; }
 .bar-fill { display: block; height: 100%; border-radius: 99px; background: var(--ok); }
-.bar-high { background: var(--ac); }
+.bar-high { background: var(--ac-ui); }
 .bar-full { background: var(--err); }
 
 /* -- cards ---------------------------------------------------------------------------------- */
@@ -139,7 +139,7 @@
 .privacy-options legend { font-family: var(--heading); font-size: 1.0625rem; font-weight: 600; padding-inline: 6px; }
 .privacy-choice { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: var(--r);
   background: var(--s2); border: 1px solid var(--b1); cursor: pointer; }
-.privacy-choice:has(input:checked) { border-color: var(--ac); background: var(--band); }
+.privacy-choice:has(input:checked) { border-color: var(--ac-text); background: var(--band); }
 .privacy-choice input { margin-block-start: 4px; width: auto; min-height: 0; flex-shrink: 0; }
 .privacy-change { padding-block: 12px; border-top: 1px solid var(--b1); }
 .privacy-change:first-child { border-top: 0; }
@@ -147,7 +147,7 @@
 .usage-plot > * + * { margin-top: 6px; }
 .usage-chart { display: block; width: 100%; height: auto; }
 .usage-grid { stroke: var(--b1); stroke-width: 1; }
-.usage-bar { fill: var(--ac); }
+.usage-bar { fill: var(--ac-ui); }
 .usage-bar:focus { outline: none; fill: var(--ac-text); stroke: var(--t1); stroke-width: 1; }
 .usage-zero { opacity: .25; }
 .usage-dates { display: flex; justify-content: space-between; gap: 10px; }
@@ -188,13 +188,13 @@
 .capacity-chart { display: block; width: 100%; height: auto; }
 .capacity-legend { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
 .capacity-legend h4 { font-size: .85rem; }
-.capacity-receive { fill: var(--ac); }
+.capacity-receive { fill: var(--ac-ui); }
 .capacity-send { fill: var(--t2); }
 .capacity-gap { fill: var(--b1); opacity: .55; }
 .capacity-peak { stroke: var(--t1); stroke-width: 1.5; }
-.capacity-bar:focus { outline: 2px solid var(--ac); }
+.capacity-bar:focus { outline: 2px solid var(--ac-text); }
 .capacity-key::before { content: ""; display: inline-block; width: .7rem; height: .7rem; margin-inline-end: .4rem; border-radius: 2px; }
-.capacity-key-receive::before { background: var(--ac); }
+.capacity-key-receive::before { background: var(--ac-ui); }
 .capacity-key-send::before { background: var(--t2); }
 .field-error:empty { display: none; }
 .live-status { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .8rem; margin-block: 0; }
@@ -222,7 +222,7 @@
 .mode-note { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-4);
   max-inline-size: 1040px; margin-inline: auto; padding: var(--space-3) 20px 0; }
 .mode-note .btn { min-block-size: 44px; white-space: normal; }
-.server-focused { border-color: var(--ac); }
+.server-focused { border-color: var(--ac-text); }
 .server-focused, .server-focused > .mode-disclosure { scroll-margin-block-start: 12rem; }
 
 /* Overview uses the same cards, read rows, chips, and spacing as the shell. */

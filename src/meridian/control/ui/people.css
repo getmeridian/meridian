@@ -10,7 +10,7 @@
 .people-filter > summary::-webkit-details-marker, .people-bulk-more > summary::-webkit-details-marker { display: none; }
 .people-filter > summary::marker, .people-bulk-more > summary::marker { content: none; }
 .people-filter > summary:hover, .people-filter[open] > summary { border-color: var(--b2); background: var(--s2); }
-.people-filter.is-active > summary { border-color: var(--ac); background: var(--ac2); color: var(--ac-text); }
+.people-filter.is-active > summary { border-color: var(--ac-text); background: var(--ac2); color: var(--ac-text); }
 .people-filter-panel { position: absolute; inset-inline-end: 0; inset-block-start: calc(100% + var(--space-2));
   z-index: 110; inline-size: 18rem; max-inline-size: calc(100vw - 32px); max-block-size: 70dvh; overflow: auto; box-shadow: var(--shadow-lg); }
 .people-filter-panel .hint { margin: 0; }
@@ -25,7 +25,7 @@
 .people-list-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .people-list-header > p { flex: 1 1 15rem; }
 .select-page { display: flex; align-items: center; gap: var(--space-2); min-block-size: 44px; font-size: .875rem; cursor: pointer; }
-.select-page input, .people-select input { inline-size: 20px; block-size: 20px; margin: 0; accent-color: var(--ac); }
+.select-page input, .people-select input { inline-size: 20px; block-size: 20px; margin: 0; accent-color: var(--ac-ui); }
 .people-item { display: flex; align-items: center; }
 .people-item + .people-item { border-block-start: 1px solid var(--b1); }
 .people-select { display: inline-grid; place-items: center; min-inline-size: 44px; min-block-size: 44px;
