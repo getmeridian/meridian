@@ -23,6 +23,7 @@
 - **Disruptive actions name their boundary** — restart, cut-off, reissue, and revocation receipts show affected nodes, reconnect scope, and key generation, and repeated clicks cannot queue duplicates.
 
 ## Pitfalls
+- **Stay restores the edited field and selection** — navigation clicks focus their link before the guard opens; remember the draft field instead of relying on native dialog focus restoration.
 - **Scope the session cookie to `ServiceConfig.public_path`** — a `/` cookie would ride every subscription request; without a path, sign-in and setup links are refused (`ui_unconfigured`).
 - **Guess limits are per bucket, never per source** — every browser arrives as nginx's 127.0.0.1 and forwarded headers are untrusted; sign-in, setup links, and each session's re-checks keep separate buckets so anonymous guesses cannot lock out the owner. Judge each guess inside `LoginLimiter.turn()` (check, hash, count), since checking before the slow hash let concurrent guesses pass.
 - **Write what a password check grants in the transaction that re-reads the hash and session** — the scrypt runs unlocked, so a reset in between could let the old password through.

@@ -46,6 +46,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
 #### Fixed
 - Connection pages load their delivery-capability helper from the service, so
   supported-app limits appear without a missing-script error (#95).
+- Staying after an unsaved-edit warning in the web panel returns focus and the
+  cursor to the draft field, including after browser Back (#95).
 - The public panel demo works end to end again: People, access profiles, client
   routing, bulk changes with undo, and token reviews follow a real service's rules,
   and actions a demo cannot perform say so (#95).
