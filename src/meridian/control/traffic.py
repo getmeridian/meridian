@@ -15,6 +15,8 @@ Nothing here records where a client connected from.
 
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
 from datetime import date, datetime, timedelta
 
 from meridian.control.errors import ServiceError, agent_error
@@ -31,7 +33,7 @@ from meridian.control.models import (
 from meridian.control.privacy import history_cutoff, prune_history_rows, read_privacy
 from meridian.control.server_allowances import advance_server_periods
 from meridian.control.store import Store
-from meridian.control.times import utc_now
+from meridian.control.times import format_timestamp
 from meridian.core.agent_protocol import StatsAck, StatsReport
 from meridian.core.traffic import NodeTrafficAccounting, NodeTrafficEvidence
 
@@ -117,8 +119,9 @@ ACCOUNTING_MIGRATION: tuple[str, ...] = (
 
 
 class TrafficLedger:
-    def __init__(self, store: Store) -> None:
+    def __init__(self, store: Store, *, clock: Callable[[], float] = time.time) -> None:
         self._store = store
+        self._clock = clock
         store.create(_SCHEMA)
         if store.meta("schema_version") is None:
             for statement in TRAFFIC_EVIDENCE_COLUMNS:
@@ -171,7 +174,7 @@ class TrafficLedger:
                     "counter_regression", f"Counters of {user.user_id} went down within one counter epoch."
                 )
             growth.append((user.user_id, user.uplink_bytes, user.downlink_bytes, up, down))
-        now = now or utc_now()
+        now = now or format_timestamp(self._clock())
         advance_server_periods(self._store, now)
         history = read_privacy(self._store).usage_history == "daily"
         day = history_cutoff(1, now)
@@ -315,12 +318,12 @@ class TrafficLedger:
         with self._store.transaction():
             settings = read_privacy(self._store)
             if settings.usage_history == "daily":
-                prune_history_rows(self._store, settings.history_days, now or utc_now())
+                prune_history_rows(self._store, settings.history_days, now or format_timestamp(self._clock()))
 
     def user_usage(self, username: str, *, days: int = 30, now: str | None = None) -> UserUsage:
         """Per-person growth received on each UTC day; zeros fill gaps, and retention bounds the window."""
         with self._store.lock:
-            settings, window = self._history_window(days, now or utc_now())
+            settings, window = self._history_window(days, now or format_timestamp(self._clock()))
             user = self._store.row("SELECT user_id FROM users WHERE username = ?", (username,))
             if user is None:
                 raise ServiceError("not_found", f"Unknown user {username!r}.", 404)
@@ -346,7 +349,7 @@ class TrafficLedger:
     def daily(self, *, days: int = 30, now: str | None = None) -> TrafficDailySummary:
         """Fleet and per-node daily growth, including retained totals of nodes that were removed."""
         with self._store.lock:
-            settings, window = self._history_window(days, now or utc_now())
+            settings, window = self._history_window(days, now or format_timestamp(self._clock()))
             rows = self._store.rows(
                 "SELECT node_id, day, bytes FROM node_traffic_daily WHERE day BETWEEN ? AND ? ORDER BY node_id",
                 (window[0].isoformat(), window[-1].isoformat()),

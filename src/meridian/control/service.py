@@ -115,7 +115,7 @@ class ControlService:
         self._db = self._store.db
         self._store.create(SCHEMA)
         # Users read their traffic from the ledger's table, so it exists before any user query.
-        self.traffic = TrafficLedger(self._store)
+        self.traffic = TrafficLedger(self._store, clock=clock)
         self.events = EventLedger(self._store, clock=clock)
         self.privacy_ledger = PrivacyLedger(self._store, clock=clock, events=self.events)
         with self._transaction():
@@ -518,9 +518,10 @@ class ControlService:
     def reset_user_traffic(self, username: str) -> UserRecord:
         """Start the user's traffic period now; a user limited by it becomes active again."""
         with self._transaction():
-            self._reset_traffic(self._require_user(username), self.now())
+            moment = self.now()
+            self._reset_traffic(self._require_user(username), moment)
             self.events.append("user.traffic_reset", username)
-            self._enforce(self.now())
+            self._enforce(moment)
             self._compose_all()
             return self._require_user(username)
 

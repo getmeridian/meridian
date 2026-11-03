@@ -70,7 +70,7 @@ from meridian.control.route_table import Route, control_routes
 from meridian.control.route_types import ApiRoute
 from meridian.control.service import ControlService
 from meridian.control.subscriptions import unknown_subscription
-from meridian.control.times import utc_now
+from meridian.control.times import parse_timestamp
 from meridian.control.token_capabilities import capability_catalog
 from meridian.control.tokens import Caller, unauthenticated
 from meridian.control.ui_routes import UI_ROUTES, UiContext
@@ -305,7 +305,7 @@ class _Handler(BaseHTTPRequestHandler):
                     "message": str(exc),
                     "retryable": retryable,
                     "retry_after_seconds": retry_after,
-                    "server_time": utc_now(),
+                    "server_time": self._service.now(),
                 },
             }
         else:
@@ -603,7 +603,7 @@ class _Handler(BaseHTTPRequestHandler):
     def agent_poll(self, _match: re.Match[str]) -> Any:
         service, session = self._session()
         # Answer before the session expires, so the agent's next request is a fresh hello.
-        remaining = session.expires_at - time.time() - 5
+        remaining = session.expires_at - parse_timestamp(service.now()) - 5
         token = self._bearer()
         return service.poll(
             session.node_id,

@@ -9,7 +9,6 @@ from pathlib import Path
 
 import pytest
 
-from meridian.control import traffic as traffic_module
 from meridian.control.models import NodeSpec, UserUpdate, users_resource_id
 from meridian.control.service import ControlService, ServiceError
 from meridian.core.agent_protocol import StatsReport, UserTraffic
@@ -27,8 +26,7 @@ def service_clock() -> list[str]:
 
 
 @pytest.fixture
-def service(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, service_clock: list[str]) -> ControlService:
-    monkeypatch.setattr(traffic_module, "utc_now", lambda: NOW)
+def service(tmp_path: Path, service_clock: list[str]) -> ControlService:
     return ControlService(
         tmp_path / "control.db",
         fleet_id=FLEET_ID,
