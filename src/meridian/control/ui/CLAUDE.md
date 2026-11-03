@@ -42,6 +42,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Ratios follow their label's direction** — keep active before total in an inline flex row with isolated numbers, so Persian reads active on the right; numeric date ranges isolate the whole range.
 - **Scrolling chip rows reveal their selection** — after every route or link, scroll the selected chip into view when the row overflows; a deep link to Security once left its chip cut off at a phone's edge.
 - **Verb-labelled buttons are actions** — Enable and Disable change their names with the available action and must never announce an inverted pressed state.
 - **Hidden person tab strips hand off focus** — returning to the sole Access panel focuses its region; a visible strip retains tab focus.
@@ -75,7 +76,6 @@
 - **Percentage chips isolate the unit too** — format the percent with the active locale and isolate the whole value, or RTL can move its sign away from the number.
 - **Phone targets follow width and pointer** — apply 44 px targets at the phone breakpoint as well as for coarse pointers; include local date inputs and chart selectors, keeping other pointer layout rules separate.
 - **Server guidance stays compact** — keep the copyable meridian command beside one caption so the notice does not dominate phone cards.
-- **Isolate count pairs together** — render Overview's active / total as one LTR unit; separate number isolates let RTL reverse the pair around the slash.
 - **Attention links name their disclosure** — open and focus Allowance and payments once after mounting, with room for the sticky header; later refreshes retain the owner's open or closed choice.
 - **Detailed notes belong to routes** — keep the switch note for Detailed-only screens or tabs; disclosures remain available in both modes and need no mode caption.
 - **Server facts follow the mode in place** — move one list of host facts between the card and More; retain card identity and disclosure state across mode changes and passive reads.

@@ -20,7 +20,7 @@ pytestmark = needs_console_dom
 # changing a binding or adding another call cannot silently inherit an opaque-ID exception.
 REVIEWED = {
     "fleet.js": {
-        "sha256": "b14030afe13db1b37ff73f8a12ff968a1d904ee21da84959148e7f1b6c345b8c",
+        "sha256": "50f419d3ab11455c6a76868b0dbacaf86d642aad447ab51c815df15e7ad97bc9",
         "paths": {
             'GET "api/revisions/" + number': ["api/revisions/{id}"],
             'GET "api/revisions/" + chosen': ["api/revisions/{id}"],

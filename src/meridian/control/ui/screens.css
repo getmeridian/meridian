@@ -232,6 +232,7 @@
 .overview-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4); align-items: start; }
 .overview-health { display: flex; gap: var(--space-3); align-items: baseline; font-size: 1.0625rem; font-weight: 600; }
 .overview-number { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.overview-ratio { display: inline-flex; align-items: baseline; gap: .25em; white-space: nowrap; }
 .overview-facts .kv-row { padding-block: var(--space-4); }
 .attention-list { display: flex; flex-direction: column; }
 .attention-row { display: flex; align-items: center; gap: var(--space-3); justify-content: space-between;

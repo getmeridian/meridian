@@ -56,6 +56,7 @@ def test_server_allowance_cards_show_usage_payment_attention_and_a_cli_command(l
     ):
         assert catalog[key].split("{")[0] in result["text"]
     assert "2026-11-30" in result["text"] and "2026-10-31" in result["text"]
+    assert result["allowanceLocalized"] and result["periodIsolated"]
     assert "<img" in result["text"] and result["images"] == 0 and not result["pwned"]
     assert all(event["method"] == "GET" and event["url"] == "ui/api/fleet" for event in result["requests"])
 

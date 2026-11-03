@@ -286,6 +286,20 @@ if (scenario === 'overview-layout') {
     primary: actions.querySelector('.btn-primary')?.hasAttribute('data-overview-add'),
   };
 }
+if (scenario === 'overview-ratio') {
+  resolveStyles(w, ui, ['tokens.css', 'styles.css', 'screens.css'], 360);
+  const active = document.querySelector('[data-overview-active]');
+  const total = document.querySelector('[data-overview-total]');
+  const figure = active.parentElement;
+  const style = w.getComputedStyle(figure);
+  report.ratio = {
+    parts: [...figure.children].map(part => clean(part.textContent).trim()),
+    isolatedNumbers: active.tagName === 'BDI' && total.tagName === 'BDI',
+    direction: figure.dir || style.direction || document.documentElement.dir,
+    display: style.display,
+    flow: style.flexDirection || 'row',
+  };
+}
 if (scenario === 'overview-visual') {
   loadStyles();
   const peopleFigure = document.querySelector('[data-overview-active]').parentElement;
@@ -300,7 +314,7 @@ if (scenario === 'overview-visual') {
       return Math.max(parseFloat(style.minHeight) || 0, parseFloat(style.minBlockSize) || 0);
     }),
     ageIsolated: document.querySelector('.live-updated').textContent.includes('\u2068'),
-    peopleIsolated: peopleFigure.tagName === 'BDI' && peopleFigure.dir === 'ltr',
+    peopleIsolated: [...peopleFigure.querySelectorAll('[data-overview-active], [data-overview-total]')].every(el => el.tagName === 'BDI'),
     trafficIsolated: trafficFigure.startsWith('\u2068') && trafficFigure.endsWith('\u2069'),
     windowIsolated: document.querySelector('[data-overview-window]').textContent.includes('\u2068'),
     meter: !!document.querySelector('.overview-fleet meter[aria-label]'),

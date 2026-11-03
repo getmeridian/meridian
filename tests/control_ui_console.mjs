@@ -220,6 +220,14 @@ if (mode === 'servers') {
   report.capacity_zeros = view.querySelectorAll('.capacity-chart [data-value="0"]').length;
   report.capacity_now = [...view.querySelectorAll('.capacity-now dd')].map(el => el.textContent);
   report.capacity_peaks = [...view.querySelectorAll('.capacity-legend > .muted')].map(el => el.textContent);
+  const used = [...view.querySelectorAll('dt')].find(el => el.textContent === M.t('server_allowance.used'));
+  const period = [...view.querySelectorAll('dt')].find(el => el.textContent === M.t('server_allowance.period'));
+  const allowance = data?.server_usage?.find(item => item.measurement === 'accepted_user_traffic');
+  report.allowanceLocalized = !!allowance && used?.nextElementSibling.textContent === M.t('people.used_of', {
+    used: M.bytes(allowance.used_bytes), limit: M.bytes(allowance.metadata.allowance_bytes),
+  });
+  report.periodIsolated = period?.nextElementSibling.children.length === 1 &&
+    period.nextElementSibling.firstElementChild.tagName === 'BDI' && period.nextElementSibling.firstElementChild.dir === 'ltr';
 }
 
 if (mode === 'quota') {
