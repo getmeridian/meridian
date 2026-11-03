@@ -4,9 +4,11 @@
 
 **Two-stage pipeline** — CI validates on every push/PR. Release triggers only on CI success on main via `workflow_run`. Prevents accidental releases from failed builds.
 
-**CI jobs**: Python Tests (3.11–3.14 matrix), Lint (plus the never-failing dead-code report as PR annotations), Type Check, Validate (PWA rendering + app metadata + VERSION + CHANGELOG + public CLI docs), Shell (shellcheck), Agent (cargo fmt, clippy, and tests, with uv for the real-service round trip; then `make agent` and a wheel built with both musl builds, checked by `verify_package_assets.py --agent-only`), System Lab (multi-node Docker deploy of this checkout's wheel and the runner-arch agent `make system-lab-agent` builds), Website Build.
+**CI jobs**: Python Tests (3.11–3.14 matrix), Lint (plus the never-failing dead-code report as PR annotations), Type Check, Validate (PWA rendering + app metadata + VERSION + CHANGELOG + public CLI docs), Shell (shellcheck), Agent (cargo fmt, clippy, and tests, with uv for the real-service round trip; then `make agent` and a wheel built with both musl builds, checked by `verify_package_assets.py --agent-only`), E2E (Chromium journeys against a seeded service), System Lab (multi-node Docker deploy of this checkout's wheel and the runner-arch agent `make system-lab-agent` builds), Website Build.
 
 **System Lab only where it matters** — the `changes` job diffs the PR (or push) and runs System Lab only when runtime code (`src/meridian` minus Markdown and locale catalogs), the agent, `tests/systemlab` (or the corpus comparison it reuses), dependencies, or `ci.yml` change; a skipped job still satisfies required checks and Release. `workflow_dispatch` always runs it. Widen the path list when the lab starts depending on something new.
+
+**E2E only where it matters** — the same `changes` job gates browser journeys on control service, connection-page templates, E2E tests, CI, or dependency changes; manual dispatch always runs them. A ten-minute budget includes installation; cache Chromium by the installed Playwright version, install OS libraries on cache hits, and upload traces/screenshots on failure.
 
 **Website package manager** — website CI uses pnpm with `website/pnpm-lock.yaml`; keep supply-chain guardrails in `website/pnpm-workspace.yaml`.
 
@@ -28,6 +30,7 @@
 - **Demo validation** — the website job runs `scripts/build_showcase.py` into `dist/demo` and checks the connection page's assets, its disabled SW, rendered pages, and the console demo's files; the release job builds the same output.
 
 ## Pitfalls
+- **Playwright must know the runner image** — `ubuntu-latest` moved to 26.04 and Playwright 1.58 refused to install Chromium there; raise the `e2e` group with the image rather than pinning an old runner.
 - **Real-session tests compile the agent offline** — the runtime Python leg needs a stable Rust toolchain and a fetched locked Cargo cache before pytest, even though the separate Agent job prepares its own dependencies.
 
 - **Pre-release notes read only `## [X.Y.Z]`** — beta changes go under its `### Since <previous beta>` part, never a separate `## Unreleased` heading, which no release job extracts (b9's whole changelog once sat there).
