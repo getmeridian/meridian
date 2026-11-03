@@ -1,35 +1,39 @@
 """Browser preferences, mirrored phone layout and assistive/keyboard navigation."""
 
-import re
-
 import pytest
-import yaml
 from playwright.sync_api import Page, expect
 
 from tests.e2e.helpers import LOCALES, SCREENS, editor, language, person, ready
 
 
-@pytest.mark.parametrize(
-    "route",
-    ["revisions", "tokens", "people/Luma/usage", "people/Luma/devices", "people/Luma/routing", "people/Luma/keys"],
-)
-def test_saved_mode_and_detailed_bookmark_keep_the_destination(owner: Page, base_url: str, route: str) -> None:
-    owner.get_by_role("radio", name="Simple", exact=True).click()
-    owner.reload()
-    expect(owner.get_by_role("radio", name="Simple", exact=True)).to_have_attribute("aria-checked", "true")
-    owner.goto(base_url + "/#/" + route)
-    ready(owner, route)
-    note = owner.locator(".mode-note:visible")
-    expect(note).to_contain_text("Detailed")
-    note.get_by_role("button", name="Switch to Detailed", exact=True).click()
-    expect(owner.locator("html")).to_have_attribute("data-mode", "detailed")
-    expect(note).to_have_count(0)
-    expect(owner).to_have_url(base_url + "/#/" + route)
-    owner.reload()
-    ready(owner, route)
-    expect(owner.get_by_role("radio", name="Detailed", exact=True)).to_have_attribute("aria-checked", "true")
-    if route.startswith("people/"):
-        expect(owner.locator(f'[data-person-tab="{route.split("/")[-1]}"]')).to_have_attribute("aria-selected", "true")
+def test_saved_modes_and_detailed_bookmarks_keep_each_destination(owner: Page, base_url: str) -> None:
+    # Read-only bookmarks share one service/context; each destination still checks both reloads.
+    for route in (
+        "revisions",
+        "tokens",
+        "people/Luma/usage",
+        "people/Luma/devices",
+        "people/Luma/routing",
+        "people/Luma/keys",
+    ):
+        owner.get_by_role("radio", name="Simple", exact=True).click()
+        owner.reload()
+        expect(owner.get_by_role("radio", name="Simple", exact=True)).to_have_attribute("aria-checked", "true")
+        owner.goto(base_url + "/#/" + route)
+        ready(owner, route)
+        note = owner.locator(".mode-note:visible")
+        expect(note).to_contain_text("Detailed")
+        note.get_by_role("button", name="Switch to Detailed", exact=True).click()
+        expect(owner.locator("html")).to_have_attribute("data-mode", "detailed")
+        expect(note).to_have_count(0)
+        expect(owner).to_have_url(base_url + "/#/" + route)
+        owner.reload()
+        ready(owner, route)
+        expect(owner.get_by_role("radio", name="Detailed", exact=True)).to_have_attribute("aria-checked", "true")
+        if route.startswith("people/"):
+            expect(owner.locator(f'[data-person-tab="{route.split("/")[-1]}"]')).to_have_attribute(
+                "aria-selected", "true"
+            )
 
 
 def test_language_guard_keeps_draft_then_persists_and_mirrors_persian(owner: Page) -> None:
@@ -90,22 +94,32 @@ def accessible_controls(page: Page) -> None:
     assert controls.count() > 0
     client = page.context.new_cdp_session(page)
     try:
-        document = client.send("DOM.getDocument")["root"]["nodeId"]
-        summaries = client.send("DOM.querySelectorAll", {"nodeId": document, "selector": "summary"})["nodeIds"]
-        for control in controls.all():
-            if control.evaluate("el => el.tagName === 'SUMMARY'"):
-                # ARIA snapshots flatten native summary into text; Chromium's AX API exposes its computed name.
-                index = control.evaluate("el => [...document.querySelectorAll('summary')].indexOf(el)")
-                tree = client.send("Accessibility.getPartialAXTree", {"nodeId": summaries[index]})["nodes"]
-                assert tree[0].get("name", {}).get("value", "").strip(), control.aria_snapshot()
-            else:
-                snapshot = control.aria_snapshot()
-                nodes = yaml.safe_load(snapshot) or []
-                node = nodes[0] if nodes else ""
-                description = next(iter(node)) if isinstance(node, dict) else node
-                assert re.match(r'\w+ (?:"[^"\n]+"|[^\s\[:][^\n\[]*)', description), control.evaluate(
-                    "el => el.outerHTML"
-                )
+        selector = "button, a[href], input, select, textarea, summary"
+        document = client.send("DOM.getDocument", {"depth": -1})["root"]
+        backend_ids = {}
+
+        def index_nodes(node: dict) -> None:
+            backend_ids[node["nodeId"]] = node["backendNodeId"]
+            for child in node.get("children", []):
+                index_nodes(child)
+
+        index_nodes(document)
+        node_ids = client.send("DOM.querySelectorAll", {"nodeId": document["nodeId"], "selector": selector})["nodeIds"]
+        visible = controls.evaluate_all(
+            """(els, selector) => {
+                const all = [...document.querySelectorAll(selector)];
+                return els.map(el => all.indexOf(el));
+            }""",
+            selector,
+        )
+        # Playwright's Chromium accessibility session reports computed names, including native summaries.
+        tree = client.send("Accessibility.getFullAXTree")["nodes"]
+        names = {node["backendDOMNodeId"]: node for node in tree if "backendDOMNodeId" in node}
+        for position, index in enumerate(visible):
+            accessible = names.get(backend_ids[node_ids[index]], {})
+            assert not accessible.get("ignored", True) and accessible.get("name", {}).get("value", "").strip(), (
+                controls.nth(position).aria_snapshot()
+            )
     finally:
         client.detach()
     for container in page.locator("dialog:visible").all() + root.locator('[role="tabpanel"]:visible').all():

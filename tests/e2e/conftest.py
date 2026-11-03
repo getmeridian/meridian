@@ -37,6 +37,8 @@ FAILED = pytest.StashKey[bool]()
 
 
 class _StaticHandler(SimpleHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
     def log_message(self, format: str, *args: object) -> None:
         pass
 
@@ -47,6 +49,7 @@ def demo_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
     directory = tmp_path_factory.mktemp("e2e-showcase")
     export_showcase(directory / "demo")
     server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_StaticHandler, directory=str(directory)))
+    server.socket.listen(128)
     thread = threading.Thread(target=lambda: server.serve_forever(poll_interval=0.05), daemon=True)
     thread.start()
     try:

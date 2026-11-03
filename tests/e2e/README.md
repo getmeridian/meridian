@@ -55,8 +55,10 @@ context. CI shares one browser and uses the normal process model.
 
 `test_modes_locales_a11y.py` follows saved modes and Detailed bookmarks, guards a
 language change with a live draft, measures Persian mirroring, and checks accessible names. `test_keyboard.py` adds/shares a person and
-switches their tabs through the keyboard. Accessible names come from Playwright ARIA snapshots;
-this is a focused browser check, not an axe audit. The phone table uses one fresh
+switches their tabs through the keyboard. Accessible names come from Playwright's Chromium accessibility session, with
+ARIA snapshots in failure evidence;
+this is a focused browser check, not an axe audit. The six mode bookmarks share one read-only service/context, with both reloads
+checked at each destination. The phone table uses one fresh
 service and context per locale, visiting five screens in both themes (40 layouts)
 to avoid reseeding and relaunching a browser for every screen/theme combination.
 
