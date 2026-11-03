@@ -212,12 +212,21 @@
   // -- feedback ----------------------------------------------------------------------------
 
   var toastTimer = null;
-  M.toast = function (text, kind) {
+  /* `action` ({label, run}) adds one button, such as Undo; the toast then stays longer and waits
+   * while the pointer or focus is on it. */
+  M.toast = function (text, kind, action) {
     var host = document.getElementById("toast") || document.body.appendChild(M.h("div", { id: "toast", role: "status" }));
-    M.mount(host, M.h("div", { class: "toast " + (kind === "error" ? "toast-error" : "toast-ok") }, text));
+    var delay = action ? 8000 : kind === "error" ? 6000 : 2600;
+    function hide() { clearTimeout(toastTimer); host.classList.remove("show"); }
+    function wait() { clearTimeout(toastTimer); toastTimer = setTimeout(hide, delay); }
+    var button = action ? M.h("button", { class: "toast-action", type: "button",
+      onclick: function () { hide(); action.run(); } }, action.label) : null;
+    M.mount(host, M.h("div", { class: "toast " + (kind === "error" ? "toast-error" : "toast-ok") }, M.h("span", { text: text }), button));
     host.classList.add("show");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { host.classList.remove("show"); }, kind === "error" ? 6000 : 2600);
+    host.classList.toggle("has-action", !!action);
+    host.onmouseenter = host.onfocusin = action ? function () { clearTimeout(toastTimer); } : null;
+    host.onmouseleave = host.onfocusout = action ? wait : null;
+    wait();
   };
 
   M.copy = function (text) {

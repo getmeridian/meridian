@@ -1088,5 +1088,6 @@
   "people.usage_unlimited": "{used} · Без лимита",
   "people.notes_present": "Есть заметка",
   "bulk.extend_short": "Продлить",
-  "bulk.clear_short": "Снять"
+  "bulk.clear_short": "Снять",
+  "action.undo": "Отменить"
 }

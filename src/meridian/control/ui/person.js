@@ -55,10 +55,10 @@
     if (error.code !== "cancelled") M.toast(M.t("person.action_error", { name: label, error: M.errorText(error) }), "error");
   }
 
-  function completed(screen, user, toastKey, label, savedForm) {
+  function completed(screen, user, toastKey, label, savedForm, action) {
     if (toastKey === "person.enabled_toast" && user.status === "expired") toastKey = "person.enabled_expired_toast";
     if (toastKey === "person.enabled_toast" && user.status === "limited") toastKey = "person.enabled_limited_toast";
-    M.toast(M.t(toastKey, { name: label }));
+    M.toast(M.t(toastKey, { name: label }), null, action);
     if (!current(screen)) return;
     screen.version++;
     draw(screen, user, screen.share, savedForm);
@@ -70,11 +70,11 @@
     }
   }
 
-  function act(screen, work, toastKey) {
+  function act(screen, work, toastKey, action) {
     if (!current(screen)) return Promise.resolve();
     var label = M.displayName(screen.username);
     return work().then(function (result) {
-      completed(screen, result.user || result, toastKey, label);
+      completed(screen, result.user || result, toastKey, label, undefined, action);
       if (current(screen) && result.commands) M.showCommandResults(result.commands);
     }, function (e) { failed(label, e); });
   }
@@ -200,8 +200,15 @@
       if (screen.toggling || !current(screen)) return;
       var disabled = screen.user.status === "disabled";
       screen.toggling = true; screen.toggle.disabled = true;
-      act(screen, function () { return M.api("PATCH", path(screen.username), { status: disabled ? "active" : "disabled" }); },
-        disabled ? "person.enabled_toast" : "person.disabled_toast").finally(function () {
+      var name = screen.username, label = M.displayName(name);
+      // Undo sends the opposite request once; it still works after leaving this person's page.
+      var undo = { label: M.t("action.undo"), run: function () {
+        M.api("PATCH", path(name), { status: disabled ? "disabled" : "active" }).then(function (changed) {
+          completed(screen, changed.user || changed, disabled ? "person.disabled_toast" : "person.enabled_toast", label);
+        }, function (e) { failed(label, e); });
+      } };
+      act(screen, function () { return M.api("PATCH", path(name), { status: disabled ? "active" : "disabled" }); },
+        disabled ? "person.enabled_toast" : "person.disabled_toast", undo).finally(function () {
         screen.toggling = false; if (current(screen)) screen.toggle.disabled = false;
       });
     } });
@@ -257,7 +264,7 @@
         h("p", { class: "muted small", "data-person-carried": "", text: M.t("person.traffic_unattributed", {
           bytes: M.bytes(user.period_traffic.unattributed_bytes) }) }) : null,
       h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
-        M.confirm(M.t("person.reset_title"), M.t("person.reset_text"), M.t("person.reset_traffic")).then(function (ok) {
+        M.confirm(M.t("person.reset_title"), M.t("person.reset_text"), M.t("person.reset_traffic"), true).then(function (ok) {
           if (ok) act(screen, function () { return M.api("POST", path(name, "/reset-traffic"), {}); }, "person.reset_toast");
         });
       } }, M.t("person.reset_traffic")));

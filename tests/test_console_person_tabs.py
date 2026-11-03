@@ -61,6 +61,14 @@ def test_enable_and_disable_are_named_actions_without_pressed_toggle_semantics(l
     assert result["writes"] == [{"status": "disabled"}, {"status": "active"}]
 
 
+@pytest.mark.parametrize("locale", ["en", "fa"])
+def test_disabling_a_person_offers_one_undo_that_sends_the_opposite_status(locale: str) -> None:
+    result = run_console("person-tabs-toggle-undo", locale)
+    assert result["undo"] and result["offers"] == 1
+    assert result["writes"] == [{"status": "disabled"}, {"status": "active"}]
+    assert result["label"]
+
+
 @pytest.mark.parametrize("tab", ["", "usage", "devices", "routing", "keys"])
 def test_person_tab_deep_links_select_one_labelled_panel(tab: str) -> None:
     result = run_console("person-tabs-route", data={"tab": tab, "mode": "detailed"})

@@ -24,7 +24,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   gets removable filter chips and compact rows, and its selection bar appears only
   once someone is selected (#95).
 - Settings is split into General, Notice, Language, Privacy, Security, and Advanced
-  sections with their own links; Tokens and Revisions become tidy lists (#95).
+  sections with their own links; Tokens and Revisions become tidy lists, and
+  disabling or enabling a person offers Undo (#95).
 - Reviewed subscription response rules by app, with bounded literal User-Agent
   and Accept conditions, ordered format/refusal/policy/header actions, and one
   transient matcher test across API, CLI, and console. Private person policies

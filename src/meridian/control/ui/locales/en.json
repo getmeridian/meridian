@@ -1088,5 +1088,6 @@
   "people.usage_unlimited": "{used} · No limit",
   "people.notes_present": "Has a note",
   "bulk.extend_short": "Extend",
-  "bulk.clear_short": "Clear"
+  "bulk.clear_short": "Clear",
+  "action.undo": "Undo"
 }

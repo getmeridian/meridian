@@ -58,6 +58,7 @@
 - **Hidden person tab strips hand off focus** — returning to the sole Access panel focuses its region; a visible strip retains tab focus.
 - **Inline refreshes distinguish saved choices from drafts** — reseed changed clean editors with focus, retain edited baselines, refresh sibling schedules, and let summary presets read the current account.
 - **Checkbox rows use the shared `.check-row` and `.choice-group`** — a rule scoped to one screen once left access profiles as raw, run-together browser checkboxes.
+- **Undo toasts send the opposite request once** — they wait while hovered or focused, and the page's own Enable/Disable button stays the keyboard path.
 - **Passive reads keep a draft's reviewed dates** — only edits and saves request a new draft preview, since repeated POST previews would renew the owner's idle activity.
 - **Traffic previews start with saved dates** — debounce period and reset-day edits, show the reset field's own error, focus it only on submit, and clear obsolete form errors on input.
 - **Schedule previews carry only schedule fields** — the preview request forbids extras, so forwarding the traffic cap failed every quota save; a cap-only save needs no preview.

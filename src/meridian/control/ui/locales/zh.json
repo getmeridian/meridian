@@ -1088,5 +1088,6 @@
   "people.usage_unlimited": "{used} · 不限流量",
   "people.notes_present": "有备注",
   "bulk.extend_short": "延长",
-  "bulk.clear_short": "清除"
+  "bulk.clear_short": "清除",
+  "action.undo": "撤销"
 }

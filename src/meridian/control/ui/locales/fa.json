@@ -1088,5 +1088,6 @@
   "people.usage_unlimited": "{used} · بدون سقف",
   "people.notes_present": "یادداشت دارد",
   "bulk.extend_short": "تمدید",
-  "bulk.clear_short": "پاک کردن"
+  "bulk.clear_short": "پاک کردن",
+  "action.undo": "واگرد"
 }
