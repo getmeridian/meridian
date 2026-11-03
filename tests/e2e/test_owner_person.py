@@ -154,13 +154,15 @@ def test_published_notice_substitutes_the_person_across_page_and_app_then_disapp
     dialog = owner.get_by_role("dialog")
     expect(dialog).to_contain_text("Hello Luma. Maintenance is finished.")
     dialog.get_by_role("button", name="Save", exact=True).click()
-    expect(dialog).not_to_be_visible()
+    # The dialog closes before the confirmed save lands; the toast follows it. Refresh fetches once.
+    expect(owner.locator("#toast")).to_contain_text("Notice saved")
     visitor.get_by_role("button", name="Refresh", exact=True).click()
     expect(visitor.locator("#owner-notice")).to_contain_text("Hello Luma. Maintenance is finished.")
     announcement = app.get(url).headers["announce"]
     assert base64.b64decode(announcement.removeprefix("base64:")).decode() == "Hello Luma. Maintenance is finished."
     owner.get_by_role("button", name="Clear notice", exact=True).click()
     owner.get_by_role("dialog").get_by_role("button", name="Clear notice", exact=True).click()
+    expect(owner.locator('[data-notice="text"]')).to_have_value("")
     visitor.get_by_role("button", name="Refresh", exact=True).click()
     expect(visitor.locator("#owner-notice")).to_be_hidden()
     assert "announce" not in app.get(url).headers

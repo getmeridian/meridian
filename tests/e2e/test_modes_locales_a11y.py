@@ -83,7 +83,9 @@ def test_phone_screens_fit_both_themes_in_each_locale(owner: Page, base_url: str
             ready(owner, route)
             expect(owner.locator("html")).to_have_attribute("lang", locale)
             expect(owner.locator("html")).to_have_attribute("data-theme", theme)
-            assert owner.evaluate("document.documentElement.scrollWidth <= innerWidth"), (locale, theme, route)
+            # innerWidth would count the scrollbar and hide that much overflow.
+            fits = "document.documentElement.scrollWidth <= document.documentElement.clientWidth"
+            assert owner.evaluate(fits), (locale, theme, route)
 
 
 def accessible_controls(page: Page) -> None:
