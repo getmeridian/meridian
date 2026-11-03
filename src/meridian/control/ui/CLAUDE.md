@@ -1,136 +1,54 @@
 # control/ui — The owner's web console
 
 ## Design decisions
-- **Record lists use native menus** — show metadata and derived token status in each row; permissions and revoke/diff actions share the local disclosure, while issuance and comparison keep their reviews.
-- **Settings sections share navigation** — fragments select one labelled panel; General stays the default, Advanced uses the shared Detailed note, and clean sections remain mounted across mode changes.
-- **Custom expiry selects a fixed draft** — Extend focuses Date for its custom choice; ordinary Edit keeps the person's saved activation mode.
-- **Person tabs keep one screen** — fragments select one labelled panel; only its contents scroll below the summary, and tab changes use the shared navigation guard.
-- **Person rows own separate drafts** — create editors on Edit, preview date and traffic choices in the service, PATCH only that row's edited fields, and close only the saved editor.
-- **People selection follows the view** — Detailed shows checkboxes; Simple's Select toggle reveals them, and mode changes preserve an existing selection. The action bar appears only with selected people; the last receipt stays in the list header.
-- **People filters have individual chips** — native panels share the fragment query; removing a chip clears selection and returns focus to its control, while passive reads retain panels and rows.
+- **Served by the service, under the secret path** — `ui_routes.py` serves `index.html` at `/` and assets at `/ui/<name>`; the API shares the process, so there is no CORS, no build step, and no outside request (system fonts, local icons, QR codes as SVG data URIs from `segno`).
+- **Vanilla JS on one namespace** — `boot.js` sets theme and direction before paint; `core.js` owns `M.h` (the only DOM builder), `M.api`, dialogs, and formatting; screens register in `M.consoleScreens`; `app.js` runs setup link → no owner → sign in → shell.
+- **One owner signs in** — a scrypt password plus an optional TOTP code or passkeys; `owner.py` stores sessions only as SHA-256 with idle and absolute limits and mints single-use setup links that only the root token requests (`meridian panel`). Passive polls (`X-Meridian-Passive`) never extend idle time.
+- **An owner session reaches `server.OWNER_ROUTES` only** — a test derives the allowlist from every `M.api` call; node, endpoint, fence, revision, enrollment, import, and backup writes refuse it, and tokens it mints stay below `admin`.
+- **The console changes only what the service owns** — people, tokens, privacy, notices, fleet language, and signed restarts. Topology (servers, routing, contact, title, allowances, profile grants, response rules) is read-only beside its `meridian` command, because the next apply would undo an edit. Removal and reissue of people the deployer declared stay on the CLI (`declared_user`).
+- **Display mode is browser-local** — `M.mode()` reads Simple or Detailed and `M.chooseMode()` emits `meridian:mode`; drafts stay mounted, Detailed-only routes and tabs show the shared mode note, and leaving one goes to Overview through the navigation guard.
+- **Fragments hold place** — Settings sections, person tabs, and People filters and sorting live in the URL fragment and survive reloads; a person with one visible panel gets a labelled region instead of a tab strip.
+- **Drafts live only in memory** — changed forms guard navigation and dismissal with Leave/Stay, passive reads refresh without replacing edits, and person rows PATCH only their edited fields.
+- **Reviews come from the service** — schedules, profiles, routing, bulk actions, token issuance, and format previews render service previews and commit one frozen hash or ID; lifecycle forms show browser time beside UTC.
+- **People are bounded service reads** — pages, facets, and selection come from the people query; a selection sends usernames or the same query, then a receipt.
+- **Sharing has one view** — Overview's person picker and the person page use `share.js`; links and QR data stay in memory.
 - **Help uses toggletips** — `M.tip` sits beside a term, never inside its label, and opens a click-toggled bubble through a status region; Escape returns focus, and `M.keyValue`, `M.field`, and `M.titled` take an optional tip.
-- **Screen metadata is shared** — `M.consoleScreens` owns rendering, navigation, and Detailed-only route checks in one registry.
-- **Display mode is browser-local** — `M.mode()` reads Simple or Detailed; `M.chooseMode()` emits `meridian:mode` after an accepted change. Shared routes and drafts stay mounted, while leaving a Detailed-only route goes to Overview through the navigation guard.
-- **Overview composes owner reads** — bounded people queries, fleet health, opt-in UTC daily traffic, revisions, and recorded owner events provide its figures; unavailable history stays unavailable, and visible refreshes are passive.
-- **Sharing has one view** — Overview's bounded person picker and the person page use `share.js`; fetched links and QR data stay in memory.
-- **App testing stays transient** — Settings lists reviewed response rules read-only; the subscription form uses the shared tester without a person and the full preview with one, keeping headers and results only in memory.
-- **Declared removal drafts leave the browser as JSON** — one local download and selectable fallback serve the whole frozen set; the existing bulk commit still changes only service-owned people.
-- **Profile filters use query facets** — retain the selected ID in the fragment and expose default and zero-count profiles without a second catalog request.
-- **Person routing uses service reviews** — policy choices remain in memory, passive reads preserve edits, and confirmation submits one frozen hash.
-- **Profile assignment shares bulk review** — person and bulk forms send the same frozen membership action, preserve drafts during passive access reads, and disclose lost inbounds before commit.
-- **People pages are bounded service reads** — rows and fragment filters survive refresh; selection sends usernames or the same query, then a frozen review and receipt.
-- **Token review uses the service** — labels come from the shared four-language capability catalog; review locks the effective expiry, edits require another review, and the one-time secret never enters browser storage.
-- **Account dates come from the service** — lifecycle forms preview the shared UTC calculator, show browser time beside UTC, and send only edited choices.
-- **Served by the service, under the secret path** — `ui_routes.py` serves `index.html` at `/` and assets at `/ui/<name>`; the API lives in the same process, so there is no CORS, no build step, and no outside request (system fonts, local icons, QR codes as SVG data URIs from `segno`).
-- **Vanilla JS on one namespace** — `boot.js` sets theme and direction before paint; `core.js` owns `M.h` (the only DOM builder), `M.api`, dialogs, and formatting; each screen file adds `M.screens.*`; `app.js` runs the state machine (setup link → no owner → sign in → shell).
-- **Owner sign-in** — one owner: a scrypt password (`passwords.py`) and an optional TOTP code. `owner.py` stores sessions only as SHA-256 with idle and absolute limits, and mints single-use setup links that only the root token can request (`meridian panel`). Passive read polls (`X-Meridian-Passive`) don't extend idle time; writes always re-check session liveness in their transaction.
-- **An owner session reaches `server.OWNER_ROUTES` only** — an allowlist derived by a test from every `M.api` call; node, endpoint, and fence writes, revisions, enrollment, import, and backups refuse it. Tokens it mints stay below `admin` and need a recent sign-in.
-- **The console changes only what the service owns** — people, tokens, privacy, notices, fleet language, and signed unit restarts. Topology (servers, routing, contact, title, allowances) is read-only and shows the `meridian` command that changes it, because the next apply would undo a console edit.
-- **People the deployer declared stay the deployer's** — users in the last applied revision's intent; removal and reissue show the CLI command, and the service refuses both to owner sessions and people tokens (`declared_user`).
-- **Person drafts live only in memory** — changed forms guard navigation and dismissal with Leave/Stay, and visible reads refresh passively without replacing edits.
-- **People triage lives in the fragment** — validated filters and sorting survive reloads and person navigation; rows stay mounted, and facet counts apply the other active filters and search.
-- **Same locale approach as the PWA** — `locales/{en,ru,fa,zh}.json`, English fallback, `fa` sets `dir="rtl"`, numbers and sizes bidi-isolated.
-- **Passkeys verify locally** — reviewed `public_url` fixes RP/origin; required user verification, none attestation, bounded CBOR, and existing cryptography verify ES256/Ed25519 without identity lookup or a new dependency. Passkeys satisfy session step-up; add/rename/remove require it, and removal ends other sessions.
+- **Same locale approach as the PWA** — `locales/{en,ru,fa,zh}.json` with English fallback; `fa` sets `dir="rtl"`; numbers, percentages, sizes, and ranges use native digits and bidi isolation.
+- **Passkeys verify locally** — reviewed `public_url` fixes RP and origin; required user verification, none attestation, bounded CBOR, and existing cryptography verify ES256/Ed25519. Passkeys satisfy step-up, and removing one ends other sessions.
 
 ## What's done well
-- **Format previews share routing evidence** — the console renders effective rules, DNS, omissions, and destination results from the same service projection as the CLI.
-- **Connection keys and leaked links have separate actions** — rotation preserves the subscription URL, sends the displayed generation, and locks confirmation and submission; declared people receive the CLI command.
-- **Revocation receipts name their boundary** — show each node's blocked, pending, or old-agent state with the remaining transfers and shared-inbound cut-off effect.
-- **CSP with no script exceptions** — `default-src 'none'`, `script-src 'self'`, `frame-ancestors 'none'`, `no-referrer` on every response; `test_control_ui_assets.py` refuses inline script, style, handlers, HTML sinks, outside URLs, and locale drift.
-- **Every mutating request is same-origin twice** — `SameSite=Strict` plus the `X-Meridian-Request: 1` header `M.api` adds (and matching `Origin`/`Sec-Fetch-Site` when sent).
+- **CSP with no script exceptions** — `default-src 'none'`, `script-src 'self'`, `frame-ancestors 'none'`, `no-referrer`; `test_control_ui_assets.py` refuses inline script, style, handlers, HTML sinks, outside URLs, and locale drift.
+- **Every mutating request is same-origin twice** — `SameSite=Strict` plus the `X-Meridian-Request: 1` header `M.api` adds, and matching `Origin`/`Sec-Fetch-Site` when sent.
 - **Assets revalidate by content-hash ETag**; anything holding a secret is `no-store`.
-- Restart and cut-off actions disclose reconnects and affected nodes before confirming, and repeated clicks cannot queue duplicates.
-- **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
+- **Disruptive actions name their boundary** — restart, cut-off, reissue, and revocation receipts show affected nodes, reconnect scope, and key generation, and repeated clicks cannot queue duplicates.
 
 ## Pitfalls
-- **Device-slot captions format their counts** — pass native digits to the limited and unlimited catalog sentences while keeping the service's numeric limits unchanged.
-- **Arrow pairs set their flow** — bulk before/after and policy match/action pairs share isolated values in a row following the page direction, with an arrow pointing toward the second value.
-- **Percentages isolate native formatting** — use the shared helper for digits, spacing, and sign; quota captions and charts never assemble a raw percent sign.
-- **Badge contrast includes its translucent fill** — judge text on the composited surface in both themes, with 4.5:1 for labels and 3:1 for controls and chart marks; keep gold fills separate from functional accents.
-- **Phone header brands stay named** — hide the wordmark beside a fleet title, keep Meridian in the link's accessible name, and let only the title ellipsize.
-- **Action rows size labels before wrapping** — keep whole words and content-sized flex items, with 44 px targets and space for a wrapped phone selection bar.
-- **Share exports span the dialog** — the QR column must not constrain the common action row.
-- **Live-read age has no outer margin** — the parent's gap owns the spacing around Updated lines across screens.
-- **Visible person tabs replace matching headings** — retain the panel's tab label, restore its heading when the strip is hidden, and repeat this after refreshed cards mount.
-- **The person summary owns the current meter** — Usage keeps directional counters, reset facts, lifetime use, and history without repeating the summary's cap bar.
-- **Ratios follow their label's direction** — keep active before total in an inline flex row with isolated numbers, so Persian reads active on the right; numeric date ranges isolate the whole range.
-- **Scrolling chip rows reveal their selection** — after every route or link, scroll the selected chip into view when the row overflows; a deep link to Security once left its chip cut off at a phone's edge.
-- **Verb-labelled buttons are actions** — Enable and Disable change their names with the available action and must never announce an inverted pressed state.
-- **Hidden person tab strips hand off focus** — returning to the sole Access panel focuses its region; a visible strip retains tab focus.
-- **Inline refreshes distinguish saved choices from drafts** — reseed changed clean editors with focus, retain edited baselines, refresh sibling schedules, and let summary presets read the current account.
-- **Checkbox rows use the shared `.check-row` and `.choice-group`** — a rule scoped to one screen once left access profiles as raw, run-together browser checkboxes.
-- **Undo toasts send the opposite request once** — they wait while hovered or focused, and the page's own Enable/Disable button stays the keyboard path.
-- **Tip buttons keep a 24 px face** — the phone rule grows every button to 44 px, so a tip takes its hit area from `::before`; its bubble resets the body font, or a legend or heading restyles it.
-- **Passive reads keep a draft's reviewed dates** — only edits and saves request a new draft preview, since repeated POST previews would renew the owner's idle activity.
-- **Traffic previews start with saved dates** — debounce period and reset-day edits, show the reset field's own error, focus it only on submit, and clear obsolete form errors on input.
-- **Schedule previews carry only schedule fields** — the preview request forbids extras, so forwarding the traffic cap failed every quota save; a cap-only save needs no preview.
-- **Saving owns the preview timer** — cancel pending previews before the final review, reject timer work during saving, and never validate controls from a delayed callback.
-- **Custom date starts before the draft snapshot** — choose its fixed mode quietly, keep untouched existing editors clean, and let the date field own its single validation alert.
-- **Quiet date choices still cancel presets** — send a silent change through the expiry guard so an earlier calendar reply cannot fill the newly opened custom editor.
-- **Summary extensions follow saved access** — guard pending reviews with edit events rather than validating unfinished drafts, and let a returned calendar preset select Fixed date from any editor mode.
-- **Phone filter controls scroll in one row** — keep their fixed panels and the removable active chips outside the clipped scrolling area.
-- **Share dialogs own their heading and frame** — mount the common caption, QR, links, actions, and connections as unframed content, including the missing-public-URL case.
-- **One visible person panel needs no tabs** — hide the strip and label a direct region; restore the tablist and tabpanel relationships when another tab is visible.
-- **Summary dates share the meter's meta line** — put reset before expiry in words below usage, retaining the expiry's focusable exact-date tooltip.
-- **Near-quota labels stop at the limit** — suppress that row reason for limited people or an exact service percentage of at least 100; keep the inclusive quota filter and other reasons.
-- **Main navigation never shrinks its labels** — keep a spaced scrolling row and reveal the active route after mounting or changing mode, using logical scroll alignment for RTL.
-- **Desktop selection bars set their direction** — override the card's column layout and keep the count and matching offer beside the actions; the phone grid remains separate.
-- **Phone matching selection fills its row** — reset the desktop offer's auto margin at the phone breakpoint so the bottom bar keeps the action across its width.
-- **Settings links name their section** — history-off notices go to Privacy, and recent settings edits go to their own fragment; the base route opens General.
-- **Menu actions return to their summary** — close and focus it before opening a dialog, or dismissal returns keyboard focus to an action hidden in the closed menu.
-- **Settings lowering keeps saved numbers** — invalid unfinished cap or retention edits cannot block a privacy reduction; review the saved fallback, and track forms only after loading and settling disabled fields.
-- **Inline previews contain their own edits** — an expiry row must leave the traffic strategy to the service, or a sibling save makes its reset preview stale.
-- **Inline time inputs need the field target** — native time controls miss the shared text/date selector; give person editors the same 44 px minimum.
-- **Custom date over an open editor refreshes its preview** when the date holds a value, or the panel keeps describing the mode it left.
-- **Pending extensions use the service review** — take the duration from the existing bulk preview; a calendar-expiry preview describes a fixed date and must never activate first-use access.
-- **Person mode changes retain row identity** — move notes and tag into More in Simple, preserving draft inputs and focus; Detailed-only tab links use the same mode note and switch.
-- **Selecting the current person tab is no navigation** — open another inline editor without asking to discard a sibling draft.
-- **Local downloads bind their own URL** — `M.h` refuses Blob hrefs; assign only the URL created locally from the reviewed JSON, as QR export does for images.
-- **Matching selection follows a full page** — offer it inside the selected bar only after every visible row is selected; phone padding reserves the extra action above the safe area.
-- **Percentage chips isolate the unit too** — format the percent with the active locale and isolate the whole value, or RTL can move its sign away from the number.
-- **Phone targets follow width and pointer** — apply 44 px targets at the phone breakpoint as well as for coarse pointers; include local date inputs and chart selectors, keeping other pointer layout rules separate.
-- **Server guidance stays compact** — keep the copyable meridian command beside one caption so the notice does not dominate phone cards.
-- **Attention links name their disclosure** — open and focus Allowance and payments once after mounting, with room for the sticky header; later refreshes retain the owner's open or closed choice.
-- **Detailed notes belong to routes** — keep the switch note for Detailed-only screens or tabs; disclosures remain available in both modes and need no mode caption.
-- **Server facts follow the mode in place** — move one list of host facts between the card and More; retain card identity and disclosure state across mode changes and passive reads.
-- **Overview actions leave room for cards** — keep the single group in the desktop header; on phones place it after the cards with a solid sticky surface and reserve its height plus the safe area.
-- **Partial reads retain evidence** — failed traffic or recent-change reads keep usable data with retry and backoff; history-off clears the in-memory traffic window.
-- **Picker replies follow the query** — check both search and cursor before drawing, including during the debounce; expired cursors restart at the first page.
-- **Disclosure refresh keeps open state** — retain each server's capacity, history, billing, and action disclosures across passive reads; changing mode must not replace an edited form.
-- **Overview retries keep card slots** — an initial read failure replaces their content, or the next successful draw loses its target.
-- **Profile declaration refusals name the CLI review** — grants and membership have different fences; translated errors point to profile, fleet import, and apply without calling a declaration race a membership edit.
-- **Capacity gaps stay gaps** — null and stale readings never become zero; chart peak labels use observed peaks, not the axis minimum, and host traffic stays distinct from counted people traffic.
-- **Empty WebAuthn owner handles are null** — zero-length ArrayBuffers are truthy; never encode them as empty strings.
-- **Recoverable refusals precede challenge consumption** — check recent identity and key capacity in the write transaction before taking a registration proof; confirmation checks session liveness first.
-- **Challenge capacity belongs to its caller** — anonymous login evicts only its oldest bounded requests; registration and confirmation keep one challenge per kind and live session, so anonymous traffic never blocks an owner.
-- **Bulk expiry validates before reading** — a deferred submit listener cannot guard direct values; clearing expiry requires the explicit No end date choice.
-- **Undo replies can be uncertain** — read the receipt before reporting success, keep its latest state, and never enable a blind retry after a lost reply.
-- **People refreshes keep usable controls** — passive reads never disable selections or the pager; failed page requests restore the last accepted cursor and controls.
-- **Cut-off scope comes from each node's effect** — core restarts reconnect all Xray inbounds and bridges; reset captions name the affected tags and the whole-core fallback.
-- **One node can have several revoked generations** — show the key version and cause beside each receipt; repeated node names alone hide which identity is pending.
-- **Challenges bind purpose, owner handle, session, and reviewed origin** — consume once before verification; five-minute expiry and a global cap bound memory, while root recovery clears keys and changes the handle.
-- **Settle a form's disabled state before `M.trackForm()`** — a field disabled after the snapshot reads as edited, and the device editor once asked to discard changes nobody made.
-- **Device caps have three choices** — inherit, unlimited, or 1–100; saving another field preserves an exemption.
-- **Scope the session cookie to `ServiceConfig.public_path`** — a `/` cookie would ride every subscription request; without a path, sign-in is refused (`ui_unconfigured`), and so is a setup link.
-- **Guess limits are per bucket, never per source** — every browser arrives as nginx's 127.0.0.1, so `login_limits.py` keeps separate in-memory buckets for sign-in, setup links, and each session's re-checks; one shared bucket let guesses lock out a signed-in owner. Never trust a forwarded-address header.
-- **Judge every guess inside `LoginLimiter.turn()`** (check, hash, count) — checking before the slow hash let concurrent guesses all pass.
-- **Write what a password check grants in the transaction that re-reads the hash and session** — the scrypt runs unlocked, so a reset or sign-out in between could still let the old password through.
-- **Re-check the password before anything that hands out a credential** (`OWNER_STEP_UP`) — otherwise a borrowed browser could seal a snapshot to its own key.
-- **A setup link travels in the URL fragment** (never sent to nginx), and `auth.js` strips it with `history.replaceState` before rendering.
-- **Treat page input as hostile** — decode the hash through `M.route()`'s guard (a bare `%` threw at boot) and read name maps with `M.has()` (a person named `toString` broke People).
-- **Adding a person is one `POST /api/users` carrying expiry and limits** — create-then-PATCH left an active, unlimited person when the PATCH never landed.
-- **Saving a person PATCHes only edited fields** — a rounded display value once saved a 4 MB quota back as 0 (unlimited); show bytes unrounded and fill textareas with text nodes, not a `value` attribute.
-- **Refreshes never clobber an edit** — preserve edited inputs, focus, and selection; apply a mutation's result only to the screen generation that sent it.
+- **Scope the session cookie to `ServiceConfig.public_path`** — a `/` cookie would ride every subscription request; without a path, sign-in and setup links are refused (`ui_unconfigured`).
+- **Guess limits are per bucket, never per source** — every browser arrives as nginx's 127.0.0.1; judge each guess inside `LoginLimiter.turn()` (check, hash, count), since checking before the slow hash let concurrent guesses pass.
+- **Write what a password check grants in the transaction that re-reads the hash and session** — the scrypt runs unlocked, so a reset in between could let the old password through.
+- **Re-check the password before handing out a credential** (`OWNER_STEP_UP`) — a borrowed browser could otherwise seal a snapshot to its own key.
+- **WebAuthn challenges bind purpose, owner handle, session, and origin** — consume once, after recoverable refusals; cap them per caller so anonymous traffic cannot evict a session's; zero-length handles are truthy ArrayBuffers and must read as null.
+- **A setup link travels in the URL fragment** and `auth.js` strips it with `history.replaceState` before rendering.
+- **Treat page input as hostile** — decode the hash through `M.route()` (a bare `%` threw at boot) and read name maps with `M.has()` (a person named `toString` broke People).
+- **Adding a person is one `POST /api/users` with expiry and limits** — create-then-PATCH left an active, unlimited person when the PATCH was lost.
+- **Show bytes unrounded and PATCH only edited fields** — a rounded display once saved a 4 MB quota back as 0 (unlimited); a browser's `badInput` must never clear a cap.
+- **Schedule previews carry only schedule fields** — the request forbids extras, so forwarding the cap failed every quota save; saving cancels pending previews, and passive reads never re-POST one (it renews idle time).
 - **Validate edited expiry as a whole-second future UTC instant before 2099** — later dates read as "never", and DST-gap local times don't exist.
-- **Judge "declared" from the person's own share view**, never a list fetched at boot that may be stale.
-- **Poll only while visible**, keep stale data with retry and backoff, and accept replies through `M.latestOnly()` — the revision diff once showed one request's reply under another's label.
-- **Command polling keeps finished sibling results** and turns terminal read errors into an unavailable result, never a false timeout.
-- **A relay's null usage is "not measured", never zero**; render billing dates as UTC calendar dates.
-- **Period counters come from the person record** — show its upload/download and disclose carried use; the browser never reconstructs a reset from lifetime totals.
-- **Pass literal strings to `M.confirm`** — it creates its own text node; a DOM node displays as an object label instead of the reviewed text.
-- **Token issuance may be uncertain** — lock the dialog throughout; a success without a secret refreshes the list and says the secret cannot be recovered.
-- **Quotas use GiB/TiB with an explicit Unlimited choice**, refusing values beyond JavaScript's exact integer range; a browser's `badInput` must never clear a cap to its default.
-- **Invalid unfinished edits must never block lowering a privacy level or clearing a notice.**
-- **Dialogs fit phones** — constrain the scrolling body to dvh and safe areas, keep actions sticky, scroll focused fields clear of the footer, and give coarse-pointer controls 44 px targets.
-- **Locale catalogs load independently** — a failed selected locale keeps English, and a failed switch keeps the previous catalog and direction.
-- **Keep each script under 800 lines and every `M.t("…")` key in `en.json`**; asset tests read literal keys only.
+- **Settle a form's disabled state before `M.trackForm()`** — a field disabled after the snapshot reads as edited.
+- **Invalid unfinished edits never block lowering a privacy level or clearing a notice** — review the saved values instead.
+- **Uncertain replies read the record** — undo and token issuance confirm the receipt or list before reporting success, and never offer a blind retry.
+- **Refreshes never clobber an edit** — keep inputs, focus, and selection; apply a reply only to the screen generation and query that sent it (`M.latestOnly()`).
+- **Poll only while visible** — keep stale data with retry and backoff; partial failures keep usable evidence, and a terminal poll error is unavailable, never a timeout.
+- **Unmeasured is not zero** — null relay usage and capacity gaps stay gaps; period counters come from the person record, never from lifetime totals.
+- **Pass literal strings to `M.confirm`**, and bind downloads to a locally created URL — `M.h` refuses Blob hrefs.
+- **Menu actions close and focus their summary before opening a dialog**, or dismissal returns focus to a hidden button.
+- **Verb-labelled buttons are actions** — Enable and Disable rename themselves and never announce a pressed state; Undo sends the opposite request once, locks the toggle meanwhile, and the page button stays the keyboard path.
+- **Phone targets follow width and pointer** — 44 px at the phone breakpoint and for coarse pointers; a tip keeps its 24 px face with a `::before` hit area, and its bubble resets the body font.
+- **Open tips close when their button leaves view** — on focus loss, a closing disclosure, or removal; measure the bubble from the viewport corner, since its static position squeezes it near an edge.
+- **Badge contrast includes its translucent fill** — 4.5:1 for labels and 3:1 for controls and chart marks in both themes.
+- **Dialogs fit phones** — the body scrolls within dvh and safe areas, actions stay sticky, and focused fields scroll clear of the footer.
+- **Scrolling rows reveal their selection** — navigation and chip rows scroll the active item into view with logical alignment for RTL.
+- **Paired values follow the page direction** — ratios, before/after, and match/action pairs sit in isolated inline rows, so Persian reads the first value on the right.
+- **Checkbox rows use the shared `.check-row` and `.choice-group`** — a screen-scoped rule left access profiles as raw, run-together checkboxes.
+- **Locale catalogs load independently** — a failed locale keeps English, and a failed switch keeps the previous catalog and direction.
+- **Keep each script under 800 lines and every `M.t("…")` key in `en.json`** — asset tests read literal keys only.
