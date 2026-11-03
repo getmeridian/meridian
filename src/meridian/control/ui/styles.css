@@ -177,3 +177,10 @@ input::placeholder { color: var(--t3); }
 @media (pointer: coarse) {
   summary { display: flex; align-items: center; }
 }
+
+/* Checkbox and radio rows, and the bordered group that holds them. */
+.check-row { display: flex; align-items: center; gap: var(--space-2); min-block-size: 44px; cursor: pointer; }
+.check-row > input[type="checkbox"], .check-row > input[type="radio"] { inline-size: 1.15rem; block-size: 1.15rem; margin: 0;
+  flex: none; accent-color: var(--ac-ui); }
+.choice-group { margin: 0; border: 1px solid var(--b1); border-radius: var(--r2); padding: .75rem; min-inline-size: 0; }
+.choice-group > legend { color: var(--t2); font-weight: 600; padding-inline: .25rem; }

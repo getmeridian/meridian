@@ -5,7 +5,7 @@
 
   M.profileChoices = function (initial) {
     var names = (initial || []).slice(), loaded = false;
-    var list = h("fieldset", { class: "stack-sm" }, h("legend", { text: M.t("profiles.title") }));
+    var list = h("fieldset", { class: "stack-sm choice-group" }, h("legend", { text: M.t("profiles.title") }));
     var error = h("p", { class: "form-error", role: "alert" });
     var nodes = h("div", { class: "stack-sm" }, list, error);
     var ready = Promise.resolve().then(function () {
