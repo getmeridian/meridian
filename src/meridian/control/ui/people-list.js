@@ -240,8 +240,8 @@
     var pageRoot = h("div", { class: "people-page" },
       h("div", { class: "page-head" }, h("div", {}, h("h1", { text: M.t("nav.people") }), h("p", { class: "muted", text: M.t("people.lede") })),
         h("button", { class: "btn btn-primary", type: "button", onclick: M.addPerson }, M.icon("plus"), M.t("people.add"))),
-      h("div", { class: "people-toolbar", role: "search", "aria-label": M.t("people.search") }, search, filters), activeChips, status,
-      h("div", { class: "people-list-header" }, count, h("div", { class: "row-actions" }, selectToggle, pageSelection, bulk.receipt)),
+      h("div", { class: "people-toolbar", role: "search", "aria-label": M.t("people.search") }, search, filters), activeChips,
+      h("div", { class: "people-list-header" }, h("div", { class: "people-list-meta" }, count, status), h("div", { class: "row-actions" }, selectToggle, pageSelection, bulk.receipt)),
       bulk.nodes, list,
       h("div", { class: "actions people-pager" }, previousButton, nextButton),
     );

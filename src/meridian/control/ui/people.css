@@ -23,7 +23,8 @@
 .people-active-chip bdi { overflow-wrap: anywhere; }
 .people-active-chip .icon { inline-size: 14px; block-size: 14px; }
 .people-list-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
-.people-list-header > p { flex: 1 1 15rem; }
+.people-list-meta { flex: 1 1 15rem; display: flex; flex-direction: column; gap: var(--space-1); }
+.people-list-meta > p { margin: 0; }
 .select-page { display: flex; align-items: center; gap: var(--space-2); min-block-size: 44px; font-size: .875rem; cursor: pointer; }
 .select-page input, .people-select input { inline-size: 20px; block-size: 20px; margin: 0; accent-color: var(--ac-ui); }
 .people-item { display: flex; align-items: center; }
