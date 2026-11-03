@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { loadStyles } from './support/console_styles.mjs';
 const require = createRequire(new URL('../website/package.json', import.meta.url));
 const { JSDOM } = require('jsdom');
 const [ui, mode, locale, raw] = process.argv.slice(2);
@@ -11,6 +12,8 @@ const dom = new JSDOM('<!doctype html><body><div id="app"></div></body>', {
   url: 'https://198.51.100.1/console/#/people?tag=GROUP_A', runScripts: 'outside-only', pretendToBeVisual: true,
 });
 const w = dom.window;
+w.document.documentElement.lang = locale;
+w.document.documentElement.dir = locale === 'fa' ? 'rtl' : 'ltr';
 let downloadedBlob;
 w.Blob = globalThis.Blob;
 w.URL.createObjectURL = blob => { downloadedBlob = blob; return 'blob:local-proposal'; };
@@ -149,6 +152,15 @@ if (mode === 'people-bulk-refresh') {
   if (!['extend', 'disable'].includes(action)) w.document.querySelector('.people-bulk-more > summary').click();
   w.document.querySelector('[data-bulk-action="' + action + '"]').click();
   await settle();
+  if (mode === 'people-bulk-direction') {
+    loadStyles(w, ui, ['tokens.css', 'styles.css', 'screens.css', 'people.css'], 360, false);
+    report.comparisons = [...w.document.querySelectorAll('.bulk-changes dd')].map(el => {
+      const pair = el.querySelector('.arrow-pair') || el, style = w.getComputedStyle(pair);
+      return { parts: [...pair.children].map(part => part.tagName), display: style.display,
+        direction: pair.dir || style.direction || w.document.documentElement.dir,
+        arrow: pair.children[1]?.textContent.trim(), flow: style.flexDirection || 'row' };
+    });
+  }
   if (data.action === 'delete') {
     report.previewProposals = w.document.querySelectorAll('[data-removal-proposal]').length;
     w.document.querySelector('[data-save-proposal]')?.click();

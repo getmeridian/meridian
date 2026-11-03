@@ -105,6 +105,7 @@ input::placeholder { color: var(--t3); }
 .kv-row:last-child { border-block-end: 0; }
 .kv-row dt { color: var(--t2); font-size: .875rem; }
 .kv-row dd { min-inline-size: 0; text-align: end; overflow-wrap: anywhere; }
+.arrow-pair { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: .35em; max-inline-size: 100%; }
 .meter { display: block; inline-size: 100%; block-size: var(--space-2); border: 0; border-radius: var(--r); overflow: hidden; }
 .meter::-webkit-meter-bar { background: var(--s2); border: 0; border-radius: var(--r); }
 .meter::-webkit-meter-optimum-value { background: var(--ok); border-radius: var(--r); }

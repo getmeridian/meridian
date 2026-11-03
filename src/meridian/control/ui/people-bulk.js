@@ -65,8 +65,7 @@
         else if (!fields.length) content.push(h("p", { class: "muted small", text: M.t("bulk.unchanged") }));
         else content.push(h("dl", { class: "bulk-changes" }, fields.map(function (key) {
           return h("div", {}, h("dt", { text: M.t("bulk.field." + key) }),
-            h("dd", {}, h("bdi", { text: value(person.before, key) }), h("span", { "aria-hidden": "true", text: " → " }),
-              h("bdi", { text: value(person.after, key) })));
+            h("dd", {}, M.arrowPair(value(person.before, key), value(person.after, key), true)));
         })));
         (person.warnings || []).forEach(function (code) { content.push(h("p", { class: "hint", text: M.t("bulk.warning." + code) })); });
         if (M.accessChangeDisclosure) content = content.concat(M.accessChangeDisclosure(person));
