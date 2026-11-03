@@ -42,6 +42,17 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Device-slot captions format their counts** — pass native digits to the limited and unlimited catalog sentences while keeping the service's numeric limits unchanged.
+- **Arrow pairs set their flow** — bulk before/after and policy match/action pairs share isolated values in a row following the page direction, with an arrow pointing toward the second value.
+- **Percentages isolate native formatting** — use the shared helper for digits, spacing, and sign; quota captions and charts never assemble a raw percent sign.
+- **Badge contrast includes its translucent fill** — judge text on the composited surface in both themes, with 4.5:1 for labels and 3:1 for controls and chart marks; keep gold fills separate from functional accents.
+- **Phone header brands stay named** — hide the wordmark beside a fleet title, keep Meridian in the link's accessible name, and let only the title ellipsize.
+- **Action rows size labels before wrapping** — keep whole words and content-sized flex items, with 44 px targets and space for a wrapped phone selection bar.
+- **Share exports span the dialog** — the QR column must not constrain the common action row.
+- **Live-read age has no outer margin** — the parent's gap owns the spacing around Updated lines across screens.
+- **Visible person tabs replace matching headings** — retain the panel's tab label, restore its heading when the strip is hidden, and repeat this after refreshed cards mount.
+- **The person summary owns the current meter** — Usage keeps directional counters, reset facts, lifetime use, and history without repeating the summary's cap bar.
+- **Ratios follow their label's direction** — keep active before total in an inline flex row with isolated numbers, so Persian reads active on the right; numeric date ranges isolate the whole range.
 - **Scrolling chip rows reveal their selection** — after every route or link, scroll the selected chip into view when the row overflows; a deep link to Security once left its chip cut off at a phone's edge.
 - **Verb-labelled buttons are actions** — Enable and Disable change their names with the available action and must never announce an inverted pressed state.
 - **Hidden person tab strips hand off focus** — returning to the sole Access panel focuses its region; a visible strip retains tab focus.
@@ -75,7 +86,6 @@
 - **Percentage chips isolate the unit too** — format the percent with the active locale and isolate the whole value, or RTL can move its sign away from the number.
 - **Phone targets follow width and pointer** — apply 44 px targets at the phone breakpoint as well as for coarse pointers; include local date inputs and chart selectors, keeping other pointer layout rules separate.
 - **Server guidance stays compact** — keep the copyable meridian command beside one caption so the notice does not dominate phone cards.
-- **Isolate count pairs together** — render Overview's active / total as one LTR unit; separate number isolates let RTL reverse the pair around the slash.
 - **Attention links name their disclosure** — open and focus Allowance and payments once after mounting, with room for the sticky header; later refreshes retain the owner's open or closed choice.
 - **Detailed notes belong to routes** — keep the switch note for Detailed-only screens or tabs; disclosures remain available in both modes and need no mode caption.
 - **Server facts follow the mode in place** — move one list of host facts between the card and More; retain card identity and disclosure state across mode changes and passive reads.

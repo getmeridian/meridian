@@ -14,7 +14,7 @@ _RENDERER_MANIFEST = {
     "pwa": "app-rule-refusals-v6",
     "control-service": "people-note-presence-v60",
     "control-api": "people-note-presence-v48",
-    "control-ui": "person-people-settings-v60",
+    "control-ui": "people-list-meta-v68",
     "firewall": "ufw-comment-v2",
     "nginx": "panel-domain-certificate-v13",
     "realm": "neutral-systemd-musl-v3",

@@ -184,8 +184,7 @@
       if (name === "tag") return state.tag === "none" ? M.t("people.no_tag") : state.tag;
       if (name === "profile") return profileLabel(state.profile);
       if (name === "expires") return M.t("people.chip_expires_value", { days: number(state.expires) });
-      if (name === "quota") return M.t("people.chip_quota_value", { percent: "\u2068" +
-        new Intl.NumberFormat(M.i18n.locale(), { style: "percent", maximumFractionDigits: 0 }).format(Number(state.quota) / 100) + "\u2069" });
+      if (name === "quota") return M.t("people.chip_quota_value", { percent: M.percent(Number(state.quota)) });
       if (name === "never") return "";
       if (name === "attention") return M.t(state.attention === "all" ? "people.attention" : "attention.reason." + state.attention);
       if (name === "lifecycle") return M.t("people.lifecycle_" + state.lifecycle);
@@ -241,8 +240,8 @@
     var pageRoot = h("div", { class: "people-page" },
       h("div", { class: "page-head" }, h("div", {}, h("h1", { text: M.t("nav.people") }), h("p", { class: "muted", text: M.t("people.lede") })),
         h("button", { class: "btn btn-primary", type: "button", onclick: M.addPerson }, M.icon("plus"), M.t("people.add"))),
-      h("div", { class: "people-toolbar", role: "search", "aria-label": M.t("people.search") }, search, filters), activeChips, status,
-      h("div", { class: "people-list-header" }, count, h("div", { class: "row-actions" }, selectToggle, pageSelection, bulk.receipt)),
+      h("div", { class: "people-toolbar", role: "search", "aria-label": M.t("people.search") }, search, filters), activeChips,
+      h("div", { class: "people-list-header" }, h("div", { class: "people-list-meta" }, count, status), h("div", { class: "row-actions" }, selectToggle, pageSelection, bulk.receipt)),
       bulk.nodes, list,
       h("div", { class: "actions people-pager" }, previousButton, nextButton),
     );

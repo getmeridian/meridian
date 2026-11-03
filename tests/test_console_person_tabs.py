@@ -72,6 +72,46 @@ def test_person_tab_deep_links_select_one_labelled_panel(tab: str) -> None:
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+@pytest.mark.parametrize("tab", ["access", "devices"])
+def test_visible_tabs_label_the_person_panel_without_a_duplicate_heading(locale: str, tab: str) -> None:
+    result = run_console("person-tabs-headings", locale, {"tab": tab, "mode": "detailed"})
+    assert result["initial"]["role"] == "tabpanel" and result["initial"]["label"]
+    assert result["initial"]["duplicates"] == 0
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_simple_person_access_keeps_its_heading_and_mode_changes_keep_the_panel_label(locale: str) -> None:
+    result = run_console("person-tabs-headings", locale, {"switchModes": True})
+    assert result["initial"]["duplicates"] == result["simple"]["duplicates"] == 1
+    assert result["detailed"]["duplicates"] == 0
+    assert result["initial"]["label"] == result["detailed"]["label"] == result["simple"]["label"]
+    assert result["samePanel"]
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+@pytest.mark.parametrize("limited", [True, False], ids=["quota", "unlimited"])
+def test_person_usage_keeps_one_summary_meter_and_directional_facts_after_refresh(locale: str, limited: bool) -> None:
+    result = run_console(
+        "person-tabs-usage-meter",
+        locale,
+        {
+            "tab": "usage",
+            "mode": "detailed",
+            "clock": True,
+            "user": {
+                "traffic_limit_bytes": 100 * 1024**3 if limited else 0,
+                "period_traffic": {"upload_bytes": 10 * 1024**3, "download_bytes": 41 * 1024**3},
+            },
+        },
+    )
+    for snapshot in (result["before"], result["after"]):
+        assert snapshot["meters"] == int(limited) and snapshot["panelUsageTexts"] == 0
+        assert snapshot["duplicateHeadings"] == 0
+        assert snapshot["summaryUsageText"] and snapshot["directional"]
+    assert result["summaryMeter"] == ("75" if limited else None)
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 def test_simple_access_is_a_direct_panel_and_detailed_restores_aria_tabs(locale: str) -> None:
     result = run_console("person-tabs-single", locale)
     assert result["before"]["stripHidden"] and result["before"]["tabs"] == 0

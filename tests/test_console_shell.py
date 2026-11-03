@@ -19,6 +19,26 @@ def test_a_fresh_browser_lands_on_overview_in_simple_mode(locale: str) -> None:
     assert result["dir"] == ("rtl" if locale == "fa" else "ltr")
 
 
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("width", [360, 1440])
+def test_header_keeps_one_row_and_an_accessible_brand_with_full_mode_labels(
+    locale: str, theme: str, width: int
+) -> None:
+    result = run_console("shell-header-layout", locale, {"width": width, "storage": {"mrd.theme": theme}})
+    header = result["header"]
+    assert header["wrap"] == "nowrap"
+    assert header["children"] == ["top-brand has-fleet-title", "shell-controls"]
+    assert header["accessibleBrand"] == "Meridian · Sample VPN"
+    assert header["fleetTitle"] == "Sample VPN" and header["fleetEllipsis"] == "ellipsis"
+    assert header["wordmarkDisplay"] == "none" if width <= 640 else header["wordmarkDisplay"] != "none"
+    assert header["labels"] == header["expectedLabels"] and header["labelWrap"] == ["nowrap", "nowrap"]
+    assert header["accountName"]
+    fallback = result["withoutFleetTitle"]
+    assert fallback["accessibleBrand"] == "Meridian" and fallback["wordmarkDisplay"] != "none"
+    assert fallback["titleHidden"] and fallback["sameChoices"]
+
+
 def test_switching_modes_keeps_a_shared_route_and_survives_a_reload() -> None:
     result = run_console("shell-switch", data={"hash": "#/people?status=disabled"})
     assert result["mode"] == "detailed" and result["storedMode"] == "detailed"

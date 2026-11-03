@@ -15,7 +15,7 @@
         (format.rules || []).forEach(function (rule) {
           var match = [].concat(rule.domains, rule.ips, rule.networks,
             (rule.ports || []).map(function (port) { return port.start === port.end ? String(port.start) : port.start + "–" + port.end; }), rule.protocols).join(" · ");
-          rules.appendChild(h("li", { value: rule.number }, h("bdi", { text: match }), " → ", action(rule.action)));
+          rules.appendChild(h("li", { value: rule.number }, M.arrowPair(match, action(rule.action))));
         });
         var omissions = (format.omitted || []).map(function (omission) {
           var text = M.t("policy.omit_" + omission.reason);

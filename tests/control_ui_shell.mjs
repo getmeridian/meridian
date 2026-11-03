@@ -136,6 +136,29 @@ const report = {};
 w.eval(fs.readFileSync(path.join(ui, 'app.js'), 'utf8'));
 await settle();
 
+if (scenario === 'shell-header-layout') {
+  resolveStyles(w, ui, ['tokens.css', 'styles.css', 'screens.css'], data.width);
+  const row = document.querySelector('.shell-top'), brand = row.querySelector('.top-brand');
+  const wordmark = brand.querySelector('.brand-name'), title = brand.querySelector('.top-title');
+  const choices = [...row.querySelectorAll('[data-mode-choice]')];
+  report.header = {
+    wrap: w.getComputedStyle(row).flexWrap,
+    children: [...row.children].map(el => el.className),
+    accessibleBrand: brand.getAttribute('aria-label'),
+    fleetTitle: title.textContent,
+    fleetEllipsis: w.getComputedStyle(title).textOverflow,
+    wordmarkDisplay: w.getComputedStyle(wordmark).display,
+    labels: choices.map(el => el.textContent),
+    expectedLabels: [M.t('mode.simple'), M.t('mode.detailed')],
+    labelWrap: choices.map(el => w.getComputedStyle(el).whiteSpace),
+    accountName: row.querySelector('.account-toggle').getAttribute('aria-label'),
+  };
+  M.state.fleet.profile_title = 'Meridian'; M.updateFleetTitle();
+  report.withoutFleetTitle = { accessibleBrand: brand.getAttribute('aria-label'),
+    titleHidden: title.hidden, wordmarkDisplay: w.getComputedStyle(wordmark).display,
+    sameChoices: choices.every((el, index) => row.querySelectorAll('[data-mode-choice]')[index] === el) };
+}
+
 if (scenario === 'shell-switch') await clickMode(data.choose || 'detailed');
 if (scenario === 'shell-deep-link') {
   report.beforeMode = M.mode?.() || null;
@@ -286,6 +309,20 @@ if (scenario === 'overview-layout') {
     primary: actions.querySelector('.btn-primary')?.hasAttribute('data-overview-add'),
   };
 }
+if (scenario === 'overview-ratio') {
+  resolveStyles(w, ui, ['tokens.css', 'styles.css', 'screens.css'], 360);
+  const active = document.querySelector('[data-overview-active]');
+  const total = document.querySelector('[data-overview-total]');
+  const figure = active.parentElement;
+  const style = w.getComputedStyle(figure);
+  report.ratio = {
+    parts: [...figure.children].map(part => clean(part.textContent).trim()),
+    isolatedNumbers: active.tagName === 'BDI' && total.tagName === 'BDI',
+    direction: figure.dir || style.direction || document.documentElement.dir,
+    display: style.display,
+    flow: style.flexDirection || 'row',
+  };
+}
 if (scenario === 'overview-visual') {
   loadStyles();
   const peopleFigure = document.querySelector('[data-overview-active]').parentElement;
@@ -300,7 +337,7 @@ if (scenario === 'overview-visual') {
       return Math.max(parseFloat(style.minHeight) || 0, parseFloat(style.minBlockSize) || 0);
     }),
     ageIsolated: document.querySelector('.live-updated').textContent.includes('\u2068'),
-    peopleIsolated: peopleFigure.tagName === 'BDI' && peopleFigure.dir === 'ltr',
+    peopleIsolated: [...peopleFigure.querySelectorAll('[data-overview-active], [data-overview-total]')].every(el => el.tagName === 'BDI'),
     trafficIsolated: trafficFigure.startsWith('\u2068') && trafficFigure.endsWith('\u2069'),
     windowIsolated: document.querySelector('[data-overview-window]').textContent.includes('\u2068'),
     meter: !!document.querySelector('.overview-fleet meter[aria-label]'),
@@ -385,6 +422,9 @@ if (scenario === 'overview-add') {
 if (scenario.startsWith('overview-')) {
   report.attention = attention();
   report.people = { active: clean(document.querySelector('[data-overview-active]')?.textContent), total: clean(document.querySelector('[data-overview-total]')?.textContent) };
+  report.quotaLabel = document.querySelector('a[href="#/people?quota=90"] .attention-label')?.textContent;
+  report.quotaLocaleLabel = M.t('overview.quota', { percent: '\u2068' +
+    new w.Intl.NumberFormat(M.i18n.locale(), { style: 'percent', maximumFractionDigits: 0 }).format(.9) + '\u2069' });
   report.calmEmpty = !!document.querySelector('[data-overview-empty]');
   report.emptyCheck = !!document.querySelector('[data-overview-empty] .icon');
   report.emptyCatalogText = M.t('overview.attention_empty');

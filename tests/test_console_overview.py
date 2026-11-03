@@ -86,6 +86,22 @@ def test_never_connected_is_a_detailed_only_attention_row(overview_data: dict) -
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_active_and_total_follow_the_labels_reading_order(overview_data: dict, locale: str) -> None:
+    result = run_console("overview-ratio", locale, overview_data)
+    ratio = result["ratio"]
+    assert ratio["parts"] == ["3", "/", "5"]
+    assert ratio["isolatedNumbers"]
+    assert ratio["direction"] == ("rtl" if locale == "fa" else "ltr")
+    assert ratio["display"] == "inline-flex" and ratio["flow"] == "row"
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_overview_quota_uses_the_same_native_percent_format_as_people(overview_data: dict, locale: str) -> None:
+    result = run_console("overview-attention", locale, overview_data)
+    assert result["quotaLabel"] == result["quotaLocaleLabel"]
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 def test_empty_overview_has_a_calm_check_and_keeps_add_and_share_available(locale: str) -> None:
     result = run_console("overview-empty", locale, {"fleet": {"profile_title": "Sample VPN", "servers": []}})
     assert result["calmEmpty"] and result["emptyCheck"] and result["add"] and result["share"]

@@ -71,6 +71,7 @@ def test_console_preview_explains_every_format_and_the_destination(tmp_path: Pat
         result = run_console("policy-preview", locale, {"response": preview.to_data()})
         assert result["previewBody"]["destination"] == "chat.example.test:443"
         assert result["formatCount"] == 5 and "chat.example.test" in result["explanation"]
+        assert set(result["ruleArrows"]) == {"←" if locale == "fa" else "→"}
         assert "policy." not in result["text"] and "work" in result["text"] and "base64" in result["text"].lower()
         assert result["stored"] == [] and not result["outside"]
     finally:

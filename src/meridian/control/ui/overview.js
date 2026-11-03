@@ -54,7 +54,7 @@
       drawFleet(data, active, total, healthCount, traffic);
       var rows = [
         { href: "#/people?expires=7", label: M.t("overview.expiring", { days: number(7) }), count: data.expiring.total, kind: "warn" },
-        { href: "#/people?quota=90", label: M.t("overview.quota", { percent: "\u2068" + M.count(90) + "%\u2069" }), count: data.quota.total, kind: "warn" },
+        { href: "#/people?quota=90", label: M.t("overview.quota", { percent: M.percent(90) }), count: data.quota.total, kind: "warn" },
         { href: "#/people?status=limited", label: M.t("overview.limited"), count: data.people.facets.status.limited || 0, kind: "danger" },
         { href: "#/people?status=disabled", label: M.t("status.disabled"), count: data.people.facets.status.disabled || 0, kind: "neutral" },
       ];
@@ -100,9 +100,9 @@
           M.t(healthKey, { count: number(needsAttention || serverCount) })),
         h("dl", { class: "overview-facts" },
           M.keyValue(M.t("overview.people"), h("div", { class: "stack-sm" },
-            h("span", { class: "overview-number" }, h("bdi", { dir: "ltr" },
-              h("span", { "data-overview-active": "", text: M.count(active) }), h("span", { class: "muted", text: " / " }),
-              h("span", { "data-overview-total": "", text: M.count(total) }))),
+            h("span", { class: "overview-number" }, h("span", { class: "overview-ratio", dir: document.documentElement.dir },
+              h("bdi", { "data-overview-active": "", text: M.count(active) }), h("span", { class: "muted", text: "/" }),
+              h("bdi", { "data-overview-total": "", text: M.count(total) }))),
             h("span", { class: "muted small", text: M.t("overview.active_total") }),
             total ? M.meter(active * 100 / total, M.t("overview.people_meter", { active: number(active), total: number(total) }))
               : h("span", { class: "muted small", text: M.t("overview.first_person") }))),

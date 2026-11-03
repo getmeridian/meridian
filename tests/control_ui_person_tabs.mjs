@@ -137,6 +137,40 @@ function stored() { return [...Object.keys(w.localStorage), ...Object.keys(w.ses
 const guard = () => document.querySelector('[data-draft-choice="stay"]')?.closest('dialog');
 async function choose(choice) { document.querySelector('[data-draft-choice="' + choice + '"]')?.click(); await settle(); await settle(); }
 
+if (scenario === 'person-tabs-headings') {
+  const panel = panels()[0];
+  function snapshot() {
+    const tab = document.getElementById(panel.getAttribute('aria-labelledby'));
+    const label = panel.getAttribute('aria-label') || tab?.textContent;
+    return { label, role: panel.getAttribute('role'),
+      duplicates: [...panel.querySelectorAll('h2')].filter(el => !el.closest('[hidden]') && el.textContent === label).length };
+  }
+  report.initial = snapshot();
+  if (data.switchModes) {
+    await M.chooseMode('detailed'); await settle(); report.detailed = snapshot();
+    await M.chooseMode('simple'); await settle(); report.simple = snapshot();
+    report.samePanel = panel === panels()[0];
+  }
+}
+
+if (scenario === 'person-tabs-usage-meter') {
+  function snapshot() {
+    const panel = panels()[0];
+    return { meters: view().querySelectorAll('meter').length,
+      panelUsageTexts: panel.querySelectorAll('.usage-text').length,
+      duplicateHeadings: [...panel.querySelectorAll('h2')].filter(el => !el.closest('[hidden]') && el.textContent === M.t('person.tab_usage')).length,
+      summaryUsageText: !!summary().querySelector('.usage-text')?.textContent,
+      directional: [M.t('usage.up'), M.t('usage.down')].every((label, index) => {
+        const dt = [...panel.querySelectorAll('dt')].find(el => el.textContent === label);
+        return dt?.nextElementSibling.textContent === M.bytes(user.period_traffic[index ? 'download_bytes' : 'upload_bytes']);
+      }) };
+  }
+  report.before = snapshot();
+  user = { ...user, used_traffic_bytes: 75 * 1024 ** 3 };
+  await advance(30001); report.after = snapshot();
+  report.summaryMeter = summary().querySelector('meter')?.getAttribute('value') || null;
+}
+
 if (scenario === 'person-tabs-header') {
   const head = summary();
   report.summary = !!head; report.back = !!head?.querySelector('a[href="#/people"]');

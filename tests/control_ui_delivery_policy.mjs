@@ -8,6 +8,8 @@ const dom = new JSDOM('<!doctype html><html><body><main id="app"></main></body><
   url: 'https://console.example.test/control/', runScripts: 'outside-only', pretendToBeVisual: true,
 });
 const w = dom.window, report = {}, calls = [];
+w.document.documentElement.lang = locale;
+w.document.documentElement.dir = locale === 'fa' ? 'rtl' : 'ltr';
 w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
 w.HTMLDialogElement.prototype.close = function () { this.open = false; };
 Object.defineProperty(w.document, 'visibilityState', { value: 'visible', configurable: true });
@@ -44,6 +46,8 @@ if (mode === 'policy-preview') {
   report.text = app.querySelector('[data-preview="result"]').textContent;
   report.explanation = app.querySelector('[data-policy-explanation]')?.textContent;
   report.formatCount = app.querySelectorAll('[data-policy-preview] > details').length;
+  report.ruleArrows = [...app.querySelectorAll('[data-policy-preview] details > ol > li')]
+    .flatMap(rule => rule.textContent.match(/[←→]/g) || []);
 } else if (!M.personDeliveryPolicy) report.missing = 'person policy editor';
 else {
   const card = M.personDeliveryPolicy(data.user, () => { report.saved = true; });

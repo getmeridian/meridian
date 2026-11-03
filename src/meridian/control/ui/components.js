@@ -51,6 +51,13 @@
     return h("div", { class: "kv-row" }, h("dt", { text: label }), h("dd", {}, value));
   };
 
+  M.arrowPair = function (first, second, quiet) {
+    var direction = document.documentElement.dir || "ltr";
+    return h("span", { class: "arrow-pair", dir: direction }, h("bdi", {}, first),
+      h("span", { "aria-hidden": quiet ? "true" : null, text: direction === "rtl" ? "←" : "→" }),
+      h("bdi", {}, second));
+  };
+
   M.emptyState = function (title, caption, check) {
     return h("div", { class: "empty-state", role: "status" },
       check ? h("span", { class: "empty-state-check", "aria-hidden": "true" }, M.icon("check")) : null,

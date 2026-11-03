@@ -8,6 +8,8 @@ const [ui, mode, locale = 'en', raw = '{}'] = process.argv.slice(2);
 const data = JSON.parse(raw === '-' ? fs.readFileSync(0, 'utf8') : raw);
 const dom = new JSDOM('<!doctype html><body><div id="app"></div></body>', { url: 'https://198.51.100.1/console/', runScripts: 'outside-only', pretendToBeVisual: true });
 const w = dom.window;
+w.document.documentElement.lang = locale;
+w.document.documentElement.dir = locale === 'fa' ? 'rtl' : 'ltr';
 Object.defineProperty(w.document, 'hidden', { value: false });
 w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
 w.HTMLDialogElement.prototype.close = function () { this.open = false; };
@@ -25,7 +27,7 @@ w.fetch = async (url, options = {}) => {
   return { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify(body) };
 };
 const load = name => { if (fs.existsSync(path.join(ui, name))) w.eval(fs.readFileSync(path.join(ui, name), 'utf8')); };
-['core.js', 'drafts.js', 'person-profiles.js', 'people-bulk-fields.js', 'people-bulk.js'].forEach(load);
+['core.js', 'drafts.js', 'components.js', 'person-profiles.js', 'people-bulk-fields.js', 'people-bulk.js'].forEach(load);
 const M = w.M, catalog = JSON.parse(fs.readFileSync(path.join(ui, 'locales', locale + '.json')));
 M.i18n = { locale: () => locale === 'zh' ? 'zh-CN' : locale, lang: locale };
 M.t = (key, params = {}) => (catalog[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? ''));

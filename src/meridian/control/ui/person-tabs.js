@@ -50,6 +50,9 @@
         } else {
           panel.removeAttribute("aria-labelledby"); panel.setAttribute("aria-label", M.t(choice.label));
         }
+        panel.querySelectorAll("h2").forEach(function (heading) {
+          if (heading.textContent === M.t(choice.label)) heading.hidden = multiple;
+        });
       });
       note.hidden = M.mode() === "detailed" || selected === "access";
     }

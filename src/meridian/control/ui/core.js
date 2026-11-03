@@ -163,6 +163,12 @@
     return n === null || n === undefined ? "—" : new Intl.NumberFormat(M.i18n.locale()).format(n);
   };
 
+  M.percent = function (n, digits) {
+    if (n === null || n === undefined) return "—";
+    return "\u2068" + new Intl.NumberFormat(M.i18n.locale(), { style: "percent",
+      maximumFractionDigits: digits === undefined ? 0 : digits }).format(n / 100) + "\u2069";
+  };
+
   M.date = function (value, withTime) {
     if (!value) return "";
     var d = typeof value === "number" ? new Date(value * 1000) : new Date(value);

@@ -31,6 +31,18 @@ def bulk_flow(people_service):
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_bulk_before_and_after_follow_the_page_direction_with_a_matching_arrow(bulk_flow, locale):
+    result = run_console("people-bulk-direction", locale, bulk_flow)
+    assert result["comparisons"]
+    for comparison in result["comparisons"]:
+        assert comparison["parts"] == ["BDI", "SPAN", "BDI"]
+        assert comparison["arrow"] == ("←" if locale == "fa" else "→")
+        assert comparison["direction"] == ("rtl" if locale == "fa" else "ltr")
+        if locale == "fa":
+            assert comparison["display"] == "inline-flex" and comparison["flow"] == "row"
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 @pytest.mark.parametrize("stale", [False, True])
 def test_people_bulk_flow_uses_the_frozen_hash_and_keeps_selection_and_rows(bulk_flow, locale, stale):
     result = run_console("people-bulk", locale, {**bulk_flow, "stale": stale})

@@ -194,9 +194,10 @@
         metadata.allowance_bytes != null ? [h("dt", { text: M.t("server_allowance.reset_day") }),
           h("dd", { text: "\u2068" + M.count(metadata.reset_day) + "\u2069" })] : null,
         measured && usage.used_bytes != null ? [h("dt", { text: M.t("server_allowance.used") }),
-          h("dd", { text: M.bytes(usage.used_bytes) + " / " + M.bytes(metadata.allowance_bytes) }),
+          h("dd", { text: metadata.allowance_bytes != null ? M.t("people.used_of", {
+            used: M.bytes(usage.used_bytes), limit: M.bytes(metadata.allowance_bytes) }) : M.bytes(usage.used_bytes) }),
           h("dt", { text: M.t("server_allowance.period") }),
-          h("dd", { text: billingDate(usage.period_start) + " → " + billingDate(usage.period_end) })] : null,
+          h("dd", {}, h("bdi", { dir: "ltr", text: billingDate(usage.period_start) + " → " + billingDate(usage.period_end) }))] : null,
         metadata.pay_on ? [h("dt", { text: M.t("server_allowance.payment_anchor") }),
           h("dd", { text: billingDate(metadata.pay_on) }),
           h("dt", { text: M.t("server_allowance.repeat") }),
