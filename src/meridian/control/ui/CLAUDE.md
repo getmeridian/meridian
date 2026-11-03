@@ -42,6 +42,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Device-slot captions format their counts** — pass native digits to the limited and unlimited catalog sentences while keeping the service's numeric limits unchanged.
 - **Arrow pairs set their flow** — bulk before/after and policy match/action pairs share isolated values in a row following the page direction, with an arrow pointing toward the second value.
 - **Percentages isolate native formatting** — use the shared helper for digits, spacing, and sign; quota captions and charts never assemble a raw percent sign.
 - **Badge contrast includes its translucent fill** — judge text on the composited surface in both themes, with 4.5:1 for labels and 3:1 for controls and chart marks; keep gold fills separate from functional accents.

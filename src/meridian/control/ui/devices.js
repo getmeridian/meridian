@@ -55,7 +55,7 @@
       return;
     }
     var count = h("bdi", { text: M.t(result.limit === 0 ? "devices.unlimited_count" : "devices.count",
-      { count: result.count, limit: result.limit }) });
+      { count: M.count(result.count), limit: M.count(result.limit) }) });
     var content = [h("div", { class: "card-head" }, count, removeButton(user.username, null, result.count, reload, current))];
     if (result.level === "private") {
       content.push(h("p", { class: "muted small", text: M.t("devices.private") }));
