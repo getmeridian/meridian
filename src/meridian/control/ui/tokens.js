@@ -17,42 +17,59 @@
   }
 
   M.renderTokens = function (view) {
-    M.mount(view, h("div", { class: "boot" }, h("span", { class: "spinner" })));
+    if (!view.isConnected) return;
+    var list = h("div", {}, h("span", { class: "spinner" }));
+    var create = h("button", { class: "btn btn-primary", type: "button", "data-token-create": "", disabled: true },
+      M.icon("plus"), M.t("tokens.create"));
+    M.mount(view, [h("div", { class: "page-head" },
+      h("div", {}, h("h1", { text: M.t("nav.tokens") }), h("p", { class: "muted small", text: M.t("tokens.lede") })), create), list]);
     Promise.all([M.api("GET", "api/tokens"), M.api("GET", "api/token-capabilities")]).then(function (data) {
+      if (!view.isConnected) return;
       var catalog = data[1];
       var tokens = data[0].tokens || [];
-      M.mount(view, [
-        h("div", { class: "page-head" },
-          h("div", {}, h("h1", { text: M.t("nav.tokens") }), h("p", { class: "muted", text: M.t("tokens.lede") })),
-          h("button", { class: "btn btn-primary", type: "button", onclick: function () { createToken(view, catalog); } },
-            M.icon("plus"), M.t("tokens.create"))),
-        tokens.length ? h("div", { class: "list" }, tokens.map(function (token) {
-          var expired = token.expires_at && Date.parse(token.expires_at) <= Date.now();
-          var grants = token.capabilities || catalog.presets[token.scope] || [];
-          return h("div", { class: "row" + (token.revoked_at || expired ? " row-dim" : "") },
-            h("div", { class: "row-main" },
-              h("div", { class: "row-title" }, h("bdi", { class: "name", text: token.name }),
-                M.pill(token.scope === "admin" ? "warn" : "muted", M.t("scope." + (token.scope || "custom")))),
-              h("div", { class: "row-sub" },
-                h("span", { text: M.t("tokens.created", { when: M.date(token.created_at) }) }),
-                h("span", { text: token.expires_at
-                  ? M.t(expired ? "tokens.expired" : "tokens.expires", { when: M.date(token.expires_at, true) })
-                  : M.t("tokens.expires_never") }),
-                h("span", { text: token.revoked_at ? M.t("tokens.revoked", { when: M.date(token.revoked_at) })
-                  : M.t("tokens.used", { when: M.ago(token.last_used_at) }) })),
-              h("details", {}, h("summary", { text: M.t("tokens.permissions") }), permissions(grants, catalog))),
-            token.revoked_at ? null : h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
-              M.confirm(M.t("tokens.revoke_title", { name: token.name }), M.t("tokens.revoke_text"), M.t("tokens.revoke"), true).then(function (ok) {
-                if (!ok) return;
-                M.api("DELETE", "api/tokens/" + token.id).then(function () {
-                  M.toast(M.t("tokens.revoked_toast")); M.renderTokens(view);
-                }, function (error) { M.toast(M.errorText(error), "error"); });
-              });
-            } }, M.t("tokens.revoke")));
-        })) : h("div", { class: "empty" }, h("p", { text: M.t("tokens.empty") })),
-      ]);
-    }, function (error) { M.mount(view, h("p", { class: "form-error", text: M.errorText(error) })); });
+      create.disabled = false;
+      create.addEventListener("click", function () { createToken(view, catalog); });
+      M.mount(list, tokens.length ? h("ul", { class: "list record-list" }, tokens.map(function (token) { return tokenRow(view, token, catalog); }))
+        : M.emptyState(M.t("tokens.empty"), M.t("tokens.empty_hint")));
+    }, function (error) { M.mount(list, h("p", { class: "form-error", role: "alert", text: M.errorText(error) })); });
   };
+
+  function isolate(value) { return "\u2068" + value + "\u2069"; }
+
+  function tokenRow(view, token, catalog) {
+    var expired = token.expires_at && Date.parse(token.expires_at) <= Date.now();
+    var grants = token.capabilities || catalog.presets[token.scope] || [];
+    var kind = token.revoked_at ? "neutral" : expired ? "warn" : "success";
+    return h("li", { class: "row record-row" + (token.revoked_at || expired ? " row-dim" : ""), "data-record": token.id },
+      h("div", { class: "record-main" },
+        h("div", { class: "row-title" }, h("bdi", { class: "record-name name", text: token.name }),
+          M.statusChip(kind, M.t(token.revoked_at ? "tokens.status_revoked" : expired ? "tokens.status_expired" : "tokens.status_active"))),
+        h("div", { class: "record-facts row-sub" },
+          h("span", { text: token.scope ? M.t("scope." + token.scope) : M.t("tokens.action_count", { count: isolate(M.count(grants.length)) }) }),
+          h("span", { text: M.t("tokens.created", { when: isolate(M.date(token.created_at)) }) }),
+          h("span", { text: token.expires_at
+            ? M.t(expired ? "tokens.expired" : "tokens.expires", { when: isolate(M.date(token.expires_at, true)) })
+            : M.t("tokens.expires_never") }),
+          h("span", { text: token.revoked_at ? M.t("tokens.revoked", { when: isolate(M.date(token.revoked_at)) })
+            : M.t("tokens.used", { when: isolate(M.ago(token.last_used_at)) }) }))),
+      M.rowMenu(token.name, [
+        h("button", { class: "btn btn-ghost", type: "button", "data-record-action": "permissions", onclick: function () {
+          M.dialog(M.t("tokens.permissions"), function (close) {
+            return [h("bdi", { class: "strong", text: token.name }), permissions(grants, catalog),
+              h("div", { class: "actions" }, h("button", { class: "btn btn-primary", type: "button",
+                onclick: function () { close(); } }, M.t("action.done")))];
+          });
+        } }, M.t("tokens.permissions")),
+        token.revoked_at ? null : h("button", { class: "btn btn-ghost", type: "button", "data-record-action": "revoke", onclick: function () {
+          M.confirm(M.t("tokens.revoke_title", { name: token.name }), M.t("tokens.revoke_text"), M.t("tokens.revoke"), true).then(function (ok) {
+            if (!ok) return;
+            M.api("DELETE", "api/tokens/" + token.id).then(function () {
+              M.toast(M.t("tokens.revoked_toast")); M.renderTokens(view);
+            }, function (error) { M.toast(M.errorText(error), "error"); });
+          });
+        } }, M.t("tokens.revoke")),
+      ]));
+  }
 
   function createToken(view, catalog) {
     M.dialog(M.t("tokens.create_title"), function (close) {

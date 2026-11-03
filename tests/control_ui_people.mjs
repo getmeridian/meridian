@@ -60,8 +60,8 @@ report.search = input.value;
 report.sameRows = [...view().querySelectorAll('a.row-link')].every(el => rows.get(el.getAttribute('href')) === el);
 report.sameInput = view().querySelector('input[type="search"]') === input;
 report.focusKept = w.document.activeElement === input;
-report.selects = Object.fromEntries([...view().querySelectorAll('select[name]')].map(el => [el.name, [...el.options].map(option => ({ value: option.value, text: option.textContent }))]));
-report.filtersOpen = !!view().querySelector('details.people-filter-card')?.open;
+report.selects = Object.fromEntries([...view().querySelectorAll('select[name]')].map(el => [el.name, [...el.options].map(option => ({ value: option.value, text: option.textContent.replace(/[\u2066-\u2069]/g, '') }))]));
+report.activeFilters = [...view().querySelectorAll('[data-remove-filter]')].map(chip => chip.getAttribute('data-remove-filter'));
 report.errors = [...view().querySelectorAll('.field-error')].map(el => el.textContent).filter(Boolean);
 report.route = M.route();
 if (mode === 'people-triage-reload') {

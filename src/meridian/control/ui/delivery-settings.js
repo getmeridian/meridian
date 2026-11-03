@@ -17,16 +17,19 @@
     M.api("GET", "api/language").then(function (state) {
       select.value = state.language;
       select.disabled = save.disabled = false;
+      M.trackForm(form);
     }, function (e) { error.textContent = M.errorText(e); });
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       var language = select.value;
-      M.busy(form, function () { return M.api("PUT", "api/language", { language: language }); }).then(function () {
+      M.saveDraft(form, function () { return M.api("PUT", "api/language", { language: language }); }).then(function () {
+        if (!form.isConnected) return;
         M.toast(M.t("language.saved"));
       }, function () { /* shown by M.busy */ });
     });
     return h("section", { class: "card" }, h("h2", { text: M.t("language.title") }),
-      h("p", { class: "muted small", text: M.t("language.hint") }), form);
+      h("p", { class: "muted small", text: M.t("language.caption") }),
+      M.learnMore(h("p", { text: M.t("language.hint") })), form);
   };
 
   function localTime(value) {
@@ -43,9 +46,9 @@
   }
 
   M.noticeSection = function () {
-    var text = h("textarea", { rows: "3", maxlength: "1000", dir: "auto", "data-notice": "text" });
-    var until = h("input", { type: "datetime-local", "data-notice": "until" });
-    var person = h("input", { type: "text", maxlength: "64", autocomplete: "off", "data-notice": "person" });
+    var text = h("textarea", { rows: "3", maxlength: "1000", dir: "auto", "data-notice": "text", disabled: true });
+    var until = h("input", { type: "datetime-local", "data-notice": "until", disabled: true });
+    var person = h("input", { type: "text", maxlength: "64", autocomplete: "off", "data-notice": "person", disabled: true });
     var status = h("p", { class: "muted small" });
     var preview = h("p", { class: "link-text", dir: "auto", "data-notice": "preview", "aria-live": "polite" });
     var error = h("p", { class: "form-error", role: "alert" });
@@ -59,7 +62,8 @@
       status, h("p", { class: "label", text: M.t("notice.preview") }), preview, error,
       h("div", { class: "row-actions" }, check, clear, save));
     var section = h("section", { class: "card" }, h("h2", { text: M.t("notice.title") }),
-      h("p", { class: "muted small", text: M.t("notice.delivery") }), form);
+      h("p", { class: "muted small", text: M.t("notice.caption") }),
+      M.learnMore(h("p", { text: M.t("notice.delivery") })), form);
 
     function load() {
       M.api("GET", "api/notice").then(function (state) {
@@ -68,6 +72,8 @@
         preview.textContent = state.preview || M.t("notice.none");
         status.textContent = state.notice && !state.active ? M.t("notice.expired") : "";
         clear.disabled = check.disabled = save.disabled = false;
+        text.disabled = until.disabled = person.disabled = false;
+        M.trackForm(form);
       }, function (e) {
         error.textContent = M.errorText(e);
         M.mount(status, h("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: load }, M.t("action.retry")));
@@ -84,21 +90,22 @@
     function run(clearing, saving) {
       var body = request(clearing);
       if (!body) return;
-      M.busy(form, function () {
+      (saving ? M.saveDraft : M.busy)(form, function () {
         return M.api("PUT", "api/notice", body).then(function (state) {
           preview.textContent = state.preview || M.t("notice.none");
           if (!saving) return null;
           return M.confirm(M.t(clearing ? "notice.clear" : "notice.confirm"),
             state.preview || M.t("notice.none"),
             M.t(clearing ? "notice.clear" : "action.save"), clearing).then(function (ok) {
-              if (!ok) return null;
+              if (!ok) throw new M.ApiError(0, "cancelled", "");
               body.confirm = true;
               return M.api("PUT", "api/notice", body);
             });
         });
       }).then(function (state) {
-        if (!state) return;
+        if (!state || !form.isConnected) return;
         if (clearing) text.value = until.value = "";
+        M.resetDraft(form);
         status.textContent = "";
         M.toast(M.t("notice.saved"));
       }, function () { /* M.busy explains the failure in the form. */ });

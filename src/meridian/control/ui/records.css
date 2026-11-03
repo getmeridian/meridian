@@ -1,0 +1,31 @@
+/* Tokens and Revisions share compact People-like rows and native action disclosures. */
+.record-list { list-style: none; overflow: visible; }
+.record-row { align-items: flex-start; gap: var(--space-3); }
+.record-row:first-child { border-start-start-radius: var(--r2); border-start-end-radius: var(--r2); }
+.record-row:last-child { border-end-start-radius: var(--r2); border-end-end-radius: var(--r2); }
+.record-main { display: flex; flex: 1; min-inline-size: 0; flex-direction: column; gap: var(--space-2);
+  color: inherit; text-decoration: none; }
+a.record-main:hover .record-name { color: var(--ac-text); }
+.record-name { min-inline-size: 0; overflow-wrap: anywhere; font-weight: 600; }
+.record-row.row-dim { opacity: 1; }
+.record-row.row-dim .record-name { color: var(--t2); }
+.record-facts { align-items: baseline; gap: var(--space-1) var(--space-3); }
+.record-facts > span { overflow-wrap: anywhere; }
+.row-menu { position: relative; flex: 0 0 auto; }
+.row-menu > summary { min-block-size: 44px; list-style: none; cursor: pointer; }
+.row-menu > summary::-webkit-details-marker { display: none; }
+.row-menu > summary::marker { content: none; }
+.row-menu > summary::after { content: "▾"; }
+.row-menu-panel { position: absolute; inset-inline-end: 0; inset-block-start: calc(100% + var(--space-2));
+  z-index: 20; inline-size: 18rem; max-inline-size: calc(100vw - 32px); max-block-size: calc(100dvh - 8rem);
+  overflow-y: auto; padding: var(--space-2); gap: var(--space-1); box-shadow: var(--shadow-lg); }
+.row-menu-panel .btn { min-block-size: 44px; justify-content: flex-start; white-space: normal; text-align: start; }
+@media (max-width: 640px) {
+  .record-list { display: flex; flex-direction: column; gap: var(--space-3); border: 0; background: none; box-shadow: none; }
+  .record-row, .record-row:first-child { padding: var(--space-3); border: 1px solid var(--b1);
+    border-radius: var(--r2); background: var(--s1); box-shadow: var(--shadow-sm); }
+  .record-row .row-title { align-items: flex-start; }
+  .row-menu { position: static; }
+  .row-menu-panel { position: fixed; inset-inline: 14px; inset-block-start: auto;
+    inset-block-end: max(14px, env(safe-area-inset-bottom)); inline-size: auto; }
+}

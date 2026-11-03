@@ -20,14 +20,14 @@ pytestmark = needs_console_dom
 # changing a binding or adding another call cannot silently inherit an opaque-ID exception.
 REVIEWED = {
     "fleet.js": {
-        "sha256": "e34cab7f098f31d3cacf09fbe57f0da5be44e7eced0a3041ddf571264efae2b5",
+        "sha256": "b14030afe13db1b37ff73f8a12ff968a1d904ee21da84959148e7f1b6c345b8c",
         "paths": {
             'GET "api/revisions/" + number': ["api/revisions/{id}"],
             'GET "api/revisions/" + chosen': ["api/revisions/{id}"],
         },
     },
     "people-bulk.js": {
-        "sha256": "06f99f2c1b0773d3f53295121b41bf4af3cb5f602fa8bc128434799046efcef9",
+        "sha256": "20883130c916280b19df96854b467629ccdaacc0ee42eb3ec7d747a7253b1c86",
         "paths": {
             'GET "api/people/bulk/receipts/" + receipt.id': ["api/people/bulk/receipts/{id}"],
             'GET "api/people/bulk/receipts/" + review.id': ["api/people/bulk/receipts/{id}"],
@@ -35,7 +35,7 @@ REVIEWED = {
         },
     },
     "tokens.js": {
-        "sha256": "24efe670013a7d1de8a8e13e4721aa8071aec31d126e5e9337bd49f763617f55",
+        "sha256": "97324c33d557202cd94f0b8fb88bf233856157b44ebc053c25d13cc87cb99c09",
         "paths": {'DELETE "api/tokens/" + token.id': ["api/tokens/{id}"]},
     },
     "i18n.js": {

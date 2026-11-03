@@ -21,6 +21,7 @@
       M.field(M.t("policy.destination"), destination, M.t("policy.destination_hint")), error,
       h("div", { class: "row-actions" }, h("button", { type: "submit", class: "btn btn-primary btn-sm" }, M.t("preview.run"))));
     var pending = false;
+    M.trackForm(form);
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       if (pending) return;
@@ -40,11 +41,13 @@
       M.busy(form, function () {
         return username ? M.api("POST", "api/subscription/preview", body) : M.api("POST", "api/response-rules/test", body);
       }).then(function (data) {
+        if (!form.isConnected) return;
         draw(result, data);
       }, function () { /* explained by M.busy */ }).finally(function () { pending = false; });
     });
     return h("section", { class: "card" }, h("h2", { text: M.t("preview.title") }),
-      h("p", { class: "muted small", text: M.t("preview.hint") }), form, result);
+      h("p", { class: "muted small", text: M.t("preview.caption") }),
+      M.learnMore(h("p", { text: M.t("preview.hint") })), form, result);
   };
 
   function draw(target, data) {

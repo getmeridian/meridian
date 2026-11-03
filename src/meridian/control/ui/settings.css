@@ -1,0 +1,32 @@
+/* Settings keeps one section beside a desktop column or a scrolling phone chip row. */
+.settings-layout { display: grid; grid-template-columns: minmax(10rem, 12rem) minmax(0, 1fr);
+  align-items: start; gap: var(--space-5); }
+.settings-sections { display: flex; flex-direction: column; flex-wrap: nowrap; gap: var(--space-1);
+  position: sticky; inset-block-start: 8rem; min-inline-size: 0; }
+.settings-section { display: flex; align-items: center; flex: 0 0 auto; min-block-size: 44px;
+  padding: var(--space-2) var(--space-3); border: 1px solid transparent; border-radius: var(--r);
+  color: var(--t2); font-size: .875rem; font-weight: 600; text-decoration: none; }
+.settings-section:hover { color: var(--t1); background: var(--s2); }
+.settings-section[aria-selected="true"] { color: var(--ac-text); background: var(--ac2); border-color: var(--ac); }
+.settings-panels, .settings-panel { min-inline-size: 0; }
+.settings-panel { scroll-margin-block-start: 8rem; }
+.settings-panel > .section-title { margin-block-start: 0 !important; }
+.settings-facts .kv-row { grid-template-columns: minmax(7rem, .75fr) minmax(0, 2fr); align-items: start; }
+.settings-facts dd { text-align: start; }
+.settings-fact-value { font-weight: 600; overflow-wrap: anywhere; }
+.settings-command { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.settings-command > .cmd { flex: 0 1 auto; }
+.learn-more > summary { display: flex; align-items: center; min-block-size: 44px; cursor: pointer;
+  color: var(--ac-text); font-size: .8125rem; font-weight: 600; }
+.learn-more > div { padding-block: var(--space-2); }
+.settings-panel .privacy-section > .section-title { margin-block-start: 0 !important; }
+.settings-panel .cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
+@media (max-width: 640px) {
+  .settings-layout { display: flex; flex-direction: column; gap: var(--space-4); }
+  .settings-sections { position: static; flex-direction: row; flex-wrap: nowrap; overflow-x: auto;
+    overscroll-behavior-inline: contain; inline-size: 100%; scrollbar-width: thin; padding-block-end: var(--space-2); }
+  .settings-section { border-radius: 99px; white-space: nowrap; border-color: var(--b1); background: var(--s1); }
+  .settings-panels { inline-size: 100%; }
+  .settings-facts .kv-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+  .settings-panel .cards { grid-template-columns: minmax(0, 1fr); }
+}

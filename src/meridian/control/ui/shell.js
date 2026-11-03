@@ -33,7 +33,9 @@
       window.dispatchEvent(new CustomEvent("meridian:mode", { detail: { mode: value } }));
       return true;
     }
-    if (next === "simple" && M.isDetailedRoute(M.route().name) && M.navigate) {
+    var route = M.route();
+    var detailedRoute = M.isDetailedRoute(route.name) || M.isDetailedPersonRoute && M.isDetailedPersonRoute(route);
+    if (next === "simple" && detailedRoute && M.navigate) {
       return M.navigate("#/overview").then(function () { return M.route().name === "overview" ? accept() : false; });
     }
     return Promise.resolve(accept());
@@ -107,17 +109,25 @@
       title.hidden = separator.hidden = fleetTitle === "Meridian";
       document.title = fleetTitle;
     }
+    var navTurn = 0;
     function update() {
+      var mine = ++navTurn;
       modes.update(value);
       M.mount(nav, (M.consoleScreens || []).filter(function (tab) { return !tab.detailed || value === "detailed"; }).map(function (tab) {
         return h("a", { href: "#/" + tab.name, class: "tab" + (tab.name === screen ? " active" : ""),
           "aria-current": tab.name === screen ? "page" : null }, M.t("nav." + tab.name));
       }));
       updateTitle();
+      Promise.resolve().then(function () {
+        if (!nav.isConnected || mine !== navTurn || nav.scrollWidth <= nav.clientWidth) return;
+        var active = nav.querySelector('[aria-current="page"]');
+        if (active) active.scrollIntoView({ block: "nearest", inline: "nearest" });
+      });
     }
     M.updateFleetTitle = updateTitle;
     update();
     return { node: header, update: update, stop: function () {
+      navTurn++;
       document.removeEventListener("click", outside);
       document.removeEventListener("keydown", escape);
       if (M.updateFleetTitle === updateTitle) M.updateFleetTitle = null;

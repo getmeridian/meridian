@@ -80,6 +80,8 @@ Only options you pass change. Raising a level prints its disclosure before confi
 
 In the web panel, open **Settings → Privacy**. Each option shows its disclosure. Review the confirmation before saving; the owner needs a recent password check and their sign-in code if enabled. API reads need `read`; writes need `admin`.
 
+The Privacy section has a direct fragment link, `#/settings/privacy`, and includes both levels and their change history. A draft guards switching sections. Lowering a level still works with invalid unfinished cap or retention edits: the review uses the saved number for each invalid field. Clearing a notice in Settings → Notice likewise ignores unfinished text or expiry edits.
+
 Every setting change records who made it (the token's name, `owner`, or `root`), when, and the complete before and after values. The web panel and CLI show the newest 50 changes.
 
 ## Lowering a level

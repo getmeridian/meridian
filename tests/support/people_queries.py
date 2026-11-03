@@ -87,6 +87,7 @@ def with_people_replies(data: dict) -> dict:
                         sub_token=f"sample-token-{index:010d}",
                         status=row.get("status", "active"),
                         tag=row.get("tag", ""),
+                        note=row.get("note", ""),
                         profiles=row.get("profiles", ["default"]),
                         expire_at=row.get("expire_at"),
                         used_traffic_bytes=used,
@@ -108,10 +109,10 @@ def with_people_replies(data: dict) -> dict:
                         "first_traffic_at, last_traffic_node) VALUES (?, 0, 0, ?, ?, NULL)",
                         (user.user_id, row["online_at"], row["online_at"]),
                     )
-            if data.get("names"):
+            if data.get("names") or data.get("declared"):
                 revision = service.revisions.propose(
                     RevisionProposal(
-                        intent={"access": {"users": [], "display_names": data["names"]}},
+                        intent={"access": {"users": data.get("declared", []), "display_names": data.get("names", {})}},
                         plan_hash="a" * 64,
                         review_hash="b" * 64,
                     ),
@@ -120,7 +121,15 @@ def with_people_replies(data: dict) -> dict:
                 service.revisions.approve(revision.number, caller=ROOT)
                 service.revisions.record_result(revision.number, RevisionResult(status="applied"))
             replies = {}
-            for options in (initial, final):
+            selections = [initial, final]
+            if data.get("remove"):
+                removed = {key: value for key, value in final.items() if key != data["remove"]}
+                if data["remove"] == "sort":
+                    removed.pop("order", None)
+                selections.append(removed)
+            if data.get("clear"):
+                selections.append({})
+            for options in selections:
                 query = PeopleQuery(**options)
                 key = json.dumps(query.selection_data(), sort_keys=True, separators=(",", ":"), ensure_ascii=False)
                 replies[key] = service.people.query(query).model_dump(mode="json")

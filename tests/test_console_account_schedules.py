@@ -54,7 +54,7 @@ def test_one_day_duration_uses_the_singular() -> None:
     assert "Valid for 1 day from first use" in result["shown"]
 
 
-def test_schedule_editor_saves_all_changed_choices_in_one_patch() -> None:
+def test_schedule_and_traffic_rows_save_only_their_changed_choices() -> None:
     result = run_console(
         "person-schedules",
         data={
@@ -82,10 +82,13 @@ def test_schedule_editor_saves_all_changed_choices_in_one_patch() -> None:
                 "renewal_interval_days": None,
                 "renewal_interval_months": 1,
                 "renewal_limit": 4,
-                "traffic_reset_anchor_day": 31,
-                "traffic_limit_strategy": "month_rolling",
             },
-        }
+        },
+        {
+            "url": "api/users/sample",
+            "method": "PATCH",
+            "body": {"traffic_limit_strategy": "month_rolling", "traffic_reset_anchor_day": 31},
+        },
     ]
     assert result["previews"]
 

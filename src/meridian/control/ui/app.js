@@ -11,16 +11,24 @@
   var header = null, modeNote = null;
   var activeHash = null, position = 0, navigationTurn = 0, ignoreHash = null;
   var restoring = null, allowedTraversal = false;
+  var renderedRoute = null;
 
   var SCREENS = [
     { name: "overview", render: function (view) { return M.renderOverview(view); } },
-    { name: "people", render: function (view, route) { return route.arg ? M.renderPerson(view, route.arg) : M.renderPeople(view); } },
+    { name: "people", render: function (view, route) { return route.arg ? M.renderPerson(view, route.arg, route.extra) : M.renderPeople(view); } },
     { name: "servers", render: function (view, route) { return M.renderServers(view, route.arg, route.extra); } },
     { name: "revisions", detailed: true, render: function (view, route) { return M.renderRevisions(view, route.arg); } },
     { name: "tokens", detailed: true, render: function (view) { return M.renderTokens(view); } },
-    { name: "settings", render: function (view) { return M.renderSettings(view); } },
+    { name: "settings", sectionRoutes: true, detailedWhen: function (route) { return M.settingsSection(route.arg) === "advanced"; },
+      render: function (view, route) { return M.renderSettings(view, route.arg); } },
   ];
   M.consoleScreens = SCREENS;
+  var detailedScreen = M.isDetailedRoute;
+  M.isDetailedRoute = function (name) {
+    return detailedScreen(name) || SCREENS.some(function (screen) {
+      return screen.name === name && screen.detailedWhen && screen.detailedWhen(M.route());
+    });
+  };
 
   function refreshAuth() {
     return M.rawApi("GET", "auth/state").then(function (auth) { M.state.auth = auth; return auth; });
@@ -104,6 +112,16 @@
     syncMode();
     var cleanup = screen.render(view, route);
     stopScreen = typeof cleanup === "function" ? cleanup : null;
+    renderedRoute = route;
+  }
+
+  function renderRoute() {
+    var route = M.route();
+    var screen = SCREENS.filter(function (item) { return item.name === route.name; })[0];
+    if (stopScreen && stopScreen.route && renderedRoute && renderedRoute.name === route.name &&
+        (renderedRoute.arg === route.arg || screen && screen.sectionRoutes)) {
+      stopScreen.route(route); renderedRoute = route; syncMode();
+    } else renderNow();
   }
 
   function syncMode() {
@@ -131,7 +149,7 @@
         position++;
         activeHash = hash;
       }
-      renderNow();
+      renderRoute();
     });
   };
 
@@ -158,7 +176,7 @@
     }
     allowedTraversal = false;
     remember(location.hash, nextPosition);
-    renderNow();
+    renderRoute();
   }
 
   function hashChanged() {
@@ -171,7 +189,7 @@
       history.back();
     } else {
       remember(location.hash, position + 1);
-      renderNow();
+      renderRoute();
     }
   }
 

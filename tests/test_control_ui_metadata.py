@@ -30,7 +30,7 @@ def test_person_metadata_is_plain_text_localized_and_patches_only_edits(locale: 
     assert result["initialNote"] == user["note"] and result["initialTag"] == user["tag"]
     assert catalog["person.note"] in result["text"] and catalog["person.tag"] in result["text"]
     assert result["injected"] is False
-    assert result["writes"] == [change]
+    assert result["writes"] == [{field: value} for field, value in change.items()]
 
 
 @pytest.mark.parametrize("change", [{"tag": "A-B"}, {"note": "x" * 501}])

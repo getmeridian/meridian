@@ -80,8 +80,10 @@ report.rendered_people = w.document.querySelectorAll('#view .people-item').lengt
 
 if (mode === 'showcase-navigation') {
   await M.go('people', 'Luma');
-  await until(() => w.document.querySelector('.individual-connections'), 'person');
+  await until(() => w.document.querySelector('[data-person-action="share"]'), 'person');
   report.person = w.document.querySelector('#view h1').textContent;
+  w.document.querySelector('[data-person-action="share"]').click();
+  await until(() => w.document.querySelector('dialog .individual-connections'), 'share dialog');
   const disclosure = w.document.querySelector('.individual-connections');
   disclosure.open = true;
   report.connections = disclosure.querySelectorAll('.connection-entry').length;
@@ -89,14 +91,19 @@ if (mode === 'showcase-navigation') {
   qrButton.click();
   await until(() => w.document.querySelector('.connection-qr'), 'qr');
   report.qr = w.document.querySelector('.connection-qr').src.startsWith('data:image/svg+xml');
+  w.document.querySelector('.connection-qr').closest('dialog').querySelector('.btn-icon').click();
   w.document.querySelector('dialog .btn-icon').click();
   await M.go('people');
   await until(() => w.document.querySelector('#view .list'), 'back');
   await M.go('servers');
   await until(() => w.document.querySelector('#view').textContent.includes('Example Hosting'), 'servers');
   report.servers = (await M.api('GET', 'ui/api/fleet')).servers.length;
-  await M.go('settings');
+  await M.go('settings', 'notice');
   await until(() => w.document.querySelector('[data-notice="text"]')?.value, 'settings');
+  await M.go('settings', 'privacy');
+  await until(() => w.document.querySelector('.privacy-choice'), 'privacy');
+  await M.go('settings', 'language');
+  await until(() => w.document.querySelector('[data-language]') && !w.document.querySelector('[data-language]').disabled, 'language');
   report.settings = !!w.document.querySelector('.privacy-choice') && !!w.document.querySelector('[data-language]');
   await M.go('tokens');
   await until(() => w.document.querySelector('#view').textContent.includes('People helper'), 'tokens');
@@ -154,8 +161,14 @@ if (mode === 'showcase-navigation') {
   const recording = JSON.parse(fs.readFileSync(path.join(directory, 'console/demo-data.json'), 'utf8'));
   report.serviceQueries = 0;
   report.queryMismatches = [];
-  function summary(page) {
-    return { users: page.users, total: page.total, population: page.population, facets: page.facets };
+  function summary(page, reported = page) {
+    const unreported = new Set(reported.users.filter(user => user.has_notes == null).map(user => user.username));
+    return { users: page.users.map(user => {
+      const row = { ...user };
+      // Older replies make no claim about this optional indicator. Reported booleans still compare exactly.
+      if (unreported.has(user.username)) delete row.has_notes;
+      return row;
+    }), total: page.total, population: page.population, facets: page.facets };
   }
   function canonical(value) {
     if (Array.isArray(value)) return value.map(canonical);
@@ -166,7 +179,7 @@ if (mode === 'showcase-navigation') {
     if (!key.startsWith('GET api/people') || key.includes('/bulk/') || key.includes('cursor=')) continue;
     const actual = await M.api('GET', key.slice(4));
     report.serviceQueries++;
-    if (JSON.stringify(canonical(summary(actual))) !== JSON.stringify(canonical(summary(expected)))) report.queryMismatches.push({ key, actual: summary(actual), expected: summary(expected) });
+    if (JSON.stringify(canonical(summary(actual))) !== JSON.stringify(canonical(summary(expected, actual)))) report.queryMismatches.push({ key, actual: summary(actual), expected: summary(expected, actual) });
   }
   const first = await M.api('GET', 'api/people?sort=usage&limit=2');
   report.ordered = (await M.api('GET', 'api/people?sort=usage')).users.map(user => user.username);
@@ -297,6 +310,7 @@ if (mode === 'showcase-navigation') {
   report.share = await M.api('GET', 'ui/api/people/' + data.person + '/share');
   await M.go('people', data.person);
   await until(() => w.document.querySelector('#view h1')?.textContent === data.person, 'inactive person');
+  await M.navigate(M.personHash(data.person, 'keys'));
   report.card = !!w.document.querySelector('.flow-block-status');
 } else if (mode === 'showcase-share-rotations') {
   if (data.person !== 'Luma') await M.api('POST', 'api/users', { username: data.person });
@@ -310,11 +324,14 @@ if (mode === 'showcase-navigation') {
   }
   await M.go('people', data.person);
   await until(() => w.document.querySelector('#view h1')?.textContent === data.person, 'rotated person');
+  await M.navigate(M.personHash(data.person, 'keys'));
   report.card = !!w.document.querySelector('.flow-block-status');
 } else if (mode === 'showcase-token-console') {
   await M.go('tokens');
-  await until(() => [...w.document.querySelectorAll('#view button')].some(button => button.textContent === M.t('tokens.create')), 'tokens');
-  [...w.document.querySelectorAll('#view button')].find(button => button.textContent === M.t('tokens.create')).click();
+  const create = () => [...w.document.querySelectorAll('#view button')]
+    .find(button => button.textContent === M.t('tokens.create') && !button.disabled);
+  await until(create, 'token catalog');
+  create().click();
   await until(() => w.document.querySelector('dialog form'), 'token form');
   const form = w.document.querySelector('dialog form');
   const name = form.querySelector('input[type=text]');

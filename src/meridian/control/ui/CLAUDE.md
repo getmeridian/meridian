@@ -1,6 +1,13 @@
 # control/ui — The owner's web console
 
 ## Design decisions
+- **Record lists use native menus** — show metadata and derived token status in each row; permissions and revoke/diff actions share the local disclosure, while issuance and comparison keep their reviews.
+- **Settings sections share navigation** — fragments select one labelled panel; General stays the default, Advanced uses the shared Detailed note, and clean sections remain mounted across mode changes.
+- **Custom expiry selects a fixed draft** — Extend focuses Date for its custom choice; ordinary Edit keeps the person's saved activation mode.
+- **Person tabs keep one screen** — fragments select one labelled panel; only its contents scroll below the summary, and tab changes use the shared navigation guard.
+- **Person rows own separate drafts** — create editors on Edit, preview date and traffic choices in the service, PATCH only that row's edited fields, and close only the saved editor.
+- **People selection follows the view** — Detailed shows checkboxes; Simple's Select toggle reveals them, and mode changes preserve an existing selection. The action bar appears only with selected people; the last receipt stays in the list header.
+- **People filters have individual chips** — native panels share the fragment query; removing a chip clears selection and returns focus to its control, while passive reads retain panels and rows.
 - **Screen metadata is shared** — `M.consoleScreens` owns rendering, navigation, and Detailed-only route checks in one registry.
 - **Display mode is browser-local** — `M.mode()` reads Simple or Detailed; `M.chooseMode()` emits `meridian:mode` after an accepted change. Shared routes and drafts stay mounted, while leaving a Detailed-only route goes to Overview through the navigation guard.
 - **Overview composes owner reads** — bounded people queries, fleet health, opt-in UTC daily traffic, revisions, and recorded owner events provide its figures; unavailable history stays unavailable, and visible refreshes are passive.
@@ -35,6 +42,37 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Scrolling chip rows reveal their selection** — after every route or link, scroll the selected chip into view when the row overflows; a deep link to Security once left its chip cut off at a phone's edge.
+- **Verb-labelled buttons are actions** — Enable and Disable change their names with the available action and must never announce an inverted pressed state.
+- **Hidden person tab strips hand off focus** — returning to the sole Access panel focuses its region; a visible strip retains tab focus.
+- **Inline refreshes distinguish saved choices from drafts** — reseed changed clean editors with focus, retain edited baselines, refresh sibling schedules, and let summary presets read the current account.
+- **Passive reads keep a draft's reviewed dates** — only edits and saves request a new draft preview, since repeated POST previews would renew the owner's idle activity.
+- **Traffic previews start with saved dates** — debounce period and reset-day edits, show the reset field's own error, focus it only on submit, and clear obsolete form errors on input.
+- **Schedule previews carry only schedule fields** — the preview request forbids extras, so forwarding the traffic cap failed every quota save; a cap-only save needs no preview.
+- **Saving owns the preview timer** — cancel pending previews before the final review, reject timer work during saving, and never validate controls from a delayed callback.
+- **Custom date starts before the draft snapshot** — choose its fixed mode quietly, keep untouched existing editors clean, and let the date field own its single validation alert.
+- **Quiet date choices still cancel presets** — send a silent change through the expiry guard so an earlier calendar reply cannot fill the newly opened custom editor.
+- **Summary extensions follow saved access** — guard pending reviews with edit events rather than validating unfinished drafts, and let a returned calendar preset select Fixed date from any editor mode.
+- **Phone filter controls scroll in one row** — keep their fixed panels and the removable active chips outside the clipped scrolling area.
+- **Share dialogs own their heading and frame** — mount the common caption, QR, links, actions, and connections as unframed content, including the missing-public-URL case.
+- **One visible person panel needs no tabs** — hide the strip and label a direct region; restore the tablist and tabpanel relationships when another tab is visible.
+- **Summary dates share the meter's meta line** — put reset before expiry in words below usage, retaining the expiry's focusable exact-date tooltip.
+- **Near-quota labels stop at the limit** — suppress that row reason for limited people or an exact service percentage of at least 100; keep the inclusive quota filter and other reasons.
+- **Main navigation never shrinks its labels** — keep a spaced scrolling row and reveal the active route after mounting or changing mode, using logical scroll alignment for RTL.
+- **Desktop selection bars set their direction** — override the card's column layout and keep the count and matching offer beside the actions; the phone grid remains separate.
+- **Phone matching selection fills its row** — reset the desktop offer's auto margin at the phone breakpoint so the bottom bar keeps the action across its width.
+- **Settings links name their section** — history-off notices go to Privacy, and recent settings edits go to their own fragment; the base route opens General.
+- **Menu actions return to their summary** — close and focus it before opening a dialog, or dismissal returns keyboard focus to an action hidden in the closed menu.
+- **Settings lowering keeps saved numbers** — invalid unfinished cap or retention edits cannot block a privacy reduction; review the saved fallback, and track forms only after loading and settling disabled fields.
+- **Inline previews contain their own edits** — an expiry row must leave the traffic strategy to the service, or a sibling save makes its reset preview stale.
+- **Inline time inputs need the field target** — native time controls miss the shared text/date selector; give person editors the same 44 px minimum.
+- **Custom date over an open editor refreshes its preview** when the date holds a value, or the panel keeps describing the mode it left.
+- **Pending extensions use the service review** — take the duration from the existing bulk preview; a calendar-expiry preview describes a fixed date and must never activate first-use access.
+- **Person mode changes retain row identity** — move notes and tag into More in Simple, preserving draft inputs and focus; Detailed-only tab links use the same mode note and switch.
+- **Selecting the current person tab is no navigation** — open another inline editor without asking to discard a sibling draft.
+- **Local downloads bind their own URL** — `M.h` refuses Blob hrefs; assign only the URL created locally from the reviewed JSON, as QR export does for images.
+- **Matching selection follows a full page** — offer it inside the selected bar only after every visible row is selected; phone padding reserves the extra action above the safe area.
+- **Percentage chips isolate the unit too** — format the percent with the active locale and isolate the whole value, or RTL can move its sign away from the number.
 - **Phone targets follow width and pointer** — apply 44 px targets at the phone breakpoint as well as for coarse pointers; include local date inputs and chart selectors, keeping other pointer layout rules separate.
 - **Server guidance stays compact** — keep the copyable meridian command beside one caption so the notice does not dominate phone cards.
 - **Isolate count pairs together** — render Overview's active / total as one LTR unit; separate number isolates let RTL reverse the pair around the slash.

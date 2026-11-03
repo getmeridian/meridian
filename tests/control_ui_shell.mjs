@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { loadStyles as resolveStyles } from './support/console_styles.mjs';
 
 const require = createRequire(new URL('../website/package.json', import.meta.url));
 const { JSDOM } = require('jsdom');
@@ -29,11 +30,18 @@ w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
 w.HTMLDialogElement.prototype.close = function () { this.open = false; };
 w.HTMLElement.prototype.scrollIntoView = function (options) {
   scrolls.push({ server: this.closest('[data-server]')?.dataset.server, section: this.dataset.modeSection,
-    open: this.open, connected: this.isConnected, block: options?.block });
+    open: this.open, connected: this.isConnected, block: options?.block, inline: options?.inline,
+    nav: this.closest('.tabs') ? this.getAttribute('href') : undefined });
 };
-if (scenario === 'overview-server-jump') {
+if (scenario === 'overview-server-jump' || scenario === 'shell-nav') {
   w.requestAnimationFrame = fn => w.setTimeout(() => fn(now), 16);
   w.cancelAnimationFrame = w.clearTimeout;
+}
+if (scenario === 'shell-nav') {
+  Object.defineProperties(w.HTMLElement.prototype, {
+    clientWidth: { get() { return this.classList.contains('tabs') ? 362 : 0; } },
+    scrollWidth: { get() { return this.classList.contains('tabs') ? 800 : 0; } },
+  });
 }
 
 const server = { node_id: 'main', role: 'node', region: 'DE', live: true, in_sync: true,
@@ -97,6 +105,7 @@ M.renderPeople = view => {
 M.renderPerson = M.renderPeople;
 M.renderTokens = screen('tokens');
 M.renderRevisions = screen('revisions');
+if (scenario === 'shell-nav') M.renderSettings = screen('settings');
 if (scenario.startsWith('shell-')) M.renderOverview = screen('overview');
 if (scenario === 'shell-settings') {
   M.noticeSection = M.languageSection = M.privacySection = M.passkeyCard = () => null;
@@ -166,6 +175,17 @@ if (scenario === 'shell-keyboard') {
   report.keyboardFocus = document.activeElement?.dataset.modeChoice || null;
   report.radioStates = [...document.querySelectorAll('.mode-switch [role="radio"]')].map(el => el.getAttribute('aria-checked'));
 }
+if (scenario === 'shell-nav') {
+  resolveStyles(w, ui, ['tokens.css', 'styles.css', 'screens.css'], 390);
+  const navStyle = w.getComputedStyle(document.querySelector('.tabs'));
+  report.navLayout = { wrap: navStyle.flexWrap, overflow: navStyle.overflowX, gap: navStyle.gap,
+    shrink: [...document.querySelectorAll('.tabs a')].map(tab => w.getComputedStyle(tab).flexShrink) };
+  await advance(20); report.initialNavScroll = scrolls.filter(item => item.nav).at(-1) || null;
+  await M.navigate('#/settings'); await settle(); await advance(20);
+  report.routeNavScroll = scrolls.filter(item => item.nav).at(-1) || null;
+  await clickMode(M.mode() === 'detailed' ? 'simple' : 'detailed'); await advance(20);
+  report.modeNavScroll = scrolls.filter(item => item.nav).at(-1) || null;
+}
 if (scenario === 'shell-server-disclosure') {
   const detail = document.querySelector('[data-mode-section="capacity"]');
   report.initialOpen = detail?.open ?? null;
@@ -213,14 +233,16 @@ if (scenario === 'shell-cli-hint') {
 }
 if (scenario === 'shell-settings') {
   report.appearanceCards = [...document.querySelectorAll('#view h2')].filter(el => el.textContent === M.t('settings.appearance')).length;
-  const sections = [...document.querySelectorAll('[data-mode-section]')];
-  report.advancedInitiallyClosed = sections.length >= 2 && sections.every(el => !el.open);
+  report.advancedInitiallyClosed = document.querySelector('[data-settings-section="advanced"]')?.hidden &&
+    !document.querySelector('[data-settings-panel="general"]')?.hidden;
+  await M.navigate('#/settings/advanced'); await settle();
   const input = document.querySelector('[data-format-person]');
   if (input) input.value = 'sample';
   await clickMode('detailed');
   report.samePreviewInput = !!input && input === document.querySelector('[data-format-person]');
   report.previewValue = document.querySelector('[data-format-person]')?.value;
-  report.advancedAfterDetailedOpen = sections.length >= 2 && sections.every(el => el.open);
+  report.advancedAfterDetailedOpen = !document.querySelector('[data-settings-panel="advanced"]')?.hidden &&
+    !document.querySelector('[data-settings-section="advanced"]')?.hidden;
 }
 
 const clean = text => String(text || '').replace(/[\u2066-\u2069]/g, '').replace(/[۰-۹]/g, char => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(char)));
@@ -374,6 +396,9 @@ if (scenario.startsWith('overview-')) {
   report.historyUnavailable = !!document.querySelector('[data-history-unavailable]');
   report.sparkline = !!document.querySelector('.overview-traffic:not([hidden]) svg');
   report.recent = [...document.querySelectorAll('.overview-recent [data-recent-kind]')].map(el => el.dataset.recentKind);
+  report.recentLinks = Object.fromEntries([...document.querySelectorAll('.overview-recent [data-recent-kind]')]
+    .map(el => [el.dataset.recentKind, el.getAttribute('href')]));
+  report.historyPrivacyLink = document.querySelector('.overview-traffic a')?.getAttribute('href') || null;
 }
 
 report.mode = M.mode?.() || null;

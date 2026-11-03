@@ -49,7 +49,7 @@ w.fetch = (url, options) => {
   tokens.push(issued);
   return Promise.resolve(reply(issued));
 };
-for (const script of ['core.js', 'capacity.js', 'fleet.js', 'tokens.js']) w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
+for (const script of ['core.js', 'components.js', 'capacity.js', 'fleet.js', 'tokens.js']) w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 const M = w.M;
 M.i18n = { lang: locale, locale: () => locale === 'zh' ? 'zh-CN' : locale };
 M.t = (key, params = {}) => (catalog[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? ''));

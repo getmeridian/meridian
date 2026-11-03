@@ -8,12 +8,18 @@
 
   function path(username, suffix) { return "api/users/" + encodeURIComponent(username) + (suffix || ""); }
 
-  M.renderPerson = function (view, username) {
-    var screen = { view: view, username: username, generation: ++generation, stopped: false, version: 0 };
+  M.renderPerson = function (view, username, tab) {
+    var screen = { view: view, username: username, tab: tab, generation: ++generation, stopped: false, version: 0, mounted: {} };
     view.meridianPersonGeneration = screen.generation;
+    view.classList.add("person-view");
     screen.liveStatus = h("div", { class: "live-status" });
     var loading = h("div", { class: "empty" }, h("span", { class: "spinner" }));
     M.mount(view, [back(), screen.liveStatus, loading]);
+    function mode() {
+      if (screen.tabs) screen.tabs.mode();
+      if (screen.access) screen.access.mode();
+    }
+    window.addEventListener("meridian:mode", mode);
     var stop = M.liveView(view, {
       status: screen.liveStatus, interval: 30000,
       load: function (passive) {
@@ -26,7 +32,15 @@
       draw: function (data) { draw(screen, data.results[0], data.results[1]); },
       empty: function () { loading.remove(); },
     });
-    return function () { screen.stopped = true; stop(); M.discardDrafts(view); };
+    function cleanup() {
+      screen.stopped = true; stop(); M.discardDrafts(view);
+      window.removeEventListener("meridian:mode", mode); view.classList.remove("person-view");
+    }
+    cleanup.route = function (route) {
+      screen.tab = route.extra;
+      if (screen.tabs) screen.tabs.select(route.extra);
+    };
+    return cleanup;
   };
 
   function back() {
@@ -65,81 +79,169 @@
     }, function (e) { failed(label, e); });
   }
 
-  function heading(user) {
-    var name = user.username;
-    return [h("div", {}, h("h1", { text: M.displayName(name) }),
-      h("p", { class: "muted" }, M.displayName(name) !== name ? h("span", { class: "mono", text: name + " · " }) : null,
-        M.t("person.since", { when: M.date(user.created_at) }))), M.statusPill(user.status)];
+  function draw(screen, user, share, savedForm) {
+    var previous = screen.user;
+    screen.user = user; screen.share = share;
+    if (!previous) {
+      screen.summary = summary(screen);
+      screen.tabs = M.personTabs(user.username, screen.tab, function (next, old, panel, oldPanel) {
+        if (oldPanel && M.hasUnsavedEdits(oldPanel)) {
+          M.discardDrafts(oldPanel);
+          if (old === "access") screen.access.reset();
+          else {
+            M.clear(oldPanel); screen.mounted[old] = false;
+            if (old === "routing") { screen.profileCard = null; screen.deliveryCard = null; }
+          }
+        }
+        mountPanel(screen, next, panel);
+      });
+      M.mount(screen.view, h("div", { class: "person-page" }, screen.summary, screen.liveStatus, screen.tabs.node));
+      screen.tabs.select(screen.tab);
+    }
+    drawSummary(screen, user, share);
+    if (screen.access) screen.access.refresh(user, savedForm);
+    if (previous && screen.profileCard) screen.profileCard.refresh(user);
+    if (previous && screen.deliveryCard) screen.deliveryCard.refresh(user);
+    if (screen.mounted.usage) M.mount(screen.usageSlot, usageCard(user, screen));
+    if (screen.mounted.keys) {
+      M.mount(screen.flowSlot, flowCard(share.flow_blocks));
+      M.mount(screen.dangerSlot, dangerCard(user, share.declared, screen));
+    }
   }
 
-  function editable(form) { return !M.formDirty(form) && !form.meridianSaving; }
-
-  function draw(screen, user, share, savedForm) {
-    var previous = screen.user, oldShare = screen.share;
-    screen.user = user;
-    screen.share = share;
-    var name = user.username;
-    if (!previous) {
-      screen.head = h("div", { class: "page-head" });
-      screen.shareSlot = h("div"); screen.usageSlot = h("div", { class: "card-slot" });
-      screen.accessSlot = h("div", { class: "card-slot" }); screen.metadataSlot = h("div"); screen.dangerSlot = h("div");
-      screen.flowSlot = h("div");
-      screen.profileSlot = h("div");
-      screen.deliverySlot = h("div");
-      if (M.personDeliveryPolicy) {
-        screen.deliveryCard = M.personDeliveryPolicy(user, function (changed) {
-          completed(screen, changed, "person.saved_toast", M.displayName(name));
-        });
-        screen.deliverySlot.appendChild(screen.deliveryCard.node);
-      }
+  function mountPanel(screen, tab, panel) {
+    if (screen.mounted[tab]) return;
+    screen.mounted[tab] = true;
+    var user = screen.user, name = user.username;
+    if (tab === "access") {
+      screen.access = M.personAccess(user, function (changed, form) {
+        completed(screen, changed, "person.saved_toast", M.displayName(name), form);
+      }, function () { return current(screen); });
+      M.mount(panel, screen.access.node);
+    } else if (tab === "usage") {
+      screen.usageSlot = h("div");
+      M.mount(screen.usageSlot, usageCard(user, screen));
+      M.mount(panel, [screen.usageSlot, M.personHistory(name)]);
+    } else if (tab === "devices") {
+      M.mount(panel, M.devicesCard(user, function (changed) {
+        if (!current(screen)) return;
+        screen.version++; draw(screen, changed, screen.share);
+      }));
+    } else if (tab === "routing") {
       if (M.personProfiles) {
         screen.profileCard = M.personProfiles(user, function (changed) {
           completed(screen, changed, "person.saved_toast", M.displayName(name));
         });
-        screen.profileSlot.appendChild(screen.profileCard.node);
+        panel.appendChild(screen.profileCard.node);
       }
-      M.mount(screen.view, [back(), screen.head, screen.liveStatus, screen.shareSlot,
-        h("div", { class: "cards" }, screen.usageSlot, screen.accessSlot), screen.profileSlot, screen.deliverySlot, screen.flowSlot, screen.metadataSlot,
-        M.personHistory(name), M.devicesCard(user, function (changed) {
-          if (!current(screen)) return;
-          screen.version++;
-          draw(screen, changed, screen.share);
-        }), screen.dangerSlot]);
-    }
-    M.mount(screen.head, heading(user));
-    if (previous && screen.profileCard) screen.profileCard.refresh(user);
-    if (previous && screen.deliveryCard) screen.deliveryCard.refresh(user);
-    M.mount(screen.flowSlot, flowCard(share.flow_blocks));
-    M.mount(screen.usageSlot, usageCard(user, screen));
-    if (!oldShare || JSON.stringify(oldShare) !== JSON.stringify(share)) {
-      var disclosure = screen.shareSlot.querySelector("details");
-      var open = disclosure && disclosure.open;
-      M.mount(screen.shareSlot, M.shareCard(share, name));
-      if (open && screen.shareSlot.querySelector("details")) screen.shareSlot.querySelector("details").open = true;
-    }
-    var accessForm = screen.accessSlot.querySelector("form");
-    var changedAccess = !previous || previous.expire_at !== user.expire_at || previous.traffic_limit_bytes !== user.traffic_limit_bytes
-      || previous.traffic_limit_strategy !== user.traffic_limit_strategy || previous.language !== user.language
-      || !M.sameLifecycle(previous, user) || JSON.stringify(previous.schedule) !== JSON.stringify(user.schedule);
-    if (!accessForm || editable(accessForm) && (changedAccess || accessForm === savedForm)) {
-      M.mount(screen.accessSlot, accessCard(user, screen));
+      if (M.personDeliveryPolicy) {
+        screen.deliveryCard = M.personDeliveryPolicy(user, function (changed) {
+          completed(screen, changed, "person.saved_toast", M.displayName(name));
+        });
+        panel.appendChild(screen.deliveryCard.node);
+      }
     } else {
-      screen.accessSlot.querySelector(".card-head").replaceWith(accessHead(user, screen));
-      screen.accessSlot.querySelector(".access-status").textContent = M.t("person.status_" + user.status);
+      screen.flowSlot = h("div"); screen.dangerSlot = h("div");
+      M.mount(screen.flowSlot, flowCard(screen.share.flow_blocks));
+      M.mount(screen.dangerSlot, dangerCard(user, screen.share.declared, screen));
+      M.mount(panel, [screen.dangerSlot, screen.flowSlot]);
     }
-    var metadataForm = screen.metadataSlot.querySelector("form");
-    var changedMetadata = !previous || previous.note !== user.note || previous.tag !== user.tag;
-    if (!metadataForm || editable(metadataForm) && (changedMetadata || metadataForm === savedForm)) {
-      M.mount(screen.metadataSlot, metadataCard(user, screen));
+  }
+
+  function usage(user) {
+    var used = user.used_traffic_bytes || 0, limit = user.traffic_limit_bytes || 0;
+    var percent = limit ? used * 100 / limit : 0;
+    var text = limit ? M.t("people.used_of", { used: M.bytes(used), limit: M.bytes(limit) }) : M.bytes(used);
+    return h("div", { class: "usage" }, h("span", { class: "usage-text", text: text }),
+      limit ? M.meter(percent, text, percent >= 100 ? "danger" : percent >= 90 ? "warn" : "success")
+        : h("span", { class: "muted small", text: M.t("people.no_limit") }));
+  }
+
+  function summary(screen) {
+    screen.title = h("h1"); screen.badge = h("span"); screen.tag = h("bdi", { class: "tag", dir: "ltr", "data-person-tag": "" });
+    screen.usernameLabel = h("bdi", { class: "muted small mono" });
+    screen.summaryUsage = h("div", { class: "person-summary-usage" });
+    screen.expiry = h("bdi", { class: "person-summary-expiry", tabindex: "0", "data-person-expiry": "" });
+    screen.expiryTooltip = h("span", { class: "person-date-tooltip", role: "tooltip", id: "person-expiry-" + screen.generation });
+    screen.expiry.setAttribute("aria-describedby", screen.expiryTooltip.id);
+    screen.reset = h("span", { class: "muted small", "data-person-reset": "" });
+    screen.receipt = h("a", { href: M.personHash(screen.username, "keys"), class: "muted small", hidden: true,
+      "data-person-receipts": "", text: M.t("person.flow_title") });
+    var shareButton = h("button", { class: "btn btn-primary", type: "button", "data-person-action": "share", onclick: function () {
+      if (screen.sharing || !current(screen)) return;
+      screen.sharing = true; shareButton.disabled = true;
+      M.openShare(screen.username).finally(function () { screen.sharing = false; shareButton.disabled = false; });
+    } }, M.icon("link"), M.t("person.share"));
+    function editExpiry(months) {
+      screen.extend.open = false;
+      screen.tabs.request("access").then(function (accepted) {
+        if (!accepted || !current(screen)) return;
+        screen.access.open("expiry", months, !months).catch(function () { /* the preview shows its error */ });
+      });
     }
-    M.mount(screen.dangerSlot, dangerCard(user, share.declared, screen));
+    var extendToggle = h("summary", { class: "btn btn-ghost", "data-person-action": "extend" },
+      M.t("person.extend"), h("span", { "aria-hidden": "true", text: "▾" }));
+    var menuButtons = [1, 3].map(function (months) {
+      return h("button", { type: "button", class: "btn btn-ghost", "data-months": months,
+        onclick: function () { editExpiry(months); } }, M.t(months === 1 ? "person.plus_month" : "person.plus_three_months"));
+    });
+    menuButtons.push(h("button", { type: "button", class: "btn btn-ghost", "data-person-custom-expiry": "",
+      onclick: function () { editExpiry(); } }, M.t("person.custom_date")));
+    screen.extend = h("details", { class: "person-extend" }, extendToggle,
+      h("div", { class: "person-extend-menu card" }, menuButtons));
+    screen.extend.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") { event.preventDefault(); screen.extend.open = false; extendToggle.focus(); }
+      else if (event.key === "ArrowDown" && event.target === extendToggle) {
+        event.preventDefault(); screen.extend.open = true; menuButtons[0].focus();
+      }
+    });
+    screen.toggle = h("button", { class: "btn btn-ghost", type: "button", "data-person-action": "toggle", onclick: function () {
+      if (screen.toggling || !current(screen)) return;
+      var disabled = screen.user.status === "disabled";
+      screen.toggling = true; screen.toggle.disabled = true;
+      act(screen, function () { return M.api("PATCH", path(screen.username), { status: disabled ? "active" : "disabled" }); },
+        disabled ? "person.enabled_toast" : "person.disabled_toast").finally(function () {
+        screen.toggling = false; if (current(screen)) screen.toggle.disabled = false;
+      });
+    } });
+    return h("header", { class: "person-summary", "data-person-summary": "" }, back(),
+      h("div", { class: "page-head person-summary-head" },
+        h("div", { class: "stack-sm" }, h("div", { class: "person-title-row" }, screen.title, screen.badge, screen.tag), screen.usernameLabel),
+        h("div", { class: "row-actions person-primary-actions", role: "group", "aria-label": M.t("person.actions") },
+          shareButton, screen.extend, screen.toggle)),
+      h("div", { class: "person-summary-facts" }, screen.summaryUsage,
+        h("p", { class: "muted small person-summary-meta", "data-person-meta": "" }, screen.reset, " · ",
+          h("span", { class: "person-expiry-detail" }, screen.expiry, screen.expiryTooltip)), screen.receipt));
+  }
+
+  function drawSummary(screen, user, share) {
+    screen.title.textContent = M.displayName(user.username);
+    screen.usernameLabel.hidden = M.displayName(user.username) === user.username;
+    screen.usernameLabel.textContent = user.username;
+    if (screen.badge.dataset.status !== user.status) {
+      M.mount(screen.badge, M.statusPill(user.status)); screen.badge.dataset.status = user.status;
+    }
+    screen.badge.title = M.t("person.status_" + user.status);
+    screen.tag.hidden = !user.tag; screen.tag.textContent = user.tag || "";
+    M.mount(screen.summaryUsage, usage(user));
+    var schedule = user.schedule, expiry = schedule ? schedule.expire_at : user.expire_at;
+    screen.expiry.textContent = M.expiryText(Object.assign({}, user, { expire_at: expiry }));
+    var exact = expiry ? "\u2068" + M.date(expiry, true) + "\u2069 · \u2068" + expiry + " UTC\u2069" : screen.expiry.textContent;
+    screen.expiry.title = exact; screen.expiryTooltip.textContent = exact;
+    screen.reset.textContent = schedule && schedule.next_reset_at
+      ? M.t("person.next_reset", { when: "\u2068" + M.date(schedule.next_reset_at) + "\u2069" })
+      : M.t("people.reset") + " · " + M.t("reset." + user.traffic_limit_strategy);
+    screen.reset.title = schedule && schedule.next_reset_at ? schedule.next_reset_at + " UTC" : "";
+    screen.receipt.hidden = !(share.flow_blocks && share.flow_blocks.nodes && share.flow_blocks.nodes.length);
+    screen.toggle.textContent = M.t(user.status === "disabled" ? "person.enable" : "person.disable");
   }
 
   function usageCard(user, screen) {
     var name = user.username;
     return h("section", { class: "card" },
       h("h2", { text: M.t("person.traffic") }),
-      M.usage(user), M.scheduleFacts(user.schedule),
+      usage(user), M.scheduleFacts(user.schedule, { compact: true, expiry: false }),
+      h("p", { class: "muted small", text: M.t("person.since", { when: "\u2068" + M.date(user.created_at) + "\u2069" }) }),
       h("dl", { class: "facts" },
         user.period_traffic ? [
           h("dt", { text: M.t("usage.up") }), h("dd", { text: M.bytes(user.period_traffic.upload_bytes) }),
@@ -151,7 +253,7 @@
         h("dt", { text: M.t("person.lifetime") }), h("dd", { text: M.bytes(user.lifetime_traffic_bytes) }),
         h("dt", { text: M.t("person.last_online") }), h("dd", { text: M.ago(user.online_at) })),
       user.period_traffic && user.period_traffic.unattributed_bytes ?
-        h("p", { class: "muted small", text: M.t("person.traffic_unattributed", {
+        h("p", { class: "muted small", "data-person-carried": "", text: M.t("person.traffic_unattributed", {
           bytes: M.bytes(user.period_traffic.unattributed_bytes) }) }) : null,
       h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
         M.confirm(M.t("person.reset_title"), M.t("person.reset_text"), M.t("person.reset_traffic")).then(function (ok) {
@@ -174,7 +276,7 @@
       h("p", { class: "muted small", text: M.t("person.flow_text") }),
       h("dl", { class: "facts" }, state.nodes.map(function (node) {
         var generation = Number.isSafeInteger(node.credential_generation) ?
-          h("span", { class: "muted small", "data-flow-generation": node.credential_generation,
+          h("bdi", { class: "muted small", "data-flow-generation": node.credential_generation,
             text: " · " + M.t("person.flow_generation", {
               generation: new Intl.NumberFormat(M.i18n.locale()).format(node.credential_generation)
             }) }) : null;
@@ -183,108 +285,6 @@
         return [h("dt", {}, h("bdi", { text: node.node_id }), generation, reason),
           h("dd", { "data-flow-state": node.status, text: labels[node.status] || labels.pending_node })];
       })));
-  }
-
-  function accessCard(user, screen) {
-    var name = user.username;
-    var expiry = M.expiryFields(user.expire_at, name);
-    var limits = M.limitFields(user);
-    var lifecycle = M.lifecycleFields(user, expiry, limits);
-    var initialLanguage = user.language || "default";
-    var language = h("select", { name: "language" },
-      h("option", { value: "default", text: M.t("language.person_default") }),
-      M.i18n.langs.map(function (code) {
-        return h("option", { value: code, lang: code, text: M.i18n.names[code] });
-      }));
-    language.value = initialLanguage;
-    var form = h("form", { class: "stack", novalidate: true },
-      lifecycle.nodes,
-      limits.nodes,
-      M.field(M.t("language.person"), language, M.t("language.person_hint")),
-      h("p", { class: "form-error", role: "alert" }),
-      h("div", { class: "row-actions" },
-        h("button", { class: "btn btn-primary btn-sm", type: "submit" }, M.t("action.save"))));
-    M.trackForm(form);
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      var change = limits.value();
-      Object.assign(change, lifecycle.change());
-      if (language.value !== initialLanguage) change.language = language.value === "default" ? null : language.value;
-      if (!Object.keys(change).length) {
-        M.resetDraft(form);
-        M.toast(M.t("person.nothing_changed"));
-        return;
-      }
-      var label = M.displayName(name);
-      M.saveDraft(form, function () { return M.api("PATCH", path(name), change); }).then(function (changed) {
-        completed(screen, changed, "person.saved_toast", label, form);
-      }, function (e) { if (!current(screen)) failed(label, e); });
-    });
-    return h("section", { class: "card" },
-      accessHead(user, screen),
-      h("p", { class: "muted small access-status", text: M.t("person.status_" + user.status) }), form);
-  }
-
-  function accessHead(user, screen) {
-    var disabled = user.status === "disabled", name = user.username;
-    return h("div", { class: "card-head" },
-        h("h2", { text: M.t("person.access") }),
-        h("button", { class: "btn btn-sm " + (disabled ? "btn-primary" : "btn-ghost"), type: "button",
-          onclick: function () {
-            act(screen, function () {
-              return M.api("PATCH", path(name), { status: disabled ? "active" : "disabled" });
-            }, disabled ? "person.enabled_toast" : "person.disabled_toast");
-          } }, M.t(disabled ? "person.enable" : "person.disable")));
-  }
-
-  function metadataCard(user, screen) {
-    var initialNote = user.note || "", initialTag = user.tag || "";
-    var note = h("textarea", { name: "note", rows: "4" }, initialNote);
-    var tag = h("input", { name: "tag", type: "text", value: initialTag, dir: "ltr", autocomplete: "off" });
-    var error = h("p", { class: "form-error", role: "alert" });
-    var form = h("form", { class: "stack", novalidate: true },
-      M.field(M.t("person.note"), note, M.t("person.note_hint")),
-      M.field(M.t("person.tag"), tag, M.t("person.tag_hint")), error,
-      h("button", { class: "btn btn-primary btn-sm", type: "submit" }, M.t("action.save")));
-    M.trackForm(form);
-    function validate() {
-      var characters = Array.from(note.value);
-      var invalidText = characters.some(function (character) {
-        var code = character.codePointAt(0);
-        return code !== 10 && (code < 32 || code >= 127 && code <= 159 || code >= 55296 && code <= 57343);
-      });
-      var noteError = characters.length > 500 || invalidText ? M.t("person.note_invalid") : "";
-      var upper = tag.value.toUpperCase();
-      if (upper !== tag.value) {
-        // Tags are uppercase; typing `family` becomes FAMILY instead of an error.
-        var caret = tag.selectionStart;
-        tag.value = upper;
-        if (caret !== null && upper.length === Array.from(upper).length) tag.setSelectionRange(caret, caret);
-      }
-      var tagError = /^[A-Z0-9_]{0,16}$/.test(tag.value) ? "" : M.t("person.tag_invalid");
-      note.setCustomValidity(noteError);
-      tag.setCustomValidity(tagError);
-      note.setAttribute("aria-invalid", noteError ? "true" : "false");
-      tag.setAttribute("aria-invalid", tagError ? "true" : "false");
-      error.textContent = noteError || tagError;
-      return !error.textContent;
-    }
-    note.addEventListener("input", validate);
-    tag.addEventListener("input", validate);
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      if (!validate()) { (note.validationMessage ? note : tag).focus(); return; }
-      var change = {};
-      if (note.value !== initialNote) change.note = note.value;
-      if (tag.value !== initialTag) change.tag = tag.value;
-      if (!Object.keys(change).length) { M.resetDraft(form); M.toast(M.t("person.nothing_changed")); return; }
-      var label = M.displayName(user.username);
-      M.saveDraft(form, function () { return M.api("PATCH", path(user.username), change); }).then(function (changed) {
-        completed(screen, changed, "person.saved_toast", label, form);
-      }, function (e) { if (!current(screen)) failed(label, e); });
-    });
-    return h("section", { class: "card" }, h("h2", { text: M.t("person.metadata") }),
-      h("p", { class: "muted small", text: M.t("person.metadata_private") }), form);
   }
 
   /* `declared` comes with this person's share view, fresh from the service: the CLI moves a declared

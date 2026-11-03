@@ -1,6 +1,9 @@
 # content/docs — Markdown documentation source
 
 ## Design decisions
+**Record lists** — all locales describe Tokens and Revisions in Detailed, contextual More actions, token status and permission reads, and reviewed revision comparisons.
+**Settings sections** — all locales describe fragment links, desktop and phone sub-navigation, guarded drafts, Advanced in Detailed, and Security's password, code, passkey, and session controls.
+**Person summary and tabs** — all locales describe the fixed summary, fragment tabs, Simple More, inline Save/Cancel guards, service-previewed extensions, and the shared Share dialog.
 **App response rules** — all locales document reviewed literal fields, first-match ordering, suffix precedence, exact unknown-token refusals, typed headers, private policy precedence, and the API/CLI/console tester.
 **Declared removal drafts** — client and CLI guides share local JSON download, file shapes and bounds, one review/apply, exact revision refusal, atomic mixed batches, the retained-person rule, and individual-only cut-off in every locale.
 **Membership filters** — client and CLI guides distinguish list `--profile`, bulk `--match-profile`, explicit default membership, contextual overlap counts, and existing private query permissions in every locale.

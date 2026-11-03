@@ -50,7 +50,7 @@ meridian fleet routing ru-split --yes
 
 不带参数的命令会显示当前策略并解释两种选项。更改会编辑拓扑、显示审核结果，并在确认后应用此次审核的内容。没有终端或使用 `--json` 时，须传入 `--yes`；`--dry-run --json` 会返回审核结果而不应用。应用会在下次刷新订阅时（默认每六小时，由 `delivery.update_interval_hours` 设置）或手动刷新后收到策略。设置向导继续使用 `ru-split`，不增加提问。
 
-`fleet export` 和 `fleet import` 会保留 `delivery.client_routing: full`。默认值 `ru-split` 会省略；从导出文件中删除此字段即可恢复默认策略。网页面板在“设置”中只读显示策略，并提供更改策略的 CLI 命令。
+`fleet export` 和 `fleet import` 会保留 `delivery.client_routing: full`。默认值 `ru-split` 会省略；从导出文件中删除此字段即可恢复默认策略。网页面板在**设置 → 常规**中只读显示策略，并提供更改策略的 CLI 命令。
 
 仅导入 Base64 链接列表的应用不会收到路由规则。请在这类应用中自行设置分流或全局路由，或使用包含配置的订阅。Hiddify 会接收 sing-box 文档并遵循其内联规则。
 
@@ -171,7 +171,7 @@ meridian fleet routing explain 198.51.100.10 --format xray-json --port 443 --net
 
 这些规则需要 Meridian 控制服务。若使用 `control.backend: remnawave`，任何非空规则列表（包括选择内置策略的规则）都会在生成计划前被拒绝；请先运行 `meridian migrate`。
 
-在导出的服务器配置中编辑 `delivery.response_rules`，再通过 `meridian fleet import` 审阅。规则按书写顺序执行，首个匹配项提供一个动作。空列表保持现有订阅的每个字节不变。规则随其他已审阅的交付设置传到服务，并由加密快照保存。网页面板的设置以只读方式列出规则。
+在导出的服务器配置中编辑 `delivery.response_rules`，再通过 `meridian fleet import` 审阅。规则按书写顺序执行，首个匹配项提供一个动作。空列表保持现有订阅的每个字节不变。规则随其他已审阅的交付设置传到服务，并由加密快照保存。网页面板的**设置 → 高级**以只读方式列出规则。
 
 每个 `match` 必须包含 `user_agent` 条件，也可添加一个 `accept` 条件；两者都必须匹配。条件包含 `operator: equals | prefix | contains` 和非空字面字符串 `value`，匹配不区分大小写。Accept 是唯一可用的额外请求头：已捕获的客户端用它区分浏览器 HTML 和应用文档。不支持转发地址、设备请求头、授权信息、正则表达式或版本比较。
 
@@ -219,4 +219,4 @@ meridian fleet response-rules test --user-agent "Hiddify/2" --accept "*/*" --per
 
 命令读取服务当前已应用的设置，返回自定义规则的名称和序号或内置规则、匹配条件的运算符、格式或拒绝结果、有效策略及来源、修改的响应头和原因。响应头文本和链接会脱敏；空值表示删除。测试不会下载订阅、查询 DNS、请求远程模板或写入状态。`--person` 纳入个人私有覆盖和访问配置；省略时不使用这些选择。输入必须为单行，User-Agent 最多 512 个字符，Accept 最多 256 个字符。
 
-`POST /api/response-rules/test` 接受 `user_agent`、`accept`、`suffix` 和可选 `person`。需要单独的 `delivery.test` 权限；指定用户时还需要 `people.read` 和 `people.private`。已签发令牌保持原有的固定权限。面板的订阅预览使用同一决策：用户留空以测试默认设置，指定用户则显示可用连接、省略项及路由详情。预览目的地需要指定用户。输入和结果只留在内存中。
+`POST /api/response-rules/test` 接受 `user_agent`、`accept`、`suffix` 和可选 `person`。需要单独的 `delivery.test` 权限；指定用户时还需要 `people.read` 和 `people.private`。已签发令牌保持原有的固定权限。**设置 → 高级**中的订阅预览使用同一决策：用户留空以测试默认设置，指定用户则显示可用连接、省略项及路由详情。预览目的地需要指定用户。输入和结果只留在内存中。

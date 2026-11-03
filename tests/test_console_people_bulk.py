@@ -125,6 +125,7 @@ def test_declared_delete_offers_one_local_proposal_without_browser_topology_writ
     assert result["previewProposals"] == result["receiptProposals"] == 1
     assert result["savedProposal"] == review.proposal.to_data()
     assert result["downloadName"] == "people-removal.json"
+    assert result["downloadHref"] and result["downloadHref"].startswith("blob:")
     assert result["commits"] == 1 and result["undos"] == 0
     assert result["stored"] == [] and not result["outside"]
     assert "bulk." not in result["dialog"]

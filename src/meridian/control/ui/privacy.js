@@ -58,24 +58,33 @@
     }
     days.addEventListener("input", update);
     update();
+    M.trackForm(form);
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var after = {
         device_limits: picked(deviceChoices), default_device_limit: Number(cap.value),
         usage_history: picked(historyChoices), history_days: Number(days.value),
       };
-      if (!Number.isInteger(after.default_device_limit) || after.default_device_limit < 1 || after.default_device_limit > 100 ||
-          !Number.isInteger(after.history_days) || after.history_days < 7 || after.history_days > 730) {
+      var lowering = ["off", "private", "full"].indexOf(after.device_limits) < ["off", "private", "full"].indexOf(before.device_limits) ||
+        before.usage_history === "daily" && after.usage_history === "off";
+      var validCap = !cap.validity.badInput && Number.isInteger(after.default_device_limit) && after.default_device_limit >= 1 && after.default_device_limit <= 100;
+      var validDays = !days.validity.badInput && Number.isInteger(after.history_days) && after.history_days >= 7 && after.history_days <= 730;
+      // A level reduction reviews saved numbers when another unfinished field is invalid.
+      if (lowering) {
+        if (!validCap) after.default_device_limit = before.default_device_limit;
+        if (!validDays) after.history_days = before.history_days;
+      } else if (!validCap || !validDays) {
         error.textContent = M.t("privacy.number_range");
         return;
       }
       if (same(before, after)) { M.toast(M.t("privacy.no_changes")); return; }
-      M.busy(form, function () {
+      M.saveDraft(form, function () {
         return confirmPrivacy(before, after).then(function (ok) {
           if (!ok) throw new M.ApiError(0, "cancelled", "");
           return M.api("PUT", "api/privacy", after);
         });
       }).then(function (result) {
+        if (!section.isConnected) return;
         M.toast(M.t(result.changed ? "privacy.saved" : "privacy.no_changes"));
         draw(section, result);
       }, function () { /* a cancelled confirmation or step-up leaves the form intact */ });
@@ -83,7 +92,8 @@
     var deleted = state.deleted || {};
     M.mount(section, [
       h("h2", { class: "section-title", text: M.t("privacy.title") }),
-      h("p", { class: "muted", text: M.t("privacy.intro") }),
+      h("p", { class: "muted small", text: M.t("privacy.caption") }),
+      M.learnMore(h("p", { text: M.t("privacy.intro") })),
       h("p", { class: "muted small", text: M.t("privacy.no_addresses") }), form,
       deleted.devices || deleted.traffic_daily || deleted.node_traffic_daily
         ? h("p", { class: "notice", role: "status", text: M.t("privacy.deleted", {

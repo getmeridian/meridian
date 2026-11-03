@@ -35,10 +35,14 @@ def run_console(mode: str, locale: str = "en", data: Any = None) -> dict[str, An
         "page-": "control_ui_page.mjs",
         "people-bulk-expiry": "control_ui_bulk_expiry.mjs",
         "people-bulk": "control_ui_people_bulk.mjs",
+        "people-triage-ux": "control_ui_people_ux.mjs",
         "people-triage": "control_ui_people.mjs",
         "account-": "connection_account.mjs",
         "command-": "control_ui_commands.mjs",
         "showcase-": "control_ui_showcase.mjs",
+        "person-tabs-": "control_ui_person_tabs.mjs",
+        "settings-": "control_ui_settings.mjs",
+        "records-": "control_ui_records.mjs",
         "person-": "control_ui_person.mjs",
     }
     runner = next((name for prefix, name in runners.items() if mode.startswith(prefix)), "control_ui_console.mjs")
@@ -47,7 +51,7 @@ def run_console(mode: str, locale: str = "en", data: Any = None) -> dict[str, An
 
         data = with_people_replies(data)
     mode = mode.removeprefix("command-")
-    if mode.startswith("token-"):
+    if mode.startswith(("token-", "records-")):
         from meridian.control.token_capabilities import capability_catalog
 
         data = {**(data or {}), "capability_catalog": capability_catalog().to_data()}

@@ -19,7 +19,8 @@
         error.textContent = "";
         try {
           var url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
-          var link = h("a", { download: "people-removal.json", href: url });
+          var link = h("a", { download: "people-removal.json" });
+          link.setAttribute("href", url);
           document.body.appendChild(link);
           try { link.click(); } finally { link.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000); }
         } catch (failure) { error.textContent = M.t("bulk.proposal_save_failed"); }
@@ -196,15 +197,27 @@
   }
   M.peopleBulkBar = function (options) {
     var count = h("span", { "data-bulk-count": "0", role: "status", "aria-live": "polite" });
-    var matching = h("button", { type: "button", class: "btn btn-ghost btn-sm", "data-select-matching": "", disabled: true });
-    var select = h("select", { name: "bulk-action", "aria-label": M.t("bulk.action_label") }, ACTIONS.map(function (kind) {
-      return h("option", { value: kind, text: M.t("bulk.action." + kind) });
-    }));
-    select.value = "extend";
-    var preview = h("button", { type: "button", class: "btn btn-primary btn-sm", "data-bulk-preview": "", disabled: true,
-      text: M.t("bulk.preview"), onclick: function () { action(select.value, options.selection(), options.done); } });
-    var clear = h("button", { type: "button", class: "btn btn-ghost btn-sm", text: M.t("bulk.clear"), onclick: options.clear });
-    var receipt = h("button", { type: "button", class: "btn btn-ghost btn-sm", text: M.t("bulk.receipt_title"), hidden: !M.lastBulkReceipt,
+    var matching = h("button", { type: "button", class: "btn btn-ghost btn-sm", "data-select-matching": "", disabled: true, hidden: true });
+    var buttons = [], ready = false, size = 0;
+    function button(kind) {
+      var node = h("button", { type: "button", class: "btn btn-ghost btn-sm", "data-bulk-action": kind, disabled: true,
+        text: M.t(kind === "extend" ? "bulk.extend_short" : "bulk.action." + kind), onclick: function () {
+          if (!ready || !size) return;
+          more.open = false;
+          action(kind, options.selection(), options.done);
+        } });
+      buttons.push(node); return node;
+    }
+    var more = h("details", { class: "people-bulk-more" },
+      h("summary", { class: "btn btn-ghost btn-sm" }, M.t("action.more"), h("span", { "aria-hidden": "true", text: "▾" })),
+      h("div", { class: "card people-bulk-menu" }, ACTIONS.filter(function (kind) { return kind !== "extend" && kind !== "disable"; }).map(button)));
+    more.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && more.open) { event.preventDefault(); more.open = false; more.querySelector("summary").focus(); }
+    });
+    var clear = h("button", { type: "button", class: "btn btn-ghost btn-sm", "data-bulk-clear": "", text: M.t("bulk.clear_short"),
+      "aria-label": M.t("bulk.clear"), onclick: function () { more.open = false; options.clear(); } });
+    // The receipt stays reachable after success clears selection and hides the action bar.
+    var receipt = h("button", { type: "button", class: "btn btn-ghost btn-sm", "data-bulk-receipt": "", text: M.t("bulk.receipt_title"), hidden: !M.lastBulkReceipt,
       onclick: function () {
         if (!M.lastBulkReceipt || receipt.disabled) return;
         receipt.disabled = true;
@@ -212,14 +225,19 @@
           M.lastBulkReceipt = updated; M.showBulkReceipt(updated, options.done);
         }, function (failure) { M.toast(errorText(failure), "error"); }).finally(function () { receipt.disabled = false; });
       } });
-    var nodes = h("div", { class: "card people-bulk-bar" }, count, matching, select, preview, clear, receipt);
-    return { nodes: nodes, matching: matching, update: function (selected, total, all, ready) {
-      count.setAttribute("data-bulk-count", String(selected));
-      count.textContent = M.t(all ? "bulk.matching_selected" : "bulk.selected", { count: M.count(selected) });
-      matching.textContent = M.t("bulk.select_matching", { count: M.count(total) });
-      matching.disabled = !ready || !total || all;
-      select.disabled = preview.disabled = !ready || !selected;
-      clear.disabled = !selected; receipt.hidden = !M.lastBulkReceipt;
+    var nodes = h("div", { class: "card sticky-actions people-bulk-bar", hidden: true, role: "region", "aria-label": M.t("bulk.action_label") },
+      count, h("div", { class: "people-bulk-actions" }, button("extend"), button("disable"), more, clear), matching);
+    return { nodes: nodes, matching: matching, receipt: receipt, close: function () { more.open = false; },
+      update: function (selected, total, all, usable, pageSelected) {
+        ready = usable; size = selected; nodes.hidden = !selected;
+        if (!selected) more.open = false;
+        count.setAttribute("data-bulk-count", String(selected));
+        count.textContent = M.t(all ? "bulk.matching_selected" : "bulk.selected", { count: "\u2068" + M.count(selected) + "\u2069" });
+        matching.textContent = M.t("bulk.select_matching", { count: "\u2068" + M.count(total) + "\u2069" });
+        matching.hidden = !pageSelected || all;
+        matching.disabled = !ready || !total || all;
+        buttons.forEach(function (node) { node.disabled = !ready || !selected; });
+        clear.disabled = !selected; receipt.hidden = !M.lastBulkReceipt;
     } };
   };
 })();

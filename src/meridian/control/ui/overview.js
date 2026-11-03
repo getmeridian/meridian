@@ -121,7 +121,7 @@
       M.mount(trafficSlot, [h("h2", { text: M.t("overview.traffic_title") }), rows
         ? sparkline(rows) : h("p", { class: "muted small", text: M.t(result.error && result.error.code === "history_off" ? "overview.history_off" : "overview.history_unavailable") }),
         result.stale ? h("p", { class: "muted small", text: M.t("overview.history_stale") }) : null,
-        result.error && result.error.code === "history_off" ? h("a", { href: "#/settings", text: M.t("privacy.title") }) : null]);
+        result.error && result.error.code === "history_off" ? h("a", { href: "#/settings/privacy", text: M.t("privacy.title") }) : null]);
     }
 
     function drawRecent() {
@@ -130,7 +130,8 @@
           href: "#/revisions/" + revision.number, label: M.t("overview.revision", { number: number(revision.number) }),
           subject: M.t("revision." + revision.status) };
       }).concat(events.filter(function (event) { return eventLabel(event.kind); }).map(function (event) {
-        var href = "#/settings";
+        var family = event.kind.split(".")[0];
+        var href = "#/settings" + (["privacy", "notice", "language"].indexOf(family) >= 0 ? "/" + family : "");
         if (event.kind.indexOf("user.") === 0) href = "#/people?q=" + encodeURIComponent(event.subject);
         else if (event.kind === "people.bulk") href = "#/people";
         else if (event.kind.indexOf("token.") === 0) href = "#/tokens";

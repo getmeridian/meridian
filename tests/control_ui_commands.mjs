@@ -58,7 +58,7 @@ w.fetch = (url, options) => {
   }
   throw new Error('unexpected request: ' + url);
 };
-for (const script of ['core.js', 'drafts.js', 'components.js', 'shell.js', 'qr-export.js', 'commands.js', 'people.js', 'expiry.js', 'lifecycle.js', 'person-connections.js', 'share.js', 'person.js', 'capacity.js', 'fleet.js']) {
+for (const script of ['core.js', 'drafts.js', 'components.js', 'shell.js', 'qr-export.js', 'commands.js', 'people.js', 'expiry.js', 'lifecycle.js', 'person-connections.js', 'share.js', 'person-tabs.js', 'person-access.js', 'person.js', 'capacity.js', 'fleet.js']) {
   w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 }
 const M = w.M;
@@ -74,7 +74,7 @@ w.HTMLDialogElement.prototype.close = function () { this.open = false; };
 const settle = async () => { for (let i = 0; i < 4; i++) await new Promise(setImmediate); };
 const view = w.document.getElementById('view');
 const restarting = mode.startsWith('restart');
-if (restarting) M.renderServers(view); else M.renderPerson(view, 'person-a');
+if (restarting) M.renderServers(view); else M.renderPerson(view, 'person-a', 'keys');
 await settle();
 const report = { requests, writes };
 report.serverText = view.querySelector('.server')?.textContent || '';

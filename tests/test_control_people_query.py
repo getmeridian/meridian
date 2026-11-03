@@ -116,6 +116,33 @@ def test_contextual_facets_are_reads(people_service):
     assert people_service._db.total_changes == before
 
 
+def test_people_query_reports_note_presence_without_returning_private_text_or_writing(people_service):
+    from meridian.control.models import UserUpdate
+
+    seed(people_service)
+    people_service.update_user("p-a", UserUpdate(note="Private sample note"))
+    before = people_service._db.total_changes
+    rows = {person["username"]: person for person in query(people_service).to_data()["users"]}
+    assert rows["p-a"]["has_notes"] is True
+    assert rows["p-b"]["has_notes"] is False
+    assert "Private sample note" not in str(rows)
+    assert all("note" not in person and "uuid" not in person for person in rows.values())
+    assert people_service._db.total_changes == before
+    people_service.update_user("p-a", UserUpdate(note=""))
+    assert not next(person for person in query(people_service).users if person.username == "p-a").has_notes
+
+
+def test_older_people_rows_keep_unreported_note_presence_unknown(people_service):
+    from meridian.core.people_query import PeoplePage
+
+    seed(people_service)
+    data = query(people_service).to_data()
+    for person in data["users"]:
+        person.pop("has_notes")
+    older = PeoplePage.model_validate(data)
+    assert all(person.has_notes is None for person in older.users)
+
+
 @pytest.mark.parametrize(
     ("sort", "order"), [("name", "asc"), ("usage", "desc"), ("expiry", "desc"), ("activity", "asc")]
 )

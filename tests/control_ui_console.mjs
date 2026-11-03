@@ -72,6 +72,11 @@ w.fetch = (url, options) => {
   if (mode.startsWith('expiry-')) {
     const user = { username: 'sample', status: 'active', created_at: '2026-10-29T00:00:00Z',
       expire_at: '2031-12-31T00:00:00Z', traffic_limit_bytes: 0, traffic_limit_strategy: 'month' };
+    if (url === 'api/users/preview') {
+      const change = JSON.parse(options.body);
+      return Promise.resolve(reply({ expire_at: change.expire_at, activation_pending: false,
+        renewal_enabled: false, next_reset_at: null, next_renewal_at: null }));
+    }
     if (options.method !== 'GET') {
       writes.push(JSON.parse(options.body));
       return Promise.resolve(reply(user));
@@ -146,7 +151,7 @@ w.fetch = (url, options) => {
     return { ...reply, text: async () => JSON.stringify(peoplePage((body.users || []).map(user => ({ ...user, display_name: data?.fleet?.display_names?.[user.username] || user.username, declared: (data?.fleet?.declared_users || []).includes(user.username) })))) };
   });
 };
-for (const script of ['core.js', 'drafts.js', 'components.js', 'shell.js', 'passkeys.js', 'qr-export.js', 'people.js', 'people-bulk.js', 'people-bulk-fields.js', 'people-list.js', 'expiry.js', 'lifecycle.js', 'person-connections.js', 'share.js', 'capacity.js', 'fleet.js', 'tokens.js']) {
+for (const script of ['core.js', 'drafts.js', 'components.js', 'shell.js', 'passkeys.js', 'qr-export.js', 'people.js', 'people-bulk.js', 'people-bulk-fields.js', 'people-list.js', 'expiry.js', 'lifecycle.js', 'person-connections.js', 'share.js', 'person-tabs.js', 'person-access.js', 'capacity.js', 'fleet.js', 'tokens.js']) {
   w.eval(fs.readFileSync(path.join(ui, script), 'utf8'));
 }
 const M = w.M;
@@ -256,6 +261,7 @@ if (mode.startsWith('expiry-')) {
     M.renderPerson(view, 'sample');
   }
   await settle();
+  if (mode !== 'expiry-add') view.querySelector('[data-person-edit="expiry"]')?.click();
   const expiry = w.document.querySelector('input[type="date"]');
   expiry.value = data.date;
   expiry.dispatchEvent(new w.Event('input'));
@@ -282,6 +288,10 @@ if (mode === 'metadata') {
   w.eval(fs.readFileSync(path.join(ui, 'person.js'), 'utf8'));
   M.renderPerson(view, 'sample');
   await settle();
+  const more = view.querySelector('[data-person-more]');
+  if (more) more.open = true;
+  view.querySelector('[data-person-edit="note"]')?.click();
+  view.querySelector('[data-person-edit="tag"]')?.click();
   const note = view.querySelector('textarea[name="note"]');
   const tag = view.querySelector('input[name="tag"]');
   report.initialNote = note?.value;
@@ -293,7 +303,8 @@ if (mode === 'metadata') {
     if ('tag' in data.change) tag.value = data.change.tag;
     note.dispatchEvent(new w.Event('input'));
     tag.dispatchEvent(new w.Event('input'));
-    note.form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+    if ('note' in data.change) note.form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+    if ('tag' in data.change) tag.form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
     await settle();
     report.error = note.validationMessage || tag.validationMessage;
   }
@@ -351,12 +362,13 @@ if (mode === 'owner-settings') {
   M.privacySection = M.noticeSection = M.languageSection = M.formatPreviewSection = M.cliHint = () => M.h('section');
   M.i18n = { ...M.i18n, langs: [locale], names: { [locale]: locale }, lang: locale };
   M.state.auth = { passkeys: { reason: 'no_domain' } };
+  w.eval(fs.readFileSync(path.join(ui, 'settings-sections.js'), 'utf8'));
   w.eval(fs.readFileSync(path.join(ui, 'settings.js'), 'utf8'));
   M.renderSettings(view);
   await settle();
   const fleet = view.querySelector('.card');
   report.text = fleet.textContent;
-  report.controls = fleet.querySelectorAll('input,button,select,textarea,form').length;
+  report.controls = fleet.querySelectorAll('input,button:not(.cmd-copy),select,textarea,form').length;
   report.injected = !!fleet.querySelector('img[src="x"]') || !!w.pwned;
 }
 
@@ -369,7 +381,7 @@ if (mode.startsWith('live-')) {
   const liveData = () => (view.querySelector('.live-data') || view).textContent;
   if (mode === 'live-fleet-failure') {
     report.names = [...view.querySelectorAll('.name')].map(el => el.textContent);
-    report.declared = view.querySelectorAll('.tag').length;
+    report.declared = view.querySelectorAll('.tag:not([hidden])').length;
     report.initial = liveData();
     await advance(interval);
     report.afterPoll = liveData();

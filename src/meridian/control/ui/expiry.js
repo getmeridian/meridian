@@ -17,7 +17,8 @@
     return pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
   }
 
-  M.expiryFields = function (timestamp, username) {
+  M.expiryFields = function (timestamp, username, options) {
+    var inline = options && options.inline;
     var initial = timestamp || null;
     var date = h("input", { type: "date", max: NEVER_EXPIRES_YEAR + "-01-01", value: M.dateValue(initial) });
     var time = h("input", { type: "time", step: "1", value: timeValue(initial) });
@@ -27,13 +28,15 @@
     var utc = h("code", { class: "expiry-utc", dir: "ltr" });
     var zone = new Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
     var presets = h("div", { class: "row-actions" });
-    var nodes = h("fieldset", { class: "expiry-fields stack-sm" },
-      h("legend", { text: M.t("people.expiry") }),
+    var nodes = h(inline ? "div" : "fieldset", { class: "expiry-fields stack-sm" },
+      inline ? null : h("legend", { text: M.t("people.expiry") }),
       h("label", { class: "expiry-never" }, never, M.t("people.no_expiry")),
       h("div", { class: "grid-2" }, M.field(M.t("person.expiry_date"), date), M.field(M.t("person.expiry_time"), time)),
-      h("p", { class: "hint expiry-zone", text: M.t("person.expiry_zone", { zone: "\u2068" + zone + "\u2069" }) }),
-      h("p", { class: "hint" }, M.t("person.expiry_utc"), " ", utc),
-      error, username ? presets : null);
+      inline ? h("p", { class: "hint expiry-zone" },
+        M.t("person.expiry_zone", { zone: "\u2068" + zone + "\u2069" }), " · ", M.t("person.expiry_utc"), " ", utc) : [
+        h("p", { class: "hint expiry-zone", text: M.t("person.expiry_zone", { zone: "\u2068" + zone + "\u2069" }) }),
+        h("p", { class: "hint" }, M.t("person.expiry_utc"), " ", utc)],
+      error, username && !inline ? presets : null);
     var turn = 0;
     function edited() { return never.checked !== initialNever || date.value !== initialDate || time.value !== initialTime; }
     function moment() {
@@ -48,7 +51,8 @@
       var d = moment();
       return never.checked ? null : d ? d.toISOString().replace(/\.\d{3}Z$/, "Z") : null;
     }
-    function validate() {
+    function validate(showErrors) {
+      if (showErrors === undefined) showErrors = true;
       date.disabled = time.disabled = never.checked;
       var d = moment(), message = "", target = date;
       if (!never.checked) {
@@ -58,30 +62,35 @@
       }
       date.setCustomValidity(target === date ? message : "");
       time.setCustomValidity(target === time ? message : "");
-      date.setAttribute("aria-invalid", date.validationMessage ? "true" : "false");
-      time.setAttribute("aria-invalid", time.validationMessage ? "true" : "false");
-      error.textContent = message;
+      date.setAttribute("aria-invalid", showErrors && date.validationMessage ? "true" : "false");
+      time.setAttribute("aria-invalid", showErrors && time.validationMessage ? "true" : "false");
+      error.textContent = showErrors ? message : "";
       utc.textContent = never.checked ? M.t("people.no_expiry") : value() || "—";
       return !message;
     }
     [date, time, never].forEach(function (input) {
-      input.addEventListener(input === never ? "change" : "input", function () {
+      input.addEventListener(input === never ? "change" : "input", function (event) {
         turn++;
         if (input === date && date.value) never.checked = false;
-        validate();
+        validate(!(event.detail && event.detail.quiet));
       });
     });
-    if (username) M.mount(presets, [1, 3].map(function (months) {
+    function preset(months) {
+      var mine = ++turn;
+      function load() {
+        return M.api("GET", "ui/api/people/" + encodeURIComponent(username) + "/expiry?months=" + months);
+      }
+      return (inline ? load() : M.busy(presets, load)).then(function (preview) {
+        if (!nodes.isConnected || turn !== mine) return;
+        date.value = M.dateValue(preview.expire_at); time.value = timeValue(preview.expire_at); never.checked = false;
+        date.dispatchEvent(new Event("input", { bubbles: true }));
+        return preview;
+      });
+    }
+    if (username && !inline) M.mount(presets, [1, 3].map(function (months) {
       return h("button", { class: "btn btn-ghost btn-sm", type: "button", dataset: { months: String(months) },
         onclick: function () {
-          var mine = ++turn;
-          M.busy(presets, function () {
-            return M.api("GET", "ui/api/people/" + encodeURIComponent(username) + "/expiry?months=" + months);
-          }).then(function (preview) {
-            if (!nodes.isConnected || turn !== mine) return;
-            date.value = M.dateValue(preview.expire_at); time.value = timeValue(preview.expire_at); never.checked = false;
-            date.dispatchEvent(new Event("input", { bubbles: true }));
-          }, function () { /* M.busy shows the preview error. */ });
+          preset(months).catch(function () { /* M.busy shows the preview error. */ });
         } }, M.t(months === 1 ? "person.plus_month" : "person.plus_three_months"));
     }));
     validate();
@@ -93,7 +102,7 @@
         invalid.focus(); invalid.reportValidity();
       }, true);
     });
-    return { nodes: nodes, date: date, time: time, never: never, value: value, validate: validate,
+    return { nodes: nodes, date: date, time: time, never: never, value: value, validate: validate, preset: preset,
       change: function () { var chosen = value(); return chosen === initial ? {} : { expire_at: chosen }; } };
   };
 })();

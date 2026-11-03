@@ -1,4 +1,4 @@
-/* Unsaved form values stay in memory. Only changed, connected person/password forms guard leaving. */
+/* Unsaved form values stay in memory. Only changed, connected forms guard leaving. */
 (function () {
   "use strict";
   var M = (window.M = window.M || {});
