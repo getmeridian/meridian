@@ -24,4 +24,5 @@
 - A used bulk Undo is hidden; replay its real HTTP request to verify the second refusal without bypassing the service.
 - Handshake TLS in handler threads with a deep backlog — wrapping the listening socket handshakes inside the single accept loop, and Chromium's burst of asset requests was reset (`ERR_CONNECTION_RESET`); a client dropping the handshake is gone, not an error.
 - ARIA snapshots must inspect the active dialog while it is open: visually mounted controls behind a native modal are inert and have no accessibility tree.
+- Demo screen journeys follow fragment links; reloading resets adapter mutations and display mode, while language survives in the URL.
 - Native summary snapshots flatten into text; read their computed names through Playwright's Chromium AX session, and parse snapshot YAML before checking names containing colons.
