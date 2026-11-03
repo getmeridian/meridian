@@ -74,6 +74,7 @@ src/meridian/CLAUDE.md                  — Python CLI package overview
 
 tests/CLAUDE.md                         — testing philosophy, MockConnection
 ├── provision/CLAUDE.md                 — mock boundary, idempotency dual-path
+├── e2e/CLAUDE.md                        — opt-in real-browser journeys against a seeded service
 ├── systemlab/CLAUDE.md                 — Docker lab topology, CI boundary
 └── realvm/CLAUDE.md                    — real-VM harness, never in CI
     └── providers/CLAUDE.md             — CloudProvider abstract + Hetzner impl

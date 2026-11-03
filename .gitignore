@@ -57,3 +57,6 @@ video/.cache/
 
 # System Lab raw captures (hold live lab secrets)
 tests/systemlab/output/
+
+# Opt-in browser failure artifacts (contain throwaway session and subscription tokens)
+/test-results/
