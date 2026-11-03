@@ -161,6 +161,8 @@
   function summary(screen) {
     screen.title = h("h1"); screen.badge = h("span"); screen.tag = h("bdi", { class: "tag", dir: "ltr", "data-person-tag": "" });
     screen.usernameLabel = h("bdi", { class: "muted small mono" });
+    screen.declared = h("span", { class: "title-row", "data-person-declared": "", hidden: true },
+      h("span", { class: "tag", text: M.t("people.declared") }), M.tip(M.t("people.declared"), M.t("people.declared_hint")));
     screen.summaryUsage = h("div", { class: "person-summary-usage" });
     screen.expiry = h("bdi", { class: "person-summary-expiry", tabindex: "0", "data-person-expiry": "" });
     screen.expiryTooltip = h("span", { class: "person-date-tooltip", role: "tooltip", id: "person-expiry-" + screen.generation });
@@ -214,7 +216,7 @@
     } });
     return h("header", { class: "person-summary", "data-person-summary": "" }, back(),
       h("div", { class: "page-head person-summary-head" },
-        h("div", { class: "stack-sm" }, h("div", { class: "person-title-row" }, screen.title, screen.badge, screen.tag), screen.usernameLabel),
+        h("div", { class: "stack-sm" }, h("div", { class: "person-title-row" }, screen.title, screen.badge, screen.tag, screen.declared), screen.usernameLabel),
         h("div", { class: "row-actions person-primary-actions", role: "group", "aria-label": M.t("person.actions") },
           shareButton, screen.extend, screen.toggle)),
       h("div", { class: "person-summary-facts" }, screen.summaryUsage,
@@ -231,6 +233,7 @@
     }
     screen.badge.title = M.t("person.status_" + user.status);
     screen.tag.hidden = !user.tag; screen.tag.textContent = user.tag || "";
+    screen.declared.hidden = !(share && share.declared);
     M.mount(screen.summaryUsage, usage(user));
     var schedule = user.schedule, expiry = schedule ? schedule.expire_at : user.expire_at;
     screen.expiry.textContent = M.expiryText(Object.assign({}, user, { expire_at: expiry }));
@@ -280,8 +283,8 @@
       removed: M.t("person.flow_reason_removed"), access_changed: M.t("person.flow_reason_access_changed")
     };
     return h("section", { class: "card flow-block-status", "aria-live": "polite" },
-      h("h2", { text: M.t("person.flow_title") }),
-      h("p", { class: "muted small", text: M.t("person.flow_text") }),
+      M.titled("h2", M.t("person.flow_title"), M.t("tip.flow_block")),
+      M.learnMore(h("p", { text: M.t("person.flow_text") })),
       h("dl", { class: "facts" }, state.nodes.map(function (node) {
         var generation = Number.isSafeInteger(node.credential_generation) ?
           h("bdi", { class: "muted small", "data-flow-generation": node.credential_generation,

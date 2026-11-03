@@ -30,7 +30,7 @@ await new Promise(setImmediate);
 const fleet = view.querySelector('.card');
 process.stdout.write(JSON.stringify({
   text: fleet.textContent,
-  controls: fleet.querySelectorAll('input,button:not(.cmd-copy),select,textarea,form').length,
+  controls: fleet.querySelectorAll('input,button:not(.cmd-copy):not(.tip-button),select,textarea,form').length,
   requests,
 }));
 w.close();

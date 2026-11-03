@@ -62,6 +62,7 @@
     terminal: "M4 6l5 5-5 5M11 17h9",
     shield: "M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z",
     x: "M6 6l12 12M18 6L6 18",
+    info: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01",
   };
   M.icon = function (name) {
     return M.h("svg", { viewBox: "0 0 24 24", "aria-hidden": "true", class: "icon" },
@@ -310,12 +311,15 @@
     }).then(Boolean);
   };
 
-  /* A labelled form field. */
-  M.field = function (label, input, hint) {
+  /* A labelled form field. An optional tip sits beside the label, never inside it (a label may hold
+   * no other control). */
+  M.field = function (label, input, hint, tip) {
     var id = "f" + Math.random().toString(36).slice(2, 9);
     input.id = id;
+    var caption = M.h("label", { for: id, text: label });
     return M.h("div", { class: "field" },
-      M.h("label", { for: id, text: label }), input, hint ? M.h("p", { class: "hint", text: hint }) : null);
+      tip && M.tip ? M.h("div", { class: "title-row" }, caption, M.tip(label, tip)) : caption,
+      input, hint ? M.h("p", { class: "hint", text: hint }) : null);
   };
 
   /* Disable a form's buttons while `work` runs; show its error under the form. */

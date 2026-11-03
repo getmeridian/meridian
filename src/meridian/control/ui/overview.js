@@ -25,7 +25,7 @@
     var status = h("div", { class: "live-status" });
     var fleetSlot = h("section", { class: "card overview-fleet" }, h("span", { class: "spinner" }));
     var attentionBody = h("div", { class: "overview-attention-body" }, h("span", { class: "spinner" }));
-    var attentionSlot = h("section", { class: "card overview-attention" }, h("h2", { text: M.t("overview.attention") }), attentionBody);
+    var attentionSlot = h("section", { class: "card overview-attention" }, M.titled("h2", M.t("overview.attention"), M.t("tip.attention")), attentionBody);
     var trafficSlot = h("section", { class: "card overview-traffic", "data-detailed-only": "", hidden: M.mode() !== "detailed" });
     var recentSlot = h("section", { class: "card overview-recent", "data-detailed-only": "", hidden: M.mode() !== "detailed" });
     var cache = null, stop, events = [], revisions = [], eventCursor = 0, recentError = null;
@@ -111,8 +111,8 @@
             traffic ? h("span", { class: "muted small", "data-overview-window": String(traffic.days),
               text: M.t("overview.window", { days: number(traffic.days) }) })
               : h("span", { class: "muted small", "data-history-unavailable": "", text: M.t(historyOff ? "overview.history_off" : "overview.history_unavailable") }),
-            trafficState.stale ? h("span", { class: "muted small", "data-history-stale": "", text: M.t("overview.history_stale") }) : null))),
-        h("p", { class: "muted small", text: M.t("overview.counted_hint") }),
+            trafficState.stale ? h("span", { class: "muted small", "data-history-stale": "", text: M.t("overview.history_stale") }) : null),
+            M.t("tip.counted_traffic"))),
       ]);
     }
 

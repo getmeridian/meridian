@@ -92,6 +92,8 @@
 .danger-row > div { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; min-width: 0; }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; font-size: .9rem; }
 .facts dt { color: var(--t2); }
+/* A server's own facts and its host facts are separate lists; one label column keeps their values aligned. */
+.server .facts { grid-template-columns: minmax(0, 11rem) minmax(0, 1fr); }
 .facts dd { min-width: 0; overflow-wrap: anywhere; }
 .share { display: flex; gap: 20px; align-items: flex-start; }
 .share-links { flex: 1; }

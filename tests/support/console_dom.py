@@ -44,6 +44,7 @@ def run_console(mode: str, locale: str = "en", data: Any = None) -> dict[str, An
         "settings-": "control_ui_settings.mjs",
         "records-": "control_ui_records.mjs",
         "person-": "control_ui_person.mjs",
+        "component-": "control_ui_components.mjs",
     }
     runner = next((name for prefix, name in runners.items() if mode.startswith(prefix)), "control_ui_console.mjs")
     if mode.startswith("people-triage"):

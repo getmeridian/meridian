@@ -12,7 +12,7 @@
     var save = h("button", { type: "submit", class: "btn btn-primary", disabled: true }, M.t("delivery.preview"));
     var form = h("form", { class: "stack", novalidate: true },
       M.field(M.t("delivery.choice"), select, M.t("delivery.private")), effective, error, save);
-    var card = h("section", { class: "card" }, h("h2", { text: M.t("delivery.title") }),
+    var card = h("section", { class: "card" }, M.titled("h2", M.t("delivery.title"), M.t("tip.person_routing")),
       h("p", { class: "muted small", text: M.t("delivery.refresh") }), form);
 
     function draw() {

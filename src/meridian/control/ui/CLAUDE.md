@@ -8,6 +8,7 @@
 - **Person rows own separate drafts** — create editors on Edit, preview date and traffic choices in the service, PATCH only that row's edited fields, and close only the saved editor.
 - **People selection follows the view** — Detailed shows checkboxes; Simple's Select toggle reveals them, and mode changes preserve an existing selection. The action bar appears only with selected people; the last receipt stays in the list header.
 - **People filters have individual chips** — native panels share the fragment query; removing a chip clears selection and returns focus to its control, while passive reads retain panels and rows.
+- **Help uses toggletips** — `M.tip` sits beside a term, never inside its label, and opens a click-toggled bubble through a status region; Escape returns focus, and `M.keyValue`, `M.field`, and `M.titled` take an optional tip.
 - **Screen metadata is shared** — `M.consoleScreens` owns rendering, navigation, and Detailed-only route checks in one registry.
 - **Display mode is browser-local** — `M.mode()` reads Simple or Detailed; `M.chooseMode()` emits `meridian:mode` after an accepted change. Shared routes and drafts stay mounted, while leaving a Detailed-only route goes to Overview through the navigation guard.
 - **Overview composes owner reads** — bounded people queries, fleet health, opt-in UTC daily traffic, revisions, and recorded owner events provide its figures; unavailable history stays unavailable, and visible refreshes are passive.
@@ -59,6 +60,7 @@
 - **Inline refreshes distinguish saved choices from drafts** — reseed changed clean editors with focus, retain edited baselines, refresh sibling schedules, and let summary presets read the current account.
 - **Checkbox rows use the shared `.check-row` and `.choice-group`** — a rule scoped to one screen once left access profiles as raw, run-together browser checkboxes.
 - **Undo toasts send the opposite request once** — they wait while hovered or focused, and the page's own Enable/Disable button stays the keyboard path.
+- **Tip buttons keep a 24 px face** — the phone rule grows every button to 44 px, so a tip takes its hit area from `::before`; its bubble resets the body font, or a legend or heading restyles it.
 - **Passive reads keep a draft's reviewed dates** — only edits and saves request a new draft preview, since repeated POST previews would renew the owner's idle activity.
 - **Traffic previews start with saved dates** — debounce period and reset-day edits, show the reset field's own error, focus it only on submit, and clear obsolete form errors on input.
 - **Schedule previews carry only schedule fields** — the preview request forbids extras, so forwarding the traffic cap failed every quota save; a cap-only save needs no preview.

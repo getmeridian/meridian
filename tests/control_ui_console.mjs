@@ -378,7 +378,7 @@ if (mode === 'owner-settings') {
   await settle();
   const fleet = view.querySelector('.card');
   report.text = fleet.textContent;
-  report.controls = fleet.querySelectorAll('input,button:not(.cmd-copy),select,textarea,form').length;
+  report.controls = fleet.querySelectorAll('input,button:not(.cmd-copy):not(.tip-button),select,textarea,form').length;
   report.injected = !!fleet.querySelector('img[src="x"]') || !!w.pwned;
 }
 

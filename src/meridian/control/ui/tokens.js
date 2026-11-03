@@ -22,7 +22,7 @@
     var create = h("button", { class: "btn btn-primary", type: "button", "data-token-create": "", disabled: true },
       M.icon("plus"), M.t("tokens.create"));
     M.mount(view, [h("div", { class: "page-head" },
-      h("div", {}, h("h1", { text: M.t("nav.tokens") }), h("p", { class: "muted small", text: M.t("tokens.lede") })), create), list]);
+      h("div", {}, M.titled("h1", M.t("nav.tokens"), M.t("tip.tokens")), h("p", { class: "muted small", text: M.t("tokens.lede") })), create), list]);
     Promise.all([M.api("GET", "api/tokens"), M.api("GET", "api/token-capabilities")]).then(function (data) {
       if (!view.isConnected) return;
       var catalog = data[1];
