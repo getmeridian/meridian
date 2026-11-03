@@ -8,7 +8,7 @@
 
 **System Lab only where it matters** — the `changes` job diffs the PR (or push) and runs System Lab only when runtime code (`src/meridian` minus Markdown and locale catalogs), the agent, `tests/systemlab` (or the corpus comparison it reuses), dependencies, or `ci.yml` change; a skipped job still satisfies required checks and Release. `workflow_dispatch` always runs it. Widen the path list when the lab starts depending on something new.
 
-**E2E only where it matters** — the same `changes` job gates browser journeys on control service, connection-page templates, E2E tests, CI, or dependency changes; manual dispatch always runs them. A ten-minute budget includes installation; cache Chromium by the installed Playwright version, install OS libraries on cache hits, and upload traces/screenshots on failure.
+**E2E only where it matters** — the same `changes` job gates browser journeys on package code, the demo and its build scripts, shared test support, CI, or dependency changes (Markdown excepted); manual dispatch always runs them. A ten-minute budget includes installation; cache Chromium by the installed Playwright version, install OS libraries on cache hits, and upload traces/screenshots on failure.
 
 **Website package manager** — website CI uses pnpm with `website/pnpm-lock.yaml`; keep supply-chain guardrails in `website/pnpm-workspace.yaml`.
 

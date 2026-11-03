@@ -262,7 +262,10 @@ jobs:
             e2e=false
             while IFS= read -r changed; do
               case "$changed" in
-                src/meridian/control/* | src/meridian/templates/pwa/* | tests/e2e/* | .github/workflows/ci.yml | pyproject.toml | uv.lock)
+                *.md) ;;
+                src/meridian/* | website/demo/* | scripts/showcase_*.py | scripts/build_showcase.py \
+                  | tests/e2e/* | tests/conftest.py | tests/support/* | Makefile \
+                  | .github/workflows/ci.yml | pyproject.toml | uv.lock)
                   e2e=true
                   echo "E2E needed: $changed"
                   break ;;
