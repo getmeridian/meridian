@@ -15,7 +15,7 @@ from meridian.cluster import ClusterConfig, SubscriptionPageConfig
 from meridian.commands import health
 from meridian.control.client import ControlServiceError
 from meridian.control.models import NodeRuntime, NodeStatus, ServiceHealth
-from meridian.control.service import utc_now
+from meridian.control.times import utc_now
 from meridian.core.agent_types import NodeStateRef
 from meridian.core.fleet import TopologyNode
 from meridian.core.verification import build_verification_check

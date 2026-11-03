@@ -14,7 +14,8 @@ from meridian.commands import client, fleet
 from meridian.console import set_json_mode
 from meridian.control.client import ControlClient
 from meridian.control.models import NodeSpec
-from meridian.control.service import ControlService, utc_now
+from meridian.control.service import ControlService
+from meridian.control.times import utc_now
 from meridian.core.agent_protocol import ObservedStateReport, StatsReport
 from meridian.i18n import set_locale
 from meridian.servers import ServerEntry

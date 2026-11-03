@@ -45,13 +45,13 @@ INTERNAL_ROUTES: tuple[InternalRoute, ...] = (
     ),
     InternalRoute(
         "GET",
-        re.compile(r"/sub/~pwa/(?:(pwa-[0-9a-f]+)/)?([a-z][a-z0-9.]+)"),
+        re.compile(r"/sub/~pwa/(?:(pwa-[0-9a-f]+)/)?([a-z][a-z0-9.-]+)"),
         page_routes.asset,
         "Public connection-page package assets.",
     ),
     InternalRoute(
         "GET",
-        re.compile(r"/sub/~legacy/pwa/([a-z][a-z0-9.]+)"),
+        re.compile(r"/sub/~legacy/pwa/([a-z][a-z0-9.-]+)"),
         page_routes.legacy_asset,
         "Public legacy connection-page assets.",
     ),

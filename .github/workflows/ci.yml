@@ -231,12 +231,13 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       system-lab: ${{ steps.filter.outputs.system-lab }}
+      e2e: ${{ steps.filter.outputs.e2e }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Decide whether System Lab is needed
+      - name: Decide whether browser journeys and System Lab are needed
         id: filter
         env:
           EVENT: ${{ github.event_name }}
@@ -256,6 +257,71 @@ jobs:
             done < <(git diff --name-only "$BASE" "$GITHUB_SHA")
           fi
           echo "system-lab=$needed" >> "$GITHUB_OUTPUT"
+          e2e=true
+          if [ "$EVENT" != "workflow_dispatch" ] && [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            e2e=false
+            while IFS= read -r changed; do
+              case "$changed" in
+                *.md) ;;
+                src/meridian/* | website/demo/* | scripts/showcase_*.py | scripts/build_showcase.py \
+                  | tests/e2e/* | tests/conftest.py | tests/support/* | Makefile \
+                  | .github/workflows/ci.yml | pyproject.toml | uv.lock)
+                  e2e=true
+                  echo "E2E needed: $changed"
+                  break ;;
+              esac
+            done < <(git diff --name-only "$BASE" "$GITHUB_SHA")
+          fi
+          echo "e2e=$e2e" >> "$GITHUB_OUTPUT"
+
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Install browser test dependencies
+        run: uv sync --locked --extra dev --group e2e
+
+      - name: Read the installed Playwright version
+        id: playwright
+        run: |
+          uv run --group e2e python - <<'PY'
+          import os
+          from importlib.metadata import version
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"version={version('playwright')}\n")
+          PY
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
+
+      # OS libraries are needed on cache hits too; Playwright reuses the cached browser.
+      - name: Install Chromium and system libraries
+        run: uv run --group e2e playwright install --with-deps chromium
+
+      - name: Run browser journeys
+        run: make e2e
+
+      - name: Upload failure traces and screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-failures
+          path: test-results/e2e/
+          retention-days: 7
+          if-no-files-found: ignore
 
   system-lab:
     name: System Lab

@@ -31,6 +31,7 @@ def save_settings(
     settings: ServiceSettings,
     *,
     compose: Callable[[], None] | None = None,
+    now: Callable[[], str] = utc_now,
     expected_access_hash: str | None = None,
     expected_profile_declarations_hash: str | None = None,
 ) -> ServiceSettings:
@@ -53,7 +54,7 @@ def save_settings(
         save_update_interval_hours(store, settings.update_interval_hours)
         save_client_routing(store, settings.client_routing)
         save_page_settings(store, settings)
-        save_server_settings(store, settings.servers, utc_now())
+        save_server_settings(store, settings.servers, now())
         if compose is not None:
             compose()
         return read_settings(store)

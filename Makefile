@@ -1,5 +1,5 @@
 .PHONY: help install sync test lint format check typecheck validate dead-code ci system-lab-preflight system-lab-agent system-lab system-lab-fast \
-       templates dead-code ai-docs build publish clean hooks agent
+       templates dead-code ai-docs build publish clean hooks agent e2e
 
 ## —— Setup ——————————————————————————————————————————————
 
@@ -19,6 +19,9 @@ hooks: ## Install git pre-push hook
 
 test: ## Run Python tests
 	uv run pytest tests/ -v --tb=short
+
+e2e: ## Run real-browser journeys (install Chromium first; tests/e2e/README.md)
+	uv run --group e2e pytest tests/e2e
 
 lint: ## Run ruff linter
 	uv run ruff check src/ tests/

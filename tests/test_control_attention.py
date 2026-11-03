@@ -12,7 +12,6 @@ import pytest
 from typer.testing import CliRunner
 
 from meridian.cli import app
-from meridian.control import service as service_module
 from meridian.control.client import ControlClient
 from meridian.control.models import UserCreate
 from meridian.control.service import ControlService
@@ -25,7 +24,6 @@ NOW = "2026-11-01T12:00:00Z"
 
 @pytest.fixture
 def service(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[ControlService]:
-    monkeypatch.setattr(service_module, "utc_now", lambda: NOW)
     service = ControlService(
         tmp_path / "control.db",
         fleet_id=FLEET_ID,
@@ -152,7 +150,10 @@ def test_stopped_threshold_is_independent_and_api_reads_remain_secret_free(
 ) -> None:
     _person(service, "stopped", used=80, age=10, last_used="2026-10-28T12:00:00Z")
     _person(service, "never", age=4)
-    with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN) as admin:
+    with (
+        serve_control(tmp_path, clock=lambda: datetime.fromisoformat(NOW).timestamp()) as url,
+        ControlClient(url, ADMIN_TOKEN) as admin,
+    ):
         reader = admin.create_token("reader", "read")
         headers = {"Authorization": f"Bearer {reader.token}"}
         response = httpx.get(url + "/api/attention?stopped_days=3", headers=headers)
@@ -219,7 +220,10 @@ def test_attention_api_is_read_scoped_has_bounded_options_and_never_returns_cred
     _person(service, "invite", age=4)
     _person(service, "expiry", expires="2026-11-04T12:00:00Z")
     secrets = [value for user in service.list_users() for value in (user.uuid, user.sub_token, user.user_id)]
-    with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN) as admin:
+    with (
+        serve_control(tmp_path, clock=lambda: datetime.fromisoformat(NOW).timestamp()) as url,
+        ControlClient(url, ADMIN_TOKEN) as admin,
+    ):
         reader = admin.create_token("reader", "read")
         headers = {"Authorization": f"Bearer {reader.token}"}
         response = httpx.get(url + "/api/attention", headers=headers)
@@ -260,7 +264,7 @@ def test_client_list_attention_filters_console_people_and_adds_reasons(
     _person(service, "fresh")
     monkeypatch.setattr(i18n, "_requested", None)
     monkeypatch.setattr(i18n, "_current", "en")
-    with serve_control(tmp_path) as url:
+    with serve_control(tmp_path, clock=lambda: datetime.fromisoformat(NOW).timestamp()) as url:
         cluster = ClusterConfig(
             panel=PanelConfig(url=url, api_token=ADMIN_TOKEN),
             topology_intent=single_server_intent(None, server_ref="srv-a", client_name="alice"),

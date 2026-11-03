@@ -13,6 +13,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 | **Unit** | MockConnection steps, config parsing, cluster handling, pure system-lab contracts | `tests/` |
 | **Deploy** | Mock-based topology setup (runtime, editor, persistence) | `tests/test_setup_*.py` |
 | **Command** | Mock-based command tests | `tests/test_*_commands.py` |
+| **E2E** | Real browser journeys across console, connection page, and app; opt-in with `make e2e` | `tests/e2e/` |
 | **System lab** | Real multi-node deploy via Docker: control service, agents, relays, connection tests | `tests/systemlab/` |
 
 **Integration-level verification** — tests pin contracts (API returns X → we handle Y), not one test per function.

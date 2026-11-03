@@ -21,7 +21,6 @@ EPOCH = "6a1f0c2e-3b4d-4e5f-8a9b-0c1d2e3f4a5b"
 
 @pytest.fixture
 def service(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[ControlService]:
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: NOW)
     service = ControlService(
         tmp_path / "control.db",
         fleet_id=FLEET_ID,

@@ -15,7 +15,7 @@ from meridian.commands.client import run_show
 from meridian.console import set_json_mode
 from meridian.control.client import ControlClient
 from meridian.control.models import UserImport, UserImportBatch
-from meridian.control.service import utc_now
+from meridian.control.times import utc_now
 from meridian.control_access import ServiceAccessPanel
 from meridian.core.clients import build_client_show_result
 from meridian.setup.single_server import single_server_intent

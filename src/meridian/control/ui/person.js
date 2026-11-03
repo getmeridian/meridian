@@ -173,7 +173,11 @@
     var shareButton = h("button", { class: "btn btn-primary", type: "button", "data-person-action": "share", onclick: function () {
       if (screen.sharing || !current(screen)) return;
       screen.sharing = true; shareButton.disabled = true;
-      M.openShare(screen.username).finally(function () { screen.sharing = false; shareButton.disabled = false; });
+      M.openShare(screen.username).finally(function () {
+        screen.sharing = false; shareButton.disabled = false;
+        // Native dialog restoration runs while this trigger is disabled.
+        if (current(screen) && document.activeElement === document.body) shareButton.focus();
+      });
     } }, M.icon("link"), M.t("person.share"));
     function editExpiry(months) {
       screen.extend.open = false;

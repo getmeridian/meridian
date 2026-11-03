@@ -7,6 +7,7 @@ node's role and the people the CLI declares. Nothing here changes state.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Literal
 
 import segno
@@ -60,6 +61,7 @@ def fleet_view(service: ControlService) -> FleetView:
     display_names = {str(k): str(v) for k, v in names.items()} if isinstance(names, dict) else {}
     traffic = service.traffic.node_totals()
     servers: list[ServerView] = []
+    moment = datetime.fromisoformat(service.now())
     for status in service.list_nodes():
         role, region = roles.get(status.node_id, ("node", ""))
         applied = status.applied.revision if status.applied else None
@@ -68,7 +70,7 @@ def fleet_view(service: ControlService) -> FleetView:
                 node_id=status.node_id,
                 role=role,
                 region=region,
-                live=status.is_live(),
+                live=status.is_live(moment),
                 last_seen_at=status.last_seen_at,
                 agent_version=status.agent_version,
                 revision=status.revision,
@@ -78,7 +80,7 @@ def fleet_view(service: ControlService) -> FleetView:
                 errors=list(status.errors),
                 traffic_bytes=traffic.get(status.node_id, 0),
                 runtime=status.runtime,
-                runtime_available=status.runtime_available(),
+                runtime_available=status.runtime_available(moment),
                 capacity=service.capacity.view(status.node_id),
                 **status.traffic_evidence().model_dump(),
             )

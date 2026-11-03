@@ -57,7 +57,6 @@ def spec(*, profiles: bool = False) -> NodeSpec:
 
 @pytest.fixture
 def service(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: NOW)
     control = ControlService(
         tmp_path / "control.db",
         fleet_id=FLEET_ID,

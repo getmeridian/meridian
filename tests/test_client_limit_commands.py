@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from types import SimpleNamespace
@@ -74,12 +74,14 @@ def _mocked_cluster(tmp_path: Path) -> ClusterConfig:
 
 
 @contextmanager
-def _fleet(tmp_path: Path, *, json_mode: bool = False) -> Iterator[SimpleNamespace]:
+def _fleet(
+    tmp_path: Path, *, json_mode: bool = False, clock: Callable[[], float] | None = None
+) -> Iterator[SimpleNamespace]:
     """A saved fleet on a real loopback control service with client alice, served to client commands."""
     set_json_mode(json_mode)
     try:
         with ExitStack() as stack:
-            url = stack.enter_context(serve_control(tmp_path))
+            url = stack.enter_context(serve_control(tmp_path, clock=clock))
             cluster = ClusterConfig(
                 panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, server_ip="198.51.100.1"),
                 topology_intent=single_server_intent(None, server_ref="srv-a", client_name="alice"),
@@ -279,12 +281,15 @@ def test_cli_removal_and_reissue_stay_with_declared_people(tmp_path: Path, capsy
 def test_extend_cli_resolves_console_people_and_reports_the_effective_expiry_and_status(
     scope: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from datetime import datetime
+
     from typer.testing import CliRunner
 
     from meridian.cli import app
 
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: "2026-10-29T12:00:00Z")
-    with _fleet(tmp_path, json_mode=True) as fleet:
+    with _fleet(
+        tmp_path, json_mode=True, clock=lambda: datetime.fromisoformat("2026-10-29T12:00:00Z").timestamp()
+    ) as fleet:
         fleet.create("ALICE")
         fleet.client.update_user("ALICE", UserUpdate(status="disabled", expire_at="2026-12-01T00:00:00Z"))
         if scope == "people":

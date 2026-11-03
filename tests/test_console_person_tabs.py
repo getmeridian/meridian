@@ -239,7 +239,6 @@ def test_extending_unused_first_use_access_keeps_activation_pending(
     months: int, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     now = "2026-11-02T12:00:00Z"
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: now)
     service = ControlService(
         tmp_path / "control.db",
         fleet_id=FLEET_ID,

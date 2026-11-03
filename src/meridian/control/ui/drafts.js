@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var M = (window.M = window.M || {});
-  var entries = [], asking = null;
+  var entries = [], asking = null, focusTurn = 0;
 
   function values(form) {
     return Array.from(form.querySelectorAll("input, select, textarea")).map(function (field) {
@@ -31,7 +31,14 @@
     var entry = { form: form, initial: values(form) };
     form.meridianDraft = entry;
     entries.push(entry);
+    form.addEventListener("focusin", function (event) {
+      if (!event.target.matches("input, select, textarea")) return;
+      entry.focused = event.target; entry.focusTurn = ++focusTurn;
+    });
+    // Tabbing through untouched fields on the way out must not move Stay away from the edit.
+    form.addEventListener("input", function (event) { entry.edited = event.target; entry.focusTurn = ++focusTurn; });
   };
+  function usable(field) { return field && field.isConnected && !field.disabled && !field.closest("[hidden]"); }
   M.formDirty = function (form) { return !!(form && form.meridianDraft && changed(form.meridianDraft)); };
   M.hasUnsavedEdits = function (container) {
     prune();
@@ -60,7 +67,18 @@
   M.tryLeave = function (container) {
     if (!M.hasUnsavedEdits(container)) return Promise.resolve(true);
     if (asking) return asking;
-    asking = M.askToLeave().finally(function () { asking = null; });
+    // A navigation click has already focused its link. Stay returns to the last edited field.
+    var drafts = entries.filter(function (entry) { return (!container || container.contains(entry.form)) && changed(entry); });
+    drafts.sort(function (first, second) { return (second.focusTurn || 0) - (first.focusTurn || 0); });
+    var field = drafts[0] && [drafts[0].edited, drafts[0].focused]
+      .concat(Array.from(drafts[0].form.querySelectorAll("input, select, textarea"))).filter(usable)[0];
+    var selection = field && typeof field.selectionStart === "number" ? [field.selectionStart, field.selectionEnd] : null;
+    asking = M.askToLeave().then(function (leave) {
+      if (!leave && usable(field)) {
+        field.focus(); if (selection) field.setSelectionRange(selection[0], selection[1]);
+      }
+      return leave;
+    }).finally(function () { asking = null; });
     return asking;
   };
 

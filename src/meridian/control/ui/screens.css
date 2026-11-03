@@ -43,6 +43,7 @@
 .tab:hover { color: var(--t1); }
 .tab.active { color: var(--t1); border-bottom-color: var(--ac-text); }
 .view { display: block; max-width: 1040px; margin: 0 auto; padding: 24px 20px 64px; outline: none; }
+.view:focus-visible { outline: 2px solid var(--ac-text); outline-offset: -2px; }
 .view > * + * { margin-top: 16px; }
 .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .page-head p { margin-top: 4px; }

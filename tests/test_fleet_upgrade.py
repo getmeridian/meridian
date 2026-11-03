@@ -14,7 +14,7 @@ from meridian.commands import fleet_upgrade
 from meridian.commands.fleet_upgrade import Component
 from meridian.control.client import ControlServiceError
 from meridian.control.models import NodeStatus, ServiceHealth
-from meridian.control.service import utc_now
+from meridian.control.times import utc_now
 from meridian.core.agent_types import NodeStateRef
 from meridian.reconciler.resources import ResourceExecutionResult
 from meridian.setup.single_server import single_server_intent

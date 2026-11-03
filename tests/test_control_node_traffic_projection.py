@@ -7,7 +7,8 @@ from unittest.mock import patch
 
 from meridian.control.client import ControlClient
 from meridian.control.models import NodeSpec
-from meridian.control.service import ControlService, utc_now
+from meridian.control.service import ControlService
+from meridian.control.times import utc_now
 from meridian.control_access import ServiceFleetPanel
 from meridian.core.agent_protocol import StatsReport
 from tests.support.control_service import ADMIN_TOKEN, FLEET_ID

@@ -24,6 +24,7 @@
 - **One owner per state** — the service owns users, `cluster.yml` owns topology, and the fence stops a stale or foreign copy from applying.
 - **Read-only fleet projection** — `adapters/cluster.py` is the only source of node and relay rows; it never shows gateways as exits or restricted relay hops as public endpoints.
 ## Pitfalls
+- **Dynamically loaded PWA scripts must ship as shared assets** — register each helper in `pwa.py`, or real pages receive a 404 and strict MIME refusal even when DOM scenarios load it directly.
 - **Removal fences read committed declarations** — validate proposal usernames against the recorded revision, since local intent already holds the removal when the lease is acquired.
 - **Restore declaration hashes are validated state** — checkpoints accept only a SHA-256 string or an absent legacy value, or malformed YAML can lose the reviewed boundary on resume.
 - **Profile history records service use** — explicit false means declarations are unsent; legacy named intent infers use only when the flag is absent, and later edits never clear recorded history.

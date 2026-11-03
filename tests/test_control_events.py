@@ -13,7 +13,6 @@ import pytest
 from typer.testing import CliRunner
 
 from meridian.cli import app
-from meridian.control import service as service_module
 from meridian.control.client import ControlClient
 from meridian.control.models import DeviceKeyCreate, PrivacySettings, UserCreate, UserUpdate
 from meridian.control.restore import stage_restored_database
@@ -35,7 +34,6 @@ def clock() -> list[float]:
 
 @pytest.fixture
 def service(tmp_path: Path, clock: list[float], monkeypatch: pytest.MonkeyPatch) -> Iterator[ControlService]:
-    monkeypatch.setattr(service_module, "utc_now", lambda: format_timestamp(clock[0]))
     service = ControlService(tmp_path / "control.db", fleet_id=FLEET_ID, version="4.0.0", clock=lambda: clock[0])
     yield service
     service.close()

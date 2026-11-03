@@ -21,6 +21,7 @@ from meridian.control.models import PrivacySettings, RevisionProposal, RevisionR
 from meridian.control.owner import CONFIRM_SECONDS, IDLE_SECONDS
 from meridian.control.server import ControlServer
 from meridian.control.service import ControlService
+from meridian.control.times import parse_timestamp
 from meridian.control.tokens import ROOT
 from meridian.control.ui_routes import CONTENT_SECURITY_POLICY, SESSION_COOKIE, UI_DIR
 from tests.support.control_service import write_privacy
@@ -290,8 +291,8 @@ def test_the_console_can_mint_a_people_token_after_step_up(fleet: Fleet) -> None
     assert issued.body["scope"] == "people" and issued.body["expires_at"] is not None
 
 
-def test_owner_can_extend_declared_and_console_people(fleet: Fleet, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: "2026-10-29T12:00:00Z")
+def test_owner_can_extend_declared_and_console_people(fleet: Fleet) -> None:
+    fleet.clock.now = parse_timestamp("2026-10-29T12:00:00Z")
     fleet.set_up()
     for name in ("alice", "bob"):
         fleet.service.put_user(name)

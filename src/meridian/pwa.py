@@ -24,6 +24,7 @@ _STATIC_FILES = (
     "language.js",
     "app.js",
     "account.js",
+    "delivery-capabilities.js",
     "contact.js",
     "notice.js",
     "selfcheck.js",

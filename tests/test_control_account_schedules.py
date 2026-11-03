@@ -21,7 +21,6 @@ EPOCH = "6a1f0c2e-3b4d-4e5f-8a9b-0c1d2e3f4a5b"
 @pytest.fixture
 def scheduled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[ControlService, list[str]]]:
     clock = ["2027-01-31T12:00:00Z"]
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: clock[0])
     service = ControlService(
         tmp_path / "control.db",
         fleet_id=FLEET_ID,

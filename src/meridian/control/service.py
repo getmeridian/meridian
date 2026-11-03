@@ -75,7 +75,7 @@ from meridian.control.store import Store
 from meridian.control.subscription_preview import preview_subscription
 from meridian.control.subscription_serving import serve_subscription
 from meridian.control.subscriptions import SubscriptionResponse
-from meridian.control.times import format_timestamp, utc_now
+from meridian.control.times import format_timestamp
 from meridian.control.tokens import TokenRegistry
 from meridian.control.traffic import TrafficLedger
 from meridian.control.user_credentials import replace_credentials
@@ -115,7 +115,7 @@ class ControlService:
         self._db = self._store.db
         self._store.create(SCHEMA)
         # Users read their traffic from the ledger's table, so it exists before any user query.
-        self.traffic = TrafficLedger(self._store)
+        self.traffic = TrafficLedger(self._store, clock=clock)
         self.events = EventLedger(self._store, clock=clock)
         self.privacy_ledger = PrivacyLedger(self._store, clock=clock, events=self.events)
         with self._transaction():
@@ -177,6 +177,10 @@ class ControlService:
     def fleet_epoch(self) -> int:
         return self._store.fleet_epoch
 
+    def now(self) -> str:
+        """Whole-second UTC time shared by account reads, writes, and previews."""
+        return format_timestamp(self._clock())
+
     def close(self) -> None:
         self._store.close()
 
@@ -202,6 +206,7 @@ class ControlService:
             self._store,
             settings,
             compose=self._compose_all,
+            now=self.now,
             expected_access_hash=expected_access_hash,
             expected_profile_declarations_hash=expected_profile_declarations_hash,
         )
@@ -235,7 +240,7 @@ class ControlService:
         return preview_user_schedule(self._store, request, now=format_timestamp(self._clock()), read_user=self.get_user)
 
     def server_usage(self, *, now: str | None = None) -> ServerUsageList:
-        return read_server_usage(self._store, now or utc_now())
+        return read_server_usage(self._store, now or self.now())
 
     def privacy(self) -> PrivacySettings:
         return read_privacy(self._store)
@@ -291,7 +296,7 @@ class ControlService:
             self._ensure_node(node_id)
             self._db.execute(
                 "UPDATE nodes SET last_seen_at = ?, agent_version = ? WHERE node_id = ?",
-                (utc_now(), agent_version, node_id),
+                (self.now(), agent_version, node_id),
             )
             if capabilities is not None:
                 self.flow_blocks.hello(node_id, capabilities)
@@ -393,7 +398,7 @@ class ControlService:
                 (
                     applied.revision if applied else None,
                     applied.sha256 if applied else None,
-                    utc_now(),
+                    self.now(),
                     report.versions.agent,
                     json.dumps(raw),
                     format_timestamp(self._clock()),
@@ -427,12 +432,12 @@ class ControlService:
             if self.get_user(create.username) is not None:
                 raise ServiceError("user_exists", f"User {create.username!r} already exists.", 409)
             self._insert_user(create)
-            self._enforce(utc_now())
+            self._enforce(self.now())
             self._compose_all()
             return self._require_user(create.username)
 
     def _insert_user(self, create: UserCreate) -> None:
-        insert_user(self._store, create, now=utc_now)
+        insert_user(self._store, create, now=self.now)
         self.events.append("user.created", create.username)
 
     def import_users(self, batch: UserImportBatch) -> UserImportResult:
@@ -441,7 +446,7 @@ class ControlService:
             self._store,
             batch,
             read_user=self.get_user,
-            now=utc_now,
+            now=self.now,
             enforce=self._enforce,
             compose=self._compose_all,
             events=self.events,
@@ -455,7 +460,7 @@ class ControlService:
             update,
             read_user=self._require_user,
             events=self.events,
-            now=utc_now,
+            now=self.now,
             enforce=self._enforce,
             compose=self._compose_all,
         )
@@ -503,7 +508,7 @@ class ControlService:
             self._store,
             username,
             days=days,
-            now=utc_now,
+            now=self.now,
             read_user=self._require_user,
             enforce=self._enforce,
             record_update=self.events.user_updated,
@@ -513,15 +518,16 @@ class ControlService:
     def reset_user_traffic(self, username: str) -> UserRecord:
         """Start the user's traffic period now; a user limited by it becomes active again."""
         with self._transaction():
-            self._reset_traffic(self._require_user(username), utc_now())
+            moment = self.now()
+            self._reset_traffic(self._require_user(username), moment)
             self.events.append("user.traffic_reset", username)
-            self._enforce(utc_now())
+            self._enforce(moment)
             self._compose_all()
             return self._require_user(username)
 
     def enforce(self, now: str | None = None) -> list[str]:
         """Apply expiry, traffic limits, and periodic resets; return who changed status."""
-        moment = now or utc_now()
+        moment = now or self.now()
         self.commands.maintain()
         self.traffic.prune_history(moment)
         self.capacity.prune()
@@ -539,7 +545,7 @@ class ControlService:
         boundary belongs to the new period, and a reset the timer ran afterwards would
         fold it into the offset and erase it.
         """
-        moment = now or utc_now()
+        moment = now or self.now()
         with self._transaction():
             # Counters of a user the service never had would only grow the database.
             known = {row[0] for row in self._db.execute("SELECT user_id FROM users")}
@@ -553,12 +559,12 @@ class ControlService:
     def get_user(self, username: str) -> UserRecord | None:
         with self._lock:
             row = self._db.execute(f"{USER_SELECT} WHERE u.username = ?", (username,)).fetchone()
-        return user_record(row, now=datetime.fromisoformat(utc_now())) if row else None
+        return user_record(row, now=datetime.fromisoformat(self.now())) if row else None
 
     def list_users(self) -> list[UserRecord]:
         with self._lock:
             rows = self._db.execute(f"{USER_SELECT} ORDER BY u.username").fetchall()
-        moment = datetime.fromisoformat(utc_now())
+        moment = datetime.fromisoformat(self.now())
         return [user_record(row, now=moment) for row in rows]
 
     def user_connections(self, username: str) -> ClientConnections:
@@ -570,7 +576,7 @@ class ControlService:
 
     def attention(self, thresholds: AttentionThresholds | None = None, *, now: str | None = None) -> AttentionList:
         return read_attention(
-            self._store, self.list_users, self.list_nodes, thresholds or AttentionThresholds(), now or utc_now()
+            self._store, self.list_users, self.list_nodes, thresholds or AttentionThresholds(), now or self.now()
         )
 
     def user_devices(self, username: str) -> UserDevices:
@@ -680,7 +686,7 @@ class ControlService:
             "fleet_epoch": self.fleet_epoch,
             "revision": revision,
             "sha256": resources_sha,
-            "issued_at": utc_now(),
+            "issued_at": self.now(),
             "resources": resources,
         }
         document["signature"] = self.authority.sign(document, DESIRED_STATE_CONTEXT)
@@ -720,7 +726,7 @@ class ControlService:
         self.events.watch_node(node_id)
 
     def _touch(self, node_id: str) -> None:
-        self._db.execute("UPDATE nodes SET last_seen_at = ? WHERE node_id = ?", (utc_now(), node_id))
+        self._db.execute("UPDATE nodes SET last_seen_at = ? WHERE node_id = ?", (self.now(), node_id))
 
     def _node(self, node_id: str) -> sqlite3.Row | None:
         return self._store.row("SELECT * FROM nodes WHERE node_id = ?", (node_id,))

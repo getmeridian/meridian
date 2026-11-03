@@ -63,7 +63,7 @@ def test_a_hello_does_not_refresh_the_age_of_the_last_runtime_report(service: Co
     acknowledge(service)
     later = datetime.fromisoformat(NOW) + timedelta(seconds=AGENT_SEEN_SECONDS + 1)
     monkeypatch.setattr(service.flow_blocks, "_clock", lambda: later.timestamp())
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: later.isoformat())
+    monkeypatch.setattr(service, "_clock", lambda: later.timestamp())
     service.node_seen("main", "0.2.11", capabilities=["user_flow_blocking"])
     assert service.user_flow_blocks("alice").nodes[0].status == "pending_node"
 
