@@ -58,15 +58,16 @@ body:has(.person-page) { overflow: hidden; }
 .person-inline-editor .lifecycle-dates { margin-block-start: var(--space-2); }
 @media (max-width: 760px) {
   .person-summary-head { flex-wrap: wrap; gap: var(--space-3); }
-  .person-primary-actions { inline-size: 100%; }
-  .person-primary-actions > .btn, .person-primary-actions > details { flex: 1; }
+  .person-primary-actions { inline-size: 100%; flex-wrap: wrap; }
+  .person-primary-actions > .btn, .person-primary-actions > details { flex: 1 0 auto; }
   .person-primary-actions > details > summary { inline-size: 100%; }
 }
 @media (max-width: 640px) {
   .person-view { padding-block-start: var(--space-2); }
   .person-summary { gap: var(--space-2); padding-block-end: var(--space-2); }
   .person-summary-head { gap: var(--space-2); }
-  .person-primary-actions .btn { padding-inline: var(--space-2); font-size: .875rem; }
+  .person-primary-actions { gap: var(--space-1); }
+  .person-primary-actions .btn { padding-inline: var(--space-2); gap: var(--space-1); font-size: .875rem; }
   .person-access-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
   .person-access-row > dt { padding-block-start: 0; }
   .person-panel .facts { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }

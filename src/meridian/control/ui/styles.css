@@ -40,7 +40,7 @@ code { font-family: var(--mono); font-size: .9em; }
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 0 16px;
   border-radius: var(--r); border: 1px solid transparent; font-weight: 600; font-size: .95rem; text-decoration: none;
   cursor: pointer; white-space: nowrap; transition: background .12s, border-color .12s, filter .12s, transform .06s;
-  -webkit-user-select: none; user-select: none;
+  -webkit-user-select: none; user-select: none; flex-shrink: 0; overflow-wrap: normal; word-break: normal;
 }
 .btn:active { transform: scale(.98); }
 .btn:disabled { opacity: .6; cursor: progress; }

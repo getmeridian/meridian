@@ -42,6 +42,10 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Phone header brands stay named** — hide the wordmark beside a fleet title, keep Meridian in the link's accessible name, and let only the title ellipsize.
+- **Action rows size labels before wrapping** — keep whole words and content-sized flex items, with 44 px targets and space for a wrapped phone selection bar.
+- **Share exports span the dialog** — the QR column must not constrain the common action row.
+- **Live-read age has no outer margin** — the parent's gap owns the spacing around Updated lines across screens.
 - **Visible person tabs replace matching headings** — retain the panel's tab label, restore its heading when the strip is hidden, and repeat this after refreshed cards mount.
 - **The person summary owns the current meter** — Usage keeps directional counters, reset facts, lifetime use, and history without repeating the summary's cap bar.
 - **Ratios follow their label's direction** — keep active before total in an inline flex row with isolated numbers, so Persian reads active on the right; numeric date ranges isolate the whole range.

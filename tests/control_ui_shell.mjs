@@ -136,6 +136,29 @@ const report = {};
 w.eval(fs.readFileSync(path.join(ui, 'app.js'), 'utf8'));
 await settle();
 
+if (scenario === 'shell-header-layout') {
+  resolveStyles(w, ui, ['tokens.css', 'styles.css', 'screens.css'], data.width);
+  const row = document.querySelector('.shell-top'), brand = row.querySelector('.top-brand');
+  const wordmark = brand.querySelector('.brand-name'), title = brand.querySelector('.top-title');
+  const choices = [...row.querySelectorAll('[data-mode-choice]')];
+  report.header = {
+    wrap: w.getComputedStyle(row).flexWrap,
+    children: [...row.children].map(el => el.className),
+    accessibleBrand: brand.getAttribute('aria-label'),
+    fleetTitle: title.textContent,
+    fleetEllipsis: w.getComputedStyle(title).textOverflow,
+    wordmarkDisplay: w.getComputedStyle(wordmark).display,
+    labels: choices.map(el => el.textContent),
+    expectedLabels: [M.t('mode.simple'), M.t('mode.detailed')],
+    labelWrap: choices.map(el => w.getComputedStyle(el).whiteSpace),
+    accountName: row.querySelector('.account-toggle').getAttribute('aria-label'),
+  };
+  M.state.fleet.profile_title = 'Meridian'; M.updateFleetTitle();
+  report.withoutFleetTitle = { accessibleBrand: brand.getAttribute('aria-label'),
+    titleHidden: title.hidden, wordmarkDisplay: w.getComputedStyle(wordmark).display,
+    sameChoices: choices.every((el, index) => row.querySelectorAll('[data-mode-choice]')[index] === el) };
+}
+
 if (scenario === 'shell-switch') await clickMode(data.choose || 'detailed');
 if (scenario === 'shell-deep-link') {
   report.beforeMode = M.mode?.() || null;

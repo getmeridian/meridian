@@ -70,7 +70,7 @@ def test_phone_selection_keeps_its_count_above_four_actions():
         data={"people": rows, "displayMode": "detailed", "scenario": "bar-layout", "width": 390},
     )
     assert result["layout"]["position"] == "fixed"
-    assert result["layout"]["display"] == result["layout"]["actionsDisplay"] == "grid"
+    assert result["layout"]["display"] == "grid" and result["layout"]["actionsDisplay"] == "flex"
     assert result["layout"]["matchingVisible"] and result["layout"]["matchingMargin"] == "0px"
     assert result["layout"]["matchingSize"] == "100%"
 

@@ -107,6 +107,9 @@
       title.textContent = fleetTitle;
       title.title = fleetTitle;
       title.hidden = separator.hidden = fleetTitle === "Meridian";
+      var brand = title.closest(".top-brand");
+      brand.classList.toggle("has-fleet-title", fleetTitle !== "Meridian");
+      brand.setAttribute("aria-label", fleetTitle === "Meridian" ? "Meridian" : "Meridian · " + fleetTitle);
       document.title = fleetTitle;
     }
     var navTurn = 0;
