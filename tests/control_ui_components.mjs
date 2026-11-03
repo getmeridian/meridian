@@ -51,13 +51,27 @@ if (scenario === 'component-tip') {
   first.querySelector('button').focus(); first.querySelector('button').click();
   input.focus();
   report.tabbedAway = state(first);
-  const details = M.h('details', { open: true }, M.h('summary', { text: 'Filters' }));
+  app.setAttribute('tabindex', '-1');
+  first.querySelector('button').focus(); first.querySelector('button').click();
+  first.querySelector('.tip-bubble').focus();
+  report.bubbleFocused = state(first);
+  key(first.querySelector('.tip-bubble'), 'Escape');
+  report.bubbleEscaped = state(first);
+  first.querySelector('button').click();
+  app.focus();
+  report.ancestorFocused = state(first);
+  const heading = M.tip('Filters', 'Narrow the list.');
+  const details = M.h('details', { open: true }, M.h('summary', {}, 'Filters', heading));
   const inside = M.tip('Quota', 'Share of the cap.');
   details.append(inside); app.append(details);
   inside.querySelector('button').click();
   details.open = false;
   await new Promise(resolve => setTimeout(resolve, 0));
   report.disclosureClosed = state(inside);
+  heading.querySelector('button').click();
+  details.open = true; await new Promise(resolve => setTimeout(resolve, 0));
+  details.open = false; await new Promise(resolve => setTimeout(resolve, 0));
+  report.summaryTip = state(heading);
 }
 
 if (scenario === 'component-toast') {

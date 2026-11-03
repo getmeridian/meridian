@@ -27,6 +27,10 @@ def test_a_tip_inside_a_label_does_not_toggle_its_control() -> None:
     assert not result["label"]["tip"]["hidden"] and result["label"]["checked"] is False
     assert result["tabbedAway"]["hidden"] and result["tabbedAway"]["expanded"] == "false"
     assert result["disclosureClosed"]["hidden"] and result["disclosureClosed"]["text"] == ""
+    assert not result["bubbleFocused"]["hidden"], "a click inside the bubble keeps focus within the tip"
+    assert result["bubbleEscaped"]["hidden"] and result["bubbleEscaped"]["focused"]
+    assert result["ancestorFocused"]["hidden"], "Shift+Tab onto a focusable ancestor closes the tip"
+    assert not result["summaryTip"]["hidden"], "a tip in the summary stays visible when its disclosure closes"
 
 
 def test_a_toast_action_runs_once_and_closes_while_plain_toasts_offer_none() -> None:

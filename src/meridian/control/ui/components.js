@@ -107,7 +107,8 @@
   }
   M.tip = function (topic, content) {
     var id = "tip-" + (++tipSequence);
-    var bubble = h("span", { class: "tip-bubble", id: id, role: "status", hidden: true });
+    // tabindex -1 lets a click inside the bubble keep focus within the tip, so Tab and Escape still close it.
+    var bubble = h("span", { class: "tip-bubble", id: id, role: "status", tabindex: "-1", hidden: true });
     var button = h("button", { class: "tip-button", type: "button", "aria-label": M.t("tip.about", { topic: topic }),
       "aria-expanded": "false", "aria-controls": id }, M.icon("info"));
     var tip = h("span", { class: "tip" }, button, bubble);
@@ -157,11 +158,15 @@
   });
   // A closing disclosure takes its open tips with it; toggle events don't bubble, so listen in capture.
   document.addEventListener("toggle", function (event) {
-    var details = event.target;
+    var details = event.target, summary = details.querySelector && details.querySelector("summary");
     if (details.open === false && details.querySelectorAll) {
-      details.querySelectorAll(".tip").forEach(function (tip) { if (tip.meridianClose) tip.meridianClose(); });
+      details.querySelectorAll(".tip").forEach(function (tip) {
+        if (tip.meridianClose && !(summary && summary.contains(tip))) tip.meridianClose();
+      });
     }
   }, true);
+  // A mode change can move rows into closed disclosures without a toggle event.
+  window.addEventListener("meridian:mode", function () { closeTips(); });
 
   M.detailedSection = function (label, content, key) {
     return h("details", { class: "mode-disclosure", "data-mode-section": key, open: M.mode() === "detailed" },
