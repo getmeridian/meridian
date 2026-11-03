@@ -107,6 +107,7 @@
       M.mount(screen.flowSlot, flowCard(share.flow_blocks));
       M.mount(screen.dangerSlot, dangerCard(user, share.declared, screen));
     }
+    screen.tabs.mode();
   }
 
   function mountPanel(screen, tab, panel) {
@@ -240,7 +241,7 @@
     var name = user.username;
     return h("section", { class: "card" },
       h("h2", { text: M.t("person.traffic") }),
-      usage(user), M.scheduleFacts(user.schedule, { compact: true, expiry: false }),
+      M.scheduleFacts(user.schedule, { compact: true, expiry: false }),
       h("p", { class: "muted small", text: M.t("person.since", { when: "\u2068" + M.date(user.created_at) + "\u2069" }) }),
       h("dl", { class: "facts" },
         user.period_traffic ? [

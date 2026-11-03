@@ -42,6 +42,8 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Visible person tabs replace matching headings** — retain the panel's tab label, restore its heading when the strip is hidden, and repeat this after refreshed cards mount.
+- **The person summary owns the current meter** — Usage keeps directional counters, reset facts, lifetime use, and history without repeating the summary's cap bar.
 - **Ratios follow their label's direction** — keep active before total in an inline flex row with isolated numbers, so Persian reads active on the right; numeric date ranges isolate the whole range.
 - **Scrolling chip rows reveal their selection** — after every route or link, scroll the selected chip into view when the row overflows; a deep link to Security once left its chip cut off at a phone's edge.
 - **Verb-labelled buttons are actions** — Enable and Disable change their names with the available action and must never announce an inverted pressed state.
