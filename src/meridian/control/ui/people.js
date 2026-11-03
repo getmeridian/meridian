@@ -175,7 +175,10 @@
         M.saveDraft(form, function () { return M.api("POST", "api/users", body); }).then(function () {
           close();
           M.toast(M.t("people.added_toast", { name: username }));
-          M.go("people", username);
+          Promise.resolve(M.go("people", username)).then(function () {
+            var view = document.getElementById("view"), route = M.route();
+            if (view && route.name === "people" && route.arg === username) view.focus();
+          });
         }, function () { /* shown in the form */ });
       });
       return form;

@@ -14,6 +14,7 @@
 ## What's done well
 - Browser failures include console errors and page errors; a deliberate HTTP refusal expects one URL/status error through `browser_faults.expect`.
 - Browser contexts refuse every non-loopback request; app requests use a VPN User-Agent without owner cookies.
+- Keyboard journeys inspect each tab stop and the focus destination after Add, Share, and tab navigation.
 - Playwright actions and `expect` wait for observable states; no timed sleeps, DOM doubles, or route mocks.
 
 ## Pitfalls
