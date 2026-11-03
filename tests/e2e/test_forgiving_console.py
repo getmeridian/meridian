@@ -51,6 +51,23 @@ def test_stay_keeps_the_draft_and_focus_then_leave_discards_without_a_write(
     expect(reopened.get_by_role("textbox")).to_have_value(before.note)
 
 
+
+def test_stay_returns_to_the_edited_field_after_tabbing_past_an_untouched_one(owner: Page) -> None:
+    person(owner)
+    form = editor(owner, "traffic")
+    amount = form.get_by_label("Traffic limit", exact=True)
+    amount.fill("75")
+    untouched = form.locator("input:focus, select:focus")
+    for _ in range(5):
+        owner.keyboard.press("Tab")
+        if untouched.count() and not amount.evaluate("el => el === document.activeElement"):
+            break
+    expect(untouched).to_have_count(1)
+    owner.get_by_role("navigation").get_by_role("link", name="Settings", exact=True).click()
+    owner.get_by_role("dialog", name="Unsaved edits", exact=True).get_by_role("button", name="Stay", exact=True).click()
+    expect(amount).to_be_focused()
+    expect(amount).to_have_value("75")
+
 def test_simple_and_detailed_keep_an_open_metadata_draft_mounted(owner: Page, service: ControlService) -> None:
     person(owner)
     before = service.get_user("Luma")
