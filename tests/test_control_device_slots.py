@@ -18,7 +18,6 @@ NOW = "2026-11-01T12:00:00Z"
 
 @pytest.fixture
 def service(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[ControlService]:
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: NOW)
     service = ControlService(
         tmp_path / "control.db",
         fleet_id=FLEET_ID,

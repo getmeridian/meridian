@@ -39,11 +39,11 @@ def test_calendar_renewal_refuses_the_legacy_no_expiry_range() -> None:
         )
 
 
-def test_month_preview_is_read_only_and_uses_the_service_account_expiry(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr("meridian.control.person_expiry.utc_now", lambda: "2027-01-01T00:00:00Z")
-    with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN, report_mutations=False) as admin:
+def test_month_preview_is_read_only_and_uses_the_service_account_expiry(tmp_path: Path) -> None:
+    with (
+        serve_control(tmp_path, clock=lambda: datetime(2027, 1, 1, tzinfo=UTC).timestamp()) as url,
+        ControlClient(url, ADMIN_TOKEN, report_mutations=False) as admin,
+    ):
         admin.put_user("sample")
         admin.update_user("sample", UserUpdate(expire_at="2032-01-31T10:20:30Z"))
         before = admin.get_user("sample")

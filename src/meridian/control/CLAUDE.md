@@ -48,6 +48,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - A proposal whose intent contains a secret-shaped key or value, or a malformed `access` block, is refused and never stored.
 
 ## Pitfalls
+- **Account time follows the injected service clock** — reads, enforcement, settings periods, and expiry previews must use the same instant as subscriptions and owner sessions; wall-time reads can disagree with them.
 - **App blocks cover personal page files and legacy redirects** — use the shared decision before rendering or redirecting, or support/config routes reveal a valid token through a blocked app.
 - **Profile facet totals count people** — omit only the profile predicate, count each membership once, and compute the all-profiles count separately from overlapping memberships.
 - **Policy writes keep declaration fences** — save catalogs and declaration fingerprints in one settings transaction, so either refusal rolls back both.

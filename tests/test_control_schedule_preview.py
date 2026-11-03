@@ -16,7 +16,6 @@ from tests.support.control_service import ADMIN_TOKEN, serve_control
 @pytest.fixture
 def pinned(monkeypatch: pytest.MonkeyPatch) -> None:
     now = "2027-01-31T12:00:00Z"
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: now)
     monkeypatch.setattr(
         "tests.support.control_service.ControlService",
         lambda *args, **kwargs: ControlService(*args, **kwargs, clock=lambda: datetime.fromisoformat(now).timestamp()),

@@ -359,7 +359,6 @@ def test_schema_thirteen_backfills_retained_node_evidence_once_and_marks_the_acc
     from datetime import datetime
 
     moment = "2026-11-01T11:00:00Z"
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: moment)
 
     def clock() -> float:
         return datetime.fromisoformat(moment).timestamp()

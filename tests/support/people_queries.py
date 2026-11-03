@@ -7,7 +7,6 @@ import re
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
 from urllib.parse import parse_qs
 
 from meridian.control.models import (
@@ -64,10 +63,7 @@ def with_people_replies(data: dict) -> dict:
     final = {**initial, **valid_options(data.get("change", {}))}
     if "sort" in data.get("change", {}) and "order" not in data["change"]:
         final["order"] = "desc" if final["sort"] in ("usage", "activity") else "asc"
-    with (
-        tempfile.TemporaryDirectory(prefix="meridian-people-dom-") as temp,
-        patch("meridian.control.service.utc_now", lambda: NOW),
-    ):
+    with tempfile.TemporaryDirectory(prefix="meridian-people-dom-") as temp:
         service = ControlService(
             Path(temp) / "control.db",
             fleet_id=FLEET_ID,

@@ -32,7 +32,6 @@ from tests.test_access_profiles import NOW, POLICY, spec
 
 @pytest.fixture
 def fleet(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Fleet]:
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: NOW)
     monkeypatch.setattr("meridian.commands.client_bulk.utc_now", lambda: NOW)
     monkeypatch.setattr(i18n, "_current", "en")
     monkeypatch.setattr(i18n, "_requested", None)

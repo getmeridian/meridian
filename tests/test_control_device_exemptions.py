@@ -25,7 +25,6 @@ def test_unlimited_person_accepts_devices_above_the_fleet_cap_and_inherit_restor
 ) -> None:
     moment = "2026-10-30T12:00:00Z"
     clock = datetime.fromisoformat(moment).astimezone(UTC).timestamp()
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: moment)
     service = ControlService(tmp_path / "control.db", fleet_id=FLEET_ID, version="4.0.0", clock=lambda: clock)
     try:
         person = service.put_user("example")

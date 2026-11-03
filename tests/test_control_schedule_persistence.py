@@ -30,7 +30,6 @@ def test_snapshot_and_restore_keep_pending_duration_or_renewal_progress(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, activated: bool
 ) -> None:
     clock = ["2027-01-31T12:00:00Z"]
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: clock[0])
 
     def current() -> float:
         return datetime.fromisoformat(clock[0]).timestamp()
@@ -82,7 +81,6 @@ def test_schedule_upgrade_keeps_creation_day_period_usage_and_lifetime(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, old_version: int
 ) -> None:
     now = "2027-01-31T12:00:00Z"
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: now)
 
     def clock() -> float:
         return datetime.fromisoformat(now).timestamp()

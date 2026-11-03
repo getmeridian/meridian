@@ -27,7 +27,6 @@ FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
 
 @pytest.fixture
 def service(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: NOW)
     monkeypatch.setattr("meridian.control.traffic.utc_now", lambda: NOW)
     with_service = ControlService(
         tmp_path / "control.db",

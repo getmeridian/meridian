@@ -116,7 +116,7 @@ def seed_service(service: ControlService, now: datetime) -> None:
         },
     )
     # Count each server's allowance from the start of the month, as a fleet set up earlier would.
-    with mock.patch("meridian.control.service_settings.utc_now", lambda: stamp(period_start("month", now))):
+    with mock.patch.object(service, "now", lambda: stamp(period_start("month", now))):
         service.put_settings(settings)
     service.import_users(
         UserImportBatch(
