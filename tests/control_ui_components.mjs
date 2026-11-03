@@ -46,6 +46,18 @@ if (scenario === 'component-tip') {
   report.outside = state(first);
   inLabel.querySelector('button').click();
   report.label = { tip: state(inLabel), checked: box.checked };
+  const input = M.h('input', { type: 'text' });
+  app.append(input);
+  first.querySelector('button').focus(); first.querySelector('button').click();
+  input.focus();
+  report.tabbedAway = state(first);
+  const details = M.h('details', { open: true }, M.h('summary', { text: 'Filters' }));
+  const inside = M.tip('Quota', 'Share of the cap.');
+  details.append(inside); app.append(details);
+  inside.querySelector('button').click();
+  details.open = false;
+  await new Promise(resolve => setTimeout(resolve, 0));
+  report.disclosureClosed = state(inside);
 }
 
 if (scenario === 'component-toast') {
@@ -54,8 +66,9 @@ if (scenario === 'component-toast') {
   const host = document.getElementById('toast'), button = host.querySelector('.toast-action');
   report.offered = { shown: host.classList.contains('show'), action: host.classList.contains('has-action'),
     label: button?.textContent, type: button?.type, text: host.textContent };
-  button.click();
-  report.undone = { runs, shown: host.classList.contains('show') };
+  button.click(); button.click();
+  report.undone = { runs, shown: host.classList.contains('show'), action: host.classList.contains('has-action'),
+    waits: host.onmouseleave === null };
   M.toast('Saved.');
   report.plain = { shown: host.classList.contains('show'), action: host.classList.contains('has-action'),
     buttons: host.querySelectorAll('button').length, waits: host.onmouseenter === null };

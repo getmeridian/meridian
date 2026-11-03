@@ -25,6 +25,8 @@ def test_a_tip_opens_one_explanation_at_a_time_and_closes_on_escape_or_outside_c
 def test_a_tip_inside_a_label_does_not_toggle_its_control() -> None:
     result = run_console("component-tip")
     assert not result["label"]["tip"]["hidden"] and result["label"]["checked"] is False
+    assert result["tabbedAway"]["hidden"] and result["tabbedAway"]["expanded"] == "false"
+    assert result["disclosureClosed"]["hidden"] and result["disclosureClosed"]["text"] == ""
 
 
 def test_a_toast_action_runs_once_and_closes_while_plain_toasts_offer_none() -> None:
@@ -36,5 +38,5 @@ def test_a_toast_action_runs_once_and_closes_while_plain_toasts_offer_none() -> 
         "type": "button",
         "text": "Disabled Kavi.Undo",
     }
-    assert result["undone"] == {"runs": 1, "shown": False}
+    assert result["undone"] == {"runs": 1, "shown": False, "action": False, "waits": True}
     assert result["plain"] == {"shown": True, "action": False, "buttons": 0, "waits": True}

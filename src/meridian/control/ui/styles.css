@@ -165,7 +165,7 @@ input::placeholder { color: var(--t3); }
   justify-content: center; pointer-events: none; z-index: 300; opacity: 0; transform: translateY(8px); visibility: hidden;
   transition: opacity .18s, transform .18s, visibility 0s .18s; }
 #toast.show { opacity: 1; transform: none; visibility: visible; transition-delay: 0s; }
-#toast.has-action .toast { pointer-events: auto; }
+#toast.show.has-action .toast { pointer-events: auto; }
 .toast { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 99px; font-size: .9rem; font-weight: 600;
   box-shadow: var(--shadow-lg); max-width: calc(100vw - 32px); }
 .toast-action { min-height: 32px; padding: 4px 12px; border: 1px solid currentColor; border-radius: 99px; background: none;
@@ -196,13 +196,13 @@ input::placeholder { color: var(--t3); }
 .tip-button .icon { width: 16px; height: 16px; }
 .tip-button:hover, .tip-button[aria-expanded="true"] { color: var(--ac-text); background: var(--ac3); }
 .tip-button:focus-visible { outline: 2px solid var(--ac-ui); outline-offset: 2px; }
-.tip-bubble { position: fixed; z-index: 60; inline-size: max-content; max-inline-size: min(20rem, calc(100vw - 16px));
+.tip-bubble { position: fixed; z-index: 120; inline-size: max-content; max-inline-size: min(20rem, calc(100vw - 16px));
   padding: var(--space-2) var(--space-3); border: 1px solid var(--b2); border-radius: var(--r); background: var(--s1);
   color: var(--t1); box-shadow: var(--shadow-lg); font-family: var(--body); font-size: .875rem; font-weight: 400; line-height: 1.45;
   text-align: start; white-space: normal; text-transform: none; letter-spacing: normal; }
 .tip-bubble[hidden] { display: none; }
 /* The phone target rule sizes every button to 44 px; a tip keeps its 24 px face and gets that area from ::before. */
-@media (max-width: 640px), (pointer: coarse) {
+@media (pointer: coarse), (max-width: 640px) {
   .tip-button { min-height: 24px; min-width: 24px; }
   .tip-button::before { content: ""; position: absolute; inset: -10px; }
 }

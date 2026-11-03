@@ -205,9 +205,16 @@
       var name = screen.username, label = M.displayName(name);
       // Undo sends the opposite request once; it still works after leaving this person's page.
       var undo = { label: M.t("action.undo"), run: function () {
+        if (screen.toggling) return;
+        screen.toggling = true; if (current(screen)) screen.toggle.disabled = true;
         M.api("PATCH", path(name), { status: disabled ? "disabled" : "active" }).then(function (changed) {
           completed(screen, changed.user || changed, disabled ? "person.disabled_toast" : "person.enabled_toast", label);
-        }, function (e) { failed(label, e); });
+          // Another screen now owns the view; ask it to re-read so it shows the restored status.
+          var live = !current(screen) && screen.view.meridianLiveStop;
+          if (live && live.refresh) live.refresh(true);
+        }, function (e) { failed(label, e); }).finally(function () {
+          screen.toggling = false; if (current(screen)) screen.toggle.disabled = false;
+        });
       } };
       act(screen, function () { return M.api("PATCH", path(name), { status: disabled ? "active" : "disabled" }); },
         disabled ? "person.enabled_toast" : "person.disabled_toast", undo).finally(function () {

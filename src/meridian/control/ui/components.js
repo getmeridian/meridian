@@ -111,7 +111,16 @@
     var button = h("button", { class: "tip-button", type: "button", "aria-label": M.t("tip.about", { topic: topic }),
       "aria-expanded": "false", "aria-controls": id }, M.icon("info"));
     var tip = h("span", { class: "tip" }, button, bubble);
+    function gone() {
+      if (!button.isConnected || button.closest("[hidden]")) return true;
+      var closed = button.closest("details:not([open])"), summary = closed && closed.querySelector("summary");
+      return !!closed && !(summary && summary.contains(button));
+    }
     function place() {
+      // A tip whose button left the page or a closed disclosure closes, so its listeners never linger.
+      if (gone()) { show(false); return; }
+      // Measure from the corner, or the static position squeezes the bubble's width near an edge.
+      bubble.style.left = "0px"; bubble.style.top = "0px";
       var margin = 8, rect = button.getBoundingClientRect(), width = bubble.offsetWidth, height = bubble.offsetHeight;
       var room = document.documentElement.clientWidth, below = rect.bottom + 6, above = rect.top - 6 - height;
       bubble.style.left = Math.max(margin, Math.min(rect.left + rect.width / 2 - width / 2, room - width - margin)) + "px";
@@ -123,9 +132,9 @@
       bubble.hidden = !open;
       M.mount(bubble, open ? content : null);
       if (open) {
-        place();
         window.addEventListener("scroll", place, true);
         window.addEventListener("resize", tip.meridianClose);
+        place();
       } else {
         window.removeEventListener("scroll", place, true);
         window.removeEventListener("resize", tip.meridianClose);
@@ -134,6 +143,9 @@
     tip.meridianClose = function () { if (!bubble.hidden) show(false); };
     // preventDefault keeps a tip inside a label or summary from toggling its control.
     button.addEventListener("click", function (event) { event.preventDefault(); show(bubble.hidden); });
+    tip.addEventListener("focusout", function (event) {
+      if (!bubble.hidden && event.relatedTarget && !tip.contains(event.relatedTarget)) show(false);
+    });
     tip.addEventListener("keydown", function (event) {
       if (event.key !== "Escape" || bubble.hidden) return;
       event.preventDefault(); event.stopPropagation(); show(false); button.focus();
@@ -143,6 +155,13 @@
   document.addEventListener("click", function (event) {
     if (!event.target.closest || !event.target.closest(".tip")) closeTips();
   });
+  // A closing disclosure takes its open tips with it; toggle events don't bubble, so listen in capture.
+  document.addEventListener("toggle", function (event) {
+    var details = event.target;
+    if (details.open === false && details.querySelectorAll) {
+      details.querySelectorAll(".tip").forEach(function (tip) { if (tip.meridianClose) tip.meridianClose(); });
+    }
+  }, true);
 
   M.detailedSection = function (label, content, key) {
     return h("details", { class: "mode-disclosure", "data-mode-section": key, open: M.mode() === "detailed" },

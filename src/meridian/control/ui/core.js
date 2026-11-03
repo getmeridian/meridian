@@ -218,10 +218,15 @@
   M.toast = function (text, kind, action) {
     var host = document.getElementById("toast") || document.body.appendChild(M.h("div", { id: "toast", role: "status" }));
     var delay = action ? 8000 : kind === "error" ? 6000 : 2600;
-    function hide() { clearTimeout(toastTimer); host.classList.remove("show"); }
+    function hide() {
+      clearTimeout(toastTimer); host.classList.remove("show", "has-action");
+      host.onmouseenter = host.onfocusin = host.onmouseleave = host.onfocusout = null;
+    }
     function wait() { clearTimeout(toastTimer); toastTimer = setTimeout(hide, delay); }
-    var button = action ? M.h("button", { class: "toast-action", type: "button",
-      onclick: function () { hide(); action.run(); } }, action.label) : null;
+    var button = action ? M.h("button", { class: "toast-action", type: "button", onclick: function () {
+      if (button.disabled) return;
+      button.disabled = true; hide(); action.run();
+    } }, action.label) : null;
     M.mount(host, M.h("div", { class: "toast " + (kind === "error" ? "toast-error" : "toast-ok") }, M.h("span", { text: text }), button));
     host.classList.add("show");
     host.classList.toggle("has-action", !!action);
