@@ -96,6 +96,12 @@ def test_active_and_total_follow_the_labels_reading_order(overview_data: dict, l
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_overview_quota_uses_the_same_native_percent_format_as_people(overview_data: dict, locale: str) -> None:
+    result = run_console("overview-attention", locale, overview_data)
+    assert result["quotaLabel"] == result["quotaLocaleLabel"]
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 def test_empty_overview_has_a_calm_check_and_keeps_add_and_share_available(locale: str) -> None:
     result = run_console("overview-empty", locale, {"fleet": {"profile_title": "Sample VPN", "servers": []}})
     assert result["calmEmpty"] and result["emptyCheck"] and result["add"] and result["share"]

@@ -54,7 +54,7 @@
       drawFleet(data, active, total, healthCount, traffic);
       var rows = [
         { href: "#/people?expires=7", label: M.t("overview.expiring", { days: number(7) }), count: data.expiring.total, kind: "warn" },
-        { href: "#/people?quota=90", label: M.t("overview.quota", { percent: "\u2068" + M.count(90) + "%\u2069" }), count: data.quota.total, kind: "warn" },
+        { href: "#/people?quota=90", label: M.t("overview.quota", { percent: M.percent(90) }), count: data.quota.total, kind: "warn" },
         { href: "#/people?status=limited", label: M.t("overview.limited"), count: data.people.facets.status.limited || 0, kind: "danger" },
         { href: "#/people?status=disabled", label: M.t("status.disabled"), count: data.people.facets.status.disabled || 0, kind: "neutral" },
       ];

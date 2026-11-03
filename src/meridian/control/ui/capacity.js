@@ -13,7 +13,7 @@
   function number(value) { return value == null ? missing() : isolated(M.count(value)); }
   function bytes(value) { return value == null ? missing() : M.bytes(value); }
   function load(value) { return value == null ? missing() : isolated(M.count(value / 1000)); }
-  function percent(value) { return value == null ? missing() : isolated(M.count(value / 10) + "%"); }
+  function percent(value) { return value == null ? missing() : M.percent(value / 10, 1); }
   function rate(value) { return value == null ? missing() : M.t("capacity.rate", { rate: M.bytes(value) }); }
   function utc(value) { return "\u2066" + String(value).slice(0, 16).replace("T", " ") + "\u2069"; }
   function fact(label, value) { return [h("dt", { text: M.t(label) }), h("dd", { text: value })]; }

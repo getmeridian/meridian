@@ -422,6 +422,9 @@ if (scenario === 'overview-add') {
 if (scenario.startsWith('overview-')) {
   report.attention = attention();
   report.people = { active: clean(document.querySelector('[data-overview-active]')?.textContent), total: clean(document.querySelector('[data-overview-total]')?.textContent) };
+  report.quotaLabel = document.querySelector('a[href="#/people?quota=90"] .attention-label')?.textContent;
+  report.quotaLocaleLabel = M.t('overview.quota', { percent: '\u2068' +
+    new w.Intl.NumberFormat(M.i18n.locale(), { style: 'percent', maximumFractionDigits: 0 }).format(.9) + '\u2069' });
   report.calmEmpty = !!document.querySelector('[data-overview-empty]');
   report.emptyCheck = !!document.querySelector('[data-overview-empty] .icon');
   report.emptyCatalogText = M.t('overview.attention_empty');

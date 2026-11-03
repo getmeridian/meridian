@@ -42,6 +42,7 @@
 - **Reissue shares removal's cut-off review** — send the explicit choice, refresh from the returned person, and retain per-node outcomes even when the cut-off fails.
 
 ## Pitfalls
+- **Percentages isolate native formatting** — use the shared helper for digits, spacing, and sign; quota captions and charts never assemble a raw percent sign.
 - **Badge contrast includes its translucent fill** — judge text on the composited surface in both themes, with 4.5:1 for labels and 3:1 for controls and chart marks; keep gold fills separate from functional accents.
 - **Phone header brands stay named** — hide the wordmark beside a fleet title, keep Meridian in the link's accessible name, and let only the title ellipsize.
 - **Action rows size labels before wrapping** — keep whole words and content-sized flex items, with 44 px targets and space for a wrapped phone selection bar.

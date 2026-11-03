@@ -184,8 +184,7 @@
       if (name === "tag") return state.tag === "none" ? M.t("people.no_tag") : state.tag;
       if (name === "profile") return profileLabel(state.profile);
       if (name === "expires") return M.t("people.chip_expires_value", { days: number(state.expires) });
-      if (name === "quota") return M.t("people.chip_quota_value", { percent: "\u2068" +
-        new Intl.NumberFormat(M.i18n.locale(), { style: "percent", maximumFractionDigits: 0 }).format(Number(state.quota) / 100) + "\u2069" });
+      if (name === "quota") return M.t("people.chip_quota_value", { percent: M.percent(Number(state.quota)) });
       if (name === "never") return "";
       if (name === "attention") return M.t(state.attention === "all" ? "people.attention" : "attention.reason." + state.attention);
       if (name === "lifecycle") return M.t("people.lifecycle_" + state.lifecycle);

@@ -80,3 +80,9 @@ def test_capacity_charts_show_the_observed_peak_for_zero_load(tmp_path: Path) ->
     result = run_console("servers", "en", server_data(tmp_path, "current"))
     peak = result["capacity_peaks"][0].translate({ord(c): None for c in "\u2066\u2067\u2068\u2069"})
     assert peak == "Peak 0"
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_capacity_memory_percent_uses_native_digits_spacing_and_sign(tmp_path: Path, locale: str) -> None:
+    result = run_console("servers", locale, server_data(tmp_path, "current"))
+    assert result["capacity_peaks"][1] == result["fullMemoryPeak"]

@@ -220,6 +220,8 @@ if (mode === 'servers') {
   report.capacity_zeros = view.querySelectorAll('.capacity-chart [data-value="0"]').length;
   report.capacity_now = [...view.querySelectorAll('.capacity-now dd')].map(el => el.textContent);
   report.capacity_peaks = [...view.querySelectorAll('.capacity-legend > .muted')].map(el => el.textContent);
+  report.fullMemoryPeak = M.t('capacity.peak', { value: '\u2068' +
+    new w.Intl.NumberFormat(M.i18n.locale(), { style: 'percent', maximumFractionDigits: 1 }).format(1) + '\u2069' });
   const used = [...view.querySelectorAll('dt')].find(el => el.textContent === M.t('server_allowance.used'));
   const period = [...view.querySelectorAll('dt')].find(el => el.textContent === M.t('server_allowance.period'));
   const allowance = data?.server_usage?.find(item => item.measurement === 'accepted_user_traffic');
