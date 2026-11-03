@@ -10,7 +10,7 @@
   };
 
   function exactDate(value, compact) {
-    if (compact) return h("bdi", { tabindex: "0", title: value + " UTC", text: M.date(value, true) });
+    if (compact) return h("bdi", {}, h("time", { datetime: value, title: value + " UTC", text: M.date(value, true) }));
     return h("span", { class: "stack-sm" }, h("bdi", { text: M.date(value, true) }),
       h("code", { dir: "ltr", text: value + " UTC" }));
   }

@@ -25,6 +25,8 @@
     }));
   }
 
+  function legend(text, tip) { return h("legend", { class: "title-row" }, h("span", { text: text }), M.tip(text, tip)); }
+
   function draw(section, state) {
     var before = state.settings;
     var cap = h("input", { type: "number", min: "1", max: "100", step: "1", value: String(before.default_device_limit) });
@@ -39,9 +41,9 @@
     var error = h("p", { class: "form-error", role: "alert" });
     var form = h("form", { class: "stack", novalidate: true },
       h("div", { class: "cards" },
-        h("fieldset", { class: "card privacy-options" }, h("legend", { text: M.t("privacy.devices") }), deviceChoices,
+        h("fieldset", { class: "card privacy-options" }, legend(M.t("privacy.devices"), M.t("tip.privacy_devices")), deviceChoices,
           M.field(M.t("privacy.device_limit"), cap, M.t("privacy.device_limit_hint"))),
-        h("fieldset", { class: "card privacy-options" }, h("legend", { text: M.t("privacy.history") }), historyChoices,
+        h("fieldset", { class: "card privacy-options" }, legend(M.t("privacy.history"), M.t("tip.privacy_history")), historyChoices,
           M.field(M.t("privacy.history_days"), days, M.t("privacy.history_days_hint")))),
       error,
       h("div", { class: "row-actions" }, h("button", { class: "btn btn-primary btn-sm", type: "submit" }, M.t("action.save"))));

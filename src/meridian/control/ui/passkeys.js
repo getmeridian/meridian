@@ -104,7 +104,7 @@
     var list = h("div", { class: "list list-plain" }, h("span", { class: "spinner" }));
     var latest = M.latestOnly();
     var card = h("section", { class: "card" },
-      h("div", { class: "card-head" }, h("h2", { text: M.t("passkeys.title") }),
+      h("div", { class: "card-head" }, M.titled("h2", M.t("passkeys.title"), M.t("tip.passkeys")),
         M.pill(state.available && supported ? "ok" : "muted", M.t(state.available && supported ? "passkeys.ready" : "passkeys.unavailable"))),
       h("p", { class: "muted small", text: M.t(state.available ? "passkeys.caption" : "passkeys.domain_caption") }),
       M.learnMore([h("p", { text: M.t(state.available ? "passkeys.text" : "passkeys.no_domain") }),

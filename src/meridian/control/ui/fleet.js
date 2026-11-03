@@ -29,7 +29,7 @@
     var status = h("div", { class: "live-status" });
     var cards = h("div", { class: "live-data" }, h("div", { class: "empty" }, h("span", { class: "spinner" })));
     M.mount(view, [
-        h("div", { class: "page-head" }, h("div", {}, h("h1", { text: M.t("nav.servers") }),
+        h("div", { class: "page-head" }, h("div", {}, M.titled("h1", M.t("nav.servers"), M.t("tip.servers")),
           h("p", { class: "muted", text: M.t("servers.lede") }))),
         M.cliHint(), status, cards, M.fleetHistory(),
     ]);
@@ -88,6 +88,8 @@
     });
   };
 
+  function term(label, tip) { return h("dt", { class: "has-tip" }, h("span", { text: label }), M.tip(label, tip)); }
+
   function placeHostFacts(card) {
     var host = card.querySelector("[data-server-host-facts]");
     if (!host) return;
@@ -132,7 +134,7 @@
         h("div", { class: "server-name" },
           h("span", { class: "dot " + (server.live ? "dot-ok" : "dot-err"), "aria-hidden": "true" }),
           h("h2", { class: "mono", text: server.node_id })),
-        M.pill("muted", M.t("role." + server.role))),
+        h("span", { class: "title-row" }, M.pill("muted", M.t("role." + server.role)), M.tip(M.t("role." + server.role), M.t("tip.server_role")))),
       h("div", { class: "server-badges" },
         M.pill(server.live ? "ok" : "muted", M.t(server.live ? "servers.online" : "servers.offline")),
         M.pill({ healthy: "ok", degraded: "warn", unhealthy: "err", unavailable: "muted" }[healthStatus],
@@ -142,10 +144,10 @@
         h("dt", { text: M.t("servers.agent") }),
         h("dd", {}, M.t(server.live ? "servers.online" : "servers.offline"), " · ",
           M.t("servers.seen", { when: M.ago(server.last_seen_at) })),
-        h("dt", { text: M.t("servers.revision") }),
+        term(M.t("servers.revision"), M.t("tip.server_revision")),
         h("dd", {}, M.t("servers.revisions", {
           applied: M.count(server.applied_revision), current: M.count(server.revision) })),
-        h("dt", { text: M.t("servers.traffic") }), h("dd", { text: M.bytes(server.traffic_bytes) })),
+        term(M.t("servers.traffic"), M.t("tip.server_traffic")), h("dd", { text: M.bytes(server.traffic_bytes) })),
       !runtime ? h("p", { class: "notice notice-warn small", text: M.t("servers.health_unavailable") }) : null,
       faults.length ? h("ul", { class: "notice notice-warn health-checks" }, faults.map(function (check) {
         return h("li", {}, h("strong", { text: check.name === "stats" ? M.t("servers.stats_stalled") + " (stats)" : check.name }),
@@ -185,7 +187,7 @@
       payment_due: "server_allowance.payment_due", payment_overdue: "server_allowance.payment_overdue",
     };
     return h("div", { class: "stack" },
-      h("h3", { text: M.t("server_allowance.title") }),
+      M.titled("h3", M.t("server_allowance.title"), M.t("tip.allowance")),
       h("dl", { class: "facts" },
         metadata.provider ? [h("dt", { text: M.t("server_allowance.provider") }),
           h("dd", { text: metadata.provider })] : null,
@@ -222,7 +224,7 @@
   M.renderRevisions = function (view, number) {
     if (number) return renderRevision(view, Number(number));
     var list = h("div", {}, h("span", { class: "spinner" }));
-    M.mount(view, [h("div", { class: "page-head" }, h("div", {}, h("h1", { text: M.t("nav.revisions") }),
+    M.mount(view, [h("div", { class: "page-head" }, h("div", {}, M.titled("h1", M.t("nav.revisions"), M.t("tip.revisions")),
       h("p", { class: "muted small", text: M.t("revisions.lede") }))), list]);
     M.api("GET", "api/revisions").then(function (data) {
       if (!view.isConnected) return;

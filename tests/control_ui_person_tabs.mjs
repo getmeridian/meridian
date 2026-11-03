@@ -98,7 +98,7 @@ const M = w.M;
 M.i18n = { lang: locale, locale: () => locale === 'zh' ? 'zh-CN' : locale, load: async () => {},
   langs: ['en', 'ru', 'fa', 'zh'], names: { en: 'English', ru: 'Русский', fa: 'فارسی', zh: '中文' } };
 M.t = (key, params = {}) => (catalog[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? ''));
-M.toast = text => events.push({ toast: text });
+M.toast = (text, kind, action) => events.push(action ? { toast: text, action } : { toast: text });
 M.takeSetupToken = () => '';
 M.renderServers = view => M.mount(view, M.h('h1', { text: 'Servers' }));
 M.renderOverview = view => M.mount(view, M.h('h1', { text: 'Overview' }));
@@ -209,6 +209,16 @@ if (scenario === 'person-tabs-toggle-action') {
   report.states = [snapshot()];
   summary().querySelector('[data-person-action="toggle"]').click(); await settle(); await settle(); report.states.push(snapshot());
   summary().querySelector('[data-person-action="toggle"]').click(); await settle(); await settle(); report.states.push(snapshot());
+  report.writes = writes;
+}
+
+if (scenario === 'person-tabs-toggle-undo') {
+  summary().querySelector('[data-person-action="toggle"]').click(); await settle(); await settle();
+  const offered = events.filter(event => event.action);
+  report.undo = offered.length === 1 && offered[0].action.label === M.t('action.undo');
+  offered[0]?.action.run(); await settle(); await settle();
+  report.offers = events.filter(event => event.action).length;
+  report.label = summary().querySelector('[data-person-action="toggle"]').textContent === M.t('person.disable');
   report.writes = writes;
 }
 
@@ -373,7 +383,7 @@ if (scenario === 'person-tabs-traffic-preview') {
   const preview = form.querySelector('.lifecycle-preview');
   const requests = () => events.filter(event => event.url === 'api/users/preview');
   const errors = () => [...form.querySelectorAll('.field-error')].filter(el => el.textContent.trim()).map(el => el.textContent);
-  report.initialReset = preview.querySelector('bdi')?.title || '';
+  report.initialReset = preview.querySelector('time')?.getAttribute('datetime') || '';
   change(form.querySelector('[name="traffic_limit_strategy"]'), 'month_rolling'); change(anchor, '0');
   form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await settle();
   report.invalid = { fields: errors(), summary: form.querySelector('.form-error').textContent,
@@ -381,7 +391,7 @@ if (scenario === 'person-tabs-traffic-preview') {
   change(anchor, '15');
   report.corrected = { fields: errors(), summary: form.querySelector('.form-error').textContent };
   await advance(250);
-  report.editing = { reset: preview.querySelector('bdi')?.title || '', previews: requests(), writes: writes.slice() };
+  report.editing = { reset: preview.querySelector('time')?.getAttribute('datetime') || '', previews: requests(), writes: writes.slice() };
   form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await settle(); await settle();
   report.writes = writes; report.closed = !fieldRow('traffic').querySelector('form');
 }
@@ -453,7 +463,7 @@ if (scenario === 'person-tabs-sibling-refresh') {
   await advance(300);
   const current = fieldRow('expiry').querySelector('form');
   report.expiry = { sameForm: current === expiry, sameDate: current.querySelector('input[type="date"]') === date,
-    date: date.value, dirty: M.formDirty(current), reset: current.querySelector('.lifecycle-preview bdi')?.title || '' };
+    date: date.value, dirty: M.formDirty(current), reset: current.querySelector('.lifecycle-preview time')?.getAttribute('datetime') || '' };
   report.writes = writes; report.trafficClosed = !fieldRow('traffic').querySelector('form');
 }
 

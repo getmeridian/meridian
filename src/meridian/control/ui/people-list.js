@@ -130,6 +130,7 @@
       if (debounce) searchTimer = setTimeout(function () { stop.refresh(false); }, 150);
       else if (stop) stop.refresh(false);
     }
+    var FILTER_TIPS = { attention: "tip.filter_attention", lifecycle: "tip.filter_lifecycle", profile: "tip.filter_profile" };
     function select(name, keys, label) {
       var input = h("select", { name: name }, keys.map(function (key) { return h("option", { value: key, text: label(key) }); }));
       controls[name] = input; input.value = state[name];
@@ -138,7 +139,7 @@
         if (name === "sort") { state.order = defaultOrder(state.sort); controls.order.value = state.order; }
         changed(false);
       });
-      return M.field(M.t("people.filter_" + name), input);
+      return M.field(M.t("people.filter_" + name), input, null, M.has(FILTER_TIPS, name) ? M.t(FILTER_TIPS[name]) : null);
     }
     var statusField = select("status", [""].concat(STATUSES), function (key) { return key ? M.t("status." + key) : M.t("people.any_status"); });
     var tagField = select("tag", ["", "none"].concat(state.tag && state.tag !== "none" ? [state.tag] : []), function (key) { return key === "" ? M.t("people.any_tag") : key === "none" ? M.t("people.no_tag") : key; });
@@ -150,7 +151,7 @@
       var input = h("input", { name: name, type: "number", min: "1", max: String(max), step: "1", inputmode: "numeric", placeholder: M.t("people.filter_off") });
       controls[name] = input; input.value = state[name];
       counters[name] = h("p", { class: "hint" }); errors[name] = h("p", { class: "field-error", role: "alert" });
-      var box = M.field(M.t("people.filter_" + name), input); box.appendChild(counters[name]); box.appendChild(errors[name]);
+      var box = M.field(M.t("people.filter_" + name), input, null, M.t("tip.filter_" + name)); box.appendChild(counters[name]); box.appendChild(errors[name]);
       input.addEventListener("input", function () {
         var value = input.value.trim(), normalized = integer(value, max), bad = input.validity.badInput || !!value && !normalized;
         text(errors[name], bad ? M.t(name === "expires" ? "people.expires_invalid" : "people.quota_invalid") : "");
@@ -164,7 +165,9 @@
     controls.never = h("input", { type: "checkbox", name: "never" }); controls.never.checked = state.never;
     counters.never = h("span", { class: "hint" });
     controls.never.addEventListener("change", function () { state.never = controls.never.checked; changed(false); });
-    var neverField = h("div", { class: "field people-never" }, h("label", { class: "check-row" }, controls.never, h("span", { text: M.t("people.filter_never") })), counters.never);
+    var neverField = h("div", { class: "field people-never" }, h("div", { class: "title-row" },
+      h("label", { class: "check-row" }, controls.never, h("span", { text: M.t("people.filter_never") })),
+      M.tip(M.t("people.filter_never"), M.t("tip.filter_never"))), counters.never);
     var sortField = select("sort", SORTS, function (key) { return M.t("people.sort_" + key); });
     var orderField = select("order", ["asc", "desc"], function (key) { return M.t("people.order_" + key); });
     function clearFilters() {

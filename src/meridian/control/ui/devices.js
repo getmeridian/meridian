@@ -79,8 +79,8 @@
     mode.value = initial === null ? "default" : initial === 0 ? "unlimited" : "limited";
     var limit = h("input", { type: "number", min: "1", max: "100", step: "1", inputmode: "numeric", value: original });
     var form = h("form", { class: "stack", novalidate: true },
-      M.field(M.t("devices.limit"), mode, M.t("devices.choice_hint")),
-      M.field(M.t("devices.limit"), limit, M.t("devices.limit_hint")),
+      M.field(M.t("devices.limit"), mode, M.t("devices.choice_hint"), M.t("tip.devices")),
+      M.field(M.t("devices.limit_number"), limit, M.t("devices.limit_hint")),
       h("p", { class: "form-error", role: "alert" }),
       h("div", { class: "row-actions" },
         h("button", { class: "btn btn-primary btn-sm", type: "submit" }, M.t("action.save"))));

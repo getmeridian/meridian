@@ -62,6 +62,7 @@
     terminal: "M4 6l5 5-5 5M11 17h9",
     shield: "M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z",
     x: "M6 6l12 12M18 6L6 18",
+    info: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01",
   };
   M.icon = function (name) {
     return M.h("svg", { viewBox: "0 0 24 24", "aria-hidden": "true", class: "icon" },
@@ -212,12 +213,26 @@
   // -- feedback ----------------------------------------------------------------------------
 
   var toastTimer = null;
-  M.toast = function (text, kind) {
+  /* `action` ({label, run}) adds one button, such as Undo; the toast then stays longer and waits
+   * while the pointer or focus is on it. */
+  M.toast = function (text, kind, action) {
     var host = document.getElementById("toast") || document.body.appendChild(M.h("div", { id: "toast", role: "status" }));
-    M.mount(host, M.h("div", { class: "toast " + (kind === "error" ? "toast-error" : "toast-ok") }, text));
+    var delay = action ? 8000 : kind === "error" ? 6000 : 2600;
+    function hide() {
+      clearTimeout(toastTimer); host.classList.remove("show", "has-action");
+      host.onmouseenter = host.onfocusin = host.onmouseleave = host.onfocusout = null;
+    }
+    function wait() { clearTimeout(toastTimer); toastTimer = setTimeout(hide, delay); }
+    var button = action ? M.h("button", { class: "toast-action", type: "button", onclick: function () {
+      if (button.disabled) return;
+      button.disabled = true; hide(); action.run();
+    } }, action.label) : null;
+    M.mount(host, M.h("div", { class: "toast " + (kind === "error" ? "toast-error" : "toast-ok") }, M.h("span", { text: text }), button));
     host.classList.add("show");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { host.classList.remove("show"); }, kind === "error" ? 6000 : 2600);
+    host.classList.toggle("has-action", !!action);
+    host.onmouseenter = host.onfocusin = action ? function () { clearTimeout(toastTimer); } : null;
+    host.onmouseleave = host.onfocusout = action ? wait : null;
+    wait();
   };
 
   M.copy = function (text) {
@@ -301,12 +316,15 @@
     }).then(Boolean);
   };
 
-  /* A labelled form field. */
-  M.field = function (label, input, hint) {
+  /* A labelled form field. An optional tip sits beside the label, never inside it (a label may hold
+   * no other control). */
+  M.field = function (label, input, hint, tip) {
     var id = "f" + Math.random().toString(36).slice(2, 9);
     input.id = id;
+    var caption = M.h("label", { for: id, text: label });
     return M.h("div", { class: "field" },
-      M.h("label", { for: id, text: label }), input, hint ? M.h("p", { class: "hint", text: hint }) : null);
+      tip && M.tip ? M.h("div", { class: "title-row" }, caption, M.tip(label, tip)) : caption,
+      input, hint ? M.h("p", { class: "hint", text: hint }) : null);
   };
 
   /* Disable a form's buttons while `work` runs; show its error under the form. */

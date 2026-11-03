@@ -61,6 +61,14 @@ def test_enable_and_disable_are_named_actions_without_pressed_toggle_semantics(l
     assert result["writes"] == [{"status": "disabled"}, {"status": "active"}]
 
 
+@pytest.mark.parametrize("locale", ["en", "fa"])
+def test_disabling_a_person_offers_one_undo_that_sends_the_opposite_status(locale: str) -> None:
+    result = run_console("person-tabs-toggle-undo", locale)
+    assert result["undo"] and result["offers"] == 1
+    assert result["writes"] == [{"status": "disabled"}, {"status": "active"}]
+    assert result["label"]
+
+
 @pytest.mark.parametrize("tab", ["", "usage", "devices", "routing", "keys"])
 def test_person_tab_deep_links_select_one_labelled_panel(tab: str) -> None:
     result = run_console("person-tabs-route", data={"tab": tab, "mode": "detailed"})
@@ -346,14 +354,14 @@ def test_traffic_editor_previews_while_editing_and_focuses_then_clears_an_invali
         locale,
         {"clock": True, "previewFields": PREVIEW_FIELDS, "schedulePreview": {"next_reset_at": "2026-11-15T00:00:00Z"}},
     )
-    assert result["initialReset"] == "2026-12-01T00:00:00Z UTC"
+    assert result["initialReset"] == "2026-12-01T00:00:00Z"
     assert len(result["invalid"]["fields"]) == 1 and result["invalid"]["focused"]
     assert (
         result["invalid"]["summary"] == "" and result["invalid"]["previews"] == 0 and result["invalid"]["writes"] == []
     )
     assert result["corrected"] == {"fields": [], "summary": ""}
     editing = result["editing"]
-    assert editing["reset"] == "2026-11-15T00:00:00Z UTC" and editing["writes"] == []
+    assert editing["reset"] == "2026-11-15T00:00:00Z" and editing["writes"] == []
     assert [event["body"] for event in editing["previews"]] == [
         {"username": "sample", "traffic_limit_strategy": "month_rolling", "traffic_reset_anchor_day": 15}
     ]
@@ -413,7 +421,7 @@ def test_sibling_traffic_save_refreshes_an_open_expiry_preview_and_preserves_its
         "person-tabs-sibling-refresh",
         data={"clock": True, "dirty": dirty, "updatedSchedule": schedule, "schedulePreview": schedule},
     )
-    assert result["expiry"]["reset"] == "2026-11-09T00:00:00Z UTC"
+    assert result["expiry"]["reset"] == "2026-11-09T00:00:00Z"
     assert result["expiry"]["sameForm"] and result["expiry"]["sameDate"]
     assert result["expiry"]["date"] == ("2032-06-01" if dirty else "2026-12-02")
     assert result["expiry"]["dirty"] is dirty and result["trafficClosed"]

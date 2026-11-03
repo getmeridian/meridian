@@ -40,9 +40,9 @@
       command: named ? "meridian fleet routing set POLICY" : "meridian fleet routing " + (policy === "full" ? "ru-split" : "full") };
   }
 
-  function fact(label, value, caption, command) {
+  function fact(label, value, caption, command, tip) {
     return M.keyValue(label, h("div", { class: "stack-sm" }, value,
-      h("div", { class: "settings-command muted small" }, h("span", { text: caption }), command)));
+      h("div", { class: "settings-command muted small" }, h("span", { text: caption }), command)), tip);
   }
 
   function generalCard(read) {
@@ -65,9 +65,9 @@
     return h("section", { class: "card" }, h("h2", { text: M.t("settings.general") }), error,
       h("dl", { class: "settings-facts" },
         fact(M.t("settings.title"), title, M.t("settings.title_caption"), M.command("meridian setup")),
-        fact(M.t("settings.public_url"), publicUrl, M.t("settings.address_caption"), M.command("meridian setup")),
-        fact(M.t("settings.owner_contact"), [contactText, contactLink], M.t("settings.contact_hint"), M.command("meridian fleet contact")),
-        fact(M.t("settings.client_routing"), routing, M.t("settings.routing_hint"), routingCommand)),
+        fact(M.t("settings.public_url"), publicUrl, M.t("settings.address_caption"), M.command("meridian setup"), M.t("tip.public_url")),
+        fact(M.t("settings.owner_contact"), [contactText, contactLink], M.t("settings.contact_hint"), M.command("meridian fleet contact"), M.t("tip.owner_contact")),
+        fact(M.t("settings.client_routing"), routing, M.t("settings.routing_hint"), routingCommand, M.t("tip.client_routing"))),
       M.learnMore([h("p", { text: M.t("settings.title_hint") }), h("p", { text: M.t("settings.public_url_hint") }), routingExplanation]));
   }
 
@@ -86,8 +86,8 @@
       if (!(settings.response_rules || []).length) M.mount(responseRules, h("li", { text: M.t("response_rules.reason_built_in_selector") }));
     }, function (e) { error.textContent = M.errorText(e); });
     return h("div", { class: "stack" },
-      h("section", { class: "card" }, h("h2", { text: M.t("settings.client_routing") }), routing, explanation, command, error),
-      h("section", { class: "card" }, h("h2", { text: M.t("response_rules.title") }),
+      h("section", { class: "card" }, M.titled("h2", M.t("settings.client_routing"), M.t("tip.client_routing")), routing, explanation, command, error),
+      h("section", { class: "card" }, M.titled("h2", M.t("response_rules.title"), M.t("tip.response_rules")),
         h("p", { class: "muted small", text: M.t("response_rules.reviewed_hint") }), responseRules));
   }
 
@@ -134,7 +134,7 @@
         M.enrollTotp().then(function (enabled) { if (enabled) M.render(); });
       } }, M.t("totp.turn_on"));
     return h("section", { class: "card" },
-      h("div", { class: "card-head" }, h("h2", { text: M.t("totp.title") }),
+      h("div", { class: "card-head" }, M.titled("h2", M.t("totp.title"), M.t("tip.totp")),
         M.pill(on ? "ok" : "muted", M.t(on ? "totp.on" : "totp.off"))),
       h("p", { class: "muted small", text: M.t(on ? "totp.on_text" : "totp.off_hint") }),
       M.learnMore(h("p", { text: M.t("totp.offer_why") })),

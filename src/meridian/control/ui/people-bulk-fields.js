@@ -57,7 +57,7 @@
       function deviceSync() { devices.disabled = deviceMode.value !== "limited"; }
       deviceMode.addEventListener("change", deviceSync); deviceSync();
       nodes.appendChild(M.field(M.t("devices.limit"), deviceMode, M.t("devices.choice_hint")));
-      nodes.appendChild(M.field(M.t("devices.limit"), devices));
+      nodes.appendChild(M.field(M.t("devices.limit_number"), devices));
       read = function () {
         if (deviceMode.value === "inherit") return { device_limit: null };
         if (deviceMode.value === "unlimited") return { device_limit: 0 };

@@ -55,10 +55,10 @@
     if (error.code !== "cancelled") M.toast(M.t("person.action_error", { name: label, error: M.errorText(error) }), "error");
   }
 
-  function completed(screen, user, toastKey, label, savedForm) {
+  function completed(screen, user, toastKey, label, savedForm, action) {
     if (toastKey === "person.enabled_toast" && user.status === "expired") toastKey = "person.enabled_expired_toast";
     if (toastKey === "person.enabled_toast" && user.status === "limited") toastKey = "person.enabled_limited_toast";
-    M.toast(M.t(toastKey, { name: label }));
+    M.toast(M.t(toastKey, { name: label }), null, action);
     if (!current(screen)) return;
     screen.version++;
     draw(screen, user, screen.share, savedForm);
@@ -70,11 +70,11 @@
     }
   }
 
-  function act(screen, work, toastKey) {
+  function act(screen, work, toastKey, action) {
     if (!current(screen)) return Promise.resolve();
     var label = M.displayName(screen.username);
     return work().then(function (result) {
-      completed(screen, result.user || result, toastKey, label);
+      completed(screen, result.user || result, toastKey, label, undefined, action);
       if (current(screen) && result.commands) M.showCommandResults(result.commands);
     }, function (e) { failed(label, e); });
   }
@@ -161,6 +161,8 @@
   function summary(screen) {
     screen.title = h("h1"); screen.badge = h("span"); screen.tag = h("bdi", { class: "tag", dir: "ltr", "data-person-tag": "" });
     screen.usernameLabel = h("bdi", { class: "muted small mono" });
+    screen.declared = h("span", { class: "title-row", "data-person-declared": "", hidden: true },
+      h("span", { class: "tag", text: M.t("people.declared") }), M.tip(M.t("people.declared"), M.t("people.declared_hint")));
     screen.summaryUsage = h("div", { class: "person-summary-usage" });
     screen.expiry = h("bdi", { class: "person-summary-expiry", tabindex: "0", "data-person-expiry": "" });
     screen.expiryTooltip = h("span", { class: "person-date-tooltip", role: "tooltip", id: "person-expiry-" + screen.generation });
@@ -200,14 +202,28 @@
       if (screen.toggling || !current(screen)) return;
       var disabled = screen.user.status === "disabled";
       screen.toggling = true; screen.toggle.disabled = true;
-      act(screen, function () { return M.api("PATCH", path(screen.username), { status: disabled ? "active" : "disabled" }); },
-        disabled ? "person.enabled_toast" : "person.disabled_toast").finally(function () {
+      var name = screen.username, label = M.displayName(name);
+      // Undo sends the opposite request once; it still works after leaving this person's page.
+      var undo = { label: M.t("action.undo"), run: function () {
+        if (screen.toggling) return;
+        screen.toggling = true; if (current(screen)) screen.toggle.disabled = true;
+        M.api("PATCH", path(name), { status: disabled ? "disabled" : "active" }).then(function (changed) {
+          completed(screen, changed.user || changed, disabled ? "person.disabled_toast" : "person.enabled_toast", label);
+          // Each route mounts a new view; ask the one showing now to re-read so it shows the restored status.
+          var view = !current(screen) && document.getElementById("view"), live = view && view.meridianLiveStop;
+          if (live && live.refresh) live.refresh(true);
+        }, function (e) { failed(label, e); }).finally(function () {
+          screen.toggling = false; if (current(screen)) screen.toggle.disabled = false;
+        });
+      } };
+      act(screen, function () { return M.api("PATCH", path(name), { status: disabled ? "active" : "disabled" }); },
+        disabled ? "person.enabled_toast" : "person.disabled_toast", undo).finally(function () {
         screen.toggling = false; if (current(screen)) screen.toggle.disabled = false;
       });
     } });
     return h("header", { class: "person-summary", "data-person-summary": "" }, back(),
       h("div", { class: "page-head person-summary-head" },
-        h("div", { class: "stack-sm" }, h("div", { class: "person-title-row" }, screen.title, screen.badge, screen.tag), screen.usernameLabel),
+        h("div", { class: "stack-sm" }, h("div", { class: "person-title-row" }, screen.title, screen.badge, screen.tag, screen.declared), screen.usernameLabel),
         h("div", { class: "row-actions person-primary-actions", role: "group", "aria-label": M.t("person.actions") },
           shareButton, screen.extend, screen.toggle)),
       h("div", { class: "person-summary-facts" }, screen.summaryUsage,
@@ -224,6 +240,7 @@
     }
     screen.badge.title = M.t("person.status_" + user.status);
     screen.tag.hidden = !user.tag; screen.tag.textContent = user.tag || "";
+    screen.declared.hidden = !(share && share.declared);
     M.mount(screen.summaryUsage, usage(user));
     var schedule = user.schedule, expiry = schedule ? schedule.expire_at : user.expire_at;
     screen.expiry.textContent = M.expiryText(Object.assign({}, user, { expire_at: expiry }));
@@ -257,7 +274,7 @@
         h("p", { class: "muted small", "data-person-carried": "", text: M.t("person.traffic_unattributed", {
           bytes: M.bytes(user.period_traffic.unattributed_bytes) }) }) : null,
       h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
-        M.confirm(M.t("person.reset_title"), M.t("person.reset_text"), M.t("person.reset_traffic")).then(function (ok) {
+        M.confirm(M.t("person.reset_title"), M.t("person.reset_text"), M.t("person.reset_traffic"), true).then(function (ok) {
           if (ok) act(screen, function () { return M.api("POST", path(name, "/reset-traffic"), {}); }, "person.reset_toast");
         });
       } }, M.t("person.reset_traffic")));
@@ -273,8 +290,8 @@
       removed: M.t("person.flow_reason_removed"), access_changed: M.t("person.flow_reason_access_changed")
     };
     return h("section", { class: "card flow-block-status", "aria-live": "polite" },
-      h("h2", { text: M.t("person.flow_title") }),
-      h("p", { class: "muted small", text: M.t("person.flow_text") }),
+      M.titled("h2", M.t("person.flow_title"), M.t("tip.flow_block")),
+      M.learnMore(h("p", { text: M.t("person.flow_text") })),
       h("dl", { class: "facts" }, state.nodes.map(function (node) {
         var generation = Number.isSafeInteger(node.credential_generation) ?
           h("bdi", { class: "muted small", "data-flow-generation": node.credential_generation,

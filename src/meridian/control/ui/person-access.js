@@ -7,7 +7,7 @@
     language: ["language"], note: ["note"], tag: ["tag"] };
 
   function date(value) {
-    return value ? h("bdi", { tabindex: "0", title: value + " UTC", text: M.date(value) }) : M.t("people.no_expiry");
+    return value ? h("bdi", {}, h("time", { datetime: value, title: value + " UTC", text: M.date(value, true) })) : M.t("people.no_expiry");
   }
   function read(key, user) {
     if (key === "expiry") {
@@ -183,10 +183,10 @@
       var edit = h("button", { class: "btn btn-ghost btn-sm", type: "button", "data-person-edit": key,
         "aria-label": M.t("person.edit_field", { field: label }), "aria-controls": editor.id, "aria-expanded": "false",
         onclick: function () { open(key); } }, M.t("person.edit"));
-      var row = M.keyValue(label, [h("div", { class: "person-read-row" }, value, edit), editor]);
+      var row = M.keyValue(label, [h("div", { class: "person-read-row" }, value, edit), editor], M.t("tip.person_" + key));
       row.classList.add("person-access-row"); row.setAttribute("data-person-field", key);
-      row.querySelector("dt").id = prefix + "-" + key + "-label";
-      entries[key] = { row: row, value: value, editor: editor, edit: edit, labelId: row.querySelector("dt").id };
+      row.querySelector("dt .term").id = prefix + "-" + key + "-label";
+      entries[key] = { row: row, value: value, editor: editor, edit: edit, labelId: row.querySelector("dt .term").id };
       (key === "note" || key === "tag" ? metadata : facts).appendChild(row);
     });
     var more = h("details", { class: "secondary-actions person-more", "data-person-more": "" },

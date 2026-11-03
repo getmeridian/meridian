@@ -5,7 +5,7 @@
 
   M.profileChoices = function (initial) {
     var names = (initial || []).slice(), loaded = false;
-    var list = h("fieldset", { class: "stack-sm" }, h("legend", { text: M.t("profiles.title") }));
+    var list = h("fieldset", { class: "stack-sm choice-group" }, h("legend", { text: M.t("profiles.title") }));
     var error = h("p", { class: "form-error", role: "alert" });
     var nodes = h("div", { class: "stack-sm" }, list, error);
     var ready = Promise.resolve().then(function () {
@@ -70,7 +70,7 @@
         }, function (failure) { if (card.isConnected) error.textContent = M.errorText(failure); });
       }).finally(function () { busy = false; save.disabled = false; });
     } }, choices.nodes, error, h("div", { class: "actions" }, save));
-    var card = h("section", { class: "card" }, h("h2", { text: M.t("profiles.title") }),
+    var card = h("section", { class: "card" }, M.titled("h2", M.t("profiles.title"), M.t("tip.profiles")),
       h("p", { class: "muted small", text: M.t("profiles.card_hint") }), form,
       h("h3", { text: M.t("profiles.effective") }), effective,
       h("p", { class: "hint", text: M.t("profiles.topology_hint", { command: "meridian profile add|set|remove|list" }) }));
