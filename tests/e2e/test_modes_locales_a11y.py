@@ -3,7 +3,7 @@
 import pytest
 from playwright.sync_api import Page, expect
 
-from tests.e2e.helpers import LOCALES, SCREENS, editor, language, person, ready
+from tests.e2e.helpers import LOCALES, SCREENS, editor, language, loaded, person, ready
 
 
 def test_saved_modes_and_detailed_bookmarks_keep_each_destination(owner: Page, base_url: str) -> None:
@@ -95,10 +95,11 @@ def accessible_controls(page: Page) -> None:
     )
     assert controls.count() > 0
     client = page.context.new_cdp_session(page)
-    try:
-        selector = "button, a[href], input, select, textarea, summary"
+    selector = "button, a[href], input, select, textarea, summary"
+
+    def snapshot() -> tuple[list[int], list[int], dict[int, int], dict[int, dict]] | None:
         document = client.send("DOM.getDocument", {"depth": -1})["root"]
-        backend_ids = {}
+        backend_ids: dict[int, int] = {}
 
         def index_nodes(node: dict) -> None:
             backend_ids[node["nodeId"]] = node["backendNodeId"]
@@ -110,13 +111,27 @@ def accessible_controls(page: Page) -> None:
         visible = controls.evaluate_all(
             """(els, selector) => {
                 const all = [...document.querySelectorAll(selector)];
-                return els.map(el => all.indexOf(el));
+                return {total: all.length, indices: els.map(el => all.indexOf(el))};
             }""",
             selector,
         )
         # Playwright's Chromium accessibility session reports computed names, including native summaries.
         tree = client.send("Accessibility.getFullAXTree")["nodes"]
+        after = page.evaluate("selector => document.querySelectorAll(selector).length", selector)
+        # The reads are separate round trips; a late render between them would pair the wrong nodes.
+        if not len(node_ids) == visible["total"] == after or any(node not in backend_ids for node in node_ids):
+            return None
         names = {node["backendDOMNodeId"]: node for node in tree if "backendDOMNodeId" in node}
+        return visible["indices"], node_ids, backend_ids, names
+
+    try:
+        for _ in range(3):
+            read = snapshot()
+            if read:
+                break
+        else:
+            pytest.fail("The page kept changing while its accessibility tree was read")
+        visible, node_ids, backend_ids, names = read
         for position, index in enumerate(visible):
             accessible = names.get(backend_ids[node_ids[index]], {})
             assert not accessible.get("ignored", True) and accessible.get("name", {}).get("value", "").strip(), (
@@ -157,7 +172,7 @@ def test_accessible_names_across_screens_tabs_editors_and_dialogs(owner: Page, b
     for tab in ["access", "usage", "devices", "routing", "keys"]:
         owner.locator(f'[data-person-tab="{tab}"]').click()
         expect(owner.locator(f'[data-person-panel="{tab}"]')).to_be_visible()
-        expect(owner.locator("#view .spinner:visible")).to_have_count(0)
+        loaded(owner, tab)
         accessible_controls(owner)
     owner.locator('[data-person-tab="access"]').click()
     for field in ("note", "traffic"):

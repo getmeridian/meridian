@@ -76,10 +76,27 @@ def language(page: Page, code: str) -> None:
     expect(page.locator("html")).to_have_attribute("lang", code)
 
 
+# Panels that fill or enable controls after their read, without a spinner or aria-busy.
+LOADED = {
+    "general": ['[data-settings-panel="general"] .settings-fact-value.mono:not(:empty)'],
+    "advanced": ['[data-settings-panel="advanced"] [data-response-rules] li'],
+    "notice": ['[data-notice="text"]:enabled'],
+    "language": ['[data-language="default"]:enabled'],
+    "routing": ['[data-person-panel="routing"] input[name="profile"]', '[data-policy="override"]:enabled'],
+}
+
+
+def loaded(page: Page, part: str) -> None:
+    expect(page.locator("#view .spinner:visible")).to_have_count(0)
+    for selector in LOADED.get(part, []):
+        expect(page.locator(selector).first).to_be_visible()
+
+
 def ready(page: Page, route: str) -> None:
     expect(page.locator("#view h1").first).to_be_visible()
     if route.startswith("people/"):
         expect(page.locator("[data-person-action=share]")).to_be_enabled()
     elif route in {"overview", "people", "servers"}:
         expect(page.locator("#view")).to_have_attribute("aria-busy", "false")
-    expect(page.locator("#view .spinner:visible")).to_have_count(0)
+    part = route.rsplit("/", 1)[-1] if "/" in route else "general" if route == "settings" else route
+    loaded(page, part)

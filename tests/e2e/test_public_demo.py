@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from playwright.sync_api import Page, expect
 
-from tests.e2e.helpers import LOCALES, add_person, language, person, ready
+from tests.e2e.helpers import LOCALES, add_person, language, loaded, person, ready
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def test_every_demo_screen_and_person_tab_loads_without_browser_faults(demo: Pag
     for tab in ["access", "usage", "devices", "routing", "keys"]:
         demo.locator(f'[data-person-tab="{tab}"]').click()
         expect(demo.locator(f'[data-person-panel="{tab}"]')).to_be_visible()
-        expect(demo.locator("#view .spinner:visible")).to_have_count(0)
+        loaded(demo, tab)
         expect(demo.locator("html")).to_have_attribute("lang", locale)
     demo.locator('.tabs a[href="#/revisions"]').click()
     demo.locator('a.record-main[href^="#/revisions/"]').first.click()
@@ -39,7 +39,7 @@ def test_every_demo_screen_and_person_tab_loads_without_browser_faults(demo: Pag
     for section in ["general", "notice", "language", "privacy", "security", "advanced"]:
         demo.locator(f'[data-settings-section="{section}"]').click()
         expect(demo.locator(f'[data-settings-panel="{section}"]')).to_be_visible()
-        expect(demo.locator("#view .spinner:visible")).to_have_count(0)
+        loaded(demo, section)
         expect(demo.locator("html")).to_have_attribute("lang", locale)
 
 
@@ -141,5 +141,6 @@ def test_demo_share_opens_that_persons_connection_page_and_switches_language(dem
     chosen_language(page, "zh")
     page.reload()
     chosen_language(page, "zh")
+    expect(page.locator("#account-panel")).to_have_attribute("aria-busy", "false")
     page.locator("#connections-panel > summary").click()
     expect(page.locator(".conn").first).to_be_visible()
