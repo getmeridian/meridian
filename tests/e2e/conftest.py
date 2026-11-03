@@ -10,6 +10,8 @@ import ssl
 import sys
 import threading
 from collections.abc import Callable, Iterator
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from time import perf_counter
 from urllib.parse import urlsplit
@@ -26,11 +28,33 @@ from meridian.control.service import ControlService
 from meridian.control.ui_routes import SESSION_COOKIE
 from meridian.core.agent_desired import SystemdUnitResource
 from meridian.core.owner_contact import OwnerContact
+from scripts.build_showcase import export_showcase
 from scripts.showcase_seed import ADMIN_TOKEN, FLEET_ID, seed_service
 from tests.e2e.support import OWNER_PASSWORD, BrowserFaults, ServiceClock
 from tests.support.tls_server import self_signed_cert
 
 FAILED = pytest.StashKey[bool]()
+
+
+class _StaticHandler(SimpleHTTPRequestHandler):
+    def log_message(self, format: str, *args: object) -> None:
+        pass
+
+
+@pytest.fixture(scope="session")
+def demo_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
+    """Build both demos once and serve their unchanged assets over loopback."""
+    directory = tmp_path_factory.mktemp("e2e-showcase")
+    export_showcase(directory / "demo")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_StaticHandler, directory=str(directory)))
+    thread = threading.Thread(target=lambda: server.serve_forever(poll_interval=0.05), daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}/demo"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
 
 
 @pytest.hookimpl(hookwrapper=True)

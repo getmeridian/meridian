@@ -64,3 +64,22 @@ def connections(app: httpx.Client, url: str) -> str:
     configs = json.loads(text)
     assert any(outbound["protocol"] == "vless" for config in configs for outbound in config["outbounds"])
     return text
+
+
+LOCALES = ["en", "ru", "fa", "zh"]
+SCREENS = ["overview", "people", "people/Luma", "servers", "settings"]
+
+
+def language(page: Page, code: str) -> None:
+    page.locator(".account-toggle").click()
+    page.locator("[data-console-language]").select_option(code)
+    expect(page.locator("html")).to_have_attribute("lang", code)
+
+
+def ready(page: Page, route: str) -> None:
+    expect(page.locator("#view h1").first).to_be_visible()
+    if route.startswith("people/"):
+        expect(page.locator("[data-person-action=share]")).to_be_enabled()
+    elif route in {"overview", "people", "servers"}:
+        expect(page.locator("#view")).to_have_attribute("aria-busy", "false")
+    expect(page.locator("#view .spinner:visible")).to_have_count(0)

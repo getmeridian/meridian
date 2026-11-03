@@ -50,3 +50,20 @@ Some macOS agent sandboxes deny Chromium child-process Mach ports. In that
 environment only, use `E2E_SINGLE_PROCESS=1 make e2e` to run full Chromium with its
 renderer and GPU in the browser process, with a fresh browser for each isolated
 context. CI shares one browser and uses the normal process model.
+
+## Layout, accessibility, and public demo
+
+`test_modes_locales_a11y.py` follows saved modes and Detailed bookmarks, guards a
+language change with a live draft, measures Persian mirroring, and adds/shares a
+person through the keyboard. Accessible names come from Playwright ARIA snapshots;
+this is a focused browser check, not an axe audit. The phone table uses one fresh
+service and context per locale, visiting five screens in both themes (40 layouts)
+to avoid reseeding and relaunching a browser for every screen/theme combination.
+
+`demo_url` exports the public demo through `scripts/build_showcase.py` once per
+session into pytest's temporary directory and serves it over loopback. Demo pages
+reuse `visitor`/`context_factory` for the same tracing and network/error guard.
+Each journey starts a new page/context, so adapter mutations stay isolated; the
+shared static recording is never edited. Screen loading follows real fragment
+links, since a demo document reload intentionally resets its in-memory mutations
+and display mode. Language choices travel through `?lang=` across both surfaces.
