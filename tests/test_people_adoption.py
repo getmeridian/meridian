@@ -8,10 +8,9 @@ from unittest.mock import patch
 
 import pytest
 import yaml
-from typer.testing import CliRunner
 
 from meridian.cli import app
-from meridian.cluster import ClusterConfig, ManagedResourceBinding, PanelConfig
+from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler import compile_topology
 from meridian.control.client import ControlClient, ControlServiceUncertain
 from meridian.control.models import UserCreate, UserUpdate
@@ -24,17 +23,8 @@ from meridian.reconciler.retirement import retire, retired_bindings
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.runtime import SetupRuntime
 from tests.support.control_service import ADMIN_TOKEN, FLEET_ID, serve_control
-from tests.support.topology import single_exit_intent
-
-NOW = 1793534400.0
-
-
-def configured(url: str) -> ClusterConfig:
-    return ClusterConfig(
-        panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, sub_path="pages"),
-        topology_intent=single_exit_intent(),
-        fleet_id=FLEET_ID,
-    )
+from tests.support.people_cli import NOW, configured
+from tests.support.people_cli import people_cli as people_cli
 
 
 def legacy(path, *, users=None):
@@ -153,15 +143,6 @@ def test_a_lost_creation_reply_keeps_the_adoption_and_a_retry_keeps_the_original
         assert ClusterConfig.load().people_adoption is None
         with ControlClient(url, ADMIN_TOKEN) as client:
             assert client.get_user("sample") == before
-
-
-@pytest.fixture
-def people_cli(tmp_home, monkeypatch):
-    with serve_control(tmp_home / "service", clock=lambda: NOW) as url:
-        cluster = configured(url)
-        cluster.save()
-        monkeypatch.setattr("meridian.commands.backup.pull_after_mutations", lambda *_args, **_kwargs: None)
-        yield CliRunner(), cluster, ControlClient(url, ADMIN_TOKEN)
 
 
 @pytest.mark.parametrize("origin", ["panel", "formerly-declared"])

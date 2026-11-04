@@ -13,7 +13,7 @@ def run(yes: bool = False, forget_unreachable: bool = False) -> None:
     """Review the compiled topology, confirm, then apply it with checkpoints."""
     operation = OperationContext()
     with error_context("apply", timer=operation.timer):
-        cluster = load_topology_cluster()
+        cluster = load_topology_cluster(warn_adoption=False)
         try:
             run_v4_apply(
                 cluster,

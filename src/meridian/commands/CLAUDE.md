@@ -20,6 +20,7 @@
 ## Pitfalls
 - An account lookup must read current service names; topology names and full `list_users()` reads miss panel renames or widen the read needlessly.
 - People tokens cannot read fleet health; account writes check the authenticated API version header without requiring broader rights.
+- Gate people mutations before prompts and batch writes; account refusals keep their hint and exit 2, while per-name failures use a failed envelope with outcomes.
 - `error_context` supplies metadata but catches nothing: convert library errors with `fail(exc)` inside it.
 - Validate typed requests before opening service or SSH access, and reconstruct untrusted models instead of unchecked `model_copy` updates.
 - JSON mutations require `--yes`; `confirm()` returns a bool, and declining must exit before any write.

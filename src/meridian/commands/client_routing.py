@@ -42,7 +42,10 @@ def run_routing(
             console.fail(t("delivery.control_required"), hint_type="user")
         try:
             with access_panel(cluster) as panel:
+                panel.require_people_service()
                 username = resolve_client_mutation_name(cluster, panel, person)
+                user = panel.get_user(username)
+                assert user is not None
             with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
                 state = client.person_delivery_policy(username)
                 result = ClientRoutingResult(state=state)
@@ -62,7 +65,7 @@ def run_routing(
                         result = ClientRoutingResult(state=preview.after, review=preview, dry_run=True)
                     else:
                         if not yes and not console.confirm(
-                            t("delivery.confirm", name=isolate(username)), default=False
+                            t("delivery.confirm", name=isolate(user.display_name or username)), default=False
                         ):
                             raise typer.Exit(1)
                         try:

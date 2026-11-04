@@ -21,7 +21,7 @@ def run() -> None:
     operation = OperationContext()
     # Exit 2 means "changes pending" to CI, so user errors exit 1 here.
     with error_context("plan", timer=operation.timer, user_error_exit_code=1):
-        cluster = load_topology_cluster()
+        cluster = load_topology_cluster(warn_adoption=False)
         try:
             run_v4_plan(cluster, json_output=is_json_mode(), operation=operation)
         except MeridianError as exc:

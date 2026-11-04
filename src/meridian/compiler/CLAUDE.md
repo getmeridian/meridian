@@ -37,4 +37,4 @@
 - **Every TCP path carries its fingerprint** — empty means Go's ClientHello, a DPI signature; Hysteria2 carries none.
 - **Client Xray JSON's `dns` block stays unused** — the final balancer rule matches every domain first; narrowing it sends plain lookups to resolvers Russia redirects, through DIRECT.
 - **Mihomo IP rules keep `no-resolve`** — local resolution leaks names, and spoofed domestic answers would match `geoip:ru`.
-- **Xray server pools use `leastPing`**; never claim strict-priority failover. **`user:` logical IDs lowercase usernames** while the service keeps their case (`AccessIntent` refuses case-only twins).
+- **Xray server pools use `leastPing`**; never claim strict-priority failover.

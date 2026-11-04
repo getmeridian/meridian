@@ -18,6 +18,7 @@
 ## Pitfalls
 - Never save forgotten bindings or edited topology from a declined or dry-run review.
 - A crash after service commit can leave a pending adoption record; verify the committed fleet, generation, plan and revision before finishing it.
+- Adoption skips conflicting legacy display names with one warning; scope-refused recovery stays pending, and a failed finish never blocks list/show.
 - Never put `control_user` in `FORGET_ONLY`; that cancels pending removals, including saved cut-offs.
 - Empty fleets are valid. Missing people do not degrade fleet health; `test` without a usable person is unavailable evidence.
 - An unreachable handed-over service never falls back to SSH fencing; otherwise a stale copy can apply around the lease.

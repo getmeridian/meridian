@@ -21,7 +21,7 @@
 - Credential rotation composes the existing client status, generation and per-node outcome contracts without returning keys.
 - Fleet documents compare every retained topology field; unedited round trips preserve semantic intent and ordering changes remain visible.
 ## Pitfalls
-- Never export `declared` person flags or topology-removal proposals; people have one service owner.
+- People have one service owner; only 4.x service query rows retain deprecated `declared: false` for old readers. Never export topology-removal proposals.
 - Keep creation seeds outside topology; unknown initial profiles and conflicting delivery defaults must fail before an apply promises them.
 - Redact with `redact_string()` and reveal exact credential paths only; container reveals preserve scalar types and never expose neighboring secrets.
 - Never publish SSH commands, tokens, database URLs, private keys or subscription secrets in ordinary results.

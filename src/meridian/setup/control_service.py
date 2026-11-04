@@ -294,14 +294,15 @@ def verify_control_service(plan: ResourcePlan, cluster: ClusterConfig) -> tuple[
         urls: dict[str, str] = {}
         cursor = None
         while True:
-            page = client.query_people(PeopleQuery(status="active", limit=500, cursor=cursor))
+            page = client.query_people(PeopleQuery(limit=500, cursor=cursor))
             for person in page.users:
                 user = client.get_user(person.username)
                 if user is None:
                     continue
-                document = client.fetch_subscription(user.sub_token, document="json")
-                if not xray_subscription_is_valid(_Document("sub", document)):
-                    raise ResourceReconcileError(f"Canonical subscription for {user.username!r} is invalid.")
+                if user.status == "active":
+                    document = client.fetch_subscription(user.sub_token, document="json")
+                    if not xray_subscription_is_valid(_Document("sub", document)):
+                        raise ResourceReconcileError(f"Canonical subscription for {user.username!r} is invalid.")
                 urls[user.username] = cluster.panel.subscription_url(user.sub_token)
             cursor = page.next_cursor
             if cursor is None:

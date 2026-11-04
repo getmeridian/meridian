@@ -130,13 +130,16 @@ class ControlServiceNotFound(ControlServiceError):
 class ControlServiceConflict(ControlServiceError):
     """The request lost a race or does not fit the object's state (HTTP 409)."""
 
+    def __init__(self, message: str, *, reason: str = "", **kwargs: Any) -> None:
+        self.reason = reason
+        super().__init__(message, **kwargs)
+
 
 class ControlServiceTopologyError(ControlServiceConflict):
-    """A named removal-proposal refusal, for the local CLI's native messages."""
+    """A named topology refusal, for the local CLI's native messages."""
 
     def __init__(self, reason: str, message: str) -> None:
-        self.reason = reason
-        super().__init__(message, category="user")
+        super().__init__(message, reason=reason, category="user")
 
 
 class ControlServicePolicyError(ControlServiceError):
@@ -385,7 +388,15 @@ class ControlClient:
         found: dict[str, UserRecord] = {}
         cursor = None
         while True:
-            page = self.query_people(PeopleQuery(q=name, cursor=cursor, limit=500))
+            try:
+                page = self.query_people(PeopleQuery(q=name, cursor=cursor, limit=500))
+            except ControlServiceScopeError:
+                # Existing read/edit tokens predate the richer query/private grants.
+                return [
+                    user
+                    for user in self.list_users()
+                    if wanted in {user.username.casefold(), user.display_name.casefold()}
+                ]
             for person in page.users:
                 if wanted not in {person.username.casefold(), person.display_name.casefold()}:
                     continue
@@ -643,7 +654,8 @@ class ControlClient:
                 retryable=True,
             ) from exc
         self.has_service_response = True
-        self.service_version = response.headers.get(SERVICE_VERSION_HEADER, "")
+        if SERVICE_VERSION_HEADER in response.headers:
+            self.service_version = response.headers[SERVICE_VERSION_HEADER]
         if response.status_code in (400, 409):
             reason = _error_body(response).get("code")
             if reason in {"stale_topology", "topology_uncommitted"}:
@@ -666,7 +678,9 @@ class ControlClient:
                     hint="Enable daily history with: meridian privacy set --history daily --yes.",
                     category="user",
                 )
-            raise ControlServiceConflict(_message(response), category="user")
+            raise ControlServiceConflict(
+                _message(response), reason=str(_error_body(response).get("code") or ""), category="user"
+            )
         if response.status_code == 403:
             raise ControlServiceScopeError(
                 f"The control service refused the request: {_message(response)}",

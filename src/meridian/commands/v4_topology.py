@@ -16,7 +16,7 @@ from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_resul
 from meridian.core.models import ErrorModel, OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.plan import CompiledPlanDriftResult, CompiledPlanResourceResult, CompiledPlanResult
-from meridian.people_adoption import people_adoption_notice
+from meridian.people_adoption import finish_people_adoption, people_adoption_notice
 from meridian.renderers import emit_json
 from meridian.setup.profile_review import (
     ProfileReviewUnavailableError,
@@ -39,6 +39,7 @@ def run_v4_apply(
     from meridian.core.setup import SetupDraft
     from meridian.servers import ServerRegistry
 
+    finish_people_adoption(cluster)
     adoption = people_adoption_notice(cluster)
     if adoption is not None and not json_output:
         warn(adoption.message)
@@ -175,6 +176,7 @@ def run_v4_plan(
     from meridian.servers import ServerRegistry
     from meridian.setup.runtime import SetupRuntime
 
+    finish_people_adoption(cluster)
     adoption = people_adoption_notice(cluster)
     if adoption is not None and not json_output:
         warn(adoption.message)
@@ -318,6 +320,8 @@ def run_v4_plan(
         for logical_id in inspection.retiring:
             err_console.print(f"  [red]remove[/red] {escape(logical_id)}")
         for change in state_changes:
+            if adoption is not None and change == adoption.message:
+                continue  # Already disclosed before the resource review.
             err_console.print(f"  [yellow]state[/yellow] {escape(change)}")
         if inspection.fence_warning:
             err_console.print(f"\n  [warn]Apply will refuse:[/warn] {escape(inspection.fence_warning)}")

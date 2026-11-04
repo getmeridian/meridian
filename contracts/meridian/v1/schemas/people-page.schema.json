@@ -202,6 +202,14 @@
           "title": "Created At",
           "type": "string"
         },
+        "declared": {
+          "const": false,
+          "default": false,
+          "deprecated": true,
+          "description": "Deprecated 4.x read compatibility only. Always false; every person is service-owned.",
+          "title": "Declared",
+          "type": "boolean"
+        },
         "device_limit": {
           "anyOf": [
             {

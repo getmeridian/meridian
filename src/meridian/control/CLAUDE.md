@@ -27,6 +27,7 @@ Owner console assets: `ui/CLAUDE.md`. Formats: `formats/CLAUDE.md`.
 - Re-check session and token liveness inside each write transaction; pre-body authorization alone permits a revoked tab to write.
 - Declare every API operation and add runnable `ROUTE_SAMPLES`; include conditional credentials and private membership grants.
 - Attach version headers only after authentication; broader fleet health is not a prerequisite for people writes.
+- A headerless route miss never erases a known API version; 4.x people pages retain deprecated `declared: false` for beta-12 readers without restoring ownership rules.
 - Legacy receipts can contain a proposal field: consume it when reading stored receipts, but omit it from current contracts.
 - The ensure route fills empty names inside its transaction so a concurrent rename wins; preserve live settings during adoption; schema backfills validate historical names and skip conflicts instead of blocking startup.
 - Only reviewed profile IDs exempt secret-shaped keys in delivery defaults; all other keys and all values undergo secret validation.

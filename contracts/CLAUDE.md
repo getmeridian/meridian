@@ -34,4 +34,5 @@
 - `--check` gives CI a cheap drift gate before API clients depend on stale shapes.
 ## Pitfalls
 - Keep fixture clocks, operation IDs, and durations fixed so diffs are meaningful.
+- 4.x people pages retain deprecated `declared: false` for beta-12 reads; failed add envelopes may carry successful and failed per-name outcomes.
 - Never write Python-version-dependent text into a contract: `HTTPStatus.phrase` changed in 3.13 (413 "Request Entity Too Large" → "Content Too Large"), so the OpenAPI generator pins RFC 9110 phrases.

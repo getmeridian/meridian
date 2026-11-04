@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import re
+
 from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
 from meridian.console import err_console, fail
 from meridian.control_access import AccessPanel
 from meridian.core.errors import MeridianError
-from meridian.core.inputs import validate_display_name_value
+from meridian.core.inputs import USERNAME_PATTERN, validate_display_name_value
 from meridian.i18n import isolate, t
 from meridian.remnawave import User
 
@@ -32,8 +34,7 @@ def resolve_client_name(cluster: ClusterConfig, name: str, **_options: object) -
     from meridian.control_access import access_panel
 
     try:
-        validate_display_name_value(name)
-        with access_panel(cluster) as panel:
+        with access_panel(cluster, read_only=True) as panel:
             return resolve_client_mutation_name(cluster, panel, name)
     except MeridianError as exc:
         fail(exc)
@@ -44,7 +45,9 @@ def resolve_client_name(cluster: ClusterConfig, name: str, **_options: object) -
 def resolve_client_mutation_name(cluster: ClusterConfig, panel: AccessPanel, name: str) -> str:
     """Exact username wins, then a folded live username or display name; ambiguity refuses."""
     try:
-        name = validate_display_name_value(name)
+        name = name.strip()
+        if re.fullmatch(USERNAME_PATTERN, name) is None:
+            name = validate_display_name_value(name)
     except ValueError as exc:
         fail(f"Invalid client name: {exc}", hint_type="user")
     try:

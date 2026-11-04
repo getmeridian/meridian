@@ -6,7 +6,7 @@ from collections.abc import Callable, Sequence
 
 from meridian import __version__
 from meridian.cluster import ClusterConfig, ClusterConfigExternallyModifiedError
-from meridian.control.client import ControlClient, ControlServiceConflict
+from meridian.control.client import ControlClient, ControlServiceConflict, ControlServiceScopeError
 from meridian.control.models import UserCreate, UserEnsure, UserRecord
 from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.people_seeds import PeopleAdoptionNotice, PeopleSeeds
@@ -57,6 +57,7 @@ def ensure_people(client: ControlClient, seeds: PeopleSeeds) -> list[UserRecord]
     """Create missing seeds and backfill empty names; never replace live settings or names."""
     result = []
     for name in seeds.users:
+        name_conflict = False
         person = client.get_user(name)
         shown = seeds.display_names.get(name, "")
         if person is None:
@@ -64,50 +65,78 @@ def ensure_people(client: ControlClient, seeds: PeopleSeeds) -> list[UserRecord]
             create = UserCreate(username=name, display_name=shown, **(settings.to_data() if settings else {}))
             try:
                 person = client.create_user(create)
-            except ControlServiceConflict:
+            except ControlServiceConflict as exc:
                 # Another invocation may have created this exact seed while this read was in flight.
-                person = client.get_user(name)
-                if person is None:
+                if exc.reason == "user_exists":
+                    person = client.get_user(name)
+                    if person is None:
+                        raise
+                elif exc.reason == "name_conflict" and shown:
+                    name_conflict = True
+                    person = client.create_user(UserCreate(**{**create.to_data(), "display_name": ""}))
+                else:
                     raise
-        if shown and not person.display_name:
+        if shown and not person.display_name and not name_conflict:
             settings = seeds.creation_settings.get(name)
             wanted = UserEnsure(display_name=shown, **(settings.to_data() if settings else {}))
-            person = client.put_user(name, ensure=wanted)
+            try:
+                person = client.put_user(name, ensure=wanted)
+            except ControlServiceConflict as exc:
+                if exc.reason != "name_conflict":
+                    raise
+                name_conflict = True
+        if name_conflict:
+            from meridian.console import warn
+
+            warn(f"Kept '{name}' without its legacy display name because that name belongs to another person.")
         result.append(person)
     return result
 
 
+def resolve_creation_request(client: ControlClient, request: UserCreate) -> UserRecord | None:
+    """Resolve a seed with exact username precedence, refusing ambiguous live names."""
+    name = request.username or request.display_name
+    matches = client.matching_users(name)
+    if len(matches) > 1:
+        raise MeridianError(
+            f"Name '{name}' matches several people: " + ", ".join(user.username for user in matches),
+            hint="Use an exact service username in setup.",
+            category="user",
+        )
+    return matches[0] if matches else None
+
+
 def ensure_creation_requests(client: ControlClient, requests: Sequence[UserCreate]) -> list[UserRecord]:
-    """Setup seeds create missing service people; explicit saved usernames keep their identity."""
+    """Setup seeds create missing service people, resolving every request against live names."""
     result = []
     for request in requests:
-
-        def existing() -> UserRecord | None:
-            if request.username is not None:
-                return client.get_user(request.username)
-            matches = client.matching_users(request.display_name)
-            if len(matches) > 1:
-                raise MeridianError(
-                    f"Name '{request.display_name}' matches several people: "
-                    + ", ".join(user.username for user in matches),
-                    hint="Use an exact service username in setup.",
-                    category="user",
-                )
-            return matches[0] if matches else None
-
-        person = existing()
+        person = resolve_creation_request(client, request)
         if person is None:
             try:
                 person = client.create_user(request)
             except ControlServiceConflict:
-                person = existing()
+                person = resolve_creation_request(client, request)
                 if person is None:
                     raise
         result.append(person)
     return result
 
 
-def finish_people_adoption(cluster: ClusterConfig, *, persist: Callable[[ClusterConfig], None] | None = None) -> None:
+def finish_people_adoption(
+    cluster: ClusterConfig, *, persist: Callable[[ClusterConfig], None] | None = None, read_only: bool = False
+) -> None:
+    """Resume a handover; an unavailable finish must not block an account read."""
+    try:
+        _finish_people_adoption(cluster, persist=persist)
+    except MeridianError as exc:
+        if not read_only:
+            raise
+        from meridian.console import warn
+
+        warn(f"Could not finish moving people to the control service: {exc}. {exc.hint}")
+
+
+def _finish_people_adoption(cluster: ClusterConfig, *, persist: Callable[[ClusterConfig], None] | None) -> None:
     """Resume only a committed handover; a partial finish retains every seed for retry."""
     adoption = cluster.people_adoption
     if adoption is None:
@@ -117,7 +146,10 @@ def finish_people_adoption(cluster: ClusterConfig, *, persist: Callable[[Cluster
             # Recover a crash between the service commit and the local committed checkpoint.
             if cluster.pending_generation or not cluster.active_plan_hash:
                 return
-            fence = client.fence()
+            try:
+                fence = client.fence()
+            except ControlServiceScopeError:
+                return
             record = fence.record
             if (
                 record is None
@@ -127,22 +159,29 @@ def finish_people_adoption(cluster: ClusterConfig, *, persist: Callable[[Cluster
                 or record.revision is None
             ):
                 return
-            revision = client.revision(record.revision)
+            try:
+                revision = client.revision(record.revision)
+            except ControlServiceScopeError:
+                return
             if revision is None or revision.status != "applied" or revision.intent.get("access", {}).get("users"):
                 return
         require_people_service(client)
         ensure_people(client, adoption)
+    bindings, checkpoints = cluster.managed_bindings, cluster.action_checkpoints
+    forget_adopted_people(cluster)
     cluster.people_adoption = None
     try:
         (persist or (lambda state: state.save()))(cluster)
     except (ClusterConfigExternallyModifiedError, OSError, ValueError) as exc:
         cluster.people_adoption = adoption
+        cluster.managed_bindings, cluster.action_checkpoints = bindings, checkpoints
         raise LocalStateError(
             "People moved to the service, but their adoption checkpoint could not be saved.",
             hint="Repair cluster.yml persistence, then rerun `meridian apply` to finish the checkpoint.",
         ) from exc
     except BaseException:
         cluster.people_adoption = adoption
+        cluster.managed_bindings, cluster.action_checkpoints = bindings, checkpoints
         raise
 
 

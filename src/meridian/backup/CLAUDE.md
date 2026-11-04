@@ -24,6 +24,7 @@
 - **Mark the new server's fence.json handed over** — otherwise an apply during an outage takes the lease over SSH around the service.
 - **Never read the recovery key from argv** — shell history and `ps` keep it; ask with a hidden prompt or read stdin.
 - **Checkpoint before deleting what a rerun needs** — the staged database goes only after `loaded` is saved.
+- **Adoption uses the restorer's persistence callback** — every post-apply finish must preserve the destination checkpoint writer.
 - **Restore above every epoch the agents may hold** — they refuse anything lower, so count earlier restores and saved snapshots.
 - **An older snapshot revives what was revoked since** (tokens, devices, people) — take the newest by default and warn when `--snapshot` names an older one.
 - **An unfinished restore never travels** — deposits keep only a finished record, or a fresh context chases a dead target.

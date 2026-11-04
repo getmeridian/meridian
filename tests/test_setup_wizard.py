@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from types import SimpleNamespace
 from typing import cast
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -101,6 +102,34 @@ class _Runtime:
             )
             for name in usernames
         ]
+
+    def resolve_people(self, draft):
+        return [request.username or request.display_name for request in draft.access.people]
+
+
+def test_a_repeat_wizard_hands_off_only_its_resolved_seeds_not_every_verified_person(tmp_path):
+    _store, shelf, service = _services(tmp_path)
+    io = _ScriptedIO([*_TWO_SERVER_JOURNEY, ("Set this up now?", "yes")])
+    runtime = _Runtime()
+    runtime.verify = MagicMock(
+        return_value=SetupVerification(
+            plan_hash="a" * 64,
+            node_count=1,
+            subscription_urls={
+                "default": "https://panel.example/sub/default",
+                "outsider": "https://panel.example/sub/outsider",
+            },
+        )
+    )
+    runtime.resolve_people = MagicMock(return_value=["resolved-sample"])
+    runtime.handoff = MagicMock(wraps=runtime.handoff)
+    wizard = SetupWizard(
+        service=service, shelf=shelf, runtime=cast(SetupRuntime, runtime), register_server=lambda *_args: None, io=io
+    )
+    assert wizard.run() == "completed"
+    runtime.handoff.assert_called_once_with(["resolved-sample"])
+    output = "\n".join(io.output)
+    assert "resolved-sample" in output and "outsider" not in output
 
 
 def _services(tmp_path):

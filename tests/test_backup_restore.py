@@ -24,6 +24,7 @@ from meridian.control.enrollment import token_sha256
 from meridian.control.server import ControlServer
 from meridian.control.service import ControlService
 from meridian.control.snapshot import decrypt_snapshot
+from meridian.core.people_seeds import PeopleAdoption
 from meridian.core.topology import SetupIntent
 from meridian.reconciler.fence import FleetFenceError, LocalFenceView
 from meridian.servers import ServerEntry, ServerRegistry
@@ -162,6 +163,30 @@ def test_a_restore_rebuilds_the_service_at_the_next_epoch(
     assert [links.username for links in outcome.links] == ["alice", "bob", "carol"]
     assert all(links.subscription_url and OLD not in links.subscription_url for links in outcome.links)
     assert len(new_server.applies) == 1
+
+
+def test_restore_finishes_people_through_the_restorers_checkpoint_writer(fleet, new_server, monkeypatch):
+    from meridian.people_adoption import finish_people_adoption
+
+    monkeypatch.setattr(restore_steps, "service_answers", lambda url, token: False)
+    cluster, snapshot = fleet
+    restorer, target = _restorer(cluster)
+    saved = []
+
+    def persist(state):
+        saved.append(state.people_adoption)
+        state.save()
+
+    restorer._persist = persist
+
+    def finish(state, *, persist):
+        assert persist is restorer._persist
+        state.people_adoption = PeopleAdoption(state="committed", users=["alice"])
+        finish_people_adoption(state, persist=persist)
+
+    monkeypatch.setattr("meridian.people_adoption.finish_people_adoption", finish)
+    restorer.run(restorer.review(target, _source(snapshot)), new_server.apply)
+    assert saved and cluster.people_adoption is None
 
 
 def test_the_review_says_a_bare_ip_fleets_links_change_and_a_domain_fleets_do_not(

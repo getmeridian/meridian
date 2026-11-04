@@ -110,14 +110,14 @@ def run_show(name: str, *, connections: bool = False) -> None:
 
 
 def _show(*, name: str, operation: OperationContext, connections: bool = False) -> None:
-    cluster = load_topology_cluster()
+    cluster = load_topology_cluster(read_only=True)
     name = resolve_client_name(cluster, name)
 
     def share_url(panel_user: PanelUserLike) -> str:
         return page_url(cluster, panel_user)
 
     try:
-        panel = access_panel(cluster)
+        panel = access_panel(cluster, read_only=True)
         result = collect_client_show(
             panel,
             name,
@@ -204,9 +204,9 @@ def _list(*, operation: OperationContext, query: PeopleQuery) -> None:
     from rich.box import ROUNDED
     from rich.table import Table
 
-    cluster = load_topology_cluster()
+    cluster = load_topology_cluster(read_only=True)
     try:
-        with access_panel(cluster) as panel:
+        with access_panel(cluster, read_only=True) as panel:
             page, users = panel.query_users(query, include_metadata=is_json_mode())
         listed = build_client_list_result(
             users,
@@ -337,6 +337,10 @@ def run_reissue(name: str, yes: bool = False, cut_off: bool = False) -> None:
             )
         cluster = load_topology_cluster()
         with access_panel(cluster) as panel:
+            try:
+                panel.require_people_service()
+            except MeridianError as exc:
+                fail(exc)
             name = resolve_client_mutation_name(cluster, panel, name)
             person = get_user_or_fail(panel, name, action="load")
             assert person is not None

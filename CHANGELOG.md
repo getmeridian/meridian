@@ -22,7 +22,11 @@ newest first; the last is what 4.0 changes compared with 3.x.
 - Every person is managed by the control service. The next reviewed apply moves
   existing people without deleting them; CLI add and remove act immediately,
   people added in the web panel work with every client command, and the web
-  panel can reissue, rotate, and remove everyone, alone or in bulk (#95).
+  panel can reissue, rotate, and remove everyone, alone or in bulk. Interrupted
+  handovers resume before review, conflicting old names warn without blocking
+  reads, and setup hands off only its people using their live usernames. People
+  commands accept full-length usernames, refuse old services before confirmation,
+  and report partial add failures; beta-12 service reads stay compatible (#95).
 - `meridian restore` ends with a one-time setup link for the restored web panel,
   then lists other computers' backup keys and offers to revoke any you no longer
   hold, such as a lost laptop's. On a machine without a backup key of its own, it

@@ -176,7 +176,7 @@ meridian client remove NAME... [--dry-run] [--yes] [--json]
 
 **`client rotate-credentials`** — 需要更换连接凭据并保留链接时，执行 `meridian client rotate-credentials NAME --yes`。它生成新的 VLESS UUID 和 Hysteria2 密码，保留订阅令牌、页面 URL、设备登记、状态、限额、到期时间、流量、备注、标签和语言。应用下次刷新订阅时获取新密钥；请用户立即刷新。各节点应用变更后会阻止旧身份的新数据流。若订阅 URL 本身泄露，请使用 `client reissue`；该命令签发新 URL 并清除设备登记。
 
-网页面板为在面板添加的用户提供**更换连接密钥**。配置文件声明的用户通过 CLI 操作，遵循与重新签发链接相同的所有权规则。JSON 模式需要 `--yes`，结果 `client-rotate-credentials` 包含凭据代次和每个节点的 `flow_blocks`。可选 `--cut-off` 也结束现有数据流；确认前会说明重置入站或重启整个节点核心的影响。
+网页面板为每位用户提供**更换连接密钥**，使用与 CLI 相同的服务操作。 JSON 模式需要 `--yes`，结果 `client-rotate-credentials` 包含凭据代次和每个节点的 `flow_blocks`。可选 `--cut-off` 也结束现有数据流；确认前会说明重置入站或重启整个节点核心的影响。
 
 **`client reissue`** — 在链接泄露后替换客户端的链接。控制服务生成新的订阅 ID 和新的密钥，因此旧的订阅 URL、连接页面和链接全部失效。Meridian 打印新的订阅 URL，它同时打开新的连接页面。状态、限额和到期时间保持不变。除非 `--yes`，否则要求确认；不属于你的客户端的名称会被拒绝。
 
@@ -221,7 +221,7 @@ JSON 筛选计数对所有有效标签均保持整数，包括 `TOKEN` 和 `API_
 | `meridian client bulk tag --set-tag none` | 设置或清除标签 |
 | `meridian client bulk devices --devices unlimited` | 设置设备限制 |
 | `meridian client bulk renewal --renew-days 30 --renewals 5` | 设置或清除续期 |
-| `meridian client bulk delete` | 删除服务人员，为已声明人员返回一个本地提案 |
+| `meridian client bulk delete` | 通过服务的冻结预览和提交原子删除用户 |
 | `meridian client bulk undo ID` | 十分钟内撤销可逆字段 |
 | `meridian client bulk receipt ID` | 读取持久回执 |
 
@@ -468,7 +468,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 | `--dry-run` | | `fleet routing`、`fleet import`：显示变更和审查结果，不应用任何内容 |
 | `--forget-unreachable` | | `fleet import`：忘记已移除且 SSH 端口无响应的服务器上部署的内容 |
 
-**`fleet status`** — 控制服务健康状态、每个 agent 的最近报告及其是否已应用当前配置、中继监听端口以及客户端数量。已声明但缺失的客户端会使健康状态降级；已禁用、达到限额或过期的客户端会正常统计，属于你的主动设置而非故障。中继监听端口可达只能证明 TCP 连通，因此未经完整验证的中继路由会使健康状态保持为 `unknown`；请用 `meridian test` 测试完整路径。退出码 `0` 表示健康，`4` 表示降级，`3` 表示未知。
+**`fleet status`** — 控制服务健康状态、每个 agent 的最近报告及其是否已应用当前配置、中继监听端口以及客户端数量。没有用户不会降低健康状态；已禁用、达到限额或过期的客户端会正常统计，属于你的主动设置而非故障。中继监听端口可达只能证明 TCP 连通，因此未经完整验证的中继路由会使健康状态保持为 `unknown`；请用 `meridian test` 测试完整路径。退出码 `0` 表示健康，`4` 表示降级，`3` 表示未知。
 
 `active` 列统计最近一次报告中流量有所增长的人数，报告采集时间显示在表格下方。迟到的旧报告不会覆盖较新的活跃数据。节点流量总计在计数器更换周期后仍会保留；`traffic_counting_since` 标记完整持久统计的起点，升级前仅补入仍保留的计数证据。
 

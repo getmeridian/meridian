@@ -56,7 +56,7 @@ def fail_meridian_v3_state() -> NoReturn:
     )
 
 
-def load_topology_cluster() -> ClusterConfig:
+def load_topology_cluster(*, warn_adoption: bool = True) -> ClusterConfig:
     """Load a cluster that has a reviewed topology, or explain how to get one."""
     cluster = load_cluster()
     if cluster.topology_intent is not None:
@@ -64,7 +64,7 @@ def load_topology_cluster() -> ClusterConfig:
         from meridian.people_adoption import people_adoption_notice
 
         notice = people_adoption_notice(cluster)
-        if notice is not None and not is_json_mode():
+        if warn_adoption and notice is not None and not is_json_mode():
             warn(notice.message + " Run `meridian apply` to finish the move.")
         return cluster
     if has_meridian_v3_state():
@@ -82,15 +82,19 @@ def load_topology_cluster() -> ClusterConfig:
     )
 
 
-def load_people_cluster() -> ClusterConfig:
+def load_people_cluster(*, read_only: bool = False) -> ClusterConfig:
     """Load a fleet and resume a committed people handover through the CLI error boundary."""
-    from meridian.people_adoption import finish_people_adoption
+    from meridian.console import is_json_mode, warn
+    from meridian.people_adoption import finish_people_adoption, people_adoption_notice
 
-    cluster = load_topology_cluster()
+    cluster = load_topology_cluster(warn_adoption=False)
     try:
-        finish_people_adoption(cluster)
+        finish_people_adoption(cluster, read_only=read_only)
     except MeridianError as exc:
         fail(exc)
+    notice = people_adoption_notice(cluster)
+    if notice is not None and not is_json_mode():
+        warn(notice.message + " Run `meridian apply` to finish the move.")
     return cluster
 
 

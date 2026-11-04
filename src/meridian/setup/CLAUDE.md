@@ -14,6 +14,7 @@
 
 ## Pitfalls
 - **Wizard names resolve through the service** — local transliteration can select another person whose username was taken; preserve only explicit saved usernames and let the service assign new ones.
+- **Handoff resolves only draft seeds** — use live usernames for traffic tests and links; verification preserves every status's URL but checks documents only for active people.
 - **A missing profile route proves absence only while health answers** — a service older than profiles has no such route, so `plan` before an upgrade read it as an outage; a 404 without a healthy service stays unavailable.
 - **Profile discovery reads the private catalog** — declarations, named profiles, and non-default memberships all require review, even when the settings map and fingerprint are absent.
 - **Every apply checks profile declarations before the fence** — use `profile_review.py` to compare live intent-level grants; a saved but unapplied edit must not ride the next imperative command, and live maps without a fingerprint need review.

@@ -93,6 +93,10 @@ class ServiceAccessPanel:
         require_people_service(self._client)
         return self._user(_translated(lambda: self._client.create_user(create)))
 
+    def require_people_service(self) -> None:
+        """Refuse unavailable credentials or an older service before reviewing a mutation."""
+        _translated(lambda: require_people_service(self._client))
+
     def delete_user(self, name: str) -> None:
         require_people_service(self._client)
         _translated(lambda: self._client.delete_user(name))
@@ -367,9 +371,9 @@ AccessPanel = ServiceAccessPanel
 FleetPanel = ServiceFleetPanel
 
 
-def access_panel(cluster: ClusterConfig) -> AccessPanel:
+def access_panel(cluster: ClusterConfig, *, read_only: bool = False) -> AccessPanel:
     """The fleet's user directory: Meridian's control service."""
-    finish_people_adoption(cluster)
+    finish_people_adoption(cluster, read_only=read_only)
     return ServiceAccessPanel(cluster.panel.url, cluster.panel.api_token)
 
 

@@ -1,4 +1,4 @@
-"""Rotate declared people's connection keys while preserving their subscription URLs."""
+"""Rotate people's connection keys while preserving their subscription URLs."""
 
 from __future__ import annotations
 
@@ -8,10 +8,11 @@ from meridian.commands._helpers import load_people_cluster as load_topology_clus
 from meridian.commands.client_handoff import resolve_client_mutation_name
 from meridian.commands.node_command_results import cut_off_disclosure, print_command_results
 from meridian.console import confirm, error_context, fail, is_json_mode, ok, warn
-from meridian.control.client import ControlServiceCredentialsChanged, ControlServiceError
+from meridian.control.client import ControlServiceCredentialsChanged
 from meridian.control_access import access_panel
 from meridian.core.client_credentials import ClientCredentialRotationResult, RotatedClient
 from meridian.core.client_sessions import CredentialRotationRequest
+from meridian.core.errors import MeridianError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.i18n import isolate, t
@@ -33,6 +34,7 @@ def run_rotate_credentials(name: str, *, yes: bool = False, cut_off: bool = Fals
         cluster = load_topology_cluster()
         try:
             with access_panel(cluster) as panel:
+                panel.require_people_service()
                 name = resolve_client_mutation_name(cluster, panel, name)
                 before = panel.user_credentials(name)
                 if before is None:
@@ -57,7 +59,7 @@ def run_rotate_credentials(name: str, *, yes: bool = False, cut_off: bool = Fals
             if is_json_mode():
                 fail(exc)
             fail(t("client.credentials_changed"), hint=t("client.credentials_refresh_hint"), hint_type="user")
-        except ControlServiceError as exc:
+        except MeridianError as exc:
             fail(exc)
         outcomes = wait_commands(cluster, rotated.commands) if cut_off else None
         code = command_exit_code(outcomes or [])

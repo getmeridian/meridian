@@ -309,7 +309,7 @@ class ControlRestorer:
             self._checkpoint(restore, "applied")
         from meridian.people_adoption import finish_people_adoption
 
-        finish_people_adoption(self.cluster)
+        finish_people_adoption(self.cluster, persist=self._persist)
         links: list[HandoffLinks] = []
         links_error = ""
         if restore.links_change:

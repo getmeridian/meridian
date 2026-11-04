@@ -35,6 +35,7 @@ def run_set_profiles(name: str, profiles: list[str], *, dry_run: bool, yes: bool
     require_profile_backend(require_intent(cluster), requested=True)
     try:
         with access_panel(cluster) as panel:
+            panel.require_people_service()
             name = resolve_client_mutation_name(cluster, panel, name)
             user = panel.get_user(name)
             if user is None:

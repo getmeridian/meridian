@@ -267,7 +267,15 @@
           "type": "string"
         },
         "data": {
-          "$ref": "#/$defs/EmptyData"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClientAddResult"
+            },
+            {
+              "$ref": "#/$defs/EmptyData"
+            }
+          ],
+          "title": "Data"
         },
         "duration_ms": {
           "title": "Duration Ms",

@@ -216,7 +216,7 @@ Use `meridian client rotate-credentials NAME --yes` when connection credentials 
 meridian client rotate-credentials alice --yes
 ```
 
-The web panel offers **Rotate connection keys** for people added there. Declared people use the CLI, following the same ownership rule as reissue. CLI JSON requires `--yes` and returns `client-rotate-credentials`, including the generation and per-node `flow_blocks`. Optional `--cut-off` also ends existing flows with the disclosed shared-inbound reset or node-wide core restart.
+The web panel offers **Rotate connection keys** for every person, using the same service operation as the CLI. JSON requires `--yes` and returns `client-rotate-credentials`, including the generation and per-node `flow_blocks`. Optional `--cut-off` also ends existing flows with the disclosed shared-inbound reset or node-wide core restart.
 
 
 ## Replacing a leaked link
@@ -227,7 +227,7 @@ If a client's link or connection page reaches someone it shouldn't, replace it:
 meridian client reissue alice
 ```
 
-In the web panel, reissue and removal use the same review: the session cut-off checkbox starts off, affected nodes are listed, and you confirm before anything changes. Repeated reissue clicks submit one change. Reissue refreshes the new link and shows per-node results separately; a failed or timed-out cut-off does not undo the new credentials. Declared people show the CLI command.
+In the web panel, reissue and removal use the same review: the session cut-off checkbox starts off, affected nodes are listed, and you confirm before anything changes. Repeated reissue clicks submit one change. Reissue refreshes the new link and shows per-node results separately; a failed or timed-out cut-off does not undo the new credentials.
 
 The control service gives the client a new subscription ID and new keys. The old subscription URL and connection page return 404, and the servers refuse the old keys. Meridian prints the new subscription URL, which also opens the new connection page. They import the new link once: their apps can't follow a subscription URL that no longer exists. Status, traffic limit and usage, expiry, and the device cap stay. Registered devices are cleared.
 
@@ -318,7 +318,7 @@ Removing a passkey prevents new sign-ins and signs out every other browser sessi
 | **Settings**: default page and app language, owner notice for everyone, subscription format preview, and **Privacy** (device limits and daily usage history); **Security** holds password, sign-in code, passkeys, and signed-in devices | **Revisions** and **Settings**: every change applied from your computer, plus the subscription title, public address, client routing policy, and public owner contact |
 | **Tokens**: create and revoke scoped API tokens | |
 
-Changes in the web panel and in the CLI are the same changes: `meridian client list` shows people added in the web panel too, and applies never undo a status, limit, or expiry set in either. People you added with `meridian client add` stay yours on the CLI: the web panel can change their limits and status, but removing them or issuing a new link prints the `meridian client` command instead, because those people belong to the reviewed topology. Every person, including those added in the web panel, gets a connection page at their subscription URL.
+The web panel and CLI manage the same service-owned people. `meridian client list` includes people added in either surface. Both can add, remove, reissue and rotate every person; applies never undo status, limits or expiry. Every person gets a connection page at their subscription URL.
 
 The web panel never holds SSH keys, so a stolen session can't change your servers. Every sign-in expires after 30 minutes idle and 12 hours at most, and creating a token requires recent password/TOTP or passkey confirmation.
 
@@ -557,7 +557,7 @@ Losing a grant removes the connection from every subscription format, individual
 
 Every unresolved receipt contributes its inbounds, regardless of its current reason. Rotating connection keys, reissuing a link, replacing keys and profiles together through import, or re-enabling a person after narrowing access keeps lost inbounds in the cut-off review until blocking is confirmed or the same key regains access.
 
-Removing a profile still used by people is refused with its membership count. Move those people to other profiles first. Ordinary applies never replace membership. Snapshots preserve every person's memberships; a replacing user import preserves them when `profiles` is omitted. Fleet export carries declared people's current memberships as creation-only settings, so a new fleet can recreate them while existing people retain their operator-owned choices. Console-only people remain service data in the snapshot.
+Removing a profile still used by people is refused with its membership count. Move those people to other profiles first. Ordinary applies never replace membership. Snapshots preserve every person's memberships; a replacing user import preserves them when `profiles` is omitted. Fleet export carries topology and profile grants; every person's memberships remain service data in the snapshot.
 
 Restore also preserves earlier profile use and refuses snapshot profiles that differ from local intent before staging or target access. It compares stored declarations, or the exact compiled map for an unstamped snapshot. Restore matching state first, then review the desired saved change with `meridian apply`; `--force` cannot bypass the match. See [Recovery](/en/recovery/).
 

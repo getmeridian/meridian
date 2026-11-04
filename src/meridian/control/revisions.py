@@ -77,8 +77,7 @@ _SECRET_VALUES = (
 def secret_paths(value: Any, path: str = "") -> list[str]:
     """JSON paths in a topology intent whose key names a secret or whose text holds one; empty means secret-free.
 
-    Declared usernames may key creation-setting mappings or display-name strings,
-    so `token` may be a person; declared profile IDs may key delivery defaults.
+    Declared profile IDs may key delivery defaults.
     Any other secret-shaped key still counts.
     """
     if path:

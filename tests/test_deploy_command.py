@@ -120,12 +120,14 @@ def test_cancel_file_stops_a_machine_deploy_before_it_connects(tmp_home: Path, m
     resolve_server.assert_not_called()
 
 
-def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypatch) -> None:
+@pytest.mark.parametrize("typed", ["alice", "Alice", "Display"])
+def test_deploy_hands_off_and_tests_the_resolved_person_not_the_typed_alias(tmp_home: Path, monkeypatch, typed) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
     conn = MagicMock(port=22, identity_file="")
     resolved = SimpleNamespace(ip="198.51.100.10", user="root", port=22, machine_id="", conn=conn)
     runtime = MagicMock()
     runtime.apply.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)
+    runtime.resolve_people.return_value = ["alice"]
     runtime.handoff.return_value = [
         HandoffLinks(
             "alice",
@@ -139,20 +141,21 @@ def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypa
         patch("meridian.commands.deploy.ensure_server_connection", return_value=resolved),
         patch("meridian.commands.deploy.check_ports") as check_ports,
         patch("meridian.commands.deploy._camouflage_candidates", return_value=["www.google.com"]),
-        patch("meridian.commands.deploy._verify_traffic", return_value=("ok", "exit IP 198.51.100.10")),
+        patch("meridian.commands.deploy._verify_traffic", return_value=("ok", "exit IP 198.51.100.10")) as traffic,
         patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
     ):
-        result = _invoke(["deploy", "198.51.100.10", "--client-name", "alice", "--no-geo-block", "--yes", "--json"])
+        result = _invoke(["deploy", "198.51.100.10", "--client-name", typed, "--no-geo-block", "--yes", "--json"])
 
     assert result.exit_code == 0, result.output
     check_ports.assert_called_once()
     draft = runtime.apply.call_args.args[0]
     intent = draft.to_intent()
-    assert [person.username for person in draft.access.people] == ["alice"]
+    assert [person.display_name for person in draft.access.people] == [typed]
     assert "users" not in intent.access.to_data()
     assert intent.exits[0].geo_block is False and intent.harden is True
     runtime.verify.assert_called_once()
     runtime.handoff.assert_called_once_with(["alice"])
+    assert traffic.call_args.args == ("198.51.100.10", "alice")
     data = json.loads(result.stdout)["data"]
     assert data["mode"] == "first_deploy"
     assert data["sni"] == "www.google.com"
@@ -163,6 +166,7 @@ def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypa
 def _fake_runtime() -> MagicMock:
     runtime = MagicMock()
     runtime.apply.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)
+    runtime.resolve_people.return_value = ["default"]
     runtime.handoff.return_value = [HandoffLinks("default", subscription_url="https://198.51.100.10/p/sub/s")]
     return runtime
 

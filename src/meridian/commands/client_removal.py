@@ -22,6 +22,10 @@ def run_reviewed_removal(
     with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
         require_people_service(client)
         preview = client.preview_bulk(BulkPreviewRequest(action=BulkAction(action="delete"), usernames=names))
+        display_names = {}
+        for person in preview.people:
+            user = client.get_user(person.username)
+            display_names[person.username] = user.display_name if user is not None else ""
         if not is_json_mode():
             preview_table(preview.people)
         receipt = None
@@ -37,7 +41,8 @@ def run_reviewed_removal(
                 receipt = reconcile_receipt(client, preview.id)
     result = ClientRemoveResult(
         clients=[
-            ClientReference(username=person.username, display_name=person.display_name) for person in preview.people
+            ClientReference(username=person.username, display_name=display_names[person.username])
+            for person in preview.people
         ],
         review_hash=preview.preview_hash,
         preview=preview,

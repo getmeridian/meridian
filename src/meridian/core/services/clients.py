@@ -82,7 +82,9 @@ def collect_client_show(
         connections = read_connections(username) if read_connections else None
         access = (
             read_access(username)
-            if read_access and (read_default_access or getattr(user, "profiles", ["default"]) != ["default"])
+            if read_access
+            and getattr(user, "profiles", ["default"])
+            and (read_default_access or getattr(user, "profiles", ["default"]) != ["default"])
             else None
         )
     return ClientShowServiceResult(

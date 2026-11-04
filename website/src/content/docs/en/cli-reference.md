@@ -176,7 +176,7 @@ First reported traffic and the last reporting node come from accepted traffic gr
 
 **`client rotate-credentials`** — Use `meridian client rotate-credentials NAME --yes` when connection credentials need replacing. It generates a new VLESS UUID and Hysteria2 auth while keeping the subscription token, page URL, device registrations, status, limits, expiry, traffic, notes, tags, and language. Apps receive the keys on their next subscription refresh; ask the person to refresh now. Old identities lose new streams as each node applies the change. A leaked subscription URL requires `client reissue`, which issues a new URL and clears device registrations.
 
-The web panel offers **Rotate connection keys** for people added there. Declared people use the CLI, following the same ownership rule as reissue. CLI JSON requires `--yes` and returns `client-rotate-credentials`, including the generation and per-node `flow_blocks`. Optional `--cut-off` also ends existing flows with the disclosed shared-inbound reset or node-wide core restart.
+The web panel offers **Rotate connection keys** for every person, using the same service operation as the CLI. JSON requires `--yes` and returns `client-rotate-credentials`, including the generation and per-node `flow_blocks`. Optional `--cut-off` also ends existing flows with the disclosed shared-inbound reset or node-wide core restart.
 
 **`client reissue`** — replaces a client's links after a leak. The control service issues a new subscription ID and new keys, so the old subscription URL, connection page, and links stop working. Meridian prints the new subscription URL, which also opens the new connection page. Status, limits, and expiry stay as set. Asks for confirmation unless `--yes`, and refuses names that aren't your clients.
 
@@ -221,7 +221,7 @@ Undo writes the original choices, then enforces expiry and quota rules just like
 | `meridian client bulk tag --set-tag none` | Set or clear tag |
 | `meridian client bulk devices --devices unlimited` | Set device cap |
 | `meridian client bulk renewal --renew-days 30 --renewals 5` | Set or clear renewal |
-| `meridian client bulk delete` | Delete service-only people; one local proposal for declared people |
+| `meridian client bulk delete` | Delete people atomically through a frozen service preview and commit |
 | `meridian client bulk undo ID` | Undo reversible fields within ten minutes |
 | `meridian client bulk receipt ID` | Read a durable receipt |
 
@@ -468,7 +468,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 | `--dry-run` | | `fleet routing`, `fleet import`: show the changes and the review, apply nothing |
 | `--forget-unreachable` | | `fleet import`: forget what was deployed on a removed server whose SSH port does not answer |
 
-**`fleet status`** — control service health, each agent's last report and whether it applied the current configuration, relay listeners, and client counts. Missing declared clients degrade health; disabled, limited, or expired clients are counted but are your choice, not a fault. A reachable relay listener only proves TCP, so unverified relay routes keep health `unknown`; use `meridian test` to check the full path. Exit `0` means healthy, `4` degraded, and `3` unknown.
+**`fleet status`** — control service health, each agent's last report and whether it applied the current configuration, relay listeners, and client counts. An empty people directory does not degrade health; disabled, limited, or expired clients are counted but are your choice, not a fault. A reachable relay listener only proves TCP, so unverified relay routes keep health `unknown`; use `meridian test` to check the full path. Exit `0` means healthy, `4` degraded, and `3` unknown.
 
 The `active` column counts people with growth in the last report, with its collection time shown below. A delayed older window cannot replace newer activity. Node byte totals survive counter epochs; `traffic_counting_since` marks complete durable accounting, with only retained evidence backfilled from before migration.
 

@@ -26,7 +26,12 @@ from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
 from meridian.fleet_contexts import refuse_if_superseded, refuse_servers_claimed_elsewhere
 from meridian.handoff import HandoffLinks, client_handoffs
-from meridian.people_adoption import ensure_creation_requests, finish_people_adoption, forget_adopted_people
+from meridian.people_adoption import (
+    ensure_creation_requests,
+    finish_people_adoption,
+    forget_adopted_people,
+    resolve_creation_request,
+)
 from meridian.reconciler.control_service_driver import ControlServiceDriver, ControlServiceDriverContext
 from meridian.reconciler.fence import ApplyFence, local_fence_view
 from meridian.reconciler.render_contract import RENDERER_CONTRACT
@@ -395,6 +400,20 @@ class SetupRuntime:
             subscription_urls=urls,
             panel_version=service_version,
         )
+
+    def resolve_people(self, draft: SetupDraft) -> list[str]:
+        """Read only the draft's seeds and return their current service usernames for handoff."""
+        from meridian.control.client import ControlClient
+
+        cluster = self._cluster_loader()
+        usernames = []
+        with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
+            for request in draft.access.people if draft.access is not None else []:
+                person = resolve_creation_request(client, request)
+                if person is None:
+                    raise LocalStateError(f"Setup person '{request.name}' no longer exists in the control service.")
+                usernames.append(person.username)
+        return usernames
 
     def handoff(self, usernames: Sequence[str]) -> list[HandoffLinks]:
         """Read connection links for verified users from the control service."""

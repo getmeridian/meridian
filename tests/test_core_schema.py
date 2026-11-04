@@ -149,20 +149,21 @@ def test_command_catalog_distinguishes_process_interrupts_from_json_outcomes() -
 
 
 @pytest.mark.parametrize(
-    ("command", "envelope_name", "data_model"),
+    ("command", "envelope_name", "data_model", "failure_models"),
     [
-        ("client.add", "client-add-envelope", "ClientAddResult"),
-        ("client.remove", "client-remove-envelope", "ClientRemoveResult"),
-        ("client.enable", "client-enable-envelope", "ClientStatusResult"),
-        ("client.disable", "client-disable-envelope", "ClientStatusResult"),
-        ("node.list", "node-list-envelope", "NodeListResult"),
-        ("relay.list", "relay-list-envelope", "RelayListResult"),
+        ("client.add", "client-add-envelope", "ClientAddResult", {"EmptyData", "ClientAddResult"}),
+        ("client.remove", "client-remove-envelope", "ClientRemoveResult", {"EmptyData"}),
+        ("client.enable", "client-enable-envelope", "ClientStatusResult", {"EmptyData"}),
+        ("client.disable", "client-disable-envelope", "ClientStatusResult", {"EmptyData"}),
+        ("node.list", "node-list-envelope", "NodeListResult", {"EmptyData"}),
+        ("relay.list", "relay-list-envelope", "RelayListResult", {"EmptyData"}),
     ],
 )
-def test_secondary_command_envelopes_bind_typed_success_and_empty_failure_data(
+def test_secondary_command_envelopes_keep_partial_add_outcomes_but_other_refusals_empty(
     command: str,
     envelope_name: str,
     data_model: str,
+    failure_models: set[str],
 ) -> None:
     schema = schema_for(envelope_name)
     success_ref = next(option["$ref"] for option in schema["oneOf"] if "SuccessEnvelope" in option["$ref"])
@@ -172,7 +173,9 @@ def test_secondary_command_envelopes_bind_typed_success_and_empty_failure_data(
 
     assert success["properties"]["command"]["const"] == command
     assert success["properties"]["data"]["$ref"].endswith(f"/{data_model}")
-    assert terminal["properties"]["data"]["$ref"].endswith("/EmptyData")
+    failure = terminal["properties"]["data"]
+    choices = failure.get("anyOf", [failure])
+    assert {choice["$ref"].rsplit("/", 1)[-1] for choice in choices} == failure_models
 
 
 def test_command_contract_registry_is_public_and_schema_neutral() -> None:
