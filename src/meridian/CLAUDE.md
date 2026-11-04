@@ -9,6 +9,7 @@
 **Errors over exits** — library modules raise `MeridianError` subclasses (`core/errors.py`) with a `category`; only command entry points call `console.fail()`. Every error must be actionable.
 **Shared logic stays out of commands** — `resolve.py` and `setup/` serve all commands; library code never imports `commands/`.
 **Deploy targets** — `resolve.resolve_deploy_target()` turns a request and the server shelf into IP, SSH user, and port without opening SSH; `deploy` and its dry run share it.
+**Local addresses before echo services** — `resolve.detect_public_ip()` takes the default route's source address when it is global and asks IP echo services only behind NAT.
 **Exit country** — `registry_country.py` reads the RIR country via RDAP (no geo-IP) when an exit is first named and stores it in intent, keeping the compiler pure.
 **Local home and contexts** — `config.default_home()` prefers `$XDG_CONFIG_HOME/meridian`; the home keeps per-person files and is the `default` context, and other fleets live in `contexts/NAME/` (`contexts.py`). `fleet_contexts.refuse_servers_claimed_elsewhere()` keeps a host in one fleet; a context a restore took over (`superseded.json`) only runs reads. `config.select_context()` binds per-fleet globals once.
 **Neutral host names** — `host_runtime.py` is the one place for unit, `/opt`, and config names (`ctld`, `netagent`, `netcore`).
