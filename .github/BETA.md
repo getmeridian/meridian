@@ -1,5 +1,5 @@
 > [!WARNING]
-> **This is a beta of Meridian 4.** Nobody gets it automatically: `pip`, `uv`, the install script, and `meridian update` on 3.x all skip it. Your 3.x servers keep working.
+> **This is a beta of Meridian 4.** The installer on getmeridian.org installs it, because the site documents Meridian 4; on a computer with 3.x it replaces your 3.x command, so use the alias below to keep both. `pip`, `uv`, and `meridian update` on 3.x stay on 3.x, and your 3.x servers keep working.
 
 **Use a separate, fresh server you can wipe.** Meridian 3.x and 4 cannot share a server: both need port 443. Meridian 4 refuses to deploy onto a server that still runs 3.x; replacing a 3.x server means tearing it down first, and every one of its users needs a new link.
 
