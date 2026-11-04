@@ -98,6 +98,7 @@
       M.mount(screen.view, h("div", { class: "person-page" }, screen.summary, screen.liveStatus, screen.tabs.node));
       screen.tabs.select(screen.tab);
     }
+    M.rememberName(user);
     drawSummary(screen, user, share);
     if (screen.access) screen.access.refresh(user, savedForm);
     if (previous && screen.profileCard) screen.profileCard.refresh(user);
@@ -116,6 +117,7 @@
     var user = screen.user, name = user.username;
     if (tab === "access") {
       screen.access = M.personAccess(user, function (changed, form) {
+        M.rememberName(changed);
         completed(screen, changed, "person.saved_toast", M.displayName(name), form);
       }, function () { return current(screen); });
       M.mount(panel, screen.access.node);

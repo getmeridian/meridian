@@ -446,9 +446,12 @@
     if (path === "auth/setup/check") return reply({ purpose: "setup" });
     if (path === "api/users" && method === "GET") return reply({ users: users });
     if (path === "api/users" && method === "POST") {
-      if (person(body.username)) return error("user_exists", "exists", 409);
+      if (body.username && person(body.username)) return error("user_exists", "exists", 409);
+      var created = Object.assign({}, body, { username: body.username || D.assignUsername(body.display_name) });
+      if (D.nameTaken(created.username, created.display_name)) return error("name_conflict", "taken", 409);
       var user = clone(responses["POST api/users"]);
-      Object.assign(user, D.updateUser(user, body), { created_at: now(), username: body.username });
+      var fields = Object.assign({}, created); delete fields.username;
+      Object.assign(user, D.updateUser(user, fields), { created_at: now(), username: created.username });
       user.user_id = "demo-person-" + (++newId);
       user.used_traffic_bytes = user.lifetime_traffic_bytes = 0;
       user.first_traffic_at = user.online_at = user.last_traffic_node = null;

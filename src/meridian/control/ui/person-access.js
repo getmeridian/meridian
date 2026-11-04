@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var M = window.M, h = M.h, sequence = 0;
-  var owned = { expiry: ["expire_at", "activation_duration_days", "renewal_interval_days", "renewal_interval_months", "renewal_limit"],
+  var owned = { name: ["display_name"], expiry: ["expire_at", "activation_duration_days", "renewal_interval_days", "renewal_interval_months", "renewal_limit"],
     traffic: ["traffic_limit_bytes", "traffic_limit_strategy", "traffic_reset_anchor_day"],
     language: ["language"], note: ["note"], tag: ["tag"] };
 
@@ -10,6 +10,7 @@
     return value ? h("bdi", {}, h("time", { datetime: value, title: value + " UTC", text: M.date(value, true) })) : M.t("people.no_expiry");
   }
   function read(key, user) {
+    if (key === "name") return user.display_name ? h("bdi", { text: user.display_name }) : M.t("person.no_display_name");
     if (key === "expiry") {
       var schedule = user.schedule;
       var value = schedule ? schedule.expire_at : user.expire_at;
@@ -62,7 +63,25 @@
     } };
   }
 
+  function nameFields(user) {
+    var original = user.display_name || "";
+    var input = h("input", { name: "display_name", type: "text", value: original, maxlength: "40", dir: "auto", autocomplete: "off" });
+    var error = h("p", { class: "field-error", role: "alert" });
+    function validate() {
+      var message = M.validDisplayName(input.value.trim()) ? "" : M.t("person.display_name_invalid");
+      input.setCustomValidity(message); input.setAttribute("aria-invalid", String(!!message)); error.textContent = message;
+      return !message;
+    }
+    input.addEventListener("input", validate);
+    return { nodes: [M.field(M.t("person.display_name"), input, M.t("person.display_name_hint")), error], value: function () {
+      if (!validate()) { input.focus(); throw new Error(error.textContent); }
+      var name = input.value.trim();
+      return name === original ? {} : { display_name: name };
+    } };
+  }
+
   function fields(key, user, currentUser) {
+    if (key === "name") return nameFields(user);
     if (key === "note" || key === "tag") return textFields(key, user);
     if (key === "language") {
       var original = user.language || "default";
@@ -126,7 +145,7 @@
 
   M.personAccess = function (initial, saved, current) {
     var user = initial, entries = {}, prefix = "person-edit-" + (++sequence);
-    var labels = { expiry: "people.expiry", traffic: "person.traffic", language: "person.page_language", note: "person.note", tag: "person.tag" };
+    var labels = { name: "person.display_name", expiry: "people.expiry", traffic: "person.traffic", language: "person.page_language", note: "person.note", tag: "person.tag" };
     var facts = h("dl", { class: "person-access-facts" }), metadata = h("dl", { class: "person-access-facts" });
     function close(entry, focus) {
       if (!entry.form) return;

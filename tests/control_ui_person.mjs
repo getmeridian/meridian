@@ -651,5 +651,47 @@ if (mode === 'person-flow-blocks') {
   report.writes = writes;
 }
 
+if (mode === 'person-name') {
+  const form = openEdit('name');
+  const input = form?.querySelector('[name="display_name"]');
+  report.label = view().querySelector('[data-person-field="name"] dt')?.textContent || '';
+  report.initialValue = input?.value;
+  input.value = data.name; input.dispatchEvent(new w.Event('input', { bubbles: true }));
+  report.invalid = input.getAttribute('aria-invalid');
+  form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  report.writes = writes.map(write => ({ method: write.method, url: write.url, body: write.body }));
+  for (const resolve of pending.splice(0)) {
+    if (data.refuse) resolve(reply({ error: { code: data.refuse, message: 'refused' } }, 409));
+    else { Object.assign(user, writes[0].body); resolve(reply({ ...user })); }
+  }
+  await settle(); await settle();
+  report.title = view().querySelector('.person-summary h1')?.textContent;
+  report.usernameShown = !view().querySelector('.person-summary bdi.mono')?.hidden;
+  report.read = view().querySelector('[data-person-field="name"] .person-read-value')?.textContent;
+  report.error = view().querySelector('[data-person-field="name"] .form-error')?.textContent || '';
+  report.formOpen = !!view().querySelector('[data-person-field="name"] form');
+}
+
+if (mode === 'person-add') {
+  M.addPerson();
+  await settle();
+  const dialog = w.document.querySelector('dialog[open]');
+  const name = dialog.querySelector('input[type="text"]');
+  name.value = data.name; name.dispatchEvent(new w.Event('input', { bubbles: true }));
+  dialog.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  report.error = dialog.querySelector('.form-error')?.textContent || '';
+  report.writes = writes.map(write => ({ method: write.method, url: write.url, body: write.body }));
+  for (const resolve of pending.splice(0)) {
+    const body = writes[0].body;
+    resolve(reply({ ...user, username: body.username || data.assigned, display_name: body.display_name || '' }));
+  }
+  await settle(); await settle();
+  report.toasts = events.filter(event => event.toast).map(event => event.toast);
+  report.hash = w.location.hash;
+  report.title = view().querySelector('.person-summary h1')?.textContent;
+}
+
 dom.window.close();
 process.stdout.write(JSON.stringify(report));

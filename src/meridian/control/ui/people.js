@@ -14,6 +14,22 @@
     return M.has(names, username) && names[username] ? String(names[username]) : username;
   };
 
+  /* Person replies carry the current name; the fleet map read at boot would keep showing an old one. */
+  M.rememberName = function (user) {
+    if (!M.state.fleet || !user || !user.username || !Object.prototype.hasOwnProperty.call(user, "display_name")) return;
+    var names = M.state.fleet.display_names = M.state.fleet.display_names || {};
+    if (user.display_name) {
+      Object.defineProperty(names, user.username, { value: user.display_name, writable: true, enumerable: true, configurable: true });
+    } else if (M.has(names, user.username)) delete names[user.username];
+  };
+
+  /* The service's display-name rule: up to 40 printable characters without commas (core.inputs). */
+  M.validDisplayName = function (value) {
+    var characters = Array.from(value);
+    return characters.length <= 40 && value.indexOf(",") < 0 &&
+      !/[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Zl}\p{Zp}]|(?! )\p{Zs}/u.test(value);
+  };
+
   M.isDeclared = function (username) {
     var declared = (M.state.fleet && M.state.fleet.declared_users) || [];
     return declared.indexOf(username) >= 0;
@@ -146,8 +162,8 @@
 
   M.addPerson = function () {
     M.dialog(M.t("people.add_title"), function (close) {
-      var name = h("input", { type: "text", required: true, maxlength: "64", pattern: "[A-Za-z0-9_.\\-]{1,64}",
-        autocomplete: "off", autocapitalize: "off", spellcheck: "false" });
+      var name = h("input", { type: "text", required: true, maxlength: "64", dir: "auto",
+        autocomplete: "off", spellcheck: "false" });
       var expiry = M.expiryFields();
       var limits = M.limitFields(null);
       var lifecycle = M.lifecycleFields(null, expiry, limits);
@@ -163,18 +179,22 @@
       M.trackForm(form);
       form.addEventListener("submit", function (e) {
         e.preventDefault();
-        var username = name.value.trim();
-        if (!USERNAME.test(username)) {
+        var typed = name.value.trim();
+        // A name the service accepts as a username keeps it as typed; any other name gets one made for it.
+        var username = USERNAME.test(typed) ? typed : "";
+        if (!typed || !username && !M.validDisplayName(typed)) {
           form.querySelector(".form-error").textContent = M.t("people.name_invalid");
           return;
         }
         // One request with the settings: create-then-PATCH left an unlimited person when the PATCH failed.
         var body = limits.value();
-        body.username = username;
+        if (username) body.username = username; else body.display_name = typed;
         Object.assign(body, lifecycle.change());
-        M.saveDraft(form, function () { return M.api("POST", "api/users", body); }).then(function () {
+        M.saveDraft(form, function () { return M.api("POST", "api/users", body); }).then(function (created) {
+          username = created.username;
+          M.rememberName(created);
           close();
-          M.toast(M.t("people.added_toast", { name: username }));
+          M.toast(M.t("people.added_toast", { name: M.displayName(username) }));
           Promise.resolve(M.go("people", username)).then(function () {
             var view = document.getElementById("view"), route = M.route();
             if (view && route.name === "people" && route.arg === username) view.focus();
