@@ -27,7 +27,10 @@ from meridian.backup.pull import finished_restore, newer_saved_snapshot, saved_s
 from meridian.backup.restore import ControlRestorer, RestoreOutcome, RestoreReview, RestoreSource, check_snapshot_fleet
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import apply_reviewed_intent, load_cluster, persist_reviewed_apply
+from meridian.commands.backup import offer_device_revocation
+from meridian.commands.panel import print_panel_access
 from meridian.console import confirm, err_console, fail, has_tty, info, ok, warn
+from meridian.control.client import ControlServiceError
 from meridian.control.restore import read_deployer_state
 from meridian.control.snapshot import Snapshot, decrypt_snapshot
 from meridian.core.errors import MeridianError
@@ -107,6 +110,17 @@ def run(
     except MeridianError as exc:
         fail(exc)
     _done(outcome)
+    _hand_back(cluster, ask=not yes and has_tty())
+
+
+def _hand_back(cluster: ClusterConfig, *, ask: bool) -> None:
+    """What the owner needs next: a setup link for the restored panel, and a say over other computers' keys."""
+    try:
+        # A snapshot never carries owner credentials, so the restored panel always needs a new owner.
+        print_panel_access(cluster, setup_link=False)
+    except ControlServiceError as exc:
+        warn(f"Could not reach the web panel: {exc}. Its setup link: meridian panel")
+    offer_device_revocation(cluster, ask=ask)
 
 
 def _open_snapshot(explicit: str, *, recovery_key: bool) -> RestoreSource:
@@ -132,13 +146,17 @@ def _open_snapshot(explicit: str, *, recovery_key: bool) -> RestoreSource:
             device = load_device_key()
         except MeridianError as exc:
             fail(exc)
-        if device is None:
+        if device is not None:
+            keys = [device.secret]
+        elif sys.stdin.isatty():
+            info("This machine has no backup key for the fleet; the recovery key opens the snapshot.")
+            keys = [_read_recovery_key()]
+        else:
             fail(
                 "This context has no device key to open the snapshot with",
-                hint="Use the fleet's recovery key: add --recovery-key.",
+                hint="Use the fleet's recovery key: add --recovery-key and pipe it on stdin.",
                 hint_type="user",
             )
-        keys = [device.secret]
     try:
         opened = decrypt_snapshot(blob, keys)
     except MeridianError as exc:
@@ -270,9 +288,9 @@ def _render(review: RestoreReview, registry: ServerRegistry) -> None:
 def _done(outcome: RestoreOutcome) -> None:
     ok(f"Restored the control service at fleet epoch {outcome.fleet_epoch}")
     if outcome.links_change:
-        warn("Every subscription URL changed. Send each client their new link:")
-    elif outcome.links:
-        info("Subscription URLs are unchanged; for reference:")
+        warn("Every subscription URL changed. Send each person their new link:")
+    else:
+        info("Subscription URLs are unchanged.")
     for links in outcome.links:
         if links.error:
             err_console.print(f"    [warn]{escape(links.name)}[/warn]: {escape(links.error)}")

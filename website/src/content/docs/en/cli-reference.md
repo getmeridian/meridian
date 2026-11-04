@@ -759,22 +759,22 @@ meridian restore --to SERVER [--snapshot FILE] [--recovery-key] [--force]
 |------|---------|-------------|
 | `--to SERVER` | (required) | The new control server: an IP, `user@IP:port`, or a saved name |
 | `--snapshot FILE` | newest saved | Snapshot to restore |
-| `--recovery-key` | | Open the snapshot with the recovery key instead of this machine's key; it is asked for (hidden) or read from one line of standard input |
+| `--recovery-key` | | Open the snapshot with the recovery key instead of this machine's key; it is asked for (hidden) or read from one line of standard input. Asked for anyway when this machine has no key of its own |
 | `--force` | | Restore even though the old control service still answers |
 | `--name NAME` | (none) | Name for the new server |
 | `--user/-u USER` | root | SSH user on the new server |
 | `--ssh-port PORT` | 22 | SSH port on the new server |
 | `--yes`, `-y` | | Skip the confirmation |
 
-Restore opens the snapshot, reviews what it will do, and asks. It then installs the control service on the new server from the snapshot, moves the control server (and the old server's exit, if it had one) to the new address in your topology, and runs the normal reviewed apply. The restored service gets a new fleet authority, new signing keys, and a new API token, so every agent enrolls again and a seized server can't sign anything your nodes accept. Users keep their accounts, limits, and traffic. The web panel owner sets a new password with a link from `meridian panel`.
+Restore opens the snapshot, reviews what it will do, and asks. It then installs the control service on the new server from the snapshot, moves the control server (and the old server's exit, if it had one) to the new address in your topology, and runs the normal reviewed apply. The restored service gets a new fleet authority, new signing keys, and a new API token, so every agent enrolls again and a seized server can't sign anything your nodes accept. Users keep their accounts, limits, and traffic. The restored web panel has no owner, so the end prints a one-time setup link for a new password; restore then lists other computers' backup keys and, at a terminal, offers to revoke each one.
 
-On a bare IP every subscription URL contains the control server's address, so each link changes: the review says so and the end prints every client's new link. With a domain, links stay the same once its DNS record points at the new server; the review names the records.
+On a bare IP every subscription URL contains the control server's address, so each link changes: the review says so and the end prints everyone's new link, including people added in the web panel. With a domain, links stay the same once its DNS record points at the new server; the review names the records.
 
 Restore refuses while the old control server still answers, because two control services would split the fleet; `--force` overrides it, for example when the old server was seized. It warns when `--snapshot` names an older file than the newest saved one: an older snapshot brings back tokens, machines, and people you have since removed. A restore that stops can be run again and continues where it stopped.
 
 Restore also checks snapshot profiles against the local intent before staging or target access; `--force` does not skip this check. A stored declaration fingerprint permits topology expansion of unchanged grants. Unstamped snapshots require an identical compiled grant map. Restore merges deposited profile history even when it retains newer local intent, and pins reviewed declarations through resumes. Choose a matching snapshot, or restore matching fleet files into a new context and review the desired saved change afterwards with `meridian apply`. See [Recovery](/en/recovery/).
 
-On a machine without the fleet, pass the snapshot file and `--recovery-key`: the snapshot's own copy of the fleet's files is restored first. If this machine's copy is older than the snapshot's, restore puts the fleet in a new context and, after the review names it, takes the fleet over from the old one, which is then marked superseded and refuses changes until you `meridian context remove` it.
+On a machine without the fleet, pass the snapshot file; restore asks for the recovery key: the snapshot's own copy of the fleet's files is restored first. If this machine's copy is older than the snapshot's, restore puts the fleet in a new context and, after the review names it, takes the fleet over from the old one, which is then marked superseded and refuses changes until you `meridian context remove` it.
 
 ### meridian migrate
 

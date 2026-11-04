@@ -12,6 +12,19 @@ describes your whole fleet; a small agent on every server applies it; and no
 server needs Docker. The first sections list what changed in each beta,
 newest first; the last is what 4.0 changes compared with 3.x.
 
+### Since 4.0.0b12
+
+#### Changed
+- `meridian restore` ends with a one-time setup link for the restored web panel,
+  then lists other computers' backup keys and offers to revoke any you no longer
+  hold, such as a lost laptop's. On a machine without a backup key of its own, it
+  asks for the recovery key instead of stopping (#95).
+
+#### Fixed
+- A restore that changed every subscription URL printed new links only for people
+  added with `meridian client add`; it now prints everyone's, including people
+  added in the web panel (#95).
+
 ### Since 4.0.0b11
 
 #### Added

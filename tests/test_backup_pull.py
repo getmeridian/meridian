@@ -18,7 +18,7 @@ from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands import backup as backup_commands
 from meridian.control.client import ControlClient
 from meridian.control.restore import read_deployer_state
-from meridian.control.snapshot import decrypt_snapshot
+from meridian.control.snapshot import decrypt_snapshot, generate_key_pair
 from tests.support.control_service import ADMIN_TOKEN, FLEET_ID, serve_control
 from tests.support.topology import single_exit_intent
 
@@ -249,3 +249,37 @@ def test_a_write_whose_outcome_is_unknown_still_counts_as_a_change(
         stop()
 
     assert seen == (["https://198.51.100.10/secret"] if reported else [])
+
+
+@pytest.mark.parametrize(("ask", "revoked"), [(True, ["old-laptop"]), (False, [])], ids=["asked", "no-terminal"])
+def test_a_restore_offers_to_revoke_other_computers_backup_keys(
+    fleet: ClusterConfig,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    ask: bool,
+    revoked: list[str],
+) -> None:
+    """The restore replaced the admin token; a lost machine's backup key would still open every new snapshot."""
+    own = create_device_key()
+    with ControlClient(fleet.panel.url, ADMIN_TOKEN) as client:
+        client.register_device_key("this-laptop", own.public)
+        client.register_device_key("old-laptop", generate_key_pair().public)
+    monkeypatch.setattr(backup_commands, "confirm", lambda question, default: True)
+
+    backup_commands.offer_device_revocation(fleet, ask=ask)
+
+    err = capsys.readouterr().err
+    assert "old-laptop" in err and "this-laptop" not in err
+    assert ("meridian backup revoke ID" in err) is not ask
+    with ControlClient(fleet.panel.url, ADMIN_TOKEN) as client:
+        assert [device.name for device in client.device_keys() if device.revoked_at] == revoked
+
+
+def test_no_other_backup_keys_means_no_offer(fleet: ClusterConfig, capsys: pytest.CaptureFixture[str]) -> None:
+    own = create_device_key()
+    with ControlClient(fleet.panel.url, ADMIN_TOKEN) as client:
+        client.register_device_key("this-laptop", own.public)
+
+    backup_commands.offer_device_revocation(fleet, ask=True)
+
+    assert "backup keys" not in capsys.readouterr().err

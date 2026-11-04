@@ -25,7 +25,6 @@ from meridian.control.server import ControlServer
 from meridian.control.service import ControlService
 from meridian.control.snapshot import decrypt_snapshot
 from meridian.core.topology import SetupIntent
-from meridian.handoff import HandoffLinks
 from meridian.reconciler.fence import FleetFenceError, LocalFenceView
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.service_fence import ControlServiceFence
@@ -83,13 +82,6 @@ def new_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[NewS
     monkeypatch.setattr(restore_steps, "hand_fence_to_service", lambda conn, cluster: server.fence_marks.append(conn))
     monkeypatch.setattr(restore_steps, "install_service", server.install)
     monkeypatch.setattr(restore_steps, "ssh_answers", lambda entry: False)
-    monkeypatch.setattr(
-        restore_steps,
-        "restored_handoffs",
-        lambda cluster, names: [
-            HandoffLinks(name, subscription_url=cluster.panel.subscription_url(f"token-{name}")) for name in names
-        ],
-    )
     yield server
     server.close()
 
@@ -111,6 +103,7 @@ def fleet(tmp_home: Path, tmp_path: Path) -> Iterator[tuple[ClusterConfig, Path]
         with ControlClient(url, ADMIN_TOKEN) as client:
             client.put_user("alice")
             client.put_user("bob")
+            client.put_user("carol")  # added in the web panel: the service knows her, cluster.yml does not
         cluster = ClusterConfig(
             panel=PanelConfig(
                 url=url, api_token=ADMIN_TOKEN, server_ip=OLD, secret_path=SECRET_PATH, sub_path=SUB_PATH
@@ -163,10 +156,10 @@ def test_a_restore_rebuilds_the_service_at_the_next_epoch(
     assert not (config.FLEET_HOME / "restore" / "control.db").exists()
     with ControlClient(saved.panel.url, saved.panel.api_token) as client:
         assert client.health().fleet_epoch == 2
-        assert [user.username for user in client.list_users()] == ["alice", "bob"]
+        assert [user.username for user in client.list_users()] == ["alice", "bob", "carol"]
     with pytest.raises(Exception, match="refused the saved admin token"):
         ControlClient(saved.panel.url, ADMIN_TOKEN).health()
-    assert [links.username for links in outcome.links] == ["alice", "bob"]
+    assert [links.username for links in outcome.links] == ["alice", "bob", "carol"]
     assert all(links.subscription_url and OLD not in links.subscription_url for links in outcome.links)
     assert len(new_server.applies) == 1
 
@@ -535,3 +528,66 @@ def test_picking_an_older_snapshot_warns_what_comes_back(
 
     _open_snapshot(str(older), recovery_key=False)
     assert f"{newer.name} is newer than this snapshot" in capsys.readouterr().err.replace("\n", " ")
+
+
+def test_a_domain_fleets_restore_lists_no_links_because_none_change(
+    fleet: tuple[ClusterConfig, Path], new_server: NewServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(restore_steps, "service_answers", lambda url, token: False)
+    cluster, snapshot = fleet
+    cluster.topology_intent = _intent(control_domain="control.example.com")
+    restorer, target = _restorer(cluster)
+
+    outcome = restorer.run(restorer.review(target, _source(snapshot)), new_server.apply)
+
+    assert not outcome.links_change and outcome.links == []
+
+
+@pytest.mark.parametrize("terminal", [True, False], ids=["prompts", "no-terminal-refuses"])
+def test_a_machine_without_a_device_key_is_asked_for_the_recovery_key(
+    fleet: tuple[ClusterConfig, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    terminal: bool,
+) -> None:
+    """A new laptop holds a copied snapshot and the paper key, never the lost machine's device key."""
+    import typer
+
+    from meridian.backup.keys import device_key_path
+    from meridian.commands import restore as restore_command
+
+    _cluster, snapshot = fleet
+    key = load_device_key()
+    assert key is not None  # any key the snapshot is sealed to stands in for the recovery key
+    device_key_path().unlink()
+    monkeypatch.setattr(restore_command.sys.stdin, "isatty", lambda: terminal)
+    monkeypatch.setattr(restore_command.getpass, "getpass", lambda prompt: key.secret)
+
+    if not terminal:
+        with pytest.raises(typer.Exit):
+            restore_command._open_snapshot(str(snapshot), recovery_key=False)
+        assert "--recovery-key" in capsys.readouterr().err
+        return
+    opened = restore_command._open_snapshot(str(snapshot), recovery_key=False)
+
+    assert opened.snapshot is not None and opened.snapshot.header.fleet_id == FLEET_ID
+    assert "recovery key opens the snapshot" in " ".join(capsys.readouterr().err.split())
+
+
+def test_a_restore_hands_back_a_setup_link_because_owners_never_ride_a_snapshot(
+    fleet: tuple[ClusterConfig, Path],
+    new_server: NewServer,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from meridian.commands import restore as restore_command
+
+    monkeypatch.setattr(restore_steps, "service_answers", lambda url, token: False)
+    cluster, snapshot = fleet
+    restorer, target = _restorer(cluster)
+    restorer.run(restorer.review(target, _source(snapshot)), new_server.apply)
+    capsys.readouterr()
+
+    restore_command._hand_back(cluster, ask=False)
+
+    assert "#setup=" in capsys.readouterr().err

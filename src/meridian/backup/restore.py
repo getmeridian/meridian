@@ -21,7 +21,7 @@ import hashlib
 import json
 import secrets
 import shlex
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -306,8 +306,10 @@ class ControlRestorer:
             self._on_step("Applying the fleet: every agent enrolls with the restored service")
             apply(self.cluster, review.intent)
             self._checkpoint(restore, "applied")
-        self._on_step("Reading connection links")
-        links = restored_handoffs(self.cluster, list(review.intent.access.users))
+        links: list[HandoffLinks] = []
+        if restore.links_change:
+            self._on_step("Reading everyone's new links")
+            links = restored_handoffs(self.cluster)
         restore.finished_at = _iso(self._now())
         self._checkpoint(restore, "done")
         return RestoreOutcome(links=links, links_change=restore.links_change, fleet_epoch=restore.fleet_epoch)
@@ -520,10 +522,13 @@ def verify_restored(cluster: ClusterConfig, fleet_epoch: int) -> None:
         )
 
 
-def restored_handoffs(cluster: ClusterConfig, usernames: Sequence[str]) -> list[HandoffLinks]:
-    from meridian.handoff import client_handoffs
+def restored_handoffs(cluster: ClusterConfig) -> list[HandoffLinks]:
+    """Every person's links from the restored service, including people added in the web panel."""
+    from meridian.control_access import access_panel
+    from meridian.handoff import user_handoff
 
-    return client_handoffs(cluster, usernames)
+    with access_panel(cluster) as panel:
+        return [user_handoff(cluster, user) for user in panel.list_users()]
 
 
 def _dns_names(intent: SetupIntent, server_ref: str) -> tuple[str, ...]:
