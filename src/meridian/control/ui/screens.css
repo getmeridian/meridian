@@ -109,7 +109,9 @@
 .connection-remark { font-size: 1rem; overflow-wrap: anywhere; }
 .connection-qr { max-width: 100%; height: auto; margin-inline: auto; }
 .expiry-fields { border: 0; min-width: 0; }
+.lifecycle-fields { border: 0; padding: 0; min-width: 0; }
 .expiry-fields legend { font-size: .875rem; font-weight: 600; margin-bottom: 8px; }
+.lifecycle-fields > legend { font-family: var(--heading); font-size: 1.0625rem; font-weight: 600; margin-bottom: 8px; }
 .expiry-never { display: flex; align-items: center; gap: 8px; font-size: .875rem; }
 .expiry-never input { width: 18px; height: 18px; padding: 0; }
 .expiry-utc { overflow-wrap: anywhere; }

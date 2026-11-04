@@ -28,6 +28,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
 - A restore that changed every subscription URL printed new links only for people
   added with `meridian client add`; it now prints everyone's, including people
   added in the web panel (#95).
+- The web panel's Add person dialog drew its account schedule inside a stray
+  border, with an unstyled time field.
 
 ### Since 4.0.0b11
 

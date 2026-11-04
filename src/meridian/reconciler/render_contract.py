@@ -14,7 +14,7 @@ _RENDERER_MANIFEST = {
     "pwa": "pwa-helper-assets-v7",
     "control-service": "person-display-names-v62",
     "control-api": "person-display-names-v49",
-    "control-ui": "person-display-names-v72",
+    "control-ui": "add-dialog-schedule-v73",
     "firewall": "ufw-comment-v2",
     "nginx": "panel-domain-certificate-v13",
     "realm": "neutral-systemd-musl-v3",

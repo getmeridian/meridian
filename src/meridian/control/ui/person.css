@@ -50,11 +50,8 @@ body:has(.person-page) { overflow: hidden; }
 .person-read-row > .btn { flex-shrink: 0; }
 .person-read-value { min-inline-size: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .person-inline-editor { padding-block: var(--space-4) var(--space-2); }
-.person-inline-editor input[type="time"] { inline-size: 100%; min-block-size: 44px; padding: 0 var(--space-3);
-  border: 1px solid var(--control-border); border-radius: var(--r); background: var(--s1); color: var(--t1); font-size: 1rem; }
 .person-more { border-block-start: 1px solid var(--b1); }
 .person-more > summary { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
-.person-inline-editor .lifecycle-fields { border: 0; padding: 0; min-inline-size: 0; }
 .person-inline-editor .lifecycle-dates { margin-block-start: var(--space-2); }
 @media (max-width: 760px) {
   .person-summary-head { flex-wrap: wrap; gap: var(--space-3); }

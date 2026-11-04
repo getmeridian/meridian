@@ -61,7 +61,7 @@ code { font-family: var(--mono); font-size: .9em; }
 /* -- forms ---------------------------------------------------------------------------------- */
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .field label { font-size: .875rem; font-weight: 600; color: var(--t1); }
-input[type="text"], input[type="password"], input[type="number"], input[type="date"], input[type="datetime-local"], input[type="search"], select, textarea {
+input[type="text"], input[type="password"], input[type="number"], input[type="date"], input[type="time"], input[type="datetime-local"], input[type="search"], select, textarea {
   width: 100%; min-height: 44px; padding: 0 12px; border-radius: var(--r); border: 1px solid var(--control-border);
   background: var(--s1); color: var(--t1); font-size: 1rem;
 }
