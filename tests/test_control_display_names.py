@@ -31,6 +31,7 @@ from meridian.control.tokens import ROOT
 from meridian.control.ui_views import fleet_view
 from meridian.control_access import ServiceAccessPanel
 from meridian.core.clients import build_client_detail, build_client_record
+from meridian.core.inputs import access_username_for
 from meridian.core.people_bulk import BulkAction, BulkCommitRequest, BulkPreviewRequest
 from meridian.core.people_query import PeopleQuery
 from meridian.handoff import user_handoff
@@ -115,6 +116,60 @@ def test_migration_without_an_applied_revision_keeps_the_username(tmp_path):
         assert int(migrated._meta("schema_version")) == SCHEMA_VERSION
     finally:
         migrated.close()
+
+
+def test_migration_skips_invalid_and_held_legacy_names_and_the_holders_can_still_rename(tmp_path):
+    database = tmp_path / "migration.db"
+    service = ControlService(database, fleet_id=FLEET_ID, version="4.0.0", clock=lambda: NOW)
+    for name in ("sample", "guest", "alice", "bob", "carol", "dave"):
+        service.put_user(name)
+    revision(service, {"bob": "Боб"})
+    service.close()
+    legacy = {"sample": "Comma, name", "alice": "GUEST", "bob": "Боб", "carol": "x" * 45, "dave": "боб", "eve": 7}
+    with sqlite3.connect(database) as db:
+        drop_person_display_name_schema(db)
+        db.execute("UPDATE revisions SET intent = ?", (json.dumps({"access": {"display_names": legacy}}),))
+        db.execute("UPDATE meta SET value = '25' WHERE key = 'schema_version'")
+    migrated = ControlService(database, fleet_id=FLEET_ID, version="4.0.0", clock=lambda: NOW)
+    try:
+        assert {user.username: user.display_name for user in migrated.list_users()} == {
+            "sample": "",
+            "guest": "",
+            "alice": "",
+            "bob": "Боб",
+            "carol": "",
+            "dave": "",
+        }
+        assert migrated.update_user("guest", UserUpdate(display_name="New guest")).display_name == "New guest"
+    finally:
+        migrated.close()
+
+
+@pytest.mark.parametrize("intent", ['{"access": {"display_names": "names"}}', '"intent"', "not json", "[]"])
+def test_migration_starts_the_service_whatever_shape_a_legacy_intent_has(tmp_path, intent):
+    database = tmp_path / "migration.db"
+    service = ControlService(database, fleet_id=FLEET_ID, version="4.0.0", clock=lambda: NOW)
+    service.put_user("sample")
+    revision(service, {"sample": "Тест"})
+    service.close()
+    with sqlite3.connect(database) as db:
+        drop_person_display_name_schema(db)
+        db.execute("UPDATE revisions SET intent = ?", (intent,))
+        db.execute("UPDATE meta SET value = '25' WHERE key = 'schema_version'")
+    migrated = ControlService(database, fleet_id=FLEET_ID, version="4.0.0", clock=lambda: NOW)
+    try:
+        assert migrated.get_user("sample").display_name == ""
+    finally:
+        migrated.close()
+
+
+def test_assigned_usernames_number_around_casefolded_names(service):
+    service.create_user(UserCreate(username="holder", display_name="Straße"))
+    assert service.create_user(UserCreate(display_name="Страссе")).username == "strasse-2"
+
+
+def test_a_taken_punctuation_only_name_numbers_into_a_valid_username():
+    assert access_username_for("---", taken=["---"]) == "user-2"
 
 
 def test_display_only_creation_transliterates_around_usernames_and_other_display_names(service):

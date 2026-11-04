@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from meridian.control.access_memberships import MEMBERSHIP_SCHEMA
 from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE
 from meridian.control.capacity import CAPACITY_TABLES
@@ -14,6 +16,7 @@ from meridian.control.owner import UI_TABLES
 from meridian.control.passkey_tables import PASSKEY_TABLES
 from meridian.control.people_schema import PEOPLE_SCHEMA
 from meridian.control.period_usage import DIRECTIONAL_PERIOD_MIGRATION
+from meridian.control.person_names import backfill_display_names
 from meridian.control.privacy import PRIVACY_TABLES
 from meridian.control.revisions import APPLY_FENCE_TABLE, REVISIONS_TABLE
 from meridian.control.server_allowances import ALLOWANCE_PERIODS_TABLE
@@ -81,7 +84,7 @@ SCHEMA += ";\n".join(PASSKEY_TABLES) + ";\n"
 SCHEMA += ";\n".join(CAPACITY_TABLES) + ";\n"
 SCHEMA += PERSON_DELIVERY_POLICY_SCHEMA[0] + ";\n"
 # Statements that bring a database from version N to N + 1 (index N - 1).
-_MIGRATIONS: tuple[tuple[str, ...], ...] = (
+_MIGRATIONS: tuple[tuple[str | Callable[[Store], None], ...], ...] = (
     (
         "ALTER TABLE users ADD COLUMN expire_at TEXT",
         "ALTER TABLE users ADD COLUMN traffic_limit_bytes INTEGER NOT NULL DEFAULT 0",
@@ -150,14 +153,7 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     # 24 -> 25: private person delivery overrides and stale-review row versions.
     PERSON_DELIVERY_POLICY_SCHEMA,
     # 25 -> 26: service-owned names, seeded only by the latest applied revision.
-    (
-        "ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT ''",
-        "WITH names AS (SELECT key, value FROM json_each("
-        " (SELECT json_extract(intent, '$.access.display_names') FROM revisions"
-        " WHERE status = 'applied' ORDER BY number DESC LIMIT 1)))"
-        " UPDATE users SET display_name = (SELECT value FROM names WHERE key = users.username)"
-        " WHERE username IN (SELECT key FROM names WHERE value != '')",
-    ),
+    ("ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT ''", backfill_display_names),
 )
 
 
@@ -167,7 +163,10 @@ def migrate(store: Store) -> None:
         raise ServiceError("conflict", "The database was written by a newer Meridian.", 409)
     for statements in _MIGRATIONS[stored - 1 : SCHEMA_VERSION - 1]:
         for statement in statements:
-            store.db.execute(statement)
+            if callable(statement):
+                statement(store)
+            else:
+                store.db.execute(statement)
     # Fresh databases already have the base schema; guarded statements also cover them.
     if store.meta("schema_version") is None:
         for statement in PEOPLE_SCHEMA:

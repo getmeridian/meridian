@@ -55,6 +55,11 @@ def test_an_intent_user_carries_credentials_status_expiry_limits_and_usage() -> 
     assert carried.notes == {}
 
 
+def test_the_intents_display_names_travel_with_the_import() -> None:
+    carried = carry_users([_user(), _user("bob")], ["alice", "bob"], display_names={"alice": "Алиса"})
+    assert [user.display_name for user in carried.batch.users] == ["Алиса", ""]
+
+
 def test_remnawaves_never_is_no_expiry() -> None:
     assert carry_users([_user()], ["alice"]).batch.users[0].expire_at is None
 

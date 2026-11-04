@@ -275,9 +275,9 @@ class ClientLimitsResult(CoreModel):
 
 
 def client_metadata_paths(records: Sequence[ClientRecord] | None = None) -> frozenset[str]:
-    """Exact metadata paths in an authorized single-person or list JSON result."""
+    """Exact operator-typed text paths in an authorized single-person or list JSON result."""
     bases = ["data.client"] if records is None else [f"data.clients.{index}" for index in range(len(records))]
-    return frozenset(f"{base}.{field}" for base in bases for field in ("note", "tag"))
+    return frozenset(f"{base}.{field}" for base in bases for field in ("display_name", "note", "tag"))
 
 
 def connection_credential_paths(view: ClientConnections | None) -> frozenset[str]:

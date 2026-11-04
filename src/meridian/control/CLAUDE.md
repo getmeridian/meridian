@@ -49,6 +49,7 @@ Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `form
 - A proposal whose intent contains a secret-shaped key or value, or a malformed `access` block, is refused and never stored.
 
 ## Pitfalls
+- **Legacy revision names were never validated** — revisions only checked for strings and console people were never checked against topology names, so the schema 26 backfill validates each name and skips held ones, or one bad name stops `ctld` starting.
 - **Shared PWA asset basenames include hyphens** — accept them in routing before the packaged-assets lookup verifies the filename, or a registered helper still gets the unknown-token reply.
 - **Account time follows the injected service clock** — reads, enforcement, settings periods, expiry previews, traffic history, and server liveness must use the same instant as subscriptions and owner sessions; wall-time reads can disagree with them. Sample it once per transaction.
 - **App blocks cover personal page files and legacy redirects** — use the shared decision before rendering or redirecting, or support/config routes reveal a valid token through a blocked app.
