@@ -170,6 +170,9 @@ def offer_device_revocation(cluster: ClusterConfig, *, ask: bool) -> None:
     """
     try:
         own = load_device_key()
+    except MeridianError:
+        own = None  # an unreadable key here hides no other computer's key; list them all
+    try:
         with backup_client(cluster, report_mutations=True) as client:
             others = [
                 device
@@ -186,8 +189,13 @@ def offer_device_revocation(cluster: ClusterConfig, *, ask: bool) -> None:
                 err_console.print("  [dim]Revoke any you no longer hold: meridian backup revoke ID[/dim]")
                 return
             for device in others:
-                if confirm(f"Revoke {device.name}'s backup key?", default=False):
+                if not confirm(f"Revoke {device.name}'s backup key?", default=False):
+                    continue
+                try:
                     client.revoke_device_key(device.id)
+                except MeridianError as exc:
+                    warn(f"Could not revoke {device.name}'s backup key: {exc}. Run: meridian backup revoke {device.id}")
+                else:
                     ok(f"Revoked {device.name}'s backup key")
     except MeridianError as exc:
         warn(f"Could not read the fleet's backup keys: {exc}. Check them with `meridian backup devices`.")

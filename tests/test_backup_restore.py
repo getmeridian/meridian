@@ -591,3 +591,39 @@ def test_a_restore_hands_back_a_setup_link_because_owners_never_ride_a_snapshot(
     restore_command._hand_back(cluster, ask=False)
 
     assert "#setup=" in capsys.readouterr().err
+
+
+def test_unread_links_after_a_finished_restore_warn_instead_of_failing(
+    fleet: tuple[ClusterConfig, Path], new_server: NewServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def unreachable(cluster: ClusterConfig) -> list[Any]:
+        raise BackupError("the service timed out")
+
+    monkeypatch.setattr(restore_steps, "service_answers", lambda url, token: False)
+    monkeypatch.setattr(restore_steps, "restored_handoffs", unreachable)
+    cluster, snapshot = fleet
+    restorer, target = _restorer(cluster)
+
+    outcome = restorer.run(restorer.review(target, _source(snapshot)), new_server.apply)
+
+    assert outcome.links_change and outcome.links == [] and "timed out" in outcome.links_error
+    assert ClusterConfig.load().control_restore.step == "done"  # type: ignore[union-attr]
+
+
+def test_an_unreachable_panel_after_a_restore_warns_and_still_offers_revocation(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from meridian.commands import restore as restore_command
+    from meridian.control.client import ControlServiceError
+
+    offered: list[bool] = []
+
+    def unreachable(cluster: ClusterConfig, *, setup_link: bool) -> None:
+        raise ControlServiceError("connection refused")
+
+    monkeypatch.setattr(restore_command, "print_panel_access", unreachable)
+    monkeypatch.setattr(restore_command, "offer_device_revocation", lambda cluster, *, ask: offered.append(ask))
+
+    restore_command._hand_back(ClusterConfig(), ask=True)
+
+    assert "meridian panel" in " ".join(capsys.readouterr().err.split()) and offered == [True]

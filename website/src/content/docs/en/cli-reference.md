@@ -759,7 +759,7 @@ meridian restore --to SERVER [--snapshot FILE] [--recovery-key] [--force]
 |------|---------|-------------|
 | `--to SERVER` | (required) | The new control server: an IP, `user@IP:port`, or a saved name |
 | `--snapshot FILE` | newest saved | Snapshot to restore |
-| `--recovery-key` | | Open the snapshot with the recovery key instead of this machine's key; it is asked for (hidden) or read from one line of standard input. Asked for anyway when this machine has no key of its own |
+| `--recovery-key` | | Open the snapshot with the recovery key instead of this machine's key; it is asked for (hidden) or read from one line of standard input. Asked for at a terminal when this machine has no key of its own |
 | `--force` | | Restore even though the old control service still answers |
 | `--name NAME` | (none) | Name for the new server |
 | `--user/-u USER` | root | SSH user on the new server |

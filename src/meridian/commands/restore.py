@@ -174,7 +174,10 @@ def _open_snapshot(explicit: str, *, recovery_key: bool) -> RestoreSource:
 def _read_recovery_key() -> str:
     """The recovery key from a hidden prompt, or from stdin without a terminal; never from argv."""
     if sys.stdin.isatty():
-        key = getpass.getpass("  Recovery key (AGE-SECRET-KEY-1...): ")
+        try:
+            key = getpass.getpass("  Recovery key (AGE-SECRET-KEY-1...): ")
+        except EOFError:
+            key = ""
     else:
         key = sys.stdin.readline()
     if not key.strip():
@@ -263,7 +266,7 @@ def _render(review: RestoreReview, registry: ServerRegistry) -> None:
             f"  [bold yellow]Every subscription URL changes[/bold yellow]: links name {escape(review.from_address)}, "
             f"and will name {escape(review.target.host)}."
         )
-        print_("  Each client's new link is printed at the end; send it to them. Their apps keep failing on the old")
+        print_("  Everyone's new link is printed at the end; send it to them. Their apps keep failing on the old")
         print_("  link until they import the new one.")
     else:
         print_("  Subscription URLs stay the same once DNS points at the new server.")
@@ -287,8 +290,15 @@ def _render(review: RestoreReview, registry: ServerRegistry) -> None:
 
 def _done(outcome: RestoreOutcome) -> None:
     ok(f"Restored the control service at fleet epoch {outcome.fleet_epoch}")
-    if outcome.links_change:
+    if outcome.links_error:
+        warn(
+            f"Every subscription URL changed, but the new links could not be read: {outcome.links_error}. "
+            "Share them from the web panel, or with `meridian client show NAME`."
+        )
+    elif outcome.links_change and outcome.links:
         warn("Every subscription URL changed. Send each person their new link:")
+    elif outcome.links_change:
+        info("Every subscription URL changed; nobody has one yet.")
     else:
         info("Subscription URLs are unchanged.")
     for links in outcome.links:

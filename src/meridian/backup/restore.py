@@ -42,7 +42,7 @@ from meridian.control.client import ControlClient, ControlServiceAuthError, Cont
 from meridian.control.restore import stage_restored_database
 from meridian.control.snapshot import Snapshot, SnapshotError, SnapshotHeader, read_header
 from meridian.core.access_profiles import profile_declarations_hash
-from meridian.core.errors import LocalStateError
+from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.inputs import is_ip
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
@@ -124,6 +124,7 @@ class RestoreOutcome:
     links: list[HandoffLinks] = field(default_factory=list)
     links_change: bool = False
     fleet_epoch: int = 0
+    links_error: str = ""
 
 
 class ControlRestorer:
@@ -307,12 +308,19 @@ class ControlRestorer:
             apply(self.cluster, review.intent)
             self._checkpoint(restore, "applied")
         links: list[HandoffLinks] = []
+        links_error = ""
         if restore.links_change:
             self._on_step("Reading everyone's new links")
-            links = restored_handoffs(self.cluster)
+            try:
+                links = restored_handoffs(self.cluster)
+            except MeridianError as exc:
+                # The fleet is restored; an unread list must not turn that into a failure.
+                links_error = str(exc)
         restore.finished_at = _iso(self._now())
         self._checkpoint(restore, "done")
-        return RestoreOutcome(links=links, links_change=restore.links_change, fleet_epoch=restore.fleet_epoch)
+        return RestoreOutcome(
+            links=links, links_change=restore.links_change, fleet_epoch=restore.fleet_epoch, links_error=links_error
+        )
 
     def _take_over(self, review: RestoreReview) -> None:
         """Mark each context holding a stale copy of this fleet superseded, before anything changes remotely.
