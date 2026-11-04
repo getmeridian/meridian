@@ -449,7 +449,7 @@ meridian route remove EXIT ROUTE [--yes] [--json]
 
 **`route list`** — shows each exit's default egress and its routes in match order.
 
-**`route remove`** — removes one route and applies the change; its destinations follow the exit's default egress again. WARP stays installed on the server but carries nothing until a route or `--warp` uses it again.
+**`route remove`** — removes one route and applies the change; its destinations follow the exit's default egress again. When nothing on the exit uses WARP any more (no `warp` route and no `--warp`), the apply removes the WARP client from the server.
 
 ### meridian fleet
 

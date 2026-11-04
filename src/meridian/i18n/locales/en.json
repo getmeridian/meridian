@@ -208,6 +208,7 @@
   "step.deploy_pwa_assets": "Upload connection pages",
   "step.uninstall_meridian": "Uninstall Meridian",
   "step.install_cloudflare_warp": "Install Cloudflare WARP",
+  "step.remove_cloudflare_warp": "Remove Cloudflare WARP",
   "step.install_tcp_forwarder": "Install TCP forwarder",
   "client.reissue_confirm": "Reissue links for '{name}'? Their current page and subscription stop working immediately.",
   "client.reissued": "Reissued links for '{name}'. The old page and subscription no longer work.",

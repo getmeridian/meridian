@@ -9,9 +9,13 @@ from meridian.compiler.models import (
 )
 from meridian.provision.ensure import ensure_file_content
 from meridian.provision.steps import ProvisionContext, StepResult
-from meridian.provision.warp import InstallWarp
+from meridian.provision.warp import WARP_SOURCE_LIST, InstallWarp, RemoveWarp
 from meridian.reconciler.resources import ResourceAction, ResourceReconcileError, UnknownResourceOutcome
-from meridian.reconciler.server_evidence import managed_command_output
+from meridian.reconciler.server_evidence import (
+    managed_command_output,
+    require_available_evidence,
+    require_successful_evidence,
+)
 from meridian.ssh import ServerConnection
 
 
@@ -59,6 +63,31 @@ def warp_connected(logical_id: str, conn: ServerConnection) -> bool:
     status = conn.run("warp-cli --accept-tos status 2>/dev/null", timeout=15)
     output = managed_command_output(logical_id, status, "WARP status")
     return output is not None and "Connected" in output
+
+
+def warp_installed(logical_id: str, conn: ServerConnection) -> bool:
+    """Whether the WARP package or its APT source is still on the server.
+
+    dpkg lists removed packages too, so the state is read; its exit 1 alone proves the package
+    unknown, and any other failure is unavailable evidence, never absence.
+    """
+    status = conn.run("dpkg-query -W -f='${Status}' cloudflare-warp", timeout=15)
+    require_available_evidence(logical_id, status, "WARP package state")
+    if status.returncode != 1:
+        require_successful_evidence(logical_id, status, "WARP package state")
+        if status.stdout.split()[-1:] == ["installed"]:
+            return True
+    source = conn.run(f"test -e {WARP_SOURCE_LIST} && echo present || true", timeout=15)
+    require_successful_evidence(logical_id, source, "WARP APT source")
+    return source.stdout.strip() == "present"
+
+
+def remove_warp(action: ResourceAction, conn: ServerConnection, address: str) -> None:
+    """Remove WARP once the exit stops routing through it, so no idle daemon keeps a Cloudflare tunnel."""
+    result = RemoveWarp().run(conn, ProvisionContext(ip=address))
+    if result.status == "failed":
+        raise_if_step_timeout(action, result)
+        raise ResourceReconcileError(f"Could not remove WARP: {result.detail}")
 
 
 def ensure_warp(conn: ServerConnection, address: str) -> None:

@@ -44,6 +44,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   people in the same batch are still deleted atomically (#95).
 
 #### Fixed
+- Turning WARP off on an exit (no `--warp` and no `warp` route left) removes the WARP
+  client, so no idle daemon keeps a Cloudflare tunnel open (#95).
 - Adding a person in the web panel moves keyboard focus to their page (#95).
 - Connection pages load their delivery-capability helper from the service, so
   supported-app limits appear without a missing-script error (#95).

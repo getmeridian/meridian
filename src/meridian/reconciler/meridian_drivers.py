@@ -71,7 +71,7 @@ from meridian.reconciler.resources import (
     postcondition_key,
 )
 from meridian.reconciler.server_evidence import require_available_evidence
-from meridian.reconciler.server_support import ensure_warp, warp_connected
+from meridian.reconciler.server_support import ensure_warp, remove_warp, warp_connected, warp_installed
 from meridian.reconciler.workloads import WorkloadStateManager
 from meridian.ssh import ServerConnection
 from meridian.xray_workload import ServiceRouteCredential, bridge_client_uuid, salamander_password
@@ -202,6 +202,7 @@ class AgentRuntimeDriver:
 
     WARP, when the exit uses it, is installed over SSH first, exactly as on a panel node: it is
     an apt package with its own daemon and registration, outside the agent's resource kinds.
+    Turning WARP off removes it only after the exit's workload stops using it.
 
     The agent generates its node key, enrolls with the token, and rewrites the
     bootstrap with the token nulled, so observation compares only the identity
@@ -225,7 +226,8 @@ class AgentRuntimeDriver:
         inspection = self._inspect(payload)
         in_place = inspection.in_place
         if in_place and payload.warp:
-            in_place = warp_connected(action.resource.logical_id, self.context.connection_for(payload.server_ref))
+            conn = self.context.connection_for(payload.server_ref)
+            in_place = warp_connected(action.resource.logical_id, conn)
         return _observation(
             action, exists=in_place, connected=in_place and inspection.live, remote_id=payload.workload_ref
         )
@@ -435,9 +437,11 @@ class NodeWorkloadDriver:
         with self.context.client() as client:
             status = client.node(payload.workload_ref)
         stored = status is not None and status.spec_sha256 == _spec_hash(spec)
-        return _observation(
-            action, exists=stored, connected=stored and _applied(status), remote_id=payload.workload_ref
-        )
+        connected = stored and _applied(status)
+        if connected and _drops_warp(payload):
+            conn = self.context.connection_for(payload.server_ref)
+            connected = not warp_installed(action.resource.logical_id, conn)
+        return _observation(action, exists=stored, connected=connected, remote_id=payload.workload_ref)
 
     @_uncertain_writes_are_unknown
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
@@ -481,6 +485,11 @@ class NodeWorkloadDriver:
                 if current is None:
                     raise ResourceReconcileError(f"The control service lost node {payload.workload_ref}.")
                 status = current
+        # Only now has Xray stopped dialing WARP's proxy, so removing WARP cannot blackhole the exit.
+        if _drops_warp(payload):
+            conn = self.context.connection_for(payload.server_ref)
+            if warp_installed(action.resource.logical_id, conn):
+                remove_warp(action, conn, self.context.address(payload.server_ref))
         return ResourceApplyReceipt(remote_id=payload.workload_ref)
 
     def retire(self, binding: ManagedResourceBinding) -> None:
@@ -661,6 +670,11 @@ def _observation(action: ResourceAction, *, exists: bool, connected: bool, remot
         remote_id=remote_id if exists else "",
         satisfied_postconditions=satisfied,
     )
+
+
+def _drops_warp(payload: NodeWorkloadPayload) -> bool:
+    """An exit whose routes no longer use WARP; its agent installed WARP only while they did."""
+    return payload.profile.workload_kind == "exit" and "warp" not in payload.profile.outbound_tags
 
 
 def _applied(status: NodeStatus | None) -> bool:

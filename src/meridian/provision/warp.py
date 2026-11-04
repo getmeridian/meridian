@@ -12,11 +12,13 @@ from __future__ import annotations
 
 from meridian.facts import ServerFacts
 from meridian.provision.apt_keys import verify_apt_key
-from meridian.provision.ensure import apt_failure, apt_update_and_install
+from meridian.provision.ensure import apt_failure, apt_update_and_install, run_apt
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.ssh import ServerConnection
 
 WARP_PROXY_PORT = 40000
+WARP_SOURCE_LIST = "/etc/apt/sources.list.d/cloudflare-client.list"
+WARP_KEYRING = "/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg"
 
 
 # ---------------------------------------------------------------------------
@@ -46,8 +48,7 @@ class InstallWarp:
             if key_error:
                 return StepResult(name=self.name, status="failed", detail=key_error)
             result = conn.run(
-                f"gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg {key_download}"
-                f" && rm -f {key_download}",
+                f"gpg --yes --dearmor --output {WARP_KEYRING} {key_download} && rm -f {key_download}",
                 timeout=30,
             )
             if result.returncode != 0:
@@ -56,9 +57,9 @@ class InstallWarp:
             # Minimal Debian images ship without lsb_release; os-release always exists.
             facts = ServerFacts(conn)
             result = conn.put_text(
-                "/etc/apt/sources.list.d/cloudflare-client.list",
+                WARP_SOURCE_LIST,
                 f"deb [arch={facts.dpkg_arch()}"
-                " signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg]"
+                f" signed-by={WARP_KEYRING}]"
                 f" https://pkg.cloudflareclient.com/ {facts.os_release().version_codename} main\n",
                 mode="644",
                 timeout=15,
@@ -126,6 +127,26 @@ class InstallWarp:
         )
 
 
-# Note: WARP outbound configuration is handled in _build_xray_config (setup.py)
-# which adds the WARP SOCKS5 outbound to the Xray config profile at deploy time.
-# The old ConfigureWarpOutbound provisioner step is no longer needed.
+class RemoveWarp:
+    """Remove the WARP client an exit no longer routes through: its Cloudflare registration, daemon,
+    package, and the APT source this module added."""
+
+    name = "Remove Cloudflare WARP"
+
+    def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
+        # A stopped daemon refuses warp-cli, so the registration goes first; both may already be gone.
+        stop = conn.run(
+            "warp-cli --accept-tos disconnect >/dev/null 2>&1;"
+            " warp-cli --accept-tos registration delete >/dev/null 2>&1;"
+            " systemctl disable --now warp-svc >/dev/null 2>&1; true",
+            timeout=60,
+        )
+        result = run_apt(conn, "apt-get purge -y -qq cloudflare-warp", timeout=120, operation_name="WARP removal")
+        if result.returncode != 0:
+            detail = f"Failed to remove cloudflare-warp: {apt_failure(result)}"
+            return StepResult(name=self.name, status="failed", detail=detail, commands=[stop, result])
+        cleanup = conn.run(f"rm -f {WARP_SOURCE_LIST} {WARP_KEYRING}", timeout=15)
+        if cleanup.returncode != 0:
+            detail = f"Failed to remove the WARP APT source: {cleanup.stderr.strip() or cleanup.returncode}"
+            return StepResult(name=self.name, status="failed", detail=detail, commands=[stop, result, cleanup])
+        return StepResult(name=self.name, status="changed", detail="WARP removed", commands=[stop, result, cleanup])

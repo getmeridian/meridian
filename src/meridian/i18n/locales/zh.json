@@ -208,6 +208,7 @@
   "step.deploy_pwa_assets": "上传连接页面",
   "step.uninstall_meridian": "卸载 Meridian",
   "step.install_cloudflare_warp": "安装 Cloudflare WARP",
+  "step.remove_cloudflare_warp": "移除 Cloudflare WARP",
   "step.install_tcp_forwarder": "安装 TCP 转发器",
   "client.reissue_confirm": "要为“{name}”重新签发链接吗？当前的页面和订阅会立即失效。",
   "client.reissued": "已为“{name}”重新签发链接。旧页面和旧订阅已失效。",

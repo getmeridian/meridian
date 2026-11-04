@@ -449,7 +449,7 @@ meridian route remove EXIT ROUTE [--yes] [--json]
 
 **`route list`** — 显示每个出口的默认出站及其路由的匹配顺序。
 
-**`route remove`** — 删除一个路由并应用更改；其目标遵循出口的默认出站。WARP 保持安装在服务器上但不承载任何东西，直到路由或 `--warp` 再次使用它。
+**`route remove`** — 删除一个路由并应用更改；其目标遵循出口的默认出站。当出口上不再有任何内容使用 WARP（没有 `warp` 路由，也没有 `--warp`）时，应用更改会从服务器上移除 WARP 客户端。
 
 ### meridian fleet
 

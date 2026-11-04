@@ -208,6 +208,7 @@
   "step.deploy_pwa_assets": "Загрузка страниц подключения",
   "step.uninstall_meridian": "Удаление Meridian",
   "step.install_cloudflare_warp": "Установка Cloudflare WARP",
+  "step.remove_cloudflare_warp": "Удаление Cloudflare WARP",
   "step.install_tcp_forwarder": "Установка TCP-форвардера (Realm)",
   "client.reissue_confirm": "Перевыпустить ссылки для «{name}»? Текущая страница подключения и подписка сразу перестанут работать.",
   "client.reissued": "Ссылки для «{name}» перевыпущены. Прежняя страница подключения и подписка больше не работают.",

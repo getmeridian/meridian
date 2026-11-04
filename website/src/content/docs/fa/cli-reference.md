@@ -449,7 +449,7 @@ meridian route remove EXIT ROUTE [--yes] [--json]
 
 **`route list`** — هر exit's egress پیش‌فرض و routes آن را به ترتیب match نشان می‌دهد.
 
-**`route remove`** — یک route را حذف کرده و تغییر را اعمال می‌کند؛ مقاصد آن egress پیش‌فرض exit را دنبال می‌کند دوباره. WARP روی سرور نصب شده باقی می‌ماند اما هیچ چیزی را حمل نمی‌کند تا route یا `--warp` آن را استفاده کند.
+**`route remove`** — یک route را حذف کرده و تغییر را اعمال می‌کند؛ مقاصد آن egress پیش‌فرض exit را دنبال می‌کند دوباره. وقتی دیگر چیزی روی exit از WARP استفاده نکند (نه route از نوع `warp` و نه `--warp`)، اعمال تغییر، کلاینت WARP را از سرور حذف می‌کند.
 
 ### meridian fleet
 
