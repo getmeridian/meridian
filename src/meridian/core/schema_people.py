@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.credential_models import UserCredentialRotation
-from meridian.control.models import UserImport, UserImportBatch, UserPatch, UserRecord, UserUpdate
+from meridian.control.models import UserCreate, UserImport, UserImportBatch, UserPatch, UserRecord, UserUpdate
 from meridian.core.account_schedule import AccountLifecycleSettings, AccountSchedulePreview
 from meridian.core.client_sessions import CredentialRotationRequest, UserFlowBlocks
 from meridian.core.people_bulk import (
@@ -37,6 +37,7 @@ PEOPLE_SCHEMAS: dict[str, type[BaseModel]] = {
     "account-lifecycle-settings": AccountLifecycleSettings,
     "account-schedule-preview": AccountSchedulePreview,
     "user-schedule-preview-request": UserSchedulePreviewRequest,
+    "user-create": UserCreate,
     "user-record": UserRecord,
     "user-update": UserUpdate,
     "user-patch": UserPatch,

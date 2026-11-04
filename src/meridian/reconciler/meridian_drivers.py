@@ -570,11 +570,17 @@ class ControlUserDriver:
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
         payload = payload_of(action, ControlUserPayload)
         with self.context.client() as client:
-            if payload.creation_settings is None:
+            if payload.creation_settings is None and not payload.display_name:
                 client.put_user(payload.username)
             else:
                 try:
-                    client.create_user(UserCreate(username=payload.username, **payload.creation_settings.model_dump()))
+                    client.create_user(
+                        UserCreate(
+                            username=payload.username,
+                            display_name=payload.display_name,
+                            **(payload.creation_settings.model_dump() if payload.creation_settings is not None else {}),
+                        )
+                    )
                 except ControlServiceConflict:
                     # Creation-only: a previous apply or concurrent creator owns the existing settings.
                     if client.get_user(payload.username) is None:

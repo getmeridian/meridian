@@ -264,6 +264,22 @@
           "description": "Null uses the fleet's cap; 0 means unlimited.",
           "title": "Device Limit"
         },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 40,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "const": "",
+              "type": "string"
+            }
+          ],
+          "default": "",
+          "description": "Public person name; empty shows the username.",
+          "title": "Display Name"
+        },
         "expires_at": {
           "description": "UTC timestamp; empty means never.",
           "title": "Expires At",

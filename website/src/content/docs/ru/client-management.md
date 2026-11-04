@@ -427,7 +427,7 @@ scrape_configs:
 | `GET /api/people/bulk/receipts/{receipt_id}` | Прочитать квитанцию без заметок и учётных данных |
 | `POST /api/people/bulk/undo` | Один раз отменить обратимые поля в течение десяти минут |
 | `POST /api/users/preview` | Рассчитать даты нового аккаунта или изменений без сохранения; people/admin или сеанс владельца |
-| `POST /api/users` | Создаёт пользователя с параметрами `username`, `status`, `expire_at`, `traffic_limit_bytes`, `traffic_limit_strategy` и `device_limit` в одной транзакции |
+| `POST /api/users` | Создаёт пользователя с параметрами `username`, `display_name`, `status`, `expire_at`, `traffic_limit_bytes`, `traffic_limit_strategy` и `device_limit` в одной транзакции |
 | `PATCH /api/users/{username}` | Изменяет статус, срок доступа, лимит и период сброса трафика или лимит устройств (неуказанные поля не меняются) |
 | `POST /api/users/{username}/reset-traffic` | Сбрасывает счётчик использованного трафика |
 | `POST /api/users/{username}/extend` | Принимает `{"days": N}` (1–3650) и прибавляет указанное число дней к текущему сроку доступа или к текущему моменту (если срок уже истёк или не был задан) |
@@ -437,6 +437,8 @@ scrape_configs:
 | `GET /api/users/{username}/devices` | Возвращает список или количество устройств согласно выбранному режиму конфиденциальности |
 | `DELETE /api/users/{username}/devices` | Очищает все зарегистрированные устройства пользователя |
 | `DELETE /api/users/{username}/devices/{device_key}` | Удаляет одну запись об устройстве |
+
+`display_name` — публичное имя пользователя на любом языке, которое хранит сервис. Оно видно на странице подключения, в панели и в ответах API даже без `people.private`. Для `POST /api/users` передайте `username`, непустое `display_name` или оба поля; если указано только имя, сервис назначит латинское имя пользователя с учётом уже занятых имён. `username` остаётся постоянным идентификатором. В `PATCH /api/users/{username}` и `PATCH /api/users` отсутствие `display_name` сохраняет имя, а `"display_name": ""` очищает его: будет показан `username`. `POST /api/import/users` также переносит это поле. Совпадение имени или `username` с именем либо `username` другого пользователя после Unicode casefold возвращает `409 name_conflict` («Каждому пользователю нужно отдельное имя»); точный существующий `username` при создании возвращает `409 user_exists`. Применение конфигурации задаёт имя только при создании. Предпросмотр массовых операций показывает имена; квитанции содержат только `username` и не сохраняют текст отображаемых имён.
 
 Прочитайте `credential_generation` через `GET /api/users/{username}`, затем передайте `{"expected_generation": N}` в `POST /api/users/{username}/rotate-credentials` с правом `people.reissue`. Если ключи уже изменились, API вернёт `409 credentials_changed`: повтор после потерянного ответа не сменит их ещё раз. Ответ содержит `user`, `subscription_preserved: true`, `flow_blocks` и `commands`; поля пользователя скрываются по тем же правам на ключи и личные данные, что и при чтении. Параметр `"cut_off": true` требует `commands.cut_off` и ставит в очередь такое же принудительное завершение сеансов после применения ревизии, как перевыпуск ссылки. Для пользователя, объявленного в конфигурации серверов, также нужно `fleet.apply`; владелец веб-панели использует CLI.
 

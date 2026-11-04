@@ -4,6 +4,7 @@ from meridian.control.route_types import BodyScope, ErrorResponse, ExtraCapabili
 
 NOT_FOUND = ErrorResponse(404, ("not_found",))
 CONFLICT = ErrorResponse(409, ("conflict",))
+NAME_CONFLICT = ErrorResponse(409, ("name_conflict",))
 HISTORY_OFF = ErrorResponse(409, ("history_off",))
 CUT_OFF_ERRORS = ErrorResponse(409, ("declared_user", "conflict", "command_queue_full"))
 CUT_OFF_SCOPE = (BodyScope("cut_off", True, "admin", "commands.cut_off"),)

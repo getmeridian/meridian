@@ -68,7 +68,7 @@ def test_handoff_greets_the_person_by_the_name_they_typed() -> None:
 
     intent = single_exit_intent(users=("guest",))
     intent = intent.model_copy(
-        update={"access": intent.access.model_copy(update={"display_names": {"guest": "مهمان"}})}
+        update={"access": intent.access.model_copy(update={"display_names": {"guest": "Old label"}})}
     )
     cluster = ClusterConfig(
         panel=PanelConfig(url="https://198.51.100.1/adminsecret", sub_path="pages"),
@@ -79,6 +79,7 @@ def test_handoff_greets_the_person_by_the_name_they_typed() -> None:
         short_uuid="short1",
         vless_uuid="550e8400-e29b-41d4-a716-446655440000",
         username="guest",
+        display_name="مهمان",
         status="ACTIVE",
     )
     assert user_handoff(cluster, user).name == "مهمان"

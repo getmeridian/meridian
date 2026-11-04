@@ -191,6 +191,9 @@ def _show(*, name: str, operation: OperationContext, connections: bool = False) 
         )
         return
 
+    shown = detail.display_name or detail.username
+    label = shown if shown == detail.username else f"{shown} ({detail.username})"
+    err_console.print(f"  [bold]{escape(label)}[/bold]")
     print_handoff_links(result.subscription_url, page_url=result.share_url)
     if result.client.connections is not None:
         print_connections(result.client.connections)

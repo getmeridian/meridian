@@ -204,7 +204,7 @@ class BulkLedger:
                 changes.append(
                     BulkPersonChange(
                         username=name,
-                        display_name=intent.names.get(name, name),
+                        display_name=user.display_name or name,
                         row_version=version[1],
                         before=before,
                         after=after,
@@ -260,7 +260,13 @@ class BulkLedger:
         row = self.store.row("SELECT body FROM bulk_receipts WHERE id = ?", (receipt_id,))
         if row is None:
             raise ServiceError("not_found", "This bulk receipt is unknown.", 404)
-        return BulkReceipt.model_validate_json(row[0])
+        receipt = BulkReceipt.model_validate_json(row[0])
+        return receipt.model_copy(
+            update={
+                "people": _receipt_people(receipt.people),
+                "undo_people": _receipt_people(receipt.undo_people) if receipt.undo_people is not None else None,
+            }
+        )
 
     def _refuse_stale(self, versions: dict[str, tuple[str, int]]) -> None:
         stale = [name for name, expected in versions.items() if self.people.row_version(name) != expected]
@@ -441,7 +447,7 @@ class BulkLedger:
                 action=review.action,
                 committed_at=now,
                 counts=committed_counts,
-                people=outcomes,
+                people=_receipt_people(outcomes),
                 proposal=review.proposal,
                 changed_nodes=changed_nodes,
                 undo_until=format_timestamp(self.clock() + UNDO_SECONDS)
@@ -529,7 +535,7 @@ class BulkLedger:
                 outcomes.append(
                     BulkPersonChange(
                         username=person.username,
-                        display_name=person.display_name,
+                        display_name=person.username,
                         row_version=versions[person.username][1],
                         before=before,
                         after=after,
@@ -555,3 +561,8 @@ class BulkLedger:
                 now=now,
             )
             return updated
+
+
+def _receipt_people(people: list[BulkPersonChange]) -> list[BulkPersonChange]:
+    """Keep receipt identities content-free, including receipts written by older services."""
+    return [person.model_copy(update={"display_name": person.username}) for person in people]

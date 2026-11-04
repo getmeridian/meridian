@@ -241,6 +241,7 @@ class ServiceAccessPanel:
             id=record.user_id,
             short_uuid=record.sub_token,
             username=record.username,
+            display_name=record.display_name,
             profiles=record.profiles,
             vless_uuid=record.uuid,
             status=record.status.upper(),

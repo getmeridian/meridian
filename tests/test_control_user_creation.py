@@ -137,3 +137,31 @@ def test_access_edits_keep_creation_settings_only_for_remaining_people() -> None
         SetupIntent.model_validate(
             {**original.model_dump(mode="json"), "access": {"users": ["bob"], "creation_settings": {"carol": SETTINGS}}}
         )
+
+
+@pytest.mark.parametrize("settings", [{}, {"traffic_limit_bytes": 123}], ids=["name-only", "with-limits"])
+def test_apply_creates_the_topology_name_once_and_never_restores_it_over_a_service_edit(tmp_path, settings):
+    intent = single_server_intent(None, server_ref="srv-a", client_name="sample").model_dump(mode="json")
+    intent["access"]["display_names"] = {"sample": "Тест"}
+    intent["access"]["creation_settings"] = {"sample": settings} if settings else {}
+    resource = next(
+        r for r in compile_topology(SetupIntent.model_validate(intent)).resources if r.logical_id == "account:sample"
+    )
+    plan = resource_plan(make_resource(resource.logical_id, resource.payload, postconditions=resource.postconditions))
+    action = build_resource_actions(plan, 1)[0]
+    assert resource.payload.display_name == "Тест"
+    with serve_control(tmp_path, clock=lambda: 1793534400.0) as url, ControlClient(url, ADMIN_TOKEN) as client:
+        driver = ControlUserDriver(SimpleNamespace(client=lambda: ControlClient(url, ADMIN_TOKEN)))
+        driver.apply(action, None)
+        assert client.get_user("sample").display_name == "Тест"
+        saved = client.update_user("sample", UserUpdate(display_name="样本", status="disabled"))
+        intent["access"]["display_names"]["sample"] = "Another topology label"
+        changed = next(
+            r
+            for r in compile_topology(SetupIntent.model_validate(intent)).resources
+            if r.logical_id == "account:sample"
+        )
+        later = build_resource_actions(resource_plan(make_resource(changed.logical_id, changed.payload)), 2)[0]
+        assert observation_converges(later, driver.observe(later, None))
+        driver.apply(later, None)
+        assert client.get_user("sample") == saved

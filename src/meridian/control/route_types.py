@@ -10,7 +10,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, Field, TypeAdapter
 
 from meridian.control.http_errors import ApiErrorResponse
-from meridian.control.models import DeviceKeyRecord, ScopeRequirement, TokenRecord, TokenScope, UserCreate
+from meridian.control.models import DeviceKeyRecord, ScopeRequirement, TokenRecord, TokenScope, UserPatch
 from meridian.core.agent_types import NodeId
 from meridian.core.client_devices import ClientDevice
 from meridian.core.token_models import Permission, PermissionRequirement, TokenCapability
@@ -23,7 +23,7 @@ WRITE: TokenScope = "admin"
 # 36-character hex/hyphen form. Tightening any of these is a separate API change.
 PATH_TYPES: dict[str, Any] = {
     "node_id": NodeId,
-    "username": UserCreate.model_fields["username"].rebuild_annotation(),
+    "username": UserPatch.model_fields["username"].rebuild_annotation(),
     "endpoint_id": Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9_.:-]{0,127}$")],
     "token_id": TokenRecord.model_fields["id"].rebuild_annotation(),
     "device_id": DeviceKeyRecord.model_fields["id"].rebuild_annotation(),

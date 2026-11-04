@@ -136,7 +136,8 @@ def test_request_schemas_keep_pydantic_bounds_and_both_patch_forms() -> None:
     schema = _resolve(document, create["requestBody"]["content"]["application/json"]["schema"]["$ref"])
     assert schema["additionalProperties"] is False
     assert schema["properties"]["traffic_limit_bytes"]["maximum"] == MAX_TRAFFIC_LIMIT_BYTES
-    assert "username" in schema["required"]
+    assert {tuple(choice["required"]) for choice in schema["anyOf"]} == {("username",), ("display_name",)}
+    assert schema["anyOf"][1]["properties"]["display_name"]["minLength"] == 1
     named = document["paths"]["/api/users/{username}"]["patch"]
     body = _resolve(document, named["requestBody"]["content"]["application/json"]["schema"]["$ref"])
     assert "username" not in body["properties"]

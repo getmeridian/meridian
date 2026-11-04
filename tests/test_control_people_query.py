@@ -48,6 +48,7 @@ def seed(service: ControlService) -> None:
                 ),
                 UserImport(
                     username="p-b",
+                    display_name="Sample label",
                     uuid="00000000-0000-4000-8000-000000000002",
                     sub_token="sample-token-0002",
                     tag="GROUP_B",

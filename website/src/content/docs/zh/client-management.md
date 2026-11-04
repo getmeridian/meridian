@@ -427,7 +427,7 @@ scrape_configs:
 | `GET /api/people/bulk/receipts/{receipt_id}` | 读取不含备注或凭据的回执 |
 | `POST /api/people/bulk/undo` | 十分钟内撤销一次未发生后续变化的字段 |
 | `POST /api/users/preview` | 预览创建或修改账户的 UTC 日期，不保存；需要 people/admin 或所有者会话 |
-| `POST /api/users` | 在一个事务中创建用户，同时设置 `username`、`status`、`expire_at`、`traffic_limit_bytes`、`traffic_limit_strategy` 和 `device_limit` |
+| `POST /api/users` | 在一个事务中创建用户，同时设置 `username`, `display_name`、`status`、`expire_at`、`traffic_limit_bytes`、`traffic_limit_strategy` 和 `device_limit` |
 | `PATCH /api/users/{username}` | 修改状态、到期时间、流量限额或重置策略、设备上限；未发送的字段保持原值 |
 | `POST /api/users/{username}/reset-traffic` | 重置已用流量 |
 | `POST /api/users/{username}/extend` | 发送 `{"days": N}`（1–3650），从当前时间和原到期时间中较晚者起增加天数；未设到期时间则从现在起算 |
@@ -437,6 +437,8 @@ scrape_configs:
 | `GET /api/users/{username}/devices` | 按所有者选择的隐私级别读取设备注册 |
 | `DELETE /api/users/{username}/devices` | 清除全部注册 |
 | `DELETE /api/users/{username}/devices/{device_key}` | 删除一项注册 |
+
+`display_name` 是支持任意文字的公开显示名称，由服务保存。连接页面、面板和账户读取均可显示它，无需 `people.private`。向 `POST /api/users` 发送 `username`、非空 `display_name` 或两者；仅提供显示名称时，服务会避开已有名称，分配拉丁字母用户名。`username` 始终是稳定标识。`PATCH /api/users/{username}` 和 `PATCH /api/users` 省略 `display_name` 会保留原值；`"display_name": ""` 清空显示名称，改为显示用户名。`POST /api/import/users` 也会导入此字段。显示名称或用户名经 Unicode casefold 后与其他人的显示名称或用户名相同，会返回 `409 name_conflict`（“每个人都需要不同的名称”）；创建时使用已存在的完全相同用户名仍返回 `409 user_exists`。应用拓扑只在创建时设置名称。批量预览显示名称；收据只保留用户名，不保存显示名称文本。
 
 先从 `GET /api/users/{username}` 读取 `credential_generation`，再以 `people.reissue` 权限向 `POST /api/users/{username}/rotate-credentials` 发送 `{"expected_generation": N}`。过期代次返回 `409 credentials_changed`，防止响应不确定时重试而再次更换密钥。响应包含 `user`、`subscription_preserved: true`、`flow_blocks` 和 `commands`；用户字段遵循与读取相同的凭证及私人数据权限。添加 `"cut_off": true` 需要 `commands.cut_off`，并排队执行与重新签发相同的版本门控完整终止操作。轮换配置文件声明的用户还需要 `fleet.apply`；所有者会话使用 CLI。
 

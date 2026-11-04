@@ -22,7 +22,7 @@ from meridian.control.tokens import API_TOKENS_TABLE_V4
 from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPOCH_BASELINES
 from meridian.control.user_flow_blocks import FLOW_BLOCKS_TABLE
 
-SCHEMA_VERSION = 25
+SCHEMA_VERSION = 26
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS secrets (name TEXT PRIMARY KEY, value BLOB NOT NULL);
@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS nodes (
 );
 CREATE TABLE IF NOT EXISTS users (
     username TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL DEFAULT '',
     user_id TEXT NOT NULL UNIQUE,
     credential_generation INTEGER NOT NULL DEFAULT 1,
     uuid TEXT NOT NULL UNIQUE,
@@ -148,6 +149,15 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     MEMBERSHIP_SCHEMA,
     # 24 -> 25: private person delivery overrides and stale-review row versions.
     PERSON_DELIVERY_POLICY_SCHEMA,
+    # 25 -> 26: service-owned names, seeded only by the latest applied revision.
+    (
+        "ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT ''",
+        "WITH names AS (SELECT key, value FROM json_each("
+        " (SELECT json_extract(intent, '$.access.display_names') FROM revisions"
+        " WHERE status = 'applied' ORDER BY number DESC LIMIT 1)))"
+        " UPDATE users SET display_name = (SELECT value FROM names WHERE key = users.username)"
+        " WHERE username IN (SELECT key FROM names WHERE value != '')",
+    ),
 )
 
 

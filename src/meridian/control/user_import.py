@@ -12,6 +12,7 @@ from meridian.control.errors import ServiceError
 from meridian.control.events import EventLedger
 from meridian.control.models import UserImportBatch, UserImportResult, UserRecord
 from meridian.control.period_usage import import_period
+from meridian.control.person_names import PersonNames
 from meridian.control.store import Store
 from meridian.control.user_expiry import require_finite_user_expiry
 from meridian.control.user_policy import period_began, whole_seconds
@@ -34,6 +35,7 @@ def import_users(
     replaced: list[str] = []
     with store.transaction():
         moment = now()
+        names = PersonNames(store)
         for item in batch.users:
             existing = read_user(item.username)
             if existing is not None and not batch.replace:
@@ -43,6 +45,7 @@ def import_users(
                     )
                 unchanged.append(item.username)
                 continue
+            names.require_unique(item.username, item.display_name, excluding=item.username)
             holder = store.row(
                 "SELECT username FROM users WHERE (lower(uuid) = ? OR sub_token = ?) AND username != ?",
                 (item.uuid.lower(), item.sub_token, item.username),
@@ -96,6 +99,7 @@ def import_users(
                 updates = ", ".join(f"{field} = ?" for field in columns)
                 store.db.execute(f"UPDATE users SET {updates} WHERE username = ?", (*values, item.username))
                 replaced.append(item.username)
+            names.reserve(item.username, item.display_name)
             save_memberships(store, record.user_id, record.profiles)
             if item.first_traffic_at is not None:
                 store.db.execute(

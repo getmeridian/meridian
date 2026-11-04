@@ -337,7 +337,7 @@ def _mutate(
             reveal=client_metadata_paths(),
         )
         return
-    shown = cluster.topology_intent.access.display_name(name) if cluster.topology_intent else name
+    shown = updated.display_name or name
     ok(t(done_key, name=shown))
     err_console.print()
     print_client_usage(build_client_record(updated))

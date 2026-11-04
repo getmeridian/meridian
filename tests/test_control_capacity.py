@@ -176,7 +176,8 @@ def test_capacity_migration_is_one_self_contained_step_from_22(tmp_path: Path) -
     store.create(
         "CREATE TABLE meta(key TEXT PRIMARY KEY,value TEXT);"
         "CREATE TABLE nodes(node_id TEXT PRIMARY KEY);"
-        "CREATE TABLE users(user_id TEXT PRIMARY KEY);"
+        "CREATE TABLE users(user_id TEXT PRIMARY KEY, username TEXT);"
+        "CREATE TABLE revisions(number INTEGER PRIMARY KEY, status TEXT, intent TEXT);"
         "CREATE TABLE people_versions(user_id TEXT PRIMARY KEY, version INTEGER NOT NULL);"
     )
     with store.transaction():

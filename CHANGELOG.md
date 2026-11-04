@@ -14,6 +14,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
 
 ### Since 4.0.0b12
 
+#### Added
+- People can have names in any script through the API, with Latin usernames assigned automatically (#95).
+
 #### Changed
 - `meridian restore` ends with a one-time setup link for the restored web panel,
   then lists other computers' backup keys and offers to revoke any you no longer

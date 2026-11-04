@@ -79,6 +79,7 @@ def with_people_replies(data: dict) -> dict:
                 imports.append(
                     UserImport(
                         username=row["username"],
+                        display_name=row.get("display_name") or data.get("names", {}).get(row["username"], ""),
                         uuid=f"00000000-0000-4000-8000-{index:012d}",
                         sub_token=f"sample-token-{index:010d}",
                         status=row.get("status", "active"),

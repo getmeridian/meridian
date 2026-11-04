@@ -114,10 +114,5 @@ class ConnectionPages:
         return SubscriptionResponse(302, "text/html; charset=utf-8", "", dict(SECURITY_HEADERS) | {"Location": target})
 
     def _display_name(self, username: str) -> str:
-        from meridian.control.ui_views import applied_intent
-
-        _, intent = applied_intent(self._service)
-        access = intent.get("access")
-        names = access.get("display_names") if isinstance(access, dict) else None
-        shown = names.get(username) if isinstance(names, dict) else None
-        return shown if isinstance(shown, str) and shown else username
+        row = self._store.row("SELECT display_name FROM users WHERE username = ?", (username,))
+        return (row["display_name"] or username) if row is not None else username

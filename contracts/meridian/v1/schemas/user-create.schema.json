@@ -1,0 +1,4 @@
+{
+  "additionalProperties": true,
+  "type": "object"
+}

@@ -50,8 +50,8 @@ WITH evidence AS MATERIALIZED (
  SELECT u.username, u.user_id, u.status, u.tag, u.expire_at, u.created_at,
  u.traffic_limit_bytes, u.activation_duration_days, u.renewal_interval_days, u.renewal_interval_months,
  v.sequence, v.version,
- people_display(u.username) AS display_name,
- people_fold(people_display(u.username)) AS name_key,
+ COALESCE(NULLIF(u.display_name, ''), u.username) AS display_name,
+ people_fold(COALESCE(NULLIF(u.display_name, ''), u.username)) AS name_key,
  people_used(COALESCE(t.uplink_bytes, 0), COALESCE(t.downlink_bytes, 0),
     u.traffic_upload_offset_bytes, u.traffic_download_offset_bytes,
     u.traffic_period_carried_bytes) AS used,
@@ -77,9 +77,7 @@ class PeopleQueryEngine:
     def __init__(self, store: Store, *, clock: Callable[[], float]) -> None:
         self.store, self.clock = store, clock
         self._key = secrets.token_bytes(32)
-        self._names: dict[str, str] = {}
         store.db.create_function("people_fold", 1, str.casefold, deterministic=True)
-        store.db.create_function("people_display", 1, lambda name: self._names.get(name, name))
         store.db.create_function(
             "people_time",
             1,
@@ -188,7 +186,6 @@ class PeopleQueryEngine:
         if query.cursor:
             raise ServiceError("invalid_request", "Bulk selection needs a query without a cursor.", 400)
         with self.store.lock:
-            self._names = self.intent().names
             data, _ = self._view(query)
             if now is not None:
                 data["now"] = now
@@ -278,7 +275,7 @@ class PeopleQueryEngine:
                 **records[name].model_dump(
                     include=set(PeoplePerson.model_fields) - {"display_name", "row_version", "declared", "has_notes"}
                 ),
-                display_name=intent.names.get(name, name),
+                display_name=records[name].display_name or name,
                 row_version=versions[name],
                 declared=name in intent.declared,
                 has_notes=bool(records[name].note),
@@ -290,7 +287,6 @@ class PeopleQueryEngine:
         query = PeopleQuery.model_validate(query.model_dump())
         with self.store.lock:
             intent = self.intent()
-            self._names = intent.names
             data, last = self._view(query)
             predicates = self.predicates(query, data)
             total, population, facets = self._facets(predicates, data)

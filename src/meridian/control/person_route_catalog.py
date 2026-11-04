@@ -31,6 +31,7 @@ from meridian.control.route_metadata import (
     DECLARED_CAPABILITY,
     DECLARED_USER,
     HISTORY_OFF,
+    NAME_CONFLICT,
     NOT_FOUND,
     USER_CREDENTIALS,
     USER_RESPONSE_CAPABILITIES,
@@ -67,7 +68,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         credentials=True,
         capability="people.edit",
         extra_capabilities=USER_RESPONSE_CAPABILITIES,
-        refusals=(ErrorResponse(409, ("user_exists",)),),
+        refusals=(ErrorResponse(409, ("user_exists", "name_conflict")),),
     ),
     route(
         "POST",
@@ -79,7 +80,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         "Import credentials, account settings, and usage atomically.",
         credentials=False,
         capability="people.bulk",
-        refusals=(CONFLICT,),
+        refusals=(CONFLICT, NAME_CONFLICT),
     ),
     route(
         "POST",
@@ -160,6 +161,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         credentials=True,
         capability="people.edit",
         extra_capabilities=USER_RESPONSE_CAPABILITIES,
+        refusals=(NAME_CONFLICT,),
         description="No request body is read. A missing person starts active with default limits.",
     ),
     route(
@@ -173,7 +175,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         credentials=True,
         capability="people.edit",
         extra_capabilities=USER_RESPONSE_CAPABILITIES,
-        refusals=(NOT_FOUND,),
+        refusals=(NOT_FOUND, NAME_CONFLICT),
     ),
     route(
         "PATCH",
@@ -186,7 +188,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         credentials=True,
         capability="people.edit",
         extra_capabilities=USER_RESPONSE_CAPABILITIES,
-        refusals=(NOT_FOUND,),
+        refusals=(NOT_FOUND, NAME_CONFLICT),
     ),
     route(
         "POST",

@@ -27,7 +27,7 @@ from meridian.reconciler.meridian_drivers import ControlUserDriver
 from meridian.reconciler.resources import build_resource_actions
 from meridian.remnawave import User
 from meridian.setup.single_server import single_server_intent
-from tests.support.control_service import ADMIN_TOKEN, serve_control
+from tests.support.control_service import ADMIN_TOKEN, seed_legacy_person, serve_control
 from tests.support.topology import single_exit_intent
 
 GIB = 1024**3
@@ -97,7 +97,12 @@ def _fleet(
             client.approve_revision(revision.number)
             client.record_revision_result(revision.number, RevisionResult(status="applied"))
             stack.enter_context(patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster))
-            yield SimpleNamespace(cluster=cluster, create=client.put_user, client=client)
+            yield SimpleNamespace(
+                cluster=cluster,
+                create=client.put_user,
+                legacy_create=lambda username: seed_legacy_person(tmp_path / "control.db", username),
+                client=client,
+            )
     finally:
         set_json_mode(False)
 
@@ -189,7 +194,7 @@ def test_client_set_can_edit_console_people_with_the_services_name_rules(
     username: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     with _fleet(tmp_path, json_mode=True) as fleet:
-        fleet.create(username)
+        (fleet.legacy_create if username == "ALICE" else fleet.create)(username)
         run_set(username, limit="50GB", reset="month", expires=FUTURE_DAY, devices="2")
         client = _envelope(capsys, "client-set-envelope")["data"]["client"]
 
@@ -209,7 +214,7 @@ def test_service_owned_edits_prefer_exact_console_names_and_refuse_ambiguity(
         "reset-traffic": run_reset_traffic,
     }
     with _fleet(tmp_path, json_mode=True) as fleet:
-        fleet.create("ALICE")
+        fleet.legacy_create("ALICE")
         if scope == "people":
             fleet.cluster.panel.api_token = fleet.client.create_token("People desk", "people").token
         original = fleet.client.get_user("alice")
@@ -290,7 +295,7 @@ def test_extend_cli_resolves_console_people_and_reports_the_effective_expiry_and
     with _fleet(
         tmp_path, json_mode=True, clock=lambda: datetime.fromisoformat("2026-10-29T12:00:00Z").timestamp()
     ) as fleet:
-        fleet.create("ALICE")
+        fleet.legacy_create("ALICE")
         fleet.client.update_user("ALICE", UserUpdate(status="disabled", expire_at="2026-12-01T00:00:00Z"))
         if scope == "people":
             fleet.cluster.panel.api_token = fleet.client.create_token("People desk", "people").token
@@ -455,7 +460,7 @@ def test_client_show_prefers_an_exact_console_name_and_refuses_an_ambiguous_one(
 ) -> None:
     """Declared `alice` and console `ALICE` are two people; a case-folded lookup handed out alice's link."""
     with _fleet(tmp_path, json_mode=True) as fleet:
-        fleet.create("ALICE")
+        fleet.legacy_create("ALICE")
         with patch("meridian.commands.client.page_url", return_value=""):
             run_show("ALICE")
             client = _envelope(capsys, "client-show-envelope")["data"]["client"]

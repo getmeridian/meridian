@@ -11447,6 +11447,28 @@
       },
       "UserCreate": {
         "additionalProperties": false,
+        "anyOf": [
+          {
+            "properties": {
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "username"
+            ]
+          },
+          {
+            "properties": {
+              "display_name": {
+                "minLength": 1
+              }
+            },
+            "required": [
+              "display_name"
+            ]
+          }
+        ],
         "description": "A new user with their first settings, created in one step (the console's \"Add person\").",
         "properties": {
           "activation_duration_days": {
@@ -11477,6 +11499,22 @@
             ],
             "default": null,
             "title": "Device Limit"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "description": "Public person name; the service assigns a Latin username when only this is given.",
+            "title": "Display Name"
           },
           "expire_at": {
             "anyOf": [
@@ -11592,14 +11630,19 @@
             "title": "Traffic Reset Anchor Day"
           },
           "username": {
-            "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
-            "title": "Username",
-            "type": "string"
+            "anyOf": [
+              {
+                "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Username"
           }
         },
-        "required": [
-          "username"
-        ],
         "title": "UserCreate",
         "type": "object"
       },
@@ -11981,6 +12024,22 @@
             "default": null,
             "title": "Device Limit"
           },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "description": "Empty shows the username.",
+            "title": "Display Name"
+          },
           "expire_at": {
             "anyOf": [
               {
@@ -12318,6 +12377,22 @@
             "default": null,
             "title": "Device Limit"
           },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "description": "Omitted preserves the name; empty clears it to show the username.",
+            "title": "Display Name"
+          },
           "expire_at": {
             "anyOf": [
               {
@@ -12574,6 +12649,22 @@
             "default": null,
             "description": "Null uses the fleet's cap; 0 means unlimited.",
             "title": "Device Limit"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "description": "Public person name in any script; empty shows the stable username.",
+            "title": "Display Name"
           },
           "expire_at": {
             "anyOf": [
@@ -13154,6 +13245,22 @@
             ],
             "default": null,
             "title": "Device Limit"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "description": "Omitted preserves the name; empty clears it to show the username.",
+            "title": "Display Name"
           },
           "expire_at": {
             "anyOf": [
@@ -15588,7 +15695,8 @@
             },
             "description": "Conflict",
             "x-meridian-error-codes": [
-              "conflict"
+              "conflict",
+              "name_conflict"
             ]
           },
           "413": {
@@ -19884,6 +19992,19 @@
               "not_found"
             ]
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "name_conflict"
+            ]
+          },
           "413": {
             "content": {
               "application/json": {
@@ -20008,6 +20129,7 @@
             },
             "description": "Conflict",
             "x-meridian-error-codes": [
+              "name_conflict",
               "user_exists"
             ]
           },
@@ -20548,6 +20670,19 @@
               "not_found"
             ]
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "name_conflict"
+            ]
+          },
           "413": {
             "content": {
               "application/json": {
@@ -20648,6 +20783,19 @@
             "description": "Forbidden",
             "x-meridian-error-codes": [
               "insufficient_scope"
+            ]
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "name_conflict"
             ]
           },
           "500": {

@@ -160,7 +160,9 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
             renamed[logical_id] = account_id
             replacements[account_id] = (
                 ControlUserPayload(
-                    username=payload.username, creation_settings=intent.access.creation_settings.get(payload.username)
+                    username=payload.username,
+                    display_name=intent.access.display_names.get(payload.username, ""),
+                    creation_settings=intent.access.creation_settings.get(payload.username),
                 ),
                 [CONTROL_SERVICE_ID, SERVICE_SETTINGS_ID],
                 _exists(account_id),

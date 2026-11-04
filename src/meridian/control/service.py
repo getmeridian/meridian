@@ -64,6 +64,7 @@ from meridian.control.people_query import PeopleQueryEngine
 from meridian.control.period_usage import reset_period
 from meridian.control.person_connections import read_connections
 from meridian.control.person_delivery_policy import DeliveryPolicyLedger
+from meridian.control.person_names import assign_person_username
 from meridian.control.privacy import PrivacyLedger, read_privacy
 from meridian.control.response_rule_testing import test_response_rules
 from meridian.control.revisions import RevisionLedger
@@ -429,6 +430,8 @@ class ControlService:
         the limits or expiry the form asked for.
         """
         with self._transaction():
+            create = assign_person_username(self._store, create)
+            assert create.username is not None
             if self.get_user(create.username) is not None:
                 raise ServiceError("user_exists", f"User {create.username!r} already exists.", 409)
             self._insert_user(create)
@@ -437,6 +440,7 @@ class ControlService:
             return self._require_user(create.username)
 
     def _insert_user(self, create: UserCreate) -> None:
+        assert create.username is not None
         insert_user(self._store, create, now=self.now)
         self.events.append("user.created", create.username)
 
@@ -560,6 +564,14 @@ class ControlService:
         with self._lock:
             row = self._db.execute(f"{USER_SELECT} WHERE u.username = ?", (username,)).fetchone()
         return user_record(row, now=datetime.fromisoformat(self.now())) if row else None
+
+    def display_names(self) -> dict[str, str]:
+        """Public names for fleet views; empty names fall back to usernames in the consumer."""
+        with self._lock:
+            return {
+                row["username"]: row["display_name"]
+                for row in self._store.rows("SELECT username, display_name FROM users WHERE display_name != ''")
+            }
 
     def list_users(self) -> list[UserRecord]:
         with self._lock:

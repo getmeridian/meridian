@@ -57,8 +57,7 @@ def fleet_view(service: ControlService) -> FleetView:
     for gateway in _items(intent, "routing_gateways"):
         roles[str(gateway.get("id", ""))] = ("gateway", str(gateway.get("region") or ""))
     declared = declared_users(intent)
-    names = _access(intent).get("display_names", {})
-    display_names = {str(k): str(v) for k, v in names.items()} if isinstance(names, dict) else {}
+    display_names = service.display_names()
     traffic = service.traffic.node_totals()
     servers: list[ServerView] = []
     moment = datetime.fromisoformat(service.now())

@@ -21,6 +21,7 @@
 ## Pitfalls
 - **Legacy backends cannot enforce response rules** — refuse nonempty app rules before compilation, including built-in policy choices, since only Meridian's service-settings resources carry them.
 - **Hash grants before resolving them** — service settings carry the core declaration fingerprint; a compiled map changes when protocols or camouflage inbounds change, even when the declared grants do not.
+- **Person names are creation-only** — control-user payloads carry topology display names at creation; later applies preserve service names.
 - **Creation profiles share the delivery resolver** — re-check initial memberships at compile even for an already-built intent; conflicting defaults cannot reach apply.
 - **Legacy backends cannot enforce profiles** — refuse named grants or initial memberships on Remnawave before compiling; only migration uses that backend.
 - **Policies follow stored references** — settings wait for workloads and endpoints; accounts always wait for settings, or their new membership can invalidate the same apply's access fence when the last profile disappears.

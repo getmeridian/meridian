@@ -16,7 +16,7 @@ from meridian.core.agent_types import Sha256Hex
 from meridian.core.client_devices import DeviceCap
 from meridian.core.client_limits import canonical_expiry, traffic_reset_from_strategy
 from meridian.core.client_sessions import UserFlowBlocks
-from meridian.core.inputs import TopologyIdValue
+from meridian.core.inputs import DisplayNameValue, TopologyIdValue
 from meridian.core.languages import Language
 from meridian.core.models import CoreModel
 from meridian.core.people_bulk import BulkPreview, BulkReceipt
@@ -36,6 +36,9 @@ class PanelUserLike(Protocol):
 
     @property
     def username(self) -> str: ...
+
+    @property
+    def display_name(self) -> str: ...
 
     @property
     def vless_uuid(self) -> str: ...
@@ -75,6 +78,9 @@ class ClientRecord(UserTrafficEvidence, AccountLifecycleState):
     """Redacted client metadata suitable for list views."""
 
     username: str
+    display_name: DisplayNameValue | Literal[""] = Field(
+        default="", exclude_if=lambda name: not name, description="Public person name; empty shows the username."
+    )
     profiles: list[TopologyIdValue] = Field(
         default_factory=default_profiles, description="Operator-owned access memberships; people/admin only."
     )
@@ -301,6 +307,7 @@ def build_client_record(
             }
         ).model_dump(),
         username=user.username,
+        display_name=getattr(user, "display_name", ""),
         profiles=getattr(user, "profiles", default_profiles()),
         id=user.id,
         status=user.status,

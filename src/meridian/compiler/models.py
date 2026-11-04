@@ -21,6 +21,7 @@ from meridian.core.agent_types import Sha256Hex
 from meridian.core.client_limits import UserCreationSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.inputs import (
+    DisplayNameValue,
     IPAddressValue,
     OptionalCountryCodeValue,
     PortValue,
@@ -495,6 +496,7 @@ class ClientEndpointPayload(CoreModel):
 class ControlUserPayload(CoreModel):
     kind: Literal["control_user"] = "control_user"
     username: RemnawaveUsername
+    display_name: DisplayNameValue | Literal[""] = Field(default="", exclude_if=lambda name: not name)
     creation_settings: UserCreationSettings | None = Field(default=None, exclude_if=lambda settings: settings is None)
 
 

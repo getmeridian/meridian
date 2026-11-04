@@ -18,6 +18,7 @@ from meridian.core.people_removal import PeopleRemovalProposal
 from meridian.core.topology import SetupIntent
 from meridian.reconciler.fence import FleetFenceError, local_fence_view
 from meridian.service_fence import ControlServiceFence
+from tests.support.control_service import seed_legacy_person
 from tests.support.fence_host import FenceHost
 from tests.support.people_proposals import commit_topology
 from tests.support.text import unstyle
@@ -59,7 +60,7 @@ def review_runtime():
 
 
 @pytest.fixture(params=["casefold", "display_name"])
-def colliding_removal(removal_cli, request):
+def colliding_removal(removal_cli, request, tmp_path):
     remote, cluster = removal_cli
     console_name = "SAMPLE-A" if request.param == "casefold" else "sample-display"
     data = cluster.topology_intent.model_dump(mode="json")
@@ -67,7 +68,10 @@ def colliding_removal(removal_cli, request):
         data["access"]["display_names"] = {"sample-a": console_name}
     cluster.topology_intent = SetupIntent.model_validate(data)
     commit_topology(remote.service, cluster.topology_intent)
-    remote.service.create_user(UserCreate(username=console_name))
+    # Pre-26 accounts may be ambiguous; current account writes correctly refuse this state.
+    seed_legacy_person(tmp_path / "control.db", console_name)
+    if request.param == "display_name":
+        remote.service._db.execute("UPDATE users SET display_name = ? WHERE username = ?", (console_name, "sample-a"))
     proposal = preview(remote.service, "delete", names=["sample-a"]).proposal
     forged = PeopleRemovalProposal.model_validate({**proposal.to_data(), "usernames": [console_name]})
     return remote, cluster, forged

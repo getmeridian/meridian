@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BeforeValidator, Field, field_validator, model_validator
+from pydantic import BeforeValidator, ConfigDict, Field, field_validator, model_validator
 
 from meridian.core.access_profiles import AccessProfileMap, InboundReference, ProfileMembership, default_profiles
 from meridian.core.account_schedule import AccountLifecycleSettings, AccountLifecycleState, AccountSchedulePreview
@@ -35,7 +35,7 @@ from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES, LimitStrategy, 
 from meridian.core.client_sessions import CredentialGeneration
 from meridian.core.connection_pages import ConnectionPageSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
-from meridian.core.inputs import ServerReferenceValue, TopologyIdValue, validate_ip_address_value
+from meridian.core.inputs import DisplayNameValue, ServerReferenceValue, TopologyIdValue, validate_ip_address_value
 from meridian.core.languages import Language
 from meridian.core.models import CoreModel
 from meridian.core.person_activity import PersonAttentionReason
@@ -238,6 +238,9 @@ class UserRecord(UserTrafficEvidence, AccountLifecycleState):
     """
 
     username: str
+    display_name: DisplayNameValue | Literal[""] = Field(
+        default="", description="Public person name in any script; empty shows the stable username."
+    )
     profiles: list[TopologyIdValue] = Field(
         default_factory=default_profiles, description="Operator-owned access membership; people.private reads it."
     )
@@ -294,6 +297,9 @@ class UserRecord(UserTrafficEvidence, AccountLifecycleState):
 class UserUpdate(AccountLifecycleSettings):
     """A partial change: omitted fields keep their value; null clears expiry or selects the default device cap."""
 
+    display_name: DisplayNameValue | Literal[""] = Field(
+        default="", description="Omitted preserves the name; empty clears it to show the username."
+    )
     status: Literal["active", "disabled"] | None = None
     profiles: ProfileMembership = Field(default_factory=default_profiles)
     expire_at: Timestamp | None = None
@@ -316,7 +322,24 @@ USERNAME_PATTERN = r"(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\.[A-Za-z0-9_-][A-Za-z
 class UserCreate(UserCreationSettings):
     """A new user with their first settings, created in one step (the console's "Add person")."""
 
-    username: str = Field(pattern=rf"^{USERNAME_PATTERN}$")
+    model_config = ConfigDict(
+        json_schema_extra={
+            "anyOf": [
+                {"required": ["username"], "properties": {"username": {"type": "string"}}},
+                {"required": ["display_name"], "properties": {"display_name": {"minLength": 1}}},
+            ]
+        }
+    )
+    username: str | None = Field(default=None, pattern=rf"^{USERNAME_PATTERN}$")
+    display_name: DisplayNameValue | Literal[""] = Field(
+        default="", description="Public person name; the service assigns a Latin username when only this is given."
+    )
+
+    @model_validator(mode="after")
+    def _name_required(self) -> UserCreate:
+        if self.username is None and not self.display_name:
+            raise ValueError("A username or display name is required.")
+        return self
 
 
 class UserPatch(UserUpdate):
@@ -339,6 +362,7 @@ class UserImport(AccountLifecycleState):
     """
 
     username: str = Field(pattern=rf"^{USERNAME_PATTERN}$")
+    display_name: DisplayNameValue | Literal[""] = Field(default="", description="Empty shows the username.")
     profiles: ProfileMembership | None = Field(
         default=None,
         exclude_if=lambda value: value is None,

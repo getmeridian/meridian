@@ -23,7 +23,7 @@
 - **Membership is creation-only in fleet documents** — exported initial profiles may create a person, but later applies never replace their live memberships.
 - **Account schedules are creation-only inputs** — existing duration, reset anchor, renewal interval, cap, and progress remain the operator's on every apply.
 - **Reviewed settings carry only what the topology owns** — never the service-owned fleet language, person overrides, or notices.
-- **Access users are partly operator-owned** — the user driver only creates and observes existence; first limits ride atomic creation, and later applies never rewrite status, notes, tags, limits, expiry, or quotas (rewriting them undid `client disable`).
+- **Access users are partly operator-owned** — the user driver only creates and observes existence; first limits ride atomic creation, and topology display names ride creation too; later applies never rewrite names, status, notes, tags, limits, expiry, or quotas (rewriting them undid `client disable`).
 - **A user retirement with a saved cut-off deletes credentials and queues resets atomically**; a 404 after a lost reply means the deletion already committed.
 - **An unseen but installed agent gets its backoff first** — after a service outage a healthy agent reads not-live for up to a minute; re-enrolling it then re-keyed every node.
 - **A new agent build is an upgrade, never an enrollment** — hash the running image (`/proc/<MainPID>/exe`), not the file, so a lost restart still reads as the old build; any failure after the swap rolls back.

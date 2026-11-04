@@ -426,7 +426,7 @@ The `token-create`, `token-record`, `token-issued`, `token-list`, `token-preview
 | `GET /api/people/bulk/receipts/{receipt_id}` | Read a receipt without notes or credentials |
 | `POST /api/people/bulk/undo` | Undo unchanged reversible fields once within ten minutes |
 | `POST /api/users/preview` | Preview creation or an edit’s UTC schedule dates without saving; people/admin or owner session |
-| `POST /api/users` | Create a person with `username`, `status`, `expire_at`, `traffic_limit_bytes`, `traffic_limit_strategy`, and `device_limit` in one transaction |
+| `POST /api/users` | Create a person with `username`, `display_name`, `status`, `expire_at`, `traffic_limit_bytes`, `traffic_limit_strategy`, and `device_limit` in one transaction |
 | `PATCH /api/users/{username}` | Change the status, expiry, traffic limit or reset strategy, or device cap; omitted fields keep their values |
 | `POST /api/users/{username}/reset-traffic` | Reset used traffic |
 | `POST /api/users/{username}/extend` | Send `{"days": N}` (1–3650) to add days after the later of now and the current expiry; no expiry starts from now |
@@ -436,6 +436,8 @@ The `token-create`, `token-record`, `token-issued`, `token-list`, `token-preview
 | `GET /api/users/{username}/devices` | Read registrations allowed by the owner's privacy level |
 | `DELETE /api/users/{username}/devices` | Clear all registrations |
 | `DELETE /api/users/{username}/devices/{device_key}` | Remove one registration |
+
+`display_name` is a public person name in any script, stored by the service and visible on connection pages, in the panel, and in person reads even without `people.private`. Send a `username`, a nonempty `display_name`, or both to `POST /api/users`; with only a display name, the service assigns a Latin username around existing names. The username stays the stable identifier. `PATCH /api/users/{username}` and `PATCH /api/users` preserve an omitted `display_name`; `"display_name": ""` clears it to show the username. `POST /api/import/users` carries the field too. A name or username matching another person’s name or username after Unicode casefold returns `409 name_conflict` (“Each person needs a different name”); an exact existing username on creation keeps `409 user_exists`. Applies set names only at creation. Bulk previews show names; receipts keep usernames and never store display-name text.
 
 Read `credential_generation` from `GET /api/users/{username}`, then send `{"expected_generation": N}` to `POST /api/users/{username}/rotate-credentials` with `people.reissue`. A stale generation returns `409 credentials_changed`, so an uncertain retry cannot rotate twice. The response contains `user`, `subscription_preserved: true`, `flow_blocks`, and `commands`; its person fields follow the same credential and private-metadata grants as reads. Adding `"cut_off": true` requires `commands.cut_off` and queues the same revision-gated hard cut-off as reissue. Rotating a declared person also requires `fleet.apply`; owner sessions use the CLI.
 

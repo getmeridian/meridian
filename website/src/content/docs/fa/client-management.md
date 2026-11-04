@@ -427,7 +427,7 @@ scrape_configs:
 | `GET /api/people/bulk/receipts/{receipt_id}` | خواندن رسید بدون یادداشت یا اطلاعات اتصال |
 | `POST /api/people/bulk/undo` | برگشت یک‌باره فیلدهای تغییرنکرده تا ده دقیقه |
 | `POST /api/users/preview` | پیش‌نمایش تاریخ‌های UTC برای ایجاد یا ویرایش بدون ذخیره؛ people/admin یا نشست مالک |
-| `POST /api/users` | ساخت حساب با `username`، `status`، `expire_at`، `traffic_limit_bytes`، `traffic_limit_strategy` و `device_limit` در یک تراکنش |
+| `POST /api/users` | ساخت حساب با `username`, `display_name`، `status`، `expire_at`، `traffic_limit_bytes`، `traffic_limit_strategy` و `device_limit` در یک تراکنش |
 | `PATCH /api/users/{username}` | تغییر وضعیت، انقضا، سقف و دورهٔ بازنشانی ترافیک یا سقف دستگاه؛ فیلدهای ارسال‌نشده حفظ می‌شوند |
 | `POST /api/users/{username}/reset-traffic` | بازنشانی ترافیک مصرف‌شده |
 | `POST /api/users/{username}/extend` | ارسال `{"days": N}` (۱–۳۶۵۰) برای افزودن روزها پس از دیرترِ زمان فعلی و انقضای حساب؛ حساب بدون انقضا از اکنون شروع می‌کند |
@@ -437,6 +437,8 @@ scrape_configs:
 | `GET /api/users/{username}/devices` | خواندن ثبت‌ها در حد سطح حریم خصوصی انتخاب‌شده توسط مالک |
 | `DELETE /api/users/{username}/devices` | پاک‌کردن همهٔ ثبت‌ها |
 | `DELETE /api/users/{username}/devices/{device_key}` | حذف یک ثبت |
+
+`display_name` نام عمومی شخص با هر خطی است؛ سرویس آن را ذخیره می‌کند و صفحهٔ اتصال، پنل و پاسخ‌های حساب حتی بدون `people.private` آن را نشان می‌دهند. در `POST /api/users` یک `username`، یک `display_name` غیرخالی یا هر دو را بفرستید؛ اگر فقط نام نمایشی باشد، سرویس با توجه به نام‌های موجود یک نام کاربری لاتین تعیین می‌کند. `username` شناسهٔ ثابت می‌ماند. در `PATCH /api/users/{username}` و `PATCH /api/users` ارسال‌نکردن `display_name` نام را حفظ می‌کند و `"display_name": ""` آن را پاک می‌کند تا نام کاربری نمایش داده شود. `POST /api/import/users` نیز این فیلد را منتقل می‌کند. تطابق نام نمایشی یا نام کاربری با نام نمایشی یا نام کاربری شخص دیگری پس از Unicode casefold، خطای `409 name_conflict` می‌دهد («هر شخص باید نام متفاوتی داشته باشد»). نام کاربری دقیقاً موجود هنگام ساخت همچنان `409 user_exists` می‌دهد. اعمال توپولوژی نام را فقط هنگام ساخت تعیین می‌کند. پیش‌نمایش عملیات گروهی نام‌ها را نشان می‌دهد؛ رسیدها فقط نام کاربری را نگه می‌دارند و متن نام نمایشی را ذخیره نمی‌کنند.
 
 `credential_generation` را از `GET /api/users/{username}` بخوانید، سپس `{"expected_generation": N}` را با دسترسی `people.reissue` به `POST /api/users/{username}/rotate-credentials` بفرستید. نسل قدیمی با `409 credentials_changed` رد می‌شود تا تکرار درخواست پس از پاسخ نامعلوم کلیدها را دوباره تغییر ندهد. پاسخ شامل `user`، `subscription_preserved: true`، `flow_blocks` و `commands` است؛ فیلدهای فرد از همان دسترسی‌های اعتبارنامه و دادهٔ خصوصی در پاسخ خواندن پیروی می‌کنند. افزودن `"cut_off": true` به `commands.cut_off` نیاز دارد و همان قطع کاملِ وابسته به اعمال نسخه را صف می‌کند. تغییر کلید فرد تعریف‌شده در پیکربندی به `fleet.apply` هم نیاز دارد؛ نشست مالک از CLI استفاده می‌کند.
 

@@ -7,6 +7,7 @@ import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from uuid import NAMESPACE_OID, uuid5
 
 from meridian.control.enrollment import token_sha256
 from meridian.control.models import PrivacySettings, ServiceConfig
@@ -151,6 +152,7 @@ def drop_people_query_schema(db: sqlite3.Connection) -> None:
 
 def drop_person_delivery_policy_schema(db: sqlite3.Connection) -> None:
     """Rewind the self-contained override step before dropping people row versions."""
+    drop_person_display_name_schema(db)
     for name in ("insert", "update", "delete"):
         db.execute(f"DROP TRIGGER IF EXISTS person_delivery_policy_{name}")
     db.execute("DROP TABLE IF EXISTS person_delivery_policies")
@@ -169,3 +171,20 @@ def drop_capacity_schema(db: sqlite3.Connection) -> None:
     drop_access_membership_schema(db)
     for table in ("node_capacity_hourly", "node_capacity_state"):
         db.execute(f"DROP TABLE IF EXISTS {table}")
+
+
+def drop_person_display_name_schema(db: sqlite3.Connection) -> None:
+    """Remove schema 26's name column before replaying any earlier migration."""
+    if "display_name" in {row[1] for row in db.execute("PRAGMA table_info(users)")}:
+        db.execute("ALTER TABLE users DROP COLUMN display_name")
+
+
+def seed_legacy_person(database: Path, username: str) -> None:
+    """Reproduce a pre-26 ambiguous username that current account writes correctly refuse."""
+    identity = uuid5(NAMESPACE_OID, username)
+    with sqlite3.connect(database) as db:
+        db.execute(
+            "INSERT INTO users (username, user_id, uuid, sub_token, status, created_at)"
+            " VALUES (?, ?, ?, ?, 'active', '2026-11-01T12:00:00Z')",
+            (username, f"u{identity.hex[:16]}", str(identity), identity.hex),
+        )
