@@ -8,31 +8,6 @@
     if (error && error.subjects && error.subjects.length) return M.t("bulk.stale", { people: error.subjects.join(", ") });
     return M.errorText(error);
   }
-  function proposalCard(proposal) {
-    if (!proposal) return null;
-    var json = JSON.stringify(proposal, null, 2) + "\n";
-    var error = h("p", { class: "form-error", role: "alert" });
-    var manual = h("textarea", { readonly: true, rows: "8", "aria-label": M.t("bulk.proposal_manual") });
-    manual.value = json;
-    var save = h("button", { type: "button", class: "btn btn-primary btn-sm", "data-save-proposal": "", text: M.t("bulk.proposal_save"),
-      onclick: function () {
-        error.textContent = "";
-        try {
-          var url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
-          var link = h("a", { download: "people-removal.json" });
-          link.setAttribute("href", url);
-          document.body.appendChild(link);
-          try { link.click(); } finally { link.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000); }
-        } catch (failure) { error.textContent = M.t("bulk.proposal_save_failed"); }
-      } });
-    return h("section", { class: "card stack", "data-removal-proposal": "" },
-      h("h3", { text: M.t("bulk.proposal_title") }),
-      h("p", { text: M.t("bulk.proposal_explain") }),
-      h("p", { class: "muted small", text: M.t("bulk.proposal_identity", { revision: M.count(proposal.revision), generation: M.count(proposal.generation) }) }),
-      h("code", { class: "link-text", text: proposal.plan_hash }),
-      M.command("meridian client remove --proposal people-removal.json"), save, error,
-      h("details", {}, h("summary", { text: M.t("bulk.proposal_manual") }), manual));
-  }
   function value(fields, key) {
     if (!fields) return M.t("bulk.deleted");
     var chosen = fields[key];
@@ -58,11 +33,7 @@
         var fields = person.changes || [];
         var content = [h("div", { class: "row-title" }, h("bdi", { class: "name", text: person.display_name }),
           h("bdi", { class: "muted small", text: person.username }))];
-        if (person.outcome === "cli_required") {
-          content.push(h("p", { text: M.t("bulk.cli_required") }));
-          if (person.cli_command) content.push(h("code", { class: "link-text", text: person.cli_command }));
-        }
-        else if (!fields.length) content.push(h("p", { class: "muted small", text: M.t("bulk.unchanged") }));
+        if (!fields.length) content.push(h("p", { class: "muted small", text: M.t("bulk.unchanged") }));
         else content.push(h("dl", { class: "bulk-changes" }, fields.map(function (key) {
           return h("div", {}, h("dt", { text: M.t("bulk.field." + key) }),
             h("dd", {}, M.arrowPair(value(person.before, key), value(person.after, key), true)));
@@ -110,7 +81,6 @@
       function draw() {
         M.mount(details, [
           h("p", { class: "muted small", text: M.t("bulk.receipt", { id: receipt.id }) }), summary(receipt),
-          proposalCard(receipt.proposal),
           receipt.undone_at ? h("p", { role: "status", text: M.t("bulk.undone") }) : h("p", { class: "hint", text: M.t(receipt.undo_until ? "bulk.undo_description" : receipt.counts.changed ? "bulk.warning.irreversible" : "bulk.no_undo_changes") }),
           reviewRows(receipt.undo_people || receipt.people),
         ]);
@@ -162,7 +132,6 @@
           if (!body.isConnected || mine !== generation) return;
           review = result;
           M.mount(details, [summary(result), h("p", { class: "hint", text: M.t("bulk.freeze") }),
-            proposalCard(result.proposal),
             (result.warnings || []).map(function (code) { return h("p", { class: code === "irreversible" ? "form-error" : "hint", text: M.t("bulk.warning." + code) }); }),
             reviewRows(result.people)]);
           commit.disabled = false; retry.disabled = false; retry.hidden = true;

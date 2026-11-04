@@ -1,6 +1,5 @@
 /* Meridian console: the People list and adding a person.
- * People live in this service: everything about them can change here. The ones the
- * deployer's fleet file declares are marked, because removing them is the CLI's job. */
+ * People live in this service: everything about them can change here or from the CLI. */
 (function () {
   "use strict";
   var M = (window.M = window.M || {});
@@ -28,11 +27,6 @@
     var characters = Array.from(value);
     return characters.length <= 40 && value.indexOf(",") < 0 &&
       !/[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}]|(?! )\p{Zs}/u.test(value);
-  };
-
-  M.isDeclared = function (username) {
-    var declared = (M.state.fleet && M.state.fleet.declared_users) || [];
-    return declared.indexOf(username) >= 0;
   };
 
   M.statusPill = function (status) {

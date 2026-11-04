@@ -19,7 +19,7 @@
     return Object.assign(D.clone(D.responses["POST api/people/bulk/preview"].counts), {
       targeted: people.length, changed: people.filter(function (person) { return person.outcome === "changed"; }).length,
       unchanged: people.filter(function (person) { return person.outcome === "unchanged"; }).length,
-      cli_required: people.filter(function (person) { return person.outcome === "cli_required"; }).length,
+      cli_required: 0,
     });
   }
   function version(user) { return [user.user_id, D.versions[user.username]]; }
@@ -109,12 +109,9 @@
     names.forEach(function (name) {
       var actual = D.person(name);
       if (!actual) D.fail("not_found", 404);
-      var before = project(actual).user, after = null, warnings = [], cli = false;
+      var before = project(actual).user, after = null, warnings = [];
       versions[name] = version(actual); originals[name] = before;
-      if (action.action === "delete") {
-        cli = D.isDeclared(name);
-        if (cli) { after = before; warnings.push("topology_delete"); }
-      } else {
+      if (action.action !== "delete") {
         var effect = applyAction(before, action); after = effect.user;
         if (effect.reset) { reversible = false; warnings.push("period_reset"); }
         if (before.status === "disabled" && after.status === "disabled") warnings.push("disabled");
@@ -126,7 +123,7 @@
       var person = Object.assign(D.clone(D.responses["POST api/people/bulk/preview"].people[0]), {
         username: name, display_name: D.cleanName(actual.display_name) || name,
         row_version: versions[name][1], before: beforeFields, after: afterFields, changes: changes,
-        outcome: cli ? "cli_required" : changes.length ? "changed" : "unchanged", cli_command: null, warnings: warnings,
+        outcome: changes.length ? "changed" : "unchanged", cli_command: null, warnings: warnings,
       });
       delete person.access; delete person.cut_off;
       if (action.action === "set-profiles") { person.access = membership(before, after); person.cut_off = cutOff(before, person.access.lost); }
@@ -136,14 +133,8 @@
       id: D.id(), preview_hash: D.id() + D.id(), created_at: D.now(), expires_at: D.iso(Date.now() + 600000),
       action: D.clone(action), people: people, counts: counts(people), changed_nodes: changedNodes(originals, effects), reversible: reversible, warnings: [],
     });
-    delete result.proposal;
     if (!reversible) result.warnings.push("irreversible");
     if (!result.counts.changed) result.warnings.push("no_change");
-    var declared = people.filter(function (person) { return person.outcome === "cli_required"; }).map(function (person) { return person.username; });
-    if (declared.length) {
-      result.proposal = D.clone(D.responses["POST api/people/bulk/preview?case=declared-delete"].proposal);
-      result.proposal.usernames = declared.sort();
-    }
     previews.set(result.id, { result: result, versions: versions, effects: effects });
     if (previews.size > 16) previews.delete(previews.keys().next().value);
     return D.reply(result);
@@ -174,8 +165,6 @@
       counts: D.clone(review.counts), changed_nodes: review.changed_nodes,
       undo_until: review.reversible && review.counts.changed ? D.iso(Date.now() + 600000) : null, undone_at: null, undo_people: null,
     });
-    delete receipt.proposal;
-    if (review.proposal) receipt.proposal = D.clone(review.proposal);
     receipts.set(receipt.id, receipt);
     var versions = {};
     review.people.forEach(function (person) { var user = D.person(person.username); if (person.outcome === "changed" && user) versions[person.username] = version(user); });

@@ -51,7 +51,7 @@ const server = { node_id: 'main', role: 'node', region: 'DE', live: true, in_syn
     disk_free_bytes: 8192, uptime_seconds: 1000, checks: [{ name: 'xray.uptime', status: 'pass', message: 'up 512 s' }] },
     versions: { xray: '26.7.28' } },
   capacity: { status: 'not_reported', recent: [], hourly: [] } };
-const fleet = data.fleet || { profile_title: 'Sample VPN', servers: [server], declared_users: [], display_names: {},
+const fleet = data.fleet || { profile_title: 'Sample VPN', servers: [server], display_names: {},
   server_usage: data.server_usage || [], server_attention: data.server_attention || [] };
 function reply(body, status = 200) {
   return Promise.resolve({ ok: status >= 200 && status < 300, status, headers: { get: () => null },
@@ -85,7 +85,7 @@ w.fetch = (url, options = {}) => {
   if (url === 'api/settings') return reply({ profile_title: 'Sample VPN', client_routing: 'ru-split', response_rules: [] });
   if (url === 'auth/sessions') return reply({ sessions: [] });
   if (url.startsWith('ui/api/people/') && url.endsWith('/share')) return reply(data.share || {
-    username: 'sample', declared: false, subscription_url: 'https://198.51.100.1/sub/sample-only',
+    username: 'sample', subscription_url: 'https://198.51.100.1/sub/sample-only',
     page_url: 'https://198.51.100.1/sub/sample-only', qr_svg: 'data:image/svg+xml,%3Csvg/%3E',
     profile_title: 'Sample VPN', connections: [], formats: [],
   });

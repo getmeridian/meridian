@@ -21,7 +21,7 @@ w.fetch = (url, options) => {
   requests.push(url);
   let body;
   if (url === 'auth/state') body = { configured: true, owner_exists: true, signed_in: true };
-  else if (url === 'ui/api/fleet') body = { servers: [], declared_users: [], display_names: data.names || {} };
+  else if (url === 'ui/api/fleet') body = { servers: [], display_names: data.names || {} };
   else if (url.startsWith('api/people?') && data.failUsers) return Promise.resolve({ ok: false, status: 500, headers: { get: () => null }, text: () => Promise.resolve('{}') });
   else if (url.startsWith('api/people?')) body = data.replies[queryKey(url.split('?')[1])];
   else throw new Error('Unexpected request: ' + url);

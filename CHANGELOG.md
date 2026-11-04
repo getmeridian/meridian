@@ -21,7 +21,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
 #### Changed
 - Every person is managed by the control service. The next reviewed apply moves
   existing people without deleting them; CLI add and remove act immediately,
-  and people added in the web panel work with every client command (#95).
+  people added in the web panel work with every client command, and the web
+  panel can reissue, rotate, and remove everyone, alone or in bulk (#95).
 - `meridian restore` ends with a one-time setup link for the restored web panel,
   then lists other computers' backup keys and offers to revoke any you no longer
   hold, such as a lost laptop's. On a machine without a backup key of its own, it

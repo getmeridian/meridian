@@ -44,7 +44,7 @@ let user = {
 if (data.pending) user = { ...user, expire_at: null, activation_duration_days: 30,
   schedule: { ...user.schedule, expire_at: null, activation_duration_days: 30, activation_pending: true } };
 const svg = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>').toString('base64');
-const share = { username: 'sample', declared: false, subscription_url: 'https://198.51.100.1/sub/test-only',
+const share = { username: 'sample', subscription_url: 'https://198.51.100.1/sub/test-only',
   page_url: 'https://198.51.100.1/sub/test-only', qr_svg: svg,
   connections: [{ remark: 'Test connection', protocol: 'reality', uri: 'vless://test-only@198.51.100.1:443', available: true, qr_svg: svg }],
   formats: [], flow_blocks: { nodes: [] }, ...data.share };
@@ -55,7 +55,7 @@ w.fetch = async (url, options = {}) => {
   const method = options.method || 'GET', body = options.body ? JSON.parse(options.body) : undefined;
   events.push({ url, method, body, passive: options.headers?.['X-Meridian-Passive'] === '1' });
   if (url === 'auth/state') return reply({ configured: true, owner_exists: true, signed_in: true });
-  if (url === 'ui/api/fleet') return reply({ profile_title: 'Test fleet', display_names: { sample: 'Sample person' }, servers: [], declared_users: [] });
+  if (url === 'ui/api/fleet') return reply({ profile_title: 'Test fleet', display_names: { sample: 'Sample person' }, servers: [] });
   if (url === 'api/users/preview') {
     const extra = data.previewFields && Object.keys(body || {}).filter(key => !data.previewFields.includes(key));
     const answer = data.failPreview || extra?.length

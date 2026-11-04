@@ -15,15 +15,9 @@ import pytest
 from pydantic import ValidationError
 
 from meridian.control.ui_routes import UI_DIR
-from scripts.build_showcase import export_showcase
-from scripts.build_showcase import validate_recordings as validate_service_recordings
+from scripts.build_showcase import export_showcase, validate_recordings
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def validate_recordings(responses):
-    """Normalize the frozen demo's retired fields; actual service recordings remain strict."""
-    validate_service_recordings(responses, legacy_people=True)
 
 
 @pytest.fixture(scope="module")

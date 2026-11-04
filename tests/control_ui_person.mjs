@@ -35,7 +35,7 @@ let user = {
   ...data.user,
 };
 const share = {
-  username: 'sample', declared: false, subscription_url: 'https://198.51.100.1/sub/test-only-link',
+  username: 'sample', subscription_url: 'https://198.51.100.1/sub/test-only-link',
   page_url: 'https://198.51.100.1/sub/test-only-link',
   qr_svg: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="white"/></svg>').toString('base64'),
   ...data.share,
@@ -59,7 +59,7 @@ w.fetch = (url, options = {}) => {
     return new Promise(resolve => pending.push(resolve));
   }
   if (url === 'auth/state') return Promise.resolve(reply({ configured: true, owner_exists: true, signed_in: signedIn }));
-  if (url === 'ui/api/fleet') return Promise.resolve(reply({ profile_title: 'Test fleet', declared_users: [],
+  if (url === 'ui/api/fleet') return Promise.resolve(reply({ profile_title: 'Test fleet',
     display_names: { sample: data.displayName || 'Sample person' }, servers: [] }));
   if (url.startsWith('ui/api/people/sample/expiry')) return Promise.resolve(reply({ expire_at: data.preview, months: data.months }));
   if (url.startsWith('ui/api/people/')) return Promise.resolve(reply({ ...share, username: url.split('/')[3] }));

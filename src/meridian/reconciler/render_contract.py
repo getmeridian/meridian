@@ -14,7 +14,7 @@ _RENDERER_MANIFEST = {
     "pwa": "pwa-helper-assets-v7",
     "control-service": "service-owned-people-v63",
     "control-api": "service-owned-people-v50",
-    "control-ui": "add-dialog-schedule-v73",
+    "control-ui": "service-owned-people-v74",
     "firewall": "ufw-comment-v2",
     "nginx": "panel-domain-certificate-v13",
     "realm": "neutral-systemd-musl-v3",

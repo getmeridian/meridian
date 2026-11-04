@@ -38,8 +38,8 @@ def test_console_removal_discloses_other_sessions_before_opt_in(locale: str) -> 
     assert catalog["commands.core_restart"] in result["resultText"]
 
 
-@pytest.mark.parametrize("mode", ["default", "cancel", "declared"])
-def test_default_cancel_and_declared_people_do_not_request_a_cut_off(mode: str) -> None:
+@pytest.mark.parametrize("mode", ["default", "cancel"])
+def test_default_and_cancel_do_not_request_a_cut_off(mode: str) -> None:
     result = run_ui(mode)
     if mode == "default":
         assert result["writes"] == [{"body": {"cut_off": False}, "csrf": "1"}]

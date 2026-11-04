@@ -14,7 +14,7 @@ const html = fs.readFileSync(path.join(directory, 'console/index.html'), 'utf8')
 const dom = new JSDOM(html, { url: `https://198.51.100.1/demo/console/?lang=${locale}#${data.route || '/people'}`, runScripts: 'outside-only', pretendToBeVisual: true });
 const w = dom.window;
 let demoNow;
-if (mode === 'showcase-queries' || ['schedule', 'undo', 'share', 'token', 'declared', 'calendar'].some(prefix => mode.startsWith('showcase-' + prefix + '-'))) {
+if (mode === 'showcase-queries' || ['schedule', 'undo', 'share', 'token', 'calendar'].some(prefix => mode.startsWith('showcase-' + prefix + '-'))) {
   const generated = Date.parse(JSON.parse(fs.readFileSync(path.join(directory, 'console/demo-data.json'), 'utf8')).generated_at);
   demoNow = (data.now ? Date.parse(data.now) : generated) + (data.offsetSeconds || 0) * 1000;
   w.Date = class extends Date {
@@ -252,8 +252,7 @@ if (mode === 'showcase-navigation') {
   report.unlimitedDevices = (await M.api('GET', 'api/users/DemoGuest/devices')).limit === 0;
   const deletion = await M.api('POST', 'api/people/bulk/preview', { usernames: ['DemoGuest', 'Neri'], action: { action: 'delete' } });
   const deleted = await M.api('POST', 'api/people/bulk/commit', { preview_id: deletion.id, preview_hash: deletion.preview_hash });
-  report.declaredKept = (await M.api('GET', 'api/users/Neri')).username === 'Neri' && deleted.counts.cli_required === 1 && deleted.proposal.usernames.join(',') === 'Neri';
-  report.bulkDeleted = !(await M.api('GET', 'api/users')).users.some(user => user.username === 'DemoGuest');
+  report.bulkDeleted = deleted.counts.changed === 2 && !(await M.api('GET', 'api/users')).users.some(user => ['DemoGuest', 'Neri'].includes(user.username));
   try { await M.api('POST', 'api/people/bulk/undo', { receipt_id: deleted.id }); }
   catch (error) { report.deleteUndoRefused = error.code === 'undo_refused'; }
 } else if (mode === 'showcase-schedule-catchup') {
@@ -363,20 +362,6 @@ if (mode === 'showcase-navigation') {
   }
   report.keptTokens = JSON.stringify(await M.api('GET', 'api/tokens')) === tokens;
   report.keptEvents = JSON.stringify(await M.api('GET', 'api/events?after=0&limit=2000')) === events;
-} else if (mode === 'showcase-declared-keys') {
-  report.refusals = [];
-  report.unchanged = [];
-  for (const person of ['Tavi', 'Neri']) {
-    async function snapshot() {
-      return JSON.stringify({ user: await M.api('GET', 'api/users/' + person), share: await M.api('GET', 'ui/api/people/' + person + '/share'),
-        devices: await M.api('GET', 'api/users/' + person + '/devices'), people: await M.api('GET', 'api/people?q=' + person),
-        events: await M.api('GET', 'api/events?after=0&limit=2000') });
-    }
-    const before = await snapshot(), user = await M.api('GET', 'api/users/' + person);
-    try { await M.api('POST', 'api/users/' + person + '/rotate-credentials', { expected_generation: user.credential_generation }); report.refusals.push({ code: null }); }
-    catch (error) { report.refusals.push({ code: error.code, status: error.status, text: M.errorText(error) }); }
-    report.unchanged.push(await snapshot() === before);
-  }
 } else if (mode === 'showcase-schedule-validation') {
   report.now = new Date(demoNow).toISOString().replace('.000Z', 'Z');
   if (data.person) report.before = await M.api('GET', 'api/users/' + data.person);

@@ -18,12 +18,3 @@ def test_console_rotation_confirms_once_preserves_drafts_and_sends_generation(lo
     assert result["draft"] == "Private draft"
     assert not result["disabledAfter"]
     assert "person.rotate" not in result["text"]
-
-
-def test_declared_people_get_the_rotation_command_instead_of_a_console_write():
-    result = run_console(
-        "person-credential-rotation", data={"share": {"declared": True}, "user": {"credential_generation": 1}}
-    )
-    assert not result["found"]
-    assert "meridian client rotate-credentials sample" in result["text"]
-    assert result["writes"] == []

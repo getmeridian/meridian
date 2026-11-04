@@ -106,7 +106,7 @@
     if (screen.mounted.usage) M.mount(screen.usageSlot, usageCard(user, screen));
     if (screen.mounted.keys) {
       M.mount(screen.flowSlot, flowCard(share.flow_blocks));
-      M.mount(screen.dangerSlot, dangerCard(user, share.declared, screen));
+      M.mount(screen.dangerSlot, dangerCard(user, screen));
     }
     screen.tabs.mode();
   }
@@ -146,7 +146,7 @@
     } else {
       screen.flowSlot = h("div"); screen.dangerSlot = h("div");
       M.mount(screen.flowSlot, flowCard(screen.share.flow_blocks));
-      M.mount(screen.dangerSlot, dangerCard(user, screen.share.declared, screen));
+      M.mount(screen.dangerSlot, dangerCard(user, screen));
       M.mount(panel, [screen.dangerSlot, screen.flowSlot]);
     }
   }
@@ -163,8 +163,6 @@
   function summary(screen) {
     screen.titleText = h("bdi"); screen.title = h("h1", {}, screen.titleText); screen.badge = h("span"); screen.tag = h("bdi", { class: "tag", dir: "ltr", "data-person-tag": "" });
     screen.usernameLabel = h("bdi", { class: "muted small mono", dir: "ltr" });
-    screen.declared = h("span", { class: "title-row", "data-person-declared": "", hidden: true },
-      h("span", { class: "tag", text: M.t("people.declared") }), M.tip(M.t("people.declared"), M.t("people.declared_hint")));
     screen.summaryUsage = h("div", { class: "person-summary-usage" });
     screen.expiry = h("bdi", { class: "person-summary-expiry", tabindex: "0", "data-person-expiry": "" });
     screen.expiryTooltip = h("span", { class: "person-date-tooltip", role: "tooltip", id: "person-expiry-" + screen.generation });
@@ -229,7 +227,7 @@
     } });
     return h("header", { class: "person-summary", "data-person-summary": "" }, back(),
       h("div", { class: "page-head person-summary-head" },
-        h("div", { class: "stack-sm" }, h("div", { class: "person-title-row" }, screen.title, screen.badge, screen.tag, screen.declared), screen.usernameLabel),
+        h("div", { class: "stack-sm" }, h("div", { class: "person-title-row" }, screen.title, screen.badge, screen.tag), screen.usernameLabel),
         h("div", { class: "row-actions person-primary-actions", role: "group", "aria-label": M.t("person.actions") },
           shareButton, screen.extend, screen.toggle)),
       h("div", { class: "person-summary-facts" }, screen.summaryUsage,
@@ -246,7 +244,6 @@
     }
     screen.badge.title = M.t("person.status_" + user.status);
     screen.tag.hidden = !user.tag; screen.tag.textContent = user.tag || "";
-    screen.declared.hidden = !(share && share.declared);
     M.mount(screen.summaryUsage, usage(user));
     var schedule = user.schedule, expiry = schedule ? schedule.expire_at : user.expire_at;
     screen.expiry.textContent = M.expiryText(Object.assign({}, user, { expire_at: expiry }));
@@ -311,18 +308,15 @@
       })));
   }
 
-  /* `declared` comes with this person's share view, fresh from the service: the CLI moves a declared
-   * person's connection page with their link, so a new link and removal are its commands. */
-  function dangerCard(user, declared, screen) {
+  function dangerCard(user, screen) {
     var name = user.username;
     return h("section", { class: "card card-danger" },
       h("h2", { text: M.t("person.danger") }),
-      rotationRow(user, declared, screen),
+      rotationRow(user, screen),
       h("div", { class: "danger-row" },
         h("div", {}, h("p", { class: "strong", text: M.t("person.reissue") }),
-          h("p", { class: "muted small", text: M.t(declared ? "person.reissue_declared" : "person.reissue_text") }),
-          declared ? M.command("meridian client reissue " + name) : null),
-        declared ? null : h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
+          h("p", { class: "muted small", text: M.t("person.reissue_text") })),
+        h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
           if (screen.reissuing || !current(screen)) return;
           screen.reissuing = true;
           M.confirmCutOffReissue(name).then(function (choice) {
@@ -335,9 +329,8 @@
         } }, M.t("person.reissue"))),
       h("div", { class: "danger-row" },
         h("div", {}, h("p", { class: "strong", text: M.t("person.remove") }),
-          h("p", { class: "muted small", text: M.t(declared ? "person.remove_declared" : "person.remove_text") }),
-          declared ? M.command("meridian client remove " + name) : null),
-        declared ? null : h("button", { class: "btn btn-danger btn-sm", type: "button", onclick: function () {
+          h("p", { class: "muted small", text: M.t("person.remove_text") })),
+        h("button", { class: "btn btn-danger btn-sm", type: "button", onclick: function () {
           M.confirmCutOffRemoval(name).then(function (choice) {
             if (!choice || !current(screen)) return;
             var label = M.displayName(name);
@@ -352,9 +345,9 @@
         } }, M.t("person.remove"))));
   }
 
-  function rotationRow(user, declared, screen) {
+  function rotationRow(user, screen) {
     var name = user.username;
-    var button = declared ? null : h("button", { class: "btn btn-ghost btn-sm", type: "button", "data-credential-rotation": "1",
+    var button = h("button", { class: "btn btn-ghost btn-sm", type: "button", "data-credential-rotation": "1",
       disabled: !!screen.rotating, onclick: function () {
         if (screen.rotating || !current(screen)) return;
         if (!Number.isSafeInteger(user.credential_generation) || user.credential_generation < 1) {
@@ -381,7 +374,6 @@
       } }, M.t("person.rotate"));
     return h("div", { class: "danger-row" },
       h("div", {}, h("p", { class: "strong", text: M.t("person.rotate") }),
-        h("p", { class: "muted small", text: M.t(declared ? "person.rotate_declared" : "person.rotate_text") }),
-        declared ? M.command("meridian client rotate-credentials " + name) : null), button);
+        h("p", { class: "muted small", text: M.t("person.rotate_text") })), button);
   }
 })();

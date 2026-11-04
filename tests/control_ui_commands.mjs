@@ -40,7 +40,7 @@ w.fetch = (url, options) => {
     return Promise.resolve(reply({ ...record, status: 'pending', command: { command_id: id, kind: 'restart_unit', resource_id: 'unit:netcore' } }));
   }
   if (url === 'api/users/person-a' && options.method === 'GET') return Promise.resolve(reply(user));
-  if (url === 'ui/api/people/person-a/share') return Promise.resolve(reply({ subscription_url: '', declared: mode === 'declared' }));
+  if (url === 'ui/api/people/person-a/share') return Promise.resolve(reply({ subscription_url: '' }));
   if (url === 'api/users/person-a/cut-off') return Promise.resolve(reply({ nodes: data.nodes || (mode === 'no-nodes' ? [] : [{ node_id: 'main', effect: 'core_restart', inbound_tags: ['vless-reality'] }]) }));
   if (url === 'api/users/person-a/reissue' && options.method === 'POST') {
     writes.push({ body: JSON.parse(options.body), csrf: options.headers['X-Meridian-Request'] });
@@ -81,10 +81,7 @@ report.serverText = view.querySelector('.server')?.textContent || '';
 const remove = reissuing
   ? [...view.querySelectorAll('.card-danger button')].find(button => button.textContent === M.t('person.reissue'))
   : view.querySelector(restarting ? '.server .row-actions button' : '.card-danger button.btn-danger');
-if (mode === 'declared') {
-  report.hasRemove = !!remove;
-  report.declaredText = view.querySelector('.card-danger').textContent;
-} else {
+{
   remove.click();
   if (restarting || reissuing) remove.click();
   await settle();

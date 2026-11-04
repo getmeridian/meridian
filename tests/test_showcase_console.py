@@ -12,16 +12,10 @@ from meridian.control.errors import ServiceError
 from meridian.control.models import TokenCreate, UserRecord, UserUpdate
 from meridian.control.token_capabilities import permission, requested_capabilities
 from meridian.core.account_schedule import calculate_schedule
-from scripts.build_showcase import export_showcase
-from scripts.build_showcase import validate_recordings as validate_service_recordings
+from scripts.build_showcase import export_showcase, validate_recordings
 from tests.support.console_dom import needs_console_dom, run_console
 
 pytestmark = needs_console_dom
-
-
-def validate_recordings(responses):
-    """Normalize the frozen demo's retired fields; actual service recordings remain strict."""
-    validate_service_recordings(responses, legacy_people=True)
 
 
 @pytest.fixture(scope="module")
@@ -124,7 +118,7 @@ def test_demo_bulk_and_routing_use_reviews_receipts_and_effective_access(demo: P
     assert result["passkeys"] == []
     assert result["rotated"] and result["rotationDevicesIntact"] and result["staleKeysRejected"]
     assert result["periodReset"] and result["unlimitedDevices"]
-    assert result["declaredKept"] and result["bulkDeleted"] and result["deleteUndoRefused"]
+    assert result["bulkDeleted"] and result["deleteUndoRefused"]
     assert result["outside"] == result["nativeApi"] == result["errors"] == []
 
 
@@ -312,17 +306,6 @@ def test_demo_token_preview_and_issue_share_request_validation(demo: Path) -> No
     result = run_console("showcase-token-refusals", data={"directory": str(demo), "bodies": bodies})
     assert all(reply["code"] == "invalid_request" and reply["status"] == 400 for reply in result["refusals"])
     assert result["keptTokens"] and result["keptEvents"]
-    assert result["outside"] == result["nativeApi"] == result["errors"] == []
-
-
-@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
-def test_demo_refuses_declared_key_rotation_without_changing_people_or_receipts(demo: Path, locale: str) -> None:
-    result = run_console("showcase-declared-keys", locale, {"directory": str(demo)})
-    assert all(
-        reply["code"] == "declared_user" and reply["status"] == 409 and reply["text"] for reply in result["refusals"]
-    )
-    assert all(result["unchanged"])
-    validate_recordings(result["responses"])
     assert result["outside"] == result["nativeApi"] == result["errors"] == []
 
 

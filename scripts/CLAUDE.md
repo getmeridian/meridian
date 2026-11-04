@@ -1,6 +1,5 @@
 # scripts — Repository automation
 ## Design decisions
-- **Frozen demo compatibility is isolated** — validate current recordings first, then project retired people fields through `showcase_compat.py` until the phase-5 adapter update; real API contracts never regain those fields.
 - **App tester contracts stay generated** — export response-rule models, the narrow admin route, and its fleet command envelope together; CLI validation maps the leaf to the fleet section.
 - Admin OpenAPI joins `export_contracts.py` and its drift check; `validate_api_docs.py` checks all four localized API operation tables against the committed document, and `make validate` runs both gates.
 **Contract export** — `export_contracts.py` writes `contracts/meridian/`; its rules live in `contracts/CLAUDE.md`.

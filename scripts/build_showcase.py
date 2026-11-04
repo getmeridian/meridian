@@ -35,7 +35,6 @@ from meridian.control.ui_routes import SESSION_COOKIE, UI_DIR  # noqa: E402
 from meridian.core.account_schedule import FINITE_EXPIRY_YEAR  # noqa: E402
 from meridian.core.client_limits import CalendarExpiryPreview  # noqa: E402
 from meridian.pwa import load_pwa_assets  # noqa: E402
-from scripts.showcase_compat import current_demo_response, legacy_demo_responses  # noqa: E402
 from scripts.showcase_recordings import (  # noqa: E402
     record_interactive_templates,
     record_people_queries,
@@ -54,11 +53,9 @@ from scripts.showcase_seed import (  # noqa: E402
 NOOP_SW = "/* SW disabled */\nself.addEventListener('install',()=>self.skipWaiting());\n"
 
 
-def validate_recordings(responses: dict[str, Any], *, legacy_people: bool = False) -> None:
+def validate_recordings(responses: dict[str, Any]) -> None:
     """Refuse model drift at generation time and in tests, using today's route catalog."""
     for key, body in responses.items():
-        if legacy_people:
-            body = current_demo_response(body)
         method, path = key.split(" ", 1)
         path = unquote(urlsplit("/" + path).path)
         route = next(
@@ -243,7 +240,7 @@ def write_recordings(directory: Path, client: httpx.Client, service: ControlServ
                 "generated_at": stamp(now),
                 "public_url": PUBLIC_URL,
                 "page_person": PAGE_PERSON,
-                "responses": legacy_demo_responses(responses),
+                "responses": responses,
                 "rotations": rotations,
                 "key_rotations": key_rotations,
                 "active_shares": active_shares,
