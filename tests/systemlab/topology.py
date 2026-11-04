@@ -86,6 +86,16 @@ def build_systemlab_intent(
                 target_ref="pool-a",
                 source_gateway_ref="gateway-a",
             ),
+            # An IP route makes the gateway resolve names (over DoH through its exits) to match it,
+            # so stage 20's plain-DNS capture on the gateway proves something.
+            OrderedRouteIntent(
+                id="route-documentation-block",
+                priority=50,
+                match="ip",
+                match_values=["192.0.2.0/24"],
+                action="block",
+                source_gateway_ref="gateway-a",
+            ),
             OrderedRouteIntent(
                 id="route-default-pool",
                 priority=100,

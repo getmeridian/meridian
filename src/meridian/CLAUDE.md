@@ -9,6 +9,7 @@
 **Errors over exits** — library modules raise `MeridianError` subclasses (`core/errors.py`) with a `category`; only command entry points call `console.fail()`. Every error must be actionable.
 **Shared logic stays out of commands** — `resolve.py` and `setup/` serve all commands; library code never imports `commands/`.
 **Deploy targets** — `resolve.resolve_deploy_target()` turns a request and the server shelf into IP, SSH user, and port without opening SSH; `deploy` and its dry run share it.
+**Local addresses before echo services** — `resolve.detect_public_ip()` takes the default route's source address when it is global and asks IP echo services only behind NAT.
 **Exit country** — `registry_country.py` reads the RIR country via RDAP (no geo-IP) when an exit is first named and stores it in intent, keeping the compiler pure.
 **Local home and contexts** — `config.default_home()` prefers `$XDG_CONFIG_HOME/meridian`; the home keeps per-person files and is the `default` context, and other fleets live in `contexts/NAME/` (`contexts.py`). `fleet_contexts.refuse_servers_claimed_elsewhere()` keeps a host in one fleet; a context a restore took over (`superseded.json`) only runs reads. `config.select_context()` binds per-fleet globals once.
 **Neutral host names** — `host_runtime.py` is the one place for unit, `/opt`, and config names (`ctld`, `netagent`, `netcore`).
@@ -42,7 +43,7 @@
 - **SSH ControlPath must fit a Unix socket** (103 bytes on macOS) — hash the target into the path and drop multiplexing when the home is too deep.
 - **Camouflage targets** — never apple.com (ASN mismatch with VPS providers) or www.microsoft.com (certificate over REALITY's size limit, so no traffic passes); `camouflage_refusal()` refuses both. A relay's SNI must be reachable from its exit, and a `--self-steal` name's DNS is checked from the exit.
 - **Reality key material is atomic** — refuse partial state instead of rotating keys; `node replace` carries keys to the new server. Hysteria2's salamander password derives from the Reality private key and is never stored separately.
-- **Exits resolve only over IP-addressed DoH** (`xray_workload.EXIT_DOH_RESOLVERS`) — a hostname resolver or `AsIs` strategy hands names to the host's plain resolver; gateways keep the host resolver, since foreign DoH may be blocked in-country.
+- **Exits resolve only over IP-addressed DoH** (`xray_workload.EXIT_DOH_RESOLVERS`) — a hostname resolver or `AsIs` strategy hands names to the host's plain resolver; a gateway sends the same DoH (IPv4) through its exits, serially, with the host resolver last, since parallel queries would hand every name to that resolver too. Gateways with country or IP routes need `IPOnDemand`: under `IPIfNonMatch` their catch-all route matches every name first.
 - **Local Xray is evidence, not a requirement** — a missing runtime is inconclusive, and an archive that misses `XRAY_SHA256` never runs.
 - **Deployer-side HTTPS uses httpx** — urllib failed certificate checks on uv-managed Pythons.
 - **Exit-IP observers match the server's address family**, or a dual-stack exit answers over the other one.

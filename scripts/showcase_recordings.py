@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from itertools import combinations
 from typing import Any, Protocol
 from urllib.parse import urlencode
@@ -42,7 +43,7 @@ SUFFIXES = ("", "info", "json", "v2ray-json", "mihomo", "clash", "stash", "singb
 def record_people_queries(record: Recorder) -> None:
     """Cover each predicate, contextual facets, missing-date sorts, and cursor pages."""
     record("api/people")
-    queries = [
+    queries: list[Mapping[str, str | int]] = [
         *(dict(q=value) for value in (" Lu ", "a", "NoMatch", "%", "_")),
         *(dict(status=value) for value in ("active", "disabled", "limited", "expired")),
         *(dict(tag=value) for value in ("none", "FAMILY", "TRIAL", "FRIENDS")),

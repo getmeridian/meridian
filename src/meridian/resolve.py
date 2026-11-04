@@ -7,8 +7,11 @@ pure helpers that library code may import without pulling in the CLI layer.
 
 from __future__ import annotations
 
+import contextlib
+import ipaddress
 import os
 import re
+import socket
 import subprocess
 from dataclasses import dataclass
 from typing import Protocol
@@ -90,38 +93,46 @@ def is_local_keyword(value: str) -> bool:
     return value.lower() in LOCAL_KEYWORDS
 
 
+def egress_address(family: socket.AddressFamily, probe: str) -> str:
+    """The global address this machine sends from on its default route, or '' behind NAT.
+
+    Connecting a UDP socket only picks a route and a source address; it sends nothing.
+    """
+    with contextlib.suppress(OSError), socket.socket(family, socket.SOCK_DGRAM) as udp:
+        udp.connect((probe, 53))
+        address = str(udp.getsockname()[0])
+        if ipaddress.ip_address(address).is_global:
+            return address
+    return ""
+
+
 def detect_public_ip() -> str:
-    """Detect the machine's public IP address (prefers IPv4)."""
-    # Try IPv4 first (most common, backward compatible)
-    for url in ("https://ifconfig.me", "https://api.ipify.org"):
-        try:
-            result = subprocess.run(
-                ["curl", "-4", "-s", "--max-time", "3", url],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                stdin=subprocess.DEVNULL,
-            )
-            ip = result.stdout.strip()
-            if is_ip(ip):
-                return ip
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            continue
-    # Fall back to IPv6
-    for url in ("https://ifconfig.me", "https://api64.ipify.org"):
-        try:
-            result = subprocess.run(
-                ["curl", "-6", "-s", "--max-time", "3", url],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                stdin=subprocess.DEVNULL,
-            )
-            ip = result.stdout.strip()
-            if is_ip(ip):
-                return ip
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            continue
+    """Detect the machine's public IP address (prefers IPv4).
+
+    Most VPS providers put the public address on an interface, so each family is read locally
+    first; only NAT clouds, whose interfaces carry private addresses, ask an IP echo service.
+    A NAT cloud's public IPv4 still wins over a global IPv6 on its interface.
+    """
+    for family, probe, curl_flag, urls in (
+        (socket.AF_INET, "1.1.1.1", "-4", ("https://ifconfig.me", "https://api.ipify.org")),
+        (socket.AF_INET6, "2606:4700:4700::1111", "-6", ("https://ifconfig.me", "https://api64.ipify.org")),
+    ):
+        if address := egress_address(family, probe):
+            return address
+        for url in urls:
+            try:
+                result = subprocess.run(
+                    ["curl", curl_flag, "-s", "--max-time", "3", url],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    stdin=subprocess.DEVNULL,
+                )
+                ip = result.stdout.strip()
+                if is_ip(ip):
+                    return ip
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                continue
     return ""
 
 

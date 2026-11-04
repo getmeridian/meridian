@@ -7,7 +7,7 @@ and token names/scopes. No credentials, client addresses, device data, or raw re
 
 from __future__ import annotations
 
-from typing import Literal, TypeAlias, get_args
+from typing import Literal, TypeAlias
 
 from pydantic import Field, model_validator
 
@@ -47,7 +47,6 @@ FleetEventKind = Literal[
     "token.created",
     "token.revoked",
 ]
-FLEET_EVENT_KINDS: tuple[FleetEventKind, ...] = get_args(FleetEventKind)
 UserEventField = Literal[
     "status",
     "device_limit",

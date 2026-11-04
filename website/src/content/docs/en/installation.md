@@ -42,6 +42,8 @@ With pipx:
 pipx install meridian-vpn
 ```
 
+When the newest release is a beta, these commands install the newest stable release instead; add `--prerelease allow` to uv, or `--pip-args=--pre` to pipx, to get the beta these docs describe.
+
 ## Update
 
 ```

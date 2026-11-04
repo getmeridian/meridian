@@ -44,7 +44,6 @@ BulkWarning = Literal[
     "quota_blocks_enable",
     "no_change",
 ]
-OperationId = str
 
 
 class BulkAction(CoreModel):

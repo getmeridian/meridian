@@ -5,3 +5,11 @@
 # Unused parameters use `qualified.name(param)`. Entries that no longer match
 # a finding are reported as stale-allowlist: delete them.
 
+meridian.control.server.ControlServer.daemon_threads  # read by socketserver.ThreadingMixIn
+meridian.control.server._Handler.server_version  # read by http.server for the Server header
+meridian.control.server._Handler.sys_version  # read by http.server for the Server header
+meridian.control.server._Handler.close_connection  # read by http.server's request loop
+meridian.control.enrollment.NodeAuthority.service_public_key  # protocol tests verify signed documents against the service key
+meridian.control.route_table.INTERNAL_UI_ROUTES  # the route-coverage test reads it instead of restating console routes
+meridian.core.agent_signing.verify  # Python reference for the Rust agent's side of meridian.agent/v1
+meridian.core.agent_signing.sign_proof  # Python reference for the Rust agent's side of meridian.agent/v1

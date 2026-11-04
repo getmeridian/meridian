@@ -1,5 +1,11 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Report a vulnerability privately
+    url: https://github.com/getmeridian/meridian/security/advisories/new
+    about: Security problems go here, never into a public issue
   - name: Documentation
     url: https://getmeridian.org
     about: Full setup guide, architecture details, and troubleshooting
+  - name: Try the demos
+    url: https://getmeridian.org/demo/
+    about: The connection page and web panel in your browser, on invented data

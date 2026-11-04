@@ -7,7 +7,10 @@ import pytest
 from meridian.migrate import MigrationError
 from meridian.migrate.users import carry_users
 from meridian.remnawave import User
-from meridian.remnawave.client import ACCESS_USER_DESCRIPTION, ACCESS_USER_TAG
+
+# How earlier betas marked the users they created in the panel.
+ACCESS_USER_DESCRIPTION = "Managed by Meridian access"
+ACCESS_USER_TAG = "MERIDIAN_ACCESS"
 
 ALICE_UUID = "3f2a9c4e-7b1d-4e6a-9c2f-1a2b3c4d5e6f"
 

@@ -436,6 +436,87 @@ def test_warp_repair_never_re_enrolls_a_healthy_agent(monkeypatch: pytest.Monkey
     assert AGENT_BINARY not in conn.write_map
 
 
+_DPKG_WARP = "dpkg-query -W -f='${Status}' cloudflare-warp"
+_WARP_SOURCE = "test -e /etc/apt/sources.list.d/cloudflare-client.list"
+
+
+def _exit_without_warp(plan: ResourcePlan, package: str, *, rc: int = 0, source: str = "") -> tuple[Any, ...]:
+    conn = MockConnection().when("uname -m", stdout="x86_64\n").when(_DPKG_WARP, stdout=package, rc=rc)
+    conn.when(_WARP_SOURCE, stdout=source)
+    drivers, control, _cluster = _setup(plan, conn)
+    control.reports = [{"applied": True}]
+    return drivers, control, conn
+
+
+def _warp_removal(conn: MockConnection) -> list[str]:
+    return [call for call in conn.calls if "apt-get purge -y -qq cloudflare-warp" in call]
+
+
+@pytest.mark.parametrize(
+    ("package", "rc", "source", "converges"),
+    [
+        ("install ok installed", 0, "", False),
+        ("hold ok installed", 0, "", False),
+        ("deinstall ok config-files", 0, "", True),
+        ("", 1, "present", False),
+        ("", 1, "", True),
+    ],
+    ids=["installed", "held", "removed-keeps-config", "source-left", "never-installed"],
+)
+def test_an_exit_without_warp_converges_only_once_package_and_source_are_gone(
+    plan: ResourcePlan, package: str, rc: int, source: str, converges: bool
+) -> None:
+    drivers, _control, _conn = _exit_without_warp(plan, package, rc=rc, source=source)
+    action = _action(plan, "workload:main")
+    drivers["node_workload"].apply(action, None)
+
+    assert observation_converges(action, drivers["node_workload"].observe(action, None)) is converges
+
+
+def test_turning_warp_off_removes_it_once_the_agent_applied_the_workload(plan: ResourcePlan) -> None:
+    drivers, _control, conn = _exit_without_warp(plan, "install ok installed")
+
+    drivers["node_workload"].apply(_action(plan, "workload:main"), None)
+
+    assert any("registration delete" in call and "disable --now warp-svc" in call for call in conn.calls)
+    assert _warp_removal(conn)
+    assert any(call.startswith("rm -f /etc/apt/sources.list.d/cloudflare-client.list") for call in conn.calls)
+
+
+def test_warp_stays_while_xray_may_still_dial_its_proxy(plan: ResourcePlan) -> None:
+    """The agent applies before the workload, and a refused workload keeps the old config running."""
+    drivers, control, conn = _exit_without_warp(plan, "install ok installed")
+    conn.when("sha256sum", stdout=f"{BINARY.sha256}  {AGENT_BINARY}\n")
+    conn.when("systemctl is-active", stdout="active\n")
+    conn.when(f"cat {AGENT_BOOTSTRAP}", stdout=_enrolled_bootstrap())
+    control.reports = [{"last_seen_at": "2999-01-01T00:00:00Z"}]
+    drivers["agent_runtime"].apply(_action(plan, "agent:main"), None)
+    control.reports = [{"failed": ["core-config"], "errors": ["xray rejected the config"]}]
+
+    with pytest.raises(ResourceReconcileError, match="could not apply"):
+        drivers["node_workload"].apply(_action(plan, "workload:main"), None)
+
+    assert _warp_removal(conn) == []
+
+
+@pytest.mark.parametrize("rc", [255, 2], ids=["ssh-lost", "dpkg-failed"])
+def test_an_unreadable_warp_package_state_is_unavailable_evidence(plan: ResourcePlan, rc: int) -> None:
+    drivers, _control, conn = _exit_without_warp(plan, "", rc=rc)
+
+    with pytest.raises(ResourceReconcileError, match="evidence is unavailable"):
+        drivers["node_workload"].apply(_action(plan, "workload:main"), None)
+
+    assert _warp_removal(conn) == []
+
+
+def test_a_warp_removal_that_lost_its_connection_is_observed_not_failed(plan: ResourcePlan) -> None:
+    drivers, _control, conn = _exit_without_warp(plan, "install ok installed")
+    conn.when("apt-get purge -y -qq cloudflare-warp", rc=255)
+
+    with pytest.raises(UnknownResourceOutcome):
+        drivers["node_workload"].apply(_action(plan, "workload:main"), None)
+
+
 def _gateway_plan(*, warp: bool = False) -> ResourcePlan:
     intent = gateway_fleet_intent()
     if warp:

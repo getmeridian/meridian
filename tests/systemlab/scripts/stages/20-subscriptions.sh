@@ -13,38 +13,43 @@ python3 "$SUBSCRIPTION_TEST" \
   --forbid-address "$RELAY_B_IP"
 pass "canonical subscription executes every advertised V4 path"
 
-# Proxied names resolve over DoH only. Sniff every interface on exit A (loopback included)
-# while a client fetches the IP observers through it: no
-# packet may carry a plain DNS question for them. The host resolver's own lookup of a control
-# name (never a parent or child of an observer name) proves the capture sees plain DNS.
+# Proxied names resolve over DoH only. Sniff every interface on a server (loopback included)
+# while a client fetches the IP observers through it: no packet may carry a plain DNS question
+# for them. The host resolver's own lookup of a control name (never a parent or child of an
+# observer name) proves the capture sees plain DNS. A gateway sends its DoH through its exits.
 observer_names=$(python3 -c '
 from urllib.parse import urlsplit
 from meridian.config import CONNECT_TEST_URLS_IPV4, CONNECT_TEST_URLS_IPV6
 print(",".join(sorted({urlsplit(url).hostname for url in CONNECT_TEST_URLS_IPV4 + CONNECT_TEST_URLS_IPV6})))
 ')
-dns_control="meridian-dns-control-$RANDOM.lab.test"
-ssh root@"$EXIT_A_IP" rm -f /tmp/dns-capture.ready /tmp/dns-capture.stop
-ssh root@"$EXIT_A_IP" python3 - --names "$observer_names,$dns_control" \
-  --ready /tmp/dns-capture.ready --stop /tmp/dns-capture.stop \
-  < "$SYSTEMLAB_ROOT/dns_capture.py" > /tmp/dns-capture.json &
-capture_pid=$!
-wait_for_command "DNS capture on exit A" 30 ssh root@"$EXIT_A_IP" test -e /tmp/dns-capture.ready
-python3 "$SUBSCRIPTION_TEST" --address "$EXIT_A_IP"
-ssh root@"$EXIT_A_IP" getent hosts "$dns_control" >/dev/null || true
-ssh root@"$EXIT_A_IP" touch /tmp/dns-capture.stop
-wait "$capture_pid"
-python3 - "$dns_control" "$observer_names" <<'PYEOF'
+assert_no_plain_dns() {
+  local label=$1 server=$2
+  local dns_control="meridian-dns-control-$RANDOM.lab.test"
+  ssh root@"$server" rm -f /tmp/dns-capture.ready /tmp/dns-capture.stop
+  ssh root@"$server" python3 - --names "$observer_names,$dns_control" \
+    --ready /tmp/dns-capture.ready --stop /tmp/dns-capture.stop \
+    < "$SYSTEMLAB_ROOT/dns_capture.py" > /tmp/dns-capture.json &
+  local capture_pid=$!
+  wait_for_command "DNS capture on $label" 30 ssh root@"$server" test -e /tmp/dns-capture.ready
+  python3 "$SUBSCRIPTION_TEST" --address "$server"
+  ssh root@"$server" getent hosts "$dns_control" >/dev/null || true
+  ssh root@"$server" touch /tmp/dns-capture.stop
+  wait "$capture_pid"
+  python3 - "$label" "$dns_control" "$observer_names" <<'PYEOF'
 import json
 import sys
 
-control, observers = sys.argv[1], sys.argv[2].split(",")
+label, control, observers = sys.argv[1], sys.argv[2], sys.argv[3].split(",")
 counts = json.load(open("/tmp/dns-capture.json"))
-print(f"  exit A capture: {counts}")
+print(f"  {label} capture: {counts}")
 assert counts[control] > 0, "the capture saw no plain DNS at all, so it proves nothing"
 leaked = {name: counts[name] for name in observers if counts[name]}
-assert not leaked, f"exit A sent plain DNS questions for proxied names: {leaked}"
+assert not leaked, f"{label} sent plain DNS questions for proxied names: {leaked}"
 PYEOF
-pass "exit A resolves proxied names over DoH, with no plain DNS on the wire"
+  pass "$label resolves proxied names over DoH, with no plain DNS on the wire"
+}
+assert_no_plain_dns "exit A" "$EXIT_A_IP"
+assert_no_plain_dns "the gateway" "$GATEWAY_IP"
 
 python3 "$SUBSCRIPTION_TEST" --automatic
 pass "canonical Xray client fallback connects"

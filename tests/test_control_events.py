@@ -436,11 +436,13 @@ def test_events_command_json_continues_the_cursor_and_invalid_flags_have_an_enve
 def test_event_human_views_translate_the_kinds_and_changed_fields(
     tmp_path: Path, tmp_home: Path, monkeypatch: pytest.MonkeyPatch, locale: str
 ) -> None:
+    from typing import get_args
+
     from meridian import i18n
     from meridian.cluster import ClusterConfig, PanelConfig
     from meridian.commands import fleet_events
     from meridian.console import set_json_mode
-    from meridian.core.fleet_events import FLEET_EVENT_KINDS
+    from meridian.core.fleet_events import FleetEventKind
 
     monkeypatch.setattr(i18n, "_requested", None)
     monkeypatch.setattr(i18n, "_current", "en")
@@ -454,7 +456,7 @@ def test_event_human_views_translate_the_kinds_and_changed_fields(
             assert result.exit_code == 0, result.output
             assert i18n.t("events.title") in result.output and "alice" in result.output
             assert "traffic_limit_bytes" not in result.output
-            assert all(i18n.t(f"events.kind.{kind}") for kind in FLEET_EVENT_KINDS)
+            assert all(i18n.t(f"events.kind.{kind}") for kind in get_args(FleetEventKind))
         finally:
             set_json_mode(False)
 

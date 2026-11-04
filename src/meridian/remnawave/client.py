@@ -22,9 +22,6 @@ logger = logging.getLogger("meridian.api")
 
 _EMPTY_BODY_STATUSES = frozenset({202, 204})
 _USERS_PAGE_SIZE = 1000  # Remnawave rejects larger pages
-# What Meridian's Remnawave fleets wrote on every access user; migrate reports the rest as not its own.
-ACCESS_USER_DESCRIPTION = "Managed by Meridian access"
-ACCESS_USER_TAG = "MERIDIAN_ACCESS"
 
 
 class RemnawaveReader:

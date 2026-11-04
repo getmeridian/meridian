@@ -44,6 +44,15 @@ newest first; the last is what 4.0 changes compared with 3.x.
   people in the same batch are still deleted atomically (#95).
 
 #### Fixed
+- A routing gateway's country and IP routes (such as `RU → direct`) now apply to
+  destinations named by domain too, not only to addresses: the gateway resolves the
+  name first. Those lookups go over DoH through its exits instead of as plain DNS
+  to 8.8.8.8. Only names that DoH cannot answer, such as nonexistent names or names
+  asked for while every exit is down, fall back to the host resolver (#95).
+- A new `local` target reads this machine's public address from its own default
+  route and asks an IP echo service only behind NAT (#95).
+- Turning WARP off on an exit (no `--warp` and no `warp` route left) removes the WARP
+  client, so no idle daemon keeps a Cloudflare tunnel open (#95).
 - Adding a person in the web panel moves keyboard focus to their page (#95).
 - Connection pages load their delivery-capability helper from the service, so
   supported-app limits appear without a missing-script error (#95).

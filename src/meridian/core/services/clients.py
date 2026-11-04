@@ -9,13 +9,11 @@ from pydantic import Field
 
 from meridian.control.models import UserUsage
 from meridian.core.access_profile_views import PersonAccess
-from meridian.core.attention import AttentionList
 from meridian.core.clients import (
     ClientConnections,
     ClientListResult,
     ClientShowResult,
     PanelUserLike,
-    build_client_list_result,
     build_client_show_result,
 )
 from meridian.core.models import CoreModel
@@ -57,27 +55,6 @@ class ClientShowServiceResult(CoreModel):
     client: ClientShowResult
     share_url: str = Field(default="", exclude=True)
     subscription_url: str = Field(default="", exclude=True)
-
-
-def collect_client_list(
-    panel_client: ClientPanelClient,
-    *,
-    allowed_usernames: Collection[str] | None = None,
-    declared_usernames: Collection[str] | None = None,
-    read_attention: Callable[[], AttentionList] | None = None,
-    tag: str | None = None,
-) -> ClientListServiceResult:
-    """Collect redacted client list data from the panel; `declared_usernames` marks the rest undeclared."""
-    with panel_client as panel:
-        users = panel.list_users()
-        attention = {person.username: person.reasons for person in read_attention().people} if read_attention else None
-    if allowed_usernames is not None:
-        allowed = set(allowed_usernames)
-        users = [user for user in users if user.username in allowed]
-    if tag is not None:
-        users = [user for user in users if getattr(user, "tag", "") == tag]
-    declared = None if declared_usernames is None else set(declared_usernames)
-    return ClientListServiceResult(clients=build_client_list_result(users, declared=declared, attention=attention))
 
 
 def collect_client_show(

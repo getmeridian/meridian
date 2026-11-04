@@ -42,6 +42,8 @@ uv tool install meridian-vpn
 pipx install meridian-vpn
 ```
 
+当最新发布版本是测试版时，这些命令会安装最新的稳定版；若要安装本文档所述的测试版，请为 uv 加上 `--prerelease allow`，或为 pipx 加上 `--pip-args=--pre`。
+
 ## 更新
 
 ```
