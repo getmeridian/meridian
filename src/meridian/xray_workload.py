@@ -57,6 +57,10 @@ EXIT_DOH_RESOLVERS = (
 # How long one endpoint may take before its answer is ignored (Xray's default is 4 s). Queries run
 # in parallel, so a resolver that silently drops packets never delays a lookup another answers.
 _DOH_TIMEOUT_MS = 2000
+# A gateway asks the same operators one at a time through its exits (IPv4 only: exits are IPv4), so
+# the in-country network sees only tunnel traffic; the host resolver answers only when all three fail.
+GATEWAY_DOH_RESOLVERS = tuple(resolver for resolver in EXIT_DOH_RESOLVERS if ":" not in resolver.address)
+_GATEWAY_DOH_TIMEOUT_MS = 1500
 
 
 class WorkloadConfigError(MeridianError):
@@ -113,7 +117,7 @@ def render_workload_config(
         outbounds.append(warp_outbound)
     _validate_route_targets(profile, {outbound["tag"] for outbound in outbounds})
     routing: dict[str, Any] = {
-        "domainStrategy": "IPIfNonMatch",
+        "domainStrategy": _domain_strategy(profile),
         "rules": [
             {
                 "type": "field",
@@ -166,13 +170,23 @@ def render_workload_config(
     return config
 
 
+def _domain_strategy(profile: ConfigProfilePayload) -> str:
+    """Resolve a name for IP rules only where a later catch-all would otherwise win first.
+
+    ``IPIfNonMatch`` resolves only once no rule matched the name, but a gateway always ends with
+    a catch-all route, so its country and IP routes would never see a named destination.
+    ``IPOnDemand`` resolves at the first IP rule instead, through the gateway's DNS block.
+    """
+    ip_rules = any(rule.match in {"country", "geoip", "ip"} for rule in profile.routing_rules)
+    return "IPOnDemand" if profile.workload_kind == "routing_gateway" and ip_rules else "IPIfNonMatch"
+
+
 def _direct_outbound(profile: ConfigProfilePayload) -> dict[str, Any]:
     """Return the freedom Outbound; an exit resolves its destinations only through DoH.
 
     ForceIP refuses a name no resolver answers instead of handing it to plain DNS. IPv4 first,
     IPv6 only for names without an A record, so an IPv4-only exit never dials an IPv6 address.
-    A routing gateway usually sits in the censored country, where foreign DoH can be blocked, so it
-    keeps the host resolver until split resolution there is tested from inside.
+    A routing gateway's direct destinations are domestic, so they keep the host resolver.
     """
     if profile.workload_kind == "routing_gateway":
         return {"tag": "direct", "protocol": "freedom"}
@@ -180,7 +194,7 @@ def _direct_outbound(profile: ConfigProfilePayload) -> dict[str, Any]:
 
 
 def _dns_config(profile: ConfigProfilePayload) -> dict[str, Any]:
-    """Return the encrypted-only resolver block an exit renders.
+    """Return the resolver block: encrypted-only on an exit, routed DoH with a host fallback on a gateway.
 
     ``https+local`` dials each resolver from the host directly, so a lookup never rides the
     routing rules (WARP, gateway routes, geo blocks) it is resolving for. With servers listed
@@ -190,8 +204,11 @@ def _dns_config(profile: ConfigProfilePayload) -> dict[str, Any]:
     resolver no longer adds its timeout to every connection.
     """
     if profile.workload_kind == "routing_gateway":
-        google = {"address": "https://dns.google/dns-query", "domains": ["geosite:geolocation-!cn"]}
-        return {"servers": [google, "8.8.8.8"]}
+        # Plain ``https`` rides the gateway's own routes to an exit, so in-country DoH blocking never
+        # applies. Serial on purpose: parallel queries would send every name to the host resolver too.
+        # Xray also moves on after NXDOMAIN or an empty answer, so names DoH cannot find reach it.
+        routed = [{"address": resolver.url, "timeoutMs": _GATEWAY_DOH_TIMEOUT_MS} for resolver in GATEWAY_DOH_RESOLVERS]
+        return {"servers": [*routed, "localhost"], "queryStrategy": "UseSystem"}
     return {
         "servers": [{"address": resolver.xray_server, "timeoutMs": _DOH_TIMEOUT_MS} for resolver in EXIT_DOH_RESOLVERS],
         "queryStrategy": "UseSystem",

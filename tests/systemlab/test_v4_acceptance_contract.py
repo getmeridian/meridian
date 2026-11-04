@@ -90,7 +90,11 @@ def test_systemlab_intent_compiles_every_v4_acceptance_path() -> None:
     assert pools[0].fail_closed is True
 
     routes = [resource.payload for resource in plan.resources if isinstance(resource.payload, RouteRulePayload)]
-    assert sorted((route.priority, route.target_type) for route in routes) == [(10, "balancer"), (100, "balancer")]
+    assert sorted((route.priority, route.target_type) for route in routes) == [
+        (10, "balancer"),
+        (50, "outbound"),
+        (100, "balancer"),
+    ]
     probe_route = next(route for route in routes if route.route_id == "route-probe-via-pool")
     assert probe_route.match_values == ["ifconfig.me"]
     assert probe_route.target_ref == "pool-a"

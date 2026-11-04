@@ -19,7 +19,7 @@ _RENDERER_MANIFEST = {
     "nginx": "panel-domain-certificate-v13",
     "realm": "neutral-systemd-musl-v3",
     "server-baseline": "lean-packages-v4",
-    "xray-workload": "exit-doh-v8",
+    "xray-workload": "gateway-names-v10",
 }
 
 RENDERER_CONTRACT = "meridian.renderer-contract/v1@sha256:" + canonical_hash(_RENDERER_MANIFEST)

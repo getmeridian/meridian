@@ -43,7 +43,7 @@
 - **SSH ControlPath must fit a Unix socket** (103 bytes on macOS) — hash the target into the path and drop multiplexing when the home is too deep.
 - **Camouflage targets** — never apple.com (ASN mismatch with VPS providers) or www.microsoft.com (certificate over REALITY's size limit, so no traffic passes); `camouflage_refusal()` refuses both. A relay's SNI must be reachable from its exit, and a `--self-steal` name's DNS is checked from the exit.
 - **Reality key material is atomic** — refuse partial state instead of rotating keys; `node replace` carries keys to the new server. Hysteria2's salamander password derives from the Reality private key and is never stored separately.
-- **Exits resolve only over IP-addressed DoH** (`xray_workload.EXIT_DOH_RESOLVERS`) — a hostname resolver or `AsIs` strategy hands names to the host's plain resolver; gateways keep the host resolver, since foreign DoH may be blocked in-country.
+- **Exits resolve only over IP-addressed DoH** (`xray_workload.EXIT_DOH_RESOLVERS`) — a hostname resolver or `AsIs` strategy hands names to the host's plain resolver; a gateway sends the same DoH (IPv4) through its exits, serially, with the host resolver last, since parallel queries would hand every name to that resolver too. Gateways with country or IP routes need `IPOnDemand`: under `IPIfNonMatch` their catch-all route matches every name first.
 - **Local Xray is evidence, not a requirement** — a missing runtime is inconclusive, and an archive that misses `XRAY_SHA256` never runs.
 - **Deployer-side HTTPS uses httpx** — urllib failed certificate checks on uv-managed Pythons.
 - **Exit-IP observers match the server's address family**, or a dual-stack exit answers over the other one.

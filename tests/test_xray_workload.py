@@ -3,6 +3,13 @@
 from __future__ import annotations
 
 import ipaddress
+import json
+import re
+import socket
+import subprocess
+import time
+from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
 import pytest
@@ -320,15 +327,10 @@ def test_gateway_renders_ordered_service_routes_and_fail_closed_balancer() -> No
     assert config["observatory"]["probeUrl"] == ("https://www.apple.com/library/test/success.html")
 
 
-def test_gateway_direct_rule_leaves_through_the_gateways_freedom_outbound() -> None:
+def _gateway_config(routes: list[OrderedRouteIntent]) -> tuple[ConfigProfilePayload, dict[str, Any]]:
     intent = single_exit_intent(
         routing_gateways=[RoutingGatewayIntent(id="gateway-a", server_ref="srv-gateway", bridge_path_ref="reality-a")],
-        routes=[
-            OrderedRouteIntent(id="zones", priority=5, match="domain", match_values=["ru", "рф"], action="direct"),
-            OrderedRouteIntent(id="sites", priority=6, match="geosite", match_values=["category-ru"], action="direct"),
-            OrderedRouteIntent(id="domestic", priority=10, match="country", match_values=["RU"], action="direct"),
-            OrderedRouteIntent(id="ads", priority=20, match="domain", match_values=["ads.example.com"], action="block"),
-        ],
+        routes=routes,
     )
     profile = next(
         resource.payload
@@ -343,13 +345,35 @@ def test_gateway_direct_rule_leaves_through_the_gateways_freedom_outbound() -> N
         public_key="public-a",
         short_id="aaaaaaaaaaaaaaaa",
     )
+    return profile, render_workload_config(
+        profile, reality_keys=_keys(), service_credentials={edge.edge_id: credential}
+    )
 
-    config = render_workload_config(profile, reality_keys=_keys(), service_credentials={edge.edge_id: credential})
+
+def test_gateway_direct_rule_leaves_through_the_gateways_freedom_outbound() -> None:
+    profile, config = _gateway_config(
+        [
+            OrderedRouteIntent(id="zones", priority=5, match="domain", match_values=["ru", "рф"], action="direct"),
+            OrderedRouteIntent(id="sites", priority=6, match="geosite", match_values=["category-ru"], action="direct"),
+            OrderedRouteIntent(id="domestic", priority=10, match="country", match_values=["RU"], action="direct"),
+            OrderedRouteIntent(id="ads", priority=20, match="domain", match_values=["ads.example.com"], action="block"),
+        ]
+    )
+    (edge,) = profile.service_outbounds
 
     outbounds = {outbound["tag"]: outbound for outbound in config["outbounds"]}
     assert outbounds["direct"] == {"tag": "direct", "protocol": "freedom"}
-    # A gateway inside the censored country keeps its pre-DoH resolver: foreign DoH can be blocked there.
-    assert config["dns"]["servers"][-1] == "8.8.8.8"
+    dns = config["dns"]
+    routed, fallback = dns["servers"][:-1], dns["servers"][-1]
+    # DoH by IP over plain https rides the gateway's routes (the default rule below sends it to the exit),
+    # so the in-country network never sees a lookup; the host resolver answers only after all of them fail.
+    assert [urlsplit(server["address"]).scheme for server in routed] == ["https"] * len(routed)
+    assert {ipaddress.ip_address(urlsplit(server["address"]).hostname or "").version for server in routed} == {4}
+    assert len({urlsplit(server["address"]).hostname for server in routed}) >= 2
+    assert fallback == "localhost"
+    # Parallel queries would hand every name to the host resolver at the same time.
+    assert dns.get("enableParallelQuery") is not True
+    assert "8.8.8.8" not in dns["servers"]
     rules = [(rule.get("ruleTag"), rule.get("outboundTag")) for rule in config["routing"]["rules"]]
     assert rules == [
         (None, "block"),  # private ranges first, always
@@ -362,6 +386,60 @@ def test_gateway_direct_rule_leaves_through_the_gateways_freedom_outbound() -> N
     assert config["routing"]["rules"][1]["domain"] == ["domain:ru", "domain:xn--p1ai"]
     assert config["routing"]["rules"][2]["domain"] == ["geosite:category-ru"]
     assert config["routing"]["rules"][3]["ip"] == ["geoip:ru"]
+    # The default route matches every name first, so IPIfNonMatch would never reach the country rule.
+    assert config["routing"]["domainStrategy"] == "IPOnDemand"
+
+
+def test_a_gateway_without_ip_routes_never_resolves_names_to_route_them() -> None:
+    _profile, config = _gateway_config(
+        [OrderedRouteIntent(id="zones", priority=5, match="domain", match_values=["ru"], action="direct")]
+    )
+
+    assert config["routing"]["domainStrategy"] == "IPIfNonMatch"
+
+
+def test_named_destinations_reach_a_gateways_ip_rules_in_real_xray(xray_binary: Path, tmp_path: Path) -> None:
+    _profile, config = _gateway_config(
+        [OrderedRouteIntent(id="domestic", priority=10, match="ip", match_values=["8.8.4.4/32"], action="direct")]
+    )
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    access = tmp_path / "access.log"
+    config["log"] = {"loglevel": "warning", "access": str(access)}
+    # geoip:private includes the documentation ranges, so this name must meet the private block.
+    config["dns"]["hosts"] = {"domestic.test": "8.8.4.4", "internal.test": "198.51.100.7"}
+    config["inbounds"] = [{"tag": "in", "listen": "127.0.0.1", "port": port, "protocol": "socks"}]
+    config["outbounds"] = [{"tag": outbound["tag"], "protocol": "blackhole"} for outbound in config["outbounds"]]
+    config.pop("observatory", None)
+    (tmp_path / "config.json").write_text(json.dumps(config), encoding="utf-8")
+    process = subprocess.Popen(
+        [str(xray_binary), "run", "-c", str(tmp_path / "config.json")], stdout=subprocess.DEVNULL
+    )
+    try:
+        deadline = time.monotonic() + 10
+        for name in (b"domestic.test", b"internal.test"):
+            while True:
+                try:
+                    client = socket.create_connection(("127.0.0.1", port), timeout=1)
+                    break
+                except OSError:
+                    assert time.monotonic() < deadline, "Xray never listened"
+                    time.sleep(0.1)
+            with client:
+                client.sendall(b"\x05\x01\x00")
+                client.recv(2)
+                client.sendall(b"\x05\x01\x00\x03" + bytes([len(name)]) + name + b"\x00\x50")
+                client.recv(10)
+        while (access.read_text(encoding="utf-8") if access.exists() else "").count("accepted") < 2:
+            assert time.monotonic() < deadline, "Xray never logged both requests"
+            time.sleep(0.1)
+    finally:
+        process.terminate()
+        process.wait(timeout=10)
+
+    routes = dict(re.findall(r"accepted tcp:(\S+):80 \[in -> (\S+)\]", access.read_text(encoding="utf-8")))
+    assert routes == {"domestic.test": "direct", "internal.test": "block"}
 
 
 def test_gateway_refuses_to_guess_missing_service_credentials() -> None:
