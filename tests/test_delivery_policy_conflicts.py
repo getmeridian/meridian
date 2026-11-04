@@ -9,24 +9,23 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from pydantic import ValidationError
 from typer.testing import CliRunner
 
 from meridian import i18n
 from meridian.cli import app
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.compiler import compile_topology
-from meridian.compiler.errors import TopologyCompileError
 from meridian.console import set_json_mode, set_quiet_mode
 from meridian.control.errors import ServiceError
 from meridian.control.models import ServiceSettings, UserCreate
 from meridian.control.service import ControlService
 from meridian.core.people_bulk import BulkCommitRequest, BulkPreviewRequest
+from meridian.core.people_seeds import PeopleSeeds
 from meridian.core.person_delivery_policy import PersonDeliveryPolicyWrite
-from meridian.core.topology import DeliveryIntent, SetupIntent
+from meridian.core.topology import SetupIntent
 from tests.support.control_service import ADMIN_TOKEN
 from tests.support.token_service import Fleet, serve_tokens, token_request
-from tests.support.topology import single_exit_intent
+from tests.support.topology import people_draft, single_exit_intent
 from tests.test_access_profiles import NOW, POLICY, spec
 
 
@@ -200,22 +199,16 @@ def test_undo_keeps_a_person_override_when_restoring_conflicting_profiles(fleet:
     assert person.profiles == ["limited", "udp"] and person.delivery_policy == "full"
 
 
-@pytest.mark.parametrize("boundary", ["intent", "compile"])
-def test_initial_profiles_refuse_conflicting_delivery_defaults_at_both_boundaries(boundary: str) -> None:
+def test_initial_profiles_refuse_conflicting_delivery_defaults_in_the_setup_draft() -> None:
     data = single_exit_intent().to_data()
     data["access_profiles"] = [{"id": name, "grants": []} for name in ("limited", "udp")]
-    data["access"]["creation_settings"] = {"default": {"profiles": ["limited", "udp"]}}
-    if boundary == "intent":
-        data["delivery"]["profile_policies"] = {"limited": "full", "udp": "ru-split"}
-        with pytest.raises(ValidationError, match="default.*different delivery policies"):
-            SetupIntent.model_validate(data)
-    else:
-        original = SetupIntent.model_validate(data)
-        proposed = original.model_copy(
-            update={"delivery": DeliveryIntent(profile_policies={"limited": "full", "udp": "ru-split"})}
-        )
-        with pytest.raises(TopologyCompileError, match="default.*different delivery policies"):
-            compile_topology(proposed)
+    data["delivery"]["profile_policies"] = {"limited": "full", "udp": "ru-split"}
+    intent = SetupIntent.model_validate(data)
+    seeds = PeopleSeeds.model_validate(
+        {"users": ["default"], "creation_settings": {"default": {"profiles": ["limited", "udp"]}}}
+    )
+    with pytest.raises(ValueError, match="default.*different delivery policies"):
+        people_draft(intent, seeds).to_intent()
 
 
 @pytest.mark.parametrize(
@@ -230,7 +223,7 @@ def test_initial_profiles_refuse_conflicting_delivery_defaults_at_both_boundarie
 def test_initial_profiles_allow_agreeing_or_unmapped_defaults(profiles: list[str], defaults: dict[str, str]) -> None:
     data = single_exit_intent().to_data()
     data["access_profiles"] = [{"id": name, "grants": []} for name in ("limited", "udp")]
-    data["access"]["creation_settings"] = {"default": {"profiles": profiles}}
     data["delivery"]["profile_policies"] = defaults
-    plan = compile_topology(SetupIntent.model_validate(data))
+    seeds = PeopleSeeds.model_validate({"users": ["default"], "creation_settings": {"default": {"profiles": profiles}}})
+    plan = compile_topology(people_draft(SetupIntent.model_validate(data), seeds).to_intent())
     assert plan.resources

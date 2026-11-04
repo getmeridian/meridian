@@ -12,10 +12,16 @@ from meridian.control.errors import ServiceError
 from meridian.control.models import TokenCreate, UserRecord, UserUpdate
 from meridian.control.token_capabilities import permission, requested_capabilities
 from meridian.core.account_schedule import calculate_schedule
-from scripts.build_showcase import export_showcase, validate_recordings
+from scripts.build_showcase import export_showcase
+from scripts.build_showcase import validate_recordings as validate_service_recordings
 from tests.support.console_dom import needs_console_dom, run_console
 
 pytestmark = needs_console_dom
+
+
+def validate_recordings(responses):
+    """Normalize the frozen demo's retired fields; actual service recordings remain strict."""
+    validate_service_recordings(responses, legacy_people=True)
 
 
 @pytest.fixture(scope="module")

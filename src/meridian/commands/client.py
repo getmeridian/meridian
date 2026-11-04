@@ -2,7 +2,7 @@
 
 Limits and expiry (`client set`, `client reset-traffic`) live in `client_limits.py`.
 
-Clients are declared in the topology's access intent; their runtime state lives in the control service.
+Every person lives in the control service; client commands never edit topology.
 """
 
 from __future__ import annotations
@@ -14,18 +14,15 @@ from pydantic import ValidationError
 from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
-from meridian.commands._helpers import format_traffic, load_topology_cluster, require_intent
+from meridian.commands._helpers import format_traffic
+from meridian.commands._helpers import load_people_cluster as load_topology_cluster
 from meridian.commands.client_connections import print_connections
 from meridian.commands.client_handoff import (
-    declared_client_name,
     format_status,
     get_user_or_fail,
-    new_client_usernames,
     print_handoff_links,
-    require_plausible_client_name,
     resolve_client_mutation_name,
     resolve_client_name,
-    validate_client_name,
 )
 from meridian.commands.client_limits import parse_limit_options, print_client_usage
 from meridian.commands.client_schedule import account_expiry
@@ -51,33 +48,9 @@ from meridian.core.people_query import PeopleQuery
 from meridian.core.person_metadata import PersonMetadataError, parse_tag_option
 from meridian.core.redaction import HANDOFF_LINK_KEYS
 from meridian.core.services.clients import ClientListServiceResult, ClientNotFoundError, collect_client_show
-from meridian.handoff import client_handoffs, page_url
+from meridian.handoff import page_url
 from meridian.i18n import t
-from meridian.people_removal import require_removal_users
-from meridian.remnawave import RemnawaveError
 from meridian.renderers import emit_json
-
-
-def _access_users(cluster: ClusterConfig) -> list[str]:
-    """Return the declared access users; panel-wide service users stay hidden."""
-    return list(require_intent(cluster).access.users)
-
-
-def _readable_users(cluster: ClusterConfig) -> list[str] | None:
-    """Who list and show may read: on a control service every user is a person of this fleet,
-    including those added in its web panel; a Remnawave panel may hold others, so only declared ones."""
-    return None if cluster.runs_control_service else _access_users(cluster)
-
-
-def _console_names(cluster: ClusterConfig) -> list[str]:
-    """Every username the control service holds (none on a Remnawave fleet), to resolve a typed name exactly."""
-    if not cluster.runs_control_service:
-        return []
-    try:
-        with access_panel(cluster) as panel:
-            return [user.username for user in panel.list_users()]
-    except RemnawaveError as exc:
-        fail(f"Could not read clients: {exc}", hint=exc.hint or "Check panel connectivity", hint_type=exc.category)
 
 
 def run_add(
@@ -123,15 +96,10 @@ def run_add(
                 )
             seen.add(name.strip().casefold())
         cluster = load_topology_cluster()
-        usernames, display_names = new_client_usernames(cluster, names)
-        run_add_v4(
-            usernames,
-            cluster,
-            operation,
-            display_names=display_names,
-            collect_handoff=client_handoffs,
-            limits=limits,
-        )
+        try:
+            run_add_v4(names, cluster, operation, limits=limits)
+        except MeridianError as exc:
+            fail(exc)
 
 
 def run_show(name: str, *, connections: bool = False) -> None:
@@ -143,10 +111,7 @@ def run_show(name: str, *, connections: bool = False) -> None:
 
 def _show(*, name: str, operation: OperationContext, connections: bool = False) -> None:
     cluster = load_topology_cluster()
-    name = resolve_client_name(cluster, name, console_people=True, console_names=_console_names(cluster))
-    if not cluster.runs_control_service:  # there the name was checked against the service's own rule
-        validate_client_name(name)
-    access_users = _access_users(cluster)
+    name = resolve_client_name(cluster, name)
 
     def share_url(panel_user: PanelUserLike) -> str:
         return page_url(cluster, panel_user)
@@ -158,8 +123,6 @@ def _show(*, name: str, operation: OperationContext, connections: bool = False) 
             name,
             build_share_url=share_url,
             build_subscription_url=cluster.panel.subscription_url,
-            allowed_usernames=_readable_users(cluster),
-            declared_usernames=access_users,
             read_usage=panel.recent_usage if cluster.runs_control_service else None,
             read_connections=panel.user_connections if connections else None,
             read_access=panel.user_access if cluster.runs_control_service else None,
@@ -171,7 +134,7 @@ def _show(*, name: str, operation: OperationContext, connections: bool = False) 
             hint="Check client name with: meridian client list",
             hint_type="user",
         )
-    except RemnawaveError as e:
+    except MeridianError as e:
         fail(
             f"Could not show client: {e}",
             hint=e.hint or "Check panel connectivity",
@@ -184,7 +147,9 @@ def _show(*, name: str, operation: OperationContext, connections: bool = False) 
             command_envelope(
                 command="client.show",
                 data=result.client.to_data(),
-                summary=Summary(text=f"Client {detail.username}", changed=False, counts={"clients": 1}),
+                summary=Summary(
+                    text=f"Client {detail.display_name or detail.username}", changed=False, counts={"clients": 1}
+                ),
                 timer=operation.timer,
             ),
             reveal=HANDOFF_LINK_KEYS | client_metadata_paths() | connection_credential_paths(result.client.connections),
@@ -245,7 +210,6 @@ def _list(*, operation: OperationContext, query: PeopleQuery) -> None:
             page, users = panel.query_users(query, include_metadata=is_json_mode())
         listed = build_client_list_result(
             users,
-            declared=[person.username for person in page.users if person.declared],
             attention={person.username: person.attention_reasons for person in page.users} if query.attention else None,
         )
         listed = ClientListResult.model_validate(
@@ -253,7 +217,7 @@ def _list(*, operation: OperationContext, query: PeopleQuery) -> None:
         )
         result = ClientListServiceResult(clients=listed)
         attention = bool(query.attention)
-    except RemnawaveError as e:
+    except MeridianError as e:
         fail(
             f"Could not list clients: {e}",
             hint=e.hint or "Check panel connectivity",
@@ -298,7 +262,7 @@ def _list(*, operation: OperationContext, query: PeopleQuery) -> None:
         shown = names.get(client.username, client.username)
         label = escape(shown if shown == client.username else f"{shown} ({client.username})")
         row = [
-            label if client.declared else f"{label} [dim]· console[/dim]",
+            label,
             escape(client.tag or "-"),
             format_status(client.status),
             format_traffic(client.traffic_used_bytes, client.traffic_limit_bytes),
@@ -316,8 +280,6 @@ def _list(*, operation: OperationContext, query: PeopleQuery) -> None:
     err_console.print(f"  [dim]{escape(t('bulk.list_count', shown=count, total=page.total))}[/dim]")
     if page.next_cursor:
         err_console.print(f"  [dim]--cursor {escape(page.next_cursor)}[/dim]")
-    if not all(client.declared for client in result.clients.clients):
-        err_console.print(f"  [dim]{escape(t('client.console_note'))}[/dim]")
     err_console.print()
     err_console.print("  [dim]Add: meridian client add NAME  |  Remove: meridian client remove NAME[/dim]")
     err_console.print()
@@ -341,38 +303,24 @@ def run_remove(
                 hint_type="user",
             )
         try:
-            from meridian.commands.client_removal import read_removal_proposal, run_reviewed_removal
-
             names = [name] if isinstance(name, str) else name or []
-            if proposal is not None and names:
-                fail(t("bulk.proposal_selection"), hint_type="user")
-            draft = read_removal_proposal(proposal) if proposal is not None else None
-            if draft is not None:
-                names = draft.usernames
+            if proposal is not None:
+                fail("--proposal has been retired. Use `meridian client remove NAME...`.", hint_type="user")
             if not names:
-                fail(t("bulk.remove_selection"), hint_type="user")
+                fail("Give one or more client names.", hint_type="user")
+            if cut_off and (len(names) != 1 or dry_run):
+                fail("--cut-off is available for one person without --dry-run.", hint_type="user")
             cluster = load_topology_cluster()
-            if cut_off and (draft is not None or len(names) > 1 or dry_run):
-                fail(t("bulk.proposal_no_cut_off"), hint_type="user")
-            access = require_intent(cluster).access
-            if draft is None:
-                # A name no declared person matches is refused whatever the service holds.
-                unknown = [value for value in names if not access.matching_users(value)]
-                for value in unknown:
-                    require_plausible_client_name(value, console=cluster.runs_control_service)
-                require_removal_users(unknown, access.users)
-                console_names = _console_names(cluster) if set(names) - set(access.users) else []
-                names = [
-                    resolve_client_name(cluster, value, console_people=True, console_names=console_names)
-                    for value in names
-                ]
-                require_removal_users(names, access.users)
+            with access_panel(cluster) as panel:
+                names = [resolve_client_mutation_name(cluster, panel, value) for value in names]
             if len(names) != len(set(names)):
-                fail(t("bulk.remove_duplicate"), hint_type="user")
-            if len(names) == 1 and draft is None and not dry_run:
+                fail("List each person once, even when using display names.", hint_type="user")
+            if len(names) == 1 and not dry_run:
                 run_remove_v4(names[0], cluster, operation, yes=yes, cut_off=cut_off)
             else:
-                run_reviewed_removal(names, cluster, operation, yes=yes, dry_run=dry_run, proposal=draft)
+                from meridian.commands.client_removal import run_reviewed_removal
+
+                run_reviewed_removal(names, cluster, operation, yes=yes, dry_run=dry_run)
         except MeridianError as exc:
             fail(exc)
 
@@ -388,17 +336,11 @@ def run_reissue(name: str, yes: bool = False, cut_off: bool = False) -> None:
                 hint_type="user",
             )
         cluster = load_topology_cluster()
-        access = require_intent(cluster).access
-        found = declared_client_name(access, name)
-        if found is None:
-            known = ", ".join(access.display_name(user) for user in access.users)
-            fail(
-                f"Client '{name}' is not one of your fleet's clients",
-                hint=f"Your clients: {known}" if known else "Add one with: meridian client add NAME",
-                hint_type="user",
-            )
-        name = found
-        shown = access.display_name(name)
+        with access_panel(cluster) as panel:
+            name = resolve_client_mutation_name(cluster, panel, name)
+            person = get_user_or_fail(panel, name, action="load")
+            assert person is not None
+            shown = person.display_name or name
         from meridian.commands.node_command_results import cut_off_disclosure
         from meridian.node_commands import cut_off_scope
 
@@ -431,8 +373,8 @@ def _reissue(
         user = get_user_or_fail(panel, name, action="load")
         if user is None:
             fail(
-                f"Client '{name}' is declared but missing from the panel",
-                hint="Run `meridian apply` to restore it, then reissue.",
+                f"Client '{name}' not found",
+                hint="Check names with: meridian client list",
                 hint_type="system",
             )
         try:
@@ -440,7 +382,7 @@ def _reissue(
                 reissued, commands = panel.revoke_user_subscription_with_cut_off(user.id)
             else:
                 reissued = panel.revoke_user_subscription(user.id)
-        except RemnawaveError as exc:
+        except MeridianError as exc:
             fail(
                 f"Could not reissue client '{name}': {exc}",
                 hint=(exc.hint or "Check panel connectivity") + f"; then rerun `meridian client reissue {name}`.",
@@ -459,7 +401,7 @@ def _reissue(
                 data=build_client_reissue_result(
                     reissued, page_url=subscription_url, subscription_url=subscription_url, cut_off=cut_off_results
                 ).to_data(),
-                summary=Summary(text=f"Reissued links for client {name}", changed=True, counts={"reissued": 1}),
+                summary=Summary(text=f"Reissued links for client {shown}", changed=True, counts={"reissued": 1}),
                 exit_code=exit_code,
                 warnings=warnings,
                 timer=operation.timer,
@@ -507,7 +449,6 @@ def _set_enabled(name: str, action: Literal["enable", "disable"]) -> None:
     operation = OperationContext()
     with error_context(f"client.{action}", timer=operation.timer):
         cluster = load_topology_cluster()
-        resolve_client_name(cluster, name, console_people=True)
         with access_panel(cluster) as panel:
             name = resolve_client_mutation_name(cluster, panel, name)
             client = get_user_or_fail(panel, name, action="load")
@@ -519,26 +460,27 @@ def _set_enabled(name: str, action: Literal["enable", "disable"]) -> None:
                 )
             try:
                 updated = (panel.enable_user if action == "enable" else panel.disable_user)(client.id)
-            except RemnawaveError as e:
+            except MeridianError as e:
                 fail(
                     f"Could not {action} client '{name}': {e}",
                     hint=e.hint or "Check panel connectivity",
                     hint_type=e.category,
                 )
 
+        shown = client.display_name or name
         status = _effective_status(updated, "active" if action == "enable" else "disabled")
         held = status not in {"active", "disabled"}
         if is_json_mode():
             emit_json(
                 command_envelope(
                     command=f"client.{action}",
-                    data=build_client_status_result(name, status).to_data(),
-                    summary=Summary(text=f"{action.capitalize()}d client '{name}'", changed=True),
+                    data=build_client_status_result(name, status, display_name=client.display_name).to_data(),
+                    summary=Summary(text=f"{action.capitalize()}d client '{shown}'", changed=True),
                     timer=operation.timer,
                 )
             )
             return
-        ok(f"Client '{name}' {action}d")
+        ok(f"Client '{shown}' {action}d")
         if held:
             if status == "expired":
                 warn(f"Client '{name}' is still expired: its expiry has passed")

@@ -82,14 +82,8 @@ def secret_paths(value: Any, path: str = "") -> list[str]:
     Any other secret-shaped key still counts.
     """
     if path:
-        return _secret_paths(value, path, (), frozenset(), frozenset())
-    return _secret_paths(value, path, (), _declared_usernames(value), _declared_profiles(value))
-
-
-def _declared_usernames(value: Any) -> frozenset[str]:
-    access = value.get("access") if isinstance(value, dict) else None
-    users = access.get("users") if isinstance(access, dict) else None
-    return frozenset(user for user in users if isinstance(user, str)) if isinstance(users, list) else frozenset()
+        return _secret_paths(value, path, (), frozenset())
+    return _secret_paths(value, path, (), _declared_profiles(value))
 
 
 def _declared_profiles(value: Any) -> frozenset[str]:
@@ -101,25 +95,17 @@ def _declared_profiles(value: Any) -> frozenset[str]:
     )
 
 
-def _secret_paths(
-    value: Any, path: str, parents: tuple[str | int, ...], declared: frozenset[str], profiles: frozenset[str]
-) -> list[str]:
+def _secret_paths(value: Any, path: str, parents: tuple[str | int, ...], profiles: frozenset[str]) -> list[str]:
     found: list[str] = []
     for key, item in _children(value):
         here = f"{path}.{key}" if path else str(key)
-        identifier = (
-            key in declared
-            and (
-                (parents == ("access", "creation_settings") and isinstance(item, dict))
-                or (parents == ("access", "display_names") and isinstance(item, str))
-            )
-        ) or (key in profiles and parents == ("delivery", "profile_policies") and isinstance(item, str))
+        identifier = key in profiles and parents == ("delivery", "profile_policies") and isinstance(item, str)
         if not identifier and isinstance(key, str) and is_sensitive_key(key):
             found.append(here)
         elif isinstance(item, str) and any(pattern.search(item) for pattern in _SECRET_VALUES):
             found.append(here)
         else:
-            found.extend(_secret_paths(item, here, (*parents, key), declared, profiles))
+            found.extend(_secret_paths(item, here, (*parents, key), profiles))
     return found
 
 

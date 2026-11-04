@@ -1,9 +1,43 @@
 {
   "$defs": {
+    "ClientAddFailure": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "title": "Error",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "error"
+      ],
+      "title": "ClientAddFailure",
+      "type": "object"
+    },
     "ClientCreated": {
       "additionalProperties": false,
       "description": "Client metadata returned after creation or reissue, with their handoff links.",
       "properties": {
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 40,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "const": "",
+              "type": "string"
+            }
+          ],
+          "default": "",
+          "title": "Display Name"
+        },
         "id": {
           "title": "Id",
           "type": "string"
@@ -44,6 +78,13 @@
         "$ref": "#/$defs/ClientCreated"
       },
       "title": "Clients",
+      "type": "array"
+    },
+    "failures": {
+      "items": {
+        "$ref": "#/$defs/ClientAddFailure"
+      },
+      "title": "Failures",
       "type": "array"
     }
   },

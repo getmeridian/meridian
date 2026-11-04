@@ -4,18 +4,12 @@ from __future__ import annotations
 
 from meridian.compiler.errors import TopologyCompileError
 from meridian.compiler.models import CompiledResource, ConfigProfilePayload, HostPayload
-from meridian.core.access_profiles import DEFAULT_ACCESS_PROFILE
-from meridian.core.delivery_policies import DeliveryPolicyResolutionError, resolve_delivery_policy
 from meridian.core.topology import SetupIntent
 
 
 def validate_profile_backend(intent: SetupIntent, *, requested: bool = False) -> None:
     """Legacy compilation exists for migration; it cannot enforce profile membership or grants."""
-    if intent.control.backend != "meridian" and (
-        requested
-        or intent.access_profiles
-        or any(settings.profiles != [DEFAULT_ACCESS_PROFILE] for settings in intent.access.creation_settings.values())
-    ):
+    if intent.control.backend != "meridian" and (requested or intent.access_profiles):
         raise TopologyCompileError("Access profiles need Meridian's control service. Run meridian migrate first.")
 
 
@@ -54,12 +48,4 @@ def compile_access_profiles(intent: SetupIntent, resources: dict[str, CompiledRe
                 f"This fleet offers: {listed or 'nothing yet'}."
             )
         result[profile.id] = sorted({ref for grant in profile.grants for ref in references[grant]})
-    for username, settings in intent.access.creation_settings.items():
-        unknown = sorted(set(settings.profiles) - {DEFAULT_ACCESS_PROFILE, *result})
-        if unknown:
-            raise TopologyCompileError(f"Initial profiles for {username} are unknown: {', '.join(unknown)}.")
-        try:
-            resolve_delivery_policy(intent.delivery, profiles=settings.profiles)
-        except DeliveryPolicyResolutionError as exc:
-            raise TopologyCompileError(f"Initial profiles for {username}: {exc}") from None
     return result

@@ -15,18 +15,18 @@ from meridian.compiler import (
     compile_topology,
     deployment_server_refs,
 )
-from meridian.compiler.models import ControlServicePayload, ResourcePlan
+from meridian.compiler.models import ControlServicePayload, ResourcePlan, canonical_hash
 from meridian.config import ACME_SERVER, XRAY_VERSION
 from meridian.control.command_models import NodeCommandRecord
 from meridian.core.cancellation import CancellationToken
 from meridian.core.errors import LocalStateError
 from meridian.core.output import OperationContext
-from meridian.core.people_removal import PeopleRemovalProposal
 from meridian.core.reporters import NoopReporter, Reporter
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
 from meridian.fleet_contexts import refuse_if_superseded, refuse_servers_claimed_elsewhere
 from meridian.handoff import HandoffLinks, client_handoffs
+from meridian.people_adoption import ensure_creation_requests, finish_people_adoption, forget_adopted_people
 from meridian.reconciler.control_service_driver import ControlServiceDriver, ControlServiceDriverContext
 from meridian.reconciler.fence import ApplyFence, local_fence_view
 from meridian.reconciler.render_contract import RENDERER_CONTRACT
@@ -82,10 +82,18 @@ class SetupReview:
     retiring: tuple[ManagedResourceBinding, ...] = ()
     retirement_targets: Mapping[str, DeploymentTarget] = field(default_factory=dict)
 
+    people_adoption: tuple[str, ...] = ()
+    people_seeds_hash: str = ""
+
     @property
     def review_hash(self) -> str:
         """The hash an operator approves: the plan plus exactly what it removes."""
-        return retirement_review_hash(self.plan.plan_hash, list(self.retiring), self.retirement_targets)
+        reviewed = retirement_review_hash(self.plan.plan_hash, list(self.retiring), self.retirement_targets)
+        return (
+            canonical_hash([reviewed, self.people_adoption, self.people_seeds_hash])
+            if (self.people_adoption or self.people_seeds_hash)
+            else reviewed
+        )
 
 
 @dataclass(frozen=True)
@@ -116,7 +124,6 @@ class SetupRuntime:
         fence_holder: str | None = None,
         user_cut_off: Mapping[str, list[NodeCommandRecord]] | None = None,
         access_review_hash: str | None = None,
-        removal_proposal: PeopleRemovalProposal | None = None,
     ) -> None:
         self._registry = registry
         self._cluster_loader = cluster_loader
@@ -130,7 +137,6 @@ class SetupRuntime:
         self._fence_holder = fence_holder
         self._user_cut_off = user_cut_off if user_cut_off is not None else {}
         self._access_review_hash = access_review_hash
-        self._removal_proposal = removal_proposal
         self._control_bootstrap = control_bootstrap or partial(
             bootstrap_reviewed_control_service,
             cancellation=cancellation,
@@ -156,7 +162,9 @@ class SetupRuntime:
             renderer_contract=RENDERER_CONTRACT,
         )
         plan = compile_topology(intent, deployment_contract=contract)
-        retiring = tuple(retired_bindings(plan, cluster))
+        shadow = cluster.clone()
+        forget_adopted_people(shadow)
+        retiring = tuple(retired_bindings(plan, shadow))
         targets = {
             server_ref: contract.server_targets[server_ref]
             for server_ref in retiring_server_refs(retiring)
@@ -164,7 +172,26 @@ class SetupRuntime:
         }
         for server_ref, entry in self._retirement_entries(retiring, plan).items():
             targets[server_ref] = _deployment_target(entry)
-        return SetupReview(intent=intent, plan=plan, retiring=retiring, retirement_targets=targets)
+        adoption = cluster.people_adoption
+        seeds = draft.access.people if draft.access is not None else None
+        seed_hash = (
+            canonical_hash(
+                [
+                    adoption.model_dump(exclude={"state"}) if adoption else None,
+                    [seed.to_data() for seed in seeds] if seeds else None,
+                ]
+            )
+            if adoption or seeds
+            else ""
+        )
+        return SetupReview(
+            intent=intent,
+            plan=plan,
+            retiring=retiring,
+            retirement_targets=targets,
+            people_adoption=tuple(adoption.users) if adoption else (),
+            people_seeds_hash=seed_hash,
+        )
 
     def apply_intent(
         self,
@@ -201,6 +228,7 @@ class SetupRuntime:
         control_entry = entries[control.server_ref]
         control_connection = connections[control.server_ref]
         shadow = cluster.clone()
+        forget_adopted_people(shadow)
         drivers = self._build_drivers(
             review.plan,
             shadow,
@@ -229,7 +257,9 @@ class SetupRuntime:
             )
 
         refuse_if_superseded()
-        validate_resource_plan_transition(review.plan, cluster)
+        shadow = cluster.clone()
+        forget_adopted_people(shadow)
+        validate_resource_plan_transition(review.plan, shadow)
         profile_history = check_profile_access(cluster, review.intent, access_review_hash=self._access_review_hash)
         targets = sorted(review.plan.deployment_contract.server_targets)
         entries = {
@@ -247,6 +277,7 @@ class SetupRuntime:
             fence.ensure(local_fence_view(cluster))
         if profile_history and not cluster.access_profiles_used:
             cluster.access_profiles_used = True
+        forget_adopted_people(cluster)
         cluster.topology_intent = review.intent
         self._persist(cluster)
 
@@ -278,6 +309,16 @@ class SetupRuntime:
             operation=self._operation,
             fence=fence,
         )
+        if result.all_succeeded:
+            if cluster.people_adoption is not None:
+                cluster.people_adoption = cluster.people_adoption.model_copy(update={"state": "committed"})
+                self._persist(cluster)
+            finish_people_adoption(cluster, persist=self._persist)
+            if draft.access is not None and draft.access.people:
+                from meridian.control.client import ControlClient
+
+                with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
+                    ensure_creation_requests(client, draft.access.people)
         return result.model_copy(update={"review_hash": review.review_hash})
 
     def _default_fence(self, connection: ServerConnection, cluster: ClusterConfig, review: SetupReview) -> ApplyFence:
@@ -292,7 +333,6 @@ class SetupRuntime:
             draft,
             holder=self._fence_holder,
             on_stall=on_stall,
-            removal_proposal=self._removal_proposal,
         )
 
     def _build_drivers(

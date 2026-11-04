@@ -254,7 +254,7 @@ class PeopleQueryEngine:
         facets["lifecycle"][""] = sum(facets["lifecycle"].values())
         return total, population, PeopleFacets(**facets)
 
-    def _people(self, names: list[str], intent: PeopleIntent, now: str) -> list[PeoplePerson]:
+    def _people(self, names: list[str], now: str) -> list[PeoplePerson]:
         if not names:
             return []
         placeholders = ",".join("?" for _ in names)
@@ -273,11 +273,10 @@ class PeopleQueryEngine:
         return [
             PeoplePerson(
                 **records[name].model_dump(
-                    include=set(PeoplePerson.model_fields) - {"display_name", "row_version", "declared", "has_notes"}
+                    include=set(PeoplePerson.model_fields) - {"display_name", "row_version", "has_notes"}
                 ),
                 display_name=records[name].display_name or name,
                 row_version=versions[name],
-                declared=name in intent.declared,
                 has_notes=bool(records[name].note),
             )
             for name in names
@@ -286,7 +285,6 @@ class PeopleQueryEngine:
     def query(self, query: PeopleQuery) -> PeoplePage:
         query = PeopleQuery.model_validate(query.model_dump())
         with self.store.lock:
-            intent = self.intent()
             data, last = self._view(query)
             predicates = self.predicates(query, data)
             total, population, facets = self._facets(predicates, data)
@@ -309,7 +307,7 @@ class PeopleQueryEngine:
                 data,
             ).fetchall()
             page = selected[: query.limit]
-            users = self._people([row[0] for row in page], intent, data["now"])
+            users = self._people([row[0] for row in page], data["now"])
             cursor = None
             if len(selected) > query.limit:
                 held = {

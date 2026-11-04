@@ -731,17 +731,6 @@
           "title": "Preview Hash",
           "type": "string"
         },
-        "proposal": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/PeopleRemovalProposal"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
         "reversible": {
           "title": "Reversible",
           "type": "boolean"
@@ -815,17 +804,6 @@
           "pattern": "^[0-9a-f]{64}$",
           "title": "Preview Hash",
           "type": "string"
-        },
-        "proposal": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/PeopleRemovalProposal"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
         },
         "undo_people": {
           "anyOf": [
@@ -996,12 +974,6 @@
         "created_at": {
           "title": "Created At",
           "type": "string"
-        },
-        "declared": {
-          "default": true,
-          "description": "False for a person added in the control service's web console rather than the fleet's reviewed intent; the CLI reads them, and the console manages them.",
-          "title": "Declared",
-          "type": "boolean"
         },
         "device_limit": {
           "anyOf": [
@@ -1490,68 +1462,6 @@
         "sha256"
       ],
       "title": "NodeStateRef",
-      "type": "object"
-    },
-    "PeopleRemovalProposal": {
-      "additionalProperties": false,
-      "description": "Remove these declared usernames in one local review and apply; carries no session cut-off choice.",
-      "properties": {
-        "fleet_id": {
-          "description": "Fleet identifier: a lowercase UUID fixed when the fleet is created.",
-          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-          "title": "Fleet Id",
-          "type": "string"
-        },
-        "generation": {
-          "minimum": 1,
-          "title": "Generation",
-          "type": "integer"
-        },
-        "intent_sha256": {
-          "description": "Lowercase hex SHA-256 digest.",
-          "pattern": "^[0-9a-f]{64}$",
-          "title": "Intent Sha256",
-          "type": "string"
-        },
-        "plan_hash": {
-          "description": "Lowercase hex SHA-256 digest.",
-          "pattern": "^[0-9a-f]{64}$",
-          "title": "Plan Hash",
-          "type": "string"
-        },
-        "revision": {
-          "minimum": 1,
-          "title": "Revision",
-          "type": "integer"
-        },
-        "schema": {
-          "const": "meridian.people-removal/v1",
-          "default": "meridian.people-removal/v1",
-          "title": "Schema",
-          "type": "string"
-        },
-        "usernames": {
-          "items": {
-            "maxLength": 36,
-            "minLength": 3,
-            "pattern": "^[A-Za-z0-9_-]+$",
-            "type": "string"
-          },
-          "maxItems": 50000,
-          "minItems": 1,
-          "title": "Usernames",
-          "type": "array"
-        }
-      },
-      "required": [
-        "fleet_id",
-        "revision",
-        "generation",
-        "plan_hash",
-        "intent_sha256",
-        "usernames"
-      ],
-      "title": "PeopleRemovalProposal",
       "type": "object"
     },
     "PeriodTraffic": {

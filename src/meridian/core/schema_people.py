@@ -6,7 +6,15 @@ from pydantic import BaseModel
 
 from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.credential_models import UserCredentialRotation
-from meridian.control.models import UserCreate, UserImport, UserImportBatch, UserPatch, UserRecord, UserUpdate
+from meridian.control.models import (
+    UserCreate,
+    UserEnsure,
+    UserImport,
+    UserImportBatch,
+    UserPatch,
+    UserRecord,
+    UserUpdate,
+)
 from meridian.core.account_schedule import AccountLifecycleSettings, AccountSchedulePreview
 from meridian.core.client_sessions import CredentialRotationRequest, UserFlowBlocks
 from meridian.core.people_bulk import (
@@ -19,14 +27,12 @@ from meridian.core.people_bulk import (
     ClientBulkResult,
 )
 from meridian.core.people_query import PeopleFacets, PeoplePage, PeoplePerson, PeopleQuery
-from meridian.core.people_removal import PeopleRemovalProposal
 
 PEOPLE_SCHEMAS: dict[str, type[BaseModel]] = {
     "people-query": PeopleQuery,
     "people-page": PeoplePage,
     "people-person": PeoplePerson,
     "people-facets": PeopleFacets,
-    "people-removal-proposal": PeopleRemovalProposal,
     "bulk-action": BulkAction,
     "bulk-preview-request": BulkPreviewRequest,
     "bulk-preview": BulkPreview,
@@ -38,6 +44,7 @@ PEOPLE_SCHEMAS: dict[str, type[BaseModel]] = {
     "account-schedule-preview": AccountSchedulePreview,
     "user-schedule-preview-request": UserSchedulePreviewRequest,
     "user-create": UserCreate,
+    "user-ensure": UserEnsure,
     "user-record": UserRecord,
     "user-update": UserUpdate,
     "user-patch": UserPatch,

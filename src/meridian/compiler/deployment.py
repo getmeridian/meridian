@@ -19,7 +19,6 @@ def normalized_intent(intent: SetupIntent) -> dict[str, Any]:
     payload["routing_gateways"] = sorted(payload["routing_gateways"], key=lambda value: value["id"])
     payload["egress_pools"] = sorted(payload["egress_pools"], key=lambda value: value["id"])
     payload["routes"] = sorted(payload["routes"], key=lambda value: (value["priority"], value["id"]))
-    payload["access"]["users"] = sorted(payload["access"]["users"])
     payload["delivery"]["formats"] = sorted(payload["delivery"]["formats"])
     return payload
 

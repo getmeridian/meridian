@@ -4,6 +4,21 @@
       "additionalProperties": false,
       "description": "Client metadata returned after creation or reissue, with their handoff links.",
       "properties": {
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 40,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "const": "",
+              "type": "string"
+            }
+          ],
+          "default": "",
+          "title": "Display Name"
+        },
         "id": {
           "title": "Id",
           "type": "string"

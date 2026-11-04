@@ -1,4 +1,4 @@
-"""Committed topology identities for people-removal reviews and their apply fence."""
+"""Shared committed revision and apply-fence fixtures."""
 
 from meridian.control.models import ApplyFenceRecord, ApplyFenceSwap, RevisionProposal, RevisionResult
 from meridian.control.service import ControlService

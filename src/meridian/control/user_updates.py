@@ -38,6 +38,17 @@ def update_user(
         return read_user(username)
 
 
+def fill_empty_display_name(store: Store, user: UserRecord, name: str, *, events: EventLedger, now: str) -> UserRecord:
+    """Fill only under the caller's write transaction, preserving a concurrent operator rename."""
+    if user.display_name or not name:
+        return user
+    updated = UserRecord.model_validate({**user.to_data(), "display_name": name})
+    require_unique_display_name(store, user.username, updated.display_name)
+    events.user_updated(user, updated, now=now)
+    save_user_fields(store, updated, ("display_name",))
+    return updated
+
+
 OPERATOR_FIELDS = tuple(dict.fromkeys((*UserUpdate.model_fields, *AccountLifecycleState.model_fields)))
 
 

@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 import typer
@@ -32,7 +32,6 @@ from meridian.control.tokens import ROOT
 from meridian.core.agent_protocol import StatsReport
 from meridian.core.agent_signing import COMMAND_CONTEXT, verify
 from meridian.reconciler.meridian_drivers import ControlUserDriver
-from meridian.remnawave import User
 from tests.support.agent_node import FakeNode
 from tests.support.control_service import ADMIN_TOKEN, FLEET_ID, drop_person_metadata_schema
 from tests.support.node_commands import command_node_spec as spec
@@ -327,7 +326,7 @@ def test_review_2_1_late_execution_result_replaces_expiry_and_records_its_event(
 def test_review_3_1_cli_removal_does_not_drop_resets_when_the_node_revision_changes(
     http: str, service: ControlService, clock: Clock, tmp_home: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    user = service.put_user("person-a")
+    service.put_user("person-a")
     session(http, clock)
     body = spec().model_dump(mode="json")
     body["resources"][0]["config"]["inbounds"].append(
@@ -335,21 +334,8 @@ def test_review_3_1_cli_removal_does_not_drop_resets_when_the_node_revision_chan
     )
     body["managed_inbounds"].append({"tag": "vless-xhttp", "protocol": "vless"})
     service.put_node_spec("main", NodeSpec.model_validate(body))
-    binding = ManagedResourceBinding(
-        logical_id="user:person-a", resource_kind="control_user", generation=1, remote_id="person-a", active=True
-    )
-    saved = ClusterConfig(
-        panel=PanelConfig(url=http, api_token=ADMIN_TOKEN),
-        topology_intent=single_exit_intent(users=["person-a", "other-person"]),
-        managed_bindings={"user:person-a@1": binding},
-    )
-    panel = MagicMock()
-    panel.__enter__.return_value = panel
-    panel.get_user.return_value = User(
-        username=user.username, id=user.user_id, short_uuid=user.sub_token, vless_uuid=user.uuid, status="ACTIVE"
-    )
+    saved = ClusterConfig(panel=PanelConfig(url=http, api_token=ADMIN_TOKEN), topology_intent=single_exit_intent())
     reads: list[str] = []
-    queued_during_retirement: list[int] = []
 
     class RacingClient(ControlClient):
         def node(self, node_id: str):
@@ -357,13 +343,6 @@ def test_review_3_1_cli_removal_does_not_drop_resets_when_the_node_revision_chan
             reads.append(node_id)
             service.put_user("person-b")
             return current
-
-    def apply(*args, **kwargs):
-        context = SimpleNamespace(
-            client=lambda: ControlClient(http, ADMIN_TOKEN), user_cut_off=kwargs.get("user_cut_off", {})
-        )
-        ControlUserDriver(context).retire(binding)
-        queued_during_retirement.append(len(service._store.rows("SELECT command_id FROM commands")))
 
     def waited(client, commands):
         return [NodeCommandOutcome(node_id="main", status="done", commands=list(commands))] if commands else []
@@ -373,8 +352,6 @@ def test_review_3_1_cli_removal_does_not_drop_resets_when_the_node_revision_chan
         exit_code = 0
         with (
             patch("meridian.commands.client.load_topology_cluster", return_value=saved),
-            patch("meridian.commands.client_v4.access_panel", return_value=panel),
-            patch("meridian.commands.client_v4.apply_reviewed_intent", side_effect=apply),
             patch("meridian.node_commands.ControlClient", side_effect=lambda *args: RacingClient(*args)),
             patch("meridian.node_commands.wait_for_commands", side_effect=waited),
         ):
@@ -384,7 +361,9 @@ def test_review_3_1_cli_removal_does_not_drop_resets_when_the_node_revision_chan
                 exit_code = exc.exit_code
         result = json.loads(capsys.readouterr().out)
         assert exit_code == 0, json.dumps(result)
-        assert queued_during_retirement == [1], "the core restart must be committed when retirement returns"
+        assert len(service._store.rows("SELECT command_id FROM commands")) == 1, (
+            "deletion commits its restart atomically"
+        )
         assert reads == [], "atomic deletion must not read a revision then issue a separate reset"
         commands = result["data"]["cut_off"][0]["commands"]
         assert [record["command"]["kind"] for record in commands] == ["restart_unit"]

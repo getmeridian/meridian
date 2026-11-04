@@ -163,7 +163,7 @@ def test_client_set_show_and_tag_filter_include_console_people(
                 assert listed["data"]["summary"]["clients"] == 1
                 assert listed["data"]["clients"][0]["username"] == "sample"
                 assert listed["data"]["clients"][0]["note"] == NOTE
-                assert listed["data"]["clients"][0]["declared"] is False
+                assert "declared" not in listed["data"]["clients"][0]
                 run_set("sample", limit=None, reset=None, expires=None, note="", tag="none")
                 cleared = json.loads(capsys.readouterr().out)["data"]["client"]
                 assert (cleared["note"], cleared["tag"]) == ("", "")

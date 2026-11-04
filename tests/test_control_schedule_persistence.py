@@ -13,16 +13,10 @@ from meridian.control.snapshot import decrypt_snapshot, generate_key_pair
 from meridian.core.account_schedule import AccountLifecycleState
 from meridian.core.agent_protocol import StatsReport, UserTraffic
 from meridian.core.client_limits import UserCreationSettings
-from meridian.core.topology import SetupIntent
-from meridian.servers import ServerRegistry
-from meridian.setup.fleet_document import (
-    dump_fleet_document,
-    fleet_document,
-    intent_from_document,
-    parse_fleet_document,
-)
+from meridian.core.people_seeds import PeopleSeeds
+from meridian.core.setup import SetupDraft
 from tests.support.control_service import FLEET_ID, drop_account_schedule_schema, drop_period_usage_schema
-from tests.support.topology import single_exit_intent
+from tests.support.topology import people_draft, single_exit_intent
 
 
 @pytest.mark.parametrize("activated", [False, True])
@@ -126,7 +120,7 @@ def test_schedule_upgrade_keeps_creation_day_period_usage_and_lifetime(
             service.close()
 
 
-def test_fleet_document_keeps_creation_schedules_and_default_payloads_stay_small(tmp_path: Path) -> None:
+def test_setup_draft_keeps_creation_schedules_outside_topology_and_default_payloads_stay_small(tmp_path: Path) -> None:
     settings = UserCreationSettings(
         activation_duration_days=30,
         renewal_interval_months=1,
@@ -135,11 +129,13 @@ def test_fleet_document_keeps_creation_schedules_and_default_payloads_stay_small
         traffic_reset_anchor_day=31,
         device_limit=0,
     )
-    data = single_exit_intent(users=["example"]).model_dump(mode="json")
-    data["access"]["creation_settings"] = {"example": settings.to_data()}
-    intent = SetupIntent.model_validate(data)
-    registry = ServerRegistry(tmp_path / "servers.json")
-    document = fleet_document(intent, registry)
-    restored = intent_from_document(parse_fleet_document(dump_fleet_document(document)), intent, registry)
-    assert restored.access.creation_settings["example"] == settings
+    draft = people_draft(single_exit_intent(), PeopleSeeds(users=["example"], creation_settings={"example": settings}))
+    restored = SetupDraft.model_validate_json(draft.model_dump_json(by_alias=True))
+    assert (
+        UserCreationSettings.model_validate(
+            restored.access.people[0].model_dump(include=set(UserCreationSettings.model_fields))
+        )
+        == settings
+    )
+    assert "creation_settings" not in restored.to_intent().access.to_data()
     assert not any(field in UserCreationSettings().to_data() for field in AccountLifecycleState.model_fields)

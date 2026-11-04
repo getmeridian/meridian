@@ -133,7 +133,6 @@ def _v4_projected_topology() -> FleetTopology:
                 ws_path="",
             )
         ],
-        access_users=["alice"],
         relays=[
             TopologyRelay(
                 ip="198.51.100.30",
@@ -355,7 +354,7 @@ class TestFleetStatus:
         data = payload.data
         assert data["summary"]["nodes"] == 1
         assert data["summary"]["relays"] == 1
-        assert data["summary"]["users"] == 1
+        assert data["summary"]["users"] == 2
         assert data["nodes"][0]["ip"] == "198.51.100.20"
         assert data["relays"][0]["ip"] == "198.51.100.30"
 

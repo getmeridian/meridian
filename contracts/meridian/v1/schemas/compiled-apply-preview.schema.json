@@ -160,6 +160,26 @@
       ],
       "title": "CutOffPlan",
       "type": "object"
+    },
+    "PeopleAdoptionNotice": {
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "people": {
+          "minimum": 0,
+          "title": "People",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "people",
+        "message"
+      ],
+      "title": "PeopleAdoptionNotice",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -169,6 +189,17 @@
       "anyOf": [
         {
           "$ref": "#/$defs/AccessProfileReview"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "people_adoption": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PeopleAdoptionNotice"
         },
         {
           "type": "null"

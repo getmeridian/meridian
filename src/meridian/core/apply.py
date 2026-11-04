@@ -8,6 +8,7 @@ from pydantic import Field
 
 from meridian.core.access_profile_views import AccessProfileReview
 from meridian.core.models import CoreModel
+from meridian.core.people_seeds import PeopleAdoptionNotice
 
 CompiledApplyActionStatus = Literal["converged", "applied", "failed", "unknown", "skipped"]
 
@@ -34,6 +35,8 @@ class CompiledApplyActionResult(CoreModel):
 class CompiledApplyResult(CoreModel):
     """Apply result for one generation-scoped V4 compiler plan."""
 
+    people_adoption: PeopleAdoptionNotice | None = Field(default=None, exclude_if=lambda value: value is None)
+
     plan_hash: str
     generation: int = Field(ge=0)
     all_succeeded: bool
@@ -53,6 +56,8 @@ class ApplyCommandData(CompiledApplyResult):
 
 class CompiledApplyPreview(CoreModel):
     """Reviewed V4 compiler-plan metadata returned before confirmation."""
+
+    people_adoption: PeopleAdoptionNotice | None = Field(default=None, exclude_if=lambda value: value is None)
 
     plan_hash: str
     resource_count: int = Field(ge=0)

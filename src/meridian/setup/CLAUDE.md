@@ -1,5 +1,6 @@
 # setup — resumable setup application service
 ## Design decisions
+**People seeds stay in the draft** — `SetupAccessSelection.people` carries service `UserCreate` requests, with usernames left unassigned for other scripts; apply creates missing seeds through the service after committing topology, before verification.
 **Secret-free draft** — `setup.json` stores only validated server refs, topology choices, stage progress, and reviewed/applied hashes, replaced atomically (0600) at every stage boundary; passwords, keys, and tokens use one-time runtime channels.
 **Server shelf IDs** — names and IPs resolve to immutable `srv-*` profile IDs before entering the draft.
 **Reviewed runtime** — setup hashes resolved targets and runtime pins, persists intent before mutation, and before handoff verifies delivered subscriptions and each XHTTP/WSS endpoint's certificate as its clients will (subscriptions alone passed while every TLS client was refused).
@@ -12,8 +13,8 @@
 - `plan` and `apply` run the same compiler and runtime as setup.
 
 ## Pitfalls
+- **Wizard names resolve through the service** — local transliteration can select another person whose username was taken; preserve only explicit saved usernames and let the service assign new ones.
 - **A missing profile route proves absence only while health answers** — a service older than profiles has no such route, so `plan` before an upgrade read it as an outage; a 404 without a healthy service stays unavailable.
-- **Removal drafts fence both checks** — carry the exact proposal through ensure before saving and acquire before server mutation; plan equality alone cannot detect a newer committed revision.
 - **Profile discovery reads the private catalog** — declarations, named profiles, and non-default memberships all require review, even when the settings map and fingerprint are absent.
 - **Every apply checks profile declarations before the fence** — use `profile_review.py` to compare live intent-level grants; a saved but unapplied edit must not ride the next imperative command, and live maps without a fingerprint need review.
 - **Observed profile history saves with accepted intent** — remember live service use after the fleet fence accepts, in the existing topology save; a separate earlier save persists forgotten bindings even when the fence refuses.

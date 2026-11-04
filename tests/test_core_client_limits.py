@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
-from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.control.client import ControlClient
 from meridian.control_access import ServiceAccessPanel
 from meridian.core.client_limits import (
@@ -20,7 +18,6 @@ from meridian.core.client_limits import (
     parse_traffic_reset,
 )
 from meridian.core.clients import build_client_record
-from meridian.setup.single_server import single_server_intent
 from tests.support.control_service import ADMIN_TOKEN, serve_control
 
 GB = 1024**3
@@ -205,42 +202,22 @@ def test_control_service_limits_round_trip_through_the_access_panel(tmp_path: Pa
 # --- Applies leave limits alone --------------------------------------------------------------------------------
 
 
-def test_control_service_apply_keeps_limits_set_by_the_operator(tmp_path: Path) -> None:
-    """The control-user driver converges on existence alone, and re-applying never resets limits or status."""
-    from meridian.compiler import compile_topology
-    from meridian.reconciler.meridian_drivers import MeridianDriverContext, build_meridian_drivers
-    from meridian.reconciler.resources import build_resource_actions, observation_converges
-    from meridian.reconciler.workloads import LocalRealityKeyFactory, WorkloadStateManager
-    from tests.support.mock_connection import MockConnection
+def test_service_creation_seeds_keep_limits_set_by_the_operator(tmp_path: Path) -> None:
+    from meridian.core.people_seeds import PeopleSeeds
+    from meridian.people_adoption import ensure_people
 
-    plan = compile_topology(
-        single_server_intent(None, server_ref="srv-a", address="198.51.100.10", client_name="alice")
-    )
-    action = next(item for item in build_resource_actions(plan, 1) if item.resource.payload.kind == "control_user")
+    seeds = PeopleSeeds(users=["alice"])
     with serve_control(tmp_path) as url:
-        cluster = ClusterConfig(panel=PanelConfig(url=url, api_token=ADMIN_TOKEN))
-        driver = build_meridian_drivers(
-            MeridianDriverContext(
-                plan=plan,
-                cluster=cluster,
-                client=lambda: ControlClient(url, ADMIN_TOKEN),
-                workloads=WorkloadStateManager(cluster, persist=lambda _c: None, key_factory=LocalRealityKeyFactory()),
-                connection_for=lambda _ref: MockConnection(),
-                server_addresses={"srv-a": "198.51.100.10"},
-                agent_binary=lambda _arch: MagicMock(),
-                persist=lambda _c: None,
-                sleep=lambda _s: None,
-            )
-        )["control_user"]
-        driver.apply(action, None)
+        with ControlClient(url, ADMIN_TOKEN) as client:
+            ensure_people(client, seeds)
         with ServiceAccessPanel(url, ADMIN_TOKEN) as panel:
             user = panel.get_user("alice")
             assert user is not None
             panel.update_user_limits(user.id, build_limit_change(limit="50GB", reset="month", expires=FUTURE_DAY))
             panel.disable_user(user.id)
 
-        assert observation_converges(action, driver.observe(action, None))
-        driver.apply(action, None)
+        with ControlClient(url, ADMIN_TOKEN) as client:
+            ensure_people(client, seeds)
         with ServiceAccessPanel(url, ADMIN_TOKEN) as panel:
             after = panel.get_user("alice")
 

@@ -30,23 +30,6 @@ def command_modes():
     set_quiet_mode(False)
 
 
-def test_fleet_export_carries_current_creation_membership_without_rewriting_intent(tmp_path: Path, tmp_home: Path):
-    with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN, report_mutations=False) as admin:
-        admin.put_settings(ServiceSettings(profile_title="Meridian", access_profiles={"limited": []}))
-        admin.create_user(UserCreate(username="default", profiles=["limited"]))
-        intent = SetupIntent.model_validate(
-            {**single_exit_intent().to_data(), "access_profiles": [{"id": "limited", "grants": []}]}
-        )
-        cluster = ClusterConfig(panel=PanelConfig(url=url, api_token=ADMIN_TOKEN), topology_intent=intent)
-        with patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster):
-            reply = CliRunner().invoke(app, ["fleet", "export", "--json"])
-        set_json_mode(False)
-        assert reply.exit_code == 0, reply.output
-        document = json.loads(reply.stdout)["data"]["document"]
-        assert document["access"]["creation_settings"]["default"]["profiles"] == ["limited"]
-        assert cluster.topology_intent.access.creation_settings == {}
-
-
 def test_apply_rechecks_profile_access_and_passes_the_review_fence_to_the_driver(tmp_path: Path, tmp_home: Path):
     with serve_control(tmp_path) as url:
         intent = SetupIntent.model_validate(

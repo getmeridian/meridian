@@ -202,10 +202,6 @@
           "title": "Created At",
           "type": "string"
         },
-        "declared": {
-          "title": "Declared",
-          "type": "boolean"
-        },
         "device_limit": {
           "anyOf": [
             {
@@ -508,7 +504,6 @@
         "username",
         "user_id",
         "display_name",
-        "declared",
         "row_version",
         "status",
         "created_at",

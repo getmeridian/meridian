@@ -1,6 +1,6 @@
 """Turn the panel's users into control-service imports, and say what does not carry over.
 
-Only `topology_intent.access.users` move: the panel's service users and anything
+Only users lifted into `people_adoption` move: the panel's service users and anything
 an operator created by hand stay behind. Each import keeps the VLESS UUID (also
 the Hysteria2 password) and the short UUID (the subscription token), so every
 link keeps working, plus status, expiry, limit, reset strategy, and usage.

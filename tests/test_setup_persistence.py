@@ -176,10 +176,7 @@ class TestSetupDraftService:
         assert service.assign_roles(_roles()).current_stage == "paths"
         assert service.configure_paths(_paths()).current_stage == "routing"
         assert service.configure_routing(SetupRoutingSelection(default_egress_ref="exit-a")).current_stage == "access"
-        assert (
-            service.configure_access(SetupAccessSelection(access=AccessIntent(users=["default"]))).current_stage
-            == "review"
-        )
+        assert service.configure_access(SetupAccessSelection(access=AccessIntent())).current_stage == "review"
         assert service.mark_reviewed("sha256:reviewed").current_stage == "apply"
         assert service.mark_applied("sha256:reviewed").current_stage == "verify"
         assert service.mark_verified("2026-07-14T13:00:00Z").current_stage == "handoff"
@@ -196,7 +193,7 @@ class TestSetupDraftService:
         service.assign_roles(_roles())
         service.configure_paths(_paths())
         service.configure_routing(SetupRoutingSelection(default_egress_ref="exit-a"))
-        service.configure_access(SetupAccessSelection(access=AccessIntent(users=["default"])))
+        service.configure_access(SetupAccessSelection(access=AccessIntent()))
 
         rewound = service.back_to("roles")
 
@@ -214,7 +211,7 @@ class TestSetupDraftService:
         service.assign_roles(_roles())
         service.configure_paths(_paths())
         service.configure_routing(SetupRoutingSelection(default_egress_ref="exit-a"))
-        service.configure_access(SetupAccessSelection(access=AccessIntent(users=["default"])))
+        service.configure_access(SetupAccessSelection(access=AccessIntent()))
         service.mark_reviewed("sha256:reviewed")
 
         with pytest.raises(LocalStateError, match="does not match the reviewed plan"):

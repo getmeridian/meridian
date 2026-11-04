@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import typer
 
-from meridian.commands._helpers import load_topology_cluster, require_intent
-from meridian.commands.client_handoff import declared_client_name
+from meridian.commands._helpers import load_people_cluster as load_topology_cluster
+from meridian.commands.client_handoff import resolve_client_mutation_name
 from meridian.commands.node_command_results import cut_off_disclosure, print_command_results
 from meridian.console import confirm, error_context, fail, is_json_mode, ok, warn
 from meridian.control.client import ControlServiceCredentialsChanged, ControlServiceError
@@ -31,25 +31,17 @@ def run_rotate_credentials(name: str, *, yes: bool = False, cut_off: bool = Fals
         if is_json_mode() and not yes:
             fail(t("client.credentials_requires_yes"), hint=t("client.credentials_yes_hint"), hint_type="user")
         cluster = load_topology_cluster()
-        access = require_intent(cluster).access
-        found = declared_client_name(access, name)
-        if found is None:
-            fail(
-                t("client.credentials_not_declared", name=isolate(name)),
-                hint=t("client.credentials_console_hint"),
-                hint_type="user",
-            )
-        name = found
-        shown = isolate(access.display_name(name))
         try:
             with access_panel(cluster) as panel:
+                name = resolve_client_mutation_name(cluster, panel, name)
                 before = panel.user_credentials(name)
                 if before is None:
                     fail(
-                        t("client.credentials_missing", name=shown),
+                        t("client.credentials_missing", name=isolate(name)),
                         hint=t("client.credentials_apply_hint"),
                         hint_type="system",
                     )
+                shown = isolate(before.display_name or before.username)
                 request = CredentialRotationRequest(expected_generation=before.credential_generation, cut_off=cut_off)
                 scope = cut_off_scope(cluster, name) if cut_off else None
                 text = t("client.credentials_confirm", name=shown)
@@ -72,6 +64,7 @@ def run_rotate_credentials(name: str, *, yes: bool = False, cut_off: bool = Fals
         data = ClientCredentialRotationResult(
             client=RotatedClient(
                 username=name,
+                display_name=rotated.user.display_name,
                 id=rotated.user.user_id,
                 status=rotated.user.status,
                 credential_generation=rotated.user.credential_generation,
@@ -85,7 +78,9 @@ def run_rotate_credentials(name: str, *, yes: bool = False, cut_off: bool = Fals
                     command="client.rotate-credentials",
                     data=data.to_data(),
                     summary=Summary(
-                        text=f"Rotated connection credentials for {name}", changed=True, counts={"rotated": 1}
+                        text=f"Rotated connection credentials for {before.display_name or name}",
+                        changed=True,
+                        counts={"rotated": 1},
                     ),
                     exit_code=code,
                     warnings=command_warnings(outcomes or []),

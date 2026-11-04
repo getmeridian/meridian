@@ -113,7 +113,7 @@ ROUTE_SAMPLES = {
     "user_connections": ("/api/users/alice/connections", None),
     "user_flow_blocks": ("/api/users/alice/flow-blocks", None),
     "user_usage": ("/api/users/alice/usage", None),
-    "put_user": ("/api/users/bob", {}),
+    "put_user": ("/api/users/bob", {"display_name": "Sample person"}),
     "update_user": ("/api/users/alice", {"status": "disabled", "display_name": "Sample edited"}),
     "patch_user": ("/api/users", {"username": "alice", "status": "disabled", "display_name": "Sample edited"}),
     "reissue_user": ("/api/users/alice/reissue", {}),
@@ -452,7 +452,9 @@ def _declare(fleet: Fleet, status: str) -> None:
         ("POST", "/api/users/alice/rotate-credentials"),
     ],
 )
-def test_people_cannot_remove_or_reissue_declared_people(fleet: Fleet, status: str, method: str, path: str) -> None:
+def test_people_can_remove_or_reissue_every_person_regardless_of_revision_status(
+    fleet: Fleet, status: str, method: str, path: str
+) -> None:
     before = fleet.service.put_user("alice")
     _declare(fleet, status)
     token = _mint(fleet, "people")["token"]
@@ -464,14 +466,17 @@ def test_people_cannot_remove_or_reissue_declared_people(fleet: Fleet, status: s
         else None
     )
     code, answer = _request(fleet.url + path, method, body, token)
-    if status == "proposed":
-        assert code == 200
+    assert code == 200 and "declared" not in answer
+    after = fleet.service.get_user("alice")
+    if method == "DELETE":
+        assert after is None
     else:
-        assert (code, answer["error"]["code"]) == (409, "declared_user")
-        assert fleet.service.get_user("alice") == before
+        assert after is not None and after.uuid != before.uuid
 
 
-def test_people_declared_refusal_is_checked_inside_the_write(fleet: Fleet, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_revision_approved_during_reissue_does_not_take_ownership_of_the_person(
+    fleet: Fleet, monkeypatch: pytest.MonkeyPatch
+) -> None:
     before = fleet.service.put_user("alice")
     original = fleet.service.reissue_user
 
@@ -481,8 +486,8 @@ def test_people_declared_refusal_is_checked_inside_the_write(fleet: Fleet, monke
 
     monkeypatch.setattr(fleet.service, "reissue_user", declare_then_reissue)
     code, answer = _request(fleet.url + "/api/users/alice/reissue", "POST", {}, _mint(fleet, "people")["token"])
-    assert (code, answer["error"]["code"]) == (409, "declared_user")
-    assert fleet.service.get_user("alice") == before
+    assert code == 200
+    assert fleet.service.get_user("alice").uuid != before.uuid
 
 
 @pytest.mark.parametrize("days", [0, 3651, -1, 1.5, "7", None, True])

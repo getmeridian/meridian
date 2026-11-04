@@ -292,16 +292,13 @@ def test_concurrent_creators_cannot_both_claim_the_same_folded_display_name(serv
     assert len(service.list_users()) == 1
 
 
-def test_query_bulk_pages_fleet_and_cli_all_read_the_column_while_declarations_stay(service):
+def test_query_bulk_pages_fleet_and_cli_all_read_the_column_without_topology_ownership(service):
     service.create_user(UserCreate(username="sample", display_name="Тест"))
     revision(service, {"sample": "Old topology label"})
     service.put_settings(ServiceSettings(profile_title="Meridian", public_url="https://198.51.100.1/connect"))
     assert not hasattr(service.people.intent(), "names")
-    assert service.people.intent().declared == {"sample"}
     page = service.people.query(PeopleQuery(q="тест"))
-    assert [(person.username, person.display_name, person.declared) for person in page.users] == [
-        ("sample", "Тест", True)
-    ]
+    assert [(person.username, person.display_name) for person in page.users] == [("sample", "Тест")]
     assert not service.people.query(PeopleQuery(q="Old topology label")).users
     review = service.bulk.preview(BulkPreviewRequest(query=PeopleQuery(q="тест"), action=BulkAction(action="disable")))
     assert review.people[0].display_name == "Тест"

@@ -11,7 +11,8 @@ from rich.markup import escape
 from rich.table import Table
 
 from meridian.cli_people import people_query
-from meridian.commands._helpers import load_topology_cluster, require_intent
+from meridian.commands._helpers import load_people_cluster as load_topology_cluster
+from meridian.commands._helpers import require_intent
 from meridian.commands.client_limits import parse_limit_options
 from meridian.commands.profile_review import require_profile_backend
 from meridian.console import confirm, err_console, error_context, fail, is_json_mode, ok, warn
@@ -20,7 +21,6 @@ from meridian.control.client import (
     ControlClient,
     ControlServiceError,
     ControlServicePolicyError,
-    ControlServiceTopologyError,
     ControlServiceUncertain,
 )
 from meridian.control.http_errors import validation_message
@@ -38,9 +38,9 @@ from meridian.core.people_bulk import (
     BulkReceipt,
     ClientBulkResult,
 )
-from meridian.core.people_removal import PeopleRemovalProposal
 from meridian.core.queries import bounded_integer
 from meridian.i18n import t
+from meridian.people_adoption import finish_people_adoption, require_people_service
 from meridian.renderers import emit_json
 
 
@@ -123,13 +123,6 @@ def preview_table(people: list[BulkPersonChange]) -> None:
     err_console.print(table)
 
 
-def print_removal_proposal(proposal: PeopleRemovalProposal | None) -> None:
-    if proposal is not None:
-        err_console.print(escape(t("bulk.proposal_title")))
-        err_console.print(proposal.model_dump_json(indent=2, by_alias=True), markup=False)
-        err_console.print(escape(t("bulk.proposal_hint")))
-
-
 def result_paths(result: ClientBulkResult) -> frozenset[str]:
     paths = set()
     for key in ("preview", "receipt"):
@@ -169,7 +162,6 @@ def emit_result(command: str, result: ClientBulkResult, operation: OperationCont
         return
     if result.receipt:
         ok(t("bulk.receipt", id=result.receipt.id))
-        print_removal_proposal(result.receipt.proposal)
         if result.receipt.undo_until and not result.receipt.undone_at:
             err_console.print(t("bulk.undo_hint", id=result.receipt.id))
         if result.receipt.undone_at:
@@ -198,18 +190,19 @@ def run_bulk(action: BulkActionName, options: dict[str, Any]) -> None:
         if is_json_mode() and not yes and not dry_run:
             fail(t("bulk.json_confirm"), hint_type="user")
         cluster = load_topology_cluster()
+        finish_people_adoption(cluster)
         if action == "set-profiles":
             require_profile_backend(require_intent(cluster), requested=True)
         try:
             with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
                 review = client.preview_bulk(request)
+                require_people_service(client)
                 if not is_json_mode():
                     preview_table(review.people)
                     err_console.print(t("bulk.summary", **review.counts.model_dump()))
                     err_console.print(t("bulk.nodes", count=review.changed_nodes))
                     for warning in review.warnings:
                         warn(t(f"bulk.warning.{warning}"))
-                    print_removal_proposal(review.proposal)
                 if dry_run:
                     emit_result(command, ClientBulkResult(preview=review, applied=False), operation)
                     return
@@ -225,11 +218,6 @@ def run_bulk(action: BulkActionName, options: dict[str, Any]) -> None:
                 emit_result(command, ClientBulkResult(preview=review, receipt=receipt, applied=True), operation)
         except ControlServicePolicyError as exc:
             fail(t(f"delivery.error_{exc.reason}"), hint_type="user")
-        except ControlServiceTopologyError as exc:
-            fail(
-                t("bulk.proposal_stale" if exc.reason == "stale_topology" else "bulk.proposal_uncommitted"),
-                hint_type="user",
-            )
         except ControlServiceError as exc:
             fail(exc)
 
@@ -258,9 +246,12 @@ def run_receipt(receipt_id: str, *, undo: bool = False, yes: bool = False, dry_r
         if undo and is_json_mode() and not yes and not dry_run:
             fail(t("bulk.json_confirm"), hint_type="user")
         cluster = load_topology_cluster()
+        finish_people_adoption(cluster)
         try:
             with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
                 receipt = client.bulk_receipt(receipt_id)
+                if undo and not dry_run:
+                    require_people_service(client)
                 if undo:
                     require_undo_eligible(receipt)
                     receipt = client.preview_bulk_undo(receipt_id)

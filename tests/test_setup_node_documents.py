@@ -10,6 +10,7 @@ import pytest
 
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.compiler import compile_topology
+from meridian.core.people_query import PeopleFacets, PeoplePage
 from meridian.reconciler.resources import ResourceReconcileError
 from meridian.setup.control_service import verify_control_service
 from tests.support.topology import single_exit_intent
@@ -19,7 +20,9 @@ def _client(*in_sync: bool) -> MagicMock:
     client = MagicMock()
     client.health.return_value = SimpleNamespace(version="4.0.0")
     client.node.side_effect = [SimpleNamespace(in_sync=value) for value in in_sync]
-    client.get_user.return_value = SimpleNamespace(sub_token="tok")
+    client.query_people.return_value = PeoplePage(
+        users=[], total=0, population=0, facets=PeopleFacets(), next_cursor=None, observed_at="2026-11-01T12:00:00Z"
+    )
     return client
 
 

@@ -1778,7 +1778,7 @@
       ],
       "command": "client.remove",
       "data_schema": "client-remove",
-      "description": "Remove declared clients in one local review and apply; their links stop working.",
+      "description": "Remove people immediately through the control service; their links stop working.",
       "envelope_schema": "client-remove-envelope",
       "error_schema": "error",
       "exit_codes": {
@@ -1795,7 +1795,6 @@
         "--yes",
         "--json",
         "--cut-off",
-        "--proposal",
         "--dry-run",
         "--context"
       ],

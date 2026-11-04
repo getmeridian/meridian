@@ -281,7 +281,7 @@ def test_client_list_attention_filters_console_people_and_adds_reasons(
                 assert people["alice"]["attention_reasons"] == ["quota"]
                 assert people["console"]["attention_reasons"] == ["unused"]
                 assert people["stopped"]["attention_reasons"] == ["stopped"]
-                assert people["console"]["declared"] is False and "fresh" not in people
+                assert "declared" not in people["console"] and "fresh" not in people
             else:
                 assert "Reason" in result.output and "Near quota" in result.output and "Never used" in result.output
                 assert "Stopped using" in result.output

@@ -111,13 +111,15 @@ def drop_operations_schema(db: sqlite3.Connection) -> None:
 
 
 @contextmanager
-def serve_control(state_dir: Path, *, public_path: str = "", clock: Callable[[], float] | None = None) -> Iterator[str]:
+def serve_control(
+    state_dir: Path, *, public_path: str = "", clock: Callable[[], float] | None = None, version: str = "4.0.0"
+) -> Iterator[str]:
     """Run a control service whose state lives in `state_dir`; yields its base URL.
 
     `public_path` stands in for the secret path nginx strips; the web UI's sign-in needs one.
     """
     options = {"clock": clock} if clock is not None else {}
-    service = ControlService(state_dir / "control.db", fleet_id=FLEET_ID, version="4.0.0", **options)
+    service = ControlService(state_dir / "control.db", fleet_id=FLEET_ID, version=version, **options)
     server = ControlServer(("127.0.0.1", 0), service, token_sha256(ADMIN_TOKEN), public_path=public_path)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

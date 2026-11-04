@@ -68,7 +68,7 @@ def single_server_intent(
             control=ControlPlaneIntent(server_ref=server_ref),
             exits=[exit_],
             default_egress_ref=exit_.id,
-            access=AccessIntent(users=[client_name or DEFAULT_CLIENT]),
+            access=AccessIntent(),
         )
 
     if existing.control.backend == "remnawave":
@@ -97,13 +97,9 @@ def single_server_intent(
             "region": region or current.region,
         }
     )
-    users = list(existing.access.users)
-    if client_name and client_name not in users:
-        users.append(client_name)
     return existing.model_copy(
         update={
             "exits": [updated if item.id == current.id else item for item in existing.exits],
-            "access": existing.access.model_copy(update={"users": users}),
         }
     )
 

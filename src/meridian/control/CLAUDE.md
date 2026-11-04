@@ -1,105 +1,40 @@
-# control — Meridian's own control service (`meridian serve`)
-
-Owner sign-in and console screens: `ui/CLAUDE.md`. Subscription documents: `formats/CLAUDE.md`.
-
+# control — Meridian's control service (`ctld`)
+Owner console assets: `ui/CLAUDE.md`. Formats: `formats/CLAUDE.md`.
 ## Design decisions
-- **Response rules need no schema step** — reviewed rules live in meta beside delivery settings; absent means empty, and settings writes, restores, and reads keep the same typed list.
-- **Declared bulk deletion freezes one draft** — the committed revision and fence identify it, the preview hash includes it, and commit re-checks it while only service-owned deletions write accounts.
-- **Profile declarations save with settings** — meta keeps their reviewed fingerprint, included in the access hash; unreviewed settings compare it atomically, and bootstrap requires no fingerprint, grants, or non-default memberships.
-- **Person delivery overrides stay private** — schema 25 owns one nullable-by-absence mapping; stateless hashes fence catalog, membership, and override, without events or node recomposition.
-- **Reviewed delivery choices validate membership** — policy catalogs live in settings; profile defaults must agree before a settings or membership write commits.
-- **Profile activation is atomic** — service settings hold the canonical grant map; staged specs carry references, and map or membership changes compose documents with the existing flow-block ledger.
-- **Metrics has its own grant** — cataloged `/metrics` uses `metrics.read` on the existing ingress, with no compatible preset expansion; node series and bounded route-ID/runtime counters expose no person labels.
-- **Capacity stays per node** — `capacity.py` keeps one latest collection, 360 recent ten-second slots, and 168 UTC hourly means/peaks; person privacy settings do not govern these address-free aggregates.
-- **People queries share SQL predicates** — cursor pages use monotonic identities, contextual counts, and the same selection across surfaces.
-- **Bulk reviews freeze names and versions** — previews stay in bounded memory; one transaction stores the receipt and composes documents.
-- **Capabilities freeze at issuance** — the route catalog owns base, body-choice, and response-field grants; compatible scopes expand once, while the separate immutable grant can later compose with access-profile bounds. Credentials and private metadata are independent permissions on every typed person result.
-- **Person routes have one catalog** — `person_route_catalog.py` owns account declarations; `route_metadata.py` keeps shared refusals and credential annotations.
-- **Display names are service data** — schema 26 seeds them once from the latest applied revision; empty shows the username, the service assigns Latin usernames, writes refuse case-folded name/username clashes atomically, and applies never rewrite a name.
-- **Service owns users, deployer owns topology** — the reconciler PUTs node specs, endpoints, and users over the admin API; the service composes each node's whole document (`node_documents.py`), signs it, and serves it to that node's agent. Client-IP forwarding is not ported yet, so `--client-ips` is hidden.
-- **Stdlib HTTP on loopback** — `ThreadingHTTPServer` behind nginx's secret path (stripped, so routes are `/api`, `/agent/v1`, `/sub`); a thread per long-poll is cheap at Meridian's fleet sizes, and `control/` never imports the deployer. `route_catalog.py` declares every `/api` operation (scopes, models, errors, credential marker) and drives dispatch, authorization, and `openapi.py`; `route_table.py` owns matching.
-- **Command routes stay apart** — `command_routes.py` composes signed-command operations with the same shared not-found contract; the catalog keeps their order and dispatch metadata.
-- **One SQLite file, migrated forward** — `store.Store` shares one connection, lock, and change condition among the ledgers, each owning its tables; `SCHEMA_VERSION` plus `_MIGRATIONS` move it forward, and a database from a newer Meridian is refused, never downgraded.
-- **Schema steps stay self-contained** — `schema.py` owns table creation and forward migrations; the service delegates under its initialization transaction.
-- **Flow-block receipts follow identities** — each node/generation keeps private per-inbound key fingerprints and the required revision; a restored key clears only matching receipts, and newer receipts retire older confirmed ones.
-- **VLESS hard cuts restart the core** — accepted TCP/mux flows survive listener resets; queue one revision-gated core restart per affected node, preserving older agents' restart capability and disclosing all-node reconnects.
-- **Connection-key rotation keeps delivery identity** — compare the current credential generation inside the write, preserve the subscription token and devices, and share replacement logic with reissue; imports advance the generation only when a connection key changes.
-- **Owner credentials stay local** — passkeys and their opaque owner handle are excluded from snapshots alongside passwords and sessions; token grant storage upgrades in the same self-contained schema step.
-- **Scoped API tokens** — one revocable token per device or agent (`tokens.py`): `read` < `propose` < `approve` < `admin`, plus a separate `people` capability for user reads and edits. Whatever applying does is `admin`. Lower scopes see user credentials blank, because those credentials connect as the user. The config's admin token is the unlisted root.
-- **Revisions record every reviewed apply** — `revisions.py` keeps author, secret-free intent, plan and review hashes, and status; only an `admin` token approves its own proposal (the one-person path). The apply fence is one compare-and-swap row: the service stores what `reconciler/fence.py` decides and never judges leases itself.
-- **Fleet CA and agent sessions** — `NodeAuthority` keeps an Ed25519 CA and signing key; enrollment trades a single-use token and CSR for a node certificate and revokes the node's earlier ones; `hello` checks chain, revocation, SAN, clock, and nonce before opening a session. Tokens are stored only as SHA-256, and protocol skew follows `core/version_skew.py`.
-- **Signed commands** — `commands.py` delivers only negotiated kinds with durable first results; cut-offs (`cutoff.py`) queue resets in the credential change's transaction, released only once that revision is reported applied (earlier, a reset could restore the revoked credentials).
-- **Traffic counted exactly once** — `traffic.py` keeps each node's last sequence and totals per counter epoch and adds only growth; old epochs keep their own baselines, only a bounded number are kept, and counters for unknown user IDs are dropped, so a node cannot grow the database at will. Node totals are durable and never rebuilt from user totals. No client address is ever stored.
-- **Period traffic has one projection** — directional baselines feed `core.traffic.period_usage` for people, delivery, and `/info`; resets preserve lifetime totals, and unknown historical splits stay disclosed as carried download until reset.
-- **Operator-owned data** — status, expiry, limits, device caps, notes, tags, languages, privacy, notices, and allowances belong to the operator; applies never write them. Enforcement (a 30 s timer, every change, every stats report) moves users between `active`, `expired`, and `limited` on shared UTC periods (`control.periods`).
-- **Privacy levels** — `privacy.py` keeps device limits `off|private|full` and usage history `off|daily`, both off by default, with a full audit; a lowering deletes or re-keys data in the same transaction as the audit row. `devices.py`: private stores only an HMAC of `x-hwid`, full stores device metadata but never an address.
-- **Encrypted snapshots** — `snapshot.py` seals an age file to every device key and the recovery key, repeating the header inside because age has no associated data; `restore.py` stages it under the next epoch with a new CA and every document signed again. `blobs.py` mirrors pinned binaries for nodes that cannot reach GitHub.
-- **Connection pages at subscriptions** — a browser at `/sub/<token>` gets the page, apps get their format, `/info` stays JSON (`subscription_serving.py`, `connection_pages.py`); shared assets live at token-free `/sub/~pwa/` (`~` is outside the token alphabet).
-- **Derived reads write nothing** — attention and the previews read one view under the store lock and store no request data; `events.py` appends typed facts inside each mutation's transaction.
-- **Stopped-use attention is aggregate evidence** — its own bounded day threshold compares last accepted traffic, including after a period reset; unknown activity stays unknown.
-- **People triage facts are derived reads** — records expose never-used, exact quota percentage, and default attention reasons from shared predicates; no filter flags or request data are stored.
-
+- The service owns every person. Account creation, names, credentials, deletion, limits, expiry, metadata and memberships live in SQLite; topology only owns node specs, endpoints and reviewed settings.
+- Schema 26 seeds display names once from the latest applied revision. Empty names show usernames; creation can assign Latin usernames, and writes refuse folded name/username clashes atomically.
+- Every person can be removed, reissued and rotated through the same API. Bulk deletion freezes all selected people and deletes them in one transaction, without local topology proposals.
+- `people_intent.py` reads the applied topology for fleet views only; revisions never determine ownership.
+- The stdlib loopback HTTP server sits behind nginx's secret ingress. Cataloged routes drive dispatch, capabilities, schemas and OpenAPI.
+- Authenticated API replies carry the installed version header for narrow compatibility checks; anonymous and subscription responses never expose it.
+- Store migrations are self-contained forward steps under the initialization transaction; newer schemas are refused, never downgraded.
+- Tokens freeze cataloged capabilities at issuance. Credentials and private metadata have separate grants; owner writes also hold session and step-up liveness.
+- Revisions record secret-free reviewed intent and hashes; the service stores apply-fence CAS state without making deployer lease decisions.
+- Profile declarations and compiled grants save with reviewed settings; memberships and private delivery overrides use the shared policy resolver.
+- People query cursors share SQL predicates and stable row versions. Bulk previews stay bounded in memory; receipts are durable and undo checks person versions, enforcement and node/grant identity.
+- Node documents compose from current accounts and specs, sign once per changed content, and use negotiated protocol capabilities and generation-bound flow-block receipts.
+- Cut-offs are atomic with account changes and release only after the revoking revision applies. VLESS streams require a core restart, with disclosed fleet reconnects.
+- Traffic grows once per accepted counter epoch/sequence. Node totals survive node deletion; person totals do not. Account schedules share one injected UTC clock and directional period baselines.
+- Privacy defaults off. Lowering a level deletes or rekeys retained data with the audit row; no client address is stored. Snapshots exclude operator authentication secrets, sessions and owner keys.
+- Subscriptions and connection pages use the same eligibility and delivery rules; person responses are no-store/noindex, and shared package assets are token-free.
+- App response rules are reviewed transient matching settings; capacity history and metrics remain bounded node aggregates without person labels.
 ## What's done well
-- **Matcher headers stay transient** — response rules read User-Agent and Accept per request and store neither; only opt-in `full` device mode records a User-Agent, through the device ledger.
-- **Snapshot profile reads are passive** — deserialize authenticated bytes in memory; never instantiate a service or migrate a database to judge restore compatibility.
-- **Policy previews are transient** — cached geodata verifies archive pins; requests trigger no fetch, and public app limits omit policy names, overrides, and memberships.
-- **Flow events record real transitions** — repeated hellos, reports, and unrelated revisions leave a confirmed receipt and its event history unchanged.
-- A revision is signed only when the resources' hash or the signing certificate changes, so repeated applies never wake agents.
-- A token's public ID finds its row, so its hash is compared once in constant time (against a dummy when none matches); a refused CSR rolls back and never burns the enrollment token.
-- A proposal whose intent contains a secret-shaped key or value, or a malformed `access` block, is refused and never stored.
-
+- Previews and derived reads write nothing; lifecycle facts are typed and contain no notes, tags, requests or credentials.
+- A missing endpoint or late report cannot recreate a removed person; unknown traffic identities are discarded.
+- Bulk deletion passes every retired identity to one document composition so revocation receipts match individual deletion.
+- Restored snapshots preserve account state while rotating service access and the fleet CA.
 ## Pitfalls
-- **Legacy revision names were never validated** — revisions only checked for strings and console people were never checked against topology names, so the schema 26 backfill validates each name and skips held ones, or one bad name stops `ctld` starting.
-- **Shared PWA asset basenames include hyphens** — accept them in routing before the packaged-assets lookup verifies the filename, or a registered helper still gets the unknown-token reply.
-- **Account time follows the injected service clock** — reads, enforcement, settings periods, expiry previews, traffic history, and server liveness must use the same instant as subscriptions and owner sessions; wall-time reads can disagree with them. Sample it once per transaction.
-- **App blocks cover personal page files and legacy redirects** — use the shared decision before rendering or redirecting, or support/config routes reveal a valid token through a blocked app.
-- **Profile facet totals count people** — omit only the profile predicate, count each membership once, and compute the all-profiles count separately from overlapping memberships.
-- **Policy writes keep declaration fences** — save catalogs and declaration fingerprints in one settings transaction, so either refusal rolls back both.
-- **Profile writes validate every membership** — previews and settings refuse any non-default profile missing from the proposed map, including memberships whose live declaration has already disappeared.
-- **Receipt row guards stay explicit** — a derived boolean does not narrow an optional SQLite row for static checks.
-- **Username and profile maps hold identifiers** — revision secret checks exempt only declared usernames with a mapping in access creation settings or a string in display names, and declared profile IDs (or `default`) with a string in delivery profile defaults; other keys and every value still undergo the full secret check, and `fleet export --json` reveals the same keys.
-- **Cut-off scope follows every unresolved receipt** — later rotation, import, or suspension may replace its reason while lost inbound tags still need a cut-off; a confirmed receipt's identities never carry into the next one, or a narrow reset widens into a core restart.
-- **Bulk projections resolve delivery before review** — validate every saved membership against current profile defaults and its private override before preview, commit, or undo dry run.
-- **Undo keeps the resource fence** — receipts retain account versions and the grant/node hash; validate restored profiles and inverse effects before either a dry run or a write, naming stale people.
-- **Cut-off reviews include unresolved access losses** — require people.read and people.private, and combine signed current users with fresh access-change receipts before choosing reset or core restart.
-- **Root identities cover current capabilities** — the unlisted root and bounded owner identity can issue new explicit grants; stored preset grants never grow with the catalog.
-- **Metric labels are fixed data** — derive route IDs from the catalog or handler names, share one unknown bucket, and omit unavailable/stale numeric values rather than inventing zero.
-- **Capacity receipt age belongs to accepted collections** — replays and retired collection epochs never refresh it; only adjacent received network samples add hourly bytes, split at UTC boundaries.
-- **Capacity fields require negotiation** — reject a populated capacity report unless its session accepted `capacity_telemetry`; older agents keep the field absent.
-- **Retry delays cross every HTTP surface** — emit Retry-After whenever a ServiceError supplies it, including anonymous authentication refusals.
-- **Redaction preserves supplied fields** — copy only changed values, or omitted bulk action parameters become supplied nulls and invalidate the review.
-- **Bulk grants keep legacy boundaries** — query and batch grants stay separate from reads and credential imports; their tag-bearing views also require private metadata permission.
-- **Membership stays private in indirect reads** — person and revision results hide profiles without people.private; effective access and configured format previews require it too.
-- **Bulk deletion carries every retired identity** — compose once with all removed records so each node queues the same receipts as a single deletion, without rotating keys.
-- **Undo shares bulk enforcement** — restore requested choices before judging status, and check managed inbound capacity before composing.
-- **Bulk before is enforced** — project both sides from one account clock, re-check every target before writing, and catch up due resets before schedule edits.
-- **Bulk after stays reviewed** — re-check the projected result at commit; a newly due action schedule needs a fresh review.
-- **Bulk applies use canonical enforcement** — write validated requested fields before enforcing, or quota restoration emits the wrong event and cap edits lose their renewal interval.
-- **Credential text matters to Hysteria2** — imported UUID case changes its auth even when VLESS treats the UUID as equal; advance the generation on the actual stored key change.
-- **Delegation re-reads its issuer** — minting must re-check revocation, permissions, expiry, and owner step-up in the insert transaction; preview emits no secret, event, or backup pull.
-- **Schedules share directional baselines** — renewal and rolling resets clear both directions and carried period use; imports initialize the same projection before enforcement, preserving lifetime totals.
-- **First use means accepted traffic** — subscription and page reads never activate; renewal progress, period offsets, and effective status change in the traffic transaction before new growth.
-- **Renewal anchors survive short months** — expiry or interval edits start a new series, cap edits keep progress, and missed renewals consume the cap with one period reset.
-- **Every write checks the whole schedule** — the renewal start, expiry, and count must agree, a cap needs an interval, and durations or renewals that would cross 2099 are refused at write time; an imported mismatched start once moved expiry backwards on renewal.
-- **Delivery reads the calculated expiry** (`effective_expiry()`) — the stored one lags a due renewal until enforcement runs, which once sent an old `expire=` beside the new refill date.
-- **A blocked receipt needs fresh received evidence** — compare applied revisions with the revocation in the same epoch; hellos never renew report age, and the core cannot close an individual TCP/UDP association without address tracking.
-- **Classify every route in the catalog** — internal routes need a reason, and credential markers must cover conditionally visible people records, endpoint passwords, and snapshots.
-- **Decode the path before routing** — `ControlClient` percent-encodes IDs, so an undecoded `%3A` made every endpoint PUT 404.
-- **Answer like nginx everywhere** — `HEAD` as `GET`, nginx's error pages, the unknown-subscription answer for any miss under `/sub/`, and small bodies before authentication; anything else names the backend to a scanner.
-- **Never log requests or store where they came from** — paths carry the secret path and subscription tokens.
-- **nginx answers 502/503/504 for a stopped service** — treat them as retryable, and raise `ControlServiceUncertain` for a write that may have committed, so drivers observe before retrying.
-- **`serve` is a daemon** — it skips the banner and the update check, or every start would print into journald and phone out.
-- **`executescript()` commits on its own** — create tables with `Store.create()`, never inside `transaction()`.
-- **Re-check session liveness and declared-person rules inside the write transaction** (`Store.conditions()`) — checked before the body was read, a revoked console tab could still write.
-- **Hash and sign documents as received JSON values**, never re-serialized models (the agent verifies the bytes it got), and compare timestamps parsed, never as text.
-- **Record a hello nonce only after the proof verifies**, and keep it past the clock window, or a captured hello replays.
-- **Judge health only from a fresh report** — polls prove reachability, not convergence; a stale report is unavailable evidence.
-- **Node baselines and revision numbers outlive node deletion; a person's totals do not** — a re-added node would otherwise count twice and refuse every document as older, while a late report must not recreate a removed person.
-- **Validate expiry and quota bounds inside the write** — years from 2099 read as "never", and quotas stop at SQLite's int64 maximum.
-- **An app without a valid `x-hwid` is served and counted nowhere**, and browsers never register a device; refusing it would lock out apps without HWID support.
-- **Subscriber device capacity is counts only** — `/info` reads used/allowed slots under the subscription lock, only at a countable opt-in level; it never selects device details or registers a browser.
-- **Secrets never ride a snapshot** — strip the secrets table, sessions, enrollment tokens, nonces, and owner tables through `strip_unsnapshotted()`, then VACUUM; device and history rows ride only while their level is on.
-- **Background tasks log no exception text** — they keep fixed error codes in memory and warn at most once per five minutes.
-- **Notes and tags stay private** — never in events or subscription output; a metadata-only edit makes no event or new node document.
-- **Resolve a person's language under the settings lock**; User-Agent and Accept never choose it.
-- **Person pages are no-store and noindex with the strict CSP**; only shared assets are cacheable, and support HTML fetches nothing.
+- Re-check session and token liveness inside each write transaction; pre-body authorization alone permits a revoked tab to write.
+- Declare every API operation and add runnable `ROUTE_SAMPLES`; include conditional credentials and private membership grants.
+- Attach version headers only after authentication; broader fleet health is not a prerequisite for people writes.
+- Legacy receipts can contain a proposal field: consume it when reading stored receipts, but omit it from current contracts.
+- The ensure route fills empty names inside its transaction so a concurrent rename wins; preserve live settings during adoption; schema backfills validate historical names and skip conflicts instead of blocking startup.
+- Only reviewed profile IDs exempt secret-shaped keys in delivery defaults; all other keys and all values undergo secret validation.
+- `executescript()` commits on its own; use `Store.create()` outside write transactions for migration setup.
+- Decode percent-encoded IDs before routing, bound bodies before authentication, and answer misses like nginx without logging secret paths.
+- Treat uncertain 502/503/504 writes as uncertain outcomes; never retry before observing. Emit Retry-After for named throttling errors.
+- Use the injected service clock for reads, schedules, history and report freshness; accepted receipt time, not a replayed hello, renews evidence.
+- Validate requested lifecycle fields before enforcement; renewal anchors, counts and expiry must agree and remain before 2099.
+- Period directions sum to use; carried history is a subset of download, and first use means accepted traffic rather than subscription reads.
+- Keep unresolved revocation identities through later rotations; queue cut-offs against current revision and clear only matching restored keys.
+- Re-check profile defaults, memberships and person overrides before preview, commit and undo; omit only the profile predicate from contextual facet counts. Redaction preserves supplied fields, and lower grants blank private names-independent metadata and credentials on every result. Missing HWID never blocks subscriptions; browser reads never register a device, and zero device cap remains unlimited. Background errors log fixed codes only; shared PWA helpers must be registered, hyphenated basenames must route, and page language is resolved under the settings lock.

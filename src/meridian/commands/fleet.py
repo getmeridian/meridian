@@ -272,17 +272,13 @@ def _render_status(status: FleetStatus) -> None:
                 "[dim]not externally probed[/dim]"
             )
 
-    if status.summary.users or status.summary.missing_access_users or status.summary.nonactive_access_users:
+    if status.summary.users:
         err_console.print()
         parts = [f"{status.summary.active_users} active"]
         if status.summary.disabled_users:
             parts.append(f"{status.summary.disabled_users} disabled")
         if status.summary.other_users:
             parts.append(f"{status.summary.other_users} other")
-        if status.summary.missing_access_users:
-            parts.append(f"{status.summary.missing_access_users} missing")
-        if status.summary.nonactive_access_users:
-            parts.append(f"{status.summary.nonactive_access_users} declared non-active")
         err_console.print(f"  [bold]Users[/bold]   {', '.join(parts)}")
 
     err_console.print()
@@ -333,8 +329,6 @@ def _run_status(*, operation: OperationContext) -> int:
                         "nodes": status.summary.nodes,
                         "relays": status.summary.relays,
                         "users": status.summary.users,
-                        "missing_access_users": status.summary.missing_access_users,
-                        "nonactive_access_users": status.summary.nonactive_access_users,
                         "unhealthy_relays": status.summary.unhealthy_relays,
                         "unknown_relays": status.summary.unknown_relays,
                         "unknown_relay_hops": status.summary.unknown_relay_hops,

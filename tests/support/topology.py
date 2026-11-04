@@ -19,6 +19,9 @@ from meridian.compiler.models import (
     compute_plan_hash,
     make_resource,
 )
+from meridian.core.people_creation import UserCreate
+from meridian.core.people_seeds import PeopleSeeds
+from meridian.core.setup import SetupDraft
 from meridian.core.topology import (
     AccessIntent,
     ControlPlaneIntent,
@@ -59,7 +62,7 @@ def single_exit_intent(
             )
         ],
         default_egress_ref=exit_id,
-        access=AccessIntent(users=list(users)),
+        access=AccessIntent(),
         **intent_fields,
     )
 
@@ -97,6 +100,7 @@ def firewall_resource(port: int = 443, *, server_ref: str = "srv-exit", logical_
 def panel_mock(**return_values: Any) -> MagicMock:
     """MeridianPanel stand-in usable as a context manager; kwargs set method return values."""
     panel = MagicMock()
+    panel.get_user.return_value = None
     panel.__enter__.return_value = panel
     panel.__exit__.return_value = False
     panel.ping.return_value = True
@@ -111,7 +115,11 @@ def panel_mock(**return_values: Any) -> MagicMock:
         users = panel.list_users.return_value
         page = SimpleNamespace(
             users=[
-                SimpleNamespace(username=user.username, display_name=user.username, declared=True, attention_reasons=[])
+                SimpleNamespace(
+                    username=user.username,
+                    display_name=getattr(user, "display_name", "") or user.username,
+                    attention_reasons=[],
+                )
                 for user in users
             ],
             total=len(users),
@@ -120,6 +128,18 @@ def panel_mock(**return_values: Any) -> MagicMock:
         )
         return page, users
 
+    def matching_users(name: str):
+        exact = panel.get_user(name)
+        if exact is not None and exact.username == name:
+            return [exact]
+        wanted = name.casefold()
+        return [
+            user
+            for user in panel.list_users()
+            if wanted in {user.username.casefold(), (getattr(user, "display_name", "") or user.username).casefold()}
+        ]
+
+    panel.matching_users.side_effect = matching_users
     panel.query_users.side_effect = query_users
     return panel
 
@@ -157,3 +177,18 @@ def gateway_fleet_intent() -> SetupIntent:
             "default_egress_ref": "both",
         }
     )
+
+
+def people_draft(intent: SetupIntent, seeds: PeopleSeeds) -> SetupDraft:
+    """Keep person creation inputs in the resumable draft, outside compiled topology."""
+    draft = SetupDraft.from_intent(intent)
+    assert draft.access is not None
+    requests = [
+        UserCreate(
+            username=name,
+            display_name=seeds.display_names.get(name, ""),
+            **(seeds.creation_settings[name].to_data() if name in seeds.creation_settings else {}),
+        )
+        for name in seeds.users
+    ]
+    return draft.model_copy(update={"access": draft.access.model_copy(update={"people": requests})})

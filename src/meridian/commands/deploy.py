@@ -297,7 +297,16 @@ def _execute(
                 _build_request(**{**request.model_dump(), "sni": sni}),
                 resolved.ip,
             )
-            applied = runtime.apply_intent(intent)
+            from meridian.core.people_creation import creation_request
+
+            draft = SetupDraft.from_intent(intent)
+            assert draft.access is not None
+            draft = draft.model_copy(
+                update={"access": draft.access.model_copy(update={"people": [creation_request(client)]})}
+            )
+            review = runtime.review(draft)
+            draft = draft.model_copy(update={"review_hash": review.review_hash})
+            applied = runtime.apply(draft)
             if not applied.all_succeeded:
                 failures = applied.failure_summary
                 fail(

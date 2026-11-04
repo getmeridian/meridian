@@ -125,7 +125,7 @@ def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypa
     conn = MagicMock(port=22, identity_file="")
     resolved = SimpleNamespace(ip="198.51.100.10", user="root", port=22, machine_id="", conn=conn)
     runtime = MagicMock()
-    runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)
+    runtime.apply.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)
     runtime.handoff.return_value = [
         HandoffLinks(
             "alice",
@@ -146,8 +146,10 @@ def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypa
 
     assert result.exit_code == 0, result.output
     check_ports.assert_called_once()
-    intent = runtime.apply_intent.call_args.args[0]
-    assert intent.access.users == ["alice"]
+    draft = runtime.apply.call_args.args[0]
+    intent = draft.to_intent()
+    assert [person.username for person in draft.access.people] == ["alice"]
+    assert "users" not in intent.access.to_data()
     assert intent.exits[0].geo_block is False and intent.harden is True
     runtime.verify.assert_called_once()
     runtime.handoff.assert_called_once_with(["alice"])
@@ -160,7 +162,7 @@ def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypa
 
 def _fake_runtime() -> MagicMock:
     runtime = MagicMock()
-    runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)
+    runtime.apply.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)
     runtime.handoff.return_value = [HandoffLinks("default", subscription_url="https://198.51.100.10/p/sub/s")]
     return runtime
 
@@ -189,7 +191,7 @@ def test_dead_camouflage_target_falls_back_to_the_next_candidate(tmp_home: Path,
     result = _deploy_with(runtime, [("failed", "connection reset"), ("ok", "exit IP 198.51.100.10")])
 
     assert result.exit_code == 0, result.output
-    snis = [call.args[0].exits[0].paths[0].reality_sni for call in runtime.apply_intent.call_args_list]
+    snis = [call.args[0].to_intent().exits[0].paths[0].reality_sni for call in runtime.apply.call_args_list]
     assert snis == ["www.google.com", "dl.google.com"]
 
 
@@ -201,7 +203,7 @@ def test_explicit_sni_is_never_swapped_and_dead_traffic_fails(tmp_home: Path, mo
 
     assert result.exit_code == 3
     assert "no traffic passes" in unstyle(result.output)
-    assert runtime.apply_intent.call_count == 1
+    assert runtime.apply.call_count == 1
     runtime.handoff.assert_not_called()
 
 
@@ -271,7 +273,7 @@ def test_cancel_during_apply_stops_before_verification_and_handoff(tmp_home: Pat
 
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
     runtime = _fake_runtime()
-    runtime.apply_intent.side_effect = OperationCancelledError(
+    runtime.apply.side_effect = OperationCancelledError(
         OperationCancellation(
             phase="apply", message="Apply stopped after 4 of 12 resource actions.", remote_changed=True
         )

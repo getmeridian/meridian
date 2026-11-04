@@ -36,14 +36,10 @@ def legacy_intent() -> SetupIntent:
     return single_exit_intent(control=ControlPlaneIntent(server_ref="srv-control", backend="remnawave"))
 
 
-@pytest.mark.parametrize("kind", ["named", "creation"])
-def test_remnawave_compilation_refuses_profile_definitions_and_initial_membership(kind: str):
+def test_remnawave_compilation_refuses_profile_definitions():
     data = legacy_intent().to_data()
-    if kind == "named":
-        data["access_profiles"] = [{"id": "limited", "grants": []}]
-    else:
-        data["access"]["creation_settings"] = {"default": {"profiles": ["limited"]}}
-    with pytest.raises(TopologyCompileError, match="meridian migrate"):
+    data["access_profiles"] = [{"id": "limited", "grants": []}]
+    with pytest.raises(TopologyCompileError, match="migrate"):
         compile_topology(SetupIntent.model_validate(data))
 
 
@@ -129,7 +125,8 @@ def test_legacy_profile_assignment_refuses_before_directory_or_service_access(
     with (
         patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
         patch(
-            "meridian.commands.client_profiles.resolve_client_name", side_effect=AssertionError("Directory I/O ran.")
+            "meridian.commands.client_profiles.resolve_client_mutation_name",
+            side_effect=AssertionError("Directory I/O ran."),
         ) as directory,
         patch("meridian.commands.client_profiles.access_panel", side_effect=AssertionError("Panel I/O ran.")) as panel,
         patch(

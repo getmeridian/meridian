@@ -1,84 +1,38 @@
 # commands — One module per subcommand
-
 ## Design decisions
-**App matcher tests read applied settings** — `fleet response-rules test` uses the narrow service tester; optional people resolve like client show, and rule edits remain reviewed fleet imports.
-**Batch removal reviews one final intent** — names or a typed proposal file share one review hash, one confirmation, and one apply; cut-off stays on the existing individual path.
-**Bulk profile filters are separate choices** — `--match-profile` selects people; `set-profiles --profile` assigns memberships through the existing frozen review.
-**Profile review logic lives in setup** — commands present gains and losses; the shared apply runtime checks declaration fingerprints for setup and every imperative path before any remote write.
-**Person policy inheritance is explicit** — `client routing --inherit` clears the private override without reserving a policy name.
-**Routing selects reviewed names** — `fleet routing` keeps preset shorthand and selects named policies from intent; a preset selection clears the named fleet default.
-**Profile reviews include people** — `profile`, `plan`, `apply`, and fleet import review effective gains/losses and fence the service membership hash; assignment uses the existing bulk receipt.
-**Bulk reviews** — `client bulk` and `client list` use the service query; commit only the returned ID/hash, and read the receipt after an uncertain reply.
-**Token issuance** — `token` reviews the same typed permissions and expiry as the console; mutations require JSON `--yes`, and only the producing create envelope reveals `data.issued.token`.
-**Client registration** — `cli_client.py` owns the client group so lifecycle options do not grow `cli_groups.py`.
-**One file per command** — `cli.py` registers top-level commands and the root callback, `cli_groups.py` the sub-apps (a group may live in its own `cli_*.py`); both parse flags and defer to the command module.
-**Commands edit intent** — fleet commands load `cluster.yml` with `load_topology_cluster()`, edit `topology_intent`, and apply it through `_helpers.apply_reviewed_intent()` with the exact review hash; removals let reviewed retirement delete what vanished. Never mutate panel or server state beside the compiled plan; the exceptions are operator-owned service data (client status, limits, devices, expiry, notes, tags, language, privacy, notices, fleet language), which applies never touch.
-**Reviews before writes** — every intent edit previews and confirms; JSON mode requires `--yes`. Service-owned edits (`fleet language`, `fleet notice`, `privacy set`, `client set`) confirm against a service-rendered preview where one exists and never run an apply.
-**Client names resolve like `client show`** — an exact service username wins over a case-folded or display-name match, and a name folding onto two people is refused. Service-owned edits and reads cover console-added people; topology-owned removal and reissue act only on `topology_intent.access.users`.
-**One target vocabulary** — `cli_options.py` owns the shared `SERVER` types; `resolve.parse_target()` reads `[user@]host[:port]`, saved names, and `local` like ssh, and `resolve.py` adds the prompts.
-**One JSON switch, one context switch** — every `--json` is `cli_options.Json` and bodies only read `is_json_mode()`; the root callback resolves argv, `--context`, and help requests through Click (`cli_catalog`), never by re-parsing argv. A superseded context runs only `context.READS_ONLY` commands.
-**Machine deploy mode** — `deploy --json`, `--events=jsonl`, `--request FILE`, and `--dry-run` serve agents and automation: no prompts or Rich, the final envelope on stdout, JSONL on stderr; hidden `--cancel-file` stops at the next safe point (exit 5).
-**Health surface** — `check` dispatches by role, `test` runs a client's delivered Xray config end to end, `doctor` bundles a report, `logs` tails the server's units; all render through `check_render.py`: negative evidence exits 4, unavailable evidence 3, a full pass 0.
-**Presentation-only wizard** — `setup_v4.py` and `setup_wizard.py` collect resumable choices (text from `meridian.i18n`, prompts from `wizard_prompts.py`, lists from `wizard_terminal.py`); compile, apply, and verify stay in `meridian.setup`.
-**Agent guide** — `meridian help agents` prints `data/agents.md`; `test_help_command.py` fails if it names a missing command.
-**Retired spellings** — `cli.RENAMED`/`RENAMED_OPTIONS` refuse old commands and flags with exit 2 and the new spelling; `cli.RETIRED` refuses a command removed without a successor (`studio`) and points to where the work moved.
-
+- CLI registration parses flags and delegates to command modules; client registration lives in `cli_client.py`.
+- Fleet commands edit topology and use `_helpers.apply_reviewed_intent()` with the reviewed hash. Operator-owned service edits never apply topology.
+- Every person is service-owned. `client add` POSTs validated `UserCreate` requests; remove DELETEs one person or uses the existing bulk preview/commit for several.
+- Names resolve from the service: exact username wins, otherwise a case-folded username or display-name match must be unique. Every confirmation uses the live display name.
+- `client add` checks every name before the first write, refuses existing people, and reports per-name requests and outcomes without SSH or local intent saves.
+- Reissue replaces links; credential rotation uses the read generation and preserves subscriptions and registrations for every person.
+- Single-person `--cut-off` discloses affected nodes and other people's reconnects. Bulk removal excludes it; removing the last person is valid.
+- `--proposal` is retired by the CLI's option refusal mechanism. Other retired commands and spellings stay in `cli.RETIRED` and `RENAMED`.
+- Bulk edits freeze names and versions; commit only the service's returned ID/hash, and read the receipt after an uncertain reply.
+- Profile and delivery reviews live in setup; every imperative apply keeps their fingerprints and service membership fence.
+- Setup is presentation over the resumable draft/runtime. Deploy applies topology, ensures its draft person through the service, verifies, and hands off.
+- JSON uses one `meridian.output/v1` envelope; shared flags and command metadata are registered in `cli_options`, `cli_catalog` and core.
+- Health has four-state evidence: failed checks exit 4, unavailable evidence 3, success 0. Machine deploy has no prompts and supports cooperative cancellation.
 ## What's done well
-- **Routing explanations use the service** — cached pinned data and current assignments match console previews; preset shorthand retains its original JSON command.
-- **Connection-key rotation follows reissue ownership** — the CLI targets declared people and uses a service generation precondition; the API and console rotate service-owned people, keeping links and registrations.
-- `fleet upgrade` reads each relay's running Realm (a failed upgrade leaves the saved pin ahead), applies the unchanged intent, then runs `check`.
-- `client remove|reissue --cut-off` discloses every affected node and other people's reconnects before confirming, and keeps typed per-node outcomes and new links even on failure.
-
+- CLI and console account paths share service contracts, generation checks and frozen bulk receipts.
+- Secrets appear only in the producing handoff or explicit detail views; confirmations remain readable and content-free events stay typed.
+- `meridian help agents` prints the packaged agent guide, which tests check against the public CLI.
 ## Pitfalls
-- **Fleet JSON keeps reviewed delivery verbatim** — reveal every nested delivery path and each delivery diff's before/after strings, or URL masking corrupts exports and hides the applied change.
-- **Proposal limits bound the read itself** — read at most 64 MiB plus one byte in binary mode; stat sizes cannot bound pipes, special files, or growing files.
-- **Saved reviews validate the whole document** — check preview hashes, declared outcomes and counts, and the CLI envelope before extracting a removal proposal.
-- **Named removals read service usernames for aliases** — exact declarations are already unambiguous; case-folded or display-name inputs need the directory before ownership checks.
-- **Proposal usernames are exact declarations** — never resolve saved usernames through case folding or display names before validating the committed intent.
-- **Restore imports keep the destination file guard** — bind the snapshot-derived model to the current context's loaded timestamp before saving; its temporary file's timestamp is not destination evidence.
-- **Empty restores save derived fleet state** — persist snapshot profile history and normalize carried checkpoints before review; declining the remote restore must not leave raw, unfinished state on disk.
-- **Restore profile checks precede target access** — validate the snapshot before resolving or registering its target, and never give changed live declarations an automatic review after installation.
-- **Assignment guards cover both entry points** — single-person and bulk profile assignment require the Meridian backend before directory or service access, even for default membership.
-- **Profile outages keep their uncertainty** — plan retains unavailable evidence; apply and fleet import may skip an unavailable review only before profiles have ever been used.
-- **Profile conflicts use delivery messages** — single, bulk, and undo reviews translate named service policy refusals through the same four-language catalog as person routing.
-- **Profile lookups may translate errors** — catch MeridianError around the directory adapter as well as API calls; the shared preview table owns the revocation warning.
-- **Legacy profile requests stop before I/O** — require the Meridian backend for profile commands and edits; resource reviews without service settings return no profile review instead of querying a legacy panel.
-- **Undo previews are inverse changes** — read the service-validated undo_people before confirmation, including dry runs, so gained/lost access and hard cut-off warnings describe the undo.
-- **The last profile still needs review** — plan and apply check the proposed intent and live service, refuse memberships still in use, and carry the access hash even when the proposed map is empty.
-- **Token clients require a configured control service** — reject missing credentials and Remnawave before constructing the HTTP client.
-- **Token events name their grant kind** — a null scope means explicit capabilities; render shared permission labels instead of None.
-- **Token expiry is the reviewed instant** — issue the preview's expires_at, never restart the day count after confirmation.
-- **Undo dry runs check the receipt** — reject irreversible, already-undone, or expired receipts; uncertain undo succeeds only after reading its recorded completion.
-- **Escape at the console boundary once** — ok/warn already escape Rich markup; pass translated display names and disclosures unchanged.
-- **Cut-off consent names each node's boundary** — a core restart reaches every Xray inbound and bridge; an inbound reset names its tags and whole-core failure fallback.
-- **Panel owner status reports only the code setting** — TOTP being off never means password-only; passkeys may also be saved, and recovery text must disclose their removal.
-- **`console.fail()` always exits** (user 2, system 3, bug 1) — entry points convert library `MeridianError`s with `fail(exc)`, or the user sees a traceback.
-- **Catch control-service errors inside the command's `error_context`** — it supplies JSON metadata but catches nothing; a non-retryable poll error is a failed outcome, not a timeout.
-- **A local save failure after a remote change exits 3** and says remote state changed.
-- **Reach Click only through `meridian.cli_types`** — Typer vendors it and production has no `click` package.
-- **`confirm()` returns a bool** — callers must `raise typer.Exit(1)` on False.
-- **Build and validate request models before opening SSH or panel connections**; rebuild models from untrusted data, never `model_copy(update=...)`.
-- **A new public command needs a `_HELP_LAYOUT` entry, a `rich_help_panel`, and a `core.command_catalog.COMMAND_OUTPUTS` entry** (`test_cli_catalog.py`); hidden `serve` and `dev` stay out of the catalog.
-- **Never save intent from a declined or dry-run review**; omitted options preserve saved values.
-- **Role names are server names** — `server set` accepts the exit, gateway, and relay IDs `fleet status` prints, since labs whose saved names are IPs had no other handle.
-- **Profile removal refuses a mapped delivery default first** — intent validation would raise a pydantic error that `profile remove` cannot render; name `delivery.profile_policies` and `fleet import` instead.
-- **Typed names may match two declared people** — resolve through `matching_users()` and refuse more than one; never re-check a declared username against the typed-name pattern, which refuses valid leading `_`/`-`.
-- **A removal draft checks its fence and intent hash before its people** — a stale draft must say so rather than report an already-removed person as undeclared; names no declared person matches, and `--cut-off` misuse, are refused before the service directory is read.
-- **A name pre-check without the directory defers declared ambiguity** — service-owned edits validate before access opens, where an exact console username still wins.
-- **Topology-owned removal and reissue never touch console-only people** — and `client reissue` clears device registrations and makes the new subscription URL the page URL at once.
-- **Flow-block receipts read at commit time are always pending** — re-read them briefly (`node_commands.wait_for_flow_blocks()`) before reporting, since the agent confirms within seconds of applying.
-- **`client enable` reports the status the service answers** (`expired`/`limited` when those still hold), never the requested one.
-- **Removals refuse the control server and its dependents before review**; `node remove --force` only extends the edit to relay chains into that exit.
-- **`forget_unreachable_servers()` forgets in memory only** — the confirmed apply saves it, or a declined import leaves bindings forgotten on disk.
-- **Teardown refuses a server that still holds roles** (a whole single-server fleet excepted) and deletes the saved profile last.
-- **`panel` asks for a setup link only with `--setup-link`** — a bare request racing an owner's setup would wipe their password; it builds its client with `report_mutations=False` because a setup link is no state a backup keeps.
-- **Never render saved admin credentials** — handoff links appear only in the producing command's final output (`emit_json(..., reveal=...)`); `doctor` and `logs` pass free text through `redact_diagnostic_text()` and never through Rich markup.
-- **A bare word that is neither a saved name nor an address is refused, never dialed**; bare `test` follows the intent, not the saved-server count.
-- **Key setup may repin the target** — save the returned identity file as the profile's `key_path`; never offer key setup without a terminal or in JSON mode.
-- **The wizard needs a terminal** — `prompt()` returns defaults without `/dev/tty`, so `setup` refuses without one unless `--yes`; a failing non-interactive stage offers back/retry/save instead of re-running into the same error.
-- **Pickers open the terminal's real device** (`os.ttyname`), not `/dev/tty` (macOS kqueue refuses the alias), and accept Ctrl+J as Enter.
-- **Re-running `node add`/`relay add` for a declared server resumes it** and refuses a conflicting SNI, domain, exit, or port; never add a second entry.
-- **`node replace` refuses the control server** (subscription URLs would change) and a target that already holds a role; a bare-IP exit's certificate SNI follows it to the new IP.
-- **`deploy` port preflight covers every port nginx binds**, loopback ones included, or deploy fails late on `nginx -t`.
-- **Normalize branding before SSH** — palettes live in `core.inputs.PAGE_PALETTES`, icons go through `branding.normalize_icon()`, and a redeploy merges unnamed branding flags from saved values.
-- **Agent versions accept any shipped build** (`control_artifacts.expected_agent_version()`) — a checkout that rebuilt one target carries two IDs.
+- An account lookup must read current service names; topology names and full `list_users()` reads miss panel renames or widen the read needlessly.
+- People tokens cannot read fleet health; account writes check the authenticated API version header without requiring broader rights.
+- `error_context` supplies metadata but catches nothing: convert library errors with `fail(exc)` inside it.
+- Validate typed requests before opening service or SSH access, and reconstruct untrusted models instead of unchecked `model_copy` updates.
+- JSON mutations require `--yes`; `confirm()` returns a bool, and declining must exit before any write.
+- Never save intent or forgotten bindings from a declined or dry-run review.
+- A local save failure after a remote topology mutation exits 3 and says remote state may have changed; immediate add has no local-save outcome.
+- Read an uncertain bulk receipt rather than repeating the commit; an undo must still be eligible and its inverse access losses reviewed.
+- Escape once at the console boundary; `ok` and `warn` already escape markup, including display names.
+- Cut-off consent names each node's whole-core or inbound boundary and its failure fallback; keep typed outcomes even on failure.
+- Profile assignment and edits require the Meridian backend before service access; unavailable profile evidence stays uncertain.
+- Profile conflicts use localized delivery refusals, and removing the last profile still reviews service memberships and effective access.
+- Restore validates snapshot identity and profile compatibility before registering targets; destination saves retain their own file guard.
+- JSON fleet exports reveal reviewed delivery containers verbatim while still masking credential fields.
+- Tokens issue the reviewed permissions and absolute expiry; only the producing result reveals the new token.
+- Reach Click only through `meridian.cli_types`; newly public commands need help layout and output-catalog entries.
+- Re-running node or relay add resumes the declared server, while conflicting SNI, domain, target or port is refused.
+- Omitted options preserve saved choices; role names resolve through the same server vocabulary fleet status prints.

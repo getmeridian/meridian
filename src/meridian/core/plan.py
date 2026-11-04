@@ -6,6 +6,7 @@ from pydantic import Field
 
 from meridian.core.access_profile_views import AccessProfileReview
 from meridian.core.models import CoreModel
+from meridian.core.people_seeds import PeopleAdoptionNotice
 from meridian.core.resources import ResourceKind
 
 
@@ -27,6 +28,8 @@ class CompiledPlanResourceResult(CoreModel):
 
 class CompiledPlanResult(CoreModel):
     """Read-only drift result for a V4 compiler plan."""
+
+    people_adoption: PeopleAdoptionNotice | None = Field(default=None, exclude_if=lambda value: value is None)
 
     plan_hash: str
     converged: bool

@@ -170,7 +170,7 @@ def test_console_people_share_the_subscription_as_the_page(tmp_path: Path) -> No
         service.put_settings(ServiceSettings(profile_title="Meridian", public_url="https://198.51.100.1/connect"))
         service.create_user(UserCreate(username="guest"))
         share = share_view(service, "guest")
-        assert share.declared is False
+        assert "declared" not in share.to_data()
         assert share.page_url == share.subscription_url != ""
     finally:
         service.close()

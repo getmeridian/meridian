@@ -242,6 +242,17 @@
           ],
           "default": null
         },
+        "people_adoption": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PeopleAdoptionNotice"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "plan_hash": {
           "title": "Plan Hash",
           "type": "string"
@@ -313,6 +324,17 @@
           "minimum": 0,
           "title": "Generation",
           "type": "integer"
+        },
+        "people_adoption": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PeopleAdoptionNotice"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "plan_hash": {
           "title": "Plan Hash",
@@ -405,6 +427,26 @@
         "nodes"
       ],
       "title": "CutOffPlan",
+      "type": "object"
+    },
+    "PeopleAdoptionNotice": {
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "people": {
+          "minimum": 0,
+          "title": "People",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "people",
+        "message"
+      ],
+      "title": "PeopleAdoptionNotice",
       "type": "object"
     }
   },

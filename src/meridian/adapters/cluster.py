@@ -83,7 +83,6 @@ def topology_from_cluster(
         nodes=nodes,
         relays=relays,
         servers=members,
-        access_users=list(intent.access.users) if intent is not None else None,
     )
 
 

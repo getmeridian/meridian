@@ -1,8 +1,6 @@
 # contracts — Generated meridian-core artifacts
-
 ## Design decisions
 - **App response rules are typed intent** — bounded literals and discriminated format/block/policy/header actions join settings, fleet schemas, a transient tester, and the narrow `delivery.test` capability; request values never enter results.
-- **Removal draft contracts bind committed topology** — previews and receipts compose one secret-free proposal schema; combined CLI removals expose the reviewed names and hash without changing individual results.
 - **Membership query facets** — profile filters and saved row memberships share people-query schemas; the empty profile facet key counts people across overlapping memberships.
 - **Profile declaration fences** — settings publish the reviewed declaration hash and its unchanged-write precondition; the private profile catalog includes that hash and non-default membership evidence.
 - **Metrics is protected text** — `metrics.read` joins catalog-derived explicit preview/issuance contracts, stays outside compatible presets, and serves Prometheus text outside the admin JSON document.
@@ -27,21 +25,13 @@
 - **Subscriber device slots** — `device-slots` exports used/allowed integers only; `/info` omits this optional projection when there is no countable device limit.
 - **Attention activity cases** — `unused` means never used after its creation threshold; `stopped` means no recent traffic after its independent bounded threshold, with no new stored history.
 - **People triage facts** — read-only record fields publish never-used evidence, exact floored quota percentage, and default-threshold reasons without stored flags.
-
 **Generated, checked in** — `scripts/export_contracts.py` is the source of truth. Do not hand-edit files below `contracts/meridian/`.
-
 **Core imports plus the CLI tree** — contract export imports `meridian.core` services and schemas, and `meridian.cli_catalog` walks the in-process Typer app for `commands.json`; it never spawns `meridian`, imports command modules, or hits prompts and process exits.
-
 **Agent protocol apart** — `agent/` holds the internal `meridian.agent/v1` service-to-agent contract (`agent/schemas/`, `agent/http.json`) for the Rust node agent; it stays out of `schemas/`, so `meridian api schemas` never sees it.
-
 **Redacted fixtures** — golden fixtures are safe passive artifacts. Operator-visible handoff details remain available through explicit UI/CLI result views.
-
 ## What's done well
-
 - Contracts include schemas, command catalog, event types, and the admin OpenAPI document in one deterministic tree.
 - `--check` gives CI a cheap drift gate before API clients depend on stale shapes.
-
 ## Pitfalls
-
 - Keep fixture clocks, operation IDs, and durations fixed so diffs are meaningful.
 - Never write Python-version-dependent text into a contract: `HTTPStatus.phrase` changed in 3.13 (413 "Request Entity Too Large" → "Content Too Large"), so the OpenAPI generator pins RFC 9110 phrases.

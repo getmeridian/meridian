@@ -6,8 +6,8 @@ import typer
 from pydantic import ValidationError
 
 from meridian import console
-from meridian.commands._helpers import load_topology_cluster
-from meridian.commands.client_handoff import resolve_client_mutation_name, resolve_client_name
+from meridian.commands._helpers import load_people_cluster as load_topology_cluster
+from meridian.commands.client_handoff import resolve_client_mutation_name
 from meridian.control.client import ControlClient, ControlServicePolicyError, ControlServiceUncertain
 from meridian.control_access import access_panel
 from meridian.core.errors import MeridianError
@@ -41,7 +41,6 @@ def run_routing(
         if not cluster.runs_control_service:
             console.fail(t("delivery.control_required"), hint_type="user")
         try:
-            resolve_client_name(cluster, person, console_people=True)
             with access_panel(cluster) as panel:
                 username = resolve_client_mutation_name(cluster, panel, person)
             with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:

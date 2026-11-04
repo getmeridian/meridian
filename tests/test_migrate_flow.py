@@ -25,6 +25,7 @@ from meridian.cluster import (
 from meridian.compiler import compile_topology
 from meridian.control.models import UserImportBatch, UserImportResult
 from meridian.core.errors import LocalStateError
+from meridian.core.people_seeds import PeopleAdoption
 from meridian.core.topology import SetupIntent, TransparentRelayIntent
 from meridian.host_runtime import NODE_DIR
 from meridian.migrate import MigrationError
@@ -55,7 +56,7 @@ def _intent() -> SetupIntent:
     relay = TransparentRelayIntent(
         id="relay-a", hop_server_refs=["srv-relay"], exit_ref=intent.exits[0].id, protocol_path_ref=reality.id
     )
-    access = intent.access.model_copy(update={"users": ["alice", "bob"]})
+    access = intent.access
     control = intent.control.model_copy(update={"backend": "remnawave"})
     return intent.model_copy(update={"transparent_relays": [relay], "access": access, "control": control})
 
@@ -74,7 +75,11 @@ def _remnawave_fleet(intent: SetupIntent) -> ClusterConfig:
             active=True,
             server_ref=str(getattr(resource.payload, "server_ref", "") or ""),
         )
+    bindings["user:alice@1"] = ManagedResourceBinding(
+        logical_id="user:alice", resource_kind="access_user", generation=1, remote_id="alice", active=True
+    )
     return ClusterConfig(
+        people_adoption=PeopleAdoption(users=["alice", "bob"]),
         panel=PanelConfig(
             url=panel_base_url(CONTROL, "", SECRET_PATH),
             api_token="remnawave-api-token",

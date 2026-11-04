@@ -41,7 +41,7 @@ def scene():
         {**before.to_data(), "uuid": "4f0c8a52-6c1d-4e8b-9a7f-2b5d4c3e1f00", "credential_generation": 2}
     )
     result = UserCredentialRotation(user=after, flow_blocks=UserFlowBlocks(username="alice", credential_generation=2))
-    panel = panel_mock(user_credentials=before, rotate_credentials=result)
+    panel = panel_mock(get_user=before, list_users=[before], user_credentials=before, rotate_credentials=result)
     cluster = ClusterConfig(
         panel=PanelConfig(url="https://198.51.100.10/panel", api_token="test-token", server_ip="198.51.100.10"),
         topology_intent=single_exit_intent(users=["alice", "bob"]),
@@ -74,20 +74,11 @@ def test_json_rotation_requires_yes_before_reading_credentials(scene, tmp_home):
     panel.assert_not_called()
 
 
-def test_cli_rotation_refuses_console_only_people_before_opening_the_service(scene, tmp_home):
-    cluster, panel, _ = scene
-    with (
-        patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-        patch("meridian.control_access.ServiceAccessPanel", return_value=panel) as access,
-    ):
-        result = CliRunner().invoke(app, ["client", "rotate-credentials", "console-person", "--yes", "--json"])
-    assert result.exit_code == 2
-    access.assert_not_called()
-
-
 def test_human_rotation_escapes_a_display_name_once(scene, tmp_home):
     cluster, panel, _ = scene
-    cluster.topology_intent.access.display_names["alice"] = "Group [work]"
+    panel.user_credentials.return_value = panel.user_credentials.return_value.model_copy(
+        update={"display_name": "Group [work]"}
+    )
     with (
         patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
         patch("meridian.control_access.ServiceAccessPanel", return_value=panel),

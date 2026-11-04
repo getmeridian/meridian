@@ -25,7 +25,7 @@ from meridian.control.command_models import (
 from meridian.remnawave import User
 from tests.support.node_commands import command_record
 from tests.support.text import unstyle
-from tests.support.topology import single_exit_intent
+from tests.support.topology import panel_mock, single_exit_intent
 
 
 @pytest.mark.parametrize("command", [["client", "remove"], ["client", "reissue"]])
@@ -69,7 +69,7 @@ def person(*, reissued: bool = False) -> User:
 
 
 @pytest.mark.parametrize(("status", "exit_code"), [("core_restart", 0), ("failed", 4), ("timed_out", 3)])
-def test_client_remove_json_preserves_all_cut_off_results_after_the_reviewed_apply(
+def test_client_remove_json_preserves_cut_off_results_after_atomic_service_deletion(
     tmp_home, capsys, status, exit_code
 ) -> None:
     saved = cluster()
@@ -89,21 +89,23 @@ def test_client_remove_json_preserves_all_cut_off_results_after_the_reviewed_app
     scope = CutOffPlan(nodes=[CutOffNode(node_id="main", inbound_tags=["vless-reality"])])
     events = []
 
-    def applied(*args, **kwargs):
-        events.append("apply")
-        kwargs["user_cut_off"]["person-a"].extend(outcomes[0].commands)
+    panel = panel_mock(get_user=person(), list_users=[person()])
+
+    def deleted(name):
+        events.append("delete")
+        return SimpleNamespace(commands=outcomes[0].commands)
+
+    panel.delete_user_with_cut_off.side_effect = deleted
 
     set_json_mode(True)
     try:
         with (
             patch("meridian.commands.client.load_topology_cluster", return_value=saved),
             patch("meridian.node_commands.cut_off_scope", return_value=scope),
+            patch("meridian.control_access.ServiceAccessPanel", return_value=panel),
+            patch("meridian.commands.client_v4.cut_off_scope", return_value=scope),
             patch(
-                "meridian.commands.client_v4.apply_reviewed_intent",
-                side_effect=applied,
-            ),
-            patch(
-                "meridian.node_commands.wait_commands",
+                "meridian.commands.client_v4.wait_commands",
                 side_effect=lambda *args: events.append("cut-off") or outcomes,
             ),
         ):
@@ -116,7 +118,7 @@ def test_client_remove_json_preserves_all_cut_off_results_after_the_reviewed_app
         result = json.loads(capsys.readouterr().out)
         assert result["exit_code"] == exit_code
         assert result["data"]["cut_off"][0]["status"] == status
-        assert events == ["apply", "cut-off"]
+        assert events == ["delete", "cut-off"]
     finally:
         set_json_mode(False)
 
@@ -158,17 +160,19 @@ def test_reissue_keeps_live_page_links_and_all_cut_off_results(tmp_home, capsys,
 
 def test_declining_the_cut_off_confirmation_changes_no_credentials(tmp_home) -> None:
     scope = CutOffPlan(nodes=[CutOffNode(node_id="main", inbound_tags=["vless-reality"], effect="core_restart")])
+    panel = panel_mock(get_user=person(), list_users=[person()])
     with (
         patch("meridian.commands.client.load_topology_cluster", return_value=cluster()),
         patch("meridian.node_commands.cut_off_scope", return_value=scope),
         patch("meridian.commands.client.confirm", return_value=False) as confirm,
-        patch("meridian.commands.client.access_panel") as panel,
+        patch("meridian.commands.client.access_panel", return_value=panel),
         pytest.raises(typer.Exit),
     ):
         run_reissue("person-a", cut_off=True)
     text = confirm.call_args.args[0]
     assert "main" in text and "inbound" in text and "bridge" in text
-    panel.assert_not_called()
+    panel.revoke_user_subscription.assert_not_called()
+    panel.revoke_user_subscription_with_cut_off.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -300,7 +304,11 @@ def test_review_5_1_service_preflight_errors_use_fail_with_the_command_json_enve
             patch("meridian.commands.node_restart.topology_from_local_cluster", return_value=topology),
             patch("meridian.commands.node_restart.ControlClient", return_value=client),
             patch("meridian.node_commands.cut_off_scope", side_effect=error),
-            patch("meridian.commands.client_v4.apply_reviewed_intent") as apply,
+            patch(
+                "meridian.control_access.ServiceAccessPanel",
+                return_value=panel_mock(get_user=person(), list_users=[person()]),
+            ),
+            patch("meridian.commands.client_v4.cut_off_scope", side_effect=error),
             pytest.raises(typer.Exit) as raised,
         ):
             if command == "node.restart":
@@ -314,6 +322,5 @@ def test_review_5_1_service_preflight_errors_use_fail_with_the_command_json_enve
         assert body["schema"] == "meridian.output/v1" and body["command"] == command
         assert body["status"] == "failed" and body["errors"][0]["message"] == message
         assert body["errors"][0]["category"] == category
-        apply.assert_not_called()
     finally:
         set_json_mode(False)

@@ -23,19 +23,17 @@ from meridian.compiler.models import (
     AgentRuntimePayload,
     ClientEndpointPayload,
     ConfigProfilePayload,
-    ControlUserPayload,
     NodeWorkloadPayload,
     ResourcePlan,
     ServiceSettingsPayload,
 )
 from meridian.control.client import (
     ControlClient,
-    ControlServiceConflict,
     ControlServiceNotFound,
     ControlServiceUncertain,
 )
 from meridian.control.command_models import NodeCommandRecord
-from meridian.control.models import ClientEndpoint, NodeSpec, NodeStatus, ServiceSettings, UserCreate
+from meridian.control.models import ClientEndpoint, NodeSpec, NodeStatus, ServiceSettings
 from meridian.control_artifacts import AgentBinary
 from meridian.core.access_profiles import profile_declarations_hash
 from meridian.core.agent_protocol import AgentBootstrap
@@ -555,37 +553,16 @@ class ClientEndpointDriver:
 
 
 class ControlUserDriver:
-    """Create the user in the service; its credentials and status are the service's."""
+    """Retire vanished pre-upgrade accounts; current plans never create account resources."""
 
     def __init__(self, context: MeridianDriverContext) -> None:
         self.context = context
 
     def observe(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceObservation:
-        payload = payload_of(action, ControlUserPayload)
-        with self.context.client() as client:
-            user = client.get_user(payload.username)
-        return _observation(action, exists=user is not None, connected=False, remote_id=payload.username)
+        raise ResourceReconcileError("People are service-owned; control_user resources are retirement-only.")
 
-    @_uncertain_writes_are_unknown
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
-        payload = payload_of(action, ControlUserPayload)
-        with self.context.client() as client:
-            if payload.creation_settings is None and not payload.display_name:
-                client.put_user(payload.username)
-            else:
-                try:
-                    client.create_user(
-                        UserCreate(
-                            username=payload.username,
-                            display_name=payload.display_name,
-                            **(payload.creation_settings.model_dump() if payload.creation_settings is not None else {}),
-                        )
-                    )
-                except ControlServiceConflict:
-                    # Creation-only: a previous apply or concurrent creator owns the existing settings.
-                    if client.get_user(payload.username) is None:
-                        raise
-        return ResourceApplyReceipt(remote_id=payload.username)
+        raise ResourceReconcileError("People are service-owned; control_user resources are retirement-only.")
 
     def retire(self, binding: ManagedResourceBinding) -> None:
         if binding.remote_id:

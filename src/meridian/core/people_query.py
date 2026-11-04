@@ -67,7 +67,6 @@ class PeoplePerson(UserTrafficEvidence, AccountLifecycleState):
     profiles: ProfileMembership = Field(default_factory=default_profiles)
     user_id: str
     display_name: str
-    declared: bool
     has_notes: bool | None = Field(
         default=None, description="Private operator note presence when reported; its text is never returned."
     )

@@ -189,6 +189,7 @@ def test_bulk_undo_dry_run_checks_receipt_eligibility(people_service, tmp_home, 
     )
     with (
         patch("meridian.commands.client_bulk.load_topology_cluster", return_value=cluster),
+        patch("meridian.commands.client_bulk.require_people_service"),
         patch.object(ControlClient, "bulk_receipt", return_value=receipt),
         patch.object(ControlClient, "preview_bulk_undo", return_value=receipt) as review_undo,
         patch.object(ControlClient, "undo_bulk") as undo,

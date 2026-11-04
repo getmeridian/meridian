@@ -206,6 +206,8 @@ def _fleet_state(cluster: ClusterConfig, snapshot: Snapshot | None) -> ClusterCo
                 )
             carried = load_deposited_cluster(deposited.cluster_yml, deposited.servers_json, snapshot.header.fleet_id)
             cluster.access_profiles_used = cluster.has_used_access_profiles or carried.has_used_access_profiles
+            if cluster.people_adoption is None and carried.people_adoption is not None:
+                cluster.people_adoption = carried.people_adoption
         return cluster
     if deposited is None:
         fail(

@@ -7,7 +7,7 @@ from rich.markup import escape
 
 from meridian import console
 from meridian.commands._helpers import load_topology_cluster
-from meridian.commands.client_handoff import resolve_client_mutation_name, resolve_client_name
+from meridian.commands.client_handoff import resolve_client_mutation_name
 from meridian.control.client import ControlClient
 from meridian.control_access import access_panel
 from meridian.core.errors import MeridianError
@@ -32,7 +32,6 @@ def run_test(*, user_agent: str, accept: str, person: str | None, suffix: str) -
             console.fail(t("delivery.control_required"), hint_type="user")
         try:
             if person is not None:
-                resolve_client_name(cluster, person, console_people=True)
                 with access_panel(cluster) as panel:
                     person = resolve_client_mutation_name(cluster, panel, person)
                 request = ResponseRuleTestRequest(**{**request.to_data(), "person": person})

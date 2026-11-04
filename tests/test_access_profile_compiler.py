@@ -84,6 +84,11 @@ def test_empty_profiles_leave_existing_compiled_payloads_identical():
 
 def test_initial_memberships_must_name_declared_profiles():
     data = single_exit_intent().to_data()
-    data["access"]["creation_settings"] = {"default": {"profiles": ["retired"]}}
-    with pytest.raises((TopologyCompileError, ValidationError), match="retired"):
-        compile_topology(SetupIntent.model_validate(data))
+    from meridian.core.people_seeds import PeopleSeeds
+    from tests.support.topology import people_draft
+
+    seeds = PeopleSeeds.model_validate(
+        {"users": ["default"], "creation_settings": {"default": {"profiles": ["retired"]}}}
+    )
+    with pytest.raises(ValueError, match="unknown"):
+        people_draft(SetupIntent.model_validate(data), seeds).to_intent()

@@ -118,7 +118,6 @@ class FleetTopology(CoreModel):
     nodes: list[TopologyNode] = Field(default_factory=list)
     relays: list[TopologyRelay] = Field(default_factory=list)
     servers: list[TopologyServerMember] = Field(default_factory=list)
-    access_users: list[str] | None = None
 
     @property
     def panel_url(self) -> str:
@@ -275,8 +274,6 @@ class FleetStatusSummary(CoreModel):
     active_users: int
     disabled_users: int
     other_users: int
-    missing_access_users: int
-    nonactive_access_users: int
     connected_nodes: int
     disconnected_nodes: int
     failed_nodes: int = 0
@@ -291,7 +288,7 @@ class FleetStatusSummary(CoreModel):
     def text(self) -> str:
         return (
             f"{self.nodes} node(s), {self.relays} relay(s), "
-            f"{self.active_users} active user(s), {self.missing_access_users} missing access user(s), "
+            f"{self.active_users} active user(s), "
             f"{self.out_of_sync_nodes} node(s) awaiting convergence, "
             f"{self.unhealthy_relays} unreachable relay listener(s), "
             f"{self.unknown_relays + self.unknown_relay_hops} unverified relay route(s)"
@@ -492,14 +489,6 @@ def build_fleet_status(
         )
 
     observed_users = list(api_users or [])
-    declared_users = set(topology.access_users or [])
-    if topology.access_users is not None:
-        observed_users = [user for user in observed_users if user.username in declared_users]
-    observed_usernames = {user.username for user in observed_users}
-    missing_access_users = len(declared_users - observed_usernames) if topology.access_users is not None else 0
-    nonactive_access_users = (
-        sum(1 for user in observed_users if user.status.upper() != "ACTIVE") if topology.access_users is not None else 0
-    )
     user_statuses = [user.status for user in observed_users]
     active_users = sum(1 for status in user_statuses if status.upper() == "ACTIVE")
     disabled_users = sum(1 for status in user_statuses if status.upper() == "DISABLED")
@@ -522,14 +511,7 @@ def build_fleet_status(
     )
     # Disabled, limited, or expired clients are operator or panel decisions, not faults.
     health: FleetHealth
-    if (
-        disconnected_nodes
-        or failed_nodes
-        or out_of_sync_nodes
-        or disabled_nodes
-        or unhealthy_relays
-        or missing_access_users
-    ):
+    if disconnected_nodes or failed_nodes or out_of_sync_nodes or disabled_nodes or unhealthy_relays:
         health = "degraded"
     elif (
         not panel_healthy
@@ -558,8 +540,6 @@ def build_fleet_status(
         active_users=active_users,
         disabled_users=disabled_users,
         other_users=other_users,
-        missing_access_users=missing_access_users,
-        nonactive_access_users=nonactive_access_users,
         connected_nodes=sum(1 for node in nodes if node.status == "connected"),
         disconnected_nodes=disconnected_nodes,
         failed_nodes=failed_nodes,

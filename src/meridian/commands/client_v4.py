@@ -1,247 +1,129 @@
-"""Access-user mutation flow for the client command group."""
+"""Immediate account creation and deletion through the control service."""
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
-from typing import NoReturn
-
 import typer
-from rich.markup import escape
+from pydantic import ValidationError
 
 from meridian.cluster import ClusterConfig
-from meridian.commands._helpers import (
-    ReviewedApplyPersistenceError,
-    apply_reviewed_intent,
-    require_intent,
-)
-from meridian.commands.client_handoff import get_user_or_fail, print_handoff_links
-from meridian.commands.client_state import build_client_persistence_warning
-from meridian.console import err_console, fail, is_json_mode, ok, warn
+from meridian.commands.client_handoff import print_handoff_links
+from meridian.commands.node_command_results import cut_off_disclosure, print_command_results
+from meridian.console import confirm, fail, is_json_mode, ok, warn
 from meridian.control_access import access_panel
-from meridian.core.client_limits import ClientLimitChange, UserCreationSettings
-from meridian.core.clients import build_client_add_result, build_client_remove_result
+from meridian.core.client_limits import ClientLimitChange
+from meridian.core.clients import ClientAddFailure, ClientAddResult, build_client_add_result, build_client_remove_result
+from meridian.core.errors import MeridianError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
+from meridian.core.people_creation import creation_request
 from meridian.core.redaction import HANDOFF_LINK_KEYS, redact_string
-from meridian.handoff import HandoffLinks
+from meridian.handoff import user_handoff
+from meridian.i18n import t
+from meridian.node_commands import command_exit_code, command_warnings, cut_off_scope, wait_commands
 from meridian.remnawave import User
 from meridian.renderers import emit_json
 
 
 def run_add_v4(
-    names: list[str],
-    cluster: ClusterConfig,
-    operation: OperationContext,
-    *,
-    display_names: Mapping[str, str] | None = None,
-    collect_handoff: Callable[[ClusterConfig, list[str]], list[HandoffLinks]],
-    limits: ClientLimitChange | None = None,
+    names: list[str], cluster: ClusterConfig, operation: OperationContext, *, limits: ClientLimitChange
 ) -> None:
-    """Add access users and their first limits through the reviewed compiler and resource drivers."""
-    from meridian.config import SERVER_PROFILES_FILE
-    from meridian.servers import ServerRegistry
-    from meridian.setup.editor import add_access_users_to_intent
-
-    intent = require_intent(cluster)
-    already_declared = [name for name in names if name in intent.access.users]
-    if already_declared:
-        fail(
-            "Client(s) already declared in the topology: " + ", ".join(already_declared),
-            hint="Run `meridian apply` to restore a missing declared client.",
-            hint_type="user",
-        )
-
-    panel = access_panel(cluster)
-    with panel:
+    """Validate and check every name before the first POST; report each request's outcome."""
+    try:
+        settings = limits.for_creation()
+        requests = [creation_request(name, settings) for name in names]
+    except (ValidationError, ValueError):
+        fail("Invalid client name or creation settings.", hint_type="user")
+    created: dict[int, tuple[str, User]] = {}
+    failed: dict[int, ClientAddFailure] = {}
+    with access_panel(cluster) as panel:
         for name in names:
-            if get_user_or_fail(panel, name, action="check") is not None:
+            existing = panel.matching_users(name)
+            if existing:
+                person = existing[0]
                 fail(
-                    f"Client '{name}' already exists in the panel but is not one of your fleet's clients",
-                    hint="Rename the unmanaged panel user or recover its Meridian ownership before adding it.",
+                    f"Client '{name}' already exists: {person.display_name or person.username} ({person.username}).",
                     hint_type="user",
                 )
-
-    settings = limits.for_creation() if limits is not None else UserCreationSettings()
-    updated = add_access_users_to_intent(
-        intent,
-        names,
-        display_names,
-        creation_settings={name: settings for name in names} if settings != UserCreationSettings() else None,
+        # Reserve requested usernames before auto-assigned ones can claim a later batch name.
+        ordered = sorted(enumerate(requests), key=lambda item: (item[1].username is None, item[0]))
+        for index, request in ordered:
+            name = names[index]
+            try:
+                user = panel.create_user(request)
+            except MeridianError as exc:
+                failed[index] = ClientAddFailure(name=name, error=redact_string(str(exc)))
+                continue
+            created[index] = (user.username, user)
+    succeeded = [created[index] for index in sorted(created)]
+    failures = [failed[index] for index in sorted(failed)]
+    links = [user_handoff(cluster, user) for _name, user in succeeded]
+    result = build_client_add_result(
+        succeeded, {link.username: (link.page_url, link.subscription_url) for link in links}
     )
-    result = apply_reviewed_intent(
-        cluster,
-        ServerRegistry(SERVER_PROFILES_FILE),
-        updated,
-        failure="Client access did not converge",
-        hint="The updated intent was saved; retry `meridian apply` after fixing the failure.",
-        on_unsaved=lambda exc: _report_state_failure(names, cluster, operation, exc),
-    )
-
-    succeeded: list[tuple[str, User]] = []
-    with access_panel(cluster) as refreshed_panel:
-        for name in names:
-            user = get_user_or_fail(refreshed_panel, name, action="verify")
-            if user is None:
-                fail(
-                    f"Client '{name}' is missing from the panel after apply",
-                    hint="Retry `meridian apply` and inspect the access-user resource.",
-                    hint_type="system",
-                )
-            succeeded.append((name, user))
-
-    handoffs = collect_handoff(cluster, [name for name, _user in succeeded])
+    result = ClientAddResult(clients=result.clients, failures=failures)
+    code = 3 if failures else 0
     if is_json_mode():
-        result_data = build_client_add_result(
-            succeeded,
-            {links.username: (links.page_url, links.subscription_url) for links in handoffs},
-        )
         emit_json(
             command_envelope(
                 command="client.add",
-                data=result_data.to_data(),
+                data=result.to_data(),
                 summary=Summary(
                     text=f"Added {len(succeeded)} client(s)",
-                    changed=result.changed,
-                    counts={
-                        "added": len(succeeded),
-                        "failed": 0,
-                    },
+                    changed=bool(succeeded),
+                    counts={"added": len(succeeded), "failed": len(failures)},
                 ),
+                exit_code=code,
                 timer=operation.timer,
             ),
             reveal=HANDOFF_LINK_KEYS,
         )
-        return
-
-    shown = display_names or {}
-    ok(f"Added {len(succeeded)} client(s): {', '.join(shown.get(name, name) for name in names)}")
-    handoff_failed = False
-    for links in handoffs:
-        if len(succeeded) > 1:
-            err_console.print()
-            err_console.print(f"  [bold]— {escape(links.name)} —[/bold]")
-        if not links.subscription_url:
-            handoff_failed = True
-            warn(f"Client '{links.name}' was added, but its links are unavailable: {links.error}")
-            continue
-        if links.error:
-            warn(f"Connection page for '{links.name}' is unavailable: {links.error}")
-        print_handoff_links(links.subscription_url, page_url=links.page_url)
-
-    err_console.print()
-    err_console.print("  [dim]View all clients:  meridian client list[/dim]")
-    err_console.print()
-    if handoff_failed:
-        raise typer.Exit(3)
-
-
-def _report_state_failure(
-    names: list[str],
-    cluster: ClusterConfig,
-    operation: OperationContext,
-    exc: ReviewedApplyPersistenceError,
-) -> NoReturn:
-    """Report the clients the panel already has when local state could not be saved after apply."""
-    reason = redact_string(str(exc.__cause__ or exc))
-    observed: list[tuple[str, User]] = []
-    try:
-        with access_panel(cluster) as panel:
-            for name in names:
-                user = panel.get_user(name)
-                if user is not None:
-                    observed.append((name, user))
-    except Exception:  # Best-effort recovery must not mask the original post-apply persistence failure.
-        observed = []
-
-    if observed:
-        warning = build_client_persistence_warning(
-            operation="applying client access",
-            reason=reason,
-        )
-        if is_json_mode():
-            result = build_client_add_result(observed)
-            emit_json(
-                command_envelope(
-                    command="client.add",
-                    data=result.to_data(),
-                    summary=Summary(
-                        text=f"Observed {len(observed)} requested client(s), but local state was not saved",
-                        changed=True,
-                        counts={
-                            "added": len(observed),
-                            "failed": len(names) - len(observed),
-                            "state_save_failed": 1,
-                        },
-                    ),
-                    exit_code=3,
-                    warnings=[warning],
-                    timer=operation.timer,
-                )
-            )
-            raise typer.Exit(3)
-
-        ok(f"Requested client(s) now exist: {', '.join(name for name, _user in observed)}")
-        warn(warning.message)
-        raise typer.Exit(3)
-
-    fail(exc)
+    else:
+        for link in links:
+            ok(f"Added client '{link.name}'")
+            print_handoff_links(link.subscription_url, page_url=link.page_url)
+        for failure in failures:
+            warn(f"Could not add '{failure.name}': {failure.error}")
+    if code:
+        raise typer.Exit(code)
 
 
 def run_remove_v4(
     name: str, cluster: ClusterConfig, operation: OperationContext, *, yes: bool, cut_off: bool = False
 ) -> None:
-    """Remove an access user through the reviewed topology, every old link stops working."""
-    from meridian.commands.node_command_results import cut_off_disclosure, print_command_results
-    from meridian.config import SERVER_PROFILES_FILE
-    from meridian.console import confirm
-    from meridian.control.command_models import NodeCommandRecord
-    from meridian.i18n import t
-    from meridian.node_commands import command_exit_code, command_warnings, cut_off_scope, wait_commands
-    from meridian.servers import ServerRegistry
-    from meridian.setup.editor import remove_access_user_from_intent
-
-    try:
-        updated = remove_access_user_from_intent(require_intent(cluster), name)
-    except ValueError as exc:
-        fail(str(exc), hint="Check client names with: meridian client list", hint_type="user")
-    scope = cut_off_scope(cluster, name) if cut_off else None
-    confirmation = t("node_commands.remove_confirm", name=require_intent(cluster).access.display_name(name))
-    if scope is not None:
-        confirmation += "\n\n" + cut_off_disclosure(scope)
-        if yes and not is_json_mode():
-            warn(cut_off_disclosure(scope))
-    if not yes and not confirm(confirmation):
-        raise typer.Exit(1)
-
-    commands: list[NodeCommandRecord] = []
-    if cut_off:
-        for binding in cluster.managed_bindings.values():
-            if binding.resource_kind == "control_user" and binding.remote_id == name:
-                binding.cut_off_on_retire = True
-    apply_reviewed_intent(
-        cluster,
-        ServerRegistry(SERVER_PROFILES_FILE),
-        updated,
-        failure=f"Client '{name}' was not fully removed",
-        hint="The client is out of the topology; rerun `meridian apply` to finish.",
-        user_cut_off={name: commands} if cut_off else None,
-    )
-
-    cut_off_results = wait_commands(cluster, commands) if scope is not None else None
-    exit_code = command_exit_code(cut_off_results or [])
+    """Delete one person, with the same atomic optional cut-off as the owner panel."""
+    with access_panel(cluster) as panel:
+        user = panel.get_user(name)
+        if user is None:
+            fail(f"Client '{name}' not found", hint_type="user")
+        shown = user.display_name or name
+        scope = cut_off_scope(cluster, name) if cut_off else None
+        text = t("node_commands.remove_confirm", name=shown)
+        if scope is not None:
+            text += "\n\n" + cut_off_disclosure(scope)
+            if yes and not is_json_mode():
+                warn(cut_off_disclosure(scope))
+        if not yes and not confirm(text):
+            raise typer.Exit(1)
+        commands = []
+        if cut_off:
+            commands = panel.delete_user_with_cut_off(name).commands
+        else:
+            panel.delete_user(name)
+    outcomes = wait_commands(cluster, commands) if cut_off else None
+    code = command_exit_code(outcomes or [])
     if is_json_mode():
         emit_json(
             command_envelope(
                 command="client.remove",
-                data=build_client_remove_result(name, cut_off=cut_off_results).to_data(),
-                summary=Summary(text=f"Removed client {name}", changed=True, counts={"removed": 1}),
-                exit_code=exit_code,
-                warnings=command_warnings(cut_off_results or []),
+                data=build_client_remove_result(name, display_name=shown, cut_off=outcomes).to_data(),
+                summary=Summary(text=f"Removed client {shown}", changed=True, counts={"removed": 1}),
+                exit_code=code,
+                warnings=command_warnings(outcomes or []),
                 timer=operation.timer,
             )
         )
     else:
-        ok(f"Removed client '{name}'. Their links no longer work.")
-        print_command_results(cut_off_results or [])
-    if exit_code:
-        raise typer.Exit(exit_code)
+        ok(f"Removed client '{shown}'. Their links no longer work.")
+        print_command_results(outcomes or [])
+    if code:
+        raise typer.Exit(code)

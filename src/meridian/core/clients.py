@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Collection, Mapping
+from collections.abc import Mapping
 from typing import Literal, Protocol, Sequence
 
 from pydantic import Field, model_validator
@@ -104,11 +104,6 @@ class ClientRecord(UserTrafficEvidence, AccountLifecycleState):
         default=None, description="Subscription status language; null uses the fleet default."
     )
     schedule: AccountSchedulePreview | None = None
-    declared: bool = Field(
-        default=True,
-        description="False for a person added in the control service's web console rather than the fleet's "
-        "reviewed intent; the CLI reads them, and the console manages them.",
-    )
 
 
 class ClientHandoff(CoreModel):
@@ -200,16 +195,23 @@ class ClientCreated(CoreModel):
     """Client metadata returned after creation or reissue, with their handoff links."""
 
     username: str
+    display_name: DisplayNameValue | Literal[""] = ""
     id: str
     status: str
     page_url: str = ""
     subscription_url: str = ""
 
 
+class ClientAddFailure(CoreModel):
+    name: str
+    error: str
+
+
 class ClientAddResult(CoreModel):
     """Result for adding one or more clients."""
 
     clients: list[ClientCreated] = Field(default_factory=list)
+    failures: list[ClientAddFailure] = Field(default_factory=list, exclude_if=lambda value: not value)
 
 
 class ClientReissueResult(CoreModel):
@@ -225,6 +227,7 @@ class ClientReference(CoreModel):
     """Public identity of a client mutation target."""
 
     username: str
+    display_name: DisplayNameValue | Literal[""] = Field(default="", exclude_if=lambda value: not value)
 
 
 class ClientRemoveResult(CoreModel):
@@ -232,6 +235,8 @@ class ClientRemoveResult(CoreModel):
 
     client: ClientReference | None = Field(default=None, exclude_if=lambda value: value is None)
     clients: list[ClientReference] | None = Field(default=None, min_length=1, exclude_if=lambda value: value is None)
+    preview: BulkPreview | None = Field(default=None, exclude_if=lambda value: value is None)
+    receipt: BulkReceipt | None = Field(default=None, exclude_if=lambda value: value is None)
     review_hash: Sha256Hex | None = Field(default=None, exclude_if=lambda value: value is None)
     applied: bool = Field(default=True, exclude_if=lambda value: value)
     cut_off: list[NodeCommandOutcome] | None = Field(
@@ -253,6 +258,7 @@ class ClientStatus(CoreModel):
     """Client identity and status returned after a status mutation."""
 
     username: str
+    display_name: DisplayNameValue | Literal[""] = Field(default="", exclude_if=lambda value: not value)
     status: ClientMutationStatus
 
 
@@ -296,7 +302,7 @@ def connection_credential_paths(view: ClientConnections | None) -> frozenset[str
 
 
 def build_client_record(
-    user: PanelUserLike, *, declared: bool = True, attention_reasons: Sequence[PersonAttentionReason] = ()
+    user: PanelUserLike, *, attention_reasons: Sequence[PersonAttentionReason] = ()
 ) -> ClientRecord:
     """Build a redacted client record from a panel user object."""
     return ClientRecord(
@@ -325,13 +331,12 @@ def build_client_record(
         tag=getattr(user, "tag", ""),
         language=getattr(user, "language", None),
         schedule=getattr(user, "schedule", None),
-        declared=declared,
     )
 
 
-def build_client_detail(user: PanelUserLike, *, declared: bool = True) -> ClientDetail:
+def build_client_detail(user: PanelUserLike) -> ClientDetail:
     """Build one client detail result from panel state."""
-    base = build_client_record(user, declared=declared)
+    base = build_client_record(user)
     return ClientDetail(
         **base.model_dump(),
         lifetime_traffic_bytes=getattr(user, "lifetime_used_traffic_bytes", 0),
@@ -342,14 +347,12 @@ def build_client_detail(user: PanelUserLike, *, declared: bool = True) -> Client
 def build_client_list_result(
     users: Sequence[PanelUserLike],
     *,
-    declared: Collection[str] | None = None,
     attention: Mapping[str, Sequence[PersonAttentionReason]] | None = None,
 ) -> ClientListResult:
-    """Build a client list result with status counts; `declared` (when given) marks the others undeclared."""
+    """Build a service person list with status counts and optional attention evidence."""
     records = [
         build_client_record(
             user,
-            declared=declared is None or user.username in declared,
             attention_reasons=attention.get(user.username, ()) if attention is not None else (),
         )
         for user in users
@@ -379,7 +382,6 @@ def build_client_show_result(
     *,
     share_url: str = "",
     subscription_url: str = "",
-    declared: bool = True,
     usage: UserUsage | None = None,
     connections: ClientConnections | None = None,
     access: PersonAccess | None = None,
@@ -387,7 +389,7 @@ def build_client_show_result(
     """Build a one-client result with optional handoff links."""
     return ClientShowResult(
         access=access,
-        client=build_client_detail(user, declared=declared),
+        client=build_client_detail(user),
         handoff=ClientHandoff(
             share_available=bool(share_url),
             subscription_available=bool(subscription_url),
@@ -409,6 +411,7 @@ def build_client_add_result(
         clients=[
             ClientCreated(
                 username=username,
+                display_name=getattr(user, "display_name", ""),
                 id=user.id,
                 status=user.status.lower(),
                 page_url=known.get(username, ("", ""))[0],
@@ -426,6 +429,7 @@ def build_client_reissue_result(
     return ClientReissueResult(
         client=ClientCreated(
             username=user.username,
+            display_name=getattr(user, "display_name", ""),
             id=user.id,
             status=user.status.lower(),
             page_url=page_url,
@@ -436,19 +440,22 @@ def build_client_reissue_result(
 
 
 def build_client_remove_result(
-    username: str, *, cut_off: Sequence[NodeCommandOutcome] | None = None
+    username: str, *, display_name: str = "", cut_off: Sequence[NodeCommandOutcome] | None = None
 ) -> ClientRemoveResult:
     """Build the stable result returned after removing one client."""
     return ClientRemoveResult(
-        client=ClientReference(username=username), cut_off=list(cut_off) if cut_off is not None else None
+        client=ClientReference(username=username, display_name=display_name),
+        cut_off=list(cut_off) if cut_off is not None else None,
     )
 
 
-def build_client_status_result(username: str, status: ClientMutationStatus) -> ClientStatusResult:
+def build_client_status_result(
+    username: str, status: ClientMutationStatus, *, display_name: str = ""
+) -> ClientStatusResult:
     """Build the stable result returned after changing one client status."""
-    return ClientStatusResult(client=ClientStatus(username=username, status=status))
+    return ClientStatusResult(client=ClientStatus(username=username, display_name=display_name, status=status))
 
 
-def build_client_limits_result(user: PanelUserLike, *, declared: bool = True) -> ClientLimitsResult:
+def build_client_limits_result(user: PanelUserLike) -> ClientLimitsResult:
     """Build the result returned after changing one client's limits or resetting their traffic."""
-    return ClientLimitsResult(client=build_client_record(user, declared=declared))
+    return ClientLimitsResult(client=build_client_record(user))

@@ -64,7 +64,7 @@ def test_a_remnawave_fleet_saved_again_keeps_its_backend_named(tmp_home: Path) -
     ClusterConfig.load().save()
 
     saved = yaml.safe_load(config.CLUSTER_CONFIG.read_text())
-    assert saved["version"] == 4 and saved["topology_intent"]["control"]["backend"] == "remnawave"
+    assert saved["version"] == 5 and saved["topology_intent"]["control"]["backend"] == "remnawave"
 
 
 def test_commands_on_a_remnawave_fleet_point_at_migrate(tmp_home: Path) -> None:

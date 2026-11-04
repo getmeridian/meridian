@@ -159,7 +159,7 @@ def test_people_rows_show_compact_usage_and_secondary_facts_and_activate_as_link
     row = result["row"]
     assert row["tag"] == "GROUP_A" and row["meter"] == 51
     assert row["expiry"] and row["exactExpiry"] and row["secondary"]
-    assert row["notes"] and row["declared"] and not row["nestedCheckbox"]
+    assert row["notes"] and not row["declared"] and not row["nestedCheckbox"]
     assert "Private sample note" not in result["text"]
     assert result["clicked"]["name"] == result["keyboard"]["name"] == "people"
     assert result["clicked"]["arg"] == result["keyboard"]["arg"] == "p-a"

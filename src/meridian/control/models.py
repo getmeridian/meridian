@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BeforeValidator, ConfigDict, Field, field_validator, model_validator
+from pydantic import BeforeValidator, Field, field_validator, model_validator
 
 from meridian.core.access_profiles import AccessProfileMap, InboundReference, ProfileMembership, default_profiles
 from meridian.core.account_schedule import AccountLifecycleSettings, AccountLifecycleState, AccountSchedulePreview
@@ -31,13 +31,16 @@ from meridian.core.agent_types import (
 )
 from meridian.core.capacity import CapacityCurrent
 from meridian.core.client_devices import ClientDevicesResult, DeviceCap
-from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES, LimitStrategy, UserCreationSettings
+from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES, LimitStrategy
 from meridian.core.client_sessions import CredentialGeneration
 from meridian.core.connection_pages import ConnectionPageSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
+from meridian.core.inputs import USERNAME_PATTERN as USERNAME_PATTERN
 from meridian.core.inputs import DisplayNameValue, ServerReferenceValue, TopologyIdValue, validate_ip_address_value
 from meridian.core.languages import Language
 from meridian.core.models import CoreModel
+from meridian.core.people_creation import UserCreate as UserCreate
+from meridian.core.people_creation import UserEnsure as UserEnsure
 from meridian.core.person_activity import PersonAttentionReason
 from meridian.core.person_metadata import PersonTag, PrivateNote
 from meridian.core.response_rules import ResponseRuleSettings
@@ -314,32 +317,6 @@ class UserUpdate(AccountLifecycleSettings):
 
 
 SUB_TOKEN_PATTERN = r"^[A-Za-z0-9_-]{16,64}$"
-# Usernames are never "." or "..": the console builds relative URLs from them, and a browser
-# resolves those segments away. Written without lookahead, which Pydantic's regex engine lacks.
-USERNAME_PATTERN = r"(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\.\.[A-Za-z0-9_.-]{1,62})"
-
-
-class UserCreate(UserCreationSettings):
-    """A new user with their first settings, created in one step (the console's "Add person")."""
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "anyOf": [
-                {"required": ["username"], "properties": {"username": {"type": "string"}}},
-                {"required": ["display_name"], "properties": {"display_name": {"minLength": 1}}},
-            ]
-        }
-    )
-    username: str | None = Field(default=None, pattern=rf"^{USERNAME_PATTERN}$")
-    display_name: DisplayNameValue | Literal[""] = Field(
-        default="", description="Public person name; the service assigns a Latin username when only this is given."
-    )
-
-    @model_validator(mode="after")
-    def _name_required(self) -> UserCreate:
-        if self.username is None and not self.display_name:
-            raise ValueError("A username or display name is required.")
-        return self
 
 
 class UserPatch(UserUpdate):
@@ -577,22 +554,6 @@ class RevisionProposal(CoreModel):
     intent: dict[str, Any] = Field(description="`topology_intent` as JSON; refused when it carries a secret.")
     plan_hash: Sha256Hex
     review_hash: Sha256Hex
-
-    @model_validator(mode="after")
-    def _access_shape(self) -> RevisionProposal:
-        """The console reads who the CLI declares from `access`; only its shape is checked, not the whole intent."""
-        if "access" not in self.intent:
-            return self
-        access = self.intent["access"]
-        if not isinstance(access, dict):
-            raise ValueError("intent.access must be an object")
-        users = access.get("users", [])
-        if not isinstance(users, list) or not all(isinstance(name, str) for name in users):
-            raise ValueError("intent.access.users must be a list of usernames")
-        names = access.get("display_names", {})
-        if not isinstance(names, dict) or not all(isinstance(name, str) for name in names.values()):
-            raise ValueError("intent.access.display_names must map usernames to names")
-        return self
 
 
 class RevisionResult(CoreModel):

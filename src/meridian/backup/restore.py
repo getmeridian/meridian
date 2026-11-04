@@ -307,6 +307,9 @@ class ControlRestorer:
             self._on_step("Applying the fleet: every agent enrolls with the restored service")
             apply(self.cluster, review.intent)
             self._checkpoint(restore, "applied")
+        from meridian.people_adoption import finish_people_adoption
+
+        finish_people_adoption(self.cluster)
         links: list[HandoffLinks] = []
         links_error = ""
         if restore.links_change:
@@ -536,7 +539,19 @@ def restored_handoffs(cluster: ClusterConfig) -> list[HandoffLinks]:
     from meridian.handoff import user_handoff
 
     with access_panel(cluster) as panel:
-        return [user_handoff(cluster, user) for user in panel.list_users()]
+        from meridian.core.people_query import PeopleQuery
+
+        links: list[HandoffLinks] = []
+        cursor = None
+        while True:
+            page, _users = panel.query_users(PeopleQuery(limit=500, cursor=cursor))
+            for person in page.users:
+                user = panel.get_user(person.username)
+                if user is not None:
+                    links.append(user_handoff(cluster, user))
+            cursor = page.next_cursor
+            if cursor is None:
+                return links
 
 
 def _dns_names(intent: SetupIntent, server_ref: str) -> tuple[str, ...]:

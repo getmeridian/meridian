@@ -28,7 +28,7 @@ def test_cluster_example_yml_loads_without_error() -> None:
     assert cfg.topology_intent is not None
     assert len(cfg.topology_intent.exits) >= 1
     assert len(cfg.topology_intent.transparent_relays) >= 1
-    assert cfg.topology_intent.access.users
+    assert cfg.people_adoption.users
     assert cfg._extra == {}
 
 

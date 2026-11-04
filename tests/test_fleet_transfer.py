@@ -93,7 +93,7 @@ def _intent(**changes: Any) -> SetupIntent:
             )
         ],
         default_egress_ref="exit-a",
-        access=AccessIntent(users=["alice", "bob"], display_names={"bob": "Боб"}),
+        access=AccessIntent(),
     ).model_dump(mode="json")
     data.update(changes)
     return SetupIntent.model_validate(data)
@@ -353,7 +353,7 @@ class TestRoundTrip:
         before = copy.deepcopy((cluster.panel, cluster.workloads, cluster.managed_bindings, cluster.allocations))
 
         def add_carol(document: dict[str, Any]) -> None:
-            document["access"]["users"].append("carol")
+            document["control"]["title"] = "Updated title"
 
         apply, _ = _import(tmp_path, _edited(registry, add_carol), cluster)
 
@@ -363,32 +363,11 @@ class TestRoundTrip:
 
 
 class TestDiff:
-    @pytest.mark.parametrize("edit", ["add", "change", "remove"])
-    def test_creation_settings_edits_name_each_person_in_fleet_order(self, registry: ServerRegistry, edit: str) -> None:
-        current = _intent()
-        document = fleet_document(current, registry)
-        original = {"bob": {"status": "disabled"}, "alice": {"traffic_limit_bytes": 10}}
-        if edit != "add":
-            document["access"]["creation_settings"] = original
-            current = intent_from_document(parse_fleet_document(dump_fleet_document(document)), current, registry)
-        document["access"]["creation_settings"] = (
-            {} if edit == "remove" else {"bob": {"device_limit": 2}, "alice": {"traffic_limit_bytes": 20}}
-        )
-        updated = intent_from_document(parse_fleet_document(dump_fleet_document(document)), current, registry)
-
-        changes = intent_changes(current, updated)
-        assert [(change.subject, change.target, change.field) for change in changes] == [
-            ("client", "alice", "creation_settings"),
-            ("client", "bob", "creation_settings"),
-        ]
-        assert all(change.before != change.after for change in changes)
-        assert all(change_line(change).startswith(f"~ {change.target} creation_settings ") for change in changes)
-
     def test_lines_read_like_the_review(self, registry: ServerRegistry) -> None:
         current = _intent()
 
         def edit(document: dict[str, Any]) -> None:
-            document["access"]["users"].append("carol")
+            document["control"]["title"] = "Updated title"
             document["exits"][1]["paths"][0]["reality_sni"] = "www.example.net"
             document["transparent_relays"] = []
             document["exits"][1]["egress_overrides"][0]["action"] = "direct"
@@ -396,18 +375,16 @@ class TestDiff:
         updated = intent_from_document(parse_fleet_document(_edited(registry, edit)), current, registry)
 
         assert [change_line(change) for change in intent_changes(current, updated)] == [
+            "~ control title Meridian -> Updated title",
             "~ exit-b sni www.example.org -> www.example.net",
             "~ exit-b ai action warp -> direct",
             "- relay relay-b",
-            "+ client carol",
         ]
 
     @pytest.mark.parametrize(
         ("edit", "expected"),
         [
             (lambda d: d.update(harden=False), "~ fleet harden true -> false"),
-            (lambda d: d["access"]["display_names"].update(bob="Роберт"), "~ bob name Боб -> Роберт"),
-            (lambda d: d["access"]["users"].remove("alice"), "- client alice"),
             (
                 lambda d: d["exits"][0]["paths"][1].update(fingerprint="firefox"),
                 "~ exit-a xhttp fingerprint chrome -> firefox",
@@ -416,7 +393,7 @@ class TestDiff:
             (lambda d: d["exits"].reverse(), "~ exits order exit-a, exit-b -> exit-b, exit-a"),
             (lambda d: d["control"].update(title="Ours"), "~ control title Meridian -> Ours"),
         ],
-        ids=["setting", "display-name", "client-removed", "path-field", "path-removed", "reorder", "control-title"],
+        ids=["setting", "path-field", "path-removed", "reorder", "control-title"],
     )
     def test_each_kind_of_edit_has_a_line(self, registry: ServerRegistry, edit: Any, expected: str) -> None:
         current = _intent()
@@ -458,26 +435,11 @@ class TestImportApplies:
         else:
             assert _applied(apply).delivery == after.delivery
 
-    def test_removing_a_client_applies_the_reviewed_intent_without_them(
-        self, registry: ServerRegistry, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        def remove_bob(document: dict[str, Any]) -> None:
-            document["access"]["users"].remove("bob")
-            document["access"]["display_names"] = {}
-
-        apply, _ = _import(tmp_path, _edited(registry, remove_bob), yes=False)
-
-        applied = _applied(apply)
-        assert applied.access.users == ["alice"]
-        assert apply.call_args.kwargs["expected_plan_hash"] == "r" * 64
-        err = capsys.readouterr().err
-        assert "- client bob" in err and "user:bob" in err
-
     def test_dry_run_reviews_without_applying(
         self, registry: ServerRegistry, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         def add_carol(document: dict[str, Any]) -> None:
-            document["access"]["users"].append("carol")
+            document["control"]["title"] = "Updated title"
 
         with patch("meridian.commands.fleet_transfer.is_json_mode", return_value=True):
             apply, _ = _import(tmp_path, _edited(registry, add_carol), dry_run=True, yes=False, tty=False)
@@ -487,7 +449,14 @@ class TestImportApplies:
         assert envelope["status"] == "ok"
         assert envelope["data"]["dry_run"] is True
         assert envelope["data"]["changes"] == [
-            {"action": "add", "subject": "client", "target": "carol", "field": "", "before": "", "after": ""}
+            {
+                "action": "change",
+                "subject": "control",
+                "target": "control",
+                "field": "title",
+                "before": "Meridian",
+                "after": "Updated title",
+            }
         ]
         assert envelope["data"]["review"]["review_hash"] == "r" * 64
 
@@ -495,7 +464,7 @@ class TestImportApplies:
         self, registry: ServerRegistry, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         def add_carol(document: dict[str, Any]) -> None:
-            document["access"]["users"].append("carol")
+            document["control"]["title"] = "Updated title"
 
         with patch("meridian.commands.fleet_transfer.is_json_mode", return_value=True):
             _import(tmp_path, _edited(registry, add_carol))
@@ -506,7 +475,7 @@ class TestImportApplies:
 
     def test_declined_prompt_applies_nothing(self, registry: ServerRegistry, tmp_path: Path) -> None:
         def add_carol(document: dict[str, Any]) -> None:
-            document["access"]["users"].append("carol")
+            document["control"]["title"] = "Updated title"
 
         with pytest.raises(typer.Exit) as exc_info:
             _import(tmp_path, _edited(registry, add_carol), yes=False, answer=False)
@@ -519,7 +488,7 @@ class TestImportApplies:
         apply.assert_not_called()
 
         def add_carol(document: dict[str, Any]) -> None:
-            document["access"]["users"].append("carol")
+            document["control"]["title"] = "Updated title"
 
         with pytest.raises(typer.Exit) as exc_info:
             _import(tmp_path, _edited(registry, add_carol), yes=False, tty=False)

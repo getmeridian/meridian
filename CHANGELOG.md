@@ -19,10 +19,17 @@ newest first; the last is what 4.0 changes compared with 3.x.
   the API, and the service picks a Latin username when one is needed (#95).
 
 #### Changed
+- Every person is managed by the control service. The next reviewed apply moves
+  existing people without deleting them; CLI add and remove act immediately,
+  and people added in the web panel work with every client command (#95).
 - `meridian restore` ends with a one-time setup link for the restored web panel,
   then lists other computers' backup keys and offers to revoke any you no longer
   hold, such as a lost laptop's. On a machine without a backup key of its own, it
   asks for the recovery key instead of stopping (#95).
+
+#### Removed
+- `client remove --proposal`; remove people by name, with one service review for
+  a batch. A fleet may have zero people (#95).
 
 #### Fixed
 - A restore that changed every subscription URL printed new links only for people

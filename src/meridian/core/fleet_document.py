@@ -153,43 +153,11 @@ def intent_changes(before: SetupIntent, after: SetupIntent) -> list[IntentChange
 
 
 def _access_changes(before: AccessIntent, after: AccessIntent) -> list[IntentChange]:
-    changes = [
-        IntentChange(action="remove", subject="client", target=user) for user in before.users if user not in after.users
-    ]
-    changes += [
-        IntentChange(action="add", subject="client", target=user) for user in after.users if user not in before.users
-    ]
-    for user in after.users:
-        if user in before.users and before.display_name(user) != after.display_name(user):
-            changes.append(
-                _change(
-                    name="client",
-                    target=user,
-                    field="name",
-                    before=before.display_name(user),
-                    after=after.display_name(user),
-                )
-            )
-        old_settings = before.creation_settings.get(user)
-        new_settings = after.creation_settings.get(user)
-        if old_settings != new_settings:
-            changes.append(
-                _change(
-                    name="client",
-                    target=user,
-                    field="creation_settings",
-                    before=old_settings.model_dump(mode="json") if old_settings else {},
-                    after=new_settings.model_dump(mode="json") if new_settings else {},
-                )
-            )
-    if before.squad_name != after.squad_name:
-        changes.append(
-            _change(
-                name="access", target="access", field="squad_name", before=before.squad_name, after=after.squad_name
-            )
-        )
-    changes += _order_change("access", "access", "users", before.users, after.users)
-    return changes
+    return (
+        [_change(name="access", target="access", field="squad_name", before=before.squad_name, after=after.squad_name)]
+        if before.squad_name != after.squad_name
+        else []
+    )
 
 
 def _collection_changes(

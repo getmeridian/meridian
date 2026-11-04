@@ -74,7 +74,7 @@ def _intent() -> SetupIntent:
             )
         ],
         default_egress_ref="primary",
-        access=AccessIntent(users=["default"]),
+        access=AccessIntent(),
     )
 
 

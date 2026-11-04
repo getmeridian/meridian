@@ -436,3 +436,8 @@ OptionalTransportPathValue = Annotated[
     AfterValidator(validate_optional_transport_path_value),
 ]
 PortValue = Annotated[int, Field(ge=1, le=65535)]
+
+
+# Usernames are never "." or "..": the console builds relative URLs from them, and a browser
+# resolves those segments away. Written without lookahead, which Pydantic's regex engine lacks.
+USERNAME_PATTERN = r"(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\.\.[A-Za-z0-9_.-]{1,62})"

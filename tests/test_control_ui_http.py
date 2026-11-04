@@ -615,15 +615,15 @@ def test_share_links_need_admin_and_every_person_has_a_page(fleet: Fleet) -> Non
     assert alice["subscription_url"] == f"https://198.51.100.7/c0nn/sub/{user.sub_token}"
     assert alice["page_url"] == alice["subscription_url"]
     assert alice["qr_svg"].startswith("data:image/svg+xml")
-    assert alice["declared"] is True
+    assert "declared" not in alice
     bob = fleet.call("GET", "/ui/api/people/bob/share", bearer=ADMIN_TOKEN).body
-    assert bob["page_url"] == bob["subscription_url"] != "" and bob["declared"] is False
+    assert bob["page_url"] == bob["subscription_url"] != "" and "declared" not in bob
     bob_user = service.get_user("bob")
     assert bob_user is not None
     page = fleet.call("GET", f"/sub/{bob_user.sub_token}", headers={"Accept": "text/html"})
     assert page.status == 200 and b"<!DOCTYPE html>" in page.raw
     view = fleet.call("GET", "/ui/api/fleet", bearer=read).body
-    assert view["declared_users"] == ["alice"] and view["intent_revision"] == number
+    assert "declared_users" not in view and view["intent_revision"] == number
 
 
 @pytest.mark.parametrize(
@@ -679,33 +679,6 @@ def test_every_shipped_asset_is_reachable(fleet: Fleet) -> None:
             assert fleet.call("GET", f"/ui/{relative}").status == 200, relative
 
 
-def test_declared_people_are_the_clis_to_remove_or_relink(fleet: Fleet) -> None:
-    """The reviewed topology owns declared credentials, even though every person now has a live page."""
-    fleet.set_up()
-    service = fleet.service
-    for name in ("alice", "bob"):
-        service.put_user(name)
-    _declare(service, "alice")
-    before = service.get_user("alice")
-    assert before is not None
-    for method, path in (("POST", "/api/users/alice/reissue"), ("DELETE", "/api/users/alice")):
-        refused = fleet.ui(method, path, {} if method == "POST" else None)
-        assert refused.status == 409 and refused.body["error"]["code"] == "declared_user", path
-        refused = fleet.ui(method, path, {"cut_off": True})
-        assert refused.status == 409 and refused.body["error"]["code"] == "declared_user", path
-    refused = fleet.ui(
-        "POST", "/api/users/alice/rotate-credentials", {"expected_generation": before.credential_generation}
-    )
-    assert refused.status == 409 and refused.body["error"]["code"] == "declared_user"
-    after = service.get_user("alice")
-    assert after is not None and after.uuid == before.uuid
-    assert fleet.ui("GET", "/ui/api/people/alice/share").body["declared"] is True
-    assert fleet.ui("POST", "/api/users/bob/reissue", {}).status == 200  # the console's own people stay its own
-    assert fleet.ui("DELETE", "/api/users/bob").status == 200
-    assert fleet.call("POST", "/api/users/alice/reissue", {}, bearer=ADMIN_TOKEN).status == 200  # the CLI may
-    assert fleet.call("DELETE", "/api/users/alice", bearer=ADMIN_TOKEN).status == 200
-
-
 def test_the_owner_can_remove_its_person_with_a_cut_off_and_read_the_result(fleet: Fleet) -> None:
     fleet.set_up()
     fleet.service.put_user("person-a")
@@ -746,23 +719,6 @@ def test_only_dot_segments_are_refused_as_usernames(fleet: Fleet, username: str,
 # -- checks that must still hold when the write lands ----------------------------------------------
 
 
-@pytest.mark.parametrize("outcome", ["approved", "failed"])
-def test_a_person_an_apply_is_declaring_stays_the_clis(fleet: Fleet, outcome: str) -> None:
-    """The apply creates its people while its revision is still approved, before it records applied; one
-    that failed elsewhere still declares them, and the CLI's retry reuses their credentials."""
-    fleet.set_up()
-    _declare(fleet.service, "erin")
-    proposal = RevisionProposal(intent={"access": {"users": ["dave"]}}, plan_hash="1" * 64, review_hash="2" * 64)
-    number = fleet.service.revisions.propose(proposal, caller=ROOT).number
-    fleet.service.revisions.approve(number, caller=ROOT)
-    fleet.service.put_user("dave")
-    if outcome == "failed":
-        fleet.service.revisions.record_result(number, RevisionResult(status="failed", detail="an exit failed"))
-    for method, path in (("POST", "/api/users/dave/reissue"), ("DELETE", "/api/users/dave")):
-        refused = fleet.ui(method, path, {} if method == "POST" else None)
-        assert refused.status == 409 and refused.body["error"]["code"] == "declared_user"
-
-
 def test_a_merely_proposed_revision_declares_no_one(fleet: Fleet) -> None:
     """A `propose` token could otherwise lock the owner out of removing or relinking their own people."""
     fleet.set_up()
@@ -771,25 +727,6 @@ def test_a_merely_proposed_revision_declares_no_one(fleet: Fleet) -> None:
     fleet.service.revisions.propose(proposal, caller=ROOT)
 
     assert fleet.ui("POST", "/api/users/dave/reissue", {}).status == 200
-
-
-def test_a_person_declared_between_the_check_and_the_write_keeps_their_link(
-    fleet: Fleet, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    fleet.set_up()
-    service = fleet.service
-    before = service.put_user("erin")
-    reissue = service.reissue_user
-
-    def declared_meanwhile(username: str) -> Any:
-        _declare(service, username)  # the apply finishes after the request was authorized
-        return reissue(username)
-
-    monkeypatch.setattr(service, "reissue_user", declared_meanwhile)
-    refused = fleet.ui("POST", "/api/users/erin/reissue", {})
-    assert refused.status == 409 and refused.body["error"]["code"] == "declared_user"
-    after = service.get_user("erin")
-    assert after is not None and (after.uuid, after.sub_token) == (before.uuid, before.sub_token)
 
 
 def test_a_session_revoked_after_authorizing_changes_nothing(fleet: Fleet, monkeypatch: pytest.MonkeyPatch) -> None:

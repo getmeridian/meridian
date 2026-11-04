@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 from pydantic import Field, field_validator, model_validator
 
-from meridian.core.access_profiles import AccessProfileIntent
+from meridian.core.access_profiles import DEFAULT_ACCESS_PROFILE, AccessProfileIntent
+from meridian.core.delivery_policies import DeliveryPolicyResolutionError, resolve_delivery_policy
 from meridian.core.inputs import (
     OptionalCountryCodeValue,
     OptionalHostnameValue,
@@ -15,6 +16,8 @@ from meridian.core.inputs import (
     TopologyIdValue,
 )
 from meridian.core.models import CoreModel
+from meridian.core.people_creation import UserCreate
+from meridian.core.people_seeds import PeopleSeeds
 from meridian.core.server_allowances import ServerMetadata
 from meridian.core.topology import (
     AccessIntent,
@@ -139,9 +142,32 @@ class SetupRoutingSelection(CoreModel):
 class SetupAccessSelection(CoreModel):
     """Human access and canonical subscription delivery choices."""
 
-    access: AccessIntent
+    access: AccessIntent = Field(default_factory=AccessIntent)
+    people: list[UserCreate] = Field(default_factory=list, exclude_if=lambda value: not value)
     access_profiles: list[AccessProfileIntent] = Field(default_factory=list, exclude_if=lambda value: not value)
     delivery: DeliveryIntent = Field(default_factory=DeliveryIntent)
+
+    @model_validator(mode="before")
+    @classmethod
+    def lift_legacy_people(cls, value: Any) -> Any:
+        if not isinstance(value, dict) or not isinstance(value.get("access"), dict):
+            return value
+        access = dict(value["access"])
+        names = {key: access.pop(key) for key in ("users", "display_names", "creation_settings") if key in access}
+        if not names:
+            return value
+        if "people" in value:
+            raise ValueError("Setup draft contains both legacy people and people seeds")
+        seeds = PeopleSeeds.model_validate(names)
+        requests = [
+            UserCreate(
+                username=name,
+                display_name=seeds.display_names.get(name, ""),
+                **(seeds.creation_settings[name].to_data() if name in seeds.creation_settings else {}),
+            )
+            for name in seeds.users
+        ]
+        return {**value, "access": access, "people": requests}
 
 
 class SetupDraft(CoreModel):
@@ -337,7 +363,7 @@ class SetupDraft(CoreModel):
             )
             for gateway in self.roles.routing_gateways
         ]
-        return SetupIntent(
+        intent = SetupIntent(
             server_metadata={ref: metadata for ref, metadata in self.server_metadata.items() if ref in role_servers},
             control=self.roles.control,
             exits=exits,
@@ -352,6 +378,17 @@ class SetupDraft(CoreModel):
             harden=self.roles.harden,
             forward_client_ips=self.roles.forward_client_ips,
         )
+
+        known_profiles = {DEFAULT_ACCESS_PROFILE, *(profile.id for profile in intent.access_profiles)}
+        for request in self.access.people:
+            unknown = set(request.profiles) - known_profiles
+            if unknown:
+                raise ValueError(f"Initial profiles for {request.name} are unknown: {', '.join(sorted(unknown))}.")
+            try:
+                resolve_delivery_policy(intent.delivery, profiles=request.profiles)
+            except DeliveryPolicyResolutionError as exc:
+                raise ValueError(f"Initial profiles for {request.name}: {exc}") from None
+        return intent
 
     def _require_current_stage_data(self) -> None:
         stage = self.current_stage

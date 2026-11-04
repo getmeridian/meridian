@@ -5,9 +5,10 @@ from __future__ import annotations
 import typer
 from pydantic import ValidationError
 
-from meridian.commands._helpers import load_topology_cluster, require_intent
+from meridian.commands._helpers import load_people_cluster as load_topology_cluster
+from meridian.commands._helpers import require_intent
 from meridian.commands.client_bulk import preview_table, reconcile_receipt, result_paths
-from meridian.commands.client_handoff import resolve_client_mutation_name, resolve_client_name
+from meridian.commands.client_handoff import resolve_client_mutation_name
 from meridian.commands.client_limits import print_client_usage
 from meridian.commands.profile_review import require_profile_backend
 from meridian.console import confirm, fail, is_json_mode, ok, warn
@@ -33,23 +34,23 @@ def run_set_profiles(name: str, profiles: list[str], *, dry_run: bool, yes: bool
     cluster = load_topology_cluster()
     require_profile_backend(require_intent(cluster), requested=True)
     try:
-        resolve_client_name(cluster, name, console_people=True)
         with access_panel(cluster) as panel:
             name = resolve_client_mutation_name(cluster, panel, name)
             user = panel.get_user(name)
             if user is None:
                 fail(t("profiles.person_unknown", name=name), hint_type="user")
-            declared = cluster.topology_intent is not None and name in cluster.topology_intent.access.users
             with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
                 preview = client.preview_bulk(BulkPreviewRequest(action=action, usernames=[name]))
                 if not is_json_mode():
                     preview_table(preview.people)
                 if dry_run:
                     result = ClientLimitsResult(
-                        client=build_client_record(user, declared=declared), profile_preview=preview, applied=False
+                        client=build_client_record(user), profile_preview=preview, applied=False
                     )
                 else:
-                    if not yes and not confirm(t("profiles.membership_confirm", name=name), default=False):
+                    if not yes and not confirm(
+                        t("profiles.membership_confirm", name=user.display_name or name), default=False
+                    ):
                         raise typer.Exit(1)
                     request = BulkCommitRequest(preview_id=preview.id, preview_hash=preview.preview_hash)
                     try:
@@ -61,7 +62,7 @@ def run_set_profiles(name: str, profiles: list[str], *, dry_run: bool, yes: bool
                     blocks = client.user_flow_blocks(name)
                     blocks = wait_for_flow_blocks(lambda: client.user_flow_blocks(name), blocks)
                     result = ClientLimitsResult(
-                        client=build_client_record(updated, declared=declared),
+                        client=build_client_record(updated),
                         profile_receipt=receipt,
                         access=client.user_access(name),
                         flow_blocks=blocks,
@@ -94,7 +95,7 @@ def run_set_profiles(name: str, profiles: list[str], *, dry_run: bool, yes: bool
         ok(t("bulk.preview_only"))
     else:
         print_client_usage(result.client)
-        ok(t("profiles.membership_changed", name=name))
+        ok(t("profiles.membership_changed", name=user.display_name or name))
         labels = {
             "blocked": "node_commands.flow_blocked",
             "pending_node": "node_commands.flow_pending",

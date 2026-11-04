@@ -105,7 +105,7 @@ def build_systemlab_intent(
             ),
         ],
         default_egress_ref="pool-a",
-        access=AccessIntent(users=["acceptance"]),
+        access=AccessIntent(),
         delivery=DeliveryIntent(
             profile_title="Meridian system lab",
             template_name="meridian-system-lab",

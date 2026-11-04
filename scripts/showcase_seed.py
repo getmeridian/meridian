@@ -212,7 +212,7 @@ def seed_service(service: ControlService, now: datetime) -> None:
             for node, country, _ in NODES
         ],
         default_egress_ref="de",
-        access=AccessIntent(users=["Tavi", "Neri"]),
+        access=AccessIntent(),
     )
     proposal = service.revisions.propose(
         RevisionProposal(intent=intent.model_dump(mode="json"), plan_hash="1" * 64, review_hash="2" * 64), caller=ROOT
