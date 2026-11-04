@@ -41,7 +41,7 @@ Key modules:
 - `setup/` — `meridian setup` wizard state and the shared runtime behind deploy, setup, and apply
 - `compiler/` — turns the topology into a reviewed, hash-identified list of resources (no I/O)
 - `reconciler/` — observes and applies those resources with checkpoints
-- `provision/` — server preparation steps (packages, hardening, Docker, Realm)
+- `provision/` — server preparation steps (packages, hardening, nginx, certificates, Realm)
 
 ## Pull Requests
 
