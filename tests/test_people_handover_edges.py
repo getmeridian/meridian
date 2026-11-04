@@ -165,7 +165,7 @@ def test_saying_no_to_a_batch_removal_leaves_every_frozen_person_untouched(peopl
 def test_add_global_refusals_keep_exit_two_and_the_original_hint(people_cli, monkeypatch, refusal):
     runner, cluster, client = people_cli
     if refusal == "version":
-        monkeypatch.setattr("meridian.people_adoption.__version__", "4.0.0b13")
+        monkeypatch.setattr("meridian.people_adoption.__version__", "99.0.0")
         hint = "meridian apply"
     elif refusal == "auth":
         cluster.panel.api_token = "wrong-token"
@@ -212,7 +212,7 @@ def test_one_rejected_name_still_reports_the_successes_and_a_failed_json_envelop
 def test_an_old_service_is_refused_before_any_person_confirmation(people_cli, monkeypatch, args, module):
     runner, _cluster, client = people_cli
     before = client.create_user(UserCreate(username="sample", display_name="样本"))
-    monkeypatch.setattr("meridian.people_adoption.__version__", "4.0.0b13")
+    monkeypatch.setattr("meridian.people_adoption.__version__", "99.0.0")
     monkeypatch.setattr("meridian.console.has_tty", lambda: True)
     target = "meridian.console.confirm" if module == "client_routing" else f"meridian.commands.{module}.confirm"
     with patch(target, side_effect=AssertionError("Unexpected prompt")):

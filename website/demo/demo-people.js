@@ -56,7 +56,7 @@
     D.source.people_fields.forEach(function (key) { if (Object.hasOwn(user, key)) view[key] = D.clone(user[key]); });
     var fleet = D.responses["GET ui/api/fleet"];
     var name = Object.hasOwn(user, "display_name") ? user.display_name : fleet.display_names[user.username];
-    return Object.assign(view, { display_name: name || user.username, row_version: D.versions[user.username] || 1 });
+    return Object.assign(view, { display_name: name || user.username, declared: false, row_version: D.versions[user.username] || 1 });
   }
   function matches(user, query, moment, omit) {
     var name = user.username.toLowerCase(), display = user.display_name.toLowerCase();

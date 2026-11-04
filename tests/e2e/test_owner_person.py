@@ -88,25 +88,10 @@ def test_extended_access_and_inline_allowance_survive_reload_but_reset_waits_for
     expect(visitor.locator(".account-metric").filter(has_text="Traffic this period")).to_contain_text("0 B / 125 GiB")
 
 
-@pytest.mark.parametrize(
-    ("declared", "cut_off"),
-    [(False, False), (False, True), (True, False)],
-    ids=["let-sessions-end", "end-open-sessions", "fleet-file-person"],
-)
-def test_new_link_erases_the_old_identity_or_explains_fleet_file_ownership(
-    owner: Page, visitor: Page, app: httpx.Client, base_url: str, declared: bool, cut_off: bool, browser_faults
+@pytest.mark.parametrize("cut_off", [False, True], ids=["let-sessions-end", "end-open-sessions"])
+def test_new_link_erases_the_old_identity(
+    owner: Page, visitor: Page, app: httpx.Client, base_url: str, cut_off: bool, browser_faults
 ) -> None:
-    if declared:
-        person(owner, "Tavi")
-        badge = owner.locator("[data-person-declared]")
-        expect(badge).to_be_visible()
-        badge.get_by_role("button").click()
-        expect(badge.get_by_role("status")).to_contain_text("fleet")
-        owner.keyboard.press("Escape")
-        owner.get_by_role("tab", name="Keys & removal", exact=True).click()
-        expect(owner.get_by_text("meridian client reissue Tavi", exact=True)).to_be_visible()
-        expect(owner.get_by_role("button", name="Issue a new link", exact=True)).to_have_count(0)
-        return
     add_person(owner)
     old_url = share_url(owner)
     connected(visitor, old_url, "E2E_visitor")

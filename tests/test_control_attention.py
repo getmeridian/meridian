@@ -269,7 +269,7 @@ def test_client_list_attention_filters_console_people_and_adds_reasons(
             panel=PanelConfig(url=url, api_token=ADMIN_TOKEN),
             topology_intent=single_server_intent(None, server_ref="srv-a", client_name="alice"),
         )
-        monkeypatch.setattr(client, "load_topology_cluster", lambda: cluster)
+        monkeypatch.setattr(client, "load_topology_cluster", lambda **_: cluster)
         try:
             args = ["--lang", "en", "client", "list", "--attention"] + (["--json"] if json_mode else [])
             result = CliRunner().invoke(app, args)

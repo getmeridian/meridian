@@ -209,7 +209,7 @@ def test_token_commands_refuse_missing_or_legacy_service_access_before_building_
         {**intent.to_data(), "control": {**intent.control.to_data(), "backend": backend}}
     )
     cluster = ClusterConfig(topology_intent=intent, panel=PanelConfig(url=url, api_token=credential))
-    monkeypatch.setattr(token, "load_topology_cluster", lambda: cluster)
+    monkeypatch.setattr(token, "load_topology_cluster", lambda **_: cluster)
 
     def client(*args: object, **kwargs: object) -> None:
         pytest.fail("A refused fleet must never construct a client.")
