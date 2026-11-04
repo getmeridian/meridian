@@ -161,8 +161,8 @@
   }
 
   function summary(screen) {
-    screen.title = h("h1"); screen.badge = h("span"); screen.tag = h("bdi", { class: "tag", dir: "ltr", "data-person-tag": "" });
-    screen.usernameLabel = h("bdi", { class: "muted small mono" });
+    screen.titleText = h("bdi"); screen.title = h("h1", {}, screen.titleText); screen.badge = h("span"); screen.tag = h("bdi", { class: "tag", dir: "ltr", "data-person-tag": "" });
+    screen.usernameLabel = h("bdi", { class: "muted small mono", dir: "ltr" });
     screen.declared = h("span", { class: "title-row", "data-person-declared": "", hidden: true },
       h("span", { class: "tag", text: M.t("people.declared") }), M.tip(M.t("people.declared"), M.t("people.declared_hint")));
     screen.summaryUsage = h("div", { class: "person-summary-usage" });
@@ -238,7 +238,7 @@
   }
 
   function drawSummary(screen, user, share) {
-    screen.title.textContent = M.displayName(user.username);
+    screen.titleText.textContent = M.displayName(user.username);
     screen.usernameLabel.hidden = M.displayName(user.username) === user.username;
     screen.usernameLabel.textContent = user.username;
     if (screen.badge.dataset.status !== user.status) {

@@ -312,7 +312,7 @@
       page = result; ready = true; loading.remove();
       var focus = document.activeElement, current = new Set();
       ordered = (result.users || []).map(function (user) {
-        current.add(user.username);
+        current.add(user.username); M.rememberName(user);
         var entry = entries.get(user.username);
         if (!entry) { entry = makeEntry(user); entries.set(user.username, entry); } else update(entry, user);
         list.insertBefore(entry.wrapper, empty); return entry;

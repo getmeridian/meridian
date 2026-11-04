@@ -35,7 +35,9 @@ def test_a_taken_name_keeps_the_draft_and_says_why() -> None:
     assert result["title"] == "Sample person"
 
 
-@pytest.mark.parametrize("name", ["Smith, Alice", "x" * 41], ids=["comma", "too-long"])
+@pytest.mark.parametrize(
+    "name", ["Smith, Alice", "x" * 41, "Unassigned \u0378"], ids=["comma", "too-long", "unassigned"]
+)
 def test_names_the_service_would_refuse_never_leave_the_browser(name: str) -> None:
     result = run_console("person-name", data={"name": name})
 

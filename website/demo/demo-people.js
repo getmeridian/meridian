@@ -55,7 +55,8 @@
     var view = {};
     D.source.people_fields.forEach(function (key) { if (Object.hasOwn(user, key)) view[key] = D.clone(user[key]); });
     var fleet = D.responses["GET ui/api/fleet"];
-    return Object.assign(view, { display_name: user.display_name || fleet.display_names[user.username] || user.username,
+    var name = Object.hasOwn(user, "display_name") ? user.display_name : fleet.display_names[user.username];
+    return Object.assign(view, { display_name: name || user.username,
       declared: fleet.declared_users.indexOf(user.username) >= 0, row_version: D.versions[user.username] || 1 });
   }
   function matches(user, query, moment, omit) {
@@ -231,7 +232,16 @@
     }
     return reset;
   };
-  function folded(value) { return String(value || "").toLowerCase(); }
+  /* Close to Python's casefold: upper first so Straße and STRASSE meet. */
+  function folded(value) { return String(value || "").toUpperCase().toLowerCase(); }
+  /* As core.inputs: up to 40 printable characters, no commas; empty shows the username. */
+  D.cleanName = function (value) {
+    if (value === undefined) return "";
+    if (typeof value !== "string") invalid();
+    var name = value.trim();
+    if (Array.from(name).length > 40 || name.indexOf(",") >= 0 || /[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}]|(?! )\p{Zs}/u.test(name)) invalid();
+    return name;
+  };
   /* As the service: a name or username may match nobody else's name or username, ignoring case. */
   D.nameTaken = function (username, displayName, except) {
     var wanted = [folded(username), folded(displayName)].filter(Boolean);
@@ -241,11 +251,20 @@
       });
     });
   };
-  /* A Latin username for a typed name; the service transliterates, the demo keeps the Latin letters it can. */
+  /* A Latin username for a typed name, as core.inputs: the name itself when it is one, else its Latin letters
+   * (the service transliterates every script; the demo keeps what NFKD leaves), numbered around every name. */
   D.assignUsername = function (displayName) {
-    var base = String(displayName || "").normalize("NFKD").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || "person";
+    var base = displayName;
+    if (!(new RegExp("^" + D.source.username_pattern + "$")).test(base)) {
+      base = displayName.normalize("NFKD").toLowerCase().replace(/[^a-z0-9_]+/g, "-").replace(/^[-_]+|[-_]+$/g, "");
+      base = base.slice(0, 32).replace(/^[-_]+|[-_]+$/g, "");
+      if (base.length < 3) base = ("user-" + base).replace(/-+$/, "");
+    }
     var name = base, n = 1;
-    while (D.nameTaken(name, "")) name = base + "-" + (++n);
+    while (D.nameTaken(name, "")) {
+      var suffix = "-" + (++n);
+      name = (base.slice(0, 32 - suffix.length).replace(/[-_]+$/, "") || "user") + suffix;
+    }
     return name;
   };
   D.updateUser = function (user, changes) {
@@ -260,10 +279,8 @@
     if (!integer(updated.traffic_limit_bytes, 0, D.source.traffic_limit_max) || updated.device_limit !== null && !integer(updated.device_limit, 0, 100)) invalid();
     if (typeof updated.note !== "string" || Array.from(updated.note).length > D.source.note_limit || /[\x00-\x09\x0b-\x1f\x7f-\x9f]/.test(updated.note) || typeof updated.tag !== "string" || updated.tag && !/^[A-Z0-9_]{1,16}$/.test(updated.tag)) invalid();
     if (updated.language !== null && ["en", "ru", "fa", "zh"].indexOf(updated.language) < 0) invalid();
-    if (updated.display_name === undefined) updated.display_name = "";
-    if (typeof updated.display_name !== "string" || Array.from(updated.display_name.trim()).length > 40 || updated.display_name.indexOf(",") >= 0) invalid();
-    updated.display_name = updated.display_name.trim();
-    if (Object.hasOwn(changes, "display_name") && D.nameTaken(user.username, updated.display_name, user.username)) D.fail("name_conflict", 409);
+    updated.display_name = D.cleanName(updated.display_name);
+    if (updated.display_name !== (user.display_name || "") && D.nameTaken("", updated.display_name, user.username)) D.fail("name_conflict", 409, [], "exists");
     [["activation_duration_days", 3650], ["renewal_interval_days", 3650], ["renewal_interval_months", 120], ["renewal_limit", 10000], ["traffic_reset_anchor_day", 31]].forEach(function (pair) {
       if (updated[pair[0]] !== null && !integer(updated[pair[0]], 1, pair[1])) invalid();
     });

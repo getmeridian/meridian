@@ -124,7 +124,7 @@
       effects[name] = after;
       var beforeFields = fields(before), afterFields = after && fields(after), changes = changed(beforeFields, afterFields);
       var person = Object.assign(D.clone(D.responses["POST api/people/bulk/preview"].people[0]), {
-        username: name, display_name: D.responses["GET ui/api/fleet"].display_names[name] || name,
+        username: name, display_name: D.cleanName(actual.display_name) || name,
         row_version: versions[name][1], before: beforeFields, after: afterFields, changes: changes,
         outcome: cli ? "cli_required" : changes.length ? "changed" : "unchanged", cli_command: null, warnings: warnings,
       });
@@ -169,7 +169,9 @@
     });
     receipt = Object.assign(D.clone(D.responses["POST api/people/bulk/commit"]), {
       id: review.id, preview_hash: review.preview_hash, action: review.action, committed_at: D.now(),
-      people: D.clone(review.people), counts: D.clone(review.counts), changed_nodes: review.changed_nodes,
+      // As the service: receipt identities stay content-free.
+      people: review.people.map(function (person) { return Object.assign(D.clone(person), { display_name: person.username }); }),
+      counts: D.clone(review.counts), changed_nodes: review.changed_nodes,
       undo_until: review.reversible && review.counts.changed ? D.iso(Date.now() + 600000) : null, undone_at: null, undo_people: null,
     });
     delete receipt.proposal;

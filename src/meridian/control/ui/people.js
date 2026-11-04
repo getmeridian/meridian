@@ -18,7 +18,7 @@
   M.rememberName = function (user) {
     if (!M.state.fleet || !user || !user.username || !Object.prototype.hasOwnProperty.call(user, "display_name")) return;
     var names = M.state.fleet.display_names = M.state.fleet.display_names || {};
-    if (user.display_name) {
+    if (user.display_name && user.display_name !== user.username) {
       Object.defineProperty(names, user.username, { value: user.display_name, writable: true, enumerable: true, configurable: true });
     } else if (M.has(names, user.username)) delete names[user.username];
   };
@@ -27,7 +27,7 @@
   M.validDisplayName = function (value) {
     var characters = Array.from(value);
     return characters.length <= 40 && value.indexOf(",") < 0 &&
-      !/[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Zl}\p{Zp}]|(?! )\p{Zs}/u.test(value);
+      !/[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}]|(?! )\p{Zs}/u.test(value);
   };
 
   M.isDeclared = function (username) {

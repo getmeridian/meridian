@@ -353,7 +353,7 @@
       enforce(user);
       // As the service: status changes are their own events; notes and tags emit none.
       if (fields.indexOf("status") >= 0) emit(body.status === "disabled" ? "user.disabled" : "user.enabled", name);
-      var operational = fields.filter(function (field) { return ["note", "tag", "status"].indexOf(field) < 0; });
+      var operational = fields.filter(function (field) { return ["note", "tag", "status", "display_name"].indexOf(field) < 0; });
       if (operational.length) emit("user.updated", name, { fields: operational });
       return reply(user);
     }
@@ -446,12 +446,17 @@
     if (path === "auth/setup/check") return reply({ purpose: "setup" });
     if (path === "api/users" && method === "GET") return reply({ users: users });
     if (path === "api/users" && method === "POST") {
-      if (body.username && person(body.username)) return error("user_exists", "exists", 409);
-      var created = Object.assign({}, body, { username: body.username || D.assignUsername(body.display_name) });
-      if (D.nameTaken(created.username, created.display_name)) return error("name_conflict", "taken", 409);
+      var display = D.cleanName(body.display_name), username = body.username;
+      if (username === undefined || username === null) {
+        if (!display) D.fail("invalid_request");
+        username = D.assignUsername(display);
+      } else if (typeof username !== "string" || !(new RegExp("^" + source.username_pattern + "$")).test(username)) D.fail("invalid_request");
+      if (person(username)) return error("user_exists", "exists", 409);
+      if (D.nameTaken(username, display)) return error("name_conflict", "exists", 409);
       var user = clone(responses["POST api/users"]);
-      var fields = Object.assign({}, created); delete fields.username;
-      Object.assign(user, D.updateUser(user, fields), { created_at: now(), username: created.username });
+      var fields = Object.assign({}, body, { display_name: display }); delete fields.username;
+      user.display_name = "";
+      Object.assign(user, D.updateUser(user, fields), { created_at: now(), username: username });
       user.user_id = "demo-person-" + (++newId);
       user.used_traffic_bytes = user.lifetime_traffic_bytes = 0;
       user.first_traffic_at = user.online_at = user.last_traffic_node = null;
@@ -531,7 +536,16 @@
   D.unavailable("GET", "api/nodes/{id}/command-targets");
   D.unavailable("POST", "api/nodes/{id}/commands");
   D.unavailable("GET", "api/nodes/{id}/commands/{id}");
-  D.recorded("GET", "ui/api/fleet");
+  // The fleet's name map follows edits, as the service reads it from the people it holds.
+  D.route("GET", "ui/api/fleet", function () {
+    var view = clone(responses["GET ui/api/fleet"]), names = {};
+    users.forEach(function (user) {
+      var name = Object.hasOwn(user, "display_name") ? user.display_name : view.display_names[user.username];
+      if (name && name !== user.username) names[user.username] = name;
+    });
+    view.display_names = names;
+    return reply(view);
+  });
   D.recorded("GET", "api/settings");
   D.recorded("GET", "api/revisions");
   D.recorded("GET", "api/revisions/{id}");

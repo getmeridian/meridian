@@ -61,6 +61,30 @@ def test_demo_mutations_preserve_current_contracts_and_reset_with_a_new_document
     assert reset["language"] == "auto" and reset["devices"] == 2
 
 
+def test_demo_names_follow_the_service_rules_for_creation_clashes_renames_and_receipts(demo: Path) -> None:
+    result = run_console("showcase-names", data={"directory": str(demo)})
+    validate_recordings(result["responses"])
+    assert result["cyrillic"]["display_name"] == "Алиса Петрова" and result["cyrillic"]["username"]
+    assert result["latin"]["display_name"] == "Straße" and result["latin"]["username"].isascii()
+    assert [refusal.get("code") for refusal in result["refused"]] == [
+        "name_conflict",
+        "name_conflict",
+        "name_conflict",
+        "invalid_request",
+        "invalid_request",
+        "invalid_request",
+        "invalid_request",
+    ]
+    assert result["keptUsers"]
+    assert result["renamed"] == result["fleetName"] == result["previewName"] == "Новое имя"
+    assert result["searched"] == ["Новое имя"]
+    assert result["renameEvents"] == 0, "the service records no event for a rename"
+    assert result["receiptName"] == "Luma", "receipt identities stay content-free"
+    assert result["clashRename"]["code"] == "name_conflict"
+    assert result["clearedFleet"] is False
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
 def test_a_language_switch_moves_into_the_demo_address_so_reloads_and_shared_links_keep_it(demo: Path) -> None:
     """Demo storage lives in memory, so `?lang=` is the only thing a reload or a shared link carries."""
     result = run_console("showcase-language", "en", {"directory": str(demo)})

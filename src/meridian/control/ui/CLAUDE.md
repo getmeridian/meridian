@@ -23,6 +23,7 @@
 - **Disruptive actions name their boundary** — restart, cut-off, reissue, and revocation receipts show affected nodes, reconnect scope, and key generation, and repeated clicks cannot queue duplicates.
 
 ## Pitfalls
+- **Every people reply refreshes the cached name map** — pass rows, person reads, and creations to `M.rememberName`; only a reply that carries `display_name` may change it, or the Share dialog and titles keep a stale name.
 - **Dialog completion restores a live target** — Share re-enables its trigger after native restoration runs; focus it then if focus fell to the body, and focus the new person's view after Add replaces the trigger's screen.
 - **Stay restores the edited field and selection** — navigation clicks focus their link before the guard opens, and leaving by keyboard tabs past untouched fields; remember the last edited field, skipping disabled or hidden ones, instead of relying on native dialog focus restoration.
 - **Scope the session cookie to `ServiceConfig.public_path`** — a `/` cookie would ride every subscription request; without a path, sign-in and setup links are refused (`ui_unconfigured`).

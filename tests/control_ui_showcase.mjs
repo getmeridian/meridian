@@ -417,6 +417,30 @@ if (mode === 'showcase-navigation') {
     try { await M.api(method, route, {}); assert.fail('Demo claimed to perform ' + route); }
     catch (error) { report.refusals.push({ code: error.code, text: M.errorText(error) }); }
   }
+} else if (mode === 'showcase-names') {
+  async function attempt(method, route, body) {
+    try { return { reply: await M.api(method, route, body) }; } catch (error) { return { code: error.code, status: error.status }; }
+  }
+  const events = async () => (await M.api('GET', 'api/events?after=0&limit=2000')).events.filter(event => event.kind === 'user.updated').length;
+  report.cyrillic = (await attempt('POST', 'api/users', { display_name: 'Алиса Петрова' })).reply;
+  report.latin = (await attempt('POST', 'api/users', { display_name: 'Straße' })).reply;
+  const users = JSON.stringify(await M.api('GET', 'api/users'));
+  report.refused = [];
+  for (const body of [{ display_name: 'STRASSE' }, { username: 'fresh', display_name: 'strasse' }, { username: 'LUMA' }, {}, { display_name: '  ' }, { display_name: 'Line\nbreak' }, { display_name: 'Comma, name' }]) {
+    report.refused.push(await attempt('POST', 'api/users', body));
+  }
+  report.keptUsers = JSON.stringify(await M.api('GET', 'api/users')) === users;
+  const updates = await events();
+  report.renamed = (await M.api('PATCH', 'api/users/Luma', { display_name: 'Новое имя' })).display_name;
+  report.renameEvents = (await events()) - updates;
+  report.fleetName = (await M.api('GET', 'ui/api/fleet')).display_names.Luma;
+  report.searched = (await M.api('GET', 'api/people?q=' + encodeURIComponent('новое'))).users.map(user => user.display_name);
+  const review = await M.api('POST', 'api/people/bulk/preview', { usernames: ['Luma'], action: { action: 'tag', tag: 'EDITED' } });
+  report.previewName = review.people[0].display_name;
+  report.receiptName = (await M.api('POST', 'api/people/bulk/commit', { preview_id: review.id, preview_hash: review.preview_hash })).people[0].display_name;
+  report.clashRename = await attempt('PATCH', 'api/users/Luma', { display_name: 'straße' });
+  await M.api('PATCH', 'api/users/Luma', { display_name: '' });
+  report.clearedFleet = Object.hasOwn((await M.api('GET', 'ui/api/fleet')).display_names, 'Luma');
 } else if (mode === 'showcase-reset') {
   report.note = (await M.api('GET', 'api/users/Luma')).note;
   report.language = (await M.api('GET', 'api/language')).language;

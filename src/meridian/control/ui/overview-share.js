@@ -34,7 +34,7 @@
           page = result;
           M.mount(list, result.users.length ? result.users.map(function (person) {
             return h("button", { type: "button", class: "share-picker-person", "data-share-person": person.username,
-              onclick: function () { close(person.username); } },
+              onclick: function () { M.rememberName(person); close(person.username); } },
               h("bdi", { class: "strong", text: person.display_name || person.username }),
               M.statusChip(person.status === "active" ? "success" : "neutral", M.t("status." + person.status)));
           }) : M.emptyState(M.t(result.population ? "overview.share_no_match" : "people.empty")));
