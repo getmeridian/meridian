@@ -97,10 +97,10 @@ jobs:
         run: uv sync --extra dev
 
       - name: Ruff check
-        run: uv run ruff check src/ tests/
+        run: uv run ruff check src/ tests/ scripts/
 
       - name: Ruff format check
-        run: uv run ruff format --check src/ tests/
+        run: uv run ruff format --check src/ tests/ scripts/
 
       # Findings surface as PR annotations; the step never fails the build.
       - name: Dead-code report (warnings only)
@@ -124,6 +124,10 @@ jobs:
 
       - name: Run mypy
         run: uv run mypy src/meridian/
+
+      # Scripts import each other as `scripts.*`; explicit bases keep one module name per file.
+      - name: Run mypy on scripts
+        run: uv run mypy --explicit-package-bases scripts/
 
   validate:
     name: Validate

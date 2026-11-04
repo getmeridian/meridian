@@ -6,6 +6,8 @@
 
 **Contract export** — `export_contracts.py` writes `contracts/meridian/`; its rules live in `contracts/CLAUDE.md`.
 
+**Linted and typed like the package** — `make lint`, `format-check`, and `typecheck` cover `scripts/`; mypy runs with `--explicit-package-bases` because scripts import each other as `scripts.*`.
+
 **Deterministic output** — scripts that write tracked artifacts must have a `--check` mode for CI drift detection.
 
 **Dead-code report** — `find_dead_code.py` (stdlib `ast`) builds a reference graph over `src/meridian`: imports resolve precisely through re-exports, attributes and production strings match members by name. Liveness spreads from production roots (src top level, `scripts/`, entry points, registration decorators), then from `tests/`; it reports `dead`, `test-only`, and `unused-param` as sorted warnings in `make ci` and CI, failing only under `--strict`.

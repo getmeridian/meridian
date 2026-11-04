@@ -60,7 +60,7 @@ SS4 = "SourceSerif4Variable-Roman.ttf"
 JBM = "JetBrainsMono[wght].ttf"
 
 # (release, file inside the archive, output name, axis limits, unicode ranges, layout features)
-BUILDS = [
+BUILDS: list[tuple[str, str, str, dict, str, list[str]]] = [
     ("fraunces", "Fraunces[SOFT,WONK,opsz,wght].ttf", "fraunces-latin", FR, LATIN, TEXT_FEATURES),
     (
         "fraunces",

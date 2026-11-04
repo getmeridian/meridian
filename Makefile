@@ -24,16 +24,17 @@ e2e: ## Run real-browser journeys (install Chromium first; tests/e2e/README.md)
 	uv run --group e2e pytest tests/e2e
 
 lint: ## Run ruff linter
-	uv run ruff check src/ tests/
+	uv run ruff check src/ tests/ scripts/
 
 format: ## Auto-format code
-	uv run ruff format src/ tests/
+	uv run ruff format src/ tests/ scripts/
 
 format-check: ## Check formatting without changes
-	uv run ruff format --check src/ tests/
+	uv run ruff format --check src/ tests/ scripts/
 
 typecheck: ## Run mypy type checker
 	uv run mypy src/meridian/
+	uv run mypy --explicit-package-bases scripts/
 
 check: lint format-check test ## Run all Python checks (lint + format + test)
 

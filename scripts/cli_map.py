@@ -421,9 +421,10 @@ r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'});
 def _concept_cards() -> str:
     cards = []
     for concept in CONCEPTS:
+        commands = concept["commands"]
+        assert isinstance(commands, list)
         chips = "".join(
-            f'<a class="chip" href="#cmd-{html.escape(str(name))}">{html.escape(str(name))}</a>'
-            for name in concept["commands"]  # type: ignore[union-attr]
+            f'<a class="chip" href="#cmd-{html.escape(str(name))}">{html.escape(str(name))}</a>' for name in commands
         )
         cards.append(
             f'<article class="concept" id="c-{concept["id"]}"><div class="label">{concept["tag"]}</div>'

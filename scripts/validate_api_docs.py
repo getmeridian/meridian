@@ -40,7 +40,7 @@ def check_api_doc(source: str, document: dict[str, Any]) -> list[str]:
 
 def main() -> int:
     document = json.loads(CONTRACT.read_text(encoding="utf-8"))
-    errors = []
+    errors: list[str] = []
     for locale in LOCALES:
         path = ROOT / "website" / "src" / "content" / "docs" / locale / "client-management.md"
         errors.extend(
