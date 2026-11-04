@@ -11,7 +11,7 @@ from typing import Any
 
 from packaging.version import InvalidVersion, Version
 
-from meridian.control.formats.selector import DocumentFormat, select_format
+from meridian.control.formats.selector import DocumentFormat, explain_format
 from meridian.core.clients import ClientDetail
 from meridian.core.redaction import redact_diagnostic_text
 from meridian.setup.single_server import single_server_intent
@@ -25,7 +25,7 @@ class SubscriptionCase:
 
     @property
     def format(self) -> DocumentFormat:
-        return select_format(self.user_agent, None)
+        return explain_format(self.user_agent, None).format
 
     @property
     def label(self) -> str:

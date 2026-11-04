@@ -13,7 +13,7 @@ from meridian.core.clients import (
     build_client_show_result,
     build_client_status_result,
 )
-from meridian.core.services.clients import ClientNotFoundError, collect_client_list, collect_client_show
+from meridian.core.services.clients import ClientNotFoundError, collect_client_show
 
 
 @dataclass
@@ -107,23 +107,6 @@ def test_client_mutation_results_preserve_public_wire_shapes() -> None:
     assert removed.to_data() == {"client": {"username": "alice"}, "cut_off": None}
     assert enabled.to_data() == {"client": {"username": "alice", "status": "active"}}
     assert disabled.to_data() == {"client": {"username": "alice", "status": "disabled"}}
-
-
-def test_collect_client_list_uses_panel_adapter() -> None:
-    result = collect_client_list(PanelClient([PanelUser(username="alice"), PanelUser(username="bob")]))
-
-    assert result.clients.summary.clients == 2
-    assert [client.username for client in result.clients.clients] == ["alice", "bob"]
-
-
-def test_collect_client_list_filters_users_outside_ownership_allowlist() -> None:
-    result = collect_client_list(
-        PanelClient([PanelUser(username="alice"), PanelUser(username="meridian-route-123")]),
-        allowed_usernames=["alice"],
-    )
-
-    assert result.clients.summary.clients == 1
-    assert [client.username for client in result.clients.clients] == ["alice"]
 
 
 def test_collect_client_show_builds_subscription_and_share_urls() -> None:

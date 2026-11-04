@@ -340,7 +340,7 @@ def _execute(
         progress.close()
 
     cluster = ClusterConfig.load()
-    _print_success(resolved.ip, cluster, request, links)
+    _print_success(resolved.ip, request, links)
     offer_recovery_key(cluster)
     exit_ = next(item for item in intent.exits if item.server_ref == entry.id)
     reality = next(path for path in exit_.paths if path.protocol == "reality")
@@ -542,7 +542,7 @@ def _prompt_server_target() -> str:
     fail("No server IP given", hint="Run: meridian deploy SERVER_IP", hint_type="user")
 
 
-def _print_success(server_ip: str, cluster: ClusterConfig, request: DeployRequest, links: HandoffLinks) -> None:
+def _print_success(server_ip: str, request: DeployRequest, links: HandoffLinks) -> None:
     if is_quiet_mode():
         return
     err_console.print("\n  [ok][bold]Done![/bold][/ok] Your proxy server is live.\n")

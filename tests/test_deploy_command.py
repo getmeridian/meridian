@@ -339,7 +339,7 @@ def test_cloudflare_advice_never_proxies_a_self_steal_domain(extra: dict[str, ob
     request = DeployRequest(ip="198.51.100.10", domain="vpn.example.com", **extra)
     out = Console(file=StringIO(), width=200)
     with patch("meridian.commands.deploy.err_console", out):
-        _print_success("198.51.100.10", MagicMock(), request, HandoffLinks("alice"))
+        _print_success("198.51.100.10", request, HandoffLinks("alice"))
     text = out.file.getvalue()
     assert advice in text
     assert ("Proxied (orange)" in text) != ("Keep it DNS only" in text)

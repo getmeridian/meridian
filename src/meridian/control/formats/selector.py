@@ -49,11 +49,6 @@ _RULES: tuple[tuple[re.Pattern[str], DocumentFormat, UserAgentFamily], ...] = (
 )
 
 
-def select_format(user_agent: str | None, accept: str | None) -> DocumentFormat:
-    """The document a request without a suffix gets."""
-    return explain_format(user_agent, accept).format
-
-
 def explain_format(user_agent: str | None, accept: str | None, suffix: str = "") -> FormatSelection:
     """The same first-match decision used by live delivery and the read-only preview."""
     if suffix:

@@ -28,7 +28,7 @@ from meridian.control.formats.entries import (
     presentation_endpoints,
     primaries,
 )
-from meridian.control.formats.selector import DocumentFormat, select_format
+from meridian.control.formats.selector import DocumentFormat, explain_format
 from meridian.control.formats.status_remarks import STATUS_REMARKS
 from meridian.control.formats.xray_json import xray_json_document
 from meridian.control.models import ClientEndpoint
@@ -551,7 +551,7 @@ def test_links_from_the_public_url_are_left_out_without_one() -> None:
     ],
 )
 def test_user_agent_rules_beyond_the_corpus(user_agent: str | None, accept: str | None, document: str) -> None:
-    assert select_format(user_agent, accept) == document
+    assert explain_format(user_agent, accept).format == document
 
 
 def _engine(variable: str) -> Path:

@@ -18,7 +18,7 @@ import httpx
 
 from meridian.cluster import ClusterConfig
 from meridian.control.client import ControlClient
-from meridian.control.formats.selector import select_format
+from meridian.control.formats.selector import explain_format
 from meridian.xray_workload import salamander_password
 from tests.systemlab.golden_corpus import HOP_BY_HOP_HEADERS, LAB_HOST_ROLES, Capture, decode_body, normalize_response
 from tests.test_control_subscription_corpus import CORPUS, DROPPED_HEADERS, _differences, _expected
@@ -105,7 +105,7 @@ def main() -> int:
         page = (
             request["user"] != "unknown"
             and not request["selector"]
-            and select_format(request["user_agent"], request["accept"]) == "browser"
+            and explain_format(request["user_agent"], request["accept"]).format == "browser"
         )
         page_failed = page and _check_page(cluster.panel.subscription_url(token), capture)
         suffix = "/info" if page else (f"/{request['selector']}" if request["selector"] else "")
