@@ -43,6 +43,10 @@ then
 fi
 pass "reviewed setup applied and verified"
 
+# People live in the control service; the reviewed topology declares none.
+meridian client show acceptance >/dev/null 2>&1 || meridian client add acceptance
+pass "acceptance person added through the control service"
+
 require_command \
   "control service running on control/exit A" \
   ssh root@"$EXIT_A_IP" systemctl is-active --quiet ctld

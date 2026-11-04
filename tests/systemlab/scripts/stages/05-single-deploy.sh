@@ -29,7 +29,7 @@ from meridian.control_access import access_panel
 cluster = ClusterConfig.load()
 assert cluster.runs_control_service
 assert cluster.topology_intent is not None
-assert cluster.topology_intent.access.users == ["solo"]
+assert cluster.people_adoption is None, "a fresh deploy keeps no topology people"
 with access_panel(cluster) as panel:
     user = panel.get_user("solo")
 assert user is not None and user.short_uuid
@@ -64,7 +64,6 @@ from meridian.control.client import ControlClient
 
 cluster = ClusterConfig.load()
 assert cluster.topology_intent is not None
-assert cluster.topology_intent.access.users == ["solo"], cluster.topology_intent.access.users
 with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
     assert client.get_user("bob") is None, "removed client still exists in the control service"
     assert client.get_user("solo") is not None
