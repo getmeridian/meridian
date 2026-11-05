@@ -102,7 +102,16 @@ def test_client_mutation_results_preserve_public_wire_shapes() -> None:
     disabled = build_client_status_result("alice", "disabled")
 
     assert added.to_data() == {
-        "clients": [{"username": "alice", "id": "17", "status": "active", "page_url": "", "subscription_url": ""}]
+        "clients": [
+            {
+                "username": "alice",
+                "display_name": "",
+                "id": "17",
+                "status": "active",
+                "page_url": "",
+                "subscription_url": "",
+            }
+        ]
     }
     assert removed.to_data() == {"client": {"username": "alice"}, "cut_off": None}
     assert enabled.to_data() == {"client": {"username": "alice", "status": "active"}}

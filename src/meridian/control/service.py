@@ -49,6 +49,7 @@ from meridian.control.models import (
     ServiceSettings,
     UserCreate,
     UserDevices,
+    UserEnsure,
     UserImportBatch,
     UserImportResult,
     UserRecord,
@@ -64,6 +65,7 @@ from meridian.control.people_query import PeopleQueryEngine
 from meridian.control.period_usage import reset_period
 from meridian.control.person_connections import read_connections
 from meridian.control.person_delivery_policy import DeliveryPolicyLedger
+from meridian.control.person_names import assign_person_username
 from meridian.control.privacy import PrivacyLedger, read_privacy
 from meridian.control.response_rule_testing import test_response_rules
 from meridian.control.revisions import RevisionLedger
@@ -82,7 +84,7 @@ from meridian.control.user_credentials import replace_credentials
 from meridian.control.user_flow_blocks import FlowBlockLedger
 from meridian.control.user_import import import_users
 from meridian.control.user_lifecycle import extend_user_expiry, insert_user
-from meridian.control.user_updates import update_user
+from meridian.control.user_updates import fill_empty_display_name, update_user
 from meridian.control.users import USER_SELECT, user_record
 from meridian.core.account_schedule import AccountSchedulePreview
 from meridian.core.agent_desired import DesiredNodeState
@@ -187,6 +189,11 @@ class ControlService:
     def snapshot(self) -> bytes:
         """This service's state, encrypted to every registered backup key (`backups.py`)."""
         return self.backups.snapshot(fleet_id=self.fleet_id, fleet_epoch=self.fleet_epoch, version=self._version)
+
+    @property
+    def version(self) -> str:
+        """Installed package version for authenticated API compatibility checks."""
+        return self._version
 
     def health(self) -> ServiceHealth:
         return self.background.health(version=self._version, fleet_id=self.fleet_id, fleet_epoch=self.fleet_epoch)
@@ -412,13 +419,16 @@ class ControlService:
 
     # -- users and endpoints -----------------------------------------------------------
 
-    def put_user(self, username: str) -> UserRecord:
-        """Create the user if missing (fresh credentials); an existing user keeps them."""
+    def put_user(self, username: str, *, ensure: UserEnsure | None = None) -> UserRecord:
+        """Ensure creation settings and fill an empty name atomically, preserving existing choices."""
+        wanted = UserEnsure.model_validate(ensure.model_dump(exclude_unset=True)) if ensure else UserEnsure()
         with self._transaction():
             existing = self.get_user(username)
             if existing is not None:
-                return existing
-            self._insert_user(UserCreate(username=username))
+                return fill_empty_display_name(
+                    self._store, existing, wanted.display_name, events=self.events, now=self.now()
+                )
+            self._insert_user(UserCreate(username=username, **wanted.to_data()))
             self._compose_all()
             return self._require_user(username)
 
@@ -429,6 +439,8 @@ class ControlService:
         the limits or expiry the form asked for.
         """
         with self._transaction():
+            create = assign_person_username(self._store, create)
+            assert create.username is not None
             if self.get_user(create.username) is not None:
                 raise ServiceError("user_exists", f"User {create.username!r} already exists.", 409)
             self._insert_user(create)
@@ -437,6 +449,7 @@ class ControlService:
             return self._require_user(create.username)
 
     def _insert_user(self, create: UserCreate) -> None:
+        assert create.username is not None
         insert_user(self._store, create, now=self.now)
         self.events.append("user.created", create.username)
 
@@ -560,6 +573,14 @@ class ControlService:
         with self._lock:
             row = self._db.execute(f"{USER_SELECT} WHERE u.username = ?", (username,)).fetchone()
         return user_record(row, now=datetime.fromisoformat(self.now())) if row else None
+
+    def display_names(self) -> dict[str, str]:
+        """Public names for fleet views; empty names fall back to usernames in the consumer."""
+        with self._lock:
+            return {
+                row["username"]: row["display_name"]
+                for row in self._store.rows("SELECT username, display_name FROM users WHERE display_name != ''")
+            }
 
     def list_users(self) -> list[UserRecord]:
         with self._lock:

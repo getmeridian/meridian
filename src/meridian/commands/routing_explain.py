@@ -6,7 +6,7 @@ from pydantic import ValidationError
 
 from meridian import console
 from meridian.commands._helpers import load_topology_cluster
-from meridian.commands.client_handoff import resolve_client_mutation_name, resolve_client_name
+from meridian.commands.client_handoff import resolve_client_mutation_name
 from meridian.control.client import ControlClient
 from meridian.control_access import access_panel
 from meridian.core.delivery_explain import DeliveryExplainRequest, DeliveryExplanation
@@ -39,7 +39,6 @@ def run_explain(
             console.fail(t("delivery.control_required"), hint_type="user")
         try:
             if person is not None:
-                resolve_client_name(cluster, person, console_people=True)
                 with access_panel(cluster) as panel:
                     person = resolve_client_mutation_name(cluster, panel, person)
                 request = DeliveryExplainRequest.model_validate({**request.to_data(), "person": person})

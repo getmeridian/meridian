@@ -23,13 +23,11 @@ def test_reissue_reviews_cut_off_and_shows_its_per_node_outcome(locale: str) -> 
     assert result["requests"].count("GET:ui/api/people/person-a/share") == 2
 
 
-@pytest.mark.parametrize("mode", ["default", "cancel", "declared", "no-nodes"])
-def test_reissue_defaults_to_no_cut_off_and_keeps_declared_people_on_the_cli(mode: str) -> None:
+@pytest.mark.parametrize("mode", ["default", "cancel", "no-nodes"])
+def test_reissue_defaults_to_no_cut_off(mode: str) -> None:
     result = run_console("command-reissue-" + mode)
     expected = [{"body": {"cut_off": False}, "csrf": "1"}] if mode in {"default", "no-nodes"} else []
     assert result["writes"] == expected
-    if mode == "declared":
-        assert "meridian client reissue person-a" in result["declaredText"] and result["hasRemove"] is False
     if mode == "no-nodes":
         assert result["choiceDisabled"] is True
     assert not any("/commands/" in request for request in result["requests"])

@@ -27,7 +27,10 @@ from meridian.backup.pull import finished_restore, newer_saved_snapshot, saved_s
 from meridian.backup.restore import ControlRestorer, RestoreOutcome, RestoreReview, RestoreSource, check_snapshot_fleet
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import apply_reviewed_intent, load_cluster, persist_reviewed_apply
+from meridian.commands.backup import offer_device_revocation
+from meridian.commands.panel import print_panel_access
 from meridian.console import confirm, err_console, fail, has_tty, info, ok, warn
+from meridian.control.client import ControlServiceError
 from meridian.control.restore import read_deployer_state
 from meridian.control.snapshot import Snapshot, decrypt_snapshot
 from meridian.core.errors import MeridianError
@@ -107,6 +110,17 @@ def run(
     except MeridianError as exc:
         fail(exc)
     _done(outcome)
+    _hand_back(cluster, ask=not yes and has_tty())
+
+
+def _hand_back(cluster: ClusterConfig, *, ask: bool) -> None:
+    """What the owner needs next: a setup link for the restored panel, and a say over other computers' keys."""
+    try:
+        # A snapshot never carries owner credentials, so the restored panel always needs a new owner.
+        print_panel_access(cluster, setup_link=False)
+    except ControlServiceError as exc:
+        warn(f"Could not reach the web panel: {exc}. Its setup link: meridian panel")
+    offer_device_revocation(cluster, ask=ask)
 
 
 def _open_snapshot(explicit: str, *, recovery_key: bool) -> RestoreSource:
@@ -132,13 +146,17 @@ def _open_snapshot(explicit: str, *, recovery_key: bool) -> RestoreSource:
             device = load_device_key()
         except MeridianError as exc:
             fail(exc)
-        if device is None:
+        if device is not None:
+            keys = [device.secret]
+        elif sys.stdin.isatty():
+            info("This machine has no backup key for the fleet; the recovery key opens the snapshot.")
+            keys = [_read_recovery_key()]
+        else:
             fail(
                 "This context has no device key to open the snapshot with",
-                hint="Use the fleet's recovery key: add --recovery-key.",
+                hint="Use the fleet's recovery key: add --recovery-key and pipe it on stdin.",
                 hint_type="user",
             )
-        keys = [device.secret]
     try:
         opened = decrypt_snapshot(blob, keys)
     except MeridianError as exc:
@@ -156,7 +174,10 @@ def _open_snapshot(explicit: str, *, recovery_key: bool) -> RestoreSource:
 def _read_recovery_key() -> str:
     """The recovery key from a hidden prompt, or from stdin without a terminal; never from argv."""
     if sys.stdin.isatty():
-        key = getpass.getpass("  Recovery key (AGE-SECRET-KEY-1...): ")
+        try:
+            key = getpass.getpass("  Recovery key (AGE-SECRET-KEY-1...): ")
+        except EOFError:
+            key = ""
     else:
         key = sys.stdin.readline()
     if not key.strip():
@@ -185,6 +206,8 @@ def _fleet_state(cluster: ClusterConfig, snapshot: Snapshot | None) -> ClusterCo
                 )
             carried = load_deposited_cluster(deposited.cluster_yml, deposited.servers_json, snapshot.header.fleet_id)
             cluster.access_profiles_used = cluster.has_used_access_profiles or carried.has_used_access_profiles
+            if cluster.people_adoption is None and carried.people_adoption is not None:
+                cluster.people_adoption = carried.people_adoption
         return cluster
     if deposited is None:
         fail(
@@ -245,7 +268,7 @@ def _render(review: RestoreReview, registry: ServerRegistry) -> None:
             f"  [bold yellow]Every subscription URL changes[/bold yellow]: links name {escape(review.from_address)}, "
             f"and will name {escape(review.target.host)}."
         )
-        print_("  Each client's new link is printed at the end; send it to them. Their apps keep failing on the old")
+        print_("  Everyone's new link is printed at the end; send it to them. Their apps keep failing on the old")
         print_("  link until they import the new one.")
     else:
         print_("  Subscription URLs stay the same once DNS points at the new server.")
@@ -269,10 +292,17 @@ def _render(review: RestoreReview, registry: ServerRegistry) -> None:
 
 def _done(outcome: RestoreOutcome) -> None:
     ok(f"Restored the control service at fleet epoch {outcome.fleet_epoch}")
-    if outcome.links_change:
-        warn("Every subscription URL changed. Send each client their new link:")
-    elif outcome.links:
-        info("Subscription URLs are unchanged; for reference:")
+    if outcome.links_error:
+        warn(
+            f"Every subscription URL changed, but the new links could not be read: {outcome.links_error}. "
+            "Share them from the web panel, or with `meridian client show NAME`."
+        )
+    elif outcome.links_change and outcome.links:
+        warn("Every subscription URL changed. Send each person their new link:")
+    elif outcome.links_change:
+        info("Every subscription URL changed; nobody has one yet.")
+    else:
+        info("Subscription URLs are unchanged.")
     for links in outcome.links:
         if links.error:
             err_console.print(f"    [warn]{escape(links.name)}[/warn]: {escape(links.error)}")

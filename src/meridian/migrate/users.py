@@ -1,6 +1,6 @@
 """Turn the panel's users into control-service imports, and say what does not carry over.
 
-Only `topology_intent.access.users` move: the panel's service users and anything
+Only users lifted into `people_adoption` move: the panel's service users and anything
 an operator created by hand stay behind. Each import keeps the VLESS UUID (also
 the Hysteria2 password) and the short UUID (the subscription token), so every
 link keeps working, plus status, expiry, limit, reset strategy, and usage.
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -57,7 +57,13 @@ class CarriedUsers:
     skipped: list[str] = field(default_factory=list)
 
 
-def carry_users(panel_users: Sequence[User], wanted: Sequence[str], *, deployed_with: str = "") -> CarriedUsers:
+def carry_users(
+    panel_users: Sequence[User],
+    wanted: Sequence[str],
+    *,
+    deployed_with: str = "",
+    display_names: Mapping[str, str] | None = None,
+) -> CarriedUsers:
     """Map the intent's users from the panel; refuse what cannot be imported without breaking a link."""
     by_name = {user.username: user for user in panel_users}
     missing = sorted(set(wanted) - set(by_name))
@@ -82,7 +88,7 @@ def carry_users(panel_users: Sequence[User], wanted: Sequence[str], *, deployed_
     for name in wanted:
         user = by_name[name]
         note, tag, metadata_notes = _metadata(user)
-        imports.append(_import(user, note=note, tag=tag))
+        imports.append(_import(user, note=note, tag=tag, display_name=(display_names or {}).get(name, "")))
         dropped = [*_dropped(user), *metadata_notes]
         if dropped:
             notes[name] = dropped
@@ -90,7 +96,7 @@ def carry_users(panel_users: Sequence[User], wanted: Sequence[str], *, deployed_
     return CarriedUsers(batch=UserImportBatch(users=imports), notes=notes, skipped=skipped)
 
 
-def _import(user: User, *, note: str, tag: str) -> UserImport:
+def _import(user: User, *, note: str, tag: str, display_name: str = "") -> UserImport:
     status = _STATUSES.get(user.status.upper())
     strategy = _STRATEGIES.get(user.traffic_limit_strategy.upper())
     if status is None or strategy is None:
@@ -110,6 +116,7 @@ def _import(user: User, *, note: str, tag: str) -> UserImport:
     try:
         return UserImport(
             username=user.username,
+            display_name=display_name,
             uuid=user.vless_uuid,
             sub_token=user.short_uuid,
             status=status,

@@ -25,13 +25,14 @@ from meridian.control.client import (
     ControlServiceHistoryOff,
     ControlServiceScopeError,
 )
-from meridian.control.command_models import NodeCommandRecord
+from meridian.control.command_models import NodeCommandRecord, UserCutOffMutation
 from meridian.control.credential_models import UserCredentialRotation
 from meridian.control.models import (
     PrivacySettings,
     PrivacyState,
     PrivacyUpdateResult,
     TrafficDailySummary,
+    UserCreate,
     UserDevices,
     UserRecord,
     UserUpdate,
@@ -51,6 +52,7 @@ from meridian.core.people_query import PeoplePage, PeopleQuery
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 from meridian.core.traffic import NodeTrafficEvidence
+from meridian.people_adoption import finish_people_adoption, require_people_service
 from meridian.remnawave import (
     XRAY_JSON_CLIENT_TYPE,
     Host,
@@ -83,11 +85,32 @@ class ServiceAccessPanel:
         record = _translated(lambda: self._client.get_user(username))
         return self._user(record) if record is not None else None
 
+    def matching_users(self, name: str) -> list[User]:
+        """Use the service's one live username/display-name resolution rule."""
+        return [self._user(record) for record in _translated(lambda: self._client.matching_users(name))]
+
+    def create_user(self, create: UserCreate) -> User:
+        require_people_service(self._client)
+        return self._user(_translated(lambda: self._client.create_user(create)))
+
+    def require_people_service(self) -> None:
+        """Refuse unavailable credentials or an older service before reviewing a mutation."""
+        _translated(lambda: require_people_service(self._client))
+
+    def delete_user(self, name: str) -> None:
+        require_people_service(self._client)
+        _translated(lambda: self._client.delete_user(name))
+
+    def delete_user_with_cut_off(self, name: str) -> UserCutOffMutation:
+        require_people_service(self._client)
+        return _translated(lambda: self._client.delete_user_with_cut_off(name))
+
     def user_credentials(self, username: str) -> UserRecord | None:
         """Typed credential metadata for a generation-checked rotation."""
         return self._client.get_user(username)
 
     def rotate_credentials(self, username: str, request: CredentialRotationRequest) -> UserCredentialRotation:
+        require_people_service(self._client)
         return self._client.rotate_credentials(username, request)
 
     def user_flow_blocks(self, username: str) -> UserFlowBlocks:
@@ -186,6 +209,7 @@ class ServiceAccessPanel:
 
     def update_user_limits(self, user_id: str, change: ClientLimitChange) -> User:
         """Set the limits the change names; the service lifts `limited`/`expired` once they allow the user."""
+        require_people_service(self._client)
         username = self._username(user_id)
         return self._user(_translated(lambda: self._client.update_user(username, limit_update(change))))
 
@@ -198,19 +222,23 @@ class ServiceAccessPanel:
         return _translated(lambda: self._client.preview_user_schedule(request))
 
     def reset_user_traffic(self, user_id: str) -> User:
+        require_people_service(self._client)
         username = self._username(user_id)
         return self._user(_translated(lambda: self._client.reset_user_traffic(username)))
 
     def extend_user(self, user_id: str, *, days: int) -> User:
         """Extend expiry and return the effective status after service enforcement."""
+        require_people_service(self._client)
         username = self._username(user_id)
         return self._user(_translated(lambda: self._client.extend_user(username, days=days)))
 
     def revoke_user_subscription(self, user_id: str) -> User:
+        require_people_service(self._client)
         username = self._username(user_id)
         return self._user(_translated(lambda: self._client.reissue_user(username)))
 
     def revoke_user_subscription_with_cut_off(self, user_id: str) -> tuple[User, list[NodeCommandRecord]]:
+        require_people_service(self._client)
         result = _translated(lambda: self._client.reissue_user_with_cut_off(self._username(user_id)))
         if result.user is None:
             raise RemnawaveError("The reissue response contains no user.", category="bug")
@@ -221,10 +249,12 @@ class ServiceAccessPanel:
         return _translated(lambda: self._client.user_devices(username))
 
     def delete_user_devices(self, user_id: str, device_key: str | None = None) -> DevicesRemoved:
+        require_people_service(self._client)
         username = self._username(user_id)
         return _translated(lambda: self._client.delete_user_devices(username, device_key))
 
     def _update(self, user_id: str, update: UserUpdate) -> User:
+        require_people_service(self._client)
         username = self._username(user_id)
         return self._user(_translated(lambda: self._client.update_user(username, update)))
 
@@ -241,6 +271,7 @@ class ServiceAccessPanel:
             id=record.user_id,
             short_uuid=record.sub_token,
             username=record.username,
+            display_name=record.display_name,
             profiles=record.profiles,
             vless_uuid=record.uuid,
             status=record.status.upper(),
@@ -340,8 +371,9 @@ AccessPanel = ServiceAccessPanel
 FleetPanel = ServiceFleetPanel
 
 
-def access_panel(cluster: ClusterConfig) -> AccessPanel:
+def access_panel(cluster: ClusterConfig, *, read_only: bool = False) -> AccessPanel:
     """The fleet's user directory: Meridian's control service."""
+    finish_people_adoption(cluster, read_only=read_only)
     return ServiceAccessPanel(cluster.panel.url, cluster.panel.api_token)
 
 

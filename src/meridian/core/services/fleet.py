@@ -101,7 +101,6 @@ def _observe_panel(
     *,
     sources: FleetSources,
     unreachable: str,
-    access_users: list[str] | None = None,
     with_users: bool,
     read_node_evidence: NodeEvidenceReader | None = None,
     read_server_usage: Callable[[], ServerUsageList] | None = None,
@@ -162,9 +161,6 @@ def _observe_panel(
                 return observed
             try:
                 users = panel.list_users()
-                if access_users is not None:
-                    allowed_users = set(access_users)
-                    users = [user for user in users if user.username in allowed_users]
                 observed.users = list(users)
                 observed.sources = observed.sources.model_copy(update={"users": "available"})
             except Exception as exc:  # Protocol adapter — concrete exception type unknown
@@ -224,7 +220,6 @@ def collect_fleet_status(
         classify_error,
         sources=FleetSources(panel="unknown", nodes="not_requested", users="not_requested", relays=relay_source),
         unreachable="Cannot reach panel API -- node and user data may be stale",
-        access_users=topology.access_users,
         with_users=True,
         read_node_evidence=read_node_evidence,
         read_server_usage=read_server_usage,

@@ -64,7 +64,7 @@ def test_the_ip_paths_intent_puts_the_panel_on_the_domain_and_the_exit_on_the_ip
     intent = SetupIntent.model_validate_json(support.build_intent("srv-aaaaaaaaaaaa", IP, PANEL))
 
     assert intent.control.public_hostname == PANEL
-    assert intent.access.users == ["alice"]
+    assert "users" not in intent.access.to_data()
     assert _paths(intent) == {"reality": ("", ""), "xhttp": (IP, IP), "hysteria2": (IP, "")}
 
 

@@ -18,7 +18,7 @@ from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands import backup as backup_commands
 from meridian.control.client import ControlClient
 from meridian.control.restore import read_deployer_state
-from meridian.control.snapshot import decrypt_snapshot
+from meridian.control.snapshot import decrypt_snapshot, generate_key_pair
 from tests.support.control_service import ADMIN_TOKEN, FLEET_ID, serve_control
 from tests.support.topology import single_exit_intent
 
@@ -249,3 +249,57 @@ def test_a_write_whose_outcome_is_unknown_still_counts_as_a_change(
         stop()
 
     assert seen == (["https://198.51.100.10/secret"] if reported else [])
+
+
+@pytest.mark.parametrize(
+    ("ask", "answers", "revoked"),
+    [(True, {"old-laptop": True, "work-pc": False}, ["old-laptop"]), (False, {}, [])],
+    ids=["asked-one-declined", "no-terminal"],
+)
+def test_a_restore_offers_to_revoke_other_computers_backup_keys(
+    fleet: ClusterConfig,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    ask: bool,
+    answers: dict[str, bool],
+    revoked: list[str],
+) -> None:
+    """The restore replaced the admin token; a lost machine's backup key would still open every new snapshot."""
+    own = create_device_key()
+    with ControlClient(fleet.panel.url, ADMIN_TOKEN) as client:
+        client.register_device_key("this-laptop", own.public)
+        client.register_device_key("old-laptop", generate_key_pair().public)
+        client.register_device_key("work-pc", generate_key_pair().public)
+    monkeypatch.setattr(
+        backup_commands, "confirm", lambda question, default: next(v for k, v in answers.items() if k in question)
+    )
+
+    backup_commands.offer_device_revocation(fleet, ask=ask)
+
+    err = capsys.readouterr().err
+    assert "old-laptop" in err and "work-pc" in err and "this-laptop" not in err
+    assert ("meridian backup revoke ID" in err) is not ask
+    with ControlClient(fleet.panel.url, ADMIN_TOKEN) as client:
+        assert [device.name for device in client.device_keys() if device.revoked_at] == revoked
+
+
+def test_no_other_backup_keys_means_no_offer(fleet: ClusterConfig, capsys: pytest.CaptureFixture[str]) -> None:
+    own = create_device_key()
+    with ControlClient(fleet.panel.url, ADMIN_TOKEN) as client:
+        client.register_device_key("this-laptop", own.public)
+
+    backup_commands.offer_device_revocation(fleet, ask=True)
+
+    assert "backup keys" not in capsys.readouterr().err
+
+
+def test_a_machine_without_its_own_key_is_offered_every_backup_key(
+    fleet: ClusterConfig, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A new laptop restored with the recovery key: every registered key belongs to another computer."""
+    with ControlClient(fleet.panel.url, ADMIN_TOKEN) as client:
+        client.register_device_key("old-laptop", generate_key_pair().public)
+
+    backup_commands.offer_device_revocation(fleet, ask=False)
+
+    assert "old-laptop" in capsys.readouterr().err

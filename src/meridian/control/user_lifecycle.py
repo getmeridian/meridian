@@ -11,6 +11,7 @@ from meridian.control.access_memberships import save_memberships
 from meridian.control.account_lifecycle import validate_user_schedule
 from meridian.control.errors import ServiceError
 from meridian.control.models import UserCreate, UserRecord
+from meridian.control.person_names import require_unique_person_name
 from meridian.control.store import Store
 from meridian.control.user_expiry import require_finite_user_expiry
 from meridian.control.users import USER_FIELDS
@@ -60,6 +61,8 @@ def extend_user_expiry(
 
 def insert_user(store: Store, create: UserCreate, *, now: Callable[[], str]) -> None:
     """Insert fresh credentials and first settings in the caller's transaction."""
+    assert create.username is not None
+    require_unique_person_name(store, create.username, create.display_name)
     moment = now()
     initial = UserRecord.model_validate(
         {

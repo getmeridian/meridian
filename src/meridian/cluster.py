@@ -1,8 +1,8 @@
 """Fleet configuration data model.
 
 Uses a single cluster-wide manifest instead of per-server credential files.
-Users/clients live in Remnawave's PostgreSQL — this file stores only
-deployment topology and panel access.
+People live in the control service's SQLite database; this file stores topology,
+service access and resumable deployment checkpoints.
 
 YAML persistence (load/save/serialize) lives in ``cluster_persistence.py``.
 """
@@ -18,6 +18,7 @@ from urllib.parse import quote, urlsplit
 
 from meridian.binary_pins import BinaryPin
 from meridian.core.inputs import is_ip, validate_optional_transport_path_value
+from meridian.core.people_seeds import PeopleAdoption
 from meridian.core.topology import SetupIntent
 
 logger = logging.getLogger("meridian.cluster")
@@ -31,8 +32,8 @@ def _load_warning(message: str, *, details: list[str] | None = None) -> None:
         logger.warning("%s", message)
 
 
-# 4: the control backend defaults to Meridian's service, so a Remnawave intent names its backend (#95).
-CURRENT_CLUSTER_VERSION = 4
+# 5: people are service-owned; legacy declarations become resumable adoption seeds (#95).
+CURRENT_CLUSTER_VERSION = 5
 
 
 class ClusterConfigExternallyModifiedError(RuntimeError):
@@ -46,7 +47,7 @@ class ClusterConfigExternallyModifiedError(RuntimeError):
 
 @dataclass
 class PanelConfig:
-    """Remnawave panel connection details."""
+    """Control-service access, including legacy panel credentials retained until migration."""
 
     url: str = ""  # Panel HTTPS endpoint (e.g., https://panel.example.com)
     api_token: str = field(default="", repr=False)  # Remnawave JWT API token (long-lived)
@@ -272,7 +273,7 @@ class ClusterConfig:
     """Fleet-wide configuration — the sole local state for Meridian 4.0.
 
     Stored as cluster.yml in Meridian's home directory. One file replaces per-server proxy.yml.
-    Client/user state lives in Remnawave's database, not here.
+    Live person state belongs to the control service; adoption seeds are temporary.
     """
 
     version: int = CURRENT_CLUSTER_VERSION
@@ -286,6 +287,7 @@ class ClusterConfig:
     control_migration: ControlMigration | None = None
     # `meridian restore` checkpoints (None = never restored).
     control_restore: ControlRestore | None = None
+    people_adoption: PeopleAdoption | None = None
     # Workload-scoped topology and durable compiled-resource state.
     topology_intent: SetupIntent | None = None
     # Sticky fact, saved immediately before sending named profiles to the service.

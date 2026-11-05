@@ -27,7 +27,7 @@ REVIEWED = {
         },
     },
     "people-bulk.js": {
-        "sha256": "fdecab79e5bae6f1d0b139da126e8da308b12401eca2d8cd8280098cff0e3b6f",
+        "sha256": "5a4db654caa3b3b1e79ab88c7196c5a207b2da9b84c61bae6f12475f180593e8",
         "paths": {
             'GET "api/people/bulk/receipts/" + receipt.id': ["api/people/bulk/receipts/{id}"],
             'GET "api/people/bulk/receipts/" + review.id': ["api/people/bulk/receipts/{id}"],

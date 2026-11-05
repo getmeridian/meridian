@@ -17,7 +17,9 @@ from meridian.control.client import ControlClient
 from meridian.control.models import ServiceSettings
 from meridian.core.access_profile_views import AccessProfileReviewRequest
 from meridian.core.access_profiles import AccessProfileIntent
+from meridian.core.people_seeds import PeopleSeeds
 from meridian.core.topology import SetupIntent
+from meridian.people_adoption import ensure_people
 from meridian.reconciler.agent_spec import build_node_spec
 from meridian.reconciler.meridian_drivers import ClientEndpointDriver, ControlUserDriver, ServiceSettingsDriver
 from meridian.reconciler.resources import build_resource_actions
@@ -55,10 +57,6 @@ def test_one_apply_stages_references_and_creates_people_without_invalidating_its
     profile = AccessProfileIntent(id="limited", grants=["exit:exit-a"])
     before = single_exit_intent(users=["existing"], access_profiles=[] if adding_profiles else [profile])
     after = single_exit_intent(users=["existing", "added"], access_profiles=[profile] if adding_profiles else [])
-    if adding_profiles:
-        data = after.to_data()
-        data["access"]["creation_settings"] = {"added": {"profiles": ["limited"]}}
-        after = SetupIntent.model_validate(data)
     previous, plan = compile_topology(before), compile_topology(after)
     keys = LocalRealityKeyFactory()("srv-exit")
     with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN, report_mutations=False) as admin:
@@ -112,5 +110,14 @@ def test_one_apply_stages_references_and_creates_people_without_invalidating_its
                 ServiceSettingsDriver(context).apply(action, None)
             elif isinstance(payload, ControlUserPayload):
                 ControlUserDriver(context).apply(action, None)
+        ensure_people(
+            admin,
+            PeopleSeeds.model_validate(
+                {
+                    "users": ["added"],
+                    "creation_settings": {"added": {"profiles": ["limited"] if adding_profiles else ["default"]}},
+                }
+            ),
+        )
         assert admin.settings().access_profiles == wanted_settings.access_profiles
         assert admin.get_user("added").profiles == (["limited"] if adding_profiles else ["default"])

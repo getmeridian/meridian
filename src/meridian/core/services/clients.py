@@ -64,7 +64,6 @@ def collect_client_show(
     build_share_url: ShareUrlBuilder | None = None,
     build_subscription_url: SubscriptionUrlBuilder | None = None,
     allowed_usernames: Collection[str] | None = None,
-    declared_usernames: Collection[str] | None = None,
     read_usage: Callable[[str], UserUsage | None] | None = None,
     read_connections: Callable[[str], ClientConnections] | None = None,
     read_access: Callable[[str], PersonAccess] | None = None,
@@ -83,7 +82,9 @@ def collect_client_show(
         connections = read_connections(username) if read_connections else None
         access = (
             read_access(username)
-            if read_access and (read_default_access or getattr(user, "profiles", ["default"]) != ["default"])
+            if read_access
+            and getattr(user, "profiles", ["default"])
+            and (read_default_access or getattr(user, "profiles", ["default"]) != ["default"])
             else None
         )
     return ClientShowServiceResult(
@@ -91,7 +92,6 @@ def collect_client_show(
             user,
             share_url=share_url,
             subscription_url=subscription_url,
-            declared=declared_usernames is None or username in declared_usernames,
             usage=usage,
             connections=connections,
             access=access,

@@ -48,7 +48,7 @@ w.fetch = (url, options = {}) => {
   if (url.startsWith('ui/locales/')) return reply(JSON.parse(fs.readFileSync(path.join(ui, url.slice(3)), 'utf8')));
   if (url === 'auth/state') return reply({ configured: true, owner_exists: true, signed_in: true,
     totp_enabled: false, passkeys: { available: false, reason: 'no_domain' } });
-  if (url === 'ui/api/fleet') return reply({ profile_title: 'Sample VPN', servers: [], declared_users: [], display_names: {} });
+  if (url === 'ui/api/fleet') return reply({ profile_title: 'Sample VPN', servers: [], display_names: {} });
   if (url === 'api/settings') return reply({ profile_title: 'Sample VPN', public_url: 'https://198.51.100.1',
     owner_contact: { text: '<img src=x onerror="window.pwned=1">', link: 'mailto:owner@example.test' },
     client_routing: 'ru-split', response_rules: [{ name: 'Sample rule', action: { kind: 'format', format: 'mihomo' } }] });

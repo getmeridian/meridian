@@ -2,37 +2,8 @@
   "$defs": {
     "AccessIntent": {
       "additionalProperties": false,
-      "description": "Meridian-owned access squad and human users.\n\n`users` are panel usernames (Latin only, as Remnawave requires); `display_names`\nkeeps the name as typed, in any script, for users whose username differs from it.",
+      "description": "Legacy squad label; people are owned by the control service.",
       "properties": {
-        "creation_settings": {
-          "description": "First account settings only; reviewed applies never replace an existing person's settings.",
-          "patternProperties": {
-            "^[A-Za-z0-9_-]+$": {
-              "$ref": "#/$defs/UserCreationSettings"
-            }
-          },
-          "propertyNames": {
-            "maxLength": 36,
-            "minLength": 3
-          },
-          "title": "Creation Settings",
-          "type": "object"
-        },
-        "display_names": {
-          "patternProperties": {
-            "^[A-Za-z0-9_-]+$": {
-              "maxLength": 40,
-              "minLength": 1,
-              "type": "string"
-            }
-          },
-          "propertyNames": {
-            "maxLength": 36,
-            "minLength": 3
-          },
-          "title": "Display Names",
-          "type": "object"
-        },
         "squad_name": {
           "default": "Meridian Access",
           "maxLength": 80,
@@ -40,22 +11,8 @@
           "pattern": "^[^\\r\\n\\t]+$",
           "title": "Squad Name",
           "type": "string"
-        },
-        "users": {
-          "items": {
-            "maxLength": 36,
-            "minLength": 3,
-            "pattern": "^[A-Za-z0-9_-]+$",
-            "type": "string"
-          },
-          "minItems": 1,
-          "title": "Users",
-          "type": "array"
         }
       },
-      "required": [
-        "users"
-      ],
       "title": "AccessIntent",
       "type": "object"
     },
@@ -1600,10 +1557,6 @@
         "protocol_path_ref"
       ],
       "title": "TransparentRelayIntent",
-      "type": "object"
-    },
-    "UserCreationSettings": {
-      "additionalProperties": true,
       "type": "object"
     }
   },

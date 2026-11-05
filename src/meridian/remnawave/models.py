@@ -25,6 +25,7 @@ class User:
     id: str = ""
     short_uuid: str = ""
     username: str = ""
+    display_name: str = ""
     profiles: list[str] = field(default_factory=default_profiles)
     vless_uuid: str = ""  # VLESS protocol UUID (used by Xray, differs from account UUID)
     status: str = ""  # "ACTIVE", "DISABLED", "LIMITED", "EXPIRED"

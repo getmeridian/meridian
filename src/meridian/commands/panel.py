@@ -25,18 +25,8 @@ def run(*, setup_link: bool = False) -> None:
         fail("No panel is deployed yet.", hint="Deploy one first: meridian deploy SERVER", hint_type="user")
     if not cluster.runs_control_service:
         fail(RemnawaveFleetError())
-    _console(cluster, setup_link=setup_link)
-
-
-def _console(cluster: ClusterConfig, *, setup_link: bool) -> None:
-    """The control service's web panel: its URL, and a one-time setup link when one is due."""
-    url = cluster.panel.display_url
     try:
-        # Minting a link changes nothing a snapshot keeps (`ui_*` tables never ride one), so no backup pull follows.
-        with ControlClient(cluster.panel.url, cluster.panel.api_token, report_mutations=False) as client:
-            owner = client.owner_status()
-            # Only --setup-link asks for a reset: bare `panel` on a fresh service gets a setup link, never a reset.
-            grant = client.issue_setup_link(reset=setup_link) if setup_link or not owner.exists else None
+        print_panel_access(cluster, setup_link=setup_link)
     except ControlServiceNotFound:
         fail(
             "This control service predates the web panel.",
@@ -45,6 +35,16 @@ def _console(cluster: ClusterConfig, *, setup_link: bool) -> None:
         )
     except ControlServiceError as exc:
         fail(exc)
+
+
+def print_panel_access(cluster: ClusterConfig, *, setup_link: bool) -> None:
+    """The web panel's URL, and a one-time setup link when one is due; raises ControlServiceError."""
+    url = cluster.panel.display_url
+    # Minting a link changes nothing a snapshot keeps (`ui_*` tables never ride one), so no backup pull follows.
+    with ControlClient(cluster.panel.url, cluster.panel.api_token, report_mutations=False) as client:
+        owner = client.owner_status()
+        # Only --setup-link asks for a reset: bare `panel` on a fresh service gets a setup link, never a reset.
+        grant = client.issue_setup_link(reset=setup_link) if setup_link or not owner.exists else None
 
     err_console.print()
     err_console.print("  [bold]Meridian web panel[/bold]")

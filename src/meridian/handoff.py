@@ -32,8 +32,7 @@ def page_url(cluster: ClusterConfig, user: PanelUserLike) -> str:
 
 
 def user_handoff(cluster: ClusterConfig, user: PanelUserLike) -> HandoffLinks:
-    intent = cluster.topology_intent
-    shown = intent.access.display_names.get(user.username, "") if intent is not None else ""
+    shown = getattr(user, "display_name", "")
     url = page_url(cluster, user)
     return HandoffLinks(
         user.username,

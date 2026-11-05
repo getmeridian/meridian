@@ -16,6 +16,7 @@ from meridian.core.inputs import (
     validate_hostname_value,
     validate_optional_transport_path_value,
 )
+from meridian.core.people_seeds import PeopleSeeds
 from meridian.core.servers import (
     ServerConnectionDraft,
     profile_from_draft,
@@ -185,10 +186,9 @@ def test_typed_names_become_valid_panel_usernames(name: str, taken: tuple[str, .
 
 
 def test_access_display_names_are_omitted_when_empty_and_findable_when_set() -> None:
-    from meridian.core.topology import AccessIntent
 
-    assert "display_names" not in AccessIntent(users=["default"]).model_dump(mode="json")
-    access = AccessIntent(users=["biba", "Boba"], display_names={"biba": "Биба"})
+    assert "display_names" not in PeopleSeeds(users=["default"]).model_dump(mode="json")
+    access = PeopleSeeds(users=["biba", "Boba"], display_names={"biba": "Биба"})
     assert [access.find_user(name) for name in ("биба", "BIBA", "boba", "nobody")] == ["biba", "biba", "Boba", None]
     assert access.display_name("biba") == "Биба" and access.display_name("Boba") == "Boba"
 
@@ -199,7 +199,6 @@ def test_access_display_names_are_omitted_when_empty_and_findable_when_set() -> 
     ids=["unknown-user", "shown-twice"],
 )
 def test_access_display_names_must_name_declared_users_once(display_names: dict[str, str], message: str) -> None:
-    from meridian.core.topology import AccessIntent
 
     with pytest.raises(ValidationError, match=message):
-        AccessIntent(users=["biba", "boba"], display_names=display_names)
+        PeopleSeeds(users=["biba", "boba"], display_names=display_names)

@@ -153,11 +153,6 @@ def record_interactive_templates(record: Recorder, service: ControlService) -> d
     )
     record("api/people/bulk/receipts/" + receipt["id"])
     record("api/people/bulk/undo", "POST", {"receipt_id": receipt["id"]})
-    record(
-        "api/people/bulk/preview?case=declared-delete",
-        "POST",
-        BulkPreviewRequest(usernames=["Tavi", "Neri"], action=BulkAction(action="delete")).to_data(),
-    )
     return {
         "people_fields": list(PeoplePerson.model_fields),
         "bulk_fields": list(BulkFields.model_fields),

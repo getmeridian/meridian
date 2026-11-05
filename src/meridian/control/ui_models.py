@@ -106,11 +106,10 @@ class ServerView(NodeTrafficEvidence):
 
 
 class FleetView(CoreModel):
-    """What the UI shows beside the admin API: servers, and who the deployer's fleet file declares."""
+    """Applied fleet topology and public service names beside the administrative API."""
 
     profile_title: str
     public_url: str
-    declared_users: list[str] = Field(description="People in the last applied revision's intent (the CLI's).")
     display_names: dict[str, str]
     intent_revision: int | None
     servers: list[ServerView]
@@ -122,9 +121,6 @@ class ShareView(CoreModel):
     """How one person connects: their subscription link and QR, and their connection page when one exists."""
 
     username: str
-    declared: bool = Field(
-        description="The last applied revision's intent lists them: removing them or issuing a new link is the CLI's."
-    )
     subscription_url: str
     page_url: str
     qr_svg: str

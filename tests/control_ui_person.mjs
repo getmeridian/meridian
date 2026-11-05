@@ -35,7 +35,7 @@ let user = {
   ...data.user,
 };
 const share = {
-  username: 'sample', declared: false, subscription_url: 'https://198.51.100.1/sub/test-only-link',
+  username: 'sample', subscription_url: 'https://198.51.100.1/sub/test-only-link',
   page_url: 'https://198.51.100.1/sub/test-only-link',
   qr_svg: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="white"/></svg>').toString('base64'),
   ...data.share,
@@ -59,7 +59,7 @@ w.fetch = (url, options = {}) => {
     return new Promise(resolve => pending.push(resolve));
   }
   if (url === 'auth/state') return Promise.resolve(reply({ configured: true, owner_exists: true, signed_in: signedIn }));
-  if (url === 'ui/api/fleet') return Promise.resolve(reply({ profile_title: 'Test fleet', declared_users: [],
+  if (url === 'ui/api/fleet') return Promise.resolve(reply({ profile_title: 'Test fleet',
     display_names: { sample: data.displayName || 'Sample person' }, servers: [] }));
   if (url.startsWith('ui/api/people/sample/expiry')) return Promise.resolve(reply({ expire_at: data.preview, months: data.months }));
   if (url.startsWith('ui/api/people/')) return Promise.resolve(reply({ ...share, username: url.split('/')[3] }));
@@ -649,6 +649,48 @@ if (mode === 'person-flow-blocks') {
   report.generations = [...(card?.querySelectorAll('[data-flow-generation]') || [])].map(node => node.dataset.flowGeneration);
   report.reasons = [...(card?.querySelectorAll('[data-flow-reason]') || [])].map(node => node.dataset.flowReason);
   report.writes = writes;
+}
+
+if (mode === 'person-name') {
+  const form = openEdit('name');
+  const input = form?.querySelector('[name="display_name"]');
+  report.label = view().querySelector('[data-person-field="name"] dt')?.textContent || '';
+  report.initialValue = input?.value;
+  input.value = data.name; input.dispatchEvent(new w.Event('input', { bubbles: true }));
+  report.invalid = input.getAttribute('aria-invalid');
+  form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  report.writes = writes.map(write => ({ method: write.method, url: write.url, body: write.body }));
+  for (const resolve of pending.splice(0)) {
+    if (data.refuse) resolve(reply({ error: { code: data.refuse, message: 'refused' } }, 409));
+    else { Object.assign(user, writes[0].body); resolve(reply({ ...user })); }
+  }
+  await settle(); await settle();
+  report.title = view().querySelector('.person-summary h1')?.textContent;
+  report.usernameShown = !view().querySelector('.person-summary bdi.mono')?.hidden;
+  report.read = view().querySelector('[data-person-field="name"] .person-read-value')?.textContent;
+  report.error = view().querySelector('[data-person-field="name"] .form-error')?.textContent || '';
+  report.formOpen = !!view().querySelector('[data-person-field="name"] form');
+}
+
+if (mode === 'person-add') {
+  M.addPerson();
+  await settle();
+  const dialog = w.document.querySelector('dialog[open]');
+  const name = dialog.querySelector('input[type="text"]');
+  name.value = data.name; name.dispatchEvent(new w.Event('input', { bubbles: true }));
+  dialog.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  report.error = dialog.querySelector('.form-error')?.textContent || '';
+  report.writes = writes.map(write => ({ method: write.method, url: write.url, body: write.body }));
+  for (const resolve of pending.splice(0)) {
+    const body = writes[0].body;
+    resolve(reply({ ...user, username: body.username || data.assigned, display_name: body.display_name || '' }));
+  }
+  await settle(); await settle();
+  report.toasts = events.filter(event => event.toast).map(event => event.toast);
+  report.hash = w.location.hash;
+  report.title = view().querySelector('.person-summary h1')?.textContent;
 }
 
 dom.window.close();

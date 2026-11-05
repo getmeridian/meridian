@@ -31,6 +31,22 @@
       "default": null,
       "title": "Device Limit"
     },
+    "display_name": {
+      "anyOf": [
+        {
+          "maxLength": 40,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "const": "",
+          "type": "string"
+        }
+      ],
+      "default": "",
+      "description": "Omitted preserves the name; empty clears it to show the username.",
+      "title": "Display Name"
+    },
     "expire_at": {
       "anyOf": [
         {

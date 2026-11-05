@@ -149,7 +149,7 @@ def _v4_cluster() -> ClusterConfig:
                 )
             ],
             default_egress_ref="exit-a",
-            access=AccessIntent(users=["default"]),
+            access=AccessIntent(),
         ),
         workloads=[
             WorkloadBinding(
@@ -398,13 +398,13 @@ def test_reachable_relay_listener_does_not_certify_route_health() -> None:
 @pytest.mark.parametrize(
     ("users", "missing", "nonactive", "health"),
     [
-        ([], 1, 0, "degraded"),
+        ([], 0, 0, "healthy"),
         # Disabled, limited, or expired is an operator/panel decision, not a fault.
         ([ApiUser(username="alice", status="DISABLED")], 0, 1, "healthy"),
         ([ApiUser(username="alice", status="LIMITED")], 0, 1, "healthy"),
     ],
 )
-def test_v4_missing_access_user_degrades_fleet_but_disabled_one_does_not(
+def test_zero_people_and_disabled_people_do_not_degrade_fleet_health(
     users: list[ApiUser],
     missing: int,
     nonactive: int,
@@ -413,7 +413,6 @@ def test_v4_missing_access_user_degrades_fleet_but_disabled_one_does_not(
     topology = _topology(
         nodes=[_node("198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True)],
     )
-    topology = topology.model_copy(update={"access_users": ["alice"]})
 
     status = build_fleet_status(
         topology,
@@ -423,8 +422,8 @@ def test_v4_missing_access_user_degrades_fleet_but_disabled_one_does_not(
         sources=FleetSources(panel="available", nodes="available", users="available", relays="not_requested"),
     )
 
-    assert status.summary.missing_access_users == missing
-    assert status.summary.nonactive_access_users == nonactive
+    assert "missing_access_users" not in status.summary.to_data()
+    assert "nonactive_access_users" not in status.summary.to_data()
     assert status.summary.health == health
 
 

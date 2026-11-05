@@ -51,7 +51,7 @@ def test_upgrade_intent_uses_the_ip_and_default_sni_without_domain_issuance() ->
     intent = SetupIntent.model_validate_json(support.build_intent("srv-aaaaaaaaaaaa", IP))
 
     assert intent.control.public_hostname == ""
-    assert intent.access.users == ["default"]
+    assert "users" not in intent.access.to_data()
     assert intent.forward_client_ips is False
     assert len(intent.exits) == 1
     for path in intent.exits[0].paths:

@@ -16,6 +16,7 @@ from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_resul
 from meridian.core.models import ErrorModel, OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.plan import CompiledPlanDriftResult, CompiledPlanResourceResult, CompiledPlanResult
+from meridian.people_adoption import finish_people_adoption, people_adoption_notice
 from meridian.renderers import emit_json
 from meridian.setup.profile_review import (
     ProfileReviewUnavailableError,
@@ -38,6 +39,10 @@ def run_v4_apply(
     from meridian.core.setup import SetupDraft
     from meridian.servers import ServerRegistry
 
+    finish_people_adoption(cluster)
+    adoption = people_adoption_notice(cluster)
+    if adoption is not None and not json_output:
+        warn(adoption.message)
     intent = require_intent(cluster)
     require_profile_backend(intent)
     registry = ServerRegistry(SERVER_PROFILES_FILE)
@@ -66,6 +71,7 @@ def run_v4_apply(
                 command_envelope(
                     command="apply",
                     data=CompiledApplyPreview(
+                        people_adoption=adoption,
                         plan_hash=review.plan.plan_hash,
                         resource_count=len(review.plan.resources),
                         review_hash=review.review_hash,
@@ -109,7 +115,9 @@ def run_v4_apply(
         exit_code=exit_code,
         summary=summary_text,
     )
-    result_data = type(result_data).model_validate({**result_data.to_data(), "access_review": access_review})
+    result_data = type(result_data).model_validate(
+        {**result_data.to_data(), "access_review": access_review, "people_adoption": adoption}
+    )
     apply_error: ErrorModel | None = None
     if not result.all_succeeded:
         apply_error = ErrorModel(
@@ -168,6 +176,10 @@ def run_v4_plan(
     from meridian.servers import ServerRegistry
     from meridian.setup.runtime import SetupRuntime
 
+    finish_people_adoption(cluster)
+    adoption = people_adoption_notice(cluster)
+    if adoption is not None and not json_output:
+        warn(adoption.message)
     intent = require_intent(cluster)
     require_profile_backend(intent)
     inspection = inspect_profile_plan(
@@ -195,8 +207,9 @@ def run_v4_plan(
         and inspection.converged
         and cluster.active_plan_hash == inspection.plan_hash
         and not cluster.pending_plan_hash
+        and adoption is None
     )
-    state_changes: list[str] = []
+    state_changes: list[str] = [adoption.message] if adoption is not None else []
     if cluster.pending_plan_hash:
         if cluster.pending_plan_hash == inspection.plan_hash:
             state_changes.append(f"activate pending generation {cluster.pending_generation}")
@@ -228,6 +241,7 @@ def run_v4_plan(
         else:
             summary_text = "Resources match; saved generation state requires activation."
         result_data = CompiledPlanResult(
+            people_adoption=adoption,
             plan_hash=inspection.plan_hash,
             converged=converged,
             summary=summary_text,
@@ -306,6 +320,8 @@ def run_v4_plan(
         for logical_id in inspection.retiring:
             err_console.print(f"  [red]remove[/red] {escape(logical_id)}")
         for change in state_changes:
+            if adoption is not None and change == adoption.message:
+                continue  # Already disclosed before the resource review.
             err_console.print(f"  [yellow]state[/yellow] {escape(change)}")
         if inspection.fence_warning:
             err_console.print(f"\n  [warn]Apply will refuse:[/warn] {escape(inspection.fence_warning)}")

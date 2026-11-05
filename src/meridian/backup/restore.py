@@ -21,7 +21,7 @@ import hashlib
 import json
 import secrets
 import shlex
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -42,7 +42,7 @@ from meridian.control.client import ControlClient, ControlServiceAuthError, Cont
 from meridian.control.restore import stage_restored_database
 from meridian.control.snapshot import Snapshot, SnapshotError, SnapshotHeader, read_header
 from meridian.core.access_profiles import profile_declarations_hash
-from meridian.core.errors import LocalStateError
+from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.inputs import is_ip
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
@@ -124,6 +124,7 @@ class RestoreOutcome:
     links: list[HandoffLinks] = field(default_factory=list)
     links_change: bool = False
     fleet_epoch: int = 0
+    links_error: str = ""
 
 
 class ControlRestorer:
@@ -306,11 +307,23 @@ class ControlRestorer:
             self._on_step("Applying the fleet: every agent enrolls with the restored service")
             apply(self.cluster, review.intent)
             self._checkpoint(restore, "applied")
-        self._on_step("Reading connection links")
-        links = restored_handoffs(self.cluster, list(review.intent.access.users))
+        from meridian.people_adoption import finish_people_adoption
+
+        finish_people_adoption(self.cluster, persist=self._persist)
+        links: list[HandoffLinks] = []
+        links_error = ""
+        if restore.links_change:
+            self._on_step("Reading everyone's new links")
+            try:
+                links = restored_handoffs(self.cluster)
+            except MeridianError as exc:
+                # The fleet is restored; an unread list must not turn that into a failure.
+                links_error = str(exc)
         restore.finished_at = _iso(self._now())
         self._checkpoint(restore, "done")
-        return RestoreOutcome(links=links, links_change=restore.links_change, fleet_epoch=restore.fleet_epoch)
+        return RestoreOutcome(
+            links=links, links_change=restore.links_change, fleet_epoch=restore.fleet_epoch, links_error=links_error
+        )
 
     def _take_over(self, review: RestoreReview) -> None:
         """Mark each context holding a stale copy of this fleet superseded, before anything changes remotely.
@@ -520,10 +533,25 @@ def verify_restored(cluster: ClusterConfig, fleet_epoch: int) -> None:
         )
 
 
-def restored_handoffs(cluster: ClusterConfig, usernames: Sequence[str]) -> list[HandoffLinks]:
-    from meridian.handoff import client_handoffs
+def restored_handoffs(cluster: ClusterConfig) -> list[HandoffLinks]:
+    """Every person's links from the restored service, including people added in the web panel."""
+    from meridian.control_access import access_panel
+    from meridian.handoff import user_handoff
 
-    return client_handoffs(cluster, usernames)
+    with access_panel(cluster) as panel:
+        from meridian.core.people_query import PeopleQuery
+
+        links: list[HandoffLinks] = []
+        cursor = None
+        while True:
+            page, _users = panel.query_users(PeopleQuery(limit=500, cursor=cursor))
+            for person in page.users:
+                user = panel.get_user(person.username)
+                if user is not None:
+                    links.append(user_handoff(cluster, user))
+            cursor = page.next_cursor
+            if cursor is None:
+                return links
 
 
 def _dns_names(intent: SetupIntent, server_ref: str) -> tuple[str, ...]:

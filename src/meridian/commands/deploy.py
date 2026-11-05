@@ -297,7 +297,16 @@ def _execute(
                 _build_request(**{**request.model_dump(), "sni": sni}),
                 resolved.ip,
             )
-            applied = runtime.apply_intent(intent)
+            from meridian.core.people_creation import creation_request
+
+            draft = SetupDraft.from_intent(intent)
+            assert draft.access is not None
+            draft = draft.model_copy(
+                update={"access": draft.access.model_copy(update={"people": [creation_request(client)]})}
+            )
+            review = runtime.review(draft)
+            draft = draft.model_copy(update={"review_hash": review.review_hash})
+            applied = runtime.apply(draft)
             if not applied.all_succeeded:
                 failures = applied.failure_summary
                 fail(
@@ -306,6 +315,7 @@ def _execute(
                     hint_type="system",
                 )
             ok("Server converged")
+            (username,) = runtime.resolve_people(draft)
             raise_if_cancelled(
                 cancellation,
                 phase="verify",
@@ -317,7 +327,7 @@ def _execute(
             )
             runtime.verify(draft)
             ok("Verified the control service, node, and subscription")
-            traffic, detail = _verify_traffic(resolved.ip, client, cancellation=cancellation)
+            traffic, detail = _verify_traffic(resolved.ip, username, cancellation=cancellation)
             if traffic == "failed" and attempt + 1 < len(sni_candidates):
                 warn(f"No traffic through camouflage target {sni or DEFAULT_SNI}; trying {sni_candidates[attempt + 1]}")
                 continue
@@ -329,7 +339,7 @@ def _execute(
             message="Deploy was cancelled after verification, before reading the connection links.",
             remote_changed=True,
         )
-        (links,) = runtime.handoff([client])
+        (links,) = runtime.handoff([username])
     except ReviewedApplyPersistenceError as exc:
         fail("Deploy changed the server, but local state could not be saved", hint=str(exc), hint_type="system")
     except OperationCancelledError:

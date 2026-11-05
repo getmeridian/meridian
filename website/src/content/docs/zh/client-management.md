@@ -5,6 +5,8 @@ description: 通过网页面板或 CLI 管理用户、分享连接页面并设�
 
 你可以在任何浏览器中通过内置[网页面板](#网页面板)（`meridian panel`）管理用户，也可以在终端中使用 `meridian client` 命令。两种方式操作的都是控制服务中的同一批账户。
 
+人员在控制服务中立即添加或删除，无需 apply 或 SSH。名称可使用任何文字。精确用户名优先；否则用户名或显示名称的不区分大小写匹配必须唯一。歧义会被拒绝。批量添加在首次写入前检查所有名称，然后逐人报告服务请求结果。已有名称会被拒绝。
+
 ## 添加客户端
 
 在网页面板中，打开 **People** 并点击 **Add person** 即可创建账户，同时可按需设置流量限额、到期时间、设备上限、语言、备注和标签，并复制连接页面链接或二维码。
@@ -216,7 +218,7 @@ agent 会先把新凭据写入 `core.json`，再修改运行中的账户。这�
 meridian client rotate-credentials alice --yes
 ```
 
-网页面板为在面板添加的用户提供**更换连接密钥**。配置文件声明的用户通过 CLI 操作，遵循与重新签发链接相同的所有权规则。JSON 模式需要 `--yes`，结果 `client-rotate-credentials` 包含凭据代次和每个节点的 `flow_blocks`。可选 `--cut-off` 也结束现有数据流；确认前会说明重置入站或重启整个节点核心的影响。
+网页面板为每位用户提供**更换连接密钥**，使用与 CLI 相同的服务操作。 JSON 模式需要 `--yes`，结果 `client-rotate-credentials` 包含凭据代次和每个节点的 `flow_blocks`。可选 `--cut-off` 也结束现有数据流；确认前会说明重置入站或重启整个节点核心的影响。
 
 
 ## 替换泄露的链接
@@ -227,7 +229,7 @@ meridian client rotate-credentials alice --yes
 meridian client reissue alice
 ```
 
-网页面板中的重新签发和删除共用同一确认流程：终止会话选项默认关闭，列出受影响节点，确认后才执行修改。重复点击重新签发只提交一次。重新签发会刷新新链接，并单独显示各节点结果；终止会话失败或超时不会撤销新凭证。配置中声明的用户会显示 CLI 命令。
+网页面板中的重新签发和删除共用同一确认流程：终止会话选项默认关闭，列出受影响节点，确认后才执行修改。重复点击重新签发只提交一次。重新签发会刷新新链接，并单独显示各节点结果；终止会话失败或超时不会撤销新凭证。
 
 控制服务会为该客户端生成新的订阅 ID 和新的密钥。旧的订阅 URL 和连接页面返回 404，服务器拒绝旧密钥。Meridian 打印新的订阅 URL，它同时打开新的连接页面。他们需要重新导入一次新链接：应用无法刷新一个已经不存在的订阅 URL。状态、流量限额和用量、到期时间及设备上限保持不变。设备登记会被清除。
 
@@ -317,7 +319,7 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 | **Settings**：页面和应用的默认语言、面向全员的通知、订阅格式预览，以及**隐私**（设备限制与每日用量历史）；**安全**包含密码、登录验证码、通行密钥和已登录设备 | **Revisions** 和 **Settings**：从你电脑上应用的每次变更，以及订阅标题、公开地址、客户端路由策略和公开所有者联系方式 |
 | **Tokens**：创建和撤销限定权限的 API 令牌 | |
 
-在网页面板和 CLI 中所做的修改是同一回事：`meridian client list` 也会显示在网页面板中添加的用户，而无论在哪边设置的状态、限额或到期时间，应用都不会撤销。用 `meridian client add` 添加的用户仍归 CLI 管理：网页面板可以修改他们的限额和状态，但删除他们或签发新链接时，会显示相应的 `meridian client` 命令，因为这些用户属于已审核的拓扑。每个人都能在自己的订阅 URL 打开连接页面，包括在网页面板中添加的用户。
+网页面板与 CLI 管理同一批由服务管理的用户。`meridian client list` 包含通过任一界面添加的用户。两者都可添加、删除、重新签发链接和轮换每位用户的密钥；apply 不会撤销状态、限额或到期时间。每位用户的订阅 URL 都提供连接页面。
 
 网页面板不保存任何 SSH 密钥，因此被盗的会话无法修改你的服务器。每次登录在闲置 30 分钟后过期，最长 12 小时；创建令牌需要近期使用密码与 TOTP 或通行密钥确认身份。
 
@@ -357,7 +359,7 @@ meridian token revoke TOKEN_ID --yes --json
 
 用户查询需要 `people.query` 和 `people.private`；批量预览、提交、回执和撤销需要 `people.batch` 和 `people.private`，因为这些视图包含标签。凭证导入仍使用独立的 `people.bulk` 权限。people/admin 预设保留原有的查询和批量操作权限；read/propose/approve 预设无法调用这些接口。
 
-`commands.restart` 允许重启 Xray；其他维护命令需要 `commands.run`。使用 `cut_off: true` 删除或重新签发时，还需要 `commands.cut_off`。删除或重新签发拓扑中声明的用户需要 `fleet.apply`；面板所有者使用 CLI。`settings.edit` 修改隐私、通知和页面语言；已确认的拓扑设置需要 `fleet.apply`。`backup.read` 下载加密快照并读取备份公钥，不能添加密钥或解密快照；`backup.edit` 管理备份密钥和保存的服务器文件。提出变更、批准他人、批准自己及应用相互独立：`revisions.propose`、`revisions.approve`、`revisions.approve_own`、`fleet.apply`。批准自己的提案还需要普通批准权限。
+`commands.restart` 允许重启 Xray；其他维护操作需要 `commands.run`。重新签发、删除或轮换时使用 `cut_off: true` 还需要 `commands.cut_off`。所有人员使用相同账户权限。
 
 面板可签发现有 read/propose/approve/people 预设，以及自身运营设置和重启操作的窄权限。拓扑管理和备份权限通过 CLI 或获授权的 API 令牌签发。创建需要近期密码与 TOTP 或通行密钥确认。令牌只能转授自身拥有的权限，不能比签发它的令牌更晚到期；已撤销或过期的签发者不能利用先前验证的请求创建新令牌。
 
@@ -427,7 +429,7 @@ scrape_configs:
 | `GET /api/people/bulk/receipts/{receipt_id}` | 读取不含备注或凭据的回执 |
 | `POST /api/people/bulk/undo` | 十分钟内撤销一次未发生后续变化的字段 |
 | `POST /api/users/preview` | 预览创建或修改账户的 UTC 日期，不保存；需要 people/admin 或所有者会话 |
-| `POST /api/users` | 在一个事务中创建用户，同时设置 `username`、`status`、`expire_at`、`traffic_limit_bytes`、`traffic_limit_strategy` 和 `device_limit` |
+| `POST /api/users` | 在一个事务中创建用户，同时设置 `username`, `display_name`、`status`、`expire_at`、`traffic_limit_bytes`、`traffic_limit_strategy` 和 `device_limit` |
 | `PATCH /api/users/{username}` | 修改状态、到期时间、流量限额或重置策略、设备上限；未发送的字段保持原值 |
 | `POST /api/users/{username}/reset-traffic` | 重置已用流量 |
 | `POST /api/users/{username}/extend` | 发送 `{"days": N}`（1–3650），从当前时间和原到期时间中较晚者起增加天数；未设到期时间则从现在起算 |
@@ -438,9 +440,9 @@ scrape_configs:
 | `DELETE /api/users/{username}/devices` | 清除全部注册 |
 | `DELETE /api/users/{username}/devices/{device_key}` | 删除一项注册 |
 
-先从 `GET /api/users/{username}` 读取 `credential_generation`，再以 `people.reissue` 权限向 `POST /api/users/{username}/rotate-credentials` 发送 `{"expected_generation": N}`。过期代次返回 `409 credentials_changed`，防止响应不确定时重试而再次更换密钥。响应包含 `user`、`subscription_preserved: true`、`flow_blocks` 和 `commands`；用户字段遵循与读取相同的凭证及私人数据权限。添加 `"cut_off": true` 需要 `commands.cut_off`，并排队执行与重新签发相同的版本门控完整终止操作。轮换配置文件声明的用户还需要 `fleet.apply`；所有者会话使用 CLI。
+`display_name` 是支持任意文字的公开显示名称，由服务保存。连接页面、面板和账户读取均可显示它，无需 `people.private`。向 `POST /api/users` 发送 `username`、非空 `display_name` 或两者；仅提供显示名称时，服务会避开已有名称，分配拉丁字母用户名。`username` 始终是稳定标识。`PATCH /api/users/{username}` 和 `PATCH /api/users` 省略 `display_name` 会保留原值；`"display_name": ""` 清空显示名称，改为显示用户名。`POST /api/import/users` 也会导入此字段。显示名称或用户名经 Unicode casefold 后与其他人的显示名称或用户名相同，会返回 `409 name_conflict`（“每个人都需要不同的名称”）；创建时使用已存在的完全相同用户名仍返回 `409 user_exists`。应用拓扑只在创建时设置名称。批量预览显示名称；收据只保留用户名，不保存显示名称文本。
 
-People 令牌无法删除服务器配置文件中声明的用户，也无法为他们重新签发连接凭据。API 会返回 `409 declared_user` 和需要运行的 CLI 命令。已经批准或失败的应用仍声明该用户时，这项限制同样有效；未经批准的提案不会声明任何用户。状态、限额、到期时间和设备上限仍可修改。
+从 `GET /api/users/{username}` 读取 `credential_generation`，然后凭 `people.reissue` 向 `POST /api/users/{username}/rotate-credentials` 发送 `{"expected_generation": N}`。过期版本会被拒绝。所有人员都保留订阅 URL 和设备注册。
 
 重新签发和删除接受可选的 `{"cut_off": true}`；凭据轮换会将该选项与 `expected_generation` 一起发送。按 `x-meridian-conditional-capabilities`，这需要 `commands.cut_off`；admin 预设包含此权限。请逐个节点检查范围：核心重启影响所有 Xray 入站与桥接连接，入站重置只影响列出的入站，失败时会回退到整个核心重启。重新签发与删除未选择切断时保留普通响应，选择后包含排队命令；凭据轮换始终返回命令列表与回执。
 
@@ -518,23 +520,11 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 有效期按整天或日历月从当前时间与原到期时间中较晚者延长，并处理短月份。等待首次使用的人员只增加时长，不激活；月数换算为从预览 UTC 日期到相应月份日期的天数。可设置或清除到期时间、配额与重置策略、标签、设备限制（继承／不限／N）或续期，也可启用、停用、重置周期流量或删除。省略的字段保持原值，重置策略与续期次数上限可单独更改。现有节点协议每个受管入站最多支持 10,000 名启用人员，预览拒绝超过此限制的更改。
 
-持久回执保存操作、参数、计数及各人的结果。如果人员及限制执行结果未变化，可在十分钟内撤销一次可逆字段，重启服务后也可撤销。流量重置、删除和会重置流量的计划更改不可逆，提交前明确提示。重置保留累计流量。回执不含私人备注、连接凭据、客户端地址或设备标识符；事件仅包含操作与计数及现有不含私人内容的单人事件。`topology_intent.access.users` 中的人员可接受服务字段更改；删除会返回一个本地拓扑提案，服务批次不会删除他们。
+批量预览将所选人员和行版本冻结十分钟。提交在一个事务中应用所有审核的更改，并返回不含备注或凭据的持久回执。可逆修改可在十分钟内撤销一次；删除和流量重置不可逆。所有人员都由服务管理。
 
-删除已声明人员时，预览和回执包含一个 `proposal`，其中仅有 `schema`（`meridian.people-removal/v1`）、`usernames`、`fleet_id`、已提交的 `revision` 和 `generation`、`plan_hash` 及 `intent_sha256`。控制台将其保存到本地的 **people-removal.json**；无法保存时可手动选择并复制 JSON。混合批次中，浏览器只在一个事务中应用服务管理的人员更改，绝不会应用拓扑。
+人员在控制服务中立即添加或删除，无需 apply 或 SSH。名称可使用任何文字。精确用户名优先；否则用户名或显示名称的不区分大小写匹配必须唯一。歧义会被拒绝。批量添加在首次写入前检查所有名称，然后逐人报告服务请求结果。已有名称会被拒绝。
 
-在部署者电脑上使用当前配置副本，先运行 `meridian client remove --proposal people-removal.json --dry-run --json`，再运行 `meridian client remove --proposal people-removal.json`：所有删除只需一次共同审核、一次确认和一次应用。也可直接使用 `meridian client remove sample-a sample-b`。`--proposal` 能读取完整的 API 批量预览或回执 JSON，以及 CLI 批量 JSON 输出，文件大小上限为 64 MiB。名称和提案文件不能同时提供。
-
-64 MiB 限制按实际读取的字节数执行，适用于管道和特殊文件，并在文本解码或 JSON 解析前检查。即使报告的大小为零，或文件在读取过程中增长，超出限制的输入也会被拒绝。
-
-提案中的 `usernames` 必须与已提交的 `topology_intent.access.users` 中的用户名完全一致，包括大小写。提案不接受显示名称。
-
-保存的批量文件必须记录删除操作，提案必须恰好列出结果为 `cli_required` 的人员，且计数一致。CLI 会验证预览哈希；如果文件同时包含预览和回执，两者的 ID、哈希和提案必须一致。独立回执保留原始预览哈希，并根据已记录的结果检查提案。CLI 响应外层对象中的未知字段会被拒绝。
-
-按名称删除时，服务中的完整用户名优先于显示名称或忽略大小写的匹配。如果名称匹配两个人，命令会拒绝删除；请使用 `client list` 中的完整用户名。仅在控制台创建的人员请用 `client bulk delete` 删除。
-
-已提交的修订、代次、计划、服务器集合或本地意图发生变化时，草稿会被拒绝；应用栅栏在修改服务器前再次检查修订，即使计划未变也会拒绝旧修订。拓扑变化也会拒绝整个混合服务提交。服务没有已提交的拓扑栅栏，或所选声明属于未完成的应用时，请先完成 `meridian apply`，再重新预览。
-
-必须至少保留一名已声明人员。提案不包含备注、标签、连接凭据、设备数据或会话切断选项。批量删除拒绝 `--cut-off`；如需原有的会话关闭审核，请逐人运行 `meridian client remove NAME --cut-off`。否则之前开始的传输可能继续。
+先运行 `meridian client remove sample-a sample-b --dry-run --json` 预览，再运行 `meridian client remove sample-a sample-b --yes --json` 提交。拒绝确认不会写入。允许零人员；`meridian test` 没有活跃人员时报告证据不可用（退出码 3）。`--proposal` 已退役。使用单人 `client remove NAME --cut-off` 披露并关闭已有会话；否则先前传输可能继续。
 
 `GET /api/people` 需要 people/admin 或所有者会话，返回 `users`、`total`、`population`、分类 `facets` 与 `next_cursor`。查询键：`q`、`status`、`tag`、`profile`、`expires`、`quota`、`never`（0/1）、`attention`、`lifecycle`、`sort`、`order`、`limit`（1–500）、`cursor`。继续游标时保持相同筛选和排序。原有 `GET /api/users` 保留。查询响应不含凭据与私人备注；CLI 的 JSON 通过现有授权单人读取接口保留备注。
 
@@ -556,7 +546,7 @@ meridian client preview person --user-agent "Hiddify/2" --suffix json --json
 
 使用 `client set person --profile limited --yes` 替换配置列表，为每个需要保留的配置重复 `--profile`。选择 `default` 可恢复完整访问。配置成员变更单独审核，与账户限额、备注及语言分开修改。**路由与配置**标签页中的访问配置部分显示已授权连接及授权原因，保留未保存的选择，并打开相同的固定预览。批量操作 **设置访问配置** 显示新增和失去的入站访问；提交时若用户或拓扑发生变化，整个操作会被拒绝。
 
-单人和批量访问配置预览、`--dry-run` 与撤销试运行，都会先解析每位用户的有效路由策略。有默认映射的配置若选择不同策略，且用户没有已保存的个人覆盖，预览会拒绝更改。`access.creation_settings` 中的初始成员关系也会在配置验证与编译阶段检查默认策略冲突，在生成计划或应用之前拒绝。
+单人和批量配置预览、`--dry-run` 及撤销预览会先解析每人的交付策略。配置默认策略冲突会被拒绝，除非该人员有兼容的私有覆盖。设置草稿的创建种子中，初始成员关系会在审核前以及服务原子创建时验证。apply 不会替换已有人员的成员关系。
 
 CLI 无法读取用户时会报告服务访问错误。配置变更导致访问丢失的警告，每次审核只显示一次。
 
@@ -568,13 +558,13 @@ CLI 无法读取用户时会报告服务访问错误。配置变更导致访问�
 
 每条尚未确认的回执都会将其入站纳入预览，与当前记录的原因无关。轮换连接密钥、重新签发链接、导入时同时替换密钥与配置归属，或在缩小访问范围后重新启用账户，都不会移除已失去的入站。只有确认阻断，或恢复同一密钥的访问后，这些入站才会从切断会话的预览中移除。
 
-仍有成员的配置无法删除，错误会报告人数。请先将用户移到其他配置。普通 apply 不会覆盖成员关系。快照保留所有用户的配置；替换式用户导入在省略 `profiles` 时保留现有成员关系。部署导出将已声明用户的当前配置保存为仅用于创建的设置，新部署可据此创建用户，已存在用户继续保留运营者的选择。只在控制台创建的用户仍保存在服务快照中。
+仍有成员的配置无法删除，错误会报告人数。请先将用户移到其他配置。普通 apply 不会覆盖成员关系。快照保留所有用户的配置；替换式用户导入在省略 `profiles` 时保留现有成员关系。部署导出保存拓扑和配置授权；每位用户的成员关系仍保存在服务快照中。
 
 恢复会保留历史访问配置使用记录，并在暂存数据库或联系目标服务器前拒绝与本地拓扑不匹配的快照。存在指纹时比较已保存的声明；没有指纹时，编译后的授权映射必须完全一致。请先恢复匹配的状态，再运行 `meridian apply` 审核所需的已保存修改；`--force` 无法跳过匹配检查。参见[恢复](/zh/recovery/)。
 
 `plan` 和 `apply` 会同时审核服务中已有的配置与拟应用的拓扑。移除最后一个配置也必须经过审核和并发变更校验；只要仍有成员，就会被拒绝。
 
-所有应用路径，包括 `setup --intent`、通过 `--restart` 重新设置，以及 `client add`、`fleet contact` 等命令，都会在保存拓扑或写入服务器前，将访问配置 ID 和授权声明与服务核对。已保存但尚未应用的访问配置修改不能随其他命令应用：请使用 `meridian profile` 或 `meridian fleet import` 修改配置，或运行 `meridian apply` 审核已保存的修改。更换协议或中继伪装名称可能改变同一个 `exit:` 或 `gateway:` 授权所包含的连接；这些变化由拓扑命令自身的审核覆盖。
+所有应用路径，包括 `setup --intent`、通过 `--restart` 重新设置，以及 `node add`、`fleet contact` 等命令，都会在保存拓扑或写入服务器前，将访问配置 ID 和授权声明与服务核对。已保存但尚未应用的访问配置修改不能随其他命令应用：请使用 `meridian profile` 或 `meridian fleet import` 修改配置，或运行 `meridian apply` 审核已保存的修改。更换协议或中继伪装名称可能改变同一个 `exit:` 或 `gateway:` 授权所包含的连接；这些变化由拓扑命令自身的审核覆盖。
 
 新部署可以通过 `setup --intent` 引入访问配置。只有服务尚无声明指纹、命名访问配置和非 `default` 成员关系时，才允许初始化。如果服务已有访问配置但没有声明指纹，请先运行 `meridian apply` 审核，再使用其他拓扑命令。
 
@@ -589,8 +579,6 @@ apply 会先保存入站及连接端点引用，再启用配置授权，最后�
 成员关系属于运营者的私有数据：`people.private` 允许在用户和配置版本响应中读取 `profiles`。实际访问权限和成员数量需要 `people.read` 与 `people.private`；授权审核需要 `fleet.apply` 与 `people.private`。账户编辑使用 `people.edit`，批量分配使用 `people.batch` 与 `people.private`。订阅格式预览需要 `people.read`，启用配置后还需要 `people.private`。people/admin 预设包含所需私有权限；其他预设收到空的 `profiles` 列表，初始成员关系也会隐藏。配置仅保存成员关系，不保存客户端 IP、设备信息或连接观察数据。
 
 JSON 审核和部署导出会保留 `token`、`secret` 等有效配置 ID 和用户名，包括嵌套的授权及创建设置列表。凭证字段仍会隐藏。
-
-`token`、`secret` 和 `api_key` 等用户名也可用于修订提案和经过审核的拓扑应用。其创建设置和显示名称仍会接受常规的敏感数据检查。用户名必须在 `access.users` 中声明；在 `access.creation_settings` 中对应的值必须是映射对象，在 `access.display_names` 中则必须是字符串。否则，类似敏感字段名称的键仍会被拒绝。
 
 | 操作 | 含义 |
 | --- | --- |

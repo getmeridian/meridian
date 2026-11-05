@@ -32,6 +32,8 @@ SUPPORTED_AGENT_PROTOCOLS: tuple[str, ...] = (AGENT_PROTOCOL,)
 # Long enough not to hammer the service, short enough that a fixed fleet recovers soon.
 UNSUPPORTED_PROTOCOL_RETRY_SECONDS = 300
 
+SERVICE_VERSION_HEADER = "X-Meridian-Version"
+
 ServiceSkew = Literal["same", "service_older", "service_newer", "unknown"]
 
 

@@ -63,12 +63,14 @@ def test_person_reviews_reject_membership_or_catalog_changes_and_write_nothing(t
 def test_schema_24_migrates_in_one_step_and_overrides_survive_applies_and_reissue(tmp_path: Path) -> None:
     from meridian.control.schema import SCHEMA_VERSION
     from meridian.core.person_delivery_policy import PersonDeliveryPolicyWrite
+    from tests.support.control_service import drop_person_display_name_schema
 
     path = tmp_path / "control.db"
     service = ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
     user = service.put_user("person")
     service.close()
     with sqlite3.connect(path) as db:
+        drop_person_display_name_schema(db)
         for name in ("person_delivery_policy_insert", "person_delivery_policy_update", "person_delivery_policy_delete"):
             db.execute(f"DROP TRIGGER IF EXISTS {name}")
         db.execute("DROP TABLE IF EXISTS person_delivery_policies")

@@ -80,6 +80,12 @@ RENAMED: dict[str, str] = {
 }
 RENAMED_OPTIONS: dict[str, str] = {"--server": "the first argument"}
 # Removed commands with no successor spelling: the refusal says where the work moved.
+RETIRED_OPTIONS: dict[tuple[str, str], str] = {
+    ("client remove", "--proposal"): "`--proposal` has been retired. Use `meridian client remove NAME...`; "
+    "people are removed immediately through the control service.",
+    ("client show", "--repair-page"): "Connection pages are served automatically. Use `meridian client show NAME`.",
+}
+
 RETIRED: dict[str, str] = {
     "studio": "`meridian studio` was removed. Manage the fleet in the owner's web panel: `meridian panel`.",
 }
@@ -149,8 +155,9 @@ def _refuse_renamed(ctx: click.Context, path: list[str], command: click.Command 
         if arg == "--":
             return
         option = arg.split("=", 1)[0]
-        if old == "client show" and option == "--repair-page":
-            _fail_renamed(ctx, old, "Connection pages are served automatically. Use `meridian client show NAME`.", rest)
+        retired = RETIRED_OPTIONS.get((old, option))
+        if retired is not None:
+            _fail_renamed(ctx, old, retired, rest)
         if option in RENAMED_OPTIONS:
             message = f"`{option}` is now {RENAMED_OPTIONS[option]}: `meridian {old} SERVER`"
             _fail_renamed(ctx, old, message, rest)

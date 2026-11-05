@@ -155,11 +155,11 @@ def test_phone_filter_controls_scroll_in_one_row_and_active_chips_stay_removable
 def test_people_rows_show_compact_usage_and_secondary_facts_and_activate_as_links(locale):
     rows = people()
     rows[0].update(used_traffic_bytes=51 * 1024**3, traffic_limit_bytes=100 * 1024**3, note="Private sample note")
-    result = run_console("people-triage-ux", locale, {"people": rows, "declared": ["p-a"], "scenario": "row"})
+    result = run_console("people-triage-ux", locale, {"people": rows, "scenario": "row"})
     row = result["row"]
     assert row["tag"] == "GROUP_A" and row["meter"] == 51
     assert row["expiry"] and row["exactExpiry"] and row["secondary"]
-    assert row["notes"] and row["declared"] and not row["nestedCheckbox"]
+    assert row["notes"] and not row["nestedCheckbox"]
     assert "Private sample note" not in result["text"]
     assert result["clicked"]["name"] == result["keyboard"]["name"] == "people"
     assert result["clicked"]["arg"] == result["keyboard"]["arg"] == "p-a"

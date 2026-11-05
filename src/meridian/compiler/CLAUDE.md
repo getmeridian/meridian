@@ -1,13 +1,14 @@
 # compiler — pure finite topology compilation
 ## Design decisions
+**People never compile** — access retains its legacy squad label; account creation belongs to setup seeds and the service, while the old kind remains available for retirement.
 **App rules travel with delivery** — compile the reviewed response list into service settings only; empty lists stay omitted and app choices never change node resources.
 **Topology probes stay separate** — `probes.py` builds verification resources from the reviewed graph; the compile spine only orders them.
 **Named delivery uses one representation** — LAN precedes custom rules and the preset tail; every client renderer preserves conjunctions and reports unsupported geodata without widening a match.
 **Access profiles resolve authentication identities** — exit, gateway, endpoint, and inbound grants compile to stable managed inbounds; unknown references and gateway bridges fail review.
 **Pure and deterministic** — output depends only on `SetupIntent` and a secret-free `DeploymentContract`: no I/O, secrets, clock reads, or randomness (tested). It never holds generated credentials or private Reality keys.
-**Finite, reviewed resources** — only explicitly typed payloads, each with a stable logical ID, sorted dependencies, typed postconditions, an ownership marker, and a payload hash; the plan hash covers the ordered graph, resolved SSH targets, runtime pins, and renderer contract. This is not a generic provider layer.
-**Control-service backend** — `meridian_backend.py` runs after the base compile and swaps panel kinds for `control_service`, `agent_runtime`, `node_workload`, `client_endpoint`, `control_user`, and `service_settings`; a routing gateway is one more agent node whose pools and routes fold into its workload. Only client-IP forwarding is refused (it changes the PROXY chain).
-**One client routing list, two policies** — `delivery.DEFAULT_CLIENT_ROUTES` renders into every structured format (add a rule there, never in one template); `ru-split` (default) and `full` differ only in Russian bypasses, while LAN bypasses, QUIC blocking, and the BitTorrent direct rule stay in both. sing-box never downloads geo lists, because an unfetchable rule set stops it starting; Base64 links carry no rules.
+**Finite reviewed resources** — typed payloads have stable IDs, sorted dependencies, postconditions, ownership markers and hashes; the plan binds the graph, SSH targets, runtime pins and renderer contract.
+**Control-service backend** — `meridian_backend.py` runs after the base compile and swaps panel kinds for `control_service`, `agent_runtime`, `node_workload`, `client_endpoint`, and `service_settings`; a routing gateway is one more agent node whose pools and routes fold into its workload. Only client-IP forwarding is refused (it changes the PROXY chain).
+**One routing list** — `delivery.DEFAULT_CLIENT_ROUTES` serves every structured format; presets differ only in Russian bypasses and retain LAN, QUIC and BitTorrent rules. Never require sing-box to fetch remote lists, since failures prevent startup. Base64 carries no routing rules.
 **Aggregate workload profiles** — each exit Profile owns its complete Inbound set; derived Inbound resources expose the identities bindings and endpoints need. Exit egress overrides compile into the Profile's routing rules ahead of the default egress.
 **Gateway rule targets** — an exit's bridge edge, a pool's balancer, or the gateway's own `direct`/`block`; `SetupIntent.gateway_routes()` is the one rule order, shared with the wizard summary.
 **Self-steal camouflage** — `self_steal.py` falls a Reality path back to a loopback nginx TLS server holding the operator's own certificate; XHTTP/WSS on that name use it, and the 443 route for the name belongs to Reality.
@@ -21,8 +22,7 @@
 ## Pitfalls
 - **Legacy backends cannot enforce response rules** — refuse nonempty app rules before compilation, including built-in policy choices, since only Meridian's service-settings resources carry them.
 - **Hash grants before resolving them** — service settings carry the core declaration fingerprint; a compiled map changes when protocols or camouflage inbounds change, even when the declared grants do not.
-- **Creation profiles share the delivery resolver** — re-check initial memberships at compile even for an already-built intent; conflicting defaults cannot reach apply.
-- **Legacy backends cannot enforce profiles** — refuse named grants or initial memberships on Remnawave before compiling; only migration uses that backend.
+- **Legacy backends cannot enforce profiles** — refuse named grants or memberships on Remnawave before compiling; only migration uses that backend.
 - **Policies follow stored references** — settings wait for workloads and endpoints; accounts always wait for settings, or their new membership can invalidate the same apply's access fence when the last profile disappears.
 **Public aliases share enforcement** — an endpoint grant includes every public connection backed by that inbound; profile previews must disclose this boundary.
 - **New optional payload or intent fields use `Field(exclude_if=...)` at their default** — otherwise every existing fleet's plan hash changes and re-applies.
@@ -30,12 +30,11 @@
 - **Certificates depend on their TCP/80 ACME rule, never on the node runtime** — Hysteria2 makes Xray load the certificate at startup, so the runtime waits for the certificate; the control bootstrap likewise depends on its public 80/443 rules.
 - **Xray sniffs BitTorrent with `enabled: true`**, never in `destOverride` (invalid); keep its direct rule after UDP/443 blocking and before the catch-all.
 - **Raise `TopologyCompileError` for unsupported intent**; deployment contracts are empty or cover every topology server ref exactly.
-- **Build every published name through `names.py`** — length limits per format, and `host_remark()` composes flag, country, method, and fingerprint.
+- **Build every published name through `names.py`** — format length limits and `host_remark()` keep labels consistent.
 - **Endpoints publish only after their listener and runtime**, in `PROTOCOL_PRIORITY` order with the control server's exit first (the entry clients pick by default); Xray-JSON-only entries exclude other formats, or sing-box and Stash list duplicates.
-- **Bare-IP clients send no SNI** — IP paths route on the no-SNI stream key. On the control server's 443, a TLS path joins the panel's server as locations only when the panel holds its name (its domain, or the IP of a panel without one); with a panel domain, IP paths take the no-SNI route for their own IP-certified server, since the panel's serves only the domain's certificate.
+- **Bare-IP clients send no SNI** — route IP paths on the no-SNI key. Join a control TLS server only when its certificate holds that name; with a panel domain, IP paths require their own IP-certified server.
 - **Geodata categories must exist in stock dat files** — an unknown `geosite:` makes Xray refuse the whole config; `geodata.py` checks server rules against `core/geodata_lists.py`, generated from the pinned Xray archive (compare both when the pin moves).
 - **Every TCP path carries its fingerprint** — empty means Go's ClientHello, a DPI signature; Hysteria2 carries none.
 - **Client Xray JSON's `dns` block stays unused** — the final balancer rule matches every domain first; narrowing it sends plain lookups to resolvers Russia redirects, through DIRECT.
 - **Mihomo IP rules keep `no-resolve`** — local resolution leaks names, and spoofed domestic answers would match `geoip:ru`.
 - **Xray server pools use `leastPing`**; never claim strict-priority failover.
-- **`user:` logical IDs lowercase usernames** while the service keeps their case (`AccessIntent` refuses case-only twins).

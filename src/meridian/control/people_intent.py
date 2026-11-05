@@ -1,4 +1,4 @@
-"""People ownership and names from the service's reviewed revisions."""
+"""Applied topology projection for fleet views; revisions never determine person ownership."""
 
 from __future__ import annotations
 
@@ -13,20 +13,15 @@ from meridian.control.store import Store
 class PeopleIntent:
     revision: int | None = None
     intent: dict[str, Any] = field(default_factory=dict)
-    names: dict[str, str] = field(default_factory=dict)
-    declared: set[str] = field(default_factory=set)
 
 
 def read_people_intent(store: Store) -> PeopleIntent:
-    """Include approved and failed creations until the latest applied declaration."""
+    """Read the latest applied topology while ignoring unfinished revisions."""
     result = PeopleIntent()
     rows = store.rows("SELECT number, status, intent FROM revisions WHERE status != 'proposed' ORDER BY number DESC")
     for row in rows:
         intent = json.loads(row["intent"])
-        access = intent.get("access", {})
-        result.declared.update(access.get("users", []))
         if row["status"] == "applied":
             result.revision, result.intent = row["number"], intent
-            result.names = access.get("display_names", {})
             break
     return result

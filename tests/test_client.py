@@ -10,7 +10,6 @@ import json
 from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -23,13 +22,11 @@ from meridian.commands.client import (
     run_enable,
     run_list,
     run_reissue,
-    run_remove,
     run_show,
 )
 from meridian.commands.client_handoff import print_handoff_links
 from meridian.console import set_json_mode
 from meridian.core.topology import AccessIntent
-from meridian.handoff import HandoffLinks
 from meridian.remnawave import RemnawaveError, User
 from tests.support.topology import panel_mock, single_exit_intent
 
@@ -93,87 +90,6 @@ def _json(capsys: pytest.CaptureFixture[str]) -> dict:
     return json.loads(capsys.readouterr().out)
 
 
-class TestRunAdd:
-    def test_v4_add_updates_intent_and_uses_compiled_access_driver(self, tmp_home: Path) -> None:
-        cluster = _make_cluster(tmp_home, users=["default"])
-        panel = _make_panel_mock()
-        panel.get_user.side_effect = [None, _make_user("alice")]
-        runtime = MagicMock()
-        runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, changed=True, failed=[])
-
-        with (
-            _cli(cluster, panel, runtime=runtime),
-            patch(
-                "meridian.commands.client.client_handoffs",
-                return_value=[HandoffLinks("alice", subscription_url="https://198.51.100.1/pages/sub/abc123")],
-            ) as publish_handoff,
-        ):
-            run_add(names=["alice"])
-
-        updated = runtime.apply_intent.call_args.args[0]
-        assert updated.access.users == ["default", "alice"]
-        publish_handoff.assert_called_once_with(cluster, ["alice"])
-
-    @pytest.mark.parametrize(
-        ("observed", "status"),
-        [(_make_user("alice"), "ok"), (None, "failed")],
-        ids=["observed", "unobserved"],
-    )
-    def test_v4_add_save_failure_reports_remote_state_change(
-        self, observed: User | None, status: str, tmp_home: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """An observed client comes back as partial data; otherwise the error says remote state may have changed."""
-        from meridian.commands._helpers import ReviewedApplyPersistenceError
-
-        panel = _make_panel_mock()
-        panel.get_user.side_effect = [None, observed]
-        runtime = MagicMock()
-        runtime.apply_intent.side_effect = ReviewedApplyPersistenceError("disk full")
-
-        with (
-            _cli(_make_cluster(tmp_home, users=["default"]), panel, json_mode=True, runtime=runtime),
-            pytest.raises(typer.Exit) as exc_info,
-        ):
-            run_add(names=["alice"])
-
-        payload = _json(capsys)
-        assert exc_info.value.exit_code == 3
-        assert payload["status"] == status
-        if observed:
-            assert payload["data"]["clients"][0]["username"] == "alice"
-            assert payload["warnings"][0]["details"]["remote_state_changed"] is True
-            assert "Remote state changed" in payload["warnings"][0]["message"]
-        else:
-            assert payload["errors"][0]["category"] == "system"
-            assert "remote state may have changed" in payload["errors"][0]["message"]
-
-    @pytest.mark.parametrize(
-        ("configured", "names"),
-        [(True, ["alice", "alice"]), (True, [""]), (False, ["alice"])],
-        ids=["duplicate-in-batch", "empty-name", "no-cluster"],
-    )
-    def test_invalid_add_fails(self, configured: bool, names: list[str], tmp_home: Path) -> None:
-        cluster = _make_cluster(tmp_home) if configured else ClusterConfig()
-        with _cli(cluster), pytest.raises(typer.Exit):
-            run_add(names=names)
-
-    def test_add_keeps_a_typed_name_and_gives_the_panel_a_latin_username(self, tmp_home: Path) -> None:
-        panel = _make_panel_mock()
-        panel.get_user.side_effect = [None, _make_user("biba")]
-        runtime = MagicMock()
-        runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, changed=True, failed=[])
-
-        with (
-            _cli(_make_cluster(tmp_home, users=["default"]), panel, runtime=runtime),
-            patch("meridian.commands.client.client_handoffs", return_value=[]) as publish_handoff,
-        ):
-            run_add(names=["Биба"])
-
-        access = runtime.apply_intent.call_args.args[0].access
-        assert (access.users, access.display_names) == (["default", "biba"], {"biba": "Биба"})
-        assert publish_handoff.call_args.args[1] == ["biba"]
-
-
 class TestRunShow:
     def test_handoff_urls_render_as_plain_text(self, capsys: pytest.CaptureFixture[str]) -> None:
         subscription_url = "https://[2001:db8::1]/[red]subscription[/red]"
@@ -197,7 +113,7 @@ class TestRunShow:
         with _cli(cluster, panel):
             run_show(name="alice")
 
-        panel.get_user.assert_called_once_with("alice")
+        panel.get_user.assert_called_with("alice")
         output = capsys.readouterr().err
         assert "panel-admin" not in output
         assert "panel-password" not in output
@@ -273,89 +189,6 @@ class TestRunList:
         assert payload["data"]["clients"][0]["traffic_used_bytes"] == 104857600
 
 
-class TestRunRemove:
-    def test_last_client_cannot_be_removed(self, tmp_home: Path) -> None:
-        with _cli(_make_cluster(tmp_home, users=["alice"])) as panel_cls, pytest.raises(typer.Exit) as exc_info:
-            run_remove(name="alice", yes=True)
-
-        assert exc_info.value.exit_code == 2
-        panel_cls.assert_not_called()
-
-    def test_remove_retires_the_user_through_the_topology_without_page_ssh(self, tmp_home: Path) -> None:
-        cluster = _make_cluster(tmp_home)
-        panel = _make_panel_mock()
-        panel.get_user.return_value = _make_user("bob")
-        runtime = MagicMock()
-        runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failure_summary="")
-
-        with (
-            _cli(cluster, panel, runtime=runtime),
-            patch("meridian.ssh.ServerConnection") as remove_page,
-        ):
-            run_remove(name="bob", yes=True)
-
-        assert runtime.apply_intent.call_args.args[0].access.users == ["alice"]
-        remove_page.assert_not_called()
-        panel.delete_user.assert_not_called()  # retirement owns the delete
-
-    def test_remove_finds_a_client_by_the_name_they_were_added_with(self, tmp_home: Path) -> None:
-        cluster = _make_cluster(tmp_home, users=["alice", "biba"])
-        cluster.topology_intent = cluster.topology_intent.model_copy(  # type: ignore[union-attr]
-            update={"access": AccessIntent(users=["alice", "biba"], display_names={"biba": "Биба"})}
-        )
-        panel = _make_panel_mock()
-        panel.get_user.return_value = _make_user("biba")
-        runtime = MagicMock()
-        runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failure_summary="")
-
-        with _cli(cluster, panel, runtime=runtime), patch("meridian.ssh.ServerConnection"):
-            run_remove(name="биба", yes=True)
-
-        access = runtime.apply_intent.call_args.args[0].access
-        assert (access.users, access.display_names) == (["alice"], {})
-
-    def test_an_unknown_name_in_any_script_is_refused_before_the_panel(self, tmp_home: Path) -> None:
-        with _cli(_make_cluster(tmp_home)) as panel_cls, pytest.raises(typer.Exit) as exc_info:
-            run_disable(name="Призрак")
-
-        assert exc_info.value.exit_code == 2
-        panel_cls.assert_not_called()
-
-    def test_unfinished_retirement_is_a_system_error(self, tmp_home: Path) -> None:
-        runtime = MagicMock()
-        runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=False, failure_summary="retire x: down")
-
-        with _cli(_make_cluster(tmp_home), runtime=runtime), pytest.raises(typer.Exit) as exc_info:
-            run_remove(name="bob", yes=True)
-
-        assert exc_info.value.exit_code == 3
-
-    def test_remove_json_refusal_emits_error_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        panel = _make_panel_mock()
-        panel.get_user.return_value = None
-
-        with _cli(_make_cluster(tmp_home), panel, json_mode=True), pytest.raises(typer.Exit):
-            run_remove(name="nonexistent", yes=True)
-
-        payload = _json(capsys)
-        assert payload["status"] == "failed"
-        assert payload["command"] == "client.remove"
-
-    def test_remove_json_requires_yes_without_prompting(
-        self, tmp_home: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        panel = _make_panel_mock()
-
-        with _cli(_make_cluster(tmp_home), panel, json_mode=True), pytest.raises(typer.Exit) as exc_info:
-            run_remove(name="alice", yes=False)
-
-        payload = _json(capsys)
-        assert exc_info.value.exit_code == 2
-        assert payload["status"] == "failed"
-        assert "--yes" in payload["errors"][0]["hint"]
-        panel.delete_user.assert_not_called()
-
-
 _NEW_VLESS = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
 
 
@@ -402,6 +235,7 @@ class TestRunReissue:
         assert payload["summary"]["changed"] is True
         assert payload["data"]["client"] == {
             "username": "alice",
+            "display_name": "",
             "id": "101",
             "status": "active",
             "page_url": "https://198.51.100.1/pages/sub/new-short-uuid-1234",
@@ -411,16 +245,20 @@ class TestRunReissue:
     def test_finds_a_client_by_the_name_they_were_added_with(self, tmp_home: Path) -> None:
         cluster = _make_cluster(tmp_home, users=["alice", "biba"])
         cluster.topology_intent = cluster.topology_intent.model_copy(  # type: ignore[union-attr]
-            update={"access": AccessIntent(users=["alice", "biba"], display_names={"biba": "Биба"})}
+            update={"access": AccessIntent()}
         )
         panel = _make_panel_mock()
+        person = _make_user("biba")
+        person.display_name = "Биба"
+        panel.list_users.return_value = [person]
+        panel.get_user.return_value = person
         panel.get_user.return_value = _make_user("biba")
         panel.revoke_user_subscription.return_value = _reissued("biba")
 
         with _reissue_cli(cluster, panel) as links:
             run_reissue(name="биба", yes=True)
 
-        panel.get_user.assert_called_once_with("biba")
+        panel.get_user.assert_called_with("biba")
         assert links.call_args.kwargs["page_url"] == links.call_args.args[0]
 
     @pytest.mark.parametrize(
@@ -439,8 +277,8 @@ class TestRunReissue:
 
         payload = _json(capsys)
         assert exc_info.value.exit_code == 2
-        assert payload["errors"][0]["hint"] == "Your clients: " + ", ".join(users)
-        panel_cls.assert_not_called()
+        assert "meridian client list" in payload["errors"][0]["hint"]
+        panel_cls.assert_called()
 
     def test_json_requires_yes_before_touching_anything(
         self, tmp_home: Path, capsys: pytest.CaptureFixture[str]
@@ -522,7 +360,7 @@ class TestToggleClient:
         with _cli(_make_cluster(tmp_home), panel):
             run(name="alice")
 
-        panel.get_user.assert_called_once_with("alice")
+        panel.get_user.assert_called_with("alice")
         getattr(panel, f"{action}_user").assert_called_once_with("101")
 
     @pytest.mark.parametrize("json_mode", [False, True], ids=["text", "json"])

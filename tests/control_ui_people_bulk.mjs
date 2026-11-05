@@ -14,9 +14,8 @@ const dom = new JSDOM('<!doctype html><body><div id="app"></div></body>', {
 const w = dom.window;
 w.document.documentElement.lang = locale;
 w.document.documentElement.dir = locale === 'fa' ? 'rtl' : 'ltr';
-let downloadedBlob;
 w.Blob = globalThis.Blob;
-w.URL.createObjectURL = blob => { downloadedBlob = blob; return 'blob:local-proposal'; };
+w.URL.createObjectURL = () => 'blob:local';
 w.URL.revokeObjectURL = () => {};
 w.HTMLAnchorElement.prototype.click = function () {
   if (this.download) { report.downloadName = this.download; report.downloadHref = this.getAttribute('href'); }
@@ -32,7 +31,7 @@ w.fetch = async (url, options = {}) => {
   requests.push(url);
   let body, status = 200;
   if (url === 'auth/state') body = { configured: true, owner_exists: true, signed_in: true };
-  else if (url === 'ui/api/fleet') body = { servers: [], declared_users: [], display_names: {} };
+  else if (url === 'ui/api/fleet') body = { servers: [], display_names: {} };
   else if (url.startsWith('api/people?')) {
     body = data.refresh && new URLSearchParams(url.split('?')[1]).has('cursor') ? data.nextPage : committed && !undone ? data.after : data.page;
     if (data.refresh && requests.filter(request => request.startsWith('api/people?')).length > 1) {
@@ -161,18 +160,11 @@ if (mode === 'people-bulk-refresh') {
         arrow: pair.children[1]?.textContent.trim(), flow: style.flexDirection || 'row' };
     });
   }
-  if (data.action === 'delete') {
-    report.previewProposals = w.document.querySelectorAll('[data-removal-proposal]').length;
-    w.document.querySelector('[data-save-proposal]')?.click();
-  }
   const commit = w.document.querySelector('[data-bulk-commit]');
   commit.click(); commit.click();
   await settle();
   report.dialog = w.document.querySelector('dialog')?.textContent || '';
-  if (data.action === 'delete') {
-    report.receiptProposals = w.document.querySelectorAll('[data-removal-proposal]').length;
-    w.document.querySelector('[data-save-proposal]')?.click();
-  } else if (!data.stale) {
+  if (data.action !== 'delete' && !data.stale) {
     w.document.querySelector('[data-bulk-undo]').click();
     await settle();
     report.dialog = w.document.querySelector('dialog')?.textContent || '';
@@ -191,6 +183,5 @@ if (mode === 'people-bulk-refresh') {
 report.commits = commits; report.undos = undos; report.undone = undone;
 report.outside = requests.some(url => /^https?:/.test(url));
 report.stored = [...Object.keys(w.localStorage), ...Object.keys(w.sessionStorage)];
-if (downloadedBlob) report.savedProposal = JSON.parse(await downloadedBlob.text());
 dom.window.close();
 process.stdout.write(JSON.stringify(report));

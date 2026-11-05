@@ -120,12 +120,14 @@ def test_cancel_file_stops_a_machine_deploy_before_it_connects(tmp_home: Path, m
     resolve_server.assert_not_called()
 
 
-def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypatch) -> None:
+@pytest.mark.parametrize("typed", ["alice", "Alice", "Display"])
+def test_deploy_hands_off_and_tests_the_resolved_person_not_the_typed_alias(tmp_home: Path, monkeypatch, typed) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
     conn = MagicMock(port=22, identity_file="")
     resolved = SimpleNamespace(ip="198.51.100.10", user="root", port=22, machine_id="", conn=conn)
     runtime = MagicMock()
-    runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)
+    runtime.apply.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)
+    runtime.resolve_people.return_value = ["alice"]
     runtime.handoff.return_value = [
         HandoffLinks(
             "alice",
@@ -139,18 +141,21 @@ def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypa
         patch("meridian.commands.deploy.ensure_server_connection", return_value=resolved),
         patch("meridian.commands.deploy.check_ports") as check_ports,
         patch("meridian.commands.deploy._camouflage_candidates", return_value=["www.google.com"]),
-        patch("meridian.commands.deploy._verify_traffic", return_value=("ok", "exit IP 198.51.100.10")),
+        patch("meridian.commands.deploy._verify_traffic", return_value=("ok", "exit IP 198.51.100.10")) as traffic,
         patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
     ):
-        result = _invoke(["deploy", "198.51.100.10", "--client-name", "alice", "--no-geo-block", "--yes", "--json"])
+        result = _invoke(["deploy", "198.51.100.10", "--client-name", typed, "--no-geo-block", "--yes", "--json"])
 
     assert result.exit_code == 0, result.output
     check_ports.assert_called_once()
-    intent = runtime.apply_intent.call_args.args[0]
-    assert intent.access.users == ["alice"]
+    draft = runtime.apply.call_args.args[0]
+    intent = draft.to_intent()
+    assert [person.display_name for person in draft.access.people] == [typed]
+    assert "users" not in intent.access.to_data()
     assert intent.exits[0].geo_block is False and intent.harden is True
     runtime.verify.assert_called_once()
     runtime.handoff.assert_called_once_with(["alice"])
+    assert traffic.call_args.args == ("198.51.100.10", "alice")
     data = json.loads(result.stdout)["data"]
     assert data["mode"] == "first_deploy"
     assert data["sni"] == "www.google.com"
@@ -160,7 +165,8 @@ def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypa
 
 def _fake_runtime() -> MagicMock:
     runtime = MagicMock()
-    runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)
+    runtime.apply.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)
+    runtime.resolve_people.return_value = ["default"]
     runtime.handoff.return_value = [HandoffLinks("default", subscription_url="https://198.51.100.10/p/sub/s")]
     return runtime
 
@@ -189,7 +195,7 @@ def test_dead_camouflage_target_falls_back_to_the_next_candidate(tmp_home: Path,
     result = _deploy_with(runtime, [("failed", "connection reset"), ("ok", "exit IP 198.51.100.10")])
 
     assert result.exit_code == 0, result.output
-    snis = [call.args[0].exits[0].paths[0].reality_sni for call in runtime.apply_intent.call_args_list]
+    snis = [call.args[0].to_intent().exits[0].paths[0].reality_sni for call in runtime.apply.call_args_list]
     assert snis == ["www.google.com", "dl.google.com"]
 
 
@@ -201,7 +207,7 @@ def test_explicit_sni_is_never_swapped_and_dead_traffic_fails(tmp_home: Path, mo
 
     assert result.exit_code == 3
     assert "no traffic passes" in unstyle(result.output)
-    assert runtime.apply_intent.call_count == 1
+    assert runtime.apply.call_count == 1
     runtime.handoff.assert_not_called()
 
 
@@ -271,7 +277,7 @@ def test_cancel_during_apply_stops_before_verification_and_handoff(tmp_home: Pat
 
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
     runtime = _fake_runtime()
-    runtime.apply_intent.side_effect = OperationCancelledError(
+    runtime.apply.side_effect = OperationCancelledError(
         OperationCancellation(
             phase="apply", message="Apply stopped after 4 of 12 resource actions.", remote_changed=True
         )

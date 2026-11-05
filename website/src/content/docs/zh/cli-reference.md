@@ -140,7 +140,6 @@ meridian client reissue NAME [--cut-off] [--yes] [--json]
 meridian client rotate-credentials NAME [--cut-off] [--yes] [--json]
 meridian client remove NAME [--cut-off] [--yes] [--json]
 meridian client remove NAME... [--dry-run] [--yes] [--json]
-meridian client remove --proposal FILE [--dry-run] [--yes] [--json]
 ```
 
 | 标志 | 默认值 | 说明 |
@@ -153,7 +152,7 @@ meridian client remove --proposal FILE [--dry-run] [--yes] [--json]
 | `--expires DATE` | never | 访问何时结束：`YYYY-MM-DD`（当天结束时，UTC）、ISO 时间如 `2026-12-31T18:00:00+03:00`（不带时区偏移的时间按 UTC 计），或 `never`。必须是将来的时间 |
 | `--yes`, `-y` | | 确认 `client reissue` 或 `client remove`；`--json` 需要 |
 
-**`client add`** — 把一个或多个人添加到拓扑并应用，然后为每个人打印连接页面和订阅 URL。页面根据他们真实的订阅生成，因此中继和 Hysteria2 存在时都会显示。拓扑中已有或控制服务中已存在的名称会被拒绝。名称可以使用任何文字（`client add Биба 王小明`）：页面和输出按输入原样显示名称，而控制服务只接受拉丁字母、数字、`.`、`-` 和 `_`，会得到音译后的用户名（`biba`、`wangxiaoming`）。其他 client 命令接受任一形式。如果无法生成客户端的订阅链接，客户端仍会被添加，命令以退出码 `3` 结束。`--limit`、`--reset`、`--expires` 和 `--devices` 都包含在审阅后的计划中，并与每个账户在同一事务中创建。应用失败时不会打印链接；重新运行 `meridian apply` 即可继续。之后的应用会保留管理者所做的修改。
+**`client add`** — 通过控制服务立即创建人员及其初始设置，并输出连接页面和订阅 URL。无需 apply 或 SSH。名称可使用任何文字；服务在需要时分配拉丁用户名。批次中任何人员创建前都会拒绝已有名称。
 
 **`client show`** — 打印连接页面、订阅 URL、状态、相对限额的流量及其重置周期、到期时间和最后在线时间。**每个人的订阅 URL 同时也是连接页面的地址。**
 
@@ -161,7 +160,7 @@ meridian client remove --proposal FILE [--dry-run] [--yes] [--json]
 
 首次记录的流量时间和最近报告流量的节点来自已接受的计数增长（JSON 中的 `first_traffic_at` 和 `last_traffic_node`）。升级前的首次使用时间可能未知；这些仅是汇总数据，不包含会话或客户端地址。
 
-**`client list`** — 列出客户端及其状态、流量、到期时间和最后在线时间，包括在网页面板中添加的用户（JSON 中为 `declared: false`）。带 `--json`，返回 `data.summary` 计数和 `data.clients[]`。
+**`client list`** — 列出服务中的所有人员及其状态、流量、到期和活动。JSON 返回 `data.summary` 和 `data.clients[]`；不再包含所有权标志。
 
 `client list --attention` 仅显示七天内到期（包含当前时刻）、已用流量达到限额的 80%，或创建超过三天且从未记录过流量的用户。原因列说明每行；JSON 包含 `clients[].attention_reasons`，汇总数量仅统计筛选后的用户。导入的历史流量即使日期未知，以及重置过的流量周期，都不会被误判为从未使用。 另一个原因 **已停止使用**（`stopped`）会标记曾使用服务、但超过三天没有新流量的用户。**尚未使用**（`unused`）仍是独立原因。API 参数 `stopped_days` 可独立设置为 1–365 天，默认 3 天；`unused_days` 的范围和默认值保持不变。周期重置不会抹去这些证据，且无需启用每日历史。导入用量缺少最后活动时间时，不会猜测用户已停止使用。
 
@@ -177,17 +176,17 @@ meridian client remove --proposal FILE [--dry-run] [--yes] [--json]
 
 **`client rotate-credentials`** — 需要更换连接凭据并保留链接时，执行 `meridian client rotate-credentials NAME --yes`。它生成新的 VLESS UUID 和 Hysteria2 密码，保留订阅令牌、页面 URL、设备登记、状态、限额、到期时间、流量、备注、标签和语言。应用下次刷新订阅时获取新密钥；请用户立即刷新。各节点应用变更后会阻止旧身份的新数据流。若订阅 URL 本身泄露，请使用 `client reissue`；该命令签发新 URL 并清除设备登记。
 
-网页面板为在面板添加的用户提供**更换连接密钥**。配置文件声明的用户通过 CLI 操作，遵循与重新签发链接相同的所有权规则。JSON 模式需要 `--yes`，结果 `client-rotate-credentials` 包含凭据代次和每个节点的 `flow_blocks`。可选 `--cut-off` 也结束现有数据流；确认前会说明重置入站或重启整个节点核心的影响。
+网页面板为每位用户提供**更换连接密钥**，使用与 CLI 相同的服务操作。 JSON 模式需要 `--yes`，结果 `client-rotate-credentials` 包含凭据代次和每个节点的 `flow_blocks`。可选 `--cut-off` 也结束现有数据流；确认前会说明重置入站或重启整个节点核心的影响。
 
 **`client reissue`** — 在链接泄露后替换客户端的链接。控制服务生成新的订阅 ID 和新的密钥，因此旧的订阅 URL、连接页面和链接全部失效。Meridian 打印新的订阅 URL，它同时打开新的连接页面。状态、限额和到期时间保持不变。除非 `--yes`，否则要求确认；不属于你的客户端的名称会被拒绝。
 
-**`client remove`** — 从拓扑中删除客户端，删除其在控制服务中的账户，订阅和连接页面随即停止响应。除非 `--yes`，否则要求确认。最后一个客户端无法删除。在网页面板中添加的用户请在网页面板中删除。
+**`client remove`** — 确认后通过服务立即删除人员（JSON 使用 `--yes`）。允许删除最后一人。多个名称使用一次冻结批量预览和原子提交；`--dry-run` 不写入。`--cut-off` 仅限单人。`--proposal` 已退役；请指定名称。
 
 **`client usage`** — 显示控制服务中任何人员（含网页面板添加者）的每日上传、下载及总字节数。须在[隐私](/zh/privacy/)中开启每日历史；否则退出码为 `2`，并提示启用命令。历史开启时，`client show` 附最近七个 UTC 天（JSON 的 `data.usage`，关闭时为 `null`）。空白日期表示无记录的流量，不会补算过去用量。
 
 **`client devices`** — private 显示数量，full 显示设备详情；off 不读取设备。`--json` 返回 `username`、`level`、`count`、有效 `limit`、`devices` 和 `removed`。`--remove ID` 或 `--clear` 清除登记而不撤销凭证；重复操作报告零条删除。也可通过 CLI 查看和清除网页面板添加的用户的设备登记。`client set --devices N` 设置上限，`--devices default` 使用集群上限。参见[设备限制](/zh/client-management/#限制设备数量)。重新签发链接会清除全部设备登记并保留上限。
 
-修改服务中用户设置的命令（`client enable`、`disable`、`set`、`reset-traffic` 以及删除设备注册）也适用于网页面板添加的用户。精确匹配的服务用户名优先；忽略大小写或按显示名称匹配时必须只对应一个用户。若有歧义，请使用 `client list` 中显示的精确用户名。删除用户、重新签发凭据和发布连接页面仍仅适用于拓扑中声明的用户。
+人员在控制服务中立即添加或删除，无需 apply 或 SSH。名称可使用任何文字。精确用户名优先；否则用户名或显示名称的不区分大小写匹配必须唯一。歧义会被拒绝。批量添加在首次写入前检查所有名称，然后逐人报告服务请求结果。已有名称会被拒绝。
 
 禁用、到期、达到流量上限、删除用户及更换连接凭据，会阻止已撤销身份的新 TCP 数据流和 UDP 会话，包括已认证的 Hysteria2 QUIC 连接或 VLESS mux 连接上的新数据流。其他用户的会话保持连接。用户详情页和 `GET /api/users/{username}/flow-blocks` 按节点返回 `blocked`、`pending_node` 或 `agent_too_old`。尚未确认的节点在收到并应用变更前可能继续使用旧配置；控制服务不可用时也如此。使用 `meridian apply` 更新旧节点 agent。事件只记录节点和结果，不记录连接地址或设备数据。
 
@@ -222,30 +221,15 @@ JSON 筛选计数对所有有效标签均保持整数，包括 `TOKEN` 和 `API_
 | `meridian client bulk tag --set-tag none` | 设置或清除标签 |
 | `meridian client bulk devices --devices unlimited` | 设置设备限制 |
 | `meridian client bulk renewal --renew-days 30 --renewals 5` | 设置或清除续期 |
-| `meridian client bulk delete` | 删除服务人员，为已声明人员返回一个本地提案 |
+| `meridian client bulk delete` | 通过服务的冻结预览和提交原子删除用户 |
 | `meridian client bulk undo ID` | 十分钟内撤销可逆字段 |
 | `meridian client bulk receipt ID` | 读取持久回执 |
 
 共享筛选：`--search TEXT`、`--status STATUS`、`--tag TAG`、`--match-profile PROFILE`、`--expiring-within DAYS`、`--quota-at-least PERCENT`、`--never-used`、`--attention`、`--attention-reason REASON`、`--lifecycle STATE`、`--sort name|usage|expiry|activity` 与 `--order asc|desc`。`--attention` 匹配任何原因，不能与 `--attention-reason` 同用。周期状态：`pending`、`renewing`、`fixed`、`unlimited`。先按忽略大小写的显示名称，再按完整用户名排序。规则见[客户端管理](/zh/client-management/)。
 
-删除已声明人员会在批量预览和回执中返回一个绑定修订的 `proposal`。保存控制台的 **people-removal.json**，或将完整 API 批量预览、回执或 CLI 批量 JSON 结果文件传给 `client remove --proposal FILE`。文件上限为 64 MiB。CLI 验证服务器集合、已提交的修订、代次、计划及本地意图，一起审核所有删除，只确认一次，并应用一次意图更改。应用栅栏在服务器修改前再次拒绝旧修订。
+批量预览将所选人员和行版本冻结十分钟。提交在一个事务中应用所有审核的更改，并返回不含备注或凭据的持久回执。可逆修改可在十分钟内撤销一次；删除和流量重置不可逆。所有人员都由服务管理。
 
-64 MiB 限制按实际读取的字节数执行，适用于管道和特殊文件，并在文本解码或 JSON 解析前检查。即使报告的大小为零，或文件在读取过程中增长，超出限制的输入也会被拒绝。
-
-提案中的 `usernames` 必须与已提交的 `topology_intent.access.users` 中的用户名完全一致，包括大小写。提案不接受显示名称。
-
-保存的批量文件必须记录删除操作，提案必须恰好列出结果为 `cli_required` 的人员，且计数一致。CLI 会验证预览哈希；如果文件同时包含预览和回执，两者的 ID、哈希和提案必须一致。独立回执保留原始预览哈希，并根据已记录的结果检查提案。CLI 响应外层对象中的未知字段会被拒绝。
-
-按名称删除时，服务中的完整用户名优先于显示名称或忽略大小写的匹配。如果名称匹配两个人，命令会拒绝删除；请使用 `client list` 中的完整用户名。仅在控制台创建的人员请用 `client bulk delete` 删除。
-
-`client remove NAME...` 也接受多个已声明名称，`--dry-run` 只审核、不保存。取消确认不会保存任何更改，且必须至少保留一名已声明人员。JSON 预览返回 `data.clients`、`data.review_hash` 和 `data.applied: false`。已应用的批量删除保留 `clients` 和 `review_hash`，省略默认值 `applied: true`。单人结果继续使用 `data.client`。
-
-提案不含人员私人字段或会话切断选项。批量删除拒绝 `--cut-off`，单人 `client remove NAME --cut-off` 保留原有确认和逐节点结果。混合批次中，服务管理的人员仍以原子事务删除；已声明人员等待本地应用，拓扑变化会拒绝整个服务提交。
-
-```bash
-meridian client remove --proposal people-removal.json --dry-run --json
-meridian client remove --proposal people-removal.json --yes --json
-```
+先运行 `meridian client remove sample-a sample-b --dry-run --json` 预览，再运行 `meridian client remove sample-a sample-b --yes --json` 提交。拒绝确认不会写入。允许零人员；`meridian test` 没有活跃人员时报告证据不可用（退出码 3）。`--proposal` 已退役。使用单人 `client remove NAME --cut-off` 披露并关闭已有会话；否则先前传输可能继续。
 
 `meridian client bulk extend --months 1 --person sample-a --dry-run --json`
 
@@ -484,7 +468,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 | `--dry-run` | | `fleet routing`、`fleet import`：显示变更和审查结果，不应用任何内容 |
 | `--forget-unreachable` | | `fleet import`：忘记已移除且 SSH 端口无响应的服务器上部署的内容 |
 
-**`fleet status`** — 控制服务健康状态、每个 agent 的最近报告及其是否已应用当前配置、中继监听端口以及客户端数量。已声明但缺失的客户端会使健康状态降级；已禁用、达到限额或过期的客户端会正常统计，属于你的主动设置而非故障。中继监听端口可达只能证明 TCP 连通，因此未经完整验证的中继路由会使健康状态保持为 `unknown`；请用 `meridian test` 测试完整路径。退出码 `0` 表示健康，`4` 表示降级，`3` 表示未知。
+**`fleet status`** — 控制服务健康状态、每个 agent 的最近报告及其是否已应用当前配置、中继监听端口以及客户端数量。没有用户不会降低健康状态；已禁用、达到限额或过期的客户端会正常统计，属于你的主动设置而非故障。中继监听端口可达只能证明 TCP 连通，因此未经完整验证的中继路由会使健康状态保持为 `unknown`；请用 `meridian test` 测试完整路径。退出码 `0` 表示健康，`4` 表示降级，`3` 表示未知。
 
 `active` 列统计最近一次报告中流量有所增长的人数，报告采集时间显示在表格下方。迟到的旧报告不会覆盖较新的活跃数据。节点流量总计在计数器更换周期后仍会保留；`traffic_counting_since` 标记完整持久统计的起点，升级前仅补入仍保留的计数证据。
 
@@ -508,7 +492,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 导入 JSON 导出文件时，请仅传入 `data.document` 的内容。经过审阅的 `delivery` 设置（包括响应规则中的 URL 路径）会在导出、导入审阅和应用结果中原样保留。
 
-**`fleet import`** — 读取编辑后的文件（或用 `-` 从标准输入读取），每处变更一行：`+` 表示添加，`-` 表示删除，`~` 表示修改字段（`~ exit-2 sni www.example.com -> www.example.org`）。随后列出变更将删除的每个资源和审查哈希，询问确认，并像 `apply` 一样只应用这次审查。未编辑的文件会输出“没有变更”。从 `access.users` 中删除客户端等同于 `client remove`：其订阅 URL 和连接页面不再可用。添加客户端等同于 `client add`，控制服务自动提供其连接页面；用 `client show NAME` 查看链接。新的伪装 SNI 会经过与 `node sni` 相同的检查。导入会拒绝：其他 `schema`、未保存的服务器（用 `meridian server add` 保存）、文件中的传输路径、对控制服务器及其域名或后端的更改、删除或重命名控制服务器上的出口，以及把出口移到另一台服务器（请用 `node replace`）。密钥和凭据保持不变。没有终端时请传入 `--yes`；`--dry-run` 只显示变更和审查结果，不应用任何内容。
+**`fleet import`** — 读取编辑后的拓扑文件（或从 stdin 使用 `-`），显示更改与退休资源，再确认并应用审核哈希。未改变的拓扑无需操作。人员通过 `client` 和服务管理。
 
 **`fleet usage`** — 显示每台服务器每个 UTC 天的总字节数，包括已删除服务器仍在保留期内的用量。`--days N` 选择保留期内 1–730 天。每日历史须开启；JSON 在 `data` 中返回服务器组总量和 `nodes[].daily`。
 
@@ -759,22 +743,22 @@ meridian restore --to SERVER [--snapshot FILE] [--recovery-key] [--force]
 |------|---------|-------------|
 | `--to SERVER` | （必需） | 新的控制服务器：IP、`user@IP:port` 或已保存的名称 |
 | `--snapshot FILE` | 最新保存的 | 要恢复的快照 |
-| `--recovery-key` | | 用恢复密钥而不是这台机器的密钥打开快照；密钥会以隐藏方式询问，或从标准输入读取一行 |
+| `--recovery-key` | | 用恢复密钥而不是这台机器的密钥打开快照；密钥会以隐藏方式询问，或从标准输入读取一行。这台机器没有自己的密钥时，在终端中不加此选项也会询问 |
 | `--force` | | 即使旧控制服务仍在响应也执行恢复 |
 | `--name NAME` | （无） | 新服务器的名称 |
 | `--user/-u USER` | root | 新服务器上的 SSH 用户 |
 | `--ssh-port PORT` | 22 | 新服务器上的 SSH 端口 |
 | `--yes`, `-y` | | 跳过确认 |
 
-restore 会打开快照，审核它要做的事并请求确认。然后它用快照在新服务器上安装控制服务，在拓扑中把控制服务器（以及旧服务器上的出口，如果有的话）移到新地址，并运行常规的已审核应用。恢复后的服务会获得新的证书颁发机构、新的签名密钥和新的 API 令牌，因此每个 agent 都会重新注册，被查扣的服务器无法签发你的节点会接受的任何内容。用户保留各自的账户、限额和流量。网页面板所有者需要通过 `meridian panel` 给出的链接设置新密码。
+restore 会打开快照，审核它要做的事并请求确认。然后它用快照在新服务器上安装控制服务，在拓扑中把控制服务器（以及旧服务器上的出口，如果有的话）移到新地址，并运行常规的已审核应用。恢复后的服务会获得新的证书颁发机构、新的签名密钥和新的 API 令牌，因此每个 agent 都会重新注册，被查扣的服务器无法签发你的节点会接受的任何内容。用户保留各自的账户、限额和流量。恢复后的网页面板没有所有者，因此结束时会打印用于设置新密码的一次性设置链接；随后 restore 会列出其他电脑的备份密钥，并在终端中逐个提出吊销。
 
-使用裸 IP 时，每个订阅 URL 都包含控制服务器的地址，因此所有链接都会改变：审核时会说明这一点，结束时会打印每个客户端的新链接。使用域名时，只要域名的 DNS 记录指向新服务器，链接就保持不变；审核时会列出这些记录。
+使用裸 IP 时，每个订阅 URL 都包含控制服务器的地址，因此所有链接都会改变：审核时会说明这一点，结束时会打印每个人的新链接，包括在网页面板中添加的人。使用域名时，只要域名的 DNS 记录指向新服务器，链接就保持不变；审核时会列出这些记录。
 
 只要旧控制服务器还在响应，restore 就会拒绝执行，因为两个控制服务会让集群分裂；`--force` 可以覆盖这一点，例如旧服务器已被查扣时。如果 `--snapshot` 指定的文件比最新保存的快照旧，它会发出警告：旧快照会带回你之后删除的令牌、机器和用户。中途停止的 restore 可以再次运行，会从中断处继续。
 
 restore 还会在暂存数据库或访问目标服务器前，将快照访问配置与本地拓扑核对；`--force` 不会跳过此检查。有声明指纹时，可在拓扑审核中改变同一声明所涵盖的连接。没有指纹的快照要求编译后的授权映射完全一致。即使保留较新的本地拓扑，恢复也会合并快照中的历史访问配置使用记录，并在检查点固定已审核的声明。请选择匹配的快照，或将对应的部署文件恢复到新上下文，完成后再用 `meridian apply` 审核所需的已保存修改。参见[恢复](/zh/recovery/)。
 
-在没有该集群的机器上，请传入快照文件和 `--recovery-key`：会先恢复快照自带的集群文件副本。如果这台机器上的副本比快照中的旧，restore 会把集群放进一个新的上下文，并在审核中说明后，从旧上下文接管集群；旧上下文会被标记为已被取代，并拒绝任何修改，直到你用 `meridian context remove` 删除它。
+在没有该集群的机器上，请传入快照文件，restore 会询问恢复密钥：会先恢复快照自带的集群文件副本。如果这台机器上的副本比快照中的旧，restore 会把集群放进一个新的上下文，并在审核中说明后，从旧上下文接管集群；旧上下文会被标记为已被取代，并拒绝任何修改，直到你用 `meridian context remove` 删除它。
 
 ### meridian migrate
 

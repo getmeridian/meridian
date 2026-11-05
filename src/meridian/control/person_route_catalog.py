@@ -17,6 +17,7 @@ from meridian.control.credential_models import UserCredentialRotation
 from meridian.control.models import (
     UserCreate,
     UserDevices,
+    UserEnsure,
     UserImportBatch,
     UserImportResult,
     UserPatch,
@@ -28,9 +29,8 @@ from meridian.control.route_metadata import (
     CONFLICT,
     CUT_OFF_ERRORS,
     CUT_OFF_SCOPE,
-    DECLARED_CAPABILITY,
-    DECLARED_USER,
     HISTORY_OFF,
+    NAME_CONFLICT,
     NOT_FOUND,
     USER_CREDENTIALS,
     USER_RESPONSE_CAPABILITIES,
@@ -67,7 +67,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         credentials=True,
         capability="people.edit",
         extra_capabilities=USER_RESPONSE_CAPABILITIES,
-        refusals=(ErrorResponse(409, ("user_exists",)),),
+        refusals=(ErrorResponse(409, ("user_exists", "name_conflict")),),
     ),
     route(
         "POST",
@@ -79,7 +79,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         "Import credentials, account settings, and usage atomically.",
         credentials=False,
         capability="people.bulk",
-        refusals=(CONFLICT,),
+        refusals=(CONFLICT, NAME_CONFLICT),
     ),
     route(
         "POST",
@@ -154,13 +154,15 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         "/api/users/{username}",
         "people",
         "put_user",
-        None,
+        UserEnsure,
         UserRecord,
         "Ensure a person exists, preserving existing settings.",
         credentials=True,
         capability="people.edit",
         extra_capabilities=USER_RESPONSE_CAPABILITIES,
-        description="No request body is read. A missing person starts active with default limits.",
+        refusals=(NAME_CONFLICT,),
+        body_required=False,
+        description="A missing person receives the first settings. Existing settings and nonempty names are preserved.",
     ),
     route(
         "PATCH",
@@ -173,7 +175,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         credentials=True,
         capability="people.edit",
         extra_capabilities=USER_RESPONSE_CAPABILITIES,
-        refusals=(NOT_FOUND,),
+        refusals=(NOT_FOUND, NAME_CONFLICT),
     ),
     route(
         "PATCH",
@@ -186,7 +188,7 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         credentials=True,
         capability="people.edit",
         extra_capabilities=USER_RESPONSE_CAPABILITIES,
-        refusals=(NOT_FOUND,),
+        refusals=(NOT_FOUND, NAME_CONFLICT),
     ),
     route(
         "POST",
@@ -198,11 +200,10 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         "Replace a person's subscription URL and connection credentials.",
         credentials=True,
         capability="people.reissue",
-        extra_capabilities=(*USER_RESPONSE_CAPABILITIES, DECLARED_CAPABILITY),
+        extra_capabilities=USER_RESPONSE_CAPABILITIES,
         body_required=False,
         body_scopes=CUT_OFF_SCOPE,
         refusals=(NOT_FOUND, CUT_OFF_ERRORS),
-        description=DECLARED_USER,
     ),
     route(
         "GET",
@@ -228,15 +229,14 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         "Rotate connection credentials keeping the subscription URL.",
         credentials=True,
         capability="people.reissue",
-        extra_capabilities=(*USER_RESPONSE_CAPABILITIES, DECLARED_CAPABILITY),
+        extra_capabilities=USER_RESPONSE_CAPABILITIES,
         body_scopes=CUT_OFF_SCOPE,
         refusals=(
             NOT_FOUND,
-            ErrorResponse(409, ("credentials_changed", "declared_user", "conflict", "command_queue_full")),
+            ErrorResponse(409, ("credentials_changed", "conflict", "command_queue_full")),
         ),
         description="Preserves device registrations and operator settings. "
         "Read the current credential_generation first. "
-        "A declared person also needs fleet.apply; owner sessions use the CLI. "
         "Optional cut_off also requires commands.cut_off.",
     ),
     route(
@@ -311,10 +311,8 @@ PERSON_ROUTES: tuple[ApiRoute, ...] = (
         "Remove a person and optionally queue session cut-offs.",
         credentials=False,
         capability="people.remove",
-        extra_capabilities=(DECLARED_CAPABILITY,),
         body_required=False,
         body_scopes=CUT_OFF_SCOPE,
         refusals=(NOT_FOUND, CUT_OFF_ERRORS),
-        description=DECLARED_USER,
     ),
 )

@@ -44,7 +44,7 @@ w.fetch = (url, options = {}) => {
   if (method !== 'GET') writes.push({ method, url, body });
   if (url.startsWith('ui/locales/')) return reply(JSON.parse(fs.readFileSync(path.join(ui, url.slice(3)), 'utf8')));
   if (url === 'auth/state') return reply({ configured: true, owner_exists: true, signed_in: true });
-  if (url === 'ui/api/fleet') return reply({ profile_title: 'Sample VPN', servers: [], declared_users: [], display_names: {} });
+  if (url === 'ui/api/fleet') return reply({ profile_title: 'Sample VPN', servers: [], display_names: {} });
   if (url === 'api/token-capabilities') return reply(data.capability_catalog);
   if (url === 'api/tokens') return reply({ tokens });
   if (url === 'api/tokens/000000000001' && method === 'DELETE') {

@@ -17,7 +17,7 @@ import shutil
 import threading
 import time
 from collections.abc import Callable
-from contextlib import AbstractContextManager, nullcontext
+from contextlib import nullcontext
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, TypeVar
@@ -54,6 +54,7 @@ from meridian.control.models import (
     ServiceSettings,
     TokenCreate,
     UserCreate,
+    UserEnsure,
     UserImportBatch,
     UserPatch,
     UserRecord,
@@ -74,7 +75,6 @@ from meridian.control.times import parse_timestamp
 from meridian.control.token_capabilities import capability_catalog
 from meridian.control.tokens import Caller, unauthenticated
 from meridian.control.ui_routes import UI_ROUTES, UiContext
-from meridian.control.user_access import refuse_declared
 from meridian.core.agent_http import AGENT_HTTP_SURFACE
 from meridian.core.agent_protocol import (
     CommandResult,
@@ -86,6 +86,7 @@ from meridian.core.agent_protocol import (
 )
 from meridian.core.client_limits import ClientExtendRequest
 from meridian.core.client_sessions import CredentialRotationRequest
+from meridian.core.version_skew import SERVICE_VERSION_HEADER
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 MAX_BODY_BYTES = AGENT_HTTP_SURFACE.max_request_bytes
@@ -284,6 +285,8 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
+        if self.api_route is not None and self.caller is not None:
+            self.send_header(SERVICE_VERSION_HEADER, self._service.version)
         headers = headers or {}
         if "Cache-Control" not in headers:
             self.send_header("Cache-Control", "no-store")
@@ -423,7 +426,9 @@ class _Handler(BaseHTTPRequestHandler):
         return visible_user(user, self._caller())
 
     def put_user(self, match: re.Match[str]) -> Any:
-        return self._service.put_user(match[1])
+        body = self._body()
+        request = UserEnsure.model_validate_json(body) if body else UserEnsure()
+        return self._service.put_user(match[1], ensure=request)
 
     def create_user(self, _match: re.Match[str]) -> Any:
         return self._service.create_user(self._model(UserCreate))
@@ -443,10 +448,9 @@ class _Handler(BaseHTTPRequestHandler):
 
     def reissue_user(self, match: re.Match[str]) -> Any:
         cut_off = self._cut_off_requested()
-        with self._refuse_declared(match[1], "meridian client reissue"):
-            if cut_off:
-                return self._service.cut_off_user(match[1], reissue=True)
-            return self._service.reissue_user(match[1])
+        if cut_off:
+            return self._service.cut_off_user(match[1], reissue=True)
+        return self._service.reissue_user(match[1])
 
     def cut_off_scope(self, match: re.Match[str]) -> Any:
         return self._service.cutoffs.scope(match[1])
@@ -454,10 +458,9 @@ class _Handler(BaseHTTPRequestHandler):
     def rotate_credentials(self, match: re.Match[str]) -> Any:
         request = self._model(CredentialRotationRequest)
         authorize_body(self, request)
-        with self._refuse_declared(match[1], "meridian client rotate-credentials"):
-            return self._service.rotate_credentials(
-                match[1], expected_generation=request.expected_generation, cut_off=request.cut_off
-            )
+        return self._service.rotate_credentials(
+            match[1], expected_generation=request.expected_generation, cut_off=request.cut_off
+        )
 
     def user_flow_blocks(self, match: re.Match[str]) -> Any:
         return self._service.user_flow_blocks(match[1])
@@ -488,14 +491,10 @@ class _Handler(BaseHTTPRequestHandler):
 
     def delete_user(self, match: re.Match[str]) -> Any:
         cut_off = self._cut_off_requested()
-        with self._refuse_declared(match[1], "meridian client remove"):
-            if cut_off:
-                return self._service.cut_off_user(match[1])
-            self._service.delete_user(match[1])
+        if cut_off:
+            return self._service.cut_off_user(match[1])
+        self._service.delete_user(match[1])
         return DeletedResource(deleted=match[1])
-
-    def _refuse_declared(self, username: str, command: str) -> AbstractContextManager[None]:
-        return refuse_declared(self._service, username, command, self.caller, self.owner_session)
 
     def get_endpoint(self, match: re.Match[str]) -> Any:
         endpoint = self._service.get_endpoint(match[1])

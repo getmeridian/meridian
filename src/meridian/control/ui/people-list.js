@@ -258,7 +258,7 @@
       entry.select.setAttribute("aria-label", M.t("bulk.select_person", { name: name }));
       entry.select.checked = matching || selected.has(user.username); entry.select.disabled = matching;
       entry.selection.hidden = M.mode() !== "detailed" && !selecting;
-      entry.declared.hidden = !user.declared; entry.notes.hidden = !user.has_notes;
+      entry.notes.hidden = !user.has_notes;
       if (!old || old.tag !== user.tag) M.mount(entry.tags, user.tag ? h("bdi", { class: "person-tag", text: user.tag }) : null);
       if (!old || old.status !== user.status) M.mount(entry.status, M.statusChip(STATUS_KINDS[user.status], M.t("status." + user.status)));
       if (!old || old.used_traffic_bytes !== user.used_traffic_bytes || old.traffic_limit_bytes !== user.traffic_limit_bytes) {
@@ -277,12 +277,11 @@
     function makeEntry(user) {
       var entry = { label: h("bdi", { class: "name" }), tags: h("span", { class: "people-tags" }), expiry: h("bdi", { class: "people-expiry" }),
         activity: h("bdi"), status: h("div", { class: "people-status" }), usage: h("div", { class: "people-usage" }), reasonSlot: h("span", { class: "people-reasons" }),
-        declared: h("span", { class: "tag", "data-people-declared": "", title: M.t("people.declared_hint"), text: M.t("people.declared") }),
         notes: h("span", { "data-people-note": "", text: M.t("people.notes_present") }),
         select: h("input", { type: "checkbox", "data-person": user.username }) };
       entry.row = h("a", { class: "row row-link people-row", href: "#/people/" + encodeURIComponent(user.username) },
         h("div", { class: "row-title people-identity" }, entry.label, entry.tags), entry.status, entry.usage, entry.expiry,
-        h("div", { class: "people-secondary muted small" }, entry.activity, entry.notes, entry.declared, entry.reasonSlot));
+        h("div", { class: "people-secondary muted small" }, entry.activity, entry.notes, entry.reasonSlot));
       entry.selection = h("label", { class: "people-select" }, entry.select);
       entry.wrapper = h("div", { class: "people-item" }, entry.selection, entry.row);
       entry.select.addEventListener("change", function () {
@@ -312,7 +311,7 @@
       page = result; ready = true; loading.remove();
       var focus = document.activeElement, current = new Set();
       ordered = (result.users || []).map(function (user) {
-        current.add(user.username);
+        current.add(user.username); M.rememberName(user);
         var entry = entries.get(user.username);
         if (!entry) { entry = makeEntry(user); entries.set(user.username, entry); } else update(entry, user);
         list.insertBefore(entry.wrapper, empty); return entry;

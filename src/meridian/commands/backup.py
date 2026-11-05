@@ -15,7 +15,7 @@ import typer
 from rich.markup import escape
 
 from meridian import config
-from meridian.backup.keys import device_key_path, rotate_recovery_key
+from meridian.backup.keys import device_key_path, load_device_key, rotate_recovery_key
 from meridian.backup.pull import backup_client, pull_snapshot
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import load_topology_cluster
@@ -161,6 +161,44 @@ def run_revoke(device_id: str) -> None:
         fail(exc)
     ok(f"Revoked {record.name}'s backup key; later snapshots are not sealed to it")
     info("Snapshots it already holds still open with its key; revoke its API access separately.")
+
+
+def offer_device_revocation(cluster: ClusterConfig, *, ask: bool) -> None:
+    """After a restore: other computers' backup keys still open every new snapshot, so offer to revoke each.
+
+    The restore already replaced the admin token; a lost or seized machine keeps only its backup key.
+    """
+    try:
+        own = load_device_key()
+    except MeridianError:
+        own = None  # an unreadable key here hides no other computer's key; list them all
+    try:
+        with backup_client(cluster, report_mutations=True) as client:
+            others = [
+                device
+                for device in client.device_keys()
+                if device.revoked_at is None and (own is None or device.public_key != own.public)
+            ]
+            if not others:
+                return
+            err_console.print()
+            err_console.print("  [bold]Other computers' backup keys[/bold] open every snapshot from now on:")
+            for device in others:
+                err_console.print(f"    {device.id}  {escape(device.name)}  [dim]since {device.created_at}[/dim]")
+            if not ask:
+                err_console.print("  [dim]Revoke any you no longer hold: meridian backup revoke ID[/dim]")
+                return
+            for device in others:
+                if not confirm(f"Revoke {device.name}'s backup key?", default=False):
+                    continue
+                try:
+                    client.revoke_device_key(device.id)
+                except MeridianError as exc:
+                    warn(f"Could not revoke {device.name}'s backup key: {exc}. Run: meridian backup revoke {device.id}")
+                else:
+                    ok(f"Revoked {device.name}'s backup key")
+    except MeridianError as exc:
+        warn(f"Could not read the fleet's backup keys: {exc}. Check them with `meridian backup devices`.")
 
 
 def _display(path: object) -> str:

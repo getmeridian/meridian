@@ -10,7 +10,6 @@ from meridian.cluster import ClusterConfig, ClusterConfigExternallyModifiedError
 from meridian.commands.apply_progress import apply_progress
 from meridian.console import fail
 from meridian.core.errors import LocalStateError, MeridianError
-from meridian.core.people_removal import PeopleRemovalProposal
 from meridian.core.topology import ExitIntent, SetupIntent
 
 if TYPE_CHECKING:
@@ -57,10 +56,16 @@ def fail_meridian_v3_state() -> NoReturn:
     )
 
 
-def load_topology_cluster() -> ClusterConfig:
+def load_topology_cluster(*, warn_adoption: bool = True) -> ClusterConfig:
     """Load a cluster that has a reviewed topology, or explain how to get one."""
     cluster = load_cluster()
     if cluster.topology_intent is not None:
+        from meridian.console import is_json_mode, warn
+        from meridian.people_adoption import people_adoption_notice
+
+        notice = people_adoption_notice(cluster)
+        if warn_adoption and notice is not None and not is_json_mode():
+            warn(notice.message + " Run `meridian apply` to finish the move.")
         return cluster
     if has_meridian_v3_state():
         fail_meridian_v3_state()
@@ -75,6 +80,22 @@ def load_topology_cluster() -> ClusterConfig:
         hint="Deploy one server with `meridian deploy IP`, or several with `meridian setup`.",
         hint_type="user",
     )
+
+
+def load_people_cluster(*, read_only: bool = False) -> ClusterConfig:
+    """Load a fleet and resume a committed people handover through the CLI error boundary."""
+    from meridian.console import is_json_mode, warn
+    from meridian.people_adoption import finish_people_adoption, people_adoption_notice
+
+    cluster = load_topology_cluster(warn_adoption=False)
+    try:
+        finish_people_adoption(cluster, read_only=read_only)
+    except MeridianError as exc:
+        fail(exc)
+    notice = people_adoption_notice(cluster)
+    if notice is not None and not is_json_mode():
+        warn(notice.message + " Run `meridian apply` to finish the move.")
+    return cluster
 
 
 def require_intent(cluster: ClusterConfig) -> SetupIntent:
@@ -123,7 +144,6 @@ def reviewed_runtime(
     fence_holder: str | None = None,
     user_cut_off: Mapping[str, list[NodeCommandRecord]] | None = None,
     access_review_hash: str | None = None,
-    removal_proposal: PeopleRemovalProposal | None = None,
 ) -> SetupRuntime:
     """A setup runtime bound to an already-loaded cluster that persists every checkpoint."""
     from meridian.setup.runtime import SetupRuntime
@@ -136,7 +156,6 @@ def reviewed_runtime(
         fence_holder=fence_holder,
         user_cut_off=user_cut_off,
         access_review_hash=access_review_hash,
-        removal_proposal=removal_proposal,
     )
 
 
@@ -152,7 +171,6 @@ def apply_reviewed_intent(
     fence_holder: str | None = None,
     user_cut_off: Mapping[str, list[NodeCommandRecord]] | None = None,
     access_review_hash: str | None = None,
-    removal_proposal: PeopleRemovalProposal | None = None,
 ) -> ResourceExecutionResult:
     """Apply an edited intent with progress, failing with ``failure`` unless every resource converged.
 
@@ -168,7 +186,6 @@ def apply_reviewed_intent(
                 fence_holder=fence_holder,
                 user_cut_off=user_cut_off,
                 access_review_hash=access_review_hash,
-                removal_proposal=removal_proposal,
             ).apply_intent(intent, expected_plan_hash=expected_plan_hash)
     except MeridianError as exc:
         if on_unsaved is not None and isinstance(exc, ReviewedApplyPersistenceError):

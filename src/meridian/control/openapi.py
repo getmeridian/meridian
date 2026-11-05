@@ -17,6 +17,7 @@ from meridian.control.models import TOKEN_SCOPES, scope_covers
 from meridian.control.route_catalog import API_ROUTES
 from meridian.control.route_types import ApiRoute, path_schema
 from meridian.control.token_capabilities import legacy_capabilities
+from meridian.core.version_skew import SERVICE_VERSION_HEADER
 
 CREDENTIAL_SENTENCE = "This response can contain credentials; keep it private and do not log it."
 
@@ -130,6 +131,12 @@ def _operation(
             "200": {
                 "description": "Successful response." + (" " + CREDENTIAL_SENTENCE if item.credentials else ""),
                 "x-meridian-credentials": item.credentials,
+                "headers": {
+                    SERVICE_VERSION_HEADER: {
+                        "description": "Installed service version; sent only after API authentication.",
+                        "schema": {"type": "string"},
+                    }
+                },
                 "content": {item.content_type: {"schema": schemas[(item.response_model, "serialization")]}},
             }
         },

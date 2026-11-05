@@ -7,6 +7,7 @@ import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from uuid import NAMESPACE_OID, uuid5
 
 from meridian.control.enrollment import token_sha256
 from meridian.control.models import PrivacySettings, ServiceConfig
@@ -110,13 +111,15 @@ def drop_operations_schema(db: sqlite3.Connection) -> None:
 
 
 @contextmanager
-def serve_control(state_dir: Path, *, public_path: str = "", clock: Callable[[], float] | None = None) -> Iterator[str]:
+def serve_control(
+    state_dir: Path, *, public_path: str = "", clock: Callable[[], float] | None = None, version: str = "4.0.0"
+) -> Iterator[str]:
     """Run a control service whose state lives in `state_dir`; yields its base URL.
 
     `public_path` stands in for the secret path nginx strips; the web UI's sign-in needs one.
     """
     options = {"clock": clock} if clock is not None else {}
-    service = ControlService(state_dir / "control.db", fleet_id=FLEET_ID, version="4.0.0", **options)
+    service = ControlService(state_dir / "control.db", fleet_id=FLEET_ID, version=version, **options)
     server = ControlServer(("127.0.0.1", 0), service, token_sha256(ADMIN_TOKEN), public_path=public_path)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -151,6 +154,7 @@ def drop_people_query_schema(db: sqlite3.Connection) -> None:
 
 def drop_person_delivery_policy_schema(db: sqlite3.Connection) -> None:
     """Rewind the self-contained override step before dropping people row versions."""
+    drop_person_display_name_schema(db)
     for name in ("insert", "update", "delete"):
         db.execute(f"DROP TRIGGER IF EXISTS person_delivery_policy_{name}")
     db.execute("DROP TABLE IF EXISTS person_delivery_policies")
@@ -169,3 +173,20 @@ def drop_capacity_schema(db: sqlite3.Connection) -> None:
     drop_access_membership_schema(db)
     for table in ("node_capacity_hourly", "node_capacity_state"):
         db.execute(f"DROP TABLE IF EXISTS {table}")
+
+
+def drop_person_display_name_schema(db: sqlite3.Connection) -> None:
+    """Remove schema 26's name column before replaying any earlier migration."""
+    if "display_name" in {row[1] for row in db.execute("PRAGMA table_info(users)")}:
+        db.execute("ALTER TABLE users DROP COLUMN display_name")
+
+
+def seed_legacy_person(database: Path, username: str) -> None:
+    """Reproduce a pre-26 ambiguous username that current account writes correctly refuse."""
+    identity = uuid5(NAMESPACE_OID, username)
+    with sqlite3.connect(database) as db:
+        db.execute(
+            "INSERT INTO users (username, user_id, uuid, sub_token, status, created_at)"
+            " VALUES (?, ?, ?, ?, 'active', '2026-11-01T12:00:00Z')",
+            (username, f"u{identity.hex[:16]}", str(identity), identity.hex),
+        )

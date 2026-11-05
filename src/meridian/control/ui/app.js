@@ -36,7 +36,7 @@
 
   function refreshFleet() {
     return M.api("GET", "ui/api/fleet").then(function (fleet) { M.state.fleet = fleet; return fleet; },
-      function () { M.state.fleet = M.state.fleet || { declared_users: [], display_names: {}, servers: [] }; });
+      function () { M.state.fleet = M.state.fleet || { display_names: {}, servers: [] }; });
   }
 
   M.onSignedOut = function () {

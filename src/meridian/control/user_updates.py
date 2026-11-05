@@ -8,6 +8,7 @@ from meridian.control.access_memberships import save_memberships
 from meridian.control.account_lifecycle import merge_user_update
 from meridian.control.events import EventLedger
 from meridian.control.models import UserRecord, UserUpdate
+from meridian.control.person_names import require_unique_display_name
 from meridian.control.store import Store
 from meridian.core.account_schedule import AccountLifecycleState
 
@@ -28,11 +29,24 @@ def update_user(
         user = read_user(username)
         moment = now()
         merged = merge_user_update(user, update, moment)
+        if merged.display_name != user.display_name:
+            require_unique_display_name(store, username, merged.display_name)
         events.user_updated(user, merged)
         save_user_fields(store, merged)
         enforce(moment)
         compose()
         return read_user(username)
+
+
+def fill_empty_display_name(store: Store, user: UserRecord, name: str, *, events: EventLedger, now: str) -> UserRecord:
+    """Fill only under the caller's write transaction, preserving a concurrent operator rename."""
+    if user.display_name or not name:
+        return user
+    updated = UserRecord.model_validate({**user.to_data(), "display_name": name})
+    require_unique_display_name(store, user.username, updated.display_name)
+    events.user_updated(user, updated, now=now)
+    save_user_fields(store, updated, ("display_name",))
+    return updated
 
 
 OPERATOR_FIELDS = tuple(dict.fromkeys((*UserUpdate.model_fields, *AccountLifecycleState.model_fields)))

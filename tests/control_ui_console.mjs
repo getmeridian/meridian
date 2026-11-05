@@ -58,7 +58,7 @@ w.fetch = (url, options) => {
       Object.assign(data.user, change);
     }
     if (url === 'api/users/sample') return Promise.resolve(reply(data.user));
-    if (url === 'ui/api/people/sample/share') return Promise.resolve(reply({ declared: false }));
+    if (url === 'ui/api/people/sample/share') return Promise.resolve(reply({}));
   }
   if (mode.startsWith('commands-')) {
     const node = url.split('/')[2];
@@ -83,12 +83,12 @@ w.fetch = (url, options) => {
     }
     if (url === 'api/users') return Promise.resolve(reply({ users: [] }));
     if (url === 'api/users/sample') return Promise.resolve(reply(user));
-    if (url === 'ui/api/people/sample/share') return Promise.resolve(reply({ declared: false }));
+    if (url === 'ui/api/people/sample/share') return Promise.resolve(reply({}));
   }
   if (mode === 'phone-app') {
     if (url === 'auth/state') return Promise.resolve(reply({ configured: true, owner_exists: true, signed_in: true }));
     if (url === 'api/users') return Promise.resolve(reply({ users: [] }));
-    if (url === 'ui/api/fleet') return Promise.resolve(reply({ servers: [], display_names: {}, declared_users: [] }));
+    if (url === 'ui/api/fleet') return Promise.resolve(reply({ servers: [], display_names: {} }));
   }
   if (mode.startsWith('locale-')) {
     const code = url.split('/').at(-1).split('.')[0];
@@ -133,7 +133,7 @@ w.fetch = (url, options) => {
     if (url === 'api/users') return Promise.resolve(reply({ users: [{ username: 'sample', status: 'active',
       used_traffic_bytes: round * 1024, traffic_limit_bytes: 0, expire_at: null, online_at: null }] }));
     if (url === 'ui/api/fleet') return Promise.resolve(reply({ profile_title: 'Test fleet', display_names: {},
-      declared_users: [], servers: [{ ...server, traffic_bytes: round * 1024 }] }));
+      servers: [{ ...server, traffic_bytes: round * 1024 }] }));
   }
   if (url === 'ui/api/fleet') return Promise.resolve(reply({ servers: data?.servers || [server],
     server_usage: data?.server_usage || [], server_attention: data?.server_attention || [] }));
@@ -148,7 +148,7 @@ w.fetch = (url, options) => {
   return Promise.resolve(response).then(async reply => {
     if (!reply.ok) return reply;
     const body = JSON.parse(await reply.text());
-    return { ...reply, text: async () => JSON.stringify(peoplePage((body.users || []).map(user => ({ ...user, display_name: data?.fleet?.display_names?.[user.username] || user.username, declared: (data?.fleet?.declared_users || []).includes(user.username) })))) };
+    return { ...reply, text: async () => JSON.stringify(peoplePage((body.users || []).map(user => ({ ...user, display_name: data?.fleet?.display_names?.[user.username] || user.username})))) };
   });
 };
 for (const script of ['core.js', 'drafts.js', 'components.js', 'shell.js', 'passkeys.js', 'qr-export.js', 'people.js', 'people-bulk.js', 'people-bulk-fields.js', 'people-list.js', 'expiry.js', 'lifecycle.js', 'person-connections.js', 'share.js', 'person-tabs.js', 'person-access.js', 'capacity.js', 'fleet.js', 'tokens.js']) {
@@ -391,7 +391,6 @@ if (mode.startsWith('live-')) {
   const liveData = () => (view.querySelector('.live-data') || view).textContent;
   if (mode === 'live-fleet-failure') {
     report.names = [...view.querySelectorAll('.name')].map(el => el.textContent);
-    report.declared = view.querySelectorAll('.tag:not([hidden])').length;
     report.initial = liveData();
     await advance(interval);
     report.afterPoll = liveData();

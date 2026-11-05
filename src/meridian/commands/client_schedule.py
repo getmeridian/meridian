@@ -65,7 +65,6 @@ def review_limit_schedule(
     change: ClientLimitChange,
     operation: OperationContext,
     *,
-    declared: bool,
     dry_run: bool,
     yes: bool,
 ) -> bool:
@@ -79,15 +78,13 @@ def review_limit_schedule(
     preview = panel.preview_user_limits(user.id, change)
     if dry_run:
         if is_json_mode():
-            result = ClientLimitsResult(
-                client=build_client_record(user, declared=declared), schedule_preview=preview, applied=False
-            )
+            result = ClientLimitsResult(client=build_client_record(user), schedule_preview=preview, applied=False)
             emit_json(
                 command_envelope(
                     command="client.set",
                     data=result.to_data(),
                     timer=operation.timer,
-                    summary=Summary(text=f"Preview schedule for {user.username}"),
+                    summary=Summary(text=f"Preview schedule for {user.display_name or user.username}"),
                 )
             )
         else:
@@ -98,6 +95,6 @@ def review_limit_schedule(
     if not yes:
         if is_json_mode():
             fail(t("lifecycle.needs_yes"), hint=t("lifecycle.review_hint"), hint_type="user")
-        if not confirm(t("lifecycle.confirm", name=user.username), default=False):
+        if not confirm(t("lifecycle.confirm", name=user.display_name or user.username), default=False):
             raise typer.Exit(1)
     return True

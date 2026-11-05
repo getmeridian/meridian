@@ -245,7 +245,7 @@ def test_basic_test_checks_managed_certificate_alongside_reality() -> None:
     )
 
 
-def test_client_selection_prefers_v4_access_order() -> None:
+def test_client_selection_uses_service_username_order() -> None:
     intent = single_exit_intent(users=["preferred", "fallback"])
     panel = FakePanel(
         [
@@ -257,10 +257,10 @@ def test_client_selection_prefers_v4_access_order() -> None:
     selected = select_active_client(panel, ClusterConfig(topology_intent=intent), "")  # type: ignore[arg-type]
 
     assert selected is not None
-    assert selected.username == "preferred"
+    assert selected.username == "fallback"
 
 
-def test_v4_default_client_selection_never_falls_back_to_service_users() -> None:
+def test_default_client_selection_includes_every_active_service_person() -> None:
     intent = single_exit_intent(users=["alice"])
     panel = FakePanel(
         [
@@ -271,10 +271,10 @@ def test_v4_default_client_selection_never_falls_back_to_service_users() -> None
 
     selected = select_active_client(panel, ClusterConfig(topology_intent=intent), "")  # type: ignore[arg-type]
 
-    assert selected is None
+    assert selected is not None and selected.username == "meridian-route-123"
 
 
-def test_v4_requested_client_selection_rejects_service_user_without_lookup() -> None:
+def test_requested_client_selection_includes_service_people() -> None:
     intent = single_exit_intent(users=["alice"])
     panel = FakePanel([User(username="meridian-route-123", status="ACTIVE", short_uuid="short-service")])
     with patch.object(panel, "get_user", wraps=panel.get_user) as get_user:
@@ -284,8 +284,8 @@ def test_v4_requested_client_selection_rejects_service_user_without_lookup() -> 
             "meridian-route-123",
         )
 
-    assert selected is None
-    get_user.assert_not_called()
+    assert selected is not None and selected.username == "meridian-route-123"
+    get_user.assert_called_once_with("meridian-route-123")
 
 
 def test_legacy_default_client_selection_still_uses_panel_users() -> None:

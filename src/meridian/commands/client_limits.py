@@ -12,12 +12,12 @@ from pydantic import ValidationError
 from rich.cells import cell_len
 from rich.markup import escape
 
-from meridian.commands._helpers import format_traffic, load_topology_cluster
+from meridian.commands._helpers import format_traffic
+from meridian.commands._helpers import load_people_cluster as load_topology_cluster
 from meridian.commands.client_handoff import (
     format_status,
     get_user_or_fail,
     resolve_client_mutation_name,
-    resolve_client_name,
 )
 from meridian.console import err_console, error_context, fail, is_json_mode, ok
 from meridian.control_access import AccessPanel, access_panel
@@ -30,12 +30,13 @@ from meridian.core.clients import (
     build_client_record,
     client_metadata_paths,
 )
+from meridian.core.errors import MeridianError
 from meridian.core.languages import LANGUAGE_NAMES, LanguageError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.person_metadata import PersonMetadataError
 from meridian.i18n import t
-from meridian.remnawave import RemnawaveError, User
+from meridian.remnawave import User
 from meridian.renderers import emit_json
 
 _RESET_KEYS = {
@@ -297,29 +298,19 @@ def _mutate(
 ) -> None:
     cluster = load_topology_cluster()
     # Validate before opening access, preserving the typed name until the service's exact-name check.
-    resolve_client_name(cluster, name, console_people=True)
     with access_panel(cluster) as panel:
         name = resolve_client_mutation_name(cluster, panel, name)
-        declared = cluster.topology_intent is not None and name in cluster.topology_intent.access.users
         user = get_user_or_fail(panel, name, action="load")
         if user is None:
-            if not declared:
-                fail(f"Client '{name}' not found", hint="Check names with meridian client list.", hint_type="user")
-            fail(
-                f"Client '{name}' is declared but missing from the panel",
-                hint="Run `meridian apply` to restore it, then retry.",
-                hint_type="system",
-            )
+            fail(f"Client '{name}' not found", hint="Check names with meridian client list.", hint_type="user")
         try:
             if limit_change is not None:
                 from meridian.commands.client_schedule import review_limit_schedule
 
-                if not review_limit_schedule(
-                    panel, user, limit_change, operation, declared=declared, dry_run=dry_run, yes=yes
-                ):
+                if not review_limit_schedule(panel, user, limit_change, operation, dry_run=dry_run, yes=yes):
                     return
             updated = mutate(panel, user)
-        except RemnawaveError as exc:
+        except MeridianError as exc:
             fail(
                 f"Could not {verb} client '{name}': {exc}",
                 hint=exc.hint or "Check panel connectivity",
@@ -330,14 +321,18 @@ def _mutate(
         emit_json(
             command_envelope(
                 command=command,
-                data=build_client_limits_result(updated, declared=declared).to_data(),
-                summary=Summary(text=f"{verb.capitalize()} client {name}", changed=True, counts={"clients": 1}),
+                data=build_client_limits_result(updated).to_data(),
+                summary=Summary(
+                    text=f"{verb.capitalize()} client {updated.display_name or name}",
+                    changed=True,
+                    counts={"clients": 1},
+                ),
                 timer=operation.timer,
             ),
             reveal=client_metadata_paths(),
         )
         return
-    shown = cluster.topology_intent.access.display_name(name) if cluster.topology_intent else name
+    shown = updated.display_name or name
     ok(t(done_key, name=shown))
     err_console.print()
     print_client_usage(build_client_record(updated))

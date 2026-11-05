@@ -52,7 +52,7 @@ def test_meridian_plan_replaces_every_panel_kind() -> None:
     plan = compile_topology(_intent())
     kinds = {item.payload.kind for item in plan.resources}
 
-    assert {"control_service", "agent_runtime", "node_workload", "control_user", "service_settings"} <= kinds
+    assert {"control_service", "agent_runtime", "node_workload", "service_settings"} <= kinds
     assert not kinds & {"control_plane_runtime", "profile", "inbound", "node", "host", "access_user", "squad"}
     endpoints = {
         item.logical_id: item.payload.fingerprint_copy  # type: ignore[union-attr]

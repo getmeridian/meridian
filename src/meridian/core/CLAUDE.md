@@ -1,72 +1,38 @@
-# core — Meridian API contracts
-
+# core — Transport-neutral Meridian contracts
 ## Design decisions
-- **People note indicators carry presence only** — bounded private queries derive `has_notes`; omitted older evidence stays unknown without per-person reads or note text.
-- **App decisions are finite** — named literal User-Agent/Accept rules reject duplicates and proven shadows; one policy resolver orders person, app, profile, named fleet, and preset choices.
-- **Removal proposals carry identity only** — bounded declared usernames and committed fleet/revision/generation/plan/intent hashes travel without private person fields or cut-off choices.
-- **Profile selection names saved membership** — the optional typed profile ID joins the same query and cursor identity; default is an explicit membership.
-- **Profile declaration fingerprints precede expansion** — hash the normalized named grants with `profile_declarations_hash`, so topology can expand unchanged exit or gateway grants without accepting a profile edit.
-- **Delivery policies are finite** — discriminated matchers, IP-addressed DNS, and bounded catalogs share one person/profile/fleet resolver; conflicting profile defaults refuse.
-- **Access grants and membership have separate owners** — topology compiles named grants; service membership is nonempty and private, with default granting every managed inbound.
-- **Capacity has one projection** — `capacity.py` owns freshness, nullable current evidence, integer derived values, and recent/hourly bounds for service, fleet JSON, and console.
-- **Connection vocabulary stays in core** — session cut-off scopes and protocol names must not import service records, or shared apply contracts cycle through topology.
-- **People queries have one typed request** — paging controls never change which people match a selection.
-- **Bulk contracts separate selection from mutation** — before/after fields and receipts omit credentials and private notes.
-- **Token grants are independent of presets** — frozen explicit capabilities compose separately from identity and future resource bounds; token schemas and command envelopes live in `schema_tokens.py`.
-- **One account clock** — `account_schedule.py` computes UTC activation, anniversary refills, and clamped renewal catch-up; billing shares `calendar.monthly_period()`.
-- **No CLI globals** — core never imports Typer, Rich, console, config, or command modules (tested); the CLI and the control service are adapters. Constants live in `core/defaults.py`.
-- **Envelope first** — JSON clients get one stable `meridian.output/v1` shape with command data under `data`; `schema_envelopes.py` builds command envelopes from the catalog, and `schema.py` composes contract families from their owning modules.
-- **Command metadata is schema-neutral** — `command_catalog.COMMAND_OUTPUTS` maps every public command path to its JSON output or `None`; argv, flags, and help come from the Typer tree via `meridian.cli_catalog`.
-- **Events are a public set** — long-running flows report typed JSONL-ready events; add a name to `core.events` before emitting it. Durable lifecycle facts for integrations are a separate contract (`fleet_events.py`).
-- **Pydantic at API boundaries** — requests, results, events, errors, and service contracts validate, serialize, and export JSON Schema from Pydantic v2 models; validate at the boundary, before any SSH or panel I/O.
-- **Verification is four-state** — passed, failed, warning, skipped; skipped evidence is inconclusive, never a pass.
-- **Cooperative cancellation** — `core/cancellation.py` owns the token protocol; workers poll only at safe points.
-- **Agent protocol is a contract, kept apart** — `meridian.agent/v1` (`agent_*` modules) is the internal service-to-agent wire format the Rust agent consumes; `schema_agent.AGENT_SCHEMAS` exports it to `contracts/meridian/v1/agent/`, never into `core.schema`. Docstrings are its spec: every field always sent, no floats, no addresses in agent messages; extend it only behind a negotiated capability. `version_skew.py` holds CLI/service/agent compatibility.
-- **Two names per person** — `AccessIntent.users` are Latin usernames; `display_names` keeps a typed name when it differs. `assign_access_usernames()` is the one place mapping typed names to usernames (via anyascii); look people up with `matching_users()` where a typed name could mean two people (one's username may fold onto another's display name).
-- **Fleet document** — `fleet_document.py` owns `meridian.fleet/v1` and `intent_changes()`, the one description of how two intents differ; unequal intents always report a change, a reorder at least.
-- **Operator settings have one contract each** — client limits (`client_limits.py`), creation settings (`UserCreationSettings`), languages, notices, owner contact, person metadata, server allowances, and connection-page settings; each module owns its bounds and canonical form. Explicit null clears, omitted fields preserve.
-- **Derived evidence** — `traffic.py` is the aggregate evidence contract (unknown history stays null) and `attention.py` derives typed reasons from it with no stored alert flags; `calendar.py` and `server_calendar.py` share clamped UTC month arithmetic.
-- **Subscription vocabulary** — `subscription_formats.py` owns document and suffix names; `subscription_preview.py` bounds transient headers and explains selection without credentials.
-
+- Core never imports CLI globals, Typer, Rich, commands, console or config. Requests and results use immutable, strict Pydantic contracts.
+- `topology.py` owns finite reviewed roles, paths, routes and delivery. `AccessIntent` retains only the legacy squad label; people never enter compiler input.
+- `people_creation.py` owns shared service requests; `people_seeds.py` owns exact legacy seeds and pending/committed adoption. Setup drafts keep people outside topology and validate initial profiles against delivery defaults.
+- Usernames identify service accounts; live display names are public fields. Exact username wins before folded username/display-name matching; ambiguity refuses.
+- Named access grants belong to topology; membership belongs to the service. The built-in default grants every managed inbound, while public aliases share enforcement.
+- Profile declaration fingerprints hash intent before expansion, so protocol changes do not silently accept a profile edit.
+- One delivery resolver orders person overrides, reviewed app rules, profile defaults, named fleet defaults and presets. Unsupported formats remain explicit.
+- People queries have one typed selection; paging never changes matching people. Bulk before/after and receipts omit credentials and private notes.
+- Token schemas freeze explicit cataloged capabilities independently of compatible presets, with private metadata and credential permissions kept separate.
+- Account schedules share UTC calendar arithmetic, first-use activation, clamped renewal anchors and bounded future timestamps.
+- Command envelopes compose registered output families; command metadata is schema-neutral and events are a fixed typed set.
+- Verification is four-state; unavailable evidence is skipped, never a pass. Empty fleets are valid and have no degraded missing-person count.
+- Internal agent contracts stay apart from public core schemas and are extended only behind negotiated capabilities; version skew is defined in `version_skew.py`.
+- Operator settings each have one owning contract with explicit-null clearing and omitted-field preservation; core never chooses human presentation wording.
+- Capacity, traffic and attention are shared aggregate evidence contracts; missing history remains unknown, while byte counts and derived ratios stay integer.
 ## What's done well
-- **Capacity preserves missing evidence** — negotiated samples use nullable figures, integer load/rates, and epoch-local host counters without interface or client identities.
-- **Explanations never guess past missing evidence** — pure first-match evaluation reports unavailable geodata or ports, and Xray pin identity lives in core for every reader.
-- **Credential rotation composes existing client status and node outcomes** — its request requires an integer generation, its CLI result carries no credential, and stale retries cannot create another generation.
-- **Flow-block evidence is capability-gated and revision-bound** — account generations and node outcomes carry no connection or device data.
-- **Defaults stay off the wire** — new intent and settings fields omit their defaults (routing `ru-split`, the six-hour refresh, empty mappings), so existing plans and payloads keep their hashes.
-- **Command kinds are hello capabilities**, and a reset result discloses its effect without carrying a user identifier.
-- No barrel re-exports in `__init__.py`; consumers import specific submodules.
-- Commands build typed, redacted results before any envelope or rendering, and reporter primitives emit typed events without choosing a renderer.
-
+- New default intent/settings fields omit their defaults, preserving existing payload and plan hashes when no change was requested.
+- Typed results are redacted before rendering; no barrel re-exports obscure ownership.
+- Credential rotation composes the existing client status, generation and per-node outcome contracts without returning keys.
+- Fleet documents compare every retained topology field; unedited round trips preserve semantic intent and ordering changes remain visible.
 ## Pitfalls
-- **Initial memberships resolve delivery defaults** — reject conflicting profile policies while validating topology, before a reviewed plan can promise an account creation that apply refuses.
-- **Geodata decodes lazily** — index list names and decode only what an explanation reads; decoding every pinned list took over 400 MB, and the control service was OOM-killed under its 256 MB limit.
-- **Geosite attributes are literal keys** — `@!cn` selects entries carrying `!cn`; treating it as the absence of `cn` changes the client's match.
-- **Explanations follow the client's name pass** — Xray's `IPIfNonMatch` catch-all ends hostname routing before DNS; an earlier IP rule cannot make a later domain match unknown.
-- **Metadata reveals cover containers** — exact revealed paths preserve nested lists and maps with secret-shaped identifiers; string credential fields and neighbouring branches remain redacted.
-- **Legacy node output omits capacity** — keep the null projection off the wire; control-service nodes carry explicit not-reported/current/stale evidence.
-- **Hourly byte sums cross agent epochs** — keep aggregate bytes as nonnegative integers; the agent's safe-integer ceiling governs individual wire counters, not rollup totals.
-- **Revealed metadata keeps scalar types** — secret-shaped tag keys must not replace facet counts with redaction strings; container reveals still mask string credentials.
-- **Bulk action schemas retain parameter types** — use post-init checks and a model schema hook, or a dict-returning serializer hides them behind an after-validator.
-- **Agent refusal codes are a shared contract** — export every Rust resource/command code before using it, and localize human command errors by code.
-- **Receipts identify the revoked key** — generations and causes stay distinct, while private per-inbound fingerprints clear a key that becomes active again.
-- **Ready includes a core restart** — revocation evidence describes old identities losing new streams, not a claim that the fresh core needs or holds block rules.
-- **Device cap zero is unlimited** — only null inherits the fleet cap; never resolve a cap by truthiness.
-- **Never emit raw SSH commands, panel tokens, private keys, database URLs, or subscription secrets.**
-- **`redact_string()` is the only secret masker** (SSH debug logs included) — teach it a new secret form instead of adding a local regex.
-- **Reveal exact paths only** — connection URIs and QR fields are complete credentials; JSON reveal options name exact dotted paths (list indices included) and never expose neighbouring fields. Preview redaction masks whole URIs and replaces opaque Base64 headers.
-- **Generated JSON Schemas are public data** — redact values without destroying schema `properties`.
-- **SSH passwords and private keys never enter public server contracts.**
-- **Keep human wording in adapters**, and wrap Pydantic `ValidationError` before rendering; raw model errors are too noisy for operators.
-- **Use `WithJsonSchema` for custom validators** that need public schema constraints without replacing readable runtime errors.
-- **Timestamps keep their input string** after validating date and time, so fractional precision and generated schemas stay unchanged.
-- **Routing domains are suffixes** — validate with `validate_domain_suffix_value()` (bare zones like `ru`, IDN to punycode); SNI and certificate names use `validate_hostname_value()`, which needs two labels. Topology IDs stay lowercase and bounded.
-- **Provider labels allow Persian ZWNJ/ZWJ joiners** while rejecting line breaks, bidi controls, and other control characters.
-- **Server metadata names only declared physical servers** and never moves automatically with an exit.
-- **Fleet diffs compare creation settings per person** — changing them is an edit, not a reorder.
-- **Command catalogs list only completed JSON outcomes** — an interruption exits 130 without an envelope; a cooperative cancel is a `cancelled` outcome with exit 5.
-- **Fleet results keep reachability, runtime, and convergence apart** — a live poll never makes an old health report current, and a healthy runtime can still await convergence.
-- **Client detail carries lifetime traffic beside the period** — resetting period use never erases the lifetime figure.
-- **Period directions sum to used traffic** — `PeriodTraffic.unattributed_bytes` names the part of download whose historical direction is unknown, never a third amount to add.
-- **Never-used and stopped-use attention are disjoint** — `is_never_used` includes imported lifetime evidence; stopped use requires a known last traffic time, never a guessed import date or daily history.
-- **Quota percentages are integer evidence** — floor exact byte ratios once for attention and browser triage, or JavaScript rounds a large cap across the threshold.
+- People have one service owner; only 4.x service query rows retain deprecated `declared: false` for old readers. Never export topology-removal proposals.
+- Keep creation seeds outside topology; unknown initial profiles and conflicting delivery defaults must fail before an apply promises them.
+- Redact with `redact_string()` and reveal exact credential paths only; container reveals preserve scalar types and never expose neighboring secrets.
+- Never publish SSH commands, tokens, database URLs, private keys or subscription secrets in ordinary results.
+- Public schemas preserve `properties`; `WithJsonSchema` retains readable runtime validators and their actual bounds.
+- Build request models before I/O and wrap validation failures at the adapter boundary; unchecked model-copy updates are not validation.
+- Receipt identities bind credential generations and causes; a confirmed receipt never widens the next key's cut-off scope.
+- Person traffic keeps lifetime figures beside period use; unattributed bytes are part of download, not a third direction.
+- Never-used and stopped-use evidence are disjoint; quota percentages floor exact byte ratios once across Python and browser views.
+- Device cap zero is unlimited; null inherits. Missing capacity evidence stays null rather than becoming zero.
+- Timestamps retain their validated input precision. Validate domains, hostnames, SNI and topology IDs with their owning input types.
+- Geodata decodes lazily to avoid exhausting service memory; geosite attributes are literal keys, and routing explanations follow the real first-match name pass.
+- Negotiated capacity and command kinds must be present before new agent fields are used; shared refusal codes and protocol schemas cover the Rust implementation too.
+- Server metadata names physical topology servers; fleet health keeps reachability, runtime freshness and convergence separate.
+- Interrupted commands have no success envelope; cooperative cancellation is a typed exit-5 outcome.

@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from pydantic import ValidationError
 
 from meridian.control.client import (
     ControlClient,
@@ -23,9 +22,6 @@ from meridian.control.models import ApplyFenceRecord, ApplyFenceSwap, RevisionPr
 from meridian.control.revisions import secret_paths
 from meridian.control.server import ControlServer
 from meridian.control.service import SCHEMA_VERSION, ControlService
-from meridian.control.ui_views import declared_users
-from meridian.core.topology import SetupIntent
-from meridian.service_fence import RevisionDraft
 from tests.support.control_service import drop_device_privacy_schema
 from tests.support.topology import single_exit_intent
 
@@ -172,41 +168,12 @@ def test_a_real_topology_intent_is_secret_free() -> None:
     assert secret_paths(single_exit_intent().model_dump(mode="json")) == []
 
 
-@pytest.mark.parametrize("username", ["token", "secret", "api_key"])
-@pytest.mark.parametrize("surface", ["apply", "service"])
-def test_secret_shaped_usernames_keep_creation_settings_and_display_names_in_revisions(
-    fleet: Fleet, username: str, surface: str
-):
-    original = single_exit_intent(users=[username]).to_data()
-    intent = SetupIntent.model_validate(
-        {
-            **original,
-            "access": {
-                **original["access"],
-                "creation_settings": {username: {"device_limit": 0, "traffic_limit_bytes": 1234}},
-                "display_names": {username: "Test account"},
-            },
-        }
-    )
-    if surface == "apply":
-        stored = RevisionDraft.from_intent(intent, plan_hash=PLAN, review_hash=REVIEW).proposal().intent
-    else:
-        with fleet.client() as root:
-            record = root.propose_revision(
-                RevisionProposal(intent=intent.to_data(), plan_hash=PLAN, review_hash=REVIEW)
-            )
-            stored = root.revision(record.number).intent
-    assert stored["access"]["creation_settings"][username]["device_limit"] == 0
-    assert stored["access"]["creation_settings"][username]["traffic_limit_bytes"] == 1234
-    assert stored["access"]["display_names"][username] == "Test account"
-
-
 @pytest.mark.parametrize(
     ("intent", "leak"),
     [
         (
             {"access": {"users": ["token"], "creation_settings": {"token": {"api_key": "value"}}}},
-            "access.creation_settings.token.api_key",
+            "access.creation_settings.token",
         ),
         (
             {"access": {"users": ["token"], "display_names": {"token": {"password": "value"}}}},
@@ -214,7 +181,7 @@ def test_secret_shaped_usernames_keep_creation_settings_and_display_names_in_rev
         ),
         (
             {"access": {"users": ["token"], "creation_settings": {"token": {"nested": [{"secret": "value"}]}}}},
-            "access.creation_settings.token.nested.0.secret",
+            "access.creation_settings.token",
         ),
         (
             {"access": {"users": ["token"], "display_names": {"token": "mrd_0123456789ab_" + "0" * 64}}},
@@ -250,25 +217,6 @@ def test_secret_shaped_usernames_keep_creation_settings_and_display_names_in_rev
 )
 def test_username_map_exceptions_still_detect_secret_fields_and_values(intent: dict[str, Any], leak: str):
     assert secret_paths(intent) == [leak]
-
-
-@pytest.mark.parametrize(
-    ("access", "declared"),
-    [
-        (None, []),
-        ([], []),
-        ({"users": None}, []),
-        ({"users": "alice"}, []),
-        ({"users": [1]}, []),
-        ({"users": ["alice"], "display_names": ["x"]}, ["alice"]),
-    ],
-    ids=["null", "list", "null-users", "string-users", "number-user", "list-names"],
-)
-def test_a_malformed_access_block_is_refused_at_proposal(access: object, declared: list[str]) -> None:
-    """The console reads `access.users` on every person screen; a bad shape there broke all of them."""
-    with pytest.raises(ValidationError, match="access"):
-        RevisionProposal(intent={"access": access}, plan_hash=PLAN, review_hash=REVIEW)
-    assert declared_users({"access": access}) == declared  # a row stored before the check still reads
 
 
 def test_a_real_topology_intent_is_a_valid_proposal() -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from meridian.core.people_seeds import PeopleSeeds
 from meridian.core.setup import (
     SetupAccessSelection,
     SetupDraft,
@@ -74,7 +75,7 @@ def _routing() -> SetupRoutingSelection:
 
 def _access() -> SetupAccessSelection:
     return SetupAccessSelection(
-        access=AccessIntent(users=["default"]),
+        access=AccessIntent(),
         delivery=DeliveryIntent(profile_title="Family VPN"),
     )
 
@@ -113,7 +114,7 @@ class TestProtocolPathIntent:
     @pytest.mark.parametrize("username", ["ab", "user/name", "x" * 37])
     def test_access_usernames_match_remnawave_limits(self, username: str) -> None:
         with pytest.raises(ValidationError, match="Access usernames"):
-            AccessIntent(users=[username])
+            PeopleSeeds(users=[username])
 
 
 class TestOrderedRoutes:
@@ -199,7 +200,7 @@ class TestSetupIntent:
                     )
                 ],
                 default_egress_ref="exit-a",
-                access=AccessIntent(users=["default"]),
+                access=AccessIntent(),
             )
 
     def test_custom_reality_sni_rejects_non_reality_path(self) -> None:
@@ -226,7 +227,7 @@ class TestSetupIntent:
                     )
                 ],
                 default_egress_ref="exit-a",
-                access=AccessIntent(users=["default"]),
+                access=AccessIntent(),
             )
 
     def test_relay_chain_rejects_exit_server_as_a_hop(self) -> None:

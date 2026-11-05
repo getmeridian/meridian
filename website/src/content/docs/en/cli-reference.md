@@ -140,7 +140,6 @@ meridian client reissue NAME [--cut-off] [--yes] [--json]
 meridian client rotate-credentials NAME [--cut-off] [--yes] [--json]
 meridian client remove NAME [--cut-off] [--yes] [--json]
 meridian client remove NAME... [--dry-run] [--yes] [--json]
-meridian client remove --proposal FILE [--dry-run] [--yes] [--json]
 ```
 
 | Flag | Default | Description |
@@ -153,7 +152,7 @@ meridian client remove --proposal FILE [--dry-run] [--yes] [--json]
 | `--expires DATE` | never | When access ends: `YYYY-MM-DD` (the end of that day, UTC), an ISO time such as `2026-12-31T18:00:00+03:00` (a time without an offset is UTC), or `never`. Must be in the future |
 | `--yes`, `-y` | | Confirm `client reissue`, `client rotate-credentials`, or `client remove`; required with `--json` |
 
-**`client add`** — adds one or more people to the topology, applies it, and prints each person's connection page and subscription URL. The page is built from their real subscription, so relays and Hysteria2 appear when present. Names already in the topology or already present in the control service are refused. Names can be in any script (`client add Биба 王小明`): pages and output show them as typed, while the control service, which accepts only Latin letters, digits, `.`, `-`, and `_`, gets a transliterated username (`biba`, `wangxiaoming`). Other client commands accept either form. If a client's subscription link can't be built, the client is still added and the command exits `3`. `--limit`, `--reset`, `--expires`, and `--devices` are carried in the reviewed plan and created with each account in one transaction. A failed apply prints no links; rerun `meridian apply` to finish. Later applies preserve operator edits.
+**`client add`** — creates each person immediately through the control service with their first settings and prints their connection page and subscription URL. No apply or SSH is needed. Names may use any script; the service assigns a Latin username when needed. Existing names are refused before any person in the batch is created.
 
 **`client show`** — prints the connection page, subscription URL, status, traffic against the limit with its reset period, expiry, and last-seen time. **The subscription URL is also the page URL for every person.**
 
@@ -161,7 +160,7 @@ meridian client remove --proposal FILE [--dry-run] [--yes] [--json]
 
 First reported traffic and the last reporting node come from accepted traffic growth (`first_traffic_at` and `last_traffic_node` in JSON). Historical first use can be unknown; these are aggregate counters, with no sessions or client addresses.
 
-**`client list`** — lists clients with status, traffic, expiry, and last seen, including people added in the web panel (`declared: false` in JSON). With `--json`, returns `data.summary` counts and `data.clients[]`.
+**`client list`** — lists every service person with status, traffic, expiry and activity. JSON returns `data.summary` and `data.clients[]`; there is no ownership flag.
 
 `client list --attention` shows only people expiring within seven days (including the current instant), at or above 80% of quota, or with no lifetime traffic more than three days after creation. A reason column explains each row; JSON includes `clients[].attention_reasons`, and summary counts cover the filtered list. Undated imported traffic and reset periods still count as previous use. A separate **Stopped using** reason (`stopped`) flags a person who previously used the service but has no accepted traffic for more than three days. **Never used** (`unused`) remains a separate reason. `stopped_days` is an independent API threshold from 1–365 days, default 3; `unused_days` keeps its existing bounds and default. Period resets do not erase this evidence, and daily history can stay off. Imported use with no known last traffic time is not guessed to have stopped.
 
@@ -177,17 +176,17 @@ First reported traffic and the last reporting node come from accepted traffic gr
 
 **`client rotate-credentials`** — Use `meridian client rotate-credentials NAME --yes` when connection credentials need replacing. It generates a new VLESS UUID and Hysteria2 auth while keeping the subscription token, page URL, device registrations, status, limits, expiry, traffic, notes, tags, and language. Apps receive the keys on their next subscription refresh; ask the person to refresh now. Old identities lose new streams as each node applies the change. A leaked subscription URL requires `client reissue`, which issues a new URL and clears device registrations.
 
-The web panel offers **Rotate connection keys** for people added there. Declared people use the CLI, following the same ownership rule as reissue. CLI JSON requires `--yes` and returns `client-rotate-credentials`, including the generation and per-node `flow_blocks`. Optional `--cut-off` also ends existing flows with the disclosed shared-inbound reset or node-wide core restart.
+The web panel offers **Rotate connection keys** for every person, using the same service operation as the CLI. JSON requires `--yes` and returns `client-rotate-credentials`, including the generation and per-node `flow_blocks`. Optional `--cut-off` also ends existing flows with the disclosed shared-inbound reset or node-wide core restart.
 
 **`client reissue`** — replaces a client's links after a leak. The control service issues a new subscription ID and new keys, so the old subscription URL, connection page, and links stop working. Meridian prints the new subscription URL, which also opens the new connection page. Status, limits, and expiry stay as set. Asks for confirmation unless `--yes`, and refuses names that aren't your clients.
 
-**`client remove`** — removes the client from the topology, deletes their account in the control service, so their subscription and page stop responding. Asks for confirmation unless `--yes`. The last client cannot be removed. People added in the web panel are removed there.
+**`client remove`** — deletes people immediately through the control service after confirmation (`--yes` in JSON mode). Removing the last person is allowed. Several names use one frozen bulk preview and commit; `--dry-run` writes nothing. `--cut-off` is single-person only. `--proposal` has been retired; use names.
 
 **`client usage`** — shows daily upload, download, and total bytes for any person in this control service, including people added in the web panel. Daily history must be enabled in [Privacy](/en/privacy/); otherwise it exits `2` with the opt-in command. `client show` adds the last seven UTC days when history is on (`data.usage` in JSON, `null` when off). Empty days mean no recorded traffic; history is never backfilled.
 
 **`client devices`** — shows a count in private mode and device details in full mode; off reads no devices. `--json` returns `username`, `level`, `count`, the effective `limit`, `devices`, and `removed`. `--remove ID` or `--clear` forgets registrations without revoking credentials; a repeat reports zero removals. Reads and removals include people added in the web panel. `client set --devices N` sets a cap; `--devices default` uses the fleet cap. See [Device limits](/en/client-management/#limit-devices). Reissuing a client clears all device registrations and keeps the cap.
 
-Service-owned edits (`client enable`, `disable`, `set`, `reset-traffic`, and device removals) also accept people added in the web panel. An exact service username wins; a case or display-name match must identify one person, otherwise use the exact username shown by `client list`. Removal, reissue, and connection-page publication remain tied to declared clients.
+People are added and removed immediately in the control service, without an apply or SSH. Names can use any script. An exact username wins; otherwise a case-folded username or display name must identify one person. Ambiguous names are refused. A batch add checks every name before writing, then reports one service request per person. Existing names are refused.
 
 Disable, expiry, quota suspension, removal, and credential replacement block new TCP streams and UDP associations for the affected identity, including new streams on an already authenticated Hysteria2 QUIC or VLESS mux connection. Other people keep their sessions. The person view and `GET /api/users/{username}/flow-blocks` report each node: `blocked`, `pending_node`, or `agent_too_old`. Pending nodes can keep serving their previous configuration until they receive and apply the change; this includes control-service outages. Update an old agent with `meridian apply`. Events record the node and outcome without addresses or device data.
 
@@ -222,30 +221,15 @@ Undo writes the original choices, then enforces expiry and quota rules just like
 | `meridian client bulk tag --set-tag none` | Set or clear tag |
 | `meridian client bulk devices --devices unlimited` | Set device cap |
 | `meridian client bulk renewal --renew-days 30 --renewals 5` | Set or clear renewal |
-| `meridian client bulk delete` | Delete service-only people; one local proposal for declared people |
+| `meridian client bulk delete` | Delete people atomically through a frozen service preview and commit |
 | `meridian client bulk undo ID` | Undo reversible fields within ten minutes |
 | `meridian client bulk receipt ID` | Read a durable receipt |
 
 Shared filters: `--search TEXT`, `--status STATUS`, `--tag TAG`, `--match-profile PROFILE`, `--expiring-within DAYS`, `--quota-at-least PERCENT`, `--never-used`, `--attention`, `--attention-reason REASON`, `--lifecycle STATE`, `--sort name|usage|expiry|activity`, `--order asc|desc`. Use either `--attention` (any default reason) or `--attention-reason`. Lifecycle choices: `pending`, `renewing`, `fixed`, `unlimited`. Names sort by case-folded display name, then exact username. See [client management](/en/client-management/) for review and privacy rules.
 
-Declared deletions return one revision-bound `proposal` in the bulk preview and receipt. Save the console's **people-removal.json**, or pass the API bulk preview/receipt or CLI bulk JSON result file to `client remove --proposal FILE`. Files are limited to 64 MiB. The CLI verifies fleet, committed revision/generation/plan, and local intent, reviews every removal together, confirms once, and applies one intent edit. The apply fence rejects an older revision again before server mutation.
+Bulk previews freeze the selected people and row versions for ten minutes. Commit applies every reviewed change in one transaction and returns a durable receipt without notes or credentials. Reversible edits may be undone once within ten minutes; deletion and traffic reset are irreversible. Every person has the same service ownership.
 
-The 64 MiB limit applies to bytes actually read, including pipes and special files, before decoding or JSON parsing. Larger input is refused even if its reported size is zero or the file grows during reading.
-
-Proposal `usernames` must exactly match the committed `topology_intent.access.users`, including case. Display names are not accepted in proposals.
-
-A saved bulk file must describe deletion, and its proposal must list exactly the people marked `cli_required`, with the same count. Preview hashes are checked; when a CLI file contains both preview and receipt, their IDs, hashes, and proposals must agree. A standalone receipt keeps the original preview hash and is checked against its recorded outcomes. CLI envelopes reject unknown fields.
-
-For named removal, an exact service username wins over display-name or case-insensitive matches. A name matching two people is refused; use the exact username from `client list`. Remove console-only people with `client bulk delete`.
-
-`client remove NAME...` also supports several declared names, with `--dry-run` to review without saving. A declined review saves nothing, and at least one declared person must remain. JSON previews return `data.clients`, `data.review_hash`, and `data.applied: false`; applied combined removals keep `clients` and `review_hash` and omit default `applied: true`. Individual results keep `data.client`.
-
-Proposals omit private person fields and session cut-off. Bulk removal refuses `--cut-off`; individual `client remove NAME --cut-off` keeps its existing consent and node outcomes. In a mixed batch, service-owned deletions still commit atomically; declared deletions wait for local apply, and a changed topology refuses the entire service commit.
-
-```bash
-meridian client remove --proposal people-removal.json --dry-run --json
-meridian client remove --proposal people-removal.json --yes --json
-```
+Use `meridian client remove sample-a sample-b --dry-run --json` to preview, then `meridian client remove sample-a sample-b --yes --json` to commit. Declining the review writes nothing. Zero people is allowed; `meridian test` without an active person reports unavailable evidence (exit 3). `--proposal` is retired. Use single-person `client remove NAME --cut-off` to disclose and close existing sessions; earlier transfers may otherwise continue.
 
 `meridian client bulk extend --months 1 --person sample-a --dry-run --json`
 
@@ -484,7 +468,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 | `--dry-run` | | `fleet routing`, `fleet import`: show the changes and the review, apply nothing |
 | `--forget-unreachable` | | `fleet import`: forget what was deployed on a removed server whose SSH port does not answer |
 
-**`fleet status`** — control service health, each agent's last report and whether it applied the current configuration, relay listeners, and client counts. Missing declared clients degrade health; disabled, limited, or expired clients are counted but are your choice, not a fault. A reachable relay listener only proves TCP, so unverified relay routes keep health `unknown`; use `meridian test` to check the full path. Exit `0` means healthy, `4` degraded, and `3` unknown.
+**`fleet status`** — control service health, each agent's last report and whether it applied the current configuration, relay listeners, and client counts. An empty people directory does not degrade health; disabled, limited, or expired clients are counted but are your choice, not a fault. A reachable relay listener only proves TCP, so unverified relay routes keep health `unknown`; use `meridian test` to check the full path. Exit `0` means healthy, `4` degraded, and `3` unknown.
 
 The `active` column counts people with growth in the last report, with its collection time shown below. A delayed older window cannot replace newer activity. Node byte totals survive counter epochs; `traffic_counting_since` marks complete durable accounting, with only retained evidence backfilled from before migration.
 
@@ -508,7 +492,7 @@ Custom token events show the effective capability labels in your CLI language; c
 
 To import a JSON export, pass only the contents of `data.document`. Reviewed `delivery` settings, including URL paths in response rules, stay unchanged in exports, import reviews, and apply results.
 
-**`fleet import`** — reads an edited file (or `-` for standard input) and shows what it changes, one line each: `+` adds, `-` removes, and `~` changes a field (`~ exit-2 sni www.example.com -> www.example.org`). It then lists every resource the change deletes and the review hash, asks, and applies exactly that review, like `apply`. A file with no edits prints "No changes". Removing a client from `access.users` removes them like `client remove`: their subscription URL and connection page stop responding. Adding one creates them like `client add` and the service serves their page automatically; `client show NAME` prints their links. New camouflage SNIs get the checks `node sni` runs. Import refuses another `schema`, a server you haven't saved (save it with `meridian server add`), transport paths in the file, changes to the control server, its domain, or its backend, removing or renaming the exit on the control server, and moving an exit to another server (use `node replace`). Keys and credentials stay as they are. Without a terminal, pass `--yes`; `--dry-run` shows the changes and the review without applying anything.
+**`fleet import`** — reads an edited topology file (or `-` for stdin), shows its changes and retiring resources, then confirms and applies the reviewed hash. Unchanged topology reports no changes. People are managed through `client` and the service.
 
 **`fleet usage`** — shows per-server byte totals for each UTC day, including retained use of removed servers. `--days N` chooses 1–730 days within retention. Daily history must be on; JSON returns fleet totals and `nodes[].daily` in `data`.
 
@@ -759,22 +743,22 @@ meridian restore --to SERVER [--snapshot FILE] [--recovery-key] [--force]
 |------|---------|-------------|
 | `--to SERVER` | (required) | The new control server: an IP, `user@IP:port`, or a saved name |
 | `--snapshot FILE` | newest saved | Snapshot to restore |
-| `--recovery-key` | | Open the snapshot with the recovery key instead of this machine's key; it is asked for (hidden) or read from one line of standard input |
+| `--recovery-key` | | Open the snapshot with the recovery key instead of this machine's key; it is asked for (hidden) or read from one line of standard input. Asked for at a terminal when this machine has no key of its own |
 | `--force` | | Restore even though the old control service still answers |
 | `--name NAME` | (none) | Name for the new server |
 | `--user/-u USER` | root | SSH user on the new server |
 | `--ssh-port PORT` | 22 | SSH port on the new server |
 | `--yes`, `-y` | | Skip the confirmation |
 
-Restore opens the snapshot, reviews what it will do, and asks. It then installs the control service on the new server from the snapshot, moves the control server (and the old server's exit, if it had one) to the new address in your topology, and runs the normal reviewed apply. The restored service gets a new fleet authority, new signing keys, and a new API token, so every agent enrolls again and a seized server can't sign anything your nodes accept. Users keep their accounts, limits, and traffic. The web panel owner sets a new password with a link from `meridian panel`.
+Restore opens the snapshot, reviews what it will do, and asks. It then installs the control service on the new server from the snapshot, moves the control server (and the old server's exit, if it had one) to the new address in your topology, and runs the normal reviewed apply. The restored service gets a new fleet authority, new signing keys, and a new API token, so every agent enrolls again and a seized server can't sign anything your nodes accept. Users keep their accounts, limits, and traffic. The restored web panel has no owner, so the end prints a one-time setup link for a new password; restore then lists other computers' backup keys and, at a terminal, offers to revoke each one.
 
-On a bare IP every subscription URL contains the control server's address, so each link changes: the review says so and the end prints every client's new link. With a domain, links stay the same once its DNS record points at the new server; the review names the records.
+On a bare IP every subscription URL contains the control server's address, so each link changes: the review says so and the end prints everyone's new link, including people added in the web panel. With a domain, links stay the same once its DNS record points at the new server; the review names the records.
 
 Restore refuses while the old control server still answers, because two control services would split the fleet; `--force` overrides it, for example when the old server was seized. It warns when `--snapshot` names an older file than the newest saved one: an older snapshot brings back tokens, machines, and people you have since removed. A restore that stops can be run again and continues where it stopped.
 
 Restore also checks snapshot profiles against the local intent before staging or target access; `--force` does not skip this check. A stored declaration fingerprint permits topology expansion of unchanged grants. Unstamped snapshots require an identical compiled grant map. Restore merges deposited profile history even when it retains newer local intent, and pins reviewed declarations through resumes. Choose a matching snapshot, or restore matching fleet files into a new context and review the desired saved change afterwards with `meridian apply`. See [Recovery](/en/recovery/).
 
-On a machine without the fleet, pass the snapshot file and `--recovery-key`: the snapshot's own copy of the fleet's files is restored first. If this machine's copy is older than the snapshot's, restore puts the fleet in a new context and, after the review names it, takes the fleet over from the old one, which is then marked superseded and refuses changes until you `meridian context remove` it.
+On a machine without the fleet, pass the snapshot file; restore asks for the recovery key: the snapshot's own copy of the fleet's files is restored first. If this machine's copy is older than the snapshot's, restore puts the fleet in a new context and, after the review names it, takes the fleet over from the old one, which is then marked superseded and refuses changes until you `meridian context remove` it.
 
 ### meridian migrate
 

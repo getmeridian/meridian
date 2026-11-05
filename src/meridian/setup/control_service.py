@@ -19,7 +19,6 @@ from meridian.compiler.models import (
     AgentRuntimePayload,
     ClientEndpointPayload,
     ControlServicePayload,
-    ControlUserPayload,
     NodeWorkloadPayload,
     ResourcePlan,
     ServerBaselinePayload,
@@ -33,6 +32,7 @@ from meridian.core.cancellation import CancellationToken
 from meridian.core.defaults import DEFAULT_SNI
 from meridian.core.errors import ProvisioningError
 from meridian.core.output import OperationContext
+from meridian.core.people_query import PeopleQuery
 from meridian.core.reporters import NoopReporter, Reporter
 from meridian.diagnostics.network import certificate_validation_error
 from meridian.health import ReadinessTimeout, poll_until_ready
@@ -292,16 +292,21 @@ def verify_control_service(plan: ResourcePlan, cluster: ClusterConfig) -> tuple[
         except ReadinessTimeout:
             raise ResourceReconcileError(f"Node {behind[0]} has not applied its current document.") from None
         urls: dict[str, str] = {}
-        for item in plan.resources:
-            if not isinstance(item.payload, ControlUserPayload):
-                continue
-            user = client.get_user(item.payload.username)
-            if user is None:
-                raise ResourceReconcileError(f"Managed access user {item.payload.username!r} is missing.")
-            document = client.fetch_subscription(user.sub_token, document="json")
-            if not xray_subscription_is_valid(_Document(urls.get(item.payload.username, "sub"), document)):
-                raise ResourceReconcileError(f"Canonical subscription for {item.payload.username!r} is invalid.")
-            urls[item.payload.username] = cluster.panel.subscription_url(user.sub_token)
+        cursor = None
+        while True:
+            page = client.query_people(PeopleQuery(limit=500, cursor=cursor))
+            for person in page.users:
+                user = client.get_user(person.username)
+                if user is None:
+                    continue
+                if user.status == "active":
+                    document = client.fetch_subscription(user.sub_token, document="json")
+                    if not xray_subscription_is_valid(_Document("sub", document)):
+                        raise ResourceReconcileError(f"Canonical subscription for {user.username!r} is invalid.")
+                urls[user.username] = cluster.panel.subscription_url(user.sub_token)
+            cursor = page.next_cursor
+            if cursor is None:
+                break
     invalid = endpoint_certificate_errors(plan)
     if invalid:
         raise ResourceReconcileError(

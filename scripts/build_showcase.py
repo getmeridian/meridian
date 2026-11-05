@@ -246,7 +246,7 @@ def write_recordings(directory: Path, client: httpx.Client, service: ControlServ
                 "active_shares": active_shares,
                 "token_create_schema": TokenCreate.model_json_schema(),
                 "finite_expiry_year": FINITE_EXPIRY_YEAR,
-                **templates,
+                **{**templates, "people_fields": [*templates["people_fields"], "declared"]},
             },
             ensure_ascii=False,
             separators=(",", ":"),

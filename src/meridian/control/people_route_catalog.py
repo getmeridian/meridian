@@ -35,11 +35,9 @@ PEOPLE_ROUTES: tuple[ApiRoute, ...] = (
         "Freeze a bulk selection and review every before/after without writing.",
         credentials=False,
         capability=("people.batch", "people.private"),
-        refusals=(NOT_FOUND, ErrorResponse(409, ("conflicting_delivery_policies", "topology_uncommitted"))),
+        refusals=(NOT_FOUND, ErrorResponse(409, ("conflicting_delivery_policies",))),
         description=(
             "Previews write no database rows or events. They expire after 10 minutes or a service restart. "
-            "Declared deletions return one secret-free proposal tied to the fleet's committed revision, generation, "
-            "plan, and intent identity for local CLI review and apply; they carry no cut-off choice."
             " Profile choices resolve each person's delivery policy before returning a review."
         ),
     ),
@@ -58,7 +56,6 @@ PEOPLE_ROUTES: tuple[ApiRoute, ...] = (
                 409,
                 (
                     "stale_people",
-                    "stale_topology",
                     "preview_expired",
                     "preview_mismatch",
                     "conflicting_delivery_policies",

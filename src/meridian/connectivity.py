@@ -439,7 +439,7 @@ def _run_canonical_subscription(
                         [
                             VerificationFinding(
                                 code="ACTIVE_CLIENT_MISSING",
-                                status="failed",
+                                status="skipped" if not requested_client else "failed",
                                 message=message,
                                 remediation="Create or enable a client, then retry with --client NAME.",
                             )
@@ -717,18 +717,9 @@ def _classify_attempt(
 
 def select_active_client(panel: VerificationPanel, cluster: ClusterConfig, requested_client: str) -> User | None:
     """Choose a deterministic active user with a usable canonical subscription."""
-    intent = cluster.topology_intent
     if requested_client:
-        if intent is not None and requested_client not in intent.access.users:
-            return None
         user = panel.get_user(requested_client)
         return user if _client_is_usable(user) else None
-    if intent is not None:
-        for username in intent.access.users:
-            user = panel.get_user(username)
-            if _client_is_usable(user):
-                return user
-        return None
     return next(
         (user for user in sorted(panel.list_users(), key=lambda item: item.username) if _client_is_usable(user)),
         None,

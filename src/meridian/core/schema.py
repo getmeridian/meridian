@@ -418,6 +418,7 @@ _, _, ClientAddOutputEnvelope = _make_command_envelope(
     "client.add",
     ClientAddResult,
     doc="Envelope schema for `meridian client add --json`.",
+    failure_data_type=ClientAddResult | EmptyData,
 )
 
 _, _, ClientRemoveOutputEnvelope = _make_command_envelope(

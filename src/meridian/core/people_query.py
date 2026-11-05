@@ -64,10 +64,14 @@ class PeoplePerson(UserTrafficEvidence, AccountLifecycleState):
     """List evidence without connection credentials or private notes."""
 
     username: str
+    declared: Literal[False] = Field(
+        default=False,
+        json_schema_extra={"deprecated": True},
+        description="Deprecated 4.x read compatibility only. Always false; every person is service-owned.",
+    )
     profiles: ProfileMembership = Field(default_factory=default_profiles)
     user_id: str
     display_name: str
-    declared: bool
     has_notes: bool | None = Field(
         default=None, description="Private operator note presence when reported; its text is never returned."
     )

@@ -41,7 +41,6 @@
       unavailable: "This action is unavailable in the demo.",
       exists: "A person with this name already exists.",
       missing: "This person is no longer in the demo. Reload to reset.",
-      declared: "This person is managed by the CLI. Choose a person added in the console.",
       load: "Demo data could not be loaded. Reload this page.",
       scheduleRange: "The schedule must end before 2099. Use a shorter interval.",
       firstUseUnknown: "First use is unknown for this account. Set a fixed expiry.",
@@ -53,7 +52,6 @@
       unavailable: "Это действие недоступно в демо.",
       exists: "Человек с таким именем уже есть.",
       missing: "Этого человека больше нет в демо. Перезагрузите страницу, чтобы вернуть исходные данные.",
-      declared: "Этим человеком управляют через CLI. Выберите человека, добавленного в консоли.",
       load: "Не удалось загрузить данные демо. Перезагрузите страницу.",
       scheduleRange: "Срок доступа должен заканчиваться до 2099 года. Выберите меньший интервал.",
       firstUseUnknown: "Неизвестно, когда этот аккаунт впервые использовали. Укажите дату окончания доступа.",
@@ -65,7 +63,6 @@
       unavailable: "این کار در نسخهٔ نمایشی در دسترس نیست.",
       exists: "شخصی با این نام از قبل وجود دارد.",
       missing: "این شخص دیگر در نسخهٔ نمایشی نیست. برای بازنشانی، صفحه را دوباره بارگیری کنید.",
-      declared: "این شخص با CLI مدیریت می‌شود. شخصی را انتخاب کنید که در کنسول افزوده شده است.",
       load: "داده‌های نمایشی بارگیری نشدند. صفحه را دوباره بارگیری کنید.",
       scheduleRange: "زمان‌بندی باید پیش از سال ۲۰۹۹ پایان یابد. بازهٔ کوتاه‌تری انتخاب کنید.",
       firstUseUnknown: "زمان نخستین استفادهٔ این حساب مشخص نیست. تاریخ انقضای ثابتی تعیین کنید.",
@@ -77,7 +74,6 @@
       unavailable: "此操作在演示中不可用。",
       exists: "已存在同名用户。",
       missing: "此用户已从演示中删除。重新加载页面即可重置。",
-      declared: "此用户由 CLI 管理。请选择在控制台中添加的用户。",
       load: "无法加载演示数据，请重新加载页面。",
       scheduleRange: "计划必须在 2099 年之前结束。请选择更短的间隔。",
       firstUseUnknown: "无法确定此用户的首次使用时间。请设置固定的到期时间。",
@@ -171,7 +167,6 @@
     return Array.from(bytes, function (value) { return value.toString(16).padStart(2, "0"); }).join("");
   };
   D.bump = function (user) { D.versions[user.username] = (D.versions[user.username] || 0) + 1; };
-  D.isDeclared = function (name) { return responses["GET ui/api/fleet"].declared_users.indexOf(name) >= 0; };
 
   function emit(kind, subject, detail) {
     events.push({ id: ++nextId, time: now(), kind: kind, actor: "owner", subject: subject, detail: detail || {} });
@@ -245,7 +240,6 @@
         if (entry.protocol !== null) { entry.uri = ""; entry.qr_svg = ""; }
       });
     }
-    view.declared = D.isDeclared(user.username);
     if (D.access && user.status === "active") {
       var allowed = D.access(user).connections.map(function (entry) { return entry.remark; });
       view.connections = view.connections.filter(function (entry) { return allowed.indexOf(entry.remark) >= 0; });
@@ -353,7 +347,7 @@
       enforce(user);
       // As the service: status changes are their own events; notes and tags emit none.
       if (fields.indexOf("status") >= 0) emit(body.status === "disabled" ? "user.disabled" : "user.enabled", name);
-      var operational = fields.filter(function (field) { return ["note", "tag", "status"].indexOf(field) < 0; });
+      var operational = fields.filter(function (field) { return ["note", "tag", "status", "display_name"].indexOf(field) < 0; });
       if (operational.length) emit("user.updated", name, { fields: operational });
       return reply(user);
     }
@@ -368,7 +362,6 @@
     }
     if (method === "POST" && suffix === "reissue" || method === "DELETE" && !suffix) {
       if (body.cut_off) return error("demo_unavailable", "unavailable", 409);
-      if (D.isDeclared(name)) return error("declared_user", "declared", 409);
       if (method === "DELETE") {
         users.splice(users.indexOf(user), 1);
         emit("user.removed", name);
@@ -446,9 +439,17 @@
     if (path === "auth/setup/check") return reply({ purpose: "setup" });
     if (path === "api/users" && method === "GET") return reply({ users: users });
     if (path === "api/users" && method === "POST") {
-      if (person(body.username)) return error("user_exists", "exists", 409);
+      var display = D.cleanName(body.display_name), username = body.username;
+      if (username === undefined || username === null) {
+        if (!display) D.fail("invalid_request");
+        username = D.assignUsername(display);
+      } else if (typeof username !== "string" || !(new RegExp("^" + source.username_pattern + "$")).test(username)) D.fail("invalid_request");
+      if (person(username)) return error("user_exists", "exists", 409);
+      if (D.nameTaken(username, display)) return error("name_conflict", "exists", 409);
       var user = clone(responses["POST api/users"]);
-      Object.assign(user, D.updateUser(user, body), { created_at: now(), username: body.username });
+      var fields = Object.assign({}, body, { display_name: display }); delete fields.username;
+      user.display_name = "";
+      Object.assign(user, D.updateUser(user, fields), { created_at: now(), username: username });
       user.user_id = "demo-person-" + (++newId);
       user.used_traffic_bytes = user.lifetime_traffic_bytes = 0;
       user.first_traffic_at = user.online_at = user.last_traffic_node = null;
@@ -528,7 +529,16 @@
   D.unavailable("GET", "api/nodes/{id}/command-targets");
   D.unavailable("POST", "api/nodes/{id}/commands");
   D.unavailable("GET", "api/nodes/{id}/commands/{id}");
-  D.recorded("GET", "ui/api/fleet");
+  // The fleet's name map follows edits, as the service reads it from the people it holds.
+  D.route("GET", "ui/api/fleet", function () {
+    var view = clone(responses["GET ui/api/fleet"]), names = {};
+    users.forEach(function (user) {
+      var name = Object.hasOwn(user, "display_name") ? user.display_name : view.display_names[user.username];
+      if (name && name !== user.username) names[user.username] = name;
+    });
+    view.display_names = names;
+    return reply(view);
+  });
   D.recorded("GET", "api/settings");
   D.recorded("GET", "api/revisions");
   D.recorded("GET", "api/revisions/{id}");

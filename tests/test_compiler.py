@@ -150,7 +150,7 @@ def _intent(*, reverse_exits: bool = False) -> SetupIntent:
             )
         ],
         default_egress_ref="primary",
-        access=AccessIntent(users=["default", "family"]),
+        access=AccessIntent(),
         delivery=DeliveryIntent(profile_title="Family VPN"),
     )
 
@@ -332,7 +332,6 @@ class TestPureCompiler:
             "host",
             "internal_squad",
             "external_squad",
-            "access_user",
             "service_user",
             "subscription_template",
             "subscription_settings",
@@ -527,7 +526,7 @@ class TestPureCompiler:
             for resource in plan.resources
         )
         users = [resource.payload for resource in plan.resources if isinstance(resource.payload, AccessUserPayload)]
-        assert users
+        assert not users
         assert all(user.external_squad_ref == "" for user in users)
 
     def test_resources_are_dependency_ordered_with_unique_tags_and_ports(self) -> None:
@@ -1084,22 +1083,6 @@ def test_hosts_follow_exit_order_within_each_protocol() -> None:
     assert reality_owners == sorted(reality_owners, key=["main", "exit-2"].index)
 
 
-def test_mixed_case_usernames_compile_to_lowercase_logical_ids() -> None:
-    plan = compile_panel_pass(single_exit_intent(users=("Biba", "boba")))
-
-    users = {
-        resource.logical_id: resource.payload.username
-        for resource in plan.resources
-        if isinstance(resource.payload, AccessUserPayload)
-    }
-    assert users == {"user:biba": "Biba", "user:boba": "boba"}
-
-
-def test_usernames_that_differ_only_by_case_are_refused() -> None:
-    with pytest.raises(ValidationError, match="ignoring case"):
-        AccessIntent(users=["biba", "Biba"])
-
-
 def _with_routes(*routes: dict[str, object]) -> SetupIntent:
     return SetupIntent.model_validate({**_intent().model_dump(), "routes": list(routes)})
 
@@ -1119,7 +1102,7 @@ def test_existing_gateway_plan_compiles_byte_identically() -> None:
     plan = compile_panel_pass(_intent())
     hashes = {resource.logical_id: resource.desired_hash for resource in plan.resources}
 
-    assert plan.intent_hash == "b61fcb298c072ec0a2716425076617135e82d80c471bb55b48cf4d55accd2192"
+    assert plan.intent_hash == "e28e4d620fa3372a8832f5c8f23655a18387179c3ca6af94013d0f14400deae6"
     assert {logical_id: hashes[logical_id] for logical_id in _GATEWAY_HASHES} == _GATEWAY_HASHES
 
 

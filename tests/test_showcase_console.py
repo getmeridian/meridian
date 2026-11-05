@@ -61,6 +61,30 @@ def test_demo_mutations_preserve_current_contracts_and_reset_with_a_new_document
     assert reset["language"] == "auto" and reset["devices"] == 2
 
 
+def test_demo_names_follow_the_service_rules_for_creation_clashes_renames_and_receipts(demo: Path) -> None:
+    result = run_console("showcase-names", data={"directory": str(demo)})
+    validate_recordings(result["responses"])
+    assert result["cyrillic"]["display_name"] == "Алиса Петрова" and result["cyrillic"]["username"]
+    assert result["latin"]["display_name"] == "Straße" and result["latin"]["username"].isascii()
+    assert [refusal.get("code") for refusal in result["refused"]] == [
+        "name_conflict",
+        "name_conflict",
+        "name_conflict",
+        "invalid_request",
+        "invalid_request",
+        "invalid_request",
+        "invalid_request",
+    ]
+    assert result["keptUsers"]
+    assert result["renamed"] == result["fleetName"] == result["previewName"] == "Новое имя"
+    assert result["searched"] == ["Новое имя"]
+    assert result["renameEvents"] == 0, "the service records no event for a rename"
+    assert result["receiptName"] == "Luma", "receipt identities stay content-free"
+    assert result["clashRename"]["code"] == "name_conflict"
+    assert result["clearedFleet"] is False
+    assert result["outside"] == result["nativeApi"] == result["errors"] == []
+
+
 def test_a_language_switch_moves_into_the_demo_address_so_reloads_and_shared_links_keep_it(demo: Path) -> None:
     """Demo storage lives in memory, so `?lang=` is the only thing a reload or a shared link carries."""
     result = run_console("showcase-language", "en", {"directory": str(demo)})
@@ -94,7 +118,7 @@ def test_demo_bulk_and_routing_use_reviews_receipts_and_effective_access(demo: P
     assert result["passkeys"] == []
     assert result["rotated"] and result["rotationDevicesIntact"] and result["staleKeysRejected"]
     assert result["periodReset"] and result["unlimitedDevices"]
-    assert result["declaredKept"] and result["bulkDeleted"] and result["deleteUndoRefused"]
+    assert result["bulkDeleted"] and result["deleteUndoRefused"]
     assert result["outside"] == result["nativeApi"] == result["errors"] == []
 
 
@@ -282,17 +306,6 @@ def test_demo_token_preview_and_issue_share_request_validation(demo: Path) -> No
     result = run_console("showcase-token-refusals", data={"directory": str(demo), "bodies": bodies})
     assert all(reply["code"] == "invalid_request" and reply["status"] == 400 for reply in result["refusals"])
     assert result["keptTokens"] and result["keptEvents"]
-    assert result["outside"] == result["nativeApi"] == result["errors"] == []
-
-
-@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
-def test_demo_refuses_declared_key_rotation_without_changing_people_or_receipts(demo: Path, locale: str) -> None:
-    result = run_console("showcase-declared-keys", locale, {"directory": str(demo)})
-    assert all(
-        reply["code"] == "declared_user" and reply["status"] == 409 and reply["text"] for reply in result["refusals"]
-    )
-    assert all(result["unchanged"])
-    validate_recordings(result["responses"])
     assert result["outside"] == result["nativeApi"] == result["errors"] == []
 
 

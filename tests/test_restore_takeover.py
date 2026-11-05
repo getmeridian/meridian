@@ -115,9 +115,7 @@ def new_server(monkeypatch: pytest.MonkeyPatch) -> NewServer:
     monkeypatch.setattr(restore_steps, "install_service", lambda plan, cluster, entry, conn: None)
     monkeypatch.setattr(restore_steps, "verify_restored", lambda cluster, epoch: None)
     monkeypatch.setattr(restore_steps, "ssh_answers", lambda entry: False)
-    monkeypatch.setattr(
-        restore_steps, "restored_handoffs", lambda cluster, names: [HandoffLinks(name) for name in names]
-    )
+    monkeypatch.setattr(restore_steps, "restored_handoffs", lambda cluster: [HandoffLinks("alice")])
     return NewServer()
 
 
@@ -279,6 +277,7 @@ def test_the_takeover_needs_yes_or_a_terminal(
     monkeypatch.setattr(restore_command, "review_restore_profiles", lambda cluster, database: None)
     monkeypatch.setattr(restore_command, "_render", lambda review, registry: None)
     monkeypatch.setattr(restore_command, "_done", lambda outcome: None)
+    monkeypatch.setattr(restore_command, "_hand_back", lambda cluster, *, ask: None)
     monkeypatch.setattr(restore_command, "has_tty", lambda: tty)
     monkeypatch.setattr("meridian.commands.resolve.resolve_server", lambda registry, **kwargs: None)
     monkeypatch.setattr("meridian.commands.server.register_server", lambda registry, resolved, *, name: None)

@@ -1737,17 +1737,6 @@
             "title": "Preview Hash",
             "type": "string"
           },
-          "proposal": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PeopleRemovalProposal"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
           "reversible": {
             "title": "Reversible",
             "type": "boolean"
@@ -1863,17 +1852,6 @@
             "pattern": "^[0-9a-f]{64}$",
             "title": "Preview Hash",
             "type": "string"
-          },
-          "proposal": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PeopleRemovalProposal"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
           },
           "undo_people": {
             "anyOf": [
@@ -7414,6 +7392,10 @@
             "type": "string"
           },
           "declared": {
+            "const": false,
+            "default": false,
+            "deprecated": true,
+            "description": "Deprecated 4.x read compatibility only. Always false; every person is service-owned.",
             "title": "Declared",
             "type": "boolean"
           },
@@ -7719,7 +7701,6 @@
           "username",
           "user_id",
           "display_name",
-          "declared",
           "row_version",
           "status",
           "created_at",
@@ -7882,68 +7863,6 @@
           }
         },
         "title": "PeopleQuery",
-        "type": "object"
-      },
-      "PeopleRemovalProposal": {
-        "additionalProperties": false,
-        "description": "Remove these declared usernames in one local review and apply; carries no session cut-off choice.",
-        "properties": {
-          "fleet_id": {
-            "description": "Fleet identifier: a lowercase UUID fixed when the fleet is created.",
-            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-            "title": "Fleet Id",
-            "type": "string"
-          },
-          "generation": {
-            "minimum": 1,
-            "title": "Generation",
-            "type": "integer"
-          },
-          "intent_sha256": {
-            "description": "Lowercase hex SHA-256 digest.",
-            "pattern": "^[0-9a-f]{64}$",
-            "title": "Intent Sha256",
-            "type": "string"
-          },
-          "plan_hash": {
-            "description": "Lowercase hex SHA-256 digest.",
-            "pattern": "^[0-9a-f]{64}$",
-            "title": "Plan Hash",
-            "type": "string"
-          },
-          "revision": {
-            "minimum": 1,
-            "title": "Revision",
-            "type": "integer"
-          },
-          "schema": {
-            "const": "meridian.people-removal/v1",
-            "default": "meridian.people-removal/v1",
-            "title": "Schema",
-            "type": "string"
-          },
-          "usernames": {
-            "items": {
-              "maxLength": 36,
-              "minLength": 3,
-              "pattern": "^[A-Za-z0-9_-]+$",
-              "type": "string"
-            },
-            "maxItems": 50000,
-            "minItems": 1,
-            "title": "Usernames",
-            "type": "array"
-          }
-        },
-        "required": [
-          "fleet_id",
-          "revision",
-          "generation",
-          "plan_hash",
-          "intent_sha256",
-          "usernames"
-        ],
-        "title": "PeopleRemovalProposal",
         "type": "object"
       },
       "PeriodTraffic": {
@@ -11447,6 +11366,28 @@
       },
       "UserCreate": {
         "additionalProperties": false,
+        "anyOf": [
+          {
+            "properties": {
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "username"
+            ]
+          },
+          {
+            "properties": {
+              "display_name": {
+                "minLength": 1
+              }
+            },
+            "required": [
+              "display_name"
+            ]
+          }
+        ],
         "description": "A new user with their first settings, created in one step (the console's \"Add person\").",
         "properties": {
           "activation_duration_days": {
@@ -11477,6 +11418,22 @@
             ],
             "default": null,
             "title": "Device Limit"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "description": "Public person name; the service assigns a Latin username when only this is given.",
+            "title": "Display Name"
           },
           "expire_at": {
             "anyOf": [
@@ -11592,14 +11549,19 @@
             "title": "Traffic Reset Anchor Day"
           },
           "username": {
-            "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
-            "title": "Username",
-            "type": "string"
+            "anyOf": [
+              {
+                "pattern": "^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\\.\\.[A-Za-z0-9_.-]{1,62})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Username"
           }
         },
-        "required": [
-          "username"
-        ],
         "title": "UserCreate",
         "type": "object"
       },
@@ -11764,6 +11726,172 @@
           "limit"
         ],
         "title": "UserDevices",
+        "type": "object"
+      },
+      "UserEnsure": {
+        "additionalProperties": false,
+        "description": "Creation settings for a missing account; existing accounts keep every setting and live name.",
+        "properties": {
+          "activation_duration_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whole UTC days from first traffic.",
+            "title": "Activation Duration Days"
+          },
+          "device_limit": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Device Limit"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "description": "Fill an empty name atomically; a nonempty service name is always preserved.",
+            "title": "Display Name"
+          },
+          "expire_at": {
+            "anyOf": [
+              {
+                "description": "RFC 3339 timestamp in UTC, ending in Z.",
+                "maxLength": 40,
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expire At"
+          },
+          "profiles": {
+            "items": {
+              "maxLength": 48,
+              "minLength": 1,
+              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Profiles",
+            "type": "array"
+          },
+          "renewal_interval_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Days"
+          },
+          "renewal_interval_months": {
+            "anyOf": [
+              {
+                "maximum": 120,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Renewal Interval Months"
+          },
+          "renewal_limit": {
+            "anyOf": [
+              {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Renewals in this series; null means unlimited.",
+            "title": "Renewal Limit"
+          },
+          "status": {
+            "default": "active",
+            "enum": [
+              "active",
+              "disabled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "traffic_limit_bytes": {
+            "default": 0,
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "title": "Traffic Limit Bytes",
+            "type": "integer"
+          },
+          "traffic_limit_strategy": {
+            "default": "no_reset",
+            "enum": [
+              "no_reset",
+              "day",
+              "week",
+              "month",
+              "month_rolling"
+            ],
+            "title": "Traffic Limit Strategy",
+            "type": "string"
+          },
+          "traffic_reset_anchor_day": {
+            "anyOf": [
+              {
+                "maximum": 31,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UTC month day; null uses creation day.",
+            "title": "Traffic Reset Anchor Day"
+          }
+        },
+        "title": "UserEnsure",
         "type": "object"
       },
       "UserFieldsDetail": {
@@ -11980,6 +12108,22 @@
             ],
             "default": null,
             "title": "Device Limit"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "description": "Empty shows the username.",
+            "title": "Display Name"
           },
           "expire_at": {
             "anyOf": [
@@ -12318,6 +12462,22 @@
             "default": null,
             "title": "Device Limit"
           },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "description": "Omitted preserves the name; empty clears it to show the username.",
+            "title": "Display Name"
+          },
           "expire_at": {
             "anyOf": [
               {
@@ -12574,6 +12734,22 @@
             "default": null,
             "description": "Null uses the fleet's cap; 0 means unlimited.",
             "title": "Device Limit"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "description": "Public person name in any script; empty shows the stable username.",
+            "title": "Display Name"
           },
           "expire_at": {
             "anyOf": [
@@ -13155,6 +13331,22 @@
             "default": null,
             "title": "Device Limit"
           },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "description": "Omitted preserves the name; empty clears it to show the username.",
+            "title": "Display Name"
+          },
           "expire_at": {
             "anyOf": [
               {
@@ -13527,7 +13719,7 @@
   "info": {
     "description": "Explicit-capability bearer-token operations behind the operator's private console address. Capabilities are declared per action and frozen on tokens. Compatible read/propose/approve/people/admin presets expand to equivalent grants; credentials and private metadata require explicit permissions. Node enrollment, agent, subscription, page, and console-session surfaces are internal or public and are excluded from this document.",
     "title": "Meridian admin API",
-    "version": "4.0.0b12"
+    "version": "4.0.0b13"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",
@@ -13546,6 +13738,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -13633,6 +13833,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -13835,6 +14043,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -13934,6 +14150,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -14049,6 +14273,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -14133,6 +14365,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -14259,6 +14499,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -14348,6 +14596,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -14432,6 +14688,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -14534,6 +14798,14 @@
               }
             },
             "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": true
           },
           "401": {
@@ -14623,6 +14895,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -14710,6 +14990,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -14841,6 +15129,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -14926,6 +15222,14 @@
               }
             },
             "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": true
           },
           "401": {
@@ -15034,6 +15338,14 @@
               }
             },
             "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": true
           },
           "400": {
@@ -15163,6 +15475,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -15252,6 +15572,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -15336,6 +15664,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -15451,6 +15787,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -15537,6 +15881,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -15588,7 +15940,8 @@
             },
             "description": "Conflict",
             "x-meridian-error-codes": [
-              "conflict"
+              "conflict",
+              "name_conflict"
             ]
           },
           "413": {
@@ -15652,6 +16005,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -15736,6 +16097,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -15851,6 +16220,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -15938,6 +16315,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -16048,6 +16433,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -16175,6 +16568,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -16290,6 +16691,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -16402,6 +16811,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -16570,6 +16987,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -16680,6 +17105,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -16790,6 +17223,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -16905,6 +17346,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -17185,6 +17634,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -17285,6 +17742,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -17339,8 +17804,7 @@
               "conflicting_delivery_policies",
               "preview_expired",
               "preview_mismatch",
-              "stale_people",
-              "stale_topology"
+              "stale_people"
             ]
           },
           "413": {
@@ -17393,7 +17857,7 @@
     },
     "/api/people/bulk/preview": {
       "post": {
-        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Previews write no database rows or events. They expire after 10 minutes or a service restart. Declared deletions return one secret-free proposal tied to the fleet's committed revision, generation, plan, and intent identity for local CLI review and apply; they carry no cut-off choice. Profile choices resolve each person's delivery policy before returning a review.",
+        "description": "Requires people.batch and people.private capabilities. Compatible presets: people, including scopes that cover them. Previews write no database rows or events. They expire after 10 minutes or a service restart.  Profile choices resolve each person's delivery policy before returning a review.",
         "operationId": "preview_people_bulk",
         "requestBody": {
           "content": {
@@ -17415,6 +17879,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -17479,8 +17951,7 @@
             },
             "description": "Conflict",
             "x-meridian-error-codes": [
-              "conflicting_delivery_policies",
-              "topology_uncommitted"
+              "conflicting_delivery_policies"
             ]
           },
           "413": {
@@ -17556,6 +18027,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -17656,6 +18135,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -17787,6 +18274,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -17871,6 +18366,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -17983,6 +18486,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -18103,6 +18614,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -18187,6 +18706,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -18303,6 +18830,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -18406,6 +18941,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -18533,6 +19076,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -18664,6 +19215,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -18740,6 +19299,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -18824,6 +19391,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -18954,6 +19529,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -19073,6 +19656,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -19150,6 +19741,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -19234,6 +19833,14 @@
               }
             },
             "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": true
           },
           "400": {
@@ -19346,6 +19953,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -19459,6 +20074,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -19548,6 +20171,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -19639,6 +20270,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -19741,6 +20380,14 @@
               }
             },
             "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": true
           },
           "401": {
@@ -19830,6 +20477,14 @@
               }
             },
             "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": true
           },
           "400": {
@@ -19882,6 +20537,19 @@
             "description": "Not Found",
             "x-meridian-error-codes": [
               "not_found"
+            ]
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "name_conflict"
             ]
           },
           "413": {
@@ -19957,6 +20625,14 @@
               }
             },
             "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": true
           },
           "400": {
@@ -20008,6 +20684,7 @@
             },
             "description": "Conflict",
             "x-meridian-error-codes": [
+              "name_conflict",
               "user_exists"
             ]
           },
@@ -20086,6 +20763,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -20189,7 +20874,7 @@
     },
     "/api/users/{username}": {
       "delete": {
-        "description": "Requires people.remove capabilities. Compatible presets: people, including scopes that cover them. Removing or reissuing a person declared by an approved, applied, or failed revision needs fleet.apply. Owner sessions use the meridian CLI. Setting cut_off to true also requires commands.cut_off.",
+        "description": "Requires people.remove capabilities. Compatible presets: people, including scopes that cover them. Setting cut_off to true also requires commands.cut_off.",
         "operationId": "delete_user",
         "parameters": [
           {
@@ -20222,6 +20907,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -20287,8 +20980,7 @@
             "description": "Conflict",
             "x-meridian-error-codes": [
               "command_queue_full",
-              "conflict",
-              "declared_user"
+              "conflict"
             ]
           },
           "413": {
@@ -20349,9 +21041,6 @@
           }
         ],
         "x-meridian-credentials": false,
-        "x-meridian-extra-capabilities": {
-          "declared_people": "fleet.apply"
-        },
         "x-meridian-scope-mode": "any",
         "x-meridian-scopes": [
           "people"
@@ -20381,6 +21070,14 @@
               }
             },
             "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": true
           },
           "401": {
@@ -20494,6 +21191,14 @@
               }
             },
             "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": true
           },
           "400": {
@@ -20548,6 +21253,19 @@
               "not_found"
             ]
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "name_conflict"
+            ]
+          },
           "413": {
             "content": {
               "application/json": {
@@ -20599,7 +21317,7 @@
         ]
       },
       "put": {
-        "description": "Requires people.edit capabilities. Compatible presets: people, including scopes that cover them. No request body is read. A missing person starts active with default limits. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.edit capabilities. Compatible presets: people, including scopes that cover them. A missing person receives the first settings. Existing settings and nonempty names are preserved. This response can contain credentials; keep it private and do not log it.",
         "operationId": "put_user",
         "parameters": [
           {
@@ -20612,6 +21330,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserEnsure"
+              }
+            }
+          },
+          "required": false
+        },
         "responses": {
           "200": {
             "content": {
@@ -20622,7 +21350,28 @@
               }
             },
             "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": true
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
           },
           "401": {
             "content": {
@@ -20648,6 +21397,32 @@
             "description": "Forbidden",
             "x-meridian-error-codes": [
               "insufficient_scope"
+            ]
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "name_conflict"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
             ]
           },
           "500": {
@@ -20713,6 +21488,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -20814,6 +21597,14 @@
               }
             },
             "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": true
           },
           "401": {
@@ -20914,6 +21705,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -21015,6 +21814,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -21124,6 +21931,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {
@@ -21267,6 +22082,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -21365,6 +22188,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -21477,6 +22308,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -21587,6 +22426,14 @@
               }
             },
             "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": true
           },
           "400": {
@@ -21717,6 +22564,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "401": {
@@ -21795,7 +22650,7 @@
     },
     "/api/users/{username}/reissue": {
       "post": {
-        "description": "Requires people.reissue capabilities. Compatible presets: people, including scopes that cover them. Removing or reissuing a person declared by an approved, applied, or failed revision needs fleet.apply. Owner sessions use the meridian CLI. Setting cut_off to true also requires commands.cut_off. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.reissue capabilities. Compatible presets: people, including scopes that cover them. Setting cut_off to true also requires commands.cut_off. This response can contain credentials; keep it private and do not log it.",
         "operationId": "reissue_user",
         "parameters": [
           {
@@ -21828,6 +22683,14 @@
               }
             },
             "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": true
           },
           "400": {
@@ -21893,8 +22756,7 @@
             "description": "Conflict",
             "x-meridian-error-codes": [
               "command_queue_full",
-              "conflict",
-              "declared_user"
+              "conflict"
             ]
           },
           "413": {
@@ -21957,7 +22819,6 @@
         "x-meridian-credentials": true,
         "x-meridian-extra-capabilities": {
           "credentials": "people.credentials",
-          "declared_people": "fleet.apply",
           "private_metadata": "people.private"
         },
         "x-meridian-scope-mode": "any",
@@ -21991,6 +22852,14 @@
               }
             },
             "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": true
           },
           "401": {
@@ -22072,7 +22941,7 @@
     },
     "/api/users/{username}/rotate-credentials": {
       "post": {
-        "description": "Requires people.reissue capabilities. Compatible presets: people, including scopes that cover them. Preserves device registrations and operator settings. Read the current credential_generation first. A declared person also needs fleet.apply; owner sessions use the CLI. Optional cut_off also requires commands.cut_off. Setting cut_off to true also requires commands.cut_off. This response can contain credentials; keep it private and do not log it.",
+        "description": "Requires people.reissue capabilities. Compatible presets: people, including scopes that cover them. Preserves device registrations and operator settings. Read the current credential_generation first. Optional cut_off also requires commands.cut_off. Setting cut_off to true also requires commands.cut_off. This response can contain credentials; keep it private and do not log it.",
         "operationId": "rotate_credentials",
         "parameters": [
           {
@@ -22105,6 +22974,14 @@
               }
             },
             "description": "Successful response. This response can contain credentials; keep it private and do not log it.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": true
           },
           "400": {
@@ -22171,8 +23048,7 @@
             "x-meridian-error-codes": [
               "command_queue_full",
               "conflict",
-              "credentials_changed",
-              "declared_user"
+              "credentials_changed"
             ]
           },
           "413": {
@@ -22235,7 +23111,6 @@
         "x-meridian-credentials": true,
         "x-meridian-extra-capabilities": {
           "credentials": "people.credentials",
-          "declared_people": "fleet.apply",
           "private_metadata": "people.private"
         },
         "x-meridian-scope-mode": "any",
@@ -22282,6 +23157,14 @@
               }
             },
             "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "x-meridian-credentials": false
           },
           "400": {

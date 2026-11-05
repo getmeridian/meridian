@@ -11,8 +11,6 @@ from meridian.cli import app
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands.profile_review import profile_review_paths
 from meridian.console import set_json_mode, set_quiet_mode
-from meridian.control.client import ControlClient
-from meridian.control.models import ServiceSettings, UserCreate
 from meridian.core.access_profile_views import AccessProfileReview
 from meridian.core.client_sessions import CutOffPlan
 from meridian.core.redaction import REDACTED, redact
@@ -60,28 +58,6 @@ def test_revealed_containers_keep_nested_metadata_and_redact_real_string_credent
     assert result["metadata"]["api_key"] == {"secret": True, "private_key": REDACTED}
     assert result["metadata"]["url"] == "https://vpn.example.org/" + REDACTED
     assert result["other"]["token"] == REDACTED
-
-
-@pytest.mark.parametrize("username", ["token", "secret", "api_key"])
-def test_json_fleet_export_preserves_creation_settings_for_credential_shaped_usernames(
-    tmp_path: Path, tmp_home: Path, username: str
-):
-    with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN, report_mutations=False) as admin:
-        admin.put_settings(ServiceSettings(profile_title="Meridian", access_profiles={"limited": []}))
-        admin.create_user(UserCreate(username=username, profiles=["limited"]))
-        intent = SetupIntent.model_validate(
-            {
-                **single_exit_intent(users=[username]).to_data(),
-                "access_profiles": [{"id": "limited", "grants": []}],
-            }
-        )
-        cluster = ClusterConfig(panel=PanelConfig(url=url, api_token=ADMIN_TOKEN), topology_intent=intent)
-        with patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster):
-            reply = CliRunner().invoke(app, ["fleet", "export", "--json"])
-        set_json_mode(False)
-        assert reply.exit_code == 0, reply.output
-        document = json.loads(reply.stdout)["data"]["document"]
-        assert document["access"]["creation_settings"][username]["profiles"] == ["limited"]
 
 
 def mapped_profile_intent(profile: str) -> SetupIntent:

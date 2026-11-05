@@ -349,7 +349,12 @@ class ControlMigrator:
             users = panel.list_users()
         finally:
             panel.close()
-        return carry_users(users, list(intent.access.users), deployed_with=self.cluster.panel.deployed_with)
+        return carry_users(
+            users,
+            list(self.cluster.people_adoption.users) if self.cluster.people_adoption else [],
+            deployed_with=self.cluster.panel.deployed_with,
+            display_names=self.cluster.people_adoption.display_names if self.cluster.people_adoption else {},
+        )
 
     def _control_connection(self, intent: SetupIntent) -> ServerConnection:
         return self._connection(intent.control.server_ref)

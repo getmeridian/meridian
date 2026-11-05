@@ -21,7 +21,7 @@ w.fetch = async (url, options = {}) => {
   requests.push({ url, passive: options.headers?.['X-Meridian-Passive'] === '1' });
   let body;
   if (url === 'auth/state') body = { configured: true, owner_exists: true, signed_in: true };
-  else if (url === 'ui/api/fleet') body = { servers: [], declared_users: [], display_names: {} };
+  else if (url === 'ui/api/fleet') body = { servers: [], display_names: {} };
   else if (url.startsWith('api/people?')) body = data.replies[queryKey(url.split('?')[1])];
   else throw new Error('Unexpected request: ' + url);
   if (!body) throw new Error('Missing service page: ' + url);
@@ -151,7 +151,7 @@ if (data.scenario === 'selection') {
   report.row = { tag: row.querySelector('.person-tag')?.textContent, caption: row.querySelector('.usage-text')?.textContent,
     meter: row.querySelector('meter')?.value, expiry: row.querySelector('.people-expiry')?.textContent,
     exactExpiry: row.querySelector('.people-expiry')?.title, secondary: row.querySelector('.people-secondary')?.textContent,
-    notes: visible(row.querySelector('[data-people-note]')), declared: visible(row.querySelector('[data-people-declared]')),
+    notes: visible(row.querySelector('[data-people-note]')),
     reasons: row.querySelector('.people-reasons')?.textContent || '',
     nestedCheckbox: !!row.querySelector('input'), href: row.getAttribute('href') };
   row.querySelector('.person-tag').click(); await settle();

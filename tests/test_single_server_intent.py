@@ -21,7 +21,7 @@ def test_fresh_ip_deploy_is_a_reality_exit_on_the_control_server() -> None:
     assert exit_.server_ref == "srv-a" and exit_.geo_block is True
     assert [path.protocol for path in exit_.paths] == ["reality"]
     assert exit_.paths[0].reality_sni == "www.google.com"
-    assert intent.access.users == ["alice"]
+    assert "users" not in intent.access.to_data()
     compile_panel_pass(intent)
 
 
@@ -57,7 +57,7 @@ def test_redeploy_keeps_transport_paths_users_and_other_exits() -> None:
         server_ref="srv-b",
         paths=[ProtocolPathIntent(id="eu-reality", protocol="reality", reality_sni="www.microsoft.com")],
     )
-    fleet = first.model_copy(update={"exits": [*first.exits, other], "access": AccessIntent(users=["alice", "bob"])})
+    fleet = first.model_copy(update={"exits": [*first.exits, other], "access": AccessIntent()})
 
     again = single_server_intent(fleet, server_ref="srv-a", domain="vpn.example.com", client_name="carol", warp=True)
 
@@ -66,7 +66,7 @@ def test_redeploy_keeps_transport_paths_users_and_other_exits() -> None:
     assert after == before
     assert again.exits[0].warp is True
     assert again.exits[1] == other
-    assert again.access.users == ["alice", "bob", "carol"]
+    assert again.access == fleet.access
 
 
 def test_fingerprint_reaches_every_tcp_path_and_survives_a_plain_redeploy() -> None:

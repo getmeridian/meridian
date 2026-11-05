@@ -92,7 +92,7 @@ def test_undo_restores_fields_and_is_single_use(people_service):
         people_service.bulk.undo(receipt.id)
 
 
-def test_delete_keeps_declared_people_and_returns_one_revision_bound_proposal(people_service):
+def test_delete_removes_every_person_even_when_an_older_revision_listed_them(people_service):
     from tests.support.people_proposals import commit_topology
     from tests.support.topology import single_exit_intent
 
@@ -101,11 +101,10 @@ def test_delete_keeps_declared_people_and_returns_one_revision_bound_proposal(pe
     review = preview(people_service, "delete", names=["p-a", "p-b"])
     assert not review.reversible
     declared = next(person for person in review.people if person.username == "p-b")
-    assert declared.cli_command is None and review.proposal.usernames == ["p-b"]
+    assert declared.cli_command is None and declared.after is None
     receipt = commit(people_service, review)
-    assert receipt.counts.changed == 1 and receipt.counts.cli_required == 1
-    assert receipt.proposal == review.proposal
-    assert people_service.get_user("p-a") is None and people_service.get_user("p-b") is not None
+    assert receipt.counts.changed == 2 and receipt.counts.cli_required == 0
+    assert people_service.get_user("p-a") is None and people_service.get_user("p-b") is None
     with pytest.raises(ServiceError, match="cannot be undone"):
         people_service.bulk.undo(receipt.id)
 

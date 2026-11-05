@@ -6,15 +6,16 @@ from rich import box
 from rich.markup import escape
 from rich.table import Table
 
-from meridian.commands._helpers import format_traffic, load_topology_cluster
-from meridian.commands.client_handoff import resolve_client_name
+from meridian.commands._helpers import format_traffic
+from meridian.commands._helpers import load_people_cluster as load_topology_cluster
+from meridian.commands.client_handoff import resolve_client_mutation_name
 from meridian.console import err_console, error_context, fail, is_json_mode
 from meridian.control.models import UserUsage
 from meridian.control_access import access_panel
+from meridian.core.errors import MeridianError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.i18n import t
-from meridian.remnawave import RemnawaveError
 from meridian.renderers import emit_json
 
 
@@ -25,10 +26,9 @@ def run_usage(name: str, *, days: str = "30") -> None:
         cluster = load_topology_cluster()
         try:
             with access_panel(cluster) as panel:
-                names = [user.username for user in panel.list_users()]
-                name = resolve_client_name(cluster, name, console_people=True, console_names=names)
+                name = resolve_client_mutation_name(cluster, panel, name)
                 usage = panel.user_usage(name, days=count)
-        except RemnawaveError as exc:
+        except MeridianError as exc:
             fail(exc)
         if is_json_mode():
             emit_json(

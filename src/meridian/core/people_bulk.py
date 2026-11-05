@@ -17,7 +17,6 @@ from meridian.core.client_devices import DeviceCap
 from meridian.core.client_limits import MAX_TRAFFIC_LIMIT_BYTES, LimitStrategy
 from meridian.core.models import CoreModel
 from meridian.core.people_query import PeopleQuery
-from meridian.core.people_removal import PeopleRemovalProposal
 from meridian.core.person_metadata import PersonTag
 from meridian.core.traffic import PeriodTraffic
 
@@ -186,7 +185,6 @@ class BulkPreview(CoreModel):
     changed_nodes: int = Field(ge=0)
     reversible: bool
     warnings: list[BulkWarning] = Field(default_factory=list)
-    proposal: PeopleRemovalProposal | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class BulkCommitRequest(CoreModel):
@@ -211,7 +209,6 @@ class BulkReceipt(CoreModel):
     committed_at: Timestamp
     counts: BulkCounts
     people: list[BulkPersonChange]
-    proposal: PeopleRemovalProposal | None = Field(default=None, exclude_if=lambda value: value is None)
     changed_nodes: int = Field(ge=0)
     undo_until: Timestamp | None
     undone_at: Timestamp | None = None

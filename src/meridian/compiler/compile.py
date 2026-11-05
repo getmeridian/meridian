@@ -30,7 +30,6 @@ from meridian.compiler.geodata import validate_geodata_lists
 from meridian.compiler.meridian_backend import to_meridian_backend, validate_meridian_backend
 from meridian.compiler.models import (
     COMPILER_VERSION,
-    AccessUserPayload,
     ConfigProfilePayload,
     ControlPlaneRuntimePayload,
     DeploymentContract,
@@ -371,7 +370,7 @@ def compile_topology(
     )
 
     all_inbounds = sorted({*inbound_by_path.values(), *(item.inbound_id for item in camouflage.values())})
-    squad_id = builder.add(
+    builder.add(
         "squad:access",
         InternalSquadPayload(
             name=internal_squad_name("access", intent.access.squad_name),
@@ -380,9 +379,8 @@ def compile_topology(
         dependencies=all_inbounds,
     )
     template_ids = compile_delivery_templates(builder, intent.delivery, control_id=control_id)
-    external_squad_id = ""
     if template_ids:
-        external_squad_id = builder.add(
+        builder.add(
             "external-squad:access",
             ExternalSquadPayload(
                 name=external_squad_name("delivery"),
@@ -390,19 +388,6 @@ def compile_topology(
             ),
             dependencies=template_ids,
         )
-    user_dependencies = [squad_id, *([external_squad_id] if external_squad_id else [])]
-    user_ids = [
-        builder.add(
-            f"user:{username.lower()}",  # logical IDs are lowercase; AccessIntent refuses case-only twins
-            AccessUserPayload(
-                username=username,
-                squad_ref=squad_id,
-                external_squad_ref=external_squad_id,
-            ),
-            dependencies=user_dependencies,
-        )
-        for username in sorted(intent.access.users)
-    ]
     settings_id = builder.add(
         "subscription:settings",
         SubscriptionSettingsPayload(
@@ -417,7 +402,7 @@ def compile_topology(
         builder=builder,
         runtime_by_exit=runtime_by_exit,
         host_ids=[*direct_host_ids, *relay_host_ids],
-        user_ids=user_ids,
+        user_ids=[],
         settings_id=settings_id,
         gateway_ids=gateway_ids,
     )

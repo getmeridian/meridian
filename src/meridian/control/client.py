@@ -57,6 +57,7 @@ from meridian.control.models import (
     TrafficSummary,
     UserCreate,
     UserDevices,
+    UserEnsure,
     UserImportBatch,
     UserImportResult,
     UserRecord,
@@ -92,6 +93,7 @@ from meridian.core.response_rule_test import ResponseRuleDecision, ResponseRuleT
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 from meridian.core.token_models import DEFAULT_TOKEN_DAYS, CapabilityCatalog, TokenCapability, TokenPreview
+from meridian.core.version_skew import SERVICE_VERSION_HEADER
 
 _GATEWAY_FAILURES = frozenset({502, 503, 504})
 # Transport errors raised before any request bytes left this machine.
@@ -128,13 +130,16 @@ class ControlServiceNotFound(ControlServiceError):
 class ControlServiceConflict(ControlServiceError):
     """The request lost a race or does not fit the object's state (HTTP 409)."""
 
+    def __init__(self, message: str, *, reason: str = "", **kwargs: Any) -> None:
+        self.reason = reason
+        super().__init__(message, **kwargs)
+
 
 class ControlServiceTopologyError(ControlServiceConflict):
-    """A named removal-proposal refusal, for the local CLI's native messages."""
+    """A named topology refusal, for the local CLI's native messages."""
 
     def __init__(self, reason: str, message: str) -> None:
-        self.reason = reason
-        super().__init__(message, category="user")
+        super().__init__(message, reason=reason, category="user")
 
 
 class ControlServicePolicyError(ControlServiceError):
@@ -168,6 +173,8 @@ class ControlClient:
         self, url: str, token: str, *, timeout: float = 20.0, verify: bool | str = True, report_mutations: bool = True
     ) -> None:
         self.url = url.rstrip("/")
+        self.service_version = ""
+        self.has_service_response = False
         self._report_mutations = report_mutations
         self._client = httpx.Client(
             base_url=url.rstrip("/") + "/",
@@ -371,26 +378,71 @@ class ControlClient:
         except ControlServiceNotFound:
             return None
 
+    def matching_users(self, name: str) -> list[UserRecord]:
+        """Exact username wins; otherwise match folded live names through bounded service pages."""
+        name = name.strip()
+        exact = self.get_user(name)
+        if exact is not None:
+            return [exact]
+        wanted = name.casefold()
+        found: dict[str, UserRecord] = {}
+        cursor = None
+        while True:
+            try:
+                page = self.query_people(PeopleQuery(q=name, cursor=cursor, limit=500))
+            except ControlServiceScopeError:
+                # Existing read/edit tokens predate the richer query/private grants.
+                return [
+                    user
+                    for user in self.list_users()
+                    if wanted in {user.username.casefold(), user.display_name.casefold()}
+                ]
+            for person in page.users:
+                if wanted not in {person.username.casefold(), person.display_name.casefold()}:
+                    continue
+                record = self.get_user(person.username)
+                if record is not None:
+                    found[record.username] = record
+            cursor = page.next_cursor
+            if cursor is None:
+                return list(found.values())
+
     def query_people(self, query: PeopleQuery) -> PeoplePage:
         params = {
             key: str(int(value)) if isinstance(value, bool) else value
             for key, value in query.model_dump().items()
             if value is not None
         }
-        return PeoplePage.model_validate(self._call("GET", "api/people?" + urlencode(params)))
+        body = self._call("GET", "api/people?" + urlencode(params))
+        if not self.service_version and isinstance(body, dict) and isinstance(body.get("users"), list):
+            # Older services still emit the retired flag; consume it without exporting ownership.
+            body = {
+                **body,
+                "users": [
+                    {key: value for key, value in person.items() if key != "declared"}
+                    if isinstance(person, dict)
+                    else person
+                    for person in body["users"]
+                ],
+            }
+        return PeoplePage.model_validate(body)
 
     def preview_bulk(self, request: BulkPreviewRequest) -> BulkPreview:
-        return BulkPreview.model_validate(
-            self._request(
-                "POST", "api/people/bulk/preview", request.model_dump(mode="json"), mutation_method="GET"
-            ).json()
-        )
+        body = self._request(
+            "POST", "api/people/bulk/preview", request.model_dump(mode="json"), mutation_method="GET"
+        ).json()
+        if not self.service_version and isinstance(body, dict):
+            body.pop("proposal", None)
+        return BulkPreview.model_validate(body)
 
     def commit_bulk(self, request: BulkCommitRequest) -> BulkReceipt:
         return BulkReceipt.model_validate(self._call("POST", "api/people/bulk/commit", request.model_dump(mode="json")))
 
     def bulk_receipt(self, receipt_id: str) -> BulkReceipt:
-        return BulkReceipt.model_validate(self._call("GET", "api/people/bulk/receipts/" + _segment(receipt_id)))
+        body = self._call("GET", "api/people/bulk/receipts/" + _segment(receipt_id))
+        if not self.service_version and isinstance(body, dict):
+            body.pop("proposal", None)
+        return BulkReceipt.model_validate(body)
 
     def undo_bulk(self, receipt_id: str) -> BulkReceipt:
         return BulkReceipt.model_validate(
@@ -409,8 +461,9 @@ class ControlClient:
     def user_connections(self, username: str) -> ClientConnections:
         return ClientConnections.model_validate(self._call("GET", f"api/users/{_segment(username)}/connections"))
 
-    def put_user(self, username: str) -> UserRecord:
-        return UserRecord.model_validate(self._call("PUT", f"api/users/{_segment(username)}", {}))
+    def put_user(self, username: str, *, ensure: UserEnsure | None = None) -> UserRecord:
+        body = ensure.model_dump(mode="json", exclude_unset=True) if ensure else {}
+        return UserRecord.model_validate(self._call("PUT", f"api/users/{_segment(username)}", body))
 
     def create_user(self, create: UserCreate) -> UserRecord:
         """Create an account with its first settings in one transaction; an existing name is a conflict."""
@@ -600,6 +653,9 @@ class ControlClient:
                 category="system",
                 retryable=True,
             ) from exc
+        self.has_service_response = True
+        if SERVICE_VERSION_HEADER in response.headers:
+            self.service_version = response.headers[SERVICE_VERSION_HEADER]
         if response.status_code in (400, 409):
             reason = _error_body(response).get("code")
             if reason in {"stale_topology", "topology_uncommitted"}:
@@ -622,7 +678,9 @@ class ControlClient:
                     hint="Enable daily history with: meridian privacy set --history daily --yes.",
                     category="user",
                 )
-            raise ControlServiceConflict(_message(response), category="user")
+            raise ControlServiceConflict(
+                _message(response), reason=str(_error_body(response).get("code") or ""), category="user"
+            )
         if response.status_code == 403:
             raise ControlServiceScopeError(
                 f"The control service refused the request: {_message(response)}",

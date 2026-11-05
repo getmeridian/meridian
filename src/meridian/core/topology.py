@@ -10,17 +10,12 @@ from typing import Final, Literal, Self
 from pydantic import Field, HttpUrl, ValidationInfo, field_validator, model_validator
 
 from meridian.core.access_profiles import AccessProfileIntent
-from meridian.core.client_limits import UserCreationSettings
 from meridian.core.defaults import DEFAULT_CLIENT_ROUTING, SUBSCRIPTION_UPDATE_INTERVAL_HOURS
 from meridian.core.delivery_policies import ClientRoutingPolicy as ClientRoutingPolicy
 from meridian.core.delivery_policies import (
-    DeliveryPolicyResolutionError,
     delivery_exit_refs,
-    resolve_delivery_policy,
 )
 from meridian.core.inputs import (
-    AccessUsernameValue,
-    DisplayNameValue,
     OptionalCountryCodeValue,
     OptionalHostnameValue,
     OptionalTopologyIdValue,
@@ -37,6 +32,7 @@ from meridian.core.inputs import (
 )
 from meridian.core.models import CoreModel
 from meridian.core.owner_contact import OwnerContactSettings
+from meridian.core.people_seeds import PeopleSeeds
 from meridian.core.protocols import ProtocolKind as ProtocolKind
 from meridian.core.response_rules import ResponseRuleSettings
 from meridian.core.server_allowances import ServerMetadata
@@ -295,65 +291,13 @@ class OrderedRouteIntent(CoreModel):
 
 
 class AccessIntent(CoreModel):
-    """Meridian-owned access squad and human users.
-
-    `users` are panel usernames (Latin only, as Remnawave requires); `display_names`
-    keeps the name as typed, in any script, for users whose username differs from it.
-    """
+    """Legacy squad label; people are owned by the control service."""
 
     squad_name: ServerTitleValue = "Meridian Access"
-    users: list[AccessUsernameValue] = Field(min_length=1)
-    display_names: dict[AccessUsernameValue, DisplayNameValue] = Field(
-        default_factory=dict, exclude_if=lambda names: not names
-    )
-    creation_settings: dict[AccessUsernameValue, UserCreationSettings] = Field(
-        default_factory=dict,
-        exclude_if=lambda settings: not settings,
-        description="First account settings only; reviewed applies never replace an existing person's settings.",
-    )
-
-    @field_validator("users")
-    @classmethod
-    def reject_duplicate_users(cls, users: list[str]) -> list[str]:
-        if len(users) != len({user.lower() for user in users}):
-            raise ValueError("Access usernames must be unique, ignoring case.")
-        return users
-
-    @model_validator(mode="after")
-    def validate_display_names(self) -> Self:
-        unknown = sorted(set(self.display_names) - set(self.users))
-        if unknown:
-            raise ValueError("Display names refer to unknown users: " + ", ".join(unknown))
-        shown = [self.display_name(user).casefold() for user in self.users]
-        if len(shown) != len(set(shown)):
-            raise ValueError("Each person needs a different name.")
-        unknown_settings = sorted(set(self.creation_settings) - set(self.users))
-        if unknown_settings:
-            raise ValueError("Creation settings refer to unknown users: " + ", ".join(unknown_settings))
-        return self
-
-    def display_name(self, username: str) -> str:
-        """The name to show for a user: as typed, else the username."""
-        return self.display_names.get(username, username)
-
-    def find_user(self, name: str) -> str | None:
-        """The username a person means by *name*: a username or a display name, ignoring case."""
-        matches = self.matching_users(name)
-        return matches[0] if matches else None
-
-    def matching_users(self, name: str) -> list[str]:
-        """Every username *name* may mean: an exact username alone, else each case-folded username or display name.
-
-        One person's username can fold onto another's display name, so more than one match is ambiguous.
-        """
-        if name in self.users:
-            return [name]
-        wanted = name.strip().casefold()
-        return [user for user in self.users if wanted in {user.casefold(), self.display_name(user).casefold()}]
 
 
 def assign_access_usernames(
-    names: Sequence[str], *, known: AccessIntent | None = None, reserved: Iterable[str] = ()
+    names: Sequence[str], *, known: PeopleSeeds | None = None, reserved: Iterable[str] = ()
 ) -> list[str]:
     """Panel usernames for typed names, in order.
 
@@ -462,11 +406,6 @@ class SetupIntent(CoreModel):
         unknown_profiles = sorted(self.delivery.profile_policies.keys() - {"default", *profile_ids})
         if unknown_profiles:
             raise ValueError("Delivery defaults name unknown access profiles: " + ", ".join(unknown_profiles) + ".")
-        for username, settings in self.access.creation_settings.items():
-            try:
-                resolve_delivery_policy(self.delivery, profiles=settings.profiles)
-            except DeliveryPolicyResolutionError as exc:
-                raise ValueError(f"Initial profiles for {username}: {exc}") from None
         unknown_exits = sorted(delivery_exit_refs(self.delivery) - {exit_.id for exit_ in self.exits})
         if unknown_exits:
             raise ValueError("Delivery rules name unknown exits: " + ", ".join(unknown_exits) + ".")

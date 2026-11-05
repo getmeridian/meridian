@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from types import SimpleNamespace
 from typing import cast
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -101,6 +102,34 @@ class _Runtime:
             )
             for name in usernames
         ]
+
+    def resolve_people(self, draft):
+        return [request.username or request.display_name for request in draft.access.people]
+
+
+def test_a_repeat_wizard_hands_off_only_its_resolved_seeds_not_every_verified_person(tmp_path):
+    _store, shelf, service = _services(tmp_path)
+    io = _ScriptedIO([*_TWO_SERVER_JOURNEY, ("Set this up now?", "yes")])
+    runtime = _Runtime()
+    runtime.verify = MagicMock(
+        return_value=SetupVerification(
+            plan_hash="a" * 64,
+            node_count=1,
+            subscription_urls={
+                "default": "https://panel.example/sub/default",
+                "outsider": "https://panel.example/sub/outsider",
+            },
+        )
+    )
+    runtime.resolve_people = MagicMock(return_value=["resolved-sample"])
+    runtime.handoff = MagicMock(wraps=runtime.handoff)
+    wizard = SetupWizard(
+        service=service, shelf=shelf, runtime=cast(SetupRuntime, runtime), register_server=lambda *_args: None, io=io
+    )
+    assert wizard.run() == "completed"
+    runtime.handoff.assert_called_once_with(["resolved-sample"])
+    output = "\n".join(io.output)
+    assert "resolved-sample" in output and "outsider" not in output
 
 
 def _services(tmp_path):
@@ -296,7 +325,7 @@ def test_first_server_added_as_local_is_selected_and_becomes_control_and_exit(tm
     assert [(exit_.server_ref, exit_.region, exit_.geo_block) for exit_ in draft.roles.exits] == [
         ("srv-here", "DE", False)
     ]
-    assert draft.access.access.users == ["alice", "laptop"]
+    assert [person.username for person in draft.access.people] == ["alice", "laptop"]
     assert any("this-server will run the control panel" in line for line in io.output)
 
 
@@ -723,20 +752,21 @@ def test_names_in_any_script_keep_their_spelling_and_get_latin_panel_usernames(t
 
     draft = store.load()
     assert draft is not None and draft.access is not None
-    access = draft.access.access
-    assert access.users == ["biba", "Boba", "wangxiaoming"]
-    assert access.display_names == {"biba": "Биба", "wangxiaoming": "王小明"}
-    assert any("Биба → biba" in line for line in io.output)
+    access = draft.access.people
+    assert [request.username for request in access] == [None, "Boba", None]
+    assert [request.display_name for request in access] == ["Биба", "Boba", "王小明"]
+    assert not any("Биба → biba" in line for line in io.output)
     assert any("Биба, Boba, 王小明" in line for line in io.output)  # the review shows the typed names
 
 
 def test_going_back_to_users_keeps_existing_usernames() -> None:
-    from meridian.commands.setup_wizard import _access_intent
+    from meridian.core.people_creation import creation_requests
 
-    previous = _access_intent(["Биба", "Biba"], None)
-    assert previous.users == ["biba-2", "Biba"]  # a name the panel accepts claims itself first
+    requests = creation_requests(["Биба", "Boba", "王小明"])
+    assert [request.username for request in requests] == [None, "Boba", None]
+    assert [request.display_name for request in requests] == ["Биба", "Boba", "王小明"]
 
-    again = _access_intent(["Biba", "Ли", "Биба"], previous)
-
-    assert again.users == ["Biba", "user-li", "biba-2"]
-    assert again.display_names == {"user-li": "Ли", "biba-2": "Биба"}
+    previous = creation_requests(["Биба", "Biba"])
+    again = creation_requests(["Biba", "Ли", "Биба"], previous)
+    assert [request.username for request in again] == ["Biba", None, None]
+    assert [request.display_name for request in again] == ["Biba", "Ли", "Биба"]

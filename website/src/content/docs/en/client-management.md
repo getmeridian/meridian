@@ -5,6 +5,8 @@ description: Manage people from the web panel or CLI, share connection pages, an
 
 You can manage people from any browser in the built-in [web panel](#web-panel) (`meridian panel`) or from the terminal with `meridian client`. Both work on the same accounts in the control service.
 
+People are added and removed immediately in the control service, without an apply or SSH. Names can use any script. An exact username wins; otherwise a case-folded username or display name must identify one person. Ambiguous names are refused. A batch add checks every name before writing, then reports one service request per person. Existing names are refused.
+
 ## Add a client
 
 In the web panel, open **People** and click **Add person** to create an account, set an optional traffic limit, expiry date, device cap, language, note, and tag, and copy their connection page link or QR code.
@@ -214,7 +216,7 @@ Use `meridian client rotate-credentials NAME --yes` when connection credentials 
 meridian client rotate-credentials alice --yes
 ```
 
-The web panel offers **Rotate connection keys** for people added there. Declared people use the CLI, following the same ownership rule as reissue. CLI JSON requires `--yes` and returns `client-rotate-credentials`, including the generation and per-node `flow_blocks`. Optional `--cut-off` also ends existing flows with the disclosed shared-inbound reset or node-wide core restart.
+The web panel offers **Rotate connection keys** for every person, using the same service operation as the CLI. JSON requires `--yes` and returns `client-rotate-credentials`, including the generation and per-node `flow_blocks`. Optional `--cut-off` also ends existing flows with the disclosed shared-inbound reset or node-wide core restart.
 
 
 ## Replacing a leaked link
@@ -225,7 +227,7 @@ If a client's link or connection page reaches someone it shouldn't, replace it:
 meridian client reissue alice
 ```
 
-In the web panel, reissue and removal use the same review: the session cut-off checkbox starts off, affected nodes are listed, and you confirm before anything changes. Repeated reissue clicks submit one change. Reissue refreshes the new link and shows per-node results separately; a failed or timed-out cut-off does not undo the new credentials. Declared people show the CLI command.
+In the web panel, reissue and removal use the same review: the session cut-off checkbox starts off, affected nodes are listed, and you confirm before anything changes. Repeated reissue clicks submit one change. Reissue refreshes the new link and shows per-node results separately; a failed or timed-out cut-off does not undo the new credentials.
 
 The control service gives the client a new subscription ID and new keys. The old subscription URL and connection page return 404, and the servers refuse the old keys. Meridian prints the new subscription URL, which also opens the new connection page. They import the new link once: their apps can't follow a subscription URL that no longer exists. Status, traffic limit and usage, expiry, and the device cap stay. Registered devices are cleared.
 
@@ -316,7 +318,7 @@ Removing a passkey prevents new sign-ins and signs out every other browser sessi
 | **Settings**: default page and app language, owner notice for everyone, subscription format preview, and **Privacy** (device limits and daily usage history); **Security** holds password, sign-in code, passkeys, and signed-in devices | **Revisions** and **Settings**: every change applied from your computer, plus the subscription title, public address, client routing policy, and public owner contact |
 | **Tokens**: create and revoke scoped API tokens | |
 
-Changes in the web panel and in the CLI are the same changes: `meridian client list` shows people added in the web panel too, and applies never undo a status, limit, or expiry set in either. People you added with `meridian client add` stay yours on the CLI: the web panel can change their limits and status, but removing them or issuing a new link prints the `meridian client` command instead, because those people belong to the reviewed topology. Every person, including those added in the web panel, gets a connection page at their subscription URL.
+The web panel and CLI manage the same service-owned people. `meridian client list` includes people added in either surface. Both can add, remove, reissue and rotate every person; applies never undo status, limits or expiry. Every person gets a connection page at their subscription URL.
 
 The web panel never holds SSH keys, so a stolen session can't change your servers. Every sign-in expires after 30 minutes idle and 12 hours at most, and creating a token requires recent password/TOTP or passkey confirmation.
 
@@ -356,7 +358,7 @@ Actions are independent. `people.read` reads account state and device records pe
 
 People queries require `people.query` and `people.private`; bulk previews, commits, receipts, and undo require `people.batch` and `people.private`, because these views include tags. Credential import keeps its separate `people.bulk` grant. The people/admin presets retain their previous query and bulk access; read/propose/approve presets cannot call those routes.
 
-`commands.restart` permits Xray unit restarts; other maintenance commands need `commands.run`. A reissue/removal with `cut_off: true` additionally needs `commands.cut_off`. Removing or reissuing a declared person requires `fleet.apply`; owner sessions use the CLI. `settings.edit` changes privacy, notices, and page language; reviewed topology settings require `fleet.apply`. `backup.read` downloads encrypted snapshots and reads public backup keys; it cannot add a key or decrypt a snapshot. `backup.edit` manages backup keys and stored fleet files. Proposing, approving others, approving oneself, and applying are separate grants (`revisions.propose`, `revisions.approve`, `revisions.approve_own`, `fleet.apply`); self-approval also needs the normal approval grant.
+`commands.restart` permits Xray unit restarts; other maintenance commands need `commands.run`. Reissue, removal or rotation with `cut_off: true` also needs `commands.cut_off`. All people use the same account permissions.
 
 The console can issue the existing read/propose/approve/people presets and narrow permissions for its service-owned edits and restarts. Fleet administration and backup permissions use the CLI or an authorized API token. Creation requires recent password/TOTP or passkey confirmation. A token can delegate only permissions it holds, cannot outlive its issuer, and a revoked or expired issuer cannot mint through a cached request.
 
@@ -426,7 +428,7 @@ The `token-create`, `token-record`, `token-issued`, `token-list`, `token-preview
 | `GET /api/people/bulk/receipts/{receipt_id}` | Read a receipt without notes or credentials |
 | `POST /api/people/bulk/undo` | Undo unchanged reversible fields once within ten minutes |
 | `POST /api/users/preview` | Preview creation or an edit’s UTC schedule dates without saving; people/admin or owner session |
-| `POST /api/users` | Create a person with `username`, `status`, `expire_at`, `traffic_limit_bytes`, `traffic_limit_strategy`, and `device_limit` in one transaction |
+| `POST /api/users` | Create a person with `username`, `display_name`, `status`, `expire_at`, `traffic_limit_bytes`, `traffic_limit_strategy`, and `device_limit` in one transaction |
 | `PATCH /api/users/{username}` | Change the status, expiry, traffic limit or reset strategy, or device cap; omitted fields keep their values |
 | `POST /api/users/{username}/reset-traffic` | Reset used traffic |
 | `POST /api/users/{username}/extend` | Send `{"days": N}` (1–3650) to add days after the later of now and the current expiry; no expiry starts from now |
@@ -437,9 +439,9 @@ The `token-create`, `token-record`, `token-issued`, `token-list`, `token-preview
 | `DELETE /api/users/{username}/devices` | Clear all registrations |
 | `DELETE /api/users/{username}/devices/{device_key}` | Remove one registration |
 
-Read `credential_generation` from `GET /api/users/{username}`, then send `{"expected_generation": N}` to `POST /api/users/{username}/rotate-credentials` with `people.reissue`. A stale generation returns `409 credentials_changed`, so an uncertain retry cannot rotate twice. The response contains `user`, `subscription_preserved: true`, `flow_blocks`, and `commands`; its person fields follow the same credential and private-metadata grants as reads. Adding `"cut_off": true` requires `commands.cut_off` and queues the same revision-gated hard cut-off as reissue. Rotating a declared person also requires `fleet.apply`; owner sessions use the CLI.
+`display_name` is a public person name in any script, stored by the service and visible on connection pages, in the panel, and in person reads even without `people.private`. Send a `username`, a nonempty `display_name`, or both to `POST /api/users`; with only a display name, the service assigns a Latin username around existing names. The username stays the stable identifier. `PATCH /api/users/{username}` and `PATCH /api/users` preserve an omitted `display_name`; `"display_name": ""` clears it to show the username. `POST /api/import/users` carries the field too. A name or username matching another person’s name or username after Unicode casefold returns `409 name_conflict` (“Each person needs a different name”); an exact existing username on creation keeps `409 user_exists`. Applies set names only at creation. Bulk previews show names; receipts keep usernames and never store display-name text.
 
-A people token cannot remove or reissue a person declared in the fleet file: the API returns `409 declared_user` with the CLI command to run. This also applies while an approved or failed apply still declares the person. An unapproved proposal does not declare anyone. Status, limits, expiry, and device caps remain editable.
+Read `credential_generation` from `GET /api/users/{username}`, then send `{"expected_generation": N}` to `POST /api/users/{username}/rotate-credentials` with `people.reissue`. A stale generation is refused. Rotation preserves the subscription URL and device registrations for every person.
 
 Reissue and deletion accept optional `{"cut_off": true}`; rotation includes it alongside `expected_generation` in its request. This requires `commands.cut_off`, as declared by `x-meridian-conditional-capabilities`; the admin preset includes it. Review each node's scope: core restarts affect every Xray inbound and bridge, while inbound resets affect the listed inbounds and can fall back to a whole-core restart. Reissue/deletion keep their usual response without a cut-off and include queued commands with it; rotation always returns its command list and receipts.
 
@@ -517,23 +519,11 @@ For bulk expiry changes, choose **No end date** to clear the expiry. When that c
 
 Extend by whole days or calendar months from the later of now and expiry, with short months clamped. Pending first-use durations grow without activation; calendar months add the days between the preview's UTC date and that date after the selected months. Set or clear expiry, quota and reset strategy, tag, device cap (inherit/unlimited/N), or renewal; enable, disable, reset period traffic, or delete. Omitted fields preserve values; reset strategy and renewal cap can be edited independently. The existing node contract permits 10,000 active people per managed inbound; previews reject changes that exceed it.
 
-Durable receipts retain action, parameters, counts, and per-person outcomes. Reversible fields can be undone once within ten minutes, even after a service restart, only while people and the reviewed enforcement outcome remain unchanged. Traffic reset, deletion, and schedule changes that reset traffic are irreversible and disclosed before commit. Resets preserve lifetime totals. Receipts contain no private notes, credentials, client addresses, or device identifiers. Events contain the action and counts plus the existing content-free per-person events. People declared in `topology_intent.access.users` may receive service-owned edits; their deletion returns one local topology proposal and never deletes them in the service batch.
+Bulk previews freeze the selected people and row versions for ten minutes. Commit applies every reviewed change in one transaction and returns a durable receipt without notes or credentials. Reversible edits may be undone once within ten minutes; deletion and traffic reset are irreversible. Every person has the same service ownership.
 
-For declared deletions, the preview and receipt carry one `proposal` containing only `schema` (`meridian.people-removal/v1`), `usernames`, `fleet_id`, committed `revision` and `generation`, `plan_hash`, and `intent_sha256`. The console saves it locally as **people-removal.json** and offers selectable JSON if saving fails. The browser applies only the service-owned part of a mixed batch, atomically; it never applies topology.
+People are added and removed immediately in the control service, without an apply or SSH. Names can use any script. An exact username wins; otherwise a case-folded username or display name must identify one person. Ambiguous names are refused. A batch add checks every name before writing, then reports one service request per person. Existing names are refused.
 
-Run `meridian client remove --proposal people-removal.json --dry-run --json` on the deployer's current fleet copy, then `meridian client remove --proposal people-removal.json` for one combined review, one confirmation, and one apply. The CLI also accepts `meridian client remove sample-a sample-b`, and `--proposal` can read an entire API bulk preview/receipt or CLI bulk JSON output, up to 64 MiB. Names and a proposal cannot be combined.
-
-The 64 MiB limit applies to bytes actually read, including pipes and special files, before decoding or JSON parsing. Larger input is refused even if its reported size is zero or the file grows during reading.
-
-Proposal `usernames` must exactly match the committed `topology_intent.access.users`, including case. Display names are not accepted in proposals.
-
-A saved bulk file must describe deletion, and its proposal must list exactly the people marked `cli_required`, with the same count. Preview hashes are checked; when a CLI file contains both preview and receipt, their IDs, hashes, and proposals must agree. A standalone receipt keeps the original preview hash and is checked against its recorded outcomes. CLI envelopes reject unknown fields.
-
-For named removal, an exact service username wins over display-name or case-insensitive matches. A name matching two people is refused; use the exact username from `client list`. Remove console-only people with `client bulk delete`.
-
-A changed committed revision, generation, plan, fleet, or local intent refuses the draft; the apply fence checks the revision again before server changes, even if the plan stayed the same. A topology change also refuses the whole mixed service commit. If there is no committed service fence, or a selected declaration belongs to an unfinished apply, finish `meridian apply` and preview again.
-
-At least one declared person must remain. The proposal includes no notes, tags, credentials, device data, or session cut-off choice. Bulk removal refuses `--cut-off`; use individual `meridian client remove NAME --cut-off` for its existing reviewed session-closure behavior. Earlier transfers may otherwise continue.
+Use `meridian client remove sample-a sample-b --dry-run --json` to preview, then `meridian client remove sample-a sample-b --yes --json` to commit. Declining the review writes nothing. Zero people is allowed; `meridian test` without an active person reports unavailable evidence (exit 3). `--proposal` is retired. Use single-person `client remove NAME --cut-off` to disclose and close existing sessions; earlier transfers may otherwise continue.
 
 `GET /api/people` requires people/admin or an owner session. It returns `users`, `total`, `population`, contextual `facets`, and `next_cursor`. Query keys: `q`, `status`, `tag`, `profile`, `expires`, `quota`, `never` (0/1), `attention`, `lifecycle`, `sort`, `order`, `limit` (1–500), `cursor`. Keep filters and order when continuing a cursor. The plain `GET /api/users` route remains available. Query responses omit credentials and private notes; CLI JSON retains its existing note view through the authorized per-person read.
 
@@ -555,7 +545,7 @@ Create or replace grants with `meridian profile add|set`; `profile list` shows g
 
 Use `client set person --profile limited --yes`, repeating `--profile` for every membership to keep. This replaces the membership list; choose `default` to restore full access. Profile edits have their own review, separate from account limits, notes, and language. The access-profile section in **Routing & profiles** shows granted connections and the profiles that permit them, preserves unsaved choices, and opens the same frozen review. **Set profiles** is also a bulk action; its preview shows gained and lost inbounds and rejects changed people or topology at commit.
 
-Single and bulk profile previews, `--dry-run`, and undo dry runs resolve each person's delivery choice before returning a review. Conflicting mapped profiles are refused unless a saved person override selects the policy. Initial memberships in `access.creation_settings` are also checked for conflicting mapped defaults during intent validation and compilation, before a plan or apply.
+Single and bulk profile previews, `--dry-run`, and undo dry runs resolve each person's delivery policy before returning a review. Conflicting profile defaults are refused unless the person has a compatible private override. Initial memberships in setup creation seeds are validated before review and again during atomic service creation. An apply never replaces an existing person's memberships.
 
 The CLI reports a service access error if it cannot read the person. A profile loss review prints the revocation warning once.
 
@@ -567,13 +557,13 @@ Losing a grant removes the connection from every subscription format, individual
 
 Every unresolved receipt contributes its inbounds, regardless of its current reason. Rotating connection keys, reissuing a link, replacing keys and profiles together through import, or re-enabling a person after narrowing access keeps lost inbounds in the cut-off review until blocking is confirmed or the same key regains access.
 
-Removing a profile still used by people is refused with its membership count. Move those people to other profiles first. Ordinary applies never replace membership. Snapshots preserve every person's memberships; a replacing user import preserves them when `profiles` is omitted. Fleet export carries declared people's current memberships as creation-only settings, so a new fleet can recreate them while existing people retain their operator-owned choices. Console-only people remain service data in the snapshot.
+Removing a profile still used by people is refused with its membership count. Move those people to other profiles first. Ordinary applies never replace membership. Snapshots preserve every person's memberships; a replacing user import preserves them when `profiles` is omitted. Fleet export carries topology and profile grants; every person's memberships remain service data in the snapshot.
 
 Restore also preserves earlier profile use and refuses snapshot profiles that differ from local intent before staging or target access. It compares stored declarations, or the exact compiled map for an unstamped snapshot. Restore matching state first, then review the desired saved change with `meridian apply`; `--force` cannot bypass the match. See [Recovery](/en/recovery/).
 
 `plan` and `apply` review profiles held by the service as well as those in the proposed topology. Removing the last profile is reviewed and fenced, and is refused while anyone still belongs to it.
 
-Every apply path, including `setup --intent`, restarting setup, and imperative commands such as `client add` or `fleet contact`, checks declared profile IDs and grants against the service before saving topology or writing to servers. A saved but unapplied profile edit is refused: edit profiles with `meridian profile` or `meridian fleet import`, or run `meridian apply` to review the saved change. Changing protocols or relay camouflage may expand an unchanged `exit:` or `gateway:` grant; the topology command's own review covers that change.
+Every apply path, including `setup --intent`, restarting setup, and imperative commands such as `node add` or `fleet contact`, checks declared profile IDs and grants against the service before saving topology or writing to servers. A saved but unapplied profile edit is refused: edit profiles with `meridian profile` or `meridian fleet import`, or run `meridian apply` to review the saved change. Changing protocols or relay camouflage may expand an unchanged `exit:` or `gateway:` grant; the topology command's own review covers that change.
 
 A fresh fleet can introduce profiles through `setup --intent`. Bootstrap is allowed only while the service has no declaration fingerprint, no named profiles, and no non-default memberships. If the service holds profiles without a fingerprint, run `meridian apply` to review them before other topology commands.
 
@@ -588,8 +578,6 @@ An apply stores inbound and endpoint references before activating profile grants
 Membership is private operator data: `people.private` reveals `profiles` in person and revision results. Effective-access and membership-count reads require both `people.read` and `people.private`; policy reviews require `fleet.apply` and `people.private`. Account edits use `people.edit`, and bulk assignment uses `people.batch` and `people.private`. Format previews require `people.read`, plus `people.private` while profiles are configured. The people/admin presets include the necessary private permissions; other presets receive an empty `profiles` list and no creation memberships. Profiles store membership only, with no client IP, device, or connection observations.
 
 JSON reviews and fleet exports preserve valid profile IDs and usernames such as `token` and `secret`, including nested grant and creation-setting lists. Credential fields remain redacted.
-
-Usernames such as `token`, `secret`, and `api_key` are also valid in revision proposals and reviewed applies. Their creation settings and display names still undergo the usual secret check. The username must be declared in `access.users`; its value must be a mapping in `access.creation_settings` or a string in `access.display_names`. Otherwise secret-shaped keys are rejected as usual.
 
 | Operation | Meaning |
 | --- | --- |

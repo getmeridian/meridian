@@ -27,6 +27,7 @@ from meridian.core.inputs import (
     validate_optional_country_code_value,
     validate_optional_hostname_value,
 )
+from meridian.core.people_creation import creation_requests
 from meridian.core.setup import (
     SETUP_STAGE_ORDER,
     SetupAccessSelection,
@@ -50,7 +51,6 @@ from meridian.core.topology import (
     SetupIntent,
     TopologyServerShelfItem,
     TrafficRouteAction,
-    assign_access_usernames,
 )
 from meridian.i18n import t, words
 from meridian.registry_country import registry_country
@@ -462,17 +462,15 @@ class SetupWizard:
     # 5. users
     def _access(self, draft: SetupDraft) -> None:
         self.prompt.explain(t("access.explain"))
-        previous = draft.access.access if draft.access is not None else None
-        default = ", ".join(previous.display_name(user) for user in previous.users) if previous else "default"
+        previous = draft.access.people if draft.access is not None else []
+        default = ", ".join(request.name for request in previous) if previous else "default"
         answer = self.prompt.ask(t("access.users"), default=default, validate=_check_users)
-        access = _access_intent(_split_names(answer), previous)
-        renamed = [f"{name} → {user}" for user, name in access.display_names.items()]
-        if renamed:
-            self.prompt.say(t("access.usernames", pairs=", ".join(renamed)), style="dim")
+        access = creation_requests(_split_names(answer), previous)
         title = draft.roles.control.title if draft.roles is not None else "Meridian"
         self.service.configure_access(
             SetupAccessSelection(
-                access=access,
+                access=draft.access.access if draft.access is not None else AccessIntent(),
+                people=access,
                 access_profiles=draft.access.access_profiles if draft.access is not None else [],
                 delivery=DeliveryIntent(profile_title=title),
             )
@@ -505,9 +503,10 @@ class SetupWizard:
         self.service.mark_verified(datetime.now(UTC).isoformat().replace("+00:00", "Z"))
 
     def _handoff(self, draft: SetupDraft) -> WizardOutcome:
-        verification = self._verification or self.runtime.verify(draft)
+        if self._verification is None:
+            self._verification = self.runtime.verify(draft)
         self.prompt.say(t("handoff.ready"), style="bold green")
-        for links in self.runtime.handoff(sorted(verification.subscription_urls)):
+        for links in self.runtime.handoff(self.runtime.resolve_people(draft)):
             self.io.write(f"  [bold]{escape(links.name)}[/bold]")
             if links.page_url:
                 self.io.write(f"    {escape(t('handoff.page'))} [bold]{escape(links.page_url)}[/bold]")
@@ -554,9 +553,14 @@ class SetupWizard:
             row(t("review.gateway"), server(gateway.server_ref))
             for values, target in _gateway_rules(intent, gateway.id):
                 row("", t("review.rule", values=values, target=target))
-        row(t("review.users"), ", ".join(intent.access.display_name(user) for user in intent.access.users))
+        seeds = draft.access.people if draft.access is not None else []
+        row(t("review.users"), ", ".join(seed.name for seed in seeds))
         self.prompt.explain(t("review.ru_direct"))
         self.prompt.say(t("review.plan", hash=review.review_hash[:12], count=len(review.plan.resources)), style="dim")
+        if review.people_adoption:
+            self.prompt.say(
+                f"{len(review.people_adoption)} people move to the control service; nothing is deleted.", style="warn"
+            )
         if review.retiring:
             self.prompt.say(t("review.removes", count=len(review.retiring)), style="warn")
             for binding in review.retiring:
@@ -647,15 +651,3 @@ def _check_users(value: str) -> None:
             raise ValueError(t("error.user_name", name=name, max=DISPLAY_NAME_MAX_LENGTH)) from None
     if len({name.casefold() for name in names}) != len(names):
         raise ValueError(t("error.users_twice"))
-
-
-def _access_intent(names: Sequence[str], previous: AccessIntent | None) -> AccessIntent:
-    """Panel usernames for typed names; a name already in the draft keeps its username."""
-    users = assign_access_usernames(names, known=previous)
-    return AccessIntent(
-        users=users,
-        display_names={user: name for user, name in zip(users, names, strict=True) if user != name},
-        creation_settings={user: settings for user, settings in previous.creation_settings.items() if user in users}
-        if previous is not None
-        else {},
-    )

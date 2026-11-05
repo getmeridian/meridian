@@ -19,7 +19,6 @@ from meridian.control.errors import ServiceError
 from meridian.control.events import EventLedger
 from meridian.control.models import NodeSpec, UserRecord
 from meridian.control.node_documents import NodeDocumentComposer, with_users
-from meridian.control.people_proposals import removal_proposal, require_current_proposal
 from meridian.control.people_query import PeopleQueryEngine
 from meridian.control.period_usage import reset_period
 from meridian.control.revisions import RevisionLedger
@@ -155,12 +154,10 @@ class BulkLedger:
                 names = self.people.select(request.query, now=now)
             if len(names) > 50000:
                 raise ServiceError("invalid_request", "Select at most 50000 people per operation.", 400)
-            intent = self.people.intent()
             versions: dict[str, tuple[str, int]] = {}
             effects: dict[str, BulkEffect] = {}
             changes: list[BulkPersonChange] = []
             deleted: set[str] = set()
-            declared_deletions: list[str] = []
             reversible = request.action.action not in ("delete", "reset-traffic")
             for name in names:
                 baseline = project_effect(self.read_user(name), now)
@@ -171,16 +168,9 @@ class BulkLedger:
                 versions[name] = version
                 before = BulkFields.from_user(user)
                 warnings: list[BulkWarning] = []
-                cli_required = False
                 if request.action.action == "delete":
                     after = None
-                    if name in intent.declared:
-                        declared_deletions.append(name)
-                        cli_required = True
-                        warnings.append("topology_delete")
-                        after = before
-                    else:
-                        deleted.add(name)
+                    deleted.add(name)
                 else:
                     effect = prepare_effect(user, request.action, now)
                     effects[name] = effect
@@ -200,11 +190,11 @@ class BulkLedger:
                     if request.action.action == "set-profiles"
                     else None
                 )
-                outcome: BulkOutcome = "cli_required" if cli_required else "changed" if fields else "unchanged"
+                outcome: BulkOutcome = "changed" if fields else "unchanged"
                 changes.append(
                     BulkPersonChange(
                         username=name,
-                        display_name=intent.names.get(name, name),
+                        display_name=user.display_name or name,
                         row_version=version[1],
                         before=before,
                         after=after,
@@ -231,7 +221,6 @@ class BulkLedger:
                 changed_nodes=self._changed_nodes(effects, deleted),
                 reversible=reversible,
                 warnings=warnings,
-                proposal=removal_proposal(self.revisions, declared_deletions),
             )
             review = BulkPreview.model_validate(
                 {
@@ -260,7 +249,17 @@ class BulkLedger:
         row = self.store.row("SELECT body FROM bulk_receipts WHERE id = ?", (receipt_id,))
         if row is None:
             raise ServiceError("not_found", "This bulk receipt is unknown.", 404)
-        return BulkReceipt.model_validate_json(row[0])
+        import json
+
+        body = json.loads(row[0])
+        body.pop("proposal", None)
+        receipt = BulkReceipt.model_validate(body)
+        return receipt.model_copy(
+            update={
+                "people": _receipt_people(receipt.people),
+                "undo_people": _receipt_people(receipt.undo_people) if receipt.undo_people is not None else None,
+            }
+        )
 
     def _refuse_stale(self, versions: dict[str, tuple[str, int]]) -> None:
         stale = [name for name, expected in versions.items() if self.people.row_version(name) != expected]
@@ -352,21 +351,14 @@ class BulkLedger:
             now = format_timestamp(self.clock())
             if datetime.fromisoformat(now) > datetime.fromisoformat(review.expires_at):
                 raise ServiceError("preview_expired", "This preview expired. Preview again.", 409)
-            if review.proposal is not None:
-                require_current_proposal(self.revisions, review.proposal)
             self._refuse_stale(frozen.versions)
             self._refuse_changed_nodes(frozen.nodes, frozen.versions)
-            declared = self.people.intent().declared
             users = {person.username: self.read_user(person.username) for person in review.people}
             baselines = {name: project_effect(user, now) for name, user in users.items()}
             stale = [
                 person.username
                 for person in review.people
                 if BulkFields.from_user(baselines[person.username].user) != person.before
-                or (
-                    review.action.action == "delete"
-                    and (person.outcome == "cli_required") != (person.username in declared)
-                )
                 or (
                     review.action.action != "delete"
                     and BulkFields.from_user(project_effect(frozen.effects[person.username].user, now).user)
@@ -441,8 +433,7 @@ class BulkLedger:
                 action=review.action,
                 committed_at=now,
                 counts=committed_counts,
-                people=outcomes,
-                proposal=review.proposal,
+                people=_receipt_people(outcomes),
                 changed_nodes=changed_nodes,
                 undo_until=format_timestamp(self.clock() + UNDO_SECONDS)
                 if review.reversible and committed_counts.changed
@@ -529,7 +520,7 @@ class BulkLedger:
                 outcomes.append(
                     BulkPersonChange(
                         username=person.username,
-                        display_name=person.display_name,
+                        display_name=person.username,
                         row_version=versions[person.username][1],
                         before=before,
                         after=after,
@@ -555,3 +546,8 @@ class BulkLedger:
                 now=now,
             )
             return updated
+
+
+def _receipt_people(people: list[BulkPersonChange]) -> list[BulkPersonChange]:
+    """Keep receipt identities content-free, including receipts written by older services."""
+    return [person.model_copy(update={"display_name": person.username}) for person in people]

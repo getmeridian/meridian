@@ -14,7 +14,7 @@ const html = fs.readFileSync(path.join(directory, 'console/index.html'), 'utf8')
 const dom = new JSDOM(html, { url: `https://198.51.100.1/demo/console/?lang=${locale}#${data.route || '/people'}`, runScripts: 'outside-only', pretendToBeVisual: true });
 const w = dom.window;
 let demoNow;
-if (mode === 'showcase-queries' || ['schedule', 'undo', 'share', 'token', 'declared', 'calendar'].some(prefix => mode.startsWith('showcase-' + prefix + '-'))) {
+if (mode === 'showcase-queries' || ['schedule', 'undo', 'share', 'token', 'calendar'].some(prefix => mode.startsWith('showcase-' + prefix + '-'))) {
   const generated = Date.parse(JSON.parse(fs.readFileSync(path.join(directory, 'console/demo-data.json'), 'utf8')).generated_at);
   demoNow = (data.now ? Date.parse(data.now) : generated) + (data.offsetSeconds || 0) * 1000;
   w.Date = class extends Date {
@@ -252,8 +252,7 @@ if (mode === 'showcase-navigation') {
   report.unlimitedDevices = (await M.api('GET', 'api/users/DemoGuest/devices')).limit === 0;
   const deletion = await M.api('POST', 'api/people/bulk/preview', { usernames: ['DemoGuest', 'Neri'], action: { action: 'delete' } });
   const deleted = await M.api('POST', 'api/people/bulk/commit', { preview_id: deletion.id, preview_hash: deletion.preview_hash });
-  report.declaredKept = (await M.api('GET', 'api/users/Neri')).username === 'Neri' && deleted.counts.cli_required === 1 && deleted.proposal.usernames.join(',') === 'Neri';
-  report.bulkDeleted = !(await M.api('GET', 'api/users')).users.some(user => user.username === 'DemoGuest');
+  report.bulkDeleted = deleted.counts.changed === 2 && !(await M.api('GET', 'api/users')).users.some(user => ['DemoGuest', 'Neri'].includes(user.username));
   try { await M.api('POST', 'api/people/bulk/undo', { receipt_id: deleted.id }); }
   catch (error) { report.deleteUndoRefused = error.code === 'undo_refused'; }
 } else if (mode === 'showcase-schedule-catchup') {
@@ -363,20 +362,6 @@ if (mode === 'showcase-navigation') {
   }
   report.keptTokens = JSON.stringify(await M.api('GET', 'api/tokens')) === tokens;
   report.keptEvents = JSON.stringify(await M.api('GET', 'api/events?after=0&limit=2000')) === events;
-} else if (mode === 'showcase-declared-keys') {
-  report.refusals = [];
-  report.unchanged = [];
-  for (const person of ['Tavi', 'Neri']) {
-    async function snapshot() {
-      return JSON.stringify({ user: await M.api('GET', 'api/users/' + person), share: await M.api('GET', 'ui/api/people/' + person + '/share'),
-        devices: await M.api('GET', 'api/users/' + person + '/devices'), people: await M.api('GET', 'api/people?q=' + person),
-        events: await M.api('GET', 'api/events?after=0&limit=2000') });
-    }
-    const before = await snapshot(), user = await M.api('GET', 'api/users/' + person);
-    try { await M.api('POST', 'api/users/' + person + '/rotate-credentials', { expected_generation: user.credential_generation }); report.refusals.push({ code: null }); }
-    catch (error) { report.refusals.push({ code: error.code, status: error.status, text: M.errorText(error) }); }
-    report.unchanged.push(await snapshot() === before);
-  }
 } else if (mode === 'showcase-schedule-validation') {
   report.now = new Date(demoNow).toISOString().replace('.000Z', 'Z');
   if (data.person) report.before = await M.api('GET', 'api/users/' + data.person);
@@ -417,6 +402,30 @@ if (mode === 'showcase-navigation') {
     try { await M.api(method, route, {}); assert.fail('Demo claimed to perform ' + route); }
     catch (error) { report.refusals.push({ code: error.code, text: M.errorText(error) }); }
   }
+} else if (mode === 'showcase-names') {
+  async function attempt(method, route, body) {
+    try { return { reply: await M.api(method, route, body) }; } catch (error) { return { code: error.code, status: error.status }; }
+  }
+  const events = async () => (await M.api('GET', 'api/events?after=0&limit=2000')).events.filter(event => event.kind === 'user.updated').length;
+  report.cyrillic = (await attempt('POST', 'api/users', { display_name: 'Алиса Петрова' })).reply;
+  report.latin = (await attempt('POST', 'api/users', { display_name: 'Straße' })).reply;
+  const users = JSON.stringify(await M.api('GET', 'api/users'));
+  report.refused = [];
+  for (const body of [{ display_name: 'STRASSE' }, { username: 'fresh', display_name: 'strasse' }, { username: 'LUMA' }, {}, { display_name: '  ' }, { display_name: 'Line\nbreak' }, { display_name: 'Comma, name' }]) {
+    report.refused.push(await attempt('POST', 'api/users', body));
+  }
+  report.keptUsers = JSON.stringify(await M.api('GET', 'api/users')) === users;
+  const updates = await events();
+  report.renamed = (await M.api('PATCH', 'api/users/Luma', { display_name: 'Новое имя' })).display_name;
+  report.renameEvents = (await events()) - updates;
+  report.fleetName = (await M.api('GET', 'ui/api/fleet')).display_names.Luma;
+  report.searched = (await M.api('GET', 'api/people?q=' + encodeURIComponent('новое'))).users.map(user => user.display_name);
+  const review = await M.api('POST', 'api/people/bulk/preview', { usernames: ['Luma'], action: { action: 'tag', tag: 'EDITED' } });
+  report.previewName = review.people[0].display_name;
+  report.receiptName = (await M.api('POST', 'api/people/bulk/commit', { preview_id: review.id, preview_hash: review.preview_hash })).people[0].display_name;
+  report.clashRename = await attempt('PATCH', 'api/users/Luma', { display_name: 'straße' });
+  await M.api('PATCH', 'api/users/Luma', { display_name: '' });
+  report.clearedFleet = Object.hasOwn((await M.api('GET', 'ui/api/fleet')).display_names, 'Luma');
 } else if (mode === 'showcase-reset') {
   report.note = (await M.api('GET', 'api/users/Luma')).note;
   report.language = (await M.api('GET', 'api/language')).language;

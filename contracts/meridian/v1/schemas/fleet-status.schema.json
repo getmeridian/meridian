@@ -615,20 +615,12 @@
           "title": "Health",
           "type": "string"
         },
-        "missing_access_users": {
-          "title": "Missing Access Users",
-          "type": "integer"
-        },
         "needs_attention": {
           "title": "Needs Attention",
           "type": "boolean"
         },
         "nodes": {
           "title": "Nodes",
-          "type": "integer"
-        },
-        "nonactive_access_users": {
-          "title": "Nonactive Access Users",
           "type": "integer"
         },
         "other_users": {
@@ -680,8 +672,6 @@
         "active_users",
         "disabled_users",
         "other_users",
-        "missing_access_users",
-        "nonactive_access_users",
         "connected_nodes",
         "disconnected_nodes",
         "disabled_nodes",

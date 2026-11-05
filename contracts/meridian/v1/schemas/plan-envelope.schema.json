@@ -221,6 +221,17 @@
           "title": "Observation Errors",
           "type": "array"
         },
+        "people_adoption": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PeopleAdoptionNotice"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "plan_hash": {
           "title": "Plan Hash",
           "type": "string"
@@ -395,6 +406,26 @@
       "title": "MeridianError",
       "type": "object"
     },
+    "PeopleAdoptionNotice": {
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "people": {
+          "minimum": 0,
+          "title": "People",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "people",
+        "message"
+      ],
+      "title": "PeopleAdoptionNotice",
+      "type": "object"
+    },
     "PlanCommandData": {
       "additionalProperties": false,
       "description": "Success data returned by plan execution.",
@@ -431,6 +462,17 @@
           },
           "title": "Observation Errors",
           "type": "array"
+        },
+        "people_adoption": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PeopleAdoptionNotice"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "plan_hash": {
           "title": "Plan Hash",

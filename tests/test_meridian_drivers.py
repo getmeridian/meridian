@@ -224,7 +224,7 @@ class _CommittedLostReply(FakeControl):
         raise ControlServiceUncertain("Could not reach the control service: ReadTimeout", retryable=True)
 
 
-@pytest.mark.parametrize("logical_id", ["workload:main", "account:default"], ids=["node-spec", "user"])
+@pytest.mark.parametrize("logical_id", ["workload:main"], ids=["node-spec"])
 def test_a_write_whose_reply_was_lost_is_an_unknown_outcome(plan: ResourcePlan, logical_id: str) -> None:
     """A definite failure would let another plan replace this one before anyone looked."""
     drivers, _control, _cluster = _setup(plan, control=_CommittedLostReply())

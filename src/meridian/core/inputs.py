@@ -184,7 +184,7 @@ def access_username_for(name: str, taken: Iterable[str] = ()) -> str:
     """The panel username for a typed name: the name itself when Remnawave accepts it.
 
     Otherwise a lowercase Latin transliteration (Биба → biba, 王小明 → wangxiaoming),
-    numbered when it collides with a *taken* username, ignoring case.
+    numbered when it collides with a *taken* name, case-folded.
     """
     name = validate_display_name_value(name)
     try:
@@ -196,12 +196,12 @@ def access_username_for(name: str, taken: Iterable[str] = ()) -> str:
         base = latin[:ACCESS_USERNAME_MAX_LENGTH].strip("-_")
         if len(base) < ACCESS_USERNAME_MIN_LENGTH:
             base = f"user-{base}".strip("-")
-    used = {username.lower() for username in taken}
+    used = {username.casefold() for username in taken}
     candidate, number = base, 1
-    while candidate in used:
+    while candidate.casefold() in used:
         number += 1
         suffix = f"-{number}"
-        candidate = base[: ACCESS_USERNAME_MAX_LENGTH - len(suffix)].rstrip("-_") + suffix
+        candidate = (base[: ACCESS_USERNAME_MAX_LENGTH - len(suffix)].rstrip("-_") or "user") + suffix
     return candidate
 
 
@@ -436,3 +436,8 @@ OptionalTransportPathValue = Annotated[
     AfterValidator(validate_optional_transport_path_value),
 ]
 PortValue = Annotated[int, Field(ge=1, le=65535)]
+
+
+# Usernames are never "." or "..": the console builds relative URLs from them, and a browser
+# resolves those segments away. Written without lookahead, which Pydantic's regex engine lacks.
+USERNAME_PATTERN = r"(?:[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}|\.[A-Za-z0-9_-][A-Za-z0-9_.-]{0,62}|\.\.[A-Za-z0-9_.-]{1,62})"

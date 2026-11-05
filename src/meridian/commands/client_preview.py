@@ -7,18 +7,18 @@ from rich import box
 from rich.markup import escape
 from rich.table import Table
 
-from meridian.commands._helpers import load_topology_cluster
-from meridian.commands.client_handoff import resolve_client_mutation_name, resolve_client_name
+from meridian.commands._helpers import load_people_cluster as load_topology_cluster
+from meridian.commands.client_handoff import resolve_client_mutation_name
 from meridian.commands.delivery_preview import print_delivery_preview
 from meridian.commands.response_rules import print_response_rule_decision
 from meridian.commands.routing_explain import print_explanation
 from meridian.console import err_console, error_context, fail, is_json_mode
 from meridian.control_access import access_panel
+from meridian.core.errors import MeridianError
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.subscription_inputs import PreviewInputs
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 from meridian.i18n import t
-from meridian.remnawave import RemnawaveError
 from meridian.renderers import emit_json
 
 
@@ -31,12 +31,11 @@ def run_preview(name: str, *, user_agent: str, accept: str = "", suffix: str = "
             field = str(exc.errors()[0]["loc"][0])
             fail(t(f"preview.invalid_{field}"), hint_type="user")
         cluster = load_topology_cluster()
-        resolve_client_name(cluster, name, console_people=True)
         try:
             with access_panel(cluster) as panel:
                 name = resolve_client_mutation_name(cluster, panel, name)
                 result = panel.preview_subscription(SubscriptionPreviewRequest(username=name, **inputs.to_data()))
-        except RemnawaveError as exc:
+        except MeridianError as exc:
             fail(exc)
         if is_json_mode():
             emit_json(

@@ -31,6 +31,7 @@ from meridian.cluster import (
 )
 from meridian.cluster_v3 import load_cluster_v3, serialize_cluster_v3, validate_cluster_v3_structure
 from meridian.core.errors import LocalStateCorruptedError, LocalStateError
+from meridian.core.people_seeds import PeopleAdoption
 
 logger = logging.getLogger("meridian.cluster")
 
@@ -145,6 +146,9 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
     if cfg.control_restore is not None:
         out["control_restore"] = _serialize_dataclass(cfg.control_restore)
 
+    if cfg.people_adoption is not None:
+        out["people_adoption"] = cfg.people_adoption.to_data()
+
     if cfg.fleet_id:
         out["fleet_id"] = cfg.fleet_id
     if cfg.image_pins:
@@ -212,6 +216,7 @@ def _load_dataclass(
 def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
     """Load a cluster config from parsed YAML."""
     _name_legacy_backend(data)
+    adoption = lift_people_adoption(data)
     # Panel
     panel = _load_dataclass(
         data.get("panel", {}),
@@ -284,6 +289,7 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         telegram=telegram,
         control_migration=control_migration,
         control_restore=control_restore,
+        people_adoption=adoption,
         topology_intent=v3.topology_intent,
         access_profiles_used=v3.access_profiles_used,
         workloads=v3.workloads,
@@ -299,6 +305,23 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         pending_plan_hash=v3.pending_plan_hash,
         _extra=extra,
     )
+
+
+def lift_people_adoption(data: dict[str, Any]) -> PeopleAdoption | None:
+    """Lift old access declarations before topology validation, without saving anything."""
+    raw = data.get("people_adoption")
+    adoption = PeopleAdoption.model_validate(raw) if raw is not None else None
+    intent = data.get("topology_intent")
+    access = intent.get("access") if isinstance(intent, dict) else None
+    if isinstance(access, dict) and any(key in access for key in ("users", "display_names", "creation_settings")):
+        if data.get("version", 5) >= 5:
+            raise ValueError("Version-5 people must be in people_adoption, not topology_intent.access")
+        seeds = {key: access.pop(key) for key in ("users", "display_names", "creation_settings") if key in access}
+        lifted = PeopleAdoption.model_validate(seeds)
+        if adoption is not None and adoption != lifted:
+            raise ValueError("people_adoption conflicts with legacy access declarations")
+        adoption = lifted if lifted.users else adoption
+    return adoption
 
 
 def _state_error(path: Path, reason: str) -> LocalStateCorruptedError:
@@ -365,7 +388,7 @@ def _validate_cluster_structure(data: dict[str, Any]) -> None:
 
     for key in ("panel", "branding"):
         _require_mapping(data, key)
-    for key in ("subscription_page", "telegram", "control_migration", "control_restore"):
+    for key in ("subscription_page", "telegram", "control_migration", "control_restore", "people_adoption"):
         _require_mapping(data, key, nullable=True)
 
     validate_cluster_v3_structure(data)

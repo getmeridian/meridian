@@ -8,26 +8,22 @@ from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 import typer
 
 from meridian.cluster import ClusterConfig, PanelConfig
-from meridian.commands.client import run_add, run_disable, run_enable, run_list, run_reissue, run_remove, run_show
+from meridian.commands.client import run_add, run_disable, run_enable, run_list, run_show
 from meridian.commands.client_limits import format_expiry, format_usage, run_reset_traffic, run_set
-from meridian.compiler import compile_topology
 from meridian.console import set_json_mode
 from meridian.control.client import ControlClient
 from meridian.control.models import RevisionProposal, RevisionResult, UserUpdate
 from meridian.core.clients import build_client_record
 from meridian.core.schema import schema_model
-from meridian.handoff import HandoffLinks
-from meridian.reconciler.meridian_drivers import ControlUserDriver
-from meridian.reconciler.resources import build_resource_actions
 from meridian.remnawave import User
 from meridian.setup.single_server import single_server_intent
-from tests.support.control_service import ADMIN_TOKEN, serve_control
+from tests.support.control_service import ADMIN_TOKEN, seed_legacy_person, serve_control
 from tests.support.topology import single_exit_intent
 
 GIB = 1024**3
@@ -97,7 +93,12 @@ def _fleet(
             client.approve_revision(revision.number)
             client.record_revision_result(revision.number, RevisionResult(status="applied"))
             stack.enter_context(patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster))
-            yield SimpleNamespace(cluster=cluster, create=client.put_user, client=client)
+            yield SimpleNamespace(
+                cluster=cluster,
+                create=client.put_user,
+                legacy_create=lambda username: seed_legacy_person(tmp_path / "control.db", username),
+                client=client,
+            )
     finally:
         set_json_mode(False)
 
@@ -189,12 +190,12 @@ def test_client_set_can_edit_console_people_with_the_services_name_rules(
     username: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     with _fleet(tmp_path, json_mode=True) as fleet:
-        fleet.create(username)
+        (fleet.legacy_create if username == "ALICE" else fleet.create)(username)
         run_set(username, limit="50GB", reset="month", expires=FUTURE_DAY, devices="2")
         client = _envelope(capsys, "client-set-envelope")["data"]["client"]
 
     assert (client["username"], client["traffic_limit_bytes"], client["device_limit"]) == (username, 50 * GIB, 2)
-    assert client["declared"] is False
+    assert "declared" not in client
 
 
 @pytest.mark.parametrize("command", ["enable", "disable", "set", "reset-traffic"])
@@ -209,7 +210,7 @@ def test_service_owned_edits_prefer_exact_console_names_and_refuse_ambiguity(
         "reset-traffic": run_reset_traffic,
     }
     with _fleet(tmp_path, json_mode=True) as fleet:
-        fleet.create("ALICE")
+        fleet.legacy_create("ALICE")
         if scope == "people":
             fleet.cluster.panel.api_token = fleet.client.create_token("People desk", "people").token
         original = fleet.client.get_user("alice")
@@ -266,17 +267,6 @@ def test_service_owned_mutations_resolve_padded_console_names_like_show(
         assert fleet.client.get_user("alice") == original
 
 
-def test_cli_removal_and_reissue_stay_with_declared_people(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    with _fleet(tmp_path, json_mode=True) as fleet:
-        before = fleet.create("carol")
-        for command in (run_remove, run_reissue):
-            with pytest.raises(typer.Exit) as refused:
-                command("carol", yes=True)
-            assert refused.value.exit_code == 2
-            capsys.readouterr()
-        assert fleet.client.get_user("carol") == before
-
-
 @pytest.mark.parametrize("scope", ["admin", "people"])
 def test_extend_cli_resolves_console_people_and_reports_the_effective_expiry_and_status(
     scope: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -290,7 +280,7 @@ def test_extend_cli_resolves_console_people_and_reports_the_effective_expiry_and
     with _fleet(
         tmp_path, json_mode=True, clock=lambda: datetime.fromisoformat("2026-10-29T12:00:00Z").timestamp()
     ) as fleet:
-        fleet.create("ALICE")
+        fleet.legacy_create("ALICE")
         fleet.client.update_user("ALICE", UserUpdate(status="disabled", expire_at="2026-12-01T00:00:00Z"))
         if scope == "people":
             fleet.cluster.panel.api_token = fleet.client.create_token("People desk", "people").token
@@ -299,11 +289,10 @@ def test_extend_cli_resolves_console_people_and_reports_the_effective_expiry_and
         payload = json.loads(result.stdout)
         schema_model("client-extend-envelope").model_validate(payload)
         client = payload["data"]["client"]
-        assert (client["username"], client["status"].lower(), client["expires_at"], client["declared"]) == (
+        assert (client["username"], client["status"].lower(), client["expires_at"]) == (
             "ALICE",
             "disabled",
             "2026-12-08T00:00:00Z",
-            False,
         )
         assert fleet.client.get_user("alice").expire_at is None
 
@@ -337,48 +326,14 @@ def test_extend_cli_refuses_an_expiry_it_would_display_as_never(
         assert fleet.client.get_user("alice") == original
 
 
-def test_client_add_creates_with_limits_during_the_reviewed_apply(
-    tmp_path: Path, tmp_home: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_client_add_creates_with_first_limits_in_one_service_post_without_apply(tmp_path, tmp_home, capsys):
     with _fleet(tmp_path, json_mode=True) as fleet:
-        runtime = MagicMock()
-
-        def apply_intent(intent: Any, *_args: object, **_kwargs: object) -> SimpleNamespace:
-            plan = compile_topology(intent)
-            action = next(
-                action for action in build_resource_actions(plan, 1) if action.resource.logical_id == "account:carol"
-            )
-            driver = ControlUserDriver(
-                SimpleNamespace(client=lambda: ControlClient(fleet.cluster.panel.url, ADMIN_TOKEN))
-            )
-            driver.apply(action, None)
-            with access_panel_for(fleet.cluster) as panel:
-                created = panel.get_user("carol")
-            assert created is not None
-            assert created.traffic_limit_bytes == 50 * GIB
-            assert created.traffic_limit_strategy == "MONTH"
-            assert created.expire_at == f"{FUTURE_DAY}T23:59:59Z"
-            assert created.hwid_device_limit == 2
-            return SimpleNamespace(all_succeeded=True, changed=True, failed=[])
-
-        runtime.apply_intent.side_effect = apply_intent
-        with (
-            patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
-            patch("meridian.servers.ServerRegistry"),
-            patch(
-                "meridian.control_access.ServiceAccessPanel.update_user_limits", side_effect=AssertionError("No PATCH")
-            ),
-            patch(
-                "meridian.commands.client.client_handoffs",
-                return_value=[HandoffLinks("carol", subscription_url="https://198.51.100.1/pages/sub/short-carol")],
-            ),
-        ):
+        with patch("meridian.setup.runtime.SetupRuntime", side_effect=AssertionError("No apply")):
             run_add(["carol"], limit="50GB", reset="month", expires=FUTURE_DAY, devices="2")
         payload = _envelope(capsys, "client-add-envelope")
         with access_panel_for(fleet.cluster) as panel:
-            carol = build_client_record(panel.get_user("carol"))  # type: ignore[arg-type]
-
-    assert payload["status"] == "ok" and payload["warnings"] == []
+            carol = build_client_record(panel.get_user("carol"))
+    assert payload["warnings"] == []
     assert carol.device_limit == 2
     assert (carol.traffic_limit_bytes, carol.traffic_reset, carol.expires_at) == (
         50 * GIB,
@@ -393,34 +348,22 @@ def access_panel_for(cluster: ClusterConfig) -> Any:
     return access_panel(cluster)
 
 
-def test_client_add_never_publishes_links_when_reviewed_creation_fails(
-    tmp_path: Path, tmp_home: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    panel = MagicMock()
-    panel.__enter__.return_value = panel
-    panel.get_user.return_value = None
-    runtime = MagicMock()
-    runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=False, failure_summary="Creation reply lost")
-    set_json_mode(True)
-    try:
+def test_client_add_never_publishes_links_when_the_creation_reply_is_lost(tmp_path, tmp_home, capsys):
+    from meridian.control.client import ControlServiceUncertain
+
+    with _fleet(tmp_path, json_mode=True):
         with (
-            patch("meridian.commands._helpers.ClusterConfig.load", return_value=_mocked_cluster(tmp_path)),
-            patch("meridian.control_access.ServiceAccessPanel", return_value=panel),
-            patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
-            patch("meridian.servers.ServerRegistry"),
-            patch("meridian.commands.client.client_handoffs", return_value=[]) as publish,
-            pytest.raises(typer.Exit) as exc_info,
+            patch(
+                "meridian.control_access.ServiceAccessPanel.create_user",
+                side_effect=ControlServiceUncertain("Creation reply lost", retryable=True),
+            ),
+            pytest.raises(typer.Exit) as error,
         ):
             run_add(["carol"], limit="50GB")
-    finally:
-        set_json_mode(False)
-
     payload = json.loads(capsys.readouterr().out)
-    assert exc_info.value.exit_code == 3
-    assert payload["status"] == "failed" and payload["data"] == {}
-    assert "Creation reply lost" in payload["errors"][0]["hint"]
-    publish.assert_not_called()
-    panel.update_user_limits.assert_not_called()
+    assert error.value.exit_code == 3
+    assert not payload["data"]["clients"]
+    assert payload["data"]["failures"] == [{"name": "carol", "error": "Creation reply lost"}]
 
 
 def test_client_list_shows_console_people_marked(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -432,8 +375,9 @@ def test_client_list_shows_console_people_marked(tmp_path: Path, capsys: pytest.
         set_json_mode(False)
         run_list()
 
-    assert {client["username"]: client["declared"] for client in clients} == {"alice": True, "carol": False}
-    assert "carol · console" in capsys.readouterr().err
+    assert {client["username"] for client in clients} == {"alice", "carol"}
+    assert all("declared" not in client for client in clients)
+    assert "· console" not in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("username", ["ab", "a.b", "c" * 37], ids=["two-chars", "dotted", "37-chars"])
@@ -447,7 +391,7 @@ def test_client_show_reads_a_console_name_outside_remnawaves_rules(
             run_show(username)
         client = _envelope(capsys, "client-show-envelope")["data"]["client"]
 
-    assert (client["username"], client["declared"]) == (username, False)
+    assert client["username"] == username and "declared" not in client
 
 
 def test_client_show_prefers_an_exact_console_name_and_refuses_an_ambiguous_one(
@@ -455,14 +399,14 @@ def test_client_show_prefers_an_exact_console_name_and_refuses_an_ambiguous_one(
 ) -> None:
     """Declared `alice` and console `ALICE` are two people; a case-folded lookup handed out alice's link."""
     with _fleet(tmp_path, json_mode=True) as fleet:
-        fleet.create("ALICE")
+        fleet.legacy_create("ALICE")
         with patch("meridian.commands.client.page_url", return_value=""):
             run_show("ALICE")
             client = _envelope(capsys, "client-show-envelope")["data"]["client"]
             with pytest.raises(typer.Exit) as refused:
                 run_show("Alice")
 
-    assert (client["username"], client["declared"]) == ("ALICE", False)
+    assert client["username"] == "ALICE" and "declared" not in client
     assert refused.value.exit_code == 2
     assert "could mean ALICE, alice" in capsys.readouterr().out
 

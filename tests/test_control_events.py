@@ -393,7 +393,7 @@ def test_custom_token_events_show_native_capability_labels_instead_of_none(
     with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN) as admin:
         admin.create_token("Reader", capabilities=["people.read", "people.private"])
         cluster = ClusterConfig(panel=PanelConfig(url=url, api_token=ADMIN_TOKEN))
-        monkeypatch.setattr(fleet_events, "load_topology_cluster", lambda: cluster)
+        monkeypatch.setattr(fleet_events, "load_topology_cluster", lambda **_: cluster)
         monkeypatch.setattr(fleet_events.err_console, "width", 300)
         result = CliRunner().invoke(app, ["--lang", locale, "fleet", "events"])
     assert result.exit_code == 0, result.output
@@ -414,7 +414,7 @@ def test_events_command_json_continues_the_cursor_and_invalid_flags_have_an_enve
         admin.put_user("alice")
         admin.put_user("bob")
         cluster = ClusterConfig(panel=PanelConfig(url=url, api_token=ADMIN_TOKEN))
-        monkeypatch.setattr(fleet_events, "load_topology_cluster", lambda: cluster)
+        monkeypatch.setattr(fleet_events, "load_topology_cluster", lambda **_: cluster)
         runner = CliRunner()
         try:
             result = runner.invoke(app, ["fleet", "events", "--since", "1", "--limit", "1", "--json"])
@@ -450,7 +450,7 @@ def test_event_human_views_translate_the_kinds_and_changed_fields(
         admin.put_user("alice")
         admin.update_user("alice", UserUpdate(traffic_limit_bytes=100))
         cluster = ClusterConfig(panel=PanelConfig(url=url, api_token=ADMIN_TOKEN))
-        monkeypatch.setattr(fleet_events, "load_topology_cluster", lambda: cluster)
+        monkeypatch.setattr(fleet_events, "load_topology_cluster", lambda **_: cluster)
         try:
             result = CliRunner().invoke(app, ["--lang", locale, "fleet", "events"])
             assert result.exit_code == 0, result.output

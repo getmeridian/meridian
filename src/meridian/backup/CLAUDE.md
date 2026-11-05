@@ -6,13 +6,14 @@
 - **A pull is also a deposit** — `pull.py` sends this machine's `cluster.yml` (admin token blanked) and `servers.json` first, so a snapshot plus the recovery key can rebuild the fleet on an empty machine.
 - **Recovery key shown once** — the first `deploy` prints it on the terminal only (never in JSON); `backup recovery-key` replaces it after confirmation. Only the public half is stored anywhere.
 - **Restore rebuilds, never copies** — `meridian restore --to NEW-SERVER` (`restore.py`, checkpointed in `ClusterConfig.control_restore`) stages the snapshot, rotates the admin token, moves the control plane in the intent, installs, then runs the normal reviewed apply; the new CA makes every agent re-enroll.
-- **A snapshot carries no secrets** — owner password, TOTP, and sessions included, so after a restore the owner takes a new `meridian panel` setup link.
+- **A snapshot carries no secrets** — owner password, TOTP, and sessions included, so a restore ends by printing a setup link and offering to revoke other computers' backup keys.
 - **Bare-IP links move; domain links don't** — without a control domain every subscription URL changes and the end prints each new link; a domain fleet keeps its URLs once DNS moves.
 
 ## What's done well
 - The pull's own client never reports its writes, so a pull cannot trigger another.
 
 ## Pitfalls
+- **Restore lists people from the restored service, never from intent** — panel-added people exist only there, and a bare-IP restore that read `access.users` left their changed links unmentioned.
 - **Restore checks fleet identity first** — share the foreign-snapshot refusal with the CLI before parsing deposits or profiles, and before registering or contacting a target. A local intent without a fleet ID never fenced, so every snapshot is foreign to it.
 - **Restore reviews capture scalar fingerprints** — frozen intents still contain mutable grant lists; compare the reviewed fingerprint again before starting, rather than hashing only the current review object.
 - **Restore keeps profile declarations reviewed** — compare the snapshot fingerprint before staging or target registration; unstamped snapshots need the same compiled grants, and checkpoints pin declarations through every resume.
@@ -23,6 +24,7 @@
 - **Mark the new server's fence.json handed over** — otherwise an apply during an outage takes the lease over SSH around the service.
 - **Never read the recovery key from argv** — shell history and `ps` keep it; ask with a hidden prompt or read stdin.
 - **Checkpoint before deleting what a rerun needs** — the staged database goes only after `loaded` is saved.
+- **Adoption uses the restorer's persistence callback** — every post-apply finish must preserve the destination checkpoint writer.
 - **Restore above every epoch the agents may hold** — they refuse anything lower, so count earlier restores and saved snapshots.
 - **An older snapshot revives what was revoked since** (tokens, devices, people) — take the newest by default and warn when `--snapshot` names an older one.
 - **An unfinished restore never travels** — deposits keep only a finished record, or a fresh context chases a dead target.

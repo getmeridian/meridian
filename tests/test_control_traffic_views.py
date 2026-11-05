@@ -79,8 +79,8 @@ def test_traffic_evidence_reaches_client_show_and_fleet_status(
                 topology_intent=single_server_intent(None, server_ref="srv-a", client_name="alice"),
             )
             topology = topology_from_cluster(cluster, servers=[ServerEntry(host="198.51.100.10", id="srv-a")])
-            monkeypatch.setattr(client, "load_topology_cluster", lambda: cluster)
-            monkeypatch.setattr(fleet, "load_topology_cluster", lambda: cluster)
+            monkeypatch.setattr(client, "load_topology_cluster", lambda **_: cluster)
+            monkeypatch.setattr(fleet, "load_topology_cluster", lambda **_: cluster)
             monkeypatch.setattr(fleet, "topology_from_local_cluster", lambda _cluster: topology)
             client.run_show("alice")
             output = capsys.readouterr()

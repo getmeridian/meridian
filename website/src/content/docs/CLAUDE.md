@@ -1,54 +1,31 @@
-# content/docs — Markdown documentation source
-
+# content/docs — Localized Markdown guides
 ## Design decisions
-**Record lists** — all locales describe Tokens and Revisions in Detailed, contextual More actions, token status and permission reads, and reviewed revision comparisons.
-**Settings sections** — all locales describe fragment links, desktop and phone sub-navigation, guarded drafts, Advanced in Detailed, and Security's password, code, passkey, and session controls.
-**Person summary and tabs** — all locales describe the fixed summary, fragment tabs, Simple More, inline Save/Cancel guards, service-previewed extensions, and the shared Share dialog.
-**App response rules** — all locales document reviewed literal fields, first-match ordering, suffix precedence, exact unknown-token refusals, typed headers, private policy precedence, and the API/CLI/console tester.
-**Declared removal drafts** — client and CLI guides share local JSON download, file shapes and bounds, one review/apply, exact revision refusal, atomic mixed batches, the retained-person rule, and individual-only cut-off in every locale.
-**Membership filters** — client and CLI guides distinguish list `--profile`, bulk `--match-profile`, explicit default membership, contextual overlap counts, and existing private query permissions in every locale.
-**Named client policies** — routing and architecture guides describe typed rules, DNS limits, profile defaults, exit blocking, local geodata, and unchanged presets in every locale.
-**Access profile guides** — all locales describe shared-inbound grants, private service membership, default equivalence, gain/loss review, flow-block boundaries, and creation-only fleet export.
-**Protected metrics** — token, CLI, and privacy guides share explicit `metrics.read`, frozen presets, the private 443 ingress, authenticated Prometheus configuration, node-only labels, runtime memory bounds, omissions, and scrape-copy retention in every locale.
-**Capacity history** — client, CLI, and privacy guides share receipt freshness, null/zero states, 360 recent slots, 168 hourly buckets, UTC windows, measured intervals, and snapshot behaviour in every locale.
-**Node capacity** — privacy guides distinguish server aggregates from counted personal traffic, nullable collection, epoch resets, and the pinned core's unsupported connection counts in all four locales.
-**Bulk revocation** — client guides describe per-person/node receipts, unchanged credentials, surviving transfers, and post-deletion confirmation in every locale.
-**Reviewed bulk people** — client and CLI guides describe server paging, shared filters, frozen targets, atomic commit, receipts, undo, declared deletion commands, and privacy in all four locales.
-**Receipt evidence** — client guides describe the same-epoch minimum revision, service receipt freshness, unchanged hello/unrelated-revision evidence, and transition-only events in every locale.
-**Revocation receipts** — client guides explain per-generation causes, private key fingerprints, restored-key clearing, and confirmed-history cleanup in every locale.
-**Core command safety** — CLI guides describe shared applied-document/config checks, retryable refusals, and new-command retries in every locale.
-**Live revocation** — client guides explain identity-only blocks, preserved DNS/IP routing, restart and re-enable cleanup, and the bounded-rule recovery request in every locale.
-**Capability tokens** — token guides describe independent action and credential grants, service previews, default expiry, explicit no-expiry, compatible frozen presets, delegation limits, and CLI producing output in every locale.
-**Owner passkeys** — client, security, and panel CLI guides describe reviewed-domain verification, recent identity checks, session bounds, lost-key removal, root recovery, and snapshot exclusion in all four locales.
-**Account schedules** — client and CLI guides document UTC anniversaries, first-traffic durations, capped renewal catch-up, previews, pending extension, and preservation; connecting guides explain first use and the page's dates in every locale.
-**Connection-key rotation** — client guides distinguish refresh with the same URL from reissue after a leaked link, document generation preconditions, device preservation, declared ownership, and optional hard cut-off in every locale.
-**Session revocation guides** — client and CLI guides describe per-node blocking, surviving TCP/UDP/XUDP associations, removal/reissue/rotation consent, all-inbound/bridge core restarts, listed-inbound resets, and failure fallbacks in every locale.
-**Person guides** — explain Leave/Stay, memory-only drafts, preserved focus, visible 30-second refresh, and owner idle expiry; browser-local expiry, exact UTC, calendar-month clamping, explicit null, and changed-field saves; captioned PNG/SVG QR export, clipboard fallback, and local-only rendering; and effective enable results. With the CLI guides they document individual credentials, explicit format URLs, their people/admin access, and the producing-output boundary.
-**Client, connecting, and CLI guides** — distinguish automatic browser defaults, the explicit subscription-language default and page/app languages, nullable person overrides, saved page choices, console edits, stable English status codes, the connection page's own picker, and JSON `--yes`; and document operator notices, safe substitutions, expiry, rendered confirmation, encrypted snapshots, and content-free events. Client and connecting guides explain reviewed public owner contact, user-initiated support links, explicit clearing, and bounded inactive remarks.
-**Client guides** — document private notes/tags (explicit clearing, tag filters, people/admin scope, snapshots, migration bounds) and device privacy (default off, private/full disclosures, restore registration loss, supported-HWID counting, and registration removal versus credential reissue).
-**Period usage** — client-management.md explains shared directional counters, preserved lifetime totals, and the explicit fallback for imported or unrecoverable historical directions.
-**Browser reissue** — client-management.md explains the shared cut-off review, separate per-node outcomes, and new credentials surviving a failed cut-off.
-**Subscriber device slots** — privacy, connecting, and client-management guides disclose count-only `/info`, full-slot refresh behaviour, uncounted apps, and memory-only page display.
-**Activity attention** — CLI and client guides distinguish `unused` from `stopped`, disclose their independent day thresholds, and keep unknown imported activity unclassified.
-**People triage** — client-management.md describes fragment persistence, contextual filter counts, integer bounds, any-age never-used filtering, and missing dates sorting last.
-**API tokens** — the API-token section in client-management explains scoped issuance, authenticated OpenAPI discovery, credential/scope markers, cut-off permissions, and the separate people capability with its credential access and transactional declared-user refusals; operation tables are checked against the committed admin contract by `scripts/validate_api_docs.py`.
-**Subscription guides** — explain Automatic-first Xray profiles and single-primary routing without mixing fingerprint alternatives, plus transient format preview, shared live rules, omissions, redacted headers, API-managed endpoint disabling, and reviewed apply restoration.
-**Client routing policy** — split-routing.md documents reviewed `ru-split | full`, private/LAN and best-effort Xray BitTorrent bypasses, format limits, subscription refresh, read-only console settings, and separate exit geo-blocking.
-**Server allowance guide** — the fleet/server CLI reference documents reviewed metadata, binary GB/TB aliases, UTC receipt periods and clamped reset days, approximate coverage, unmeasured relays, and computed payment reminders.
-**Hosting, relay, and security guides** — keep dated hosting reports, mobile whitelist limits, and audited outbound requests in all four locales; distinguish page requests from installation, DNS, diagnostics, and VPN-app traffic, and state each request's data and controls.
-**Per-locale directories** — each locale (en, ru, fa, zh) has its own folder with identically named markdown files. English is the source; other locales are translations.
-**Frontmatter schema** — Starlight's plain `docsSchema` (`title`, `description`). Sections and page order live in one list, `src/lib/docs-sidebar.mjs`, shared by every locale.
-**Machine-readable consumption** — these markdown files are read at build time by the Markdown twins (`/{locale}/{page}.md`), and by `scripts/ai-docs.mjs` (`/llms-full.txt`, `/ai/reference.md`, and the packaged `ai-reference.md`).
-**Durable prose** — write as the current release: no beta notes, no "still works for one release", no version-dated caveats.
-**Russian glossary** (docs, landing, CLI) — relay is «промежуточный сервер», firewall «файрвол», no «флот» (say «ваши серверы»); the product is a «VPN» in prose, «прокси» only where technically exact (protocols, Xray, app proxy modes).
-**App list from the catalog** — a line holding only `<!-- apps -->` becomes the featured apps of `src/data/apps.json` (`src/lib/apps-list.mjs`) in the page and its Markdown twin; never hand-write an app list.
-**Links** — link other pages as `/{locale}/{page}/` (with `#anchor` from that locale's own heading); the build validates every link.
-
+- Every public guide has en/ru/fa/zh parity, matching frontmatter and the shared sidebar. All command names and API operation tables are validated.
+- People are service-owned in every locale: CLI add/remove are immediate, all commands read current display names, zero people is allowed, and `--proposal` is retired.
+- The next reviewed apply discloses adoption of old version 4 people, preserves accounts and completes missing seeds after commit.
+- Client guides distinguish single-person session cut-off from atomic bulk preview/commit and durable receipts; earlier transfers can continue without a cut-off.
+- Setup drafts keep initial people outside topology; deploy ensures them through the service before verification and handoff, and restores print every changed service link.
+- Architecture separates reviewed roles, grants, delivery and deployment state from live people, membership, private metadata and operator settings.
+- Profile filters name saved membership; aliases sharing an inbound share enforcement, and gain/loss reviews explain flow-block boundaries.
+- Delivery policies and app rules describe finite literal matches, ordered resolution, private person overrides, unsupported formats and transient testing without request storage.
+- Tokens describe frozen explicit grants and presets, protected metrics, conditional cut-off rights, credential views and private metadata separately.
+- Capacity remains bounded per-node evidence with receipt freshness and null/zero distinctions; personal privacy controls govern device/history storage independently.
+- Account schedule guides distinguish first-use durations, rolling reset anchors, bounded renewals and absolute expiry without activation on page reads.
+- Panel guides describe contextual record lists, person summary/tabs, guarded inline edits, service-rendered previews and Simple/Detailed navigation.
+## What's done well
+- CLI catalogs, command examples and four localized API tables derive from the current public contracts.
+- Connection-page instructions describe the real subscription methods and shared assets without remote templates or automatic external requests.
+- Privacy guides disclose what is stored and deleted, with counts-only anonymous views and content-free administrative events.
 ## Pitfalls
-- **Routing excerpts share client semantics** — update the routing, client, CLI, and connecting guides together when a client's match or DNS pass changes.
-- **Privacy disclosures are source text** — privacy.md explains defaults, seizure costs, downgrade deletion, and private device re-registration after restore in every locale; totals-only claims must say they are the default.
-- **Locale parity** — every guide entry above holds in all four locales, and all four locale directories must have the same filenames. A missing file means that locale won't have that doc page, and the sidebar will show a gap.
-- **AI bundles are English-only** — `scripts/ai-docs.mjs` reads only from `en/`. Translations don't affect the AI-facing docs.
-- **A new page joins the sidebar list** — add its slug to `src/lib/docs-sidebar.mjs`; the build fails on a page that is missing from it or a slug without a page.
-- **This CLAUDE.md lives inside a content collection** — `content.config.ts` uses `**/[a-z]*.md` glob to exclude it. All doc filenames must stay lowercase.
-- **CLI validation is live-tree and section-scoped** — every public leaf and root option must appear in its matching section in all four locales; hidden developer commands are excluded.
+- Never describe people as declarations or tell users that add/remove need apply; older configuration ownership exists only in the disclosed adoption transition.
+- Do not document removal proposals as actionable; retired flags provide the replacement command and batch previews write nothing.
+- Describe exact-username precedence and ambiguity refusal against current service names, including panel renames and non-Latin display names.
+- CLI and console are two surfaces of the same accounts; no console-only ownership badge belongs in current backend descriptions.
+- Keep localized headings and links aligned; translated headings require translated anchor links.
+- Regenerate API operation tables when route metadata changes, and validate them against the committed OpenAPI document.
+- Names and subscriptions are distinct identifiers; shared links use the public page path, never the administrator's secret ingress.
+- Reissue invalidates previous pages, subscriptions and credentials; rotation preserves subscription identity and registrations but changes connection keys.
+- A test without usable people is unavailable evidence (exit 3), not a failed network test or a reason to degrade fleet health.
+- Use documented scopes and conditional grants rather than inventing requirements from a UI control's visibility.
+- Fleet import describes topology only in this phase; people export/import seeds have separate design decisions.
+- Mermaid sources require generated SVG updates before changing diagrams; do not change a block without rendering its checked-in artifact.

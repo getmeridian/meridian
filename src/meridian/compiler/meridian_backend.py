@@ -5,8 +5,8 @@ firewall rules. For the skeleton this module keeps those server-side kinds and
 replaces the panel-shaped ones: the control plane becomes `control_service`, an
 exit's or routing gateway's Profile, Inbounds, binding, and node become one
 `agent_runtime` plus one `node_workload` (a gateway's pools, routes, and gateway
-resource fold into it), primary Hosts become `client_endpoint`s, and users become
-`control_user`s. Squads, templates, service users, node-API firewall rules, and
+resource fold into it), and primary Hosts become `client_endpoint`s. People have no
+compiled resources. Squads, templates, service users, node-API firewall rules, and
 panel probes have no equivalent. Once Remnawave is gone the compiler emits these directly.
 """
 
@@ -25,7 +25,6 @@ from meridian.compiler.models import (
     ConfigProfilePayload,
     ControlPlaneRuntimePayload,
     ControlServicePayload,
-    ControlUserPayload,
     EgressPoolPayload,
     FirewallRulePayload,
     HostPayload,
@@ -156,15 +155,7 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
                 [logical_id],
             )
         elif isinstance(payload, AccessUserPayload):
-            account_id = f"account:{logical_id.removeprefix('user:')}"
-            renamed[logical_id] = account_id
-            replacements[account_id] = (
-                ControlUserPayload(
-                    username=payload.username, creation_settings=intent.access.creation_settings.get(payload.username)
-                ),
-                [CONTROL_SERVICE_ID, SERVICE_SETTINGS_ID],
-                _exists(account_id),
-            )
+            renamed[logical_id] = None
         elif isinstance(payload, SubscriptionSettingsPayload):
             renamed[logical_id] = SERVICE_SETTINGS_ID
             replacements[SERVICE_SETTINGS_ID] = (
