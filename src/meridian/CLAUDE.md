@@ -35,4 +35,4 @@
 - Refuse unsupported camouflage hosts before mutation, and register dynamically loaded PWA helpers as shared package assets.
 - Readiness retries only named transient errors; a failed live agent is failed evidence, and refused service credentials stop status with exit 2.
 - Local Xray is optional verification evidence; never execute an archive whose pin does not match.
-- Build programmatic CLI options via Typer (`typer.Option` + `get_command`), never raw `click.Option(...)`; Typer 0.29+ requires internal descriptors.
+- Build programmatic CLI options via Typer (`typer.Option` + `get_command`), never raw `click.Option(...)`; Typer 0.29+ requires internal descriptors. Raise the `typer` ceiling only after `meridian --help` passes on the new release.
