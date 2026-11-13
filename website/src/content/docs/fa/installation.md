@@ -42,7 +42,7 @@ uv tool install meridian-vpn
 pipx install meridian-vpn
 ```
 
-وقتی جدیدترین release یک نسخهٔ بتا باشد، این فرمان‌ها جدیدترین نسخهٔ پایدار را نصب می‌کنند؛ برای نصب همان بتایی که این مستندات توضیح می‌دهند، `--prerelease allow` را به uv یا `--pip-args=--pre` را به pipx اضافه کنید.
+وقتی جدیدترین release یک نسخهٔ بتا باشد، این فرمان‌ها جدیدترین نسخهٔ پایدار را نصب می‌کنند. برای نصب همان بتایی که این مستندات توضیح می‌دهند، pre-release را با نسخه درخواست کنید: `uv tool install 'meridian-vpn>=4.0.0b0'` یا `pipx install 'meridian-vpn>=4.0.0b0'`. از `--prerelease allow` و `--pip-args=--pre` استفاده نکنید؛ این گزینه‌ها نسخه‌های pre-release همهٔ وابستگی‌ها را هم نصب می‌کنند.
 
 ## به‌روزرسانی
 

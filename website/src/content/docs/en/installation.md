@@ -42,7 +42,7 @@ With pipx:
 pipx install meridian-vpn
 ```
 
-When the newest release is a beta, these commands install the newest stable release instead; add `--prerelease allow` to uv, or `--pip-args=--pre` to pipx, to get the beta these docs describe.
+When the newest release is a beta, these commands install the newest stable release instead. To get the beta these docs describe, ask for a pre-release by version: `uv tool install 'meridian-vpn>=4.0.0b0'` or `pipx install 'meridian-vpn>=4.0.0b0'`. Avoid `--prerelease allow` and `--pip-args=--pre`: they take pre-releases of every dependency too.
 
 ## Update
 

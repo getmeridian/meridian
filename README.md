@@ -52,7 +52,7 @@ macOS or Linux (on Windows, use WSL):
 curl -sSf https://getmeridian.org/install.sh | bash
 ```
 
-Or from PyPI: `uv tool install meridian-vpn` (or `pipx install meridian-vpn`). When the newest release is a beta, add `--prerelease allow` (pipx: `--pip-args=--pre`) to get the version this page describes.
+Or from PyPI: `uv tool install meridian-vpn` (or `pipx install meridian-vpn`). When the newest release is a beta, ask for it by version to get the version this page describes: `uv tool install 'meridian-vpn>=4.0.0b0'` (or `pipx install 'meridian-vpn>=4.0.0b0'`). `--prerelease allow` and `--pip-args=--pre` also take pre-releases of every dependency.
 
 You need a fresh Debian or Ubuntu VPS you can reach over SSH with a key, as root or a user with passwordless sudo. Meridian runs on your computer, not on the server.
 

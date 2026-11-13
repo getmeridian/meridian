@@ -12,6 +12,13 @@ describes your whole fleet; a small agent on every server applies it; and no
 server needs Docker. The first sections list what changed in each beta,
 newest first; the last is what 4.0 changes compared with 3.x.
 
+### Since 4.0.0b14
+
+#### Fixed
+- Installing a beta with `--prerelease allow` pulled httpx's 1.0 development build,
+  and commands crashed with `module 'httpx' has no attribute 'ConnectError'`. httpx
+  is capped below 1, and the install docs ask for the beta by version instead.
+
 ### Since 4.0.0b13
 
 #### Fixed
