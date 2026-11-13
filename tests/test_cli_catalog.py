@@ -29,3 +29,13 @@ def test_contracts_take_argv_flags_and_help_from_the_command() -> None:
     assert route_add.description == "Send matching destinations through WARP, directly, or nowhere"
     assert command_argv("check", commands["check"]) == ["check", "[SERVER]"]
     assert "dev.preview" not in contracts
+
+
+def test_leaf_context_option_tracks_typer_descriptor_and_flags() -> None:
+    commands = public_commands()
+    context_opt = next(param for param in commands["client.list"].params if "--context" in getattr(param, "opts", ()))
+
+    assert context_opt.metavar == "NAME"
+    assert context_opt.default == ""
+    assert context_opt.expose_value is False
+    assert context_opt.show_default is False

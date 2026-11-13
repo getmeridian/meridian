@@ -12,6 +12,15 @@ describes your whole fleet; a small agent on every server applies it; and no
 server needs Docker. The first sections list what changed in each beta,
 newest first; the last is what 4.0 changes compared with 3.x.
 
+### Since 4.0.0b13
+
+#### Fixed
+- Every command crashed at startup with `TyperOption.__init__() missing 1 required
+  keyword-only argument: 'type_descriptor'` once Typer 0.29 was installed, on your
+  computer and in the control service a deploy installs on the server. Meridian now
+  works with Typer 0.26 through 0.29 and caps it below 0.30 until a newer one is
+  tested (#140).
+
 ### Since 4.0.0b12
 
 #### Added

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 
 import typer
+from typer.main import get_command
 
 from meridian import cli_types as click
 
@@ -160,6 +161,31 @@ def _remember_leaf_context(ctx: click.Context, _param: object, value: object) ->
     return value
 
 
+def _leaf_context_option() -> click.Option:
+    # Build via Typer so Option construction stays compatible across Typer releases (e.g. type_descriptor in 0.29+).
+    probe = typer.Typer()
+
+    @probe.command()
+    def _leaf_context(
+        context: str = typer.Option(
+            "",
+            "--context",
+            metavar="NAME",
+            expose_value=False,
+            show_default=False,
+            callback=_remember_leaf_context,
+            help=CONTEXT_HELP,
+        ),
+    ) -> None:
+        pass
+
+    command = get_command(probe)
+    for param in command.params:
+        if isinstance(param, click.Option) and "--context" in param.opts:
+            return param
+    raise AssertionError("Failed to construct --context option")
+
+
 def add_context_option(group: click.Group) -> None:
     """Give every leaf below ``group`` a `--context NAME` option, so it also works after the command.
 
@@ -175,13 +201,4 @@ def add_context_option(group: click.Group) -> None:
             if not command.invoke_without_command:
                 continue
         if not any("--context" in getattr(param, "opts", ()) for param in command.params):
-            command.params.append(
-                click.Option(
-                    param_decls=["--context"],
-                    metavar="NAME",
-                    default="",
-                    expose_value=False,
-                    callback=_remember_leaf_context,
-                    help=CONTEXT_HELP,
-                )
-            )
+            command.params.append(_leaf_context_option())
