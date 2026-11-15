@@ -129,6 +129,7 @@ certificate برای دامنه شما تنها زمانی می‌تواند ص�
 
 علت‌های دیگر:
 - سرور reboot شد و سرویس‌ها شروع نشدند → `meridian plan` نشان می‌دهد چه چیز خاموش است و `meridian apply` تعمیر می‌کند. دستی: `systemctl restart ctld netagent nginx`
+- سرویس کنترل متوقف یا خراب است و `meridian apply` می‌گوید پاسخ نمی‌دهد → `meridian check --repair` همان نسخه را دوباره نصب و راه‌اندازی می‌کند و داده‌هایش را نگه می‌دارد ([`meridian check`](/fa/cli-reference/#meridian-check))
 - دیسک پر — `df -h /`، `journalctl --vacuum-time=1d`
 - سرور کنترل برای همیشه از دست رفته — آن را با `meridian restore` از یک snapshot بازسازی کنید ([سرور کنترل از دست رفت](/fa/recovery/#سرور-کنترل-از-دست-رفت))
 - اتصال برقرار است اما سایت‌ها با نام باز نمی‌شوند (با نشانی IP باز می‌شوند) — سرور خروجی به هیچ‌یک از resolverهای DNS رمزگذاری‌شده‌اش نمی‌رسد. `meridian check` آن‌ها را زیر **Encrypted DNS** نام می‌برد؛ TCP 443 خروجی به آن نشانی‌ها را در فایروال ارائه‌دهنده باز کنید

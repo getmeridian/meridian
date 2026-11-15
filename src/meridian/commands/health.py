@@ -75,8 +75,21 @@ def run(
     sni: str = "",
     domain: str = "",
     ai: bool = False,
+    repair: bool = False,
+    yes: bool = False,
 ) -> None:
     """Check one server (or the whole fleet) and exit 0 / 4 findings / 3 inconclusive."""
+    if repair and (sni or domain or ai):
+        with error_context("check"):
+            fail("--repair cannot be combined with --domain, --sni, or --ai", hint_type="user")
+    if repair:
+        from meridian.commands.control_repair import run as run_repair
+
+        run_repair(target, user=user, ssh_port=ssh_port, yes=yes)
+        return
+    if yes:
+        with error_context("check"):
+            fail("--yes confirms --repair; a check changes nothing", hint_type="user")
     try:
         sni = validate_hostname_value(sni) if sni else ""
         domain = validate_hostname_value(domain) if domain else ""

@@ -77,6 +77,11 @@ class LocalStateError(MeridianError):
         super().__init__(message, hint=hint, category=category)
 
 
+def release_command(version: str, args: str) -> str:
+    """The command that runs *args* with one Meridian release, whatever this machine has installed."""
+    return f"uvx --from 'meridian-vpn=={version}' meridian {args}"
+
+
 def previous_release_command(deployed_with: str, args: str) -> str:
     """The command that runs *args* with the Meridian release that deployed a Remnawave fleet.
 
@@ -84,7 +89,7 @@ def previous_release_command(deployed_with: str, args: str) -> str:
     removing its servers) before or instead of `meridian migrate` takes that release.
     """
     # 4.0.0b8 is the last release that drives Remnawave.
-    return f"uvx --from 'meridian-vpn=={deployed_with or '4.0.0b8'}' meridian {args}"
+    return release_command(deployed_with or "4.0.0b8", args)
 
 
 class RemnawaveFleetError(LocalStateError):

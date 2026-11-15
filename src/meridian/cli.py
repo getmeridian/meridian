@@ -587,6 +587,8 @@ def check_cmd(
     user: User = "",
     ssh_port: SshPort = 0,
     ai: bool = typer.Option(False, "--ai", help="Copy an AI-ready diagnostic prompt to the clipboard"),
+    repair: bool = typer.Option(False, "--repair", help="Reinstall and restart a stopped or broken control service"),
+    yes: Yes = False,
     _json: Json = False,
 ) -> None:
     """Check server health, or whether a new server can run Meridian
@@ -595,15 +597,17 @@ def check_cmd(
     gateway servers get panel, container, listener, TLS, and disk checks;
     relays get their hops checked. With no server, the whole fleet is checked.
     Exits 0 when every check passes, 4 on findings, 3 when evidence was unavailable.
+    [cyan]--repair[/cyan] brings back a control service that apply cannot reach.
 
     [dim]Examples:[/dim]
       [cyan]meridian check[/cyan]
       [cyan]meridian check 198.51.100.10[/cyan]
       [cyan]meridian check ubuntu@198.51.100.20:2222 --sni www.example.com[/cyan]
+      [cyan]meridian check --repair[/cyan]
     """
     from meridian.commands.health import run
 
-    run(target, user=user, ssh_port=ssh_port, sni=sni, domain=domain, ai=ai)
+    run(target, user=user, ssh_port=ssh_port, sni=sni, domain=domain, ai=ai, repair=repair, yes=yes)
 
 
 @app.command("scan", rich_help_panel=ADVANCED)

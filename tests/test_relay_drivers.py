@@ -189,6 +189,57 @@ def test_stream_artifact_routes_no_sni_to_local_control_https() -> None:
     assert "server 127.0.0.1:8443;" in rendered
 
 
+@pytest.mark.parametrize(
+    ("address", "expected"),
+    [("198.51.100.10", '"198.51.100.10"'), ("2001:db8::10", '"2001:db8::10"'), ("srv.example.net", None)],
+    ids=["ipv4", "ipv6", "hostname"],
+)
+def test_the_servers_own_ip_as_sni_takes_the_no_sni_route(address: str, expected: str | None) -> None:
+    """Dart clients (Hiddify, FlClashX) put a URL's IP in SNI; it must reach the same server as no SNI (#147)."""
+    payload = NginxArtifactPayload(
+        server_ref="srv-exit",
+        listener_port=443,
+        layer="stream",
+        routes=[
+            NginxRouteSpec(match="sni", server_names=[""], backend_server_ref="srv-exit", backend_port=8443),
+            NginxRouteSpec(
+                match="sni",
+                server_names=["www.microsoft.com"],
+                backend_server_ref="srv-exit",
+                backend_port=10443,
+                protocol="reality",
+            ),
+        ],
+        fallback_server_name="www.microsoft.com",
+    )
+
+    rendered = render_nginx_artifact("nginx:srv-exit:stream:443", payload, {**ADDRESSES, "srv-exit": address})
+
+    routes = dict(line.split() for line in rendered.splitlines() if line.startswith("    ") and line.endswith(";"))
+    if expected is None:
+        assert not any(key.startswith('"') and key != '""' for key in routes)
+    else:
+        assert routes[expected] == routes['""']
+        assert routes[expected] != routes["www.microsoft.com"]
+
+
+def test_a_route_without_no_sni_gets_no_ip_route() -> None:
+    payload = NginxArtifactPayload(
+        server_ref="srv-exit",
+        listener_port=443,
+        layer="stream",
+        routes=[
+            NginxRouteSpec(
+                match="sni", server_names=["vpn.example.com"], backend_server_ref="srv-exit", backend_port=8443
+            )
+        ],
+    )
+
+    rendered = render_nginx_artifact("nginx:srv-exit:stream:443", payload, ADDRESSES)
+
+    assert "198.51.100.10" not in rendered
+
+
 def test_realm_restart_failure_restores_previous_files(monkeypatch: pytest.MonkeyPatch) -> None:
     plan, action = _realm_plan_and_action()
     config_path = realm_config_path(action.resource.logical_id)

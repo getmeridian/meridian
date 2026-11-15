@@ -91,8 +91,10 @@ class InstallControlService:
 
     name = "Install control service"
 
-    def __init__(self, install: ControlServiceInstall) -> None:
+    def __init__(self, install: ControlServiceInstall, *, reinstall: bool = False) -> None:
         self.install = install
+        # `meridian check --repair`: install the package again even when the record matches it.
+        self.reinstall = reinstall
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
         self._changed = False
@@ -140,7 +142,11 @@ class InstallControlService:
             detail = (read.stderr or read.stdout).strip()[:200] or f"exit {read.returncode}"
             return f"could not read which service package is installed: {detail}"
         marker = read.stdout.strip()
-        if marker == package.identity and conn.run(f"test -x {SERVICE_BINARY}", timeout=15).returncode == 0:
+        if (
+            not self.reinstall
+            and marker == package.identity
+            and conn.run(f"test -x {SERVICE_BINARY}", timeout=15).returncode == 0
+        ):
             return ""
         installed = package_version(marker)
         if installed and service_skew(package.version, installed) == "service_newer":
@@ -160,8 +166,10 @@ class InstallControlService:
             if written.returncode != 0:
                 return f"could not upload the dependency pins: {written.stderr.strip()[:200]}"
             constrain = f" --constraints {CONSTRAINTS_FILE}"
+        # A matching version with a damaged environment would otherwise count as installed.
+        refresh = " --reinstall" if self.reinstall else ""
         result = conn.run(
-            f"{_UV_ENV} {UV_BINARY} tool install --force --python {CONTROL_SERVICE_PYTHON}{constrain} "
+            f"{_UV_ENV} {UV_BINARY} tool install --force{refresh} --python {CONTROL_SERVICE_PYTHON}{constrain} "
             f"{shlex.quote(spec)}",
             timeout=900,
             operation_name="install control service",

@@ -12,6 +12,23 @@ describes your whole fleet; a small agent on every server applies it; and no
 server needs Docker. The first sections list what changed in each beta,
 newest first; the last is what 4.0 changes compared with 3.x.
 
+### Since 4.0.0b16
+
+#### Added
+- `meridian check --repair` brings back a control service that is stopped or broken,
+  for example by a failed upgrade, which every apply refused. It reinstalls the same
+  Meridian version on the control server with that server's own configuration,
+  restarts the service, and waits until it answers; people, topology, and revisions
+  stay as they are. It shows a review and asks first, and refuses a service that
+  still answers, a server without its configuration or database, and an install of
+  another version (#124).
+
+#### Fixed
+- Hiddify and FlClashX could not import a subscription from a fleet without a domain:
+  they failed with "the server's certificate may be invalid". Dart's HTTP client puts
+  the server's IP in SNI, which only the camouflage site answered. The server's own
+  IP now reaches the same place as a connection without SNI (#147).
+
 ### Since 4.0.0b15
 
 #### Changed

@@ -314,6 +314,8 @@
         "--user",
         "--ssh-port",
         "--ai",
+        "--repair",
+        "--yes",
         "--json",
         "--context"
       ],

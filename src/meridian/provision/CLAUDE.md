@@ -8,6 +8,7 @@
 **Semantic ensure helpers** — `ensure.py` wraps package, file, service, and UFW operations; use it with `ServerFacts` instead of new check/act shell snippets.
 **Renderer-free steps** — `Provisioner.run()` emits typed core events; Rich lives only in `progress.py`. Cancellation is polled only between steps.
 **Control service install** — `InstallControlService` installs the exact `meridian-vpn` on a sha256-pinned uv under `/opt/ctld`, with `--constraints` from the package's `control-constraints.txt` (uv.lock's versions, written by the build hook), and never over a newer recorded package (`core/version_skew.py`). uv ignores hashes in a constraints file, so the pins carry none.
+**Control service repair** — `control_repair.py` (`meridian check --repair`) reruns that install with `reinstall=True` and the server's own `config.json`, only while the service is silent, its database exists, and the recorded version is the CLI's; it never touches what an apply owns.
 ## What's done well
 - **Check before acting** — steps read package, file, and unit state first, so a rerun reports `ok`, not `changed`.
 ## Pitfalls

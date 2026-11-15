@@ -129,6 +129,7 @@ See the [IP Blocked Recovery guide](/en/recovery/) for recovery options (replace
 
 Other causes:
 - Server rebooted and services didn't start → `meridian plan` shows what is off and `meridian apply` repairs it. By hand: `systemctl restart ctld netagent nginx`
+- The control service is stopped or broken, so `meridian apply` says it does not answer → `meridian check --repair` reinstalls the same version and restarts it, keeping its data ([`meridian check`](/en/cli-reference/#meridian-check))
 - Disk full → `df -h /`, `journalctl --vacuum-time=1d`
 - Control server gone for good → rebuild it from a snapshot with `meridian restore` ([Control server lost](/en/recovery/#control-server-lost))
 - Connected, but sites by name do not open (IP addresses still do) → the exit reaches none of its encrypted DNS resolvers. `meridian check` names them under **Encrypted DNS**; allow outbound TCP 443 to those addresses in the provider's firewall
