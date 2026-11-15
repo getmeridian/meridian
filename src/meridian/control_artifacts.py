@@ -1,8 +1,10 @@
 """What the deployer installs for Meridian's own control plane: the service package and the node agent.
 
 A release installs `meridian-vpn==<this version>` from PyPI on the control
-server and uploads the agent builds its wheel carries (`meridian/agent_dist/`,
-both musl targets with their sha256 and version files). A development checkout
+server, held to the dependency versions CI tested (the wheel's
+`meridian/data/control-constraints.txt`, built from uv.lock), and uploads the
+agent builds its wheel carries (`meridian/agent_dist/`, both musl targets with
+their sha256 and version files). A development checkout
 (an editable install) builds and uploads its own wheel and uses the agent
 that `make agent` built, so unreleased code can be tested on a real server.
 """
@@ -16,9 +18,10 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from functools import cache
-from importlib import metadata
+from importlib import metadata, resources
 from pathlib import Path
 from urllib.parse import unquote, urlparse
+from zipfile import BadZipFile, ZipFile
 
 from meridian import __version__
 from meridian.core.errors import LocalStateError
@@ -26,6 +29,8 @@ from meridian.core.errors import LocalStateError
 AGENT_TARGETS = {"x86_64": "x86_64-unknown-linux-musl", "aarch64": "aarch64-unknown-linux-musl"}
 # Where a built wheel carries the agent builds (scripts/hatch_build.py copies them from agent/dist).
 PACKAGED_AGENT_DIR = Path(__file__).resolve().parent / "agent_dist"
+# The build hook writes the dependency pins from uv.lock here (scripts/hatch_build.CONSTRAINTS_NAME).
+CONSTRAINTS_RESOURCE = "data/control-constraints.txt"
 
 
 @dataclass(frozen=True)
@@ -35,6 +40,8 @@ class ServicePackage:
     requirement: str
     wheel: bytes = b""
     wheel_name: str = ""
+    # Exact pins for its dependencies; "" installs the newest allowed (a source build without uv.lock).
+    constraints: str = ""
 
     @property
     def identity(self) -> str:
@@ -88,7 +95,7 @@ def source_checkout() -> Path | None:
 def service_package() -> ServicePackage:
     checkout = source_checkout()
     if checkout is None:
-        return ServicePackage(requirement=f"meridian-vpn=={__version__}")
+        return ServicePackage(requirement=f"meridian-vpn=={__version__}", constraints=_packaged_constraints())
     with tempfile.TemporaryDirectory(prefix="meridian-wheel-") as out:
         try:
             subprocess.run(
@@ -105,7 +112,26 @@ def service_package() -> ServicePackage:
         wheels = sorted(Path(out).glob("meridian_vpn-*.whl"))
         if not wheels:
             raise LocalStateError("uv build produced no meridian-vpn wheel.")
-        return ServicePackage(requirement="", wheel=wheels[-1].read_bytes(), wheel_name=wheels[-1].name)
+        wheel = wheels[-1]
+        return ServicePackage(
+            requirement="", wheel=wheel.read_bytes(), wheel_name=wheel.name, constraints=wheel_constraints(wheel)
+        )
+
+
+def _packaged_constraints() -> str:
+    try:
+        return resources.files("meridian").joinpath(CONSTRAINTS_RESOURCE).read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
+def wheel_constraints(wheel: Path) -> str:
+    """The dependency pins a built wheel carries, or "" when it has none."""
+    try:
+        with ZipFile(wheel) as archive:
+            return archive.read(f"meridian/{CONSTRAINTS_RESOURCE}").decode("utf-8")
+    except (KeyError, OSError, BadZipFile):
+        return ""
 
 
 def agent_binary(arch: str) -> AgentBinary:

@@ -20,6 +20,8 @@
 
 **Weekly pin bump** — `bump-pins.yml` runs `scripts/bump_pins.py` on Mondays, force-pushes `bot/bump-pins`, opens or updates its PR, and dispatches CI on the branch (a `GITHUB_TOKEN` push triggers no `pull_request` run; `workflow_dispatch` is exempt). Opening the PR needs "Allow GitHub Actions to create pull requests"; without it the run warns with a compare link. A source it could not check fails the run after the PR step.
 
+**Weekly dependency canary** — `dependency-canary.yml` installs the checkout's wheel with the newest allowed dependencies (stable, and with `--prerelease allow`) and runs `scripts/smoke_install.py` (CLI help plus `meridian serve` answering 401). A failed scheduled run opens or comments on one issue. Control servers are unaffected: they install uv.lock's pins (`control-constraints.txt`, written by `scripts/hatch_build.py`).
+
 **OIDC publishing** — Pages deploy uses trusted publisher (no token). PyPI requires `environment: pypi` approval gate + OIDC. No long-lived secrets.
 
 ## What's done well

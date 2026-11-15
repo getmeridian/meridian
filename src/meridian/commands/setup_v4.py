@@ -10,7 +10,9 @@ from typing import TYPE_CHECKING
 from pydantic import ValidationError
 
 from meridian import config, i18n
+from meridian.cluster import ClusterConfig
 from meridian.commands.apply_progress import apply_progress
+from meridian.commands.backup import offer_recovery_key
 from meridian.commands.setup_wizard import CamouflageSites, SetupWizard
 from meridian.console import error_context, fail, has_tty
 from meridian.core.errors import LocalStateError, MeridianError
@@ -83,7 +85,10 @@ def _run(*, intent_path: str, restart: bool, yes: bool) -> None:
                 suggest_sni=partial(_suggest_sni, registry),
                 check_own_domain=partial(_check_own_domain, registry),
             )
-            wizard.run()
+            outcome = wizard.run()
+        if outcome == "completed":
+            # Like deploy, a finished setup leaves the fleet with a recovery key, shown once.
+            offer_recovery_key(ClusterConfig.load())
 
 
 def _load_intent(source: str) -> SetupIntent:

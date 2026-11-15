@@ -52,17 +52,19 @@ macOS or Linux (on Windows, use WSL):
 curl -sSf https://getmeridian.org/install.sh | bash
 ```
 
-Or from PyPI: `uv tool install meridian-vpn` (or `pipx install meridian-vpn`). When the newest release is a beta, ask for it by version to get the version this page describes: `uv tool install 'meridian-vpn>=4.0.0b0'` (or `pipx install 'meridian-vpn>=4.0.0b0'`). `--prerelease allow` and `--pip-args=--pre` also take pre-releases of every dependency.
+Or from PyPI, while 4.0 is in beta: `uv tool install 'meridian-vpn>=4.0.0b0'` (or `pipx install 'meridian-vpn>=4.0.0b0'`). A plain `uv tool install meridian-vpn` installs the newest stable release (3.17.3 today), which has no web panel and none of the commands below. Ask for Meridian by version rather than with `--prerelease allow` or `--pip-args=--pre`: those take pre-releases of every dependency too.
 
 You need a fresh Debian or Ubuntu VPS you can reach over SSH with a key, as root or a user with passwordless sudo. Meridian runs on your computer, not on the server.
 
 ## Quick start
 
 ```bash
-meridian deploy 198.51.100.10 --client-name alice
+meridian setup
 ```
 
-When it prints "Done", send Alice the connection page link. They open it, install the recommended app, and tap once to connect. Then:
+The guided wizard asks for your server's address, a camouflage site (it suggests ones that answer from the server's network), an optional domain, and the people who will connect. It shows a review before it changes anything, and if it is interrupted, running it again resumes. For one server and no questions, `meridian deploy 198.51.100.10 --client-name alice` does the same in one line.
+
+When it is ready, send each person their connection page link. They open it, install the recommended app, and tap once to connect. Then:
 
 ```bash
 meridian panel                     # web panel URL and a one-time setup link
@@ -71,12 +73,12 @@ meridian client show bob           # print their link and status
 meridian test                      # real traffic through the delivered subscription
 ```
 
-Re-run `deploy` at any time: keys, paths, and clients are kept. `meridian setup` asks the same questions as a guided wizard.
+Re-run `deploy` at any time: keys, paths, and clients are kept. An interrupted `setup` resumes where it stopped.
 
-## What one deploy sets up
+## What each server gets
 
 - **Methods:** VLESS+Reality and XHTTP on TCP 443, Hysteria2 on UDP 443 with salamander. Every subscription lists all of them (with Chrome and Firefox TLS fingerprints), and capable apps switch on their own.
-- **Camouflage:** nginx routes TCP 443 by SNI without decrypting. A probe without the key reaches a real website and gets its genuine certificate. Deploy picks the target from the server's own network.
+- **Camouflage:** nginx routes TCP 443 by SNI without decrypting. A probe without the key reaches a real website and gets its genuine certificate. Meridian looks for the target on the server's own network: `deploy` picks one, `setup` suggests them.
 - **Hardening:** key-only SSH, fail2ban, BBR, UFW opening only SSH and 443, and a Let's Encrypt certificate for the IP. No domain needed.
 - **Control service and web panel:** Meridian's own, on a secret HTTPS path: users, subscriptions, and the web panel. Shared links never reveal the path, and each server's agent dials out to it, so nodes open no extra ports. No Docker, no third-party panel.
 - **Privacy and backups:** no client IPs or connection logs are stored; device and daily history tracking are opt-in and off by default. After every change your machine pulls an encrypted snapshot sealed to your device keys and a recovery key. If the control server is lost or seized, `meridian restore` rebuilds it on another server.
@@ -100,7 +102,7 @@ meridian node replace EXIT_ID 198.51.100.30           # move a blocked exit, key
 meridian setup                                        # any shape: relay chains, routing gateways
 ```
 
-Every change edits one topology in `~/.config/meridian/cluster.yml`. `meridian plan` shows what would change; `meridian apply` applies exactly that, with checkpoints, so an interrupted run resumes. Back up that folder and the recovery key deploy shows once: together they bring the fleet back on a new machine.
+Every change edits one topology in `~/.config/meridian/cluster.yml`. `meridian plan` shows what would change; `meridian apply` applies exactly that, with checkpoints, so an interrupted run resumes. Back up that folder and the recovery key (`setup` and `deploy` show it once; `meridian backup recovery-key` makes a new one): together they bring the fleet back on a new machine.
 
 ## When something breaks
 

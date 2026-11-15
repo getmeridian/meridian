@@ -7,7 +7,7 @@
 **nginx and TLS split** — `nginx_render.py` renders config strings, `nginx.py` holds the steps, `tls.py` issues acme.sh certificates.
 **Semantic ensure helpers** — `ensure.py` wraps package, file, service, and UFW operations; use it with `ServerFacts` instead of new check/act shell snippets.
 **Renderer-free steps** — `Provisioner.run()` emits typed core events; Rich lives only in `progress.py`. Cancellation is polled only between steps.
-**Control service install** — `InstallControlService` installs the exact `meridian-vpn` on a sha256-pinned uv under `/opt/ctld`, and never over a newer recorded package (`core/version_skew.py`).
+**Control service install** — `InstallControlService` installs the exact `meridian-vpn` on a sha256-pinned uv under `/opt/ctld`, with `--constraints` from the package's `control-constraints.txt` (uv.lock's versions, written by the build hook), and never over a newer recorded package (`core/version_skew.py`). uv ignores hashes in a constraints file, so the pins carry none.
 ## What's done well
 - **Check before acting** — steps read package, file, and unit state first, so a rerun reports `ok`, not `changed`.
 ## Pitfalls

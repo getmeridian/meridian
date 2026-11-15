@@ -19,13 +19,18 @@ NOW = "2026-11-14T12:00:00Z"
 EPOCH = "5b0c8a52-6c1d-4e8b-9a7f-2b5d4c3e1f00"
 
 
+def clock() -> float:
+    """The services' fixed now; a served one on the real clock started a new period on the 15th."""
+    return datetime.fromisoformat(NOW).timestamp()
+
+
 @pytest.fixture
 def service(tmp_path: Path) -> Iterator[ControlService]:
     value = ControlService(
         tmp_path / "control.db",
         fleet_id=FLEET_ID,
         version="4.0.0",
-        clock=lambda: datetime.fromisoformat(NOW).timestamp(),
+        clock=clock,
     )
     value.put_node_spec("main", NodeSpec(resources=[]))
     value.put_user("sample")
@@ -194,7 +199,7 @@ def test_server_evidence_reaches_read_scoped_api_and_console_with_bounded_attent
 ) -> None:
     configure(service)
     count(service, 80)
-    with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN) as admin:
+    with serve_control(tmp_path, clock=clock) as url, ControlClient(url, ADMIN_TOKEN) as admin:
         reader = admin.create_token("reader", "read")
         headers = {"Authorization": f"Bearer {reader.token}"}
         response = httpx.get(url + "/api/servers", headers=headers)

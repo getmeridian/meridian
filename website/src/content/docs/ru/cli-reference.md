@@ -336,7 +336,7 @@ meridian server set edge --allowance none --pay-on none --yes
 
 ### meridian node
 
-Управление выходными серверами. Первый сервер разворачивается командой `meridian deploy` (или через `meridian setup`), а дополнительные выходные серверы добавляются командой `meridian node add`.
+Управление выходными серверами. Первый сервер настраивается через `meridian setup` (или командой `meridian deploy`), а дополнительные выходные серверы добавляются командой `meridian node add`.
 
 ```
 meridian node add [USER@]IP[:PORT] [flags]

@@ -336,7 +336,7 @@ Enabling an allowance or changing its reset day starts tracking when the service
 
 ### meridian node
 
-Manage exit servers. The first server is deployed with `meridian deploy` (or `meridian setup`); add more exits with `meridian node add`.
+Manage exit servers. The first server is set up with `meridian setup` (or `meridian deploy`); add more exits with `meridian node add`.
 
 ```
 meridian node add [USER@]IP[:PORT] [flags]

@@ -12,6 +12,24 @@ describes your whole fleet; a small agent on every server applies it; and no
 server needs Docker. The first sections list what changed in each beta,
 newest first; the last is what 4.0 changes compared with 3.x.
 
+### Since 4.0.0b15
+
+#### Changed
+- The control server installs Meridian with the dependency versions it was tested
+  with, read from `uv.lock` and shipped in the package, instead of the newest ones
+  PyPI offers that day. A new Typer or httpx release can no longer break a deploy
+  (#145). A weekly canary installs the newest allowed versions and opens an issue
+  when one breaks Meridian.
+- The README and Getting Started now start with `meridian setup`, the guided wizard;
+  `meridian deploy` stays the one-line shortcut for one server. The PyPI install
+  commands ask for `'meridian-vpn>=4.0.0b0'` until 4.0 is final, because a plain
+  install gets 3.17.3, which has no web panel (#144).
+
+#### Fixed
+- `meridian setup` now creates the fleet's recovery key and shows it once at the
+  end, as `meridian deploy` does. Before, a fleet built with the wizard had none
+  until `meridian backup recovery-key` was run.
+
 ### Since 4.0.0b14
 
 #### Fixed

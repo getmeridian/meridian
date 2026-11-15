@@ -34,15 +34,15 @@ MERIDIAN_VERSION=$VERSION bash install.sh
 
 使用 uv（推荐）：
 ```
-uv tool install meridian-vpn
+uv tool install 'meridian-vpn>=4.0.0b0'
 ```
 
 使用 pipx：
 ```
-pipx install meridian-vpn
+pipx install 'meridian-vpn>=4.0.0b0'
 ```
 
-当最新发布版本是测试版时，这些命令会安装最新的稳定版。若要安装本文档所述的测试版，请按版本指定预发布版：`uv tool install 'meridian-vpn>=4.0.0b0'` 或 `pipx install 'meridian-vpn>=4.0.0b0'`。不要使用 `--prerelease allow` 或 `--pip-args=--pre`：它们也会安装所有依赖的预发布版。
+在 4.0 正式版发布之前，请像上面这样按版本安装。直接运行 `uv tool install meridian-vpn`（或 `pipx install meridian-vpn`）会安装最新的稳定版（目前为 3.17.3），它没有网页面板，也没有本文档中的命令。不要使用 `--prerelease allow` 或 `--pip-args=--pre`：它们也会安装所有依赖的预发布版。
 
 ## 更新
 

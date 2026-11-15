@@ -336,7 +336,7 @@ meridian server set edge --allowance none --pay-on none --yes
 
 ### meridian node
 
-管理出口服务器。第一个服务器用 `meridian deploy`（或 `meridian setup`）部署；用 `meridian node add` 添加更多出口。
+管理出口服务器。第一个服务器用 `meridian setup`（或 `meridian deploy`）设置；用 `meridian node add` 添加更多出口。
 
 ```
 meridian node add [USER@]IP[:PORT] [flags]
