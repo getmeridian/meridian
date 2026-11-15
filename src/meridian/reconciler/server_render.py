@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import shlex
 from collections.abc import Mapping
 
@@ -156,11 +157,17 @@ def _render_stream(
         target_names.setdefault(target, f"meridian_upstream_{token}_{len(target_names)}")
 
     map_lines: list[str] = []
+    names = {name for route in payload.routes for name in route.server_names}
     for route in payload.routes:
         upstream = target_names[(route.backend_server_ref, route.backend_port)]
         for server_name in route.server_names:
             key = '""' if not server_name else server_name
             map_lines.append(f"    {key} {upstream};")
+            own_ip = _own_ip(addresses.get(payload.server_ref, "")) if not server_name else ""
+            if own_ip and own_ip not in names:
+                # RFC 6066 forbids an IP in SNI, but Dart's HttpClient (Hiddify, FlClashX) sends
+                # the URL's IP there. Unrouted, it reached the camouflage site's certificate (#147).
+                map_lines.append(f'    "{own_ip}" {upstream};')
 
     fallback_name = f"meridian_fallback_{token}"
     reject_name = f"meridian_reject_{token}"
@@ -310,6 +317,15 @@ def _backend_address(
     if artifact_server_ref == backend_server_ref:
         return "127.0.0.1"
     return _address(addresses, backend_server_ref)
+
+
+def _own_ip(address: str) -> str:
+    """The server's public IP literal as clients write it in a URL, or "" for a name or loopback."""
+    try:
+        ip = ipaddress.ip_address(address.strip("[]"))
+    except ValueError:
+        return ""
+    return "" if ip.is_loopback else str(ip)
 
 
 def _address(addresses: Mapping[str, str], server_ref: str) -> str:
