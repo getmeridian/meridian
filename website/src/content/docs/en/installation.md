@@ -34,15 +34,15 @@ To check the copy at getmeridian.org instead, compare `curl -sSf https://getmeri
 
 With uv (recommended):
 ```
-uv tool install meridian-vpn
+uv tool install 'meridian-vpn>=4.0.0b0'
 ```
 
 With pipx:
 ```
-pipx install meridian-vpn
+pipx install 'meridian-vpn>=4.0.0b0'
 ```
 
-When the newest release is a beta, these commands install the newest stable release instead. To get the beta these docs describe, ask for a pre-release by version: `uv tool install 'meridian-vpn>=4.0.0b0'` or `pipx install 'meridian-vpn>=4.0.0b0'`. Avoid `--prerelease allow` and `--pip-args=--pre`: they take pre-releases of every dependency too.
+Until 4.0 is final, ask for it by version like this. A plain `uv tool install meridian-vpn` (or `pipx install meridian-vpn`) installs the newest stable release (3.17.3 today), which has no web panel and none of the commands in these docs. Avoid `--prerelease allow` and `--pip-args=--pre`: they take pre-releases of every dependency too.
 
 ## Update
 

@@ -34,15 +34,15 @@ MERIDIAN_VERSION=$VERSION bash install.sh
 
 Через `uv` (рекомендуется):
 ```
-uv tool install meridian-vpn
+uv tool install 'meridian-vpn>=4.0.0b0'
 ```
 
 Через `pipx`:
 ```
-pipx install meridian-vpn
+pipx install 'meridian-vpn>=4.0.0b0'
 ```
 
-Когда последним вышедшим релизом является бета-версия, эти команды ставят последний стабильный релиз. Чтобы получить бету, которую описывает эта документация, запросите пре-релиз по версии: `uv tool install 'meridian-vpn>=4.0.0b0'` или `pipx install 'meridian-vpn>=4.0.0b0'`. Не используйте `--prerelease allow` и `--pip-args=--pre`: они берут пре-релизы и всех зависимостей.
+Пока 4.0 не вышла финальным релизом, запрашивайте её по версии, как выше. Обычная команда `uv tool install meridian-vpn` (или `pipx install meridian-vpn`) ставит последний стабильный релиз (сейчас 3.17.3), в котором нет веб-панели и команд из этой документации. Не используйте `--prerelease allow` и `--pip-args=--pre`: они берут пре-релизы и всех зависимостей.
 
 ## Обновление CLI
 

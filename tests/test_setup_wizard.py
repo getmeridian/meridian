@@ -506,6 +506,33 @@ def test_setup_without_a_terminal_refuses_instead_of_taking_defaults(tmp_home, m
     assert exc_info.value.exit_code == 2
 
 
+@pytest.mark.parametrize(("outcome", "offered"), [("completed", True), ("saved", False)])
+def test_a_finished_setup_offers_the_recovery_key_like_deploy(tmp_home, monkeypatch, outcome, offered) -> None:
+    from contextlib import nullcontext
+
+    from meridian.commands import setup_v4
+
+    fleet = object()
+    shown: list[object] = []
+
+    class Wizard:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+        def run(self) -> str:
+            return outcome
+
+    monkeypatch.setattr(setup_v4, "has_tty", lambda: True)
+    monkeypatch.setattr(setup_v4, "apply_progress", lambda **_kwargs: nullcontext(None))
+    monkeypatch.setattr(setup_v4, "SetupWizard", Wizard)
+    monkeypatch.setattr(setup_v4.ClusterConfig, "load", classmethod(lambda cls: fleet))
+    monkeypatch.setattr(setup_v4, "offer_recovery_key", shown.append)
+
+    setup_v4.run(yes=True)
+
+    assert shown == ([fleet] if offered else [])
+
+
 @pytest.mark.parametrize(
     ("sites", "expected"),
     [

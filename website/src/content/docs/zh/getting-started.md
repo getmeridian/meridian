@@ -1,6 +1,6 @@
 ---
 title: 快速开始
-description: 在几分钟内安装 Meridian 并部署第一台自托管 VPN 服务器。
+description: 在几分钟内安装 Meridian 并设置第一台自托管 VPN 服务器。
 ---
 
 一条命令即可把全新的 VPS 变成加固过的 VPN 服务器，为你配备内置网页面板，并为每个人生成专属连接页面。本指南带你在几分钟内从零完成可用连接。
@@ -25,29 +25,37 @@ curl -sSf https://getmeridian.org/install.sh | bash
 
 > 从 Meridian 3.x 升级？Meridian 4 不是就地升级。请先阅读[从 3.x 升级](/zh/installation/#从-3x-升级)。
 
-## 部署
+## 设置服务器
+
+```
+meridian setup
+```
+
+交互式向导会询问服务器地址、伪装网站（它会推荐从服务器所在网络能访问到的网站）、可选的域名，以及要连接的人的名字。在做任何更改之前，它会先显示一份审核摘要。进度会被保存：如果中途中断，再次运行 `meridian setup` 即可继续。如果你已经以 `root` 身份登录在 VPS 本机上，地址填写 `local` 即可跳过 SSH。
+
+只有一台服务器且不想回答问题时，`meridian deploy` 一行命令即可完成同样的工作：
 
 ```
 meridian deploy 198.51.100.10
 ```
 
-不指定 IP 直接运行 `meridian deploy` 时，命令会提示输入。如果你已经以 `root` 身份登录在 VPS 本机上，运行 `meridian deploy local` 可跳过 SSH。
+不指定 IP 直接运行 `meridian deploy` 时，命令会提示输入；`meridian deploy local` 直接在 VPS 本机上运行。
 
-## 部署过程会做什么
+## 设置过程会做什么
 
 1. **加固服务器** — 仅允许 SSH 密钥登录、启用 fail2ban、配置只开放必要端口的 UFW 防火墙，并启用 BBR 拥塞控制
 2. **安装控制服务与网页面板** — Meridian 的控制服务（保存你的用户、提供他们的订阅并承载网页面板）以及运行 Xray 的节点 agent。无需 Docker 或第三方面板
-3. **选择伪装目标** — 先在服务器自身所在网络中寻找合适的 TLS 1.3 网站，找不到时回退到 `www.google.com`、`dl.google.com` 和 `www.cloudflare.com`（也可用 `--sni` 手动指定）
+3. **选择伪装目标** — 先在服务器自身所在网络中寻找合适的 TLS 1.3 网站，找不到时回退到 `www.google.com`、`dl.google.com` 和 `www.cloudflare.com`。`setup` 让你从中选择或填写自己的网站；`deploy` 会自动选择一个（也可用 `--sni` 手动指定）
 4. **配置连接方式** — 在 nginx 后的 TCP 443 端口上配置 VLESS+Reality 和 XHTTP（使用为服务器 IP 签发的 Let's Encrypt 证书），并在 UDP 443 上配置 Hysteria2
-5. **验证真实流量** — 在输出“Done”之前，Meridian 会通过交付的订阅发送真实流量；若流量不通则自动尝试下一个伪装目标
-6. **发布连接页面** — 为第一个人生成专属连接页面，并准备好你的网页面板
+5. **验证真实流量** — 在交付链接之前，Meridian 会通过交付的订阅发送真实流量；若流量不通，`deploy` 会自动尝试下一个伪装目标
+6. **发布连接页面** — 为每个人生成专属连接页面，并准备好你的网页面板
 7. **显示一次恢复密钥** — 请离线保存；有了它，丢失的控制服务器可以重建（见[备份](/zh/deploy/#备份)）
 
-部署带有检查点。如果中途中断，重新运行同一条命令即可从中断处继续。
+两条命令都带有检查点。如果中途中断，重新运行同一条命令即可从中断处继续。
 
 ## 连接
 
-部署完成后会输出：
+完成后会输出：
 
 - **连接页面链接**（带二维码）— 发给需要连接的人即可。页面上有应用下载链接、二维码和一键导入按钮。
 - **订阅 URL** — 可直接粘贴到任何 Xray/V2Ray 应用中。应用会自动刷新订阅，因此后续添加的服务器和中继会自动出现。
@@ -101,11 +109,7 @@ meridian client add alice
 
 ## 多台服务器
 
-`meridian deploy` 适用于单台服务器。如果需要配置多个出口、境内中继服务器或路由网关，请使用交互式向导：
-
-```
-meridian setup
-```
+同一个向导 `meridian setup` 也能搭建包含多个出口、境内中继服务器或路由网关的集群：在第一步添加更多服务器，然后指定每台服务器的角色。应用之前，它会先显示审核摘要。
 
 你也可以用 `meridian node add` 和 `meridian relay add` 逐步扩展集群。每次变更都会经过同一套已审核拓扑：`meridian plan` 显示将要发生的变更，`meridian apply` 执行变更。
 

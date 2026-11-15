@@ -336,7 +336,7 @@ meridian server set edge --allowance none --pay-on none --yes
 
 ### meridian node
 
-سروری exit را مدیریت کنید. سرور اول با `meridian deploy` استقرار می‌یابد (یا `meridian setup`)؛ با `meridian node add` exit دیگر اضافه کنید.
+سروری exit را مدیریت کنید. سرور اول با `meridian setup` راه‌اندازی می‌شود (یا `meridian deploy`)؛ با `meridian node add` exit دیگر اضافه کنید.
 
 ```
 meridian node add [USER@]IP[:PORT] [flags]

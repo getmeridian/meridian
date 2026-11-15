@@ -10,18 +10,18 @@ You need [uv](https://docs.astral.sh/uv/getting-started/installation/) (macOS or
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh   # installs uv and uvx; open a new terminal afterwards
 alias meridian4='uvx --prerelease allow --from meridian-vpn@latest meridian'
-meridian4 deploy 198.51.100.10        # IP of the separate server
+meridian4 setup                       # asks for the separate server's IP and walks you through
 ```
 
-When the deploy finishes, `meridian4 panel` prints the address of the web panel, where you manage people and API tokens from a browser, and a one-time link to set its password. Treat both like passwords.
+`meridian4 setup` walks you through one server or several (exits in other countries, relays) in English, Russian, Persian, or Chinese, and shows a review before it changes anything. Prefer flags to questions? `meridian4 deploy 198.51.100.10` sets up one server in one line.
 
-Prefer questions to flags? `meridian4 setup` walks you through one server or several (exits in other countries, relays) in English, Russian, Persian, or Chinese. The alias always runs the newest beta; after a new one comes out, `meridian4 apply` brings your servers up to date.
+When it finishes, `meridian4 panel` prints the address of the web panel, where you manage people and API tokens from a browser, and a one-time link to set its password. Treat both like passwords. The alias always runs the newest beta; after a new one comes out, `meridian4 apply` brings your servers up to date.
 
 **Already running an earlier 4.0 beta?** Those deployed Remnawave; b9 replaces it with Meridian's own control service. Run `meridian4 migrate` once: it keeps every client link, key, limit, expiry, and traffic count, and checks the links are unchanged before it removes Remnawave. It first backs up the panel's database to `~/.config/meridian/backups/` on your computer and to `/var/backups/meridian-migration/` on the control server; there is no rollback, the backup is the way back. It resumes if interrupted. Panel-only data is not carried over (the panel's admin account, per-day usage history, HWID device lists, plugins, and client IP forwarding), and the review lists it.
 
 **Gave the web panel its own domain on b9?** If that server also runs an exit, run `meridian4 apply` once: b9 let the panel's certificate and the server's IP certificate overwrite each other, which broke either the panel or XHTTP and Hysteria2 over the IP.
 
-**Keep `~/.config/meridian`.** It is how Meridian 4 manages your servers. After every change, each computer that manages the fleet saves an encrypted snapshot of the control service, and your first deploy shows a recovery key once: write it down and keep it offline. If the control server is lost or seized, `meridian4 restore --to NEW-SERVER` rebuilds it from the newest snapshot (on a bare IP, every link changes and is printed; with a domain they stay). See the [recovery guide](https://getmeridian.org/en/recovery/). When 4.0 is released, install `meridian` the usual way and it manages the same servers; nothing to move or redeploy. Set up with an earlier alias that pointed at `~/.meridian-v4`? Drop that part; Meridian finds the folder on its own.
+**Keep `~/.config/meridian`.** It is how Meridian 4 manages your servers. After every change, each computer that manages the fleet saves an encrypted snapshot of the control service, and your first setup or deploy shows a recovery key once: write it down and keep it offline. If the control server is lost or seized, `meridian4 restore --to NEW-SERVER` rebuilds it from the newest snapshot (on a bare IP, every link changes and is printed; with a domain they stay). See the [recovery guide](https://getmeridian.org/en/recovery/). When 4.0 is released, install `meridian` the usual way and it manages the same servers; nothing to move or redeploy. Set up with an earlier alias that pointed at `~/.meridian-v4`? Drop that part; Meridian finds the folder on its own.
 
 Then, **from a device inside the censored network**, run:
 
