@@ -575,11 +575,18 @@ meridian context remove NAME [--yes]
 ```
 meridian check [SERVER] [--domain NAME] [--sni HOST] [--user USER]
                [--ssh-port PORT] [--ai] [--json]
+meridian check [CONTROL-SERVER] --repair [--yes] [--user USER] [--ssh-port PORT]
 ```
 
 `--domain` 和 `--sni` 适用于尚未部署的服务器：检查域名解析到服务器以及特定伪装目标可达。`--user` 和 `--ssh-port` 覆盖保存的 SSH 用户和端口。`--ai` 复制 AI 就绪诊断提示到剪贴板。`--json` 发出单个 `meridian.output/v1` 信封，每个服务器和范围都有一份报告。
 
 缺失证据永不视为成功。退出 `0` 表示每个检查都通过，`4` 表示发现问题，`3` 表示需要的证据不可用，`2` 表示无效输入。每个失败都打印其修复。使用 `meridian test` 通过整条路由推动真实流量。
+
+**`--repair`** — 恢复已停止或损坏的控制服务，例如升级失败之后。服务无响应时，所有 `meridian apply` 都会拒绝执行，因为应用锁保存在服务内部。修复会使用服务器自身的配置，在 `/opt/ctld` 下重新安装同一版本的 `meridian-vpn`，重写 `ctld` 单元，重启服务并等待其响应。拓扑、用户、节点文档、应用锁和修订都原样保留在数据库中。它只作用于集群的控制服务器（如果指定 `SERVER`，必须是该服务器），会先显示审阅内容，并在做出任何更改前请求确认；`--yes` 跳过确认，没有终端时必须使用。它没有 `--json` 输出。以下情况会拒绝执行：
+
+- 服务仍在响应：请使用 `meridian apply`；
+- 服务器缺少配置（`/etc/ctld/config.json`）或数据库：使用 [`meridian restore`](#meridian-restore) 从快照重建；
+- 服务器记录的安装版本与当前 Meridian 不同：按错误提示运行对应的版本（例如 `uvx --from 'meridian-vpn==4.0.0b15' meridian check --repair`）。开发用的源码检出会用自己的构建覆盖较旧的版本。
 
 ### meridian scan
 

@@ -575,11 +575,18 @@ With no server, every server in the fleet is checked.
 ```
 meridian check [SERVER] [--domain NAME] [--sni HOST] [--user USER]
                [--ssh-port PORT] [--ai] [--json]
+meridian check [CONTROL-SERVER] --repair [--yes] [--user USER] [--ssh-port PORT]
 ```
 
 `--domain` and `--sni` apply to servers not deployed yet: they check that the domain resolves to the server and that a specific camouflage target is reachable. `--user` and `--ssh-port` override the saved SSH user and port. `--ai` copies an AI-ready diagnostic prompt to the clipboard. `--json` emits one `meridian.output/v1` envelope with a report per server and scope.
 
 Missing evidence is never treated as success. Exit `0` means every check passed, `4` means problems were found, `3` means required evidence was unavailable, and `2` means invalid input. Each failure prints its fix. Use `meridian test` to push real traffic through the whole route.
+
+**`--repair`** — brings back a control service that is stopped or broken, for example after a failed upgrade. Every `meridian apply` refuses while the service does not answer, because the apply fence lives in it. The repair reinstalls the same `meridian-vpn` version under `/opt/ctld` with the server's own configuration, rewrites the `ctld` unit, restarts it, and waits until it answers. Topology, people, node documents, the apply fence, and revisions stay in the database as they are. It works on the fleet's control server only (a `SERVER` must name it), shows a review, and asks before it changes anything; `--yes` skips the question, and without a terminal it is required. It has no `--json` output. It refuses:
+
+- a service that answers: use `meridian apply`;
+- a server without its configuration (`/etc/ctld/config.json`) or database: rebuild it from a snapshot with [`meridian restore`](#meridian-restore);
+- a server whose recorded install is another version than this Meridian: run the matching release, as the error says (for example `uvx --from 'meridian-vpn==4.0.0b15' meridian check --repair`). A development checkout installs its own build over an older one.
 
 ### meridian scan
 

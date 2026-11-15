@@ -311,7 +311,8 @@ class ControlServiceFence:
                 raise
             raise FleetFenceError(
                 "The control service keeps this fleet's apply fence but does not answer.",
-                hint="Run `meridian check`, or `systemctl restart ctld` on the control server, then retry.",
+                hint="Run `meridian check`; if the service is stopped or broken, "
+                "`meridian check --repair` brings it back.",
                 category="system",
                 retryable=True,
             ) from exc

@@ -129,6 +129,7 @@ description: 常见问题、解决方案和诊断工具。
 
 其他原因：
 - 服务器重启后服务未随之启动 → `meridian plan` 会显示未运行的组件，`meridian apply` 会将其修复。也可手动恢复：`systemctl restart ctld netagent nginx`
+- 控制服务已停止或损坏，`meridian apply` 提示它没有响应 → `meridian check --repair` 会重新安装同一版本并重启服务，数据保持不变（[`meridian check`](/zh/cli-reference/#meridian-check)）
 - 磁盘已满 → `df -h /`、`journalctl --vacuum-time=1d`
 - 控制服务器永久丢失 → 用 `meridian restore` 从快照重建它（[控制服务器丢失](/zh/recovery/#控制服务器丢失)）
 - 已连接，但按域名无法打开网站（按 IP 地址可以）→ 出口服务器无法连接任何加密 DNS 解析器。`meridian check` 会在 **Encrypted DNS** 下列出它们；请在服务商防火墙中放行到这些地址的出站 TCP 443
