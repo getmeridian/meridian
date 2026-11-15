@@ -2,7 +2,9 @@
 
 A sha256-pinned uv installs `meridian-vpn` with its own Python under
 `/opt/ctld`, so the service never depends on the distribution's Python (Ubuntu
-22.04 ships 3.10). It runs as the `ctld` system user on loopback; nginx's
+22.04 ships 3.10). Its dependencies are held to the versions CI tested: without
+the package's constraints, a new Typer or httpx release broke fresh installs
+(#140). It runs as the `ctld` system user on loopback; nginx's
 secret path is its only way in.
 
 The install never downgrades: a server whose recorded package is newer than
@@ -35,6 +37,7 @@ from meridian.ssh import ServerConnection
 UV_BINARY = f"{CONTROL_SERVICE_DIR}/bin/uv"
 SERVICE_BINARY = f"{CONTROL_SERVICE_DIR}/bin/meridian"
 INSTALLED_MARKER = f"{CONTROL_SERVICE_DIR}/installed"
+CONSTRAINTS_FILE = f"{CONTROL_SERVICE_DIR}/constraints.txt"
 _UV_ENV = (
     f"UV_PYTHON_INSTALL_DIR={CONTROL_SERVICE_DIR}/python UV_TOOL_DIR={CONTROL_SERVICE_DIR}/tools "
     f"UV_TOOL_BIN_DIR={CONTROL_SERVICE_DIR}/bin UV_CACHE_DIR={CONTROL_SERVICE_DIR}/cache "
@@ -151,8 +154,15 @@ class InstallControlService:
             upload = conn.put_bytes(spec, package.wheel, mode="644", create_parent=True, timeout=120)
             if upload.returncode != 0:
                 return f"could not upload the service wheel: {upload.stderr.strip()[:200]}"
+        constrain = ""
+        if package.constraints:
+            written = conn.put_text(CONSTRAINTS_FILE, package.constraints, mode="644", timeout=15)
+            if written.returncode != 0:
+                return f"could not upload the dependency pins: {written.stderr.strip()[:200]}"
+            constrain = f" --constraints {CONSTRAINTS_FILE}"
         result = conn.run(
-            f"{_UV_ENV} {UV_BINARY} tool install --force --python {CONTROL_SERVICE_PYTHON} {shlex.quote(spec)}",
+            f"{_UV_ENV} {UV_BINARY} tool install --force --python {CONTROL_SERVICE_PYTHON}{constrain} "
+            f"{shlex.quote(spec)}",
             timeout=900,
             operation_name="install control service",
         )

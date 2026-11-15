@@ -11,6 +11,7 @@ from meridian.config import UV_SHA256, UV_VERSION
 from meridian.control.models import ServiceConfig
 from meridian.control_artifacts import ServicePackage
 from meridian.provision.control_service import (
+    CONSTRAINTS_FILE,
     INSTALLED_MARKER,
     ControlServiceInstall,
     InstallControlService,
@@ -99,6 +100,30 @@ def test_dev_build_uploads_the_wheel_and_installs_that_file() -> None:
     path = "/opt/ctld/wheels/meridian_vpn-4.0.0-py3-none-any.whl"
     assert conn.write_map[path] == wheel.wheel
     conn.assert_called_with_pattern(f"tool install --force --python 3.12 {path}")
+
+
+def test_the_package_installs_with_the_dependency_versions_it_was_tested_with() -> None:
+    pins = "typer==0.29.1\nhttpx==0.27.2\n"
+    pinned = ServicePackage(requirement="meridian-vpn==4.0.0", constraints=pins)
+    conn = MockConnection()
+    conn.when("bin/uv --version", stdout=f"uv {UV_VERSION}\n")
+    conn.when(f"cat {INSTALLED_MARKER}", stdout="")
+
+    _install(pinned).run(conn, _ctx())
+
+    assert conn.write_map[CONSTRAINTS_FILE].decode() == pins
+    conn.assert_called_with_pattern(f"tool install --force --python 3.12 --constraints {CONSTRAINTS_FILE} meridian-vpn")
+
+
+def test_a_package_without_pins_installs_unconstrained() -> None:
+    conn = MockConnection()
+    conn.when("bin/uv --version", stdout=f"uv {UV_VERSION}\n")
+    conn.when(f"cat {INSTALLED_MARKER}", stdout="")
+
+    _install().run(conn, _ctx())
+
+    assert CONSTRAINTS_FILE not in conn.write_map
+    conn.assert_not_called_with_pattern("--constraints")
 
 
 def test_unknown_architecture_fails_before_downloading() -> None:

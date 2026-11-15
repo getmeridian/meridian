@@ -1,0 +1,70 @@
+name: Dependency canary
+
+# Weekly: install this checkout's wheel with the newest dependencies pyproject.toml allows
+# (and once more with pre-releases of every dependency, as `--prerelease allow` does), then
+# smoke-test the CLI and the control service (scripts/smoke_install.py). Control servers
+# install the pins from uv.lock, but people's computers take the newest allowed releases, so
+# a breaking Typer or httpx release (#140) shows up here before an issue does. A failed
+# scheduled run opens, or comments on, one issue.
+on:
+  schedule:
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: dependency-canary
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    name: Newest dependencies (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: stable
+            prerelease: disallow
+          - name: pre-releases
+            prerelease: allow
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Build wheel
+        run: uv build --wheel --out-dir "$RUNNER_TEMP/wheel"
+
+      - name: Install with the newest dependencies
+        run: |
+          uv tool install --python 3.12 --prerelease ${{ matrix.prerelease }} --no-cache "$RUNNER_TEMP"/wheel/*.whl
+          uv pip list --python "$(uv tool dir)/meridian-vpn/bin/python"
+
+      - name: Smoke test
+        run: python3 scripts/smoke_install.py "$(uv tool dir --bin)/meridian"
+
+  report:
+    name: Report a failure
+    needs: canary
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TITLE: "Dependency canary: a new dependency release breaks Meridian"
+      RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Open or update the issue
+        run: |
+          body="The weekly canary failed with the newest allowed dependencies: $RUN. Cap the dependency in pyproject.toml (and lock it) or adapt to it; control servers keep the pins from uv.lock meanwhile."
+          number=$(gh issue list --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "Failed again: $RUN"
+          else
+            gh issue create --title "$TITLE" --body "$body" --label bug
+          fi

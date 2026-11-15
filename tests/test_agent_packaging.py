@@ -70,6 +70,7 @@ def _wheel(tmp_path: Path, builds: dict[str, bytes], *, digest: str | None = Non
     with ZipFile(wheel, "w") as archive:
         archive.writestr("meridian/data/agents.md", "# Meridian for AI agents")
         archive.writestr("meridian/data/ai-reference.md", "# Reference")
+        archive.writestr("meridian/data/control-constraints.txt", "typer==0.29.1\n")
         for name, data in builds.items():
             path = verify_package_assets.AGENT_PREFIX + name
             archive.writestr(path, data)
