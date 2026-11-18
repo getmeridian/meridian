@@ -26,8 +26,10 @@ const specs = [
     </div>
     <figure class="hero__plate" data-atlas data-state="still">
       <div class="hero__globe">
-        <img src={globe} width="534" height="424" alt={t('hero.mapAlt')} fetchpriority="high" decoding="async" />
+        <img src={globe} width="534" height="424" alt={t('hero.mapAlt')} draggable="false" fetchpriority="high" decoding="async" />
         <canvas width="534" height="424" aria-hidden="true"></canvas>
+        <button class="hero__grab" data-atlas-grab type="button" hidden aria-label={t('hero.grab')}
+          aria-describedby="atlas-gesture-help" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home"></button>
       </div>
       <figcaption class="hero__legend">
         <span class="hero__figure">{t('hero.figure')}</span>
@@ -36,7 +38,7 @@ const specs = [
           <span><i class="hero__key"></i>{t('hero.device')}</span>
         </span>
         <span class="hero__motion-slot">
-          <button class="hero__motion" type="button" hidden aria-label={t('hero.replay')}
+          <button class="hero__motion" data-atlas-motion type="button" hidden aria-label={t('hero.replay')}
             data-pause={t('hero.pause')} data-replay={t('hero.replay')} data-resume={t('hero.resume')}>
             <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path class="hero__pause" d="M7 5v10m6-10v10" />
@@ -44,6 +46,10 @@ const specs = [
               <path class="hero__replay" d="M4 8a6.2 6.2 0 1 1 .4 5M4 3v5h5" />
             </svg>
           </button>
+        </span>
+        <span class="hero__gesture" id="atlas-gesture-help" hidden>
+          <svg width="14" height="12" viewBox="0 0 18 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 7h15m-12-3-3 3 3 3m9-6 3 3-3 3"/></svg>
+          {t('hero.gesture')}<span class="hero__sr">{t('hero.keys')}</span>
         </span>
       </figcaption>
     </figure>
@@ -104,8 +110,17 @@ const specs = [
   .hero__globe canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
   @media (prefers-reduced-motion: no-preference) {
     .hero__globe canvas { transition: opacity .24s ease; }
-    [data-painted] .hero__globe canvas { opacity: 1; }
   }
+  [data-painted] .hero__globe canvas { opacity: 1; }
+  .hero__grab { position: absolute; left: 19.66%; top: 11.09%; width: 62.17%; height: 78.30%;
+    border: 0; padding: 0; border-radius: 50%; background: transparent; touch-action: pan-y pinch-zoom;
+    cursor: grab; user-select: none; -webkit-tap-highlight-color: transparent; }
+  .hero__grab:active, [data-state="dragging"] .hero__grab { cursor: grabbing; }
+  .hero__grab:focus-visible { outline: 2px solid var(--ac-text); outline-offset: 5px; }
+  .hero__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .hero__legend .hero__gesture { flex: 1 0 100%; font: .74rem/1.4 var(--label-font); color: var(--t2); }
+  .hero__gesture svg { color: var(--ac-text); flex-shrink: 0; }
+  .hero__legend .hero__gesture[hidden], .hero__grab[hidden] { display: none; }
   .hero__motion-slot { width: 40px; height: 30px; justify-content: flex-end; }
   .hero__motion { display: grid; place-items: center; position: relative; width: 30px; height: 30px; padding: 0;
     border: 1px solid var(--b2); border-radius: 50%; color: var(--ac-text); background: var(--bg); cursor: pointer; }
@@ -113,7 +128,7 @@ const specs = [
   .hero__motion:hover { border-color: var(--ac-text); background: var(--band); }
   .hero__motion:focus-visible { outline: 2px solid var(--ac-text); outline-offset: 3px; }
   .hero__motion::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; }
-  [data-state="running"] .hero__pause, [data-state="paused"] .hero__play, [data-state="settled"] .hero__replay { display: block; }
+  [data-state="running"] .hero__pause, [data-state="paused"] .hero__play, [data-state="settled"] .hero__replay, [data-state="dragging"] .hero__replay, [data-state="coasting"] .hero__replay { display: block; }
   .hero__plate img { display: block; width: 100%; height: auto; }
   .hero__legend {
     display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px;
