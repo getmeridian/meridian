@@ -1,17 +1,12 @@
 // The printed plate and this orthographic view share the same centre, radius and initial bearings.
 // Geography is projected once into unit vectors; a moving frame only rotates those vectors.
 import coasts from '../assets/globe-coasts.json';
+import { chooseRoute, clamp, cx, cy, homePitch, itineraries, journeys, limbFade, networkInk, rad, radius,
+  roleAt, roleSize, roll, routeBands, traceStep, visibleLeg, world, type City, type Role, type Vec } from './atlas-network.ts';
 
-const rad = Math.PI / 180, radius = 166, cx = 271, cy = 213;
-const homePitch = 26 * rad, maxPitch = 65 * rad;
-const cosHome = Math.cos(homePitch), sinHome = Math.sin(homePitch);
-const cosRoll = Math.cos(13 * rad), sinRoll = Math.sin(13 * rad);
-type Vec = [number, number, number];
+const maxPitch = 65 * rad;
+const cosRoll = Math.cos(roll), sinRoll = Math.sin(roll);
 type Point = [number, number];
-const world = (lon: number, lat: number): Vec => {
-  const c = Math.cos(lat * rad), l = (lon + 25) * rad;
-  return [c * Math.sin(l), Math.sin(lat * rad), c * Math.cos(l)];
-};
 function line(coords: number[], divisor = 1) {
   const out = new Float32Array(coords.length * 1.5);
   for (let i = 0; i < coords.length; i += 2) out.set(world(coords[i] / divisor, coords[i + 1] / divisor), i * 1.5);
@@ -31,29 +26,6 @@ for (let lat = -75; lat <= 75; lat += 15) {
   grid.push(line(a));
 }
 const equator = line(Array.from({ length: 121 }, (_, i) => [-180 + 3 * i, 0]).flat());
-// Recover the geographic positions of the four marks from the static illustration.
-function bearing(x: number, y: number): Vec {
-  x = (x - cx) / radius; y = (cy - y) / radius;
-  [x, y] = [x * cosRoll - y * sinRoll, x * sinRoll + y * cosRoll];
-  const z = Math.sqrt(1 - x * x - y * y);
-  return [x, y * cosHome + z * sinHome, z * cosHome - y * sinHome];
-}
-const hub = bearing(337.5, 161.3);
-// Lift the printed Béziers onto the home hemisphere. Reprojecting their points keeps the
-// exact illustrated route at home and makes the far part disappear when a visitor spins it.
-const links = [[179.5, 139.1, 260.5, 86.2], [193.4, 309.1, 232.4, 201.2], [428.3, 214.1, 398.9, 147.7]].map(
-  ([ex, ey, bx, by]) => {
-    const at = (t: number) => {
-      const u = 1 - t;
-      return bearing(u * u * 337.5 + 2 * u * t * bx + t * t * ex, u * u * 161.3 + 2 * u * t * by + t * t * ey);
-    };
-    const points = new Float32Array(49 * 3);
-    for (let i = 0; i <= 48; i++) points.set(at(i / 48), i * 3);
-    return { points, at, end: at(1) };
-  });
-const ease = (t: number) => t * t * (3 - 2 * t);
-const clamp = (x: number) => Math.max(0, Math.min(1, x));
-
 type Shape = { world: Float32Array; view: Float64Array };
 const shape = (world: Float32Array): Shape => ({ world, view: new Float64Array(world.length) });
 
@@ -139,7 +111,9 @@ function frontLine(path: Path2D, view: Float64Array) {
   }
 }
 
-export function atlasPainter(canvas: HTMLCanvasElement) {
+export function atlasPainter(canvas: HTMLCanvasElement, locale = document.documentElement?.lang || 'en') {
+  const code = locale.split('-')[0];
+  const language = code === 'fa' || code === 'ru' || code === 'zh' ? code : 'en';
   const c = canvas.getContext('2d');
   if (!c) throw new Error('Canvas unavailable');
   const ctx = c;
@@ -165,16 +139,18 @@ export function atlasPainter(canvas: HTMLCanvasElement) {
   shade.addColorStop(0, 'rgba(19,32,50,0)'); shade.addColorStop(.78, 'rgba(19,32,50,.15)');
   shade.addColorStop(1, 'rgba(19,32,50,.48)');
   const continents = land.map(shape), graticules = grid.map(shape), equatorialLine = shape(equator);
-  const routes = links.map(link => shape(link.points));
-  const tail = new Float64Array(6);
-  let width = 0;
+  let width = 0, labelSize = 11, lastCycle = -1, selected = 0;
+  const labelWidths = new Map<string, number>();
+  const nextRoute = (yaw: number, pitch: number, after?: number) => chooseRoute(yaw, pitch, after);
   function size(cssWidth: number) {
     // Canvas dimensions follow the plate, not the screen. Cap raster work on high-density phones.
     const next = Math.max(1, Math.round(cssWidth * Math.min(devicePixelRatio || 1, 2)));
     if (next === width) return false;
+    labelSize = Math.max(11, Math.min(16, 10.6 * 534 / Math.max(1, cssWidth)));
+    labelWidths.clear();
     width = next; canvas.width = next; canvas.height = Math.round(next * 424 / 534); return true;
   }
-  function draw(yawRadians: number, progress: number | null, pitchRadians = homePitch) {
+  function draw(yawRadians: number, progress: number | null, pitchRadians = homePitch, routeIndex?: number) {
     const pitch = Math.max(-maxPitch, Math.min(maxPitch, pitchRadians));
     const cos = Math.cos(yawRadians), sin = Math.sin(yawRadians), cp = Math.cos(pitch), sp = Math.sin(pitch);
     const xx = radius * (cos * cosRoll - sin * sp * sinRoll), xy = radius * cp * sinRoll;
@@ -213,48 +189,99 @@ export function atlasPainter(canvas: HTMLCanvasElement) {
     ctx.fillStyle = shade; ctx.fillRect(cx - 167, cy - 167, 334, 334);
     ctx.beginPath(); ctx.arc(cx, cy, radius - .35, 0, 2 * Math.PI); ctx.strokeStyle = '#64717a'; ctx.lineWidth = .9; ctx.stroke();
 
-    const [sx, sy, hubDepth] = point(hub);
-    function circle(x: number, y: number, r: number, fill: string, stroke?: string) {
-      ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fillStyle = fill; ctx.fill();
-      if (stroke) { ctx.lineWidth = 1; ctx.strokeStyle = stroke; ctx.stroke(); }
+    const phase = progress === null ? null : progress - Math.floor(progress);
+    if (phase !== null) {
+      const cycle = Math.floor(progress!);
+      if (routeIndex !== undefined && itineraries[routeIndex]) selected = routeIndex;
+      else if (lastCycle !== cycle) selected = nextRoute(yawRadians, pitch, lastCycle < 0 ? undefined : selected);
+      lastCycle = cycle;
     }
-    ctx.lineCap = 'round';
-    links.forEach(({ at, end }, index) => {
-      const route = new Path2D(); frontLine(route, project(routes[index]));
-      ctx.strokeStyle = 'rgba(21,33,51,.74)'; ctx.lineWidth = 3.6; ctx.stroke(route);
-      ctx.strokeStyle = '#f4c478'; ctx.lineWidth = 1.7; ctx.stroke(route);
-      const [ex, ey, depth] = point(end);
-      if (progress !== null) {
-        const t = (progress - (.07 + index * .19)) / .46;
-        if (t > 0 && t < 1) {
-          const head = ease(t);
-          let a = point(at(clamp(head - 4 * .024)));
-          for (let i = 4; i > 0; --i) {
-            const b = point(at(clamp(head - (i - 1) * .024)));
-            tail.set(a); tail.set(b, 3); a = b;
-            const segment = new Path2D(); frontLine(segment, tail);
-            ctx.lineWidth = 3 - i * .2;
-            ctx.strokeStyle = 'rgba(255,242,190,' + (.94 - i * .13) + ')'; ctx.stroke(segment);
-          }
-          if (a[2] >= 0) circle(a[0], a[1], 3, '#fff5d3', '#b98a43');
+    const step = phase === null ? null : traceStep(selected, phase);
+    const basePaths = routeBands.map(() => new Path2D()), accentPaths = routeBands.map(() => new Path2D());
+    const projected = itineraries.map(stops => stops.map(city => point(city.pos)));
+    function addLeg(inks: Path2D[], pts: Float32Array) {
+      for (const { band, xy } of visibleLeg(pts, point)) {
+        const path = inks[band];
+        path.moveTo(xy[0], xy[1]);
+        for (let i = 2; i < xy.length; i += 2) path.lineTo(xy[i], xy[i + 1]);
+      }
+    }
+    journeys.forEach(legs => legs.forEach(leg => addLeg(basePaths, leg.pts)));
+    if (step && step.t > 0) {
+      const leg = journeys[selected][step.leg], end = Math.floor(step.t * (leg.pts.length / 3 - 1)) * 3 + 3;
+      if (end === leg.pts.length) addLeg(accentPaths, leg.pts);
+      else {
+        const reached = new Float32Array(end + 3);
+        reached.set(leg.pts.subarray(0, end)); reached.set(leg.at(step.t), end);
+        addLeg(accentPaths, reached);
+      }
+    }
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    function paths(inks: Path2D[], strength: number, thick: number) {
+      inks.forEach((ink, band) => {
+        ctx.globalAlpha = strength * routeBands[band];
+        ctx.strokeStyle = networkInk.shadow; ctx.lineWidth = thick + 1.2; ctx.stroke(ink);
+        ctx.strokeStyle = networkInk.line; ctx.lineWidth = thick; ctx.stroke(ink);
+      });
+    }
+    const opacity = phase === null ? 0 : Math.min(clamp(phase / .05), clamp((1 - phase) / .07));
+    paths(basePaths, .66, 1.1);
+    if (step) paths(accentPaths, opacity, 1.9);
+    function marker([x, y, depth]: Vec, role: Role) {
+      if (depth <= 0) return;
+      ctx.globalAlpha = limbFade(depth); ctx.fillStyle = role === 'server' ? networkInk.server : networkInk.shadow;
+      ctx.strokeStyle = role === 'server' ? networkInk.shadow : networkInk.marker; ctx.lineWidth = 1.15;
+      const r = roleSize[role];
+      ctx.beginPath();
+      if (role === 'device') ctx.arc(x, y, r, 0, 2*Math.PI);
+      else if (role === 'relay') ctx.rect(x-r, y-r, 2*r, 2*r);
+      else { ctx.moveTo(x, y-r); ctx.lineTo(x+r, y); ctx.lineTo(x, y+r); ctx.lineTo(x-r, y); ctx.closePath(); }
+      ctx.fill(); ctx.stroke();
+      if (role === 'device') { ctx.fillStyle = networkInk.marker; ctx.beginPath(); ctx.arc(x,y,1.15,0,2*Math.PI); ctx.fill(); }
+    }
+    const marks = projected.flat().filter(p => p[2] > .07);
+    projected.forEach((stops, route) => stops.forEach((pos, i) => marker(pos, roleAt(i, itineraries[route].length))));
+    if (step && phase !== null) {
+      const from = step.leg, to = from + 1, cities = itineraries[selected], positions = projected[selected];
+      const head = point(journeys[selected][from].at(step.t));
+      if (head[2] > 0) {
+        ctx.globalAlpha = limbFade(head[2]) * opacity; ctx.fillStyle = '#fff3cf'; ctx.strokeStyle = '#845f2b';
+        ctx.lineWidth = .8; ctx.beginPath(); ctx.arc(head[0], head[1], 2.75, 0, 2*Math.PI); ctx.fill(); ctx.stroke();
+      }
+      // Set names in the current page language. Try both sides of each mark; omit a
+      // label rather than covering another city, the globe's rim or the other name.
+      ctx.font = '600 ' + labelSize + 'px system-ui, sans-serif'; ctx.direction = language === 'fa' ? 'rtl' : 'ltr';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      const candidates = (city: City, [x, y, z]: Vec) => {
+        const name = city.names[language];
+        let length = labelWidths.get(name);
+        if (length === undefined) { length = ctx.measureText(name).width; labelWidths.set(name, length); }
+        const w = length + 7, h = labelSize + 4, pad = 6;
+        const spots = z <= .21 ? [] : [[x+pad,y-h-pad/2], [x-w-pad,y-h-pad/2], [x+pad,y+pad/2],
+          [x-w-pad,y+pad/2], [x-w/2,y+pad], [x-w/2,y-h-pad]].filter(([left, top]) =>
+          ![left,left+w].some(a => [top,top+h].some(b => Math.hypot(a-cx,b-cy) > radius-3)) &&
+          !marks.some(([a,b]) => a>left-4 && a<left+w+4 && b>top-4 && b<top+h+4));
+        return { name, w, h, spots, fade: clamp((z - .21) / .18) * opacity };
+      };
+      const dest = candidates(cities[to], positions[to]), origin = candidates(cities[from], positions[from]);
+      let d: number[] | undefined = dest.spots[0], o: number[] | undefined = origin.spots[0];
+      if (d && o) {
+        o = undefined;
+        for (const s of dest.spots) {
+          const fit = origin.spots.find(t => t[0]+origin.w+2 <= s[0] || s[0]+dest.w+2 <= t[0] ||
+            t[1]+origin.h+2 <= s[1] || s[1]+dest.h+2 <= t[1]);
+          if (fit) { d = s; o = fit; break; }
         }
       }
-      if (depth < 0) return;
-      circle(ex, ey, 8, '#192738', '#f6cb79'); circle(ex, ey, 3, '#ffda8e');
-      const echo = progress === null ? -1 : (progress - (.07 + index * .19 + .46)) / .12;
-      if (echo > 0 && echo < 1) {
-        ctx.beginPath(); ctx.arc(ex, ey, 8 + 7 * ease(echo), 0, 2 * Math.PI);
-        ctx.strokeStyle = 'rgba(255,219,149,' + (1 - echo) * .9 + ')'; ctx.lineWidth = 1.35; ctx.stroke();
+      function label(item: typeof dest, spot?: number[]) {
+        if (!spot || !item.fade) return;
+        const [x,y] = spot;
+        ctx.globalAlpha = item.fade * .88; ctx.fillStyle = networkInk.shadow; ctx.fillRect(x,y,item.w,item.h);
+        ctx.globalAlpha = item.fade; ctx.fillStyle = '#fff1ce'; ctx.fillText(item.name,x+3.5,y+item.h/2);
       }
-    });
-    if (hubDepth >= 0) {
-      ctx.setLineDash([2, 2]); circle(sx, sy, 14, '#293446', '#f6cf86'); ctx.setLineDash([]);
-      ctx.save(); ctx.translate(sx, sy); ctx.rotate(Math.PI / 4);
-      ctx.fillStyle = '#e7b45f'; ctx.fillRect(-6.4, -6.4, 12.8, 12.8);
-      ctx.strokeStyle = '#fff0c9'; ctx.strokeRect(-6.4, -6.4, 12.8, 12.8);
-      ctx.fillStyle = '#263343'; ctx.fillRect(-2.4, -2.4, 4.8, 4.8); ctx.restore();
+      label(dest,d); label(origin,o);
     }
     ctx.restore();
   }
-  return { size, draw };
+  return { size, draw, nextRoute };
 }
