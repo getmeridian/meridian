@@ -56,6 +56,7 @@ def test_stale_edit_keeps_the_draft_and_reload_requires_discard(
 ) -> None:
     owner.get_by_role("navigation").get_by_role("link", name="Settings", exact=True).click()
     original = connection_editor(owner)
+    expect(original.get_by_label("Title", exact=True)).to_have_attribute("maxlength", "80")
     original.get_by_label("Title", exact=True).fill("My unsaved title")
     other = owner.context.new_page()
     try:

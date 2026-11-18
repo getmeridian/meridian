@@ -85,7 +85,7 @@
     keys(patch, ["expected_version", "profile_title", "update_interval_hours", "owner_contact", "servers"]);
     if (patch.expected_version !== state.version) D.fail("stale_presentation", 409);
     var next = D.clone(state);
-    if (has(patch, "profile_title")) { next.profile_title = text(patch.profile_title, 100); if (!next.profile_title) bad(); }
+    if (has(patch, "profile_title")) { next.profile_title = text(patch.profile_title, 80); if (!next.profile_title) bad(); }
     if (has(patch, "update_interval_hours")) {
       integer(patch.update_interval_hours, 1, 168); next.update_interval_hours = patch.update_interval_hours;
     }

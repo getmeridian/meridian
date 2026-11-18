@@ -15,7 +15,7 @@
         ["", "server_allowance.one_off"], ["month", "server_allowance.month"], ["year", "server_allowance.year"]]),
     ];
     return [
-      spec("profile_title", "settings.title", { maxlength: 100, dir: "auto", required: true }, "settings.title_caption"),
+      spec("profile_title", "settings.title", { maxlength: 80, dir: "auto", required: true }, "settings.title_caption"),
       spec("update_interval_hours", "presentation.interval", { type: "number", min: 1, max: 168, required: true }),
       spec("text", "presentation.contact_text", { maxlength: 120, dir: "auto" }),
       spec("link", "presentation.contact_link", { maxlength: 2048, dir: "ltr", type: "text" }, "presentation.link_hint"),
