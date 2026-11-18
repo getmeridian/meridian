@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from typer.testing import CliRunner
 
 from meridian.cli import app
@@ -16,6 +17,15 @@ def test_help_agents_prints_the_bundled_guide_as_plain_markdown() -> None:
     assert result.stdout.startswith("# Meridian for AI agents")
     assert result.stdout == load_agent_guide()
     assert "\x1b[" not in result.stdout
+
+
+@pytest.mark.parametrize("args", [["help"], ["help", "agents"], ["help", "node", "add"], ["node", "add", "--help"]])
+def test_local_help_never_starts_an_update_check_or_beta_banner(monkeypatch, args) -> None:
+    monkeypatch.setattr("meridian.cli.DISABLE_UPDATE_CHECK", False)
+    monkeypatch.setattr("meridian.update.check_for_update", lambda *_: pytest.fail("local help contacted the updater"))
+    monkeypatch.setattr("meridian.cli.banner_due", lambda *_: pytest.fail("local help checked the beta banner"))
+    result = runner.invoke(app, args)
+    assert result.exit_code == 0, result.output
 
 
 def test_help_command_path_shows_that_commands_help() -> None:

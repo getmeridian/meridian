@@ -87,7 +87,8 @@ class TestHelpSections:
             nxt = output.find("╭─", start)
             return output[start : nxt if nxt != -1 else len(output)]
 
-        assert "setup" in section("Get started") and "deploy" in section("Get started")
+        assert all(name in section("Get started") for name in ("setup", "deploy", "panel"))
+        assert "panel" not in section("Advanced")
         assert "client" in section("Clients")
         for name in ("node", "relay", "route", "fleet", "server"):
             assert name in section("Servers")

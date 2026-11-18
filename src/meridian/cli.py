@@ -56,11 +56,11 @@ SERVERS = "Servers"
 CHECK_AND_FIX = "Check & fix"
 ADVANCED = "Advanced"
 _HELP_LAYOUT: tuple[tuple[str, tuple[str, ...]], ...] = (
-    (GET_STARTED, ("setup", "deploy", "help")),
+    (GET_STARTED, ("setup", "deploy", "panel", "help")),
     (CLIENTS, ("client", "profile")),
     (SERVERS, ("node", "relay", "route", "fleet", "server", "context")),
     (CHECK_AND_FIX, ("check", "test", "probe", "doctor", "logs", "plan", "apply", "backup", "restore")),
-    (ADVANCED, ("panel", "token", "privacy", "scan", "update", "migrate", "teardown", "api")),
+    (ADVANCED, ("token", "privacy", "scan", "update", "migrate", "teardown", "api")),
 )
 # Option panels inside `deploy --help`.
 SERVER_ACCESS = "Server access"
@@ -176,15 +176,14 @@ app = typer.Typer(
     name="meridian",
     cls=_SectionedGroup,
     help=(
-        "Deploy and manage self-hosted VPN servers\n\n"
-        "One command turns a fresh VPS into a hardened VPN server, with a built-in "
-        "web panel and a connection page for each person.\n\n"
+        "Run a VPN on your own servers. Manage access from the web panel and "
+        "give each person a connection page.\n\n"
         "[dim]Quick start:[/dim]\n"
-        "  [cyan]meridian deploy 198.51.100.10[/cyan]   One server, connection page at the end\n"
-        "  [cyan]meridian panel[/cyan]                  Web panel URL and one-time setup link\n"
+        "  [cyan]meridian deploy 198.51.100.10[/cyan]   Set up a VPN on one server\n"
+        "  [cyan]meridian panel[/cyan]                  Get the link to your web panel\n"
         "  [cyan]meridian client add alice[/cyan]       Give another person access\n"
-        "  [cyan]meridian setup[/cyan]                  Guided wizard for several servers, relays, or routing\n"
-        "  [cyan]meridian check[/cyan]                  Is everything healthy?"
+        "  [cyan]meridian setup[/cyan]                  Configure servers and routes step by step\n"
+        "  [cyan]meridian check[/cyan]                  Check the deployed server"
     ),
     epilog=(
         "[dim]Docs: https://getmeridian.org/docs  ·  Help for any command: meridian help COMMAND  ·  "
@@ -297,17 +296,17 @@ def main_callback(
 
         # Human output speaks the chosen language, else the terminal's; machine output stays English.
         i18n.set_locale(i18n.explicit_locale() or i18n.system_locale())
-    # `serve` is a daemon: its journal gets no banner, and the server never phones out for updates.
-    daemon = ctx.invoked_subcommand == "serve"
-    if not daemon:
-        from meridian.commands.backup import pull_after_mutations
+    # Help is local documentation; the daemon also has no interactive startup work.
+    if ctx.invoked_subcommand in ("serve", "help") or (invocation is not None and invocation.help_requested):
+        return
 
-        pull_after_mutations(ctx.call_on_close)  # every change to a service fleet ends with a fresh snapshot
-    if not machine_output and not daemon and not (invocation is not None and invocation.help_requested):
-        if banner_due(__version__):
-            banner(__version__)
+    from meridian.commands.backup import pull_after_mutations
 
-    if not DISABLE_UPDATE_CHECK and not machine_output and ctx.invoked_subcommand not in ("update", "serve"):
+    pull_after_mutations(ctx.call_on_close)  # every change to a service fleet ends with a fresh snapshot
+    if not machine_output and banner_due(__version__):
+        banner(__version__)
+
+    if not DISABLE_UPDATE_CHECK and not machine_output and ctx.invoked_subcommand != "update":
         from meridian.update import check_for_update
 
         check_for_update(__version__)
@@ -736,7 +735,7 @@ def logs_cmd(
     run(ip, user=user, ssh_port=ssh_port, lines=lines, pattern=pattern, components=component)
 
 
-@app.command("panel", rich_help_panel=ADVANCED)
+@app.command("panel", rich_help_panel=GET_STARTED)
 def panel_cmd(
     setup_link: bool = typer.Option(
         False, "--setup-link", hidden=True, help="Print a fresh one-time setup link for the web panel"
