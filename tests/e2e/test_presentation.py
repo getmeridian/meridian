@@ -25,6 +25,8 @@ def test_contact_and_refresh_are_reviewed_then_confirmed_with_the_owner(
 ) -> None:
     clock.advance(seconds=CONFIRM_SECONDS + 1)
     owner.get_by_role("navigation").get_by_role("link", name="Settings", exact=True).click()
+    interval_row = owner.locator("dt").filter(has_text="Refresh interval (hours)").locator("..")
+    expect(interval_row).to_contain_text("6")
     form = connection_editor(owner)
     before = service.settings()
     form.get_by_label("Refresh interval (hours)").fill("19")
@@ -46,6 +48,7 @@ def test_contact_and_refresh_are_reviewed_then_confirmed_with_the_owner(
     expect(form).not_to_be_visible()
     assert service.settings().owner_contact.text == "Ask the household admin"
     assert service.settings().update_interval_hours == 19
+    expect(interval_row).to_contain_text("19")
 
 
 def test_stale_edit_keeps_the_draft_and_reload_requires_discard(

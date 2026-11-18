@@ -53,7 +53,8 @@
     var explanation = h("p"), command = h("span"), error = h("p", { class: "form-error", role: "alert" });
     function show(state) {
       title.textContent = state.profile_title;
-      interval.textContent = M.count(state.update_interval_hours);
+      // GET api/settings omits the documented six-hour default.
+      interval.textContent = M.count(state.update_interval_hours == null ? 6 : state.update_interval_hours);
       var contact = state.owner_contact || {};
       contactText.textContent = contact.text || (contact.link ? "" : M.t("settings.contact_none"));
       contactLink.textContent = contact.link || ""; contactLink.hidden = !contact.link;

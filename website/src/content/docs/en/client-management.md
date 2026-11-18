@@ -314,7 +314,7 @@ Removing a passkey prevents new sign-ins and signs out every other browser sessi
 
 | Change in the web panel | Shown read-only (change with `meridian`) |
 |---|---|
-| **People**: add, share a link and QR code, enable or disable, set expiry, traffic limit and reset period, device cap, language, private note and tag, reset traffic, clear devices, issue a new link, remove (with optional session cut-off) | **Servers**: every exit, relay, and gateway, whether its agent is online and up to date, its version, traffic, monthly allowance, and payment date; **Restart Xray** on a node |
+| **People**: add, share a link and QR code, enable or disable, set expiry, traffic limit and reset period, device cap, language, private note and tag, reset traffic, clear devices, issue a new link, remove (with optional session cut-off) | **Servers**: every exit, relay, and gateway, whether its agent is online and up to date, its version and traffic; **Restart Xray** on a node |
 | Settings: subscription title and refresh interval, public contact, notices, language, privacy and sign-in security. Servers: provider, monthly allowance, reset day and payment dates. | Revisions and Settings: applied changes, public address and client routing policy. |
 | **Tokens**: create and revoke scoped API tokens | |
 
