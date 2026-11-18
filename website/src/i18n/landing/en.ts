@@ -20,7 +20,7 @@ export const en = {
   'hero.demo': 'Try the demos',
   'hero.docs': 'Read the docs',
   'hero.grab': 'Spin globe or trace connections',
-  'hero.gesture': 'Drag to spin · Tap to trace',
+  'hero.gesture': 'Drag to spin. Click or tap to trace.',
   'hero.keys': 'Use the arrow keys to rotate, Home to reset, or Enter to trace the connections.',
   'hero.pause': 'Pause globe animation',
   'hero.replay': 'Replay globe animation',
