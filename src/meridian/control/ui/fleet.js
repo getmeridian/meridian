@@ -36,13 +36,15 @@
     M.mount(view, [
         h("div", { class: "page-head" }, h("div", {}, M.titled("h1", M.t("nav.servers"), M.t("tip.servers")),
           h("p", { class: "muted", text: M.t("servers.lede") }))),
-        M.cliHint(), status, cards, M.fleetHistory(),
+        status, cards, M.cliHint(), M.fleetHistory(),
     ]);
     return M.liveView(view, {
       status: status, interval: 10000,
       load: function (passive) { return M.api("GET", "ui/api/fleet", undefined, { passive: passive }); },
       draw: function (fleet) {
         var active = document.activeElement;
+        var focusedCard = active && active.closest("[data-server]"), focusedSection = active && active.closest("[data-mode-section]");
+        var restoreCard = focusedCard && (active === focusedCard || (active.tagName === "SUMMARY" && active.parentElement === focusedSection));
         var focusRef = active && (active.dataset.billingEdit || (active === document.body && pendingBillingFocus));
         pendingBillingFocus = null;
         M.state.fleet = fleet;
@@ -95,6 +97,16 @@
             return b.dataset.billingEdit === focusRef;
           });
           if (trigger) trigger.focus({ preventScroll: true });
+        }
+        if (restoreCard) {
+          var replacement = all.find(function (card) { return card.dataset.server === focusedCard.dataset.server; });
+          if (replacement && focusedSection) {
+            var section = Array.from(replacement.querySelectorAll("[data-mode-section]")).find(function (item) {
+              return item.dataset.modeSection === focusedSection.dataset.modeSection;
+            });
+            replacement = section && section.querySelector("summary");
+          }
+          if (replacement) replacement.focus({ preventScroll: true });
         }
         firstDraw = false;
       },
@@ -153,15 +165,6 @@
         M.pill(server.live ? "ok" : "muted", M.t(server.live ? "servers.online" : "servers.offline")),
         M.pill({ healthy: "ok", degraded: "warn", unhealthy: "err", unavailable: "muted" }[healthStatus],
           M.t("servers.health_" + healthStatus)), sync),
-      h("dl", { class: "facts", "data-server-facts": "" },
-        server.region ? [h("dt", { text: M.t("servers.country") }), h("dd", { text: country(server.region) })] : null,
-        h("dt", { text: M.t("servers.agent") }),
-        h("dd", {}, M.t(server.live ? "servers.online" : "servers.offline"), " · ",
-          M.t("servers.seen", { when: M.ago(server.last_seen_at) })),
-        term(M.t("servers.revision"), M.t("tip.server_revision")),
-        h("dd", {}, M.t("servers.revisions", {
-          applied: M.count(server.applied_revision), current: M.count(server.revision) })),
-        term(M.t("servers.traffic"), M.t("tip.server_traffic")), h("dd", { text: M.bytes(server.traffic_bytes) })),
       !runtime ? h("p", { class: "notice notice-warn small", text: M.t("servers.health_unavailable") }) : null,
       faults.length ? h("ul", { class: "notice notice-warn health-checks" }, faults.map(function (check) {
         return h("li", {}, h("strong", { text: check.name === "stats" ? M.t("servers.stats_stalled") + " (stats)" : check.name }),
@@ -173,6 +176,15 @@
           return h("li", { class: "mono small", text: line });
         })))
         : null,
+      h("dl", { class: "facts", "data-server-facts": "" },
+        server.region ? [h("dt", { text: M.t("servers.country") }), h("dd", { text: country(server.region) })] : null,
+        h("dt", { text: M.t("servers.agent") }),
+        h("dd", {}, M.t(server.live ? "servers.online" : "servers.offline"), " · ",
+          M.t("servers.seen", { when: M.ago(server.last_seen_at) })),
+        term(M.t("servers.revision"), M.t("tip.server_revision")),
+        h("dd", {}, M.t("servers.revisions", {
+          applied: M.count(server.applied_revision), current: M.count(server.revision) })),
+        term(M.t("servers.traffic"), M.t("tip.server_traffic")), h("dd", { text: M.bytes(server.traffic_bytes) })),
       M.detailedSection(M.t("capacity.title"), M.serverCapacity(server.capacity), "capacity"),
       usage ? M.detailedSection(M.t("server_allowance.title"), allowanceDetails(usage, attention, billingChanged), "allowance")
         : h("p", { class: "muted small", text: M.t("server_allowance.approximate") }),
@@ -201,7 +213,7 @@
       payment_due: "server_allowance.payment_due", payment_overdue: "server_allowance.payment_overdue",
     };
     return h("div", { class: "stack" },
-      M.titled("h3", M.t("server_allowance.title"), M.t("tip.allowance")),
+      h("p", { class: "muted small", text: M.t("tip.allowance") }),
       h("dl", { class: "facts" },
         metadata.provider ? [h("dt", { text: M.t("server_allowance.provider") }),
           h("dd", { text: metadata.provider })] : null,

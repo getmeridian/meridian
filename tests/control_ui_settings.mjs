@@ -140,7 +140,7 @@ if (scenario === 'settings-routes' || scenario === 'settings-layout') {
     const nav = view()?.querySelector('.settings-sections'), layout = view()?.querySelector('.settings-layout');
     const style = nav ? w.getComputedStyle(nav) : {};
     report.orientation = nav?.getAttribute('aria-orientation'); report.layout = layout ? w.getComputedStyle(layout).display : null;
-    report.navDirection = style.flexDirection; report.overflow = style.overflowX; report.wrap = style.flexWrap;
+    report.navDirection = style.flexDirection; report.navDisplay = style.display; report.navColumns = style.gridTemplateColumns;
     report.targets = tabs.map(node => { const css = w.getComputedStyle(node); return Math.max(parseFloat(css.minHeight) || 0, parseFloat(css.minBlockSize) || 0); });
     report.tabs = visibleTabs();
   }

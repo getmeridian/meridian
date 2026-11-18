@@ -124,8 +124,8 @@ def test_server_attention_links_open_the_server_and_payment_reminders() -> None:
         },
     )
     assert set(result["attention"]) == {
-        "#/servers/offline/allowance",
-        "#/servers/behind/allowance",
+        "#/servers/offline",
+        "#/servers/behind",
         "#/servers/relay/allowance",
     }
     assert "2" in result["fleetHealth"] and result["healthKind"] == "warn"
@@ -396,7 +396,7 @@ def test_phone_theme_and_rtl_contracts_cover_the_shared_components(
     visual = result["visual"]
     assert visual["background"] == background
     assert visual["columns"] == "minmax(0, 1fr)"
-    assert visual["readAlignment"] == "end" and visual["menuEdge"] == "0px"
+    assert visual["readAlignment"] == "start" and visual["menuEdge"] == "0px"
     assert all(height >= 44 for height in visual["targets"])
     assert result["dir"] == ("rtl" if locale == "fa" else "ltr")
     assert visual["ageIsolated"] and visual["meter"]

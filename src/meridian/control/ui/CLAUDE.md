@@ -11,6 +11,7 @@
 - **Drafts live only in memory** — changed forms guard navigation and dismissal with Leave/Stay, passive reads refresh without replacing edits, and person rows PATCH only their edited fields.
 - **Reviews come from the service** — schedule, token, and format previews are service reads (token issuance sends the reviewed expiry); routing, profiles, and bulk actions commit one frozen hash or ID. Lifecycle forms show browser time beside UTC.
 - **People are bounded service reads** — pages, facets, and selection come from the people query; a selection sends usernames or the same query, then a receipt.
+- **Overview separates server health, billing, and routine account states** — health links focus the server; billing links open its allowance. Disabled and unused accounts remain searchable without reporting an incident. Traffic columns represent UTC days; the daily totals table gives the same values without a chart.
 - **Sharing has one view** — Overview's person picker and the person page use `share.js`; links and QR data stay in memory.
 - **Help uses toggletips** — `M.tip` sits beside a term, never inside its label, and opens a click-toggled bubble through a status region; Escape returns focus, and `M.keyValue`, `M.field`, and `M.titled` take an optional tip.
 - **Same locale approach as the PWA** — `locales/{en,ru,fa,zh}.json` with English fallback; `fa` sets `dir="rtl"`; numbers, percentages, sizes, and ranges use native digits and bidi isolation.

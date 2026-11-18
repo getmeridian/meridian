@@ -92,24 +92,31 @@
     }
     document.addEventListener("click", outside);
     document.addEventListener("keydown", escape);
-    var title = h("bdi", { class: "top-title" });
+    var title = h("bdi", { class: "top-title" }), compact = h("bdi", { class: "compact-title", hidden: true });
     var separator = h("span", { class: "brand-separator muted", "aria-hidden": "true", text: "·" });
     var nav = h("nav", { class: "tabs", "aria-label": M.t("nav.label") });
     var header = h("header", { class: "top" },
       h("div", { class: "top-inner shell-top" },
         h("a", { class: "top-brand", href: "#/overview" },
           h("img", { src: "ui/icon.svg", alt: "", class: "brand-mark" }),
-          h("span", { class: "brand-name", text: "Meridian" }), separator, title),
+          h("span", { class: "brand-name", text: "Meridian" }), separator, title, compact),
         h("div", { class: "shell-controls" }, modes.node, account)),
       h("div", { class: "top-inner" }, nav));
     function updateTitle() {
       var fleetTitle = M.state.fleet && M.state.fleet.profile_title || "Meridian";
       title.textContent = fleetTitle;
       title.title = fleetTitle;
-      title.hidden = separator.hidden = fleetTitle === "Meridian";
+      var shortTitle = fleetTitle.replace(/^Meridian\s+[·|–—-]\s+/i, "");
+      compact.textContent = shortTitle;
+      compact.hidden = shortTitle === fleetTitle || !shortTitle;
+      title.classList.toggle("has-short-title", !compact.hidden);
+      var branded = /^Meridian(?:$|[\s·:|–—-])/i.test(fleetTitle);
+      title.hidden = fleetTitle === "Meridian";
+      separator.hidden = branded;
       var brand = title.closest(".top-brand");
-      brand.classList.toggle("has-fleet-title", fleetTitle !== "Meridian");
-      brand.setAttribute("aria-label", fleetTitle === "Meridian" ? "Meridian" : "Meridian · " + fleetTitle);
+      brand.classList.toggle("has-fleet-title", !title.hidden);
+      brand.querySelector(".brand-name").hidden = branded && !title.hidden;
+      brand.setAttribute("aria-label", branded ? fleetTitle : "Meridian · " + fleetTitle);
       document.title = fleetTitle;
     }
     var navTurn = 0;
@@ -118,7 +125,7 @@
       modes.update(value);
       M.mount(nav, (M.consoleScreens || []).filter(function (tab) { return !tab.detailed || value === "detailed"; }).map(function (tab) {
         return h("a", { href: "#/" + tab.name, class: "tab" + (tab.name === screen ? " active" : ""),
-          "aria-current": tab.name === screen ? "page" : null }, M.t("nav." + tab.name));
+          "aria-current": tab.name === screen ? "page" : null }, M.icon(tab.name), M.t("nav." + tab.name));
       }));
       updateTitle();
       Promise.resolve().then(function () {

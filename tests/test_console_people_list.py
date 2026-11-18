@@ -131,7 +131,7 @@ def test_removing_one_chip_keeps_the_other_filter():
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
-def test_phone_filter_controls_scroll_in_one_row_and_active_chips_stay_removable(locale):
+def test_phone_filter_controls_wrap_and_active_chips_stay_removable(locale):
     result = run_console(
         "people-triage-ux",
         locale,
@@ -144,7 +144,7 @@ def test_phone_filter_controls_scroll_in_one_row_and_active_chips_stay_removable
         },
     )
     layout = result["filterLayout"]
-    assert layout["wrap"] == "nowrap" and layout["overflow"] == "auto"
+    assert layout["wrap"] == "wrap" and layout["overflow"] != "auto"
     assert all(value == "0" for value in layout["shrink"])
     assert layout["underSearch"] and layout["activeOutside"] and layout["panelPosition"] == "fixed"
     assert result["removeVisible"] and [chip["key"] for chip in result["afterRemove"]] == ["status"]

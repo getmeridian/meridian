@@ -1,4 +1,4 @@
-/* Settings keeps one section beside a desktop column or a scrolling phone chip row. */
+/* Settings keeps one section beside a desktop column or a short grid of phone tabs. */
 .settings-layout { display: grid; grid-template-columns: minmax(10rem, 12rem) minmax(0, 1fr);
   align-items: start; gap: var(--space-5); }
 .settings-sections { display: flex; flex-direction: column; flex-wrap: nowrap; gap: var(--space-1);
@@ -23,9 +23,8 @@
 .settings-panel .cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
 @media (max-width: 640px) {
   .settings-layout { display: flex; flex-direction: column; gap: var(--space-4); }
-  .settings-sections { position: static; flex-direction: row; flex-wrap: nowrap; overflow-x: auto;
-    overscroll-behavior-inline: contain; inline-size: 100%; scrollbar-width: thin; padding-block-end: var(--space-2); }
-  .settings-section { border-radius: 99px; white-space: nowrap; border-color: var(--b1); background: var(--s1); }
+  .settings-sections { position: static; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); inline-size: 100%; }
+  .settings-section { justify-content: center; text-align: center; overflow-wrap: anywhere; padding-inline: 4px; border-color: var(--b1); background: var(--s1); }
   .settings-panels { inline-size: 100%; }
   .settings-facts .kv-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
   .settings-panel .cards { grid-template-columns: minmax(0, 1fr); }

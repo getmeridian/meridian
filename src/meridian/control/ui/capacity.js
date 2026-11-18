@@ -27,7 +27,7 @@
       stale: "capacity.stale_help", unavailable: "capacity.unavailable_help", not_reported: "capacity.not_reported_help",
     };
     return h("div", { class: "server-capacity stack-sm" },
-      h("div", { class: "card-head" }, h("h3", { text: M.t("capacity.title") }),
+      h("div", { class: "card-head" },
         M.pill(status === "current" ? "ok" : status === "stale" ? "warn" : "muted", M.t(states[status]))),
       status !== "current" ? h("p", { class: "muted small", text: M.t(help[status]) }) : null,
       data.received_at ? h("p", { class: "muted small", text: M.t("capacity.received", { when: M.ago(data.received_at) }) }) : null,
@@ -40,8 +40,8 @@
         fact("capacity.tx_now", rate(values.tx_bytes_per_second)),
         fact("capacity.xray_memory", bytes(values.xray_memory_resident_bytes)),
         fact("capacity.xray_uptime", values.xray_uptime_seconds == null ? missing() : M.uptime(values.xray_uptime_seconds))) : null,
-      h("p", { class: "muted small", text: M.t("capacity.cpu_load_hint") }),
-      h("p", { class: "muted small", text: M.t("capacity.host_traffic") }),
+      status === "current" ? h("p", { class: "muted small", text: M.t("capacity.cpu_load_hint") }) : null,
+      status === "current" ? h("p", { class: "muted small", text: M.t("capacity.host_traffic") }) : null,
       history(data));
   };
 
