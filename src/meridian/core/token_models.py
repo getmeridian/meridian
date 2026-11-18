@@ -46,6 +46,7 @@ TokenCapability = Literal[
     "backup.read",
     "backup.edit",
     "settings.edit",
+    "settings.presentation",
     "tokens.read",
     "tokens.issue",
     "tokens.revoke",

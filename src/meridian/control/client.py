@@ -89,6 +89,7 @@ from meridian.core.person_delivery_policy import (
     PersonDeliveryPolicyState,
     PersonDeliveryPolicyWrite,
 )
+from meridian.core.presentation import PresentationPatch, PresentationState
 from meridian.core.response_rule_test import ResponseRuleDecision, ResponseRuleTestRequest
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
@@ -269,16 +270,26 @@ class ControlClient:
     def server_usage(self) -> ServerUsageList:
         return ServerUsageList.model_validate(self._call("GET", "api/servers"))
 
+    def presentation(self) -> PresentationState:
+        return PresentationState.model_validate(self._call("GET", "api/settings/presentation"))
+
+    def patch_presentation(self, patch: PresentationPatch) -> PresentationState:
+        return PresentationState.model_validate(
+            self._call("PATCH", "api/settings/presentation", patch.model_dump(mode="json", exclude_unset=True))
+        )
+
     def put_settings(
         self,
         settings: ServiceSettings,
         *,
+        adopt_presentation: bool = False,
         expected_access_hash: str | None = None,
         expected_profile_declarations_hash: str | None = None,
     ) -> ServiceSettings:
         request = ServiceSettingsWrite.model_validate(
             {
                 **settings.to_data(),
+                "adopt_presentation": adopt_presentation,
                 "expected_access_hash": expected_access_hash,
                 "expected_profile_declarations_hash": expected_profile_declarations_hash,
             }

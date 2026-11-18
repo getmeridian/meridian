@@ -73,6 +73,7 @@ from meridian.core.client_limits import CalendarExpiryPreview
 from meridian.core.fleet_events import FleetEventPage
 from meridian.core.languages import LanguageSettings, LanguageState
 from meridian.core.notices import NoticeState, NoticeWrite
+from meridian.core.presentation import PresentationPatch, PresentationState
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
 from meridian.core.token_models import CapabilityCatalog, TokenPreview
@@ -147,6 +148,29 @@ API_ROUTES: tuple[ApiRoute, ...] = (
         "Read service health and version.",
         credentials=False,
         capability="fleet.read",
+    ),
+    route(
+        "GET",
+        "/api/settings/presentation",
+        "read",
+        "get_presentation",
+        None,
+        PresentationState,
+        "Read the fleet presentation and server billing settings.",
+        credentials=False,
+        capability="fleet.read",
+    ),
+    route(
+        "PATCH",
+        "/api/settings/presentation",
+        WRITE,
+        "patch_presentation",
+        PresentationPatch,
+        PresentationState,
+        "Save reviewed owner settings at the expected version; contact edits require a recent owner sign-in.",
+        credentials=False,
+        capability="settings.presentation",
+        refusals=(ErrorResponse(409, ("stale_presentation",)),),
     ),
     route(
         "GET",

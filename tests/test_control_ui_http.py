@@ -443,11 +443,52 @@ def test_without_a_session_the_api_answers_401(fleet: Fleet) -> None:
 
 
 def test_a_session_reads_the_settings_but_never_writes_them(fleet: Fleet) -> None:
-    """The title and address are the fleet file's: an apply would put a console edit back."""
+    """The broad settings writer also controls network policy and stays CLI-only."""
     fleet.set_up()
     current = fleet.ui("GET", "/api/settings").body
     titled = fleet.ui("PUT", "/api/settings", {"profile_title": "Ours", "public_url": current["public_url"]})
     assert titled.status == 403 and titled.body["error"]["code"] == "insufficient_scope"
+
+
+def test_presentation_changes_require_the_reviewed_version_and_only_public_contact_needs_step_up(fleet: Fleet) -> None:
+    fleet.set_up()
+    path = "/api/settings/presentation"
+    current = fleet.ui("GET", path).body
+    fleet.clock.now += CONFIRM_SECONDS + 1
+    edit = {"expected_version": current["version"], "profile_title": "Our fleet", "update_interval_hours": 19}
+    saved = fleet.ui("PATCH", path, edit)
+    assert saved.status == 200 and saved.body["version"] == current["version"] + 1
+    assert fleet.ui("PATCH", path, edit).body["error"]["code"] == "stale_presentation"
+    public = {"expected_version": saved.body["version"], "owner_contact": {"text": "Private test label"}}
+    refused = fleet.ui("PATCH", path, public)
+    assert refused.status == 403 and refused.body["error"]["code"] == "reauth_required"
+    assert fleet.ui("POST", "/auth/confirm", {"password": PASSWORD}).status == 200
+    assert fleet.ui("PATCH", path, public).status == 200
+    read = fleet.ui("GET", path).body
+    assert read["owner_contact"]["text"] == "Private test label" and read["update_interval_hours"] == 19
+    assert read["profile_title"] == "Our fleet"
+    changes = [
+        event for event in fleet.ui("GET", "/api/events").body["events"] if event["kind"] == "presentation.changed"
+    ]
+    assert len(changes) == 2
+    assert changes[-1]["actor"] == "owner" and changes[-1]["detail"] == {"fields": ["owner_contact"]}
+    assert "Private test label" not in str(changes) and "Our fleet" not in str(changes)
+
+
+def test_contact_rechecks_step_up_inside_the_write(fleet: Fleet, monkeypatch: pytest.MonkeyPatch) -> None:
+    fleet.set_up()
+    path = "/api/settings/presentation"
+    current = fleet.ui("GET", path).body
+    write = fleet.service.update_presentation
+
+    def after_expiry(patch):
+        fleet.clock.now += CONFIRM_SECONDS + 1
+        return write(patch)
+
+    monkeypatch.setattr(fleet.service, "update_presentation", after_expiry)
+    reply = fleet.ui("PATCH", path, {"expected_version": current["version"], "owner_contact": {"text": "never saved"}})
+    assert reply.status == 403 and reply.body["error"]["code"] == "reauth_required"
+    assert fleet.ui("GET", path).body == current
 
 
 def test_the_console_never_mints_an_admin_token(fleet: Fleet) -> None:

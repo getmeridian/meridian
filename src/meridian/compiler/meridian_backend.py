@@ -40,7 +40,7 @@ from meridian.compiler.models import (
     make_resource,
 )
 from meridian.core.access_profiles import profile_declarations_hash
-from meridian.core.server_allowances import ServerAllowanceSpec
+from meridian.core.server_allowances import ServerAllowanceSpec, ServerMetadata
 from meridian.core.topology import SetupIntent
 
 CONTROL_SERVICE_ID = "control:service"
@@ -51,8 +51,8 @@ def _server_settings(intent: SetupIntent) -> dict[str, ServerAllowanceSpec]:
     agents = {item.server_ref: item.id for item in intent.exits}
     agents.update({item.server_ref: item.id for item in intent.routing_gateways})
     return {
-        ref: ServerAllowanceSpec(node_id=agents.get(ref), metadata=metadata)
-        for ref, metadata in sorted(intent.server_metadata.items())
+        ref: ServerAllowanceSpec(node_id=agents.get(ref), metadata=ServerMetadata())
+        for ref in sorted(intent.declared_server_refs())
     }
 
 
@@ -160,14 +160,12 @@ def to_meridian_backend(builder: PlanBuilder, intent: SetupIntent) -> PlanBuilde
             renamed[logical_id] = SERVICE_SETTINGS_ID
             replacements[SERVICE_SETTINGS_ID] = (
                 ServiceSettingsPayload(
-                    owner_contact=intent.delivery.owner_contact,
                     access_profiles=access_profiles,
                     access_profile_declarations_hash=(
                         profile_declarations_hash(intent.access_profiles) if intent.access_profiles else None
                     ),
                     servers=_server_settings(intent),
-                    profile_title=payload.profile_title,
-                    update_interval_hours=payload.update_interval_hours,
+                    profile_title="Meridian",
                     client_routing=payload.client_routing,
                     delivery_policies=intent.delivery.delivery_policies,
                     default_policy=intent.delivery.default_policy,

@@ -86,6 +86,7 @@ from meridian.core.agent_protocol import (
 )
 from meridian.core.client_limits import ClientExtendRequest
 from meridian.core.client_sessions import CredentialRotationRequest
+from meridian.core.presentation import PresentationPatch
 from meridian.core.version_skew import SERVICE_VERSION_HEADER
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
@@ -329,6 +330,21 @@ class _Handler(BaseHTTPRequestHandler):
     def health(self, _match: re.Match[str]) -> Any:
         return self._service.health()
 
+    def get_presentation(self, _match: re.Match[str]) -> Any:
+        return self._service.presentation()
+
+    def patch_presentation(self, _match: re.Match[str]) -> Any:
+        patch = self._model(PresentationPatch)
+        session = self.owner_session
+        # The session can expire or lose its step-up between parsing and taking SQLite's write lock.
+        recent = (
+            self._service.conditions(lambda: self._service.owner.hold_recent(session))
+            if session and patch.owner_contact is not None
+            else nullcontext()
+        )
+        with recent:
+            return self._service.update_presentation(patch)
+
     def get_settings(self, _match: re.Match[str]) -> Any:
         return self._service.settings()
 
@@ -336,8 +352,11 @@ class _Handler(BaseHTTPRequestHandler):
         request = self._model(ServiceSettingsWrite)
         return self._service.put_settings(
             ServiceSettings.model_validate(
-                request.model_dump(exclude={"expected_access_hash", "expected_profile_declarations_hash"})
+                request.model_dump(
+                    exclude={"expected_access_hash", "expected_profile_declarations_hash", "adopt_presentation"}
+                )
             ),
+            adopt_presentation=request.adopt_presentation,
             expected_access_hash=request.expected_access_hash,
             expected_profile_declarations_hash=request.expected_profile_declarations_hash,
         )
@@ -673,6 +692,8 @@ OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
         *DELIVERY_POLICY_OWNER_ROUTES,
         *RESPONSE_RULE_OWNER_ROUTES,
         _Handler.get_settings,
+        _Handler.get_presentation,
+        _Handler.patch_presentation,
         _Handler.get_privacy,
         _Handler.put_privacy,
         _Handler.user_usage,

@@ -73,7 +73,7 @@ def test_empty_contact_preserves_existing_serialization() -> None:
     assert "owner_contact" not in settings.model_dump(mode="json")
 
 
-def test_contact_travels_through_compiler_and_fleet_document() -> None:
+def test_contact_seed_does_not_change_compiled_resources() -> None:
     current = single_exit_intent()
     delivery = DeliveryIntent.model_validate({"owner_contact": CONTACT, "update_interval_hours": 24})
     updated = single_exit_intent(delivery=delivery)
@@ -81,8 +81,8 @@ def test_contact_travels_through_compiler_and_fleet_document() -> None:
     payload = next(
         resource.payload for resource in plan.resources if isinstance(resource.payload, ServiceSettingsPayload)
     )
-    assert payload.owner_contact == delivery.owner_contact
-    assert payload.update_interval_hours == 24
+    assert not payload.owner_contact.text and not payload.owner_contact.link
+    assert plan.plan_hash == compile_topology(current).plan_hash
     changes = intent_changes(current, updated)
     assert any(change.subject == "delivery" and change.field == "owner_contact" for change in changes)
     assert "owner_contact" in updated.model_dump()["delivery"]

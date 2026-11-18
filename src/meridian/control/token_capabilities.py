@@ -175,6 +175,12 @@ _LABELS: dict[TokenCapability, tuple[str, str, str, str]] = {
         "مدیریت کلیدهای پشتیبان و فایل‌های ذخیره‌شده سرورها",
         "管理备份密钥和保存的服务器文件",
     ),
+    "settings.presentation": (
+        "Edit the subscription title, refresh interval, owner contact and server billing",
+        "Менять название подписки, интервал обновления, контакты владельца и оплату серверов",
+        "ویرایش عنوان اشتراک، فاصلهٔ به‌روزرسانی، اطلاعات تماس مالک و پرداخت سرورها",
+        "编辑订阅名称、刷新间隔、所有者联系方式和服务器账单",
+    ),
     "settings.edit": (
         "Change privacy, notices, and page language",
         "Менять настройки конфиденциальности, сообщения и язык страниц",
@@ -270,7 +276,7 @@ def console_capabilities() -> frozenset[TokenCapability]:
     """Keep existing console presets and permit delegation of its own service-owned edits/restarts."""
     return frozenset().union(
         *(legacy_capabilities(scope) for scope in TOKEN_SCOPES if scope != "admin"),
-        {"settings.edit", "commands.restart", "metrics.read"},
+        {"settings.edit", "settings.presentation", "commands.restart", "metrics.read"},
     )
 
 
