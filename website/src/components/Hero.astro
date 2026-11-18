@@ -116,7 +116,7 @@ const specs = [
     border: 0; padding: 0; border-radius: 50%; background: transparent; touch-action: pan-y pinch-zoom;
     cursor: grab; user-select: none; -webkit-tap-highlight-color: transparent; }
   .hero__grab:active, [data-state="dragging"] .hero__grab { cursor: grabbing; }
-  .hero__grab:focus-visible { outline: 2px solid var(--ac-text); outline-offset: 5px; }
+  .hero__grab:focus-visible { border-radius: 50%; outline: 2px solid var(--ac-text); outline-offset: 5px; }
   .hero__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .hero__legend .hero__gesture { flex: 1 0 100%; font: .74rem/1.4 var(--label-font); color: var(--t2); }
   .hero__gesture svg { color: var(--ac-text); flex-shrink: 0; }
