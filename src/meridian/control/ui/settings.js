@@ -46,7 +46,7 @@
   }
 
   function generalCard(read) {
-    var title = h("bdi", { class: "settings-fact-value" }), interval = h("bdi", {});
+    var title = h("bdi", { class: "settings-fact-value", dir: "auto" }), interval = h("bdi", {});
     var publicUrl = h("bdi", { class: "link-text", dir: "ltr" });
     var contactText = h("bdi", { dir: "auto" }), contactLink = h("bdi", { class: "link-text", dir: "ltr" });
     var routing = h("bdi", { class: "settings-fact-value mono", dir: "ltr" });
@@ -57,6 +57,7 @@
       interval.textContent = M.count(state.update_interval_hours == null ? 6 : state.update_interval_hours);
       var contact = state.owner_contact || {};
       contactText.textContent = contact.text || (contact.link ? "" : M.t("settings.contact_none"));
+      contactText.hidden = !contactText.textContent;
       contactLink.textContent = contact.link || ""; contactLink.hidden = !contact.link;
     }
     var edit = h("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () {
@@ -64,8 +65,8 @@
         if (!state || typeof state !== "object") return;
         show(state);
         if (M.state.fleet) M.state.fleet.profile_title = state.profile_title;
-        if (M.updateFleetTitle) M.updateFleetTitle();
-        document.title = state.profile_title;
+        if (M.updateFleetTitle && M.state.fleet) M.updateFleetTitle();
+        else document.title = state.profile_title;
       });
     } }, M.t("presentation.edit"));
     read.then(function (settings) {

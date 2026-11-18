@@ -45,7 +45,7 @@
   }
   M.editPresentation = function (server) {
     return M.dialog(M.t(server ? "presentation.billing_edit" : "presentation.edit"), function (close) {
-      var base, version, defs = fields(server), fieldset = h("div", { class: "stack" });
+      var base, latest, defs = fields(server), fieldset = h("div", { class: "stack" });
       var error = h("p", { class: "form-error", role: "alert" });
       var submit = h("button", { type: "submit", class: "btn btn-primary", disabled: true }, M.t("presentation.review"));
       var reload = h("button", { type: "button", class: "btn btn-ghost", hidden: true, onclick: function () {
@@ -77,7 +77,7 @@
           if (!form.isConnected) return;
           if (server && !M.has(state.servers, server)) throw new M.ApiError(400, "unknown_server", "");
           base = server ? state.servers[server] : Object.assign({}, state, state.owner_contact);
-          version = state.version;
+          latest = state;
           defs.forEach(function (f) {
             f.input.value = f.initial = inputValue(f.key, base[f.key]);
             f.input.disabled = false; f.input.setCustomValidity("");
@@ -94,19 +94,21 @@
         for (var i = 0; i < defs.length; i++) {
           var f = defs[i], key = f.key, raw = f.input.value.trim(), value = raw;
           if (raw === f.initial) continue;
+          if (key === "profile_title" && !raw) { f.input.value = ""; f.input.reportValidity(); return; }
           if (key === "allowance_bytes" && raw) {
             var parsed = M.parseQuotaBytes(raw, "GiB");
             if (parsed.error) { f.input.setCustomValidity(M.t(parsed.error)); f.input.reportValidity(); return; }
             value = parsed.bytes;
           } else if (key === "reset_day" || key === "update_interval_hours") value = Number(raw);
           else if (!raw && ["allowance_bytes", "pay_on", "pay_every"].includes(key)) value = null;
+          if (value === base[key]) continue;
           if (key === "text" || key === "link") contact[key] = value;
           else patch[key] = value;
           rows.push({ label: f.label, before: display(f, base[key]), after: display(f, value) });
         }
-        if (!rows.length) { close(true); return; }
+        if (!rows.length) { close(latest); return; }
         if (Object.keys(contact).length) patch.owner_contact = Object.assign({ text: "", link: "" }, base.owner_contact, contact);
-        var request = { expected_version: version };
+        var request = { expected_version: latest.version };
         if (server) { request.servers = Object.create(null); request.servers[server] = patch; }
         else Object.assign(request, patch);
         close.lock(true);
@@ -119,7 +121,7 @@
           close.lock(false); close(state); M.toast(M.t(server ? "presentation.billing_saved" : "presentation.saved"));
         }, function (e) {
           close.lock(false);
-          if (e.code === "stale_presentation") { reload.hidden = false; submit.disabled = true; }
+          if (e.code === "stale_presentation") { reload.hidden = false; submit.disabled = true; reload.focus(); }
         });
       });
       load();

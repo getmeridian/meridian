@@ -4,6 +4,7 @@ from playwright.sync_api import Locator, Page, expect
 
 from meridian.control.owner import CONFIRM_SECONDS
 from meridian.control.service import ControlService
+from meridian.core.presentation import PresentationPatch
 from tests.e2e.helpers import ready
 from tests.e2e.support import OWNER_PASSWORD
 
@@ -72,10 +73,18 @@ def test_stale_edit_keeps_the_draft_and_reload_requires_discard(
     expect(original.get_by_role("alert")).to_contain_text("Someone changed these settings")
     expect(original.get_by_label("Title", exact=True)).to_have_value("My unsaved title")
     assert service.settings().profile_title == "Current fleet title"
-    original.get_by_role("button", name="Load current settings").click()
+    reload = original.get_by_role("button", name="Load current settings")
+    expect(reload).to_be_focused()
+    reload.click()
     discard = owner.get_by_role("dialog", name="Load current settings", exact=True)
+    discard.get_by_role("button", name="Cancel").click()
+    expect(original.get_by_label("Title", exact=True)).to_have_value("My unsaved title")
+    reload.click()
     discard.get_by_role("button", name="Load current settings").click()
     expect(original.get_by_label("Title", exact=True)).to_have_value("Current fleet title")
+    original.get_by_role("button", name="Review changes").click()
+    expect(original).not_to_be_visible()
+    expect(owner.locator("dt").filter(has_text="Title").locator("..")).to_contain_text("Current fleet title")
 
 
 def test_demo_billing_edit_reaches_server_card_and_reload_resets_it(visitor: Page, demo_url: str) -> None:
@@ -99,3 +108,33 @@ def test_demo_billing_edit_reaches_server_card_and_reload_resets_it(visitor: Pag
     details.locator("summary").click()
     expect(details).to_contain_text(before)
     expect(details).not_to_contain_text("Weekend hosting")
+
+
+def test_phone_billing_edit_keeps_exact_allowance_and_returns_to_the_server(
+    owner: Page, service: ControlService
+) -> None:
+    owner.set_viewport_size({"width": 390, "height": 844})
+    state = service.presentation()
+    ref = "srv-de"
+    # The browser cannot represent this 64-bit byte count exactly.
+    large = (1 << 54) + 1
+    state = service.update_presentation(
+        PresentationPatch.model_validate(
+            {"expected_version": state.version, "servers": {ref: {"allowance_bytes": large}}}
+        )
+    )
+    owner.goto(owner.url.split("#", 1)[0] + "#/servers")
+    ready(owner, "servers")
+    trigger = owner.locator('[data-billing-edit="srv-de"]')
+    trigger.click()
+    form = owner.get_by_role("dialog", name="Edit allowance and payments")
+    expect(form.locator('input[type="date"]')).to_be_enabled()
+    form.locator('input[type="date"]').fill("")
+    expect(form.get_by_label("Repeat", exact=True)).to_be_disabled()
+    review(owner, form).get_by_role("button", name="Save").click()
+    expect(form).not_to_be_visible()
+    expect(trigger).to_be_focused()
+    after = service.presentation()
+    assert after.version == state.version + 1
+    assert after.servers[ref] == state.servers[ref].model_copy(update={"pay_on": None, "pay_every": None})
+    assert after.servers[ref].allowance_bytes == large

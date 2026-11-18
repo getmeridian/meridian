@@ -26,7 +26,11 @@
 
   M.renderServers = function (view, selectedServer, selectedSection) {
     var disclosureState = new Map(), firstDraw = true;
-    function billingChanged() { if (view.meridianLiveStop) view.meridianLiveStop.refresh(false); }
+    var pendingBillingFocus = null;
+    function billingChanged(ref) {
+      pendingBillingFocus = ref;
+      if (view.meridianLiveStop) view.meridianLiveStop.refresh(false);
+    }
     var status = h("div", { class: "live-status" });
     var cards = h("div", { class: "live-data" }, h("div", { class: "empty" }, h("span", { class: "spinner" })));
     M.mount(view, [
@@ -38,6 +42,9 @@
       status: status, interval: 10000,
       load: function (passive) { return M.api("GET", "ui/api/fleet", undefined, { passive: passive }); },
       draw: function (fleet) {
+        var active = document.activeElement;
+        var focusRef = active && (active.dataset.billingEdit || (active === document.body && pendingBillingFocus));
+        pendingBillingFocus = null;
         M.state.fleet = fleet;
         if (M.updateFleetTitle) M.updateFleetTitle();
         cards.querySelectorAll("[data-server]").forEach(function (card) {
@@ -83,6 +90,12 @@
         });
         M.mount(cards, all.length ? h("div", { class: "cards" }, all)
           : h("div", { class: "empty" }, h("p", { text: M.t("servers.empty") })));
+        if (focusRef) {
+          var trigger = Array.from(cards.querySelectorAll("[data-billing-edit]")).find(function (b) {
+            return b.dataset.billingEdit === focusRef;
+          });
+          if (trigger) trigger.focus({ preventScroll: true });
+        }
         firstDraw = false;
       },
       empty: function () { M.clear(cards); },
@@ -216,10 +229,10 @@
           (reason === "allowance_exceeded" || reason === "payment_overdue" ? "notice-err" : "notice-warn"),
           text: M.t(labels[reason]) }) : null;
       }),
-      h("div", { class: "row-actions" }, h("button", { type: "button", class: "btn btn-ghost btn-sm",
+      h("div", { class: "row-actions" }, h("button", { type: "button", class: "btn btn-ghost btn-sm", "data-billing-edit": usage.server_ref,
         onclick: function () {
           M.editPresentation(usage.server_ref).then(function (result) {
-            if (result && typeof result === "object") billingChanged();
+            if (result && typeof result === "object") billingChanged(usage.server_ref);
           });
         } }, M.t("presentation.billing_edit"))));
   }

@@ -15,7 +15,7 @@
   function integer(value, min, max) { if (!Number.isSafeInteger(value) || value < min || value > max) bad(); }
   function contact(value) {
     keys(value, ["text", "link"]);
-    var c = { text: text(value.text || "", 120), link: text(value.link || "", 2048) };
+    var c = { text: text(has(value, "text") ? value.text : "", 120), link: text(has(value, "link") ? value.link : "", 2048) };
     if (c.link) {
       try {
         var url = new URL(c.link), decoded = decodeURIComponent(c.link);
