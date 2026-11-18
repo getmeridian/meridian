@@ -151,12 +151,11 @@ meridian fleet import fleet.yml
 导入会在执行任何操作之前显示每处变更：
 
 ```
-  + client carol
   ~ exit-2 sni www.example.com -> www.example.org
   → 应用？ [y/N]
 ```
 
-文件以保存的名称指代服务器，不包含密钥、凭据、链接或传输路径，因此可以放进代码仓库。文件中出现的服务器必须先保存（`meridian server add`）。导入会拒绝哪些内容，见 [`fleet import`](/zh/cli-reference/#meridian-fleet)。
+文件使用保存的服务器名称，不包含私钥、凭据、个人连接链接或传输路径。文件中出现的服务器必须先保存（`meridian server add`）。导入会拒绝哪些内容，见 [`fleet import`](/zh/cli-reference/#meridian-fleet)。
 
 ## 部署前检查
 
