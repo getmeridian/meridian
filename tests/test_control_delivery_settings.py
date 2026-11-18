@@ -153,9 +153,16 @@ def test_payment_only_edit_preserves_exact_allowance_and_survives_topology_write
         with pytest.raises(ServiceError, match="Upgrade"):
             service.put_settings(settings)
         service.put_settings(
-            settings.model_copy(update={"public_url": "https://example.test/sub"}), adopt_presentation=True
+            settings.model_copy(update={"public_url": "https://example.test/sub"}),
+            adopt_presentation=True,
+            expected_presentation_version=updated.version,
         )
-        assert service.presentation() == updated
+        updated = service.presentation()
+        assert (
+            updated.seeded
+            and updated.profile_title == "From panel"
+            and updated.servers["edge"].allowance_bytes == large
+        )
         retired = settings.model_copy(update={"servers": {}})
         service.put_settings(retired, adopt_presentation=True)
         assert service.presentation().version == updated.version + 1 and not service.presentation().servers

@@ -588,7 +588,13 @@ class ServiceSettingsDriver:
     def observe(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceObservation:
         with self.context.client() as client:
             current = client.settings()
-            equal = self._topology(current) == self._topology(self._settings(action)) and client.presentation().seeded
+            equal = self._topology(current) == self._topology(self._settings(action))
+            if equal:
+                try:
+                    equal = client.presentation().seeded
+                except ControlServiceNotFound:
+                    # An older service cannot have handed presentation over yet.
+                    equal = False
         return _observation(
             action,
             exists=equal,

@@ -500,7 +500,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 **`fleet title`, `fleet refresh`** — 用 `fleet title [TITLE]` 更改订阅名称，用 `fleet refresh [HOURS]` 更改刷新间隔（1–168 小时）。省略参数即可读取当前值。用 `--dry-run` 预览，或用 `--yes` 直接保存。如果其他人已保存更改，请重新预览。
 
-**`fleet contact`** — 在**设置 → 常规**中或用 `fleet contact` 修改公开说明和支持链接。在面板修改联系方式前需要重新确认身份。未指定的字段保持原值；`--text ""` 清除说明，`--link none` 清除链接。JSON 返回 `data.owner_contact` 和 `data.version`。
+**`fleet contact`** — 在**设置 → 常规**中或用 `fleet contact` 修改公开说明和支持链接。在面板修改联系方式前需要重新确认身份。未指定的字段保持原值；`--text ""` 清除说明，`--link none` 清除链接。JSON 返回 `data.owner_contact` 和 `data.version`。 在旧文件中，省略 `owner_contact` 会保留当前联系方式。显式提供时会替换整个联系方式：`owner_contact: {}` 清空两个字段，只提供文本则删除旧链接。预览会显示每一项更改。
 **服务器流量额度** — `fleet status` 和网页面板的“服务器”页面显示周期用量、服务商、重置日、下次付款日期以及服务器提醒。用量是已接受用户流量的估算值（上传 + 下载），不包含协议开销、服务器自身下载以及中继转发流量。报告计入接收时所在的 UTC 周期，因此延迟报告可能增加后一个周期的用量。中继及未运行 agent 的控制服务器显示 **未计量**，不显示用量数字。 在**服务器**中或用 `meridian server set NAME` 修改付款信息。只需要连接控制服务，即使出口离线也可保存。
 
 `GET /api/servers` 需要 read 权限，返回 `server-usage` 合同：服务器信息、UTC 周期边界、已计数字节、计量开始时间、下次付款以及计量范围。`GET /api/attention` 增加 `servers[]`：达到 80% 时为 `allowance_near`，达到 100% 时为 `allowance_exceeded`，付款日期在 7 天内时为 `payment_due`，已过期的单次日期为 `payment_overdue`。查询参数 `allowance_percent` 和 `allowance_exceeded_percent` 的范围是 1–100，前者不得高于后者；`payment_days` 的范围是 1–30。额度与付款提醒会设置 `summary.needs_attention`；部署健康状态和退出码继续表示服务运行状态。

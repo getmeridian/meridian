@@ -83,9 +83,6 @@ def import_presentation(
     with presentation_client(cluster) as client:
         before = live_presentation(client)
         try:
-            contact = fields.get("owner_contact")
-            if isinstance(contact, dict):
-                fields = {**fields, "owner_contact": {**before.owner_contact.model_dump(), **contact}}
             patch = PresentationPatch.model_validate({"expected_version": before.version, **fields})
             changes = presentation_changes(before, patch.updated(before))
         except KeyError as exc:

@@ -37,7 +37,9 @@ class PresentationPatch(CoreModel):
     def require_values(self) -> Self:
         if any(getattr(self, key) is None for key in self.model_fields_set):
             raise ValueError("Omit unchanged settings. Use an empty contact to clear it.")
-        if self.model_fields_set == {"expected_version"}:
+        if not self.model_fields_set - {"expected_version", "servers"} and not any(
+            change.model_fields_set for change in self.servers.values()
+        ):
             raise ValueError("Choose a presentation setting to change.")
         return self
 

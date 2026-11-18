@@ -15,6 +15,7 @@ from meridian.core.server_allowances import ServerMetadata, ServerMetadataError
 
 VERSION_KEY = "presentation_version"
 OWNED_KEY = "presentation_adopted"
+_EARLY_FIELDS = "presentation_edited_before_seed"
 
 
 def read_presentation(store: Store) -> PresentationState:
@@ -29,26 +30,42 @@ def read_presentation(store: Store) -> PresentationState:
         )
 
 
-def merge_topology_settings(store: Store, settings: ServiceSettings, *, adopt: bool) -> ServiceSettings:
-    """Keep operator values; topology still owns which servers exist and which agent measures each one."""
-    if store.meta(OWNED_KEY) != "1":
-        if adopt:
-            store.set_meta(OWNED_KEY, "1")
-        return settings
+def _early_fields(store: Store) -> set[str]:
+    return {field for field in (store.meta(_EARLY_FIELDS) or "").split(",") if field}
+
+
+def merge_topology_settings(
+    store: Store, settings: ServiceSettings, previous: PresentationState, *, adopt: bool
+) -> ServiceSettings:
+    """Seed missing fields once; the service wins for settings committed by an earlier release or the owner."""
+    early = _early_fields(store) if not previous.seeded else set()
     if not adopt:
-        raise ServiceError("presentation_adopted", "Upgrade the Meridian CLI before applying fleet settings.", 409)
-    existing = read_presentation(store)
-    return settings.model_copy(
-        update={
-            "profile_title": existing.profile_title,
-            "update_interval_hours": existing.update_interval_hours,
-            "owner_contact": existing.owner_contact,
-            "servers": {
-                ref: spec.model_copy(update={"metadata": existing.servers.get(ref, ServerMetadata())})
-                for ref, spec in settings.servers.items()
-            },
-        }
-    )
+        if early or previous.seeded:
+            raise ServiceError("presentation_adopted", "Upgrade the Meridian CLI before applying fleet settings.", 409)
+        return settings
+    # Each released settings writer persisted the keys for features it knew. Unlike a fresh
+    # service (which also starts with a default title), an old topology write persisted public_url.
+    stored = {
+        "profile_title": store.meta("public_url") is not None or previous.profile_title != "Meridian",
+        "update_interval_hours": store.meta("update_interval_hours") is not None,
+        "owner_contact": store.meta("connection_page_settings") is not None,
+    }
+    fields = {
+        field: getattr(previous, field)
+        for field, present in stored.items()
+        if previous.seeded or present or field in early
+    }
+    fields["servers"] = {
+        ref: spec.model_copy(
+            update={"metadata": previous.servers.get(ref, ServerMetadata() if previous.seeded else spec.metadata)}
+        )
+        for ref, spec in settings.servers.items()
+    }
+    if not previous.seeded:
+        store.set_meta(OWNED_KEY, "1")
+        if early:
+            store.set_meta(_EARLY_FIELDS, "")
+    return settings.model_copy(update=fields)
 
 
 def patch_presentation(
@@ -84,7 +101,10 @@ def patch_presentation(
                 {ref: spec.model_copy(update={"metadata": updated.servers[ref]}) for ref, spec in specs.items()},
                 now(),
             )
-        store.set_meta(OWNED_KEY, "1")
+        if not state.seeded:
+            # An owner may open an upgraded or freshly installed panel before the first modern
+            # topology apply. Protect that edit immediately, but leave other fields available to seed.
+            store.set_meta(_EARLY_FIELDS, ",".join(sorted(_early_fields(store).union(changed))))
         store.set_meta(VERSION_KEY, str(state.version + 1))
         events.append(
             "presentation.changed", "presentation", detail=PresentationFieldsDetail.model_validate({"fields": changed})

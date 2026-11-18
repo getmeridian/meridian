@@ -55,7 +55,7 @@ def save_settings(
             and expected_presentation_version != previous.version
         ):
             raise ServiceError("stale_presentation", "Presentation changed before handover. Review again.", 409)
-        settings = merge_topology_settings(store, settings, adopt=adopt_presentation)
+        settings = merge_topology_settings(store, settings, previous, adopt=adopt_presentation)
         save_access_profiles(store, settings.access_profiles)
         save_profile_declarations_hash(store, settings.access_profile_declarations_hash)
         save_delivery_policies(store, settings, access_profiles=settings.access_profiles)

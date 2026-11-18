@@ -105,3 +105,34 @@ def test_export_cannot_replay_old_values_and_explicit_legacy_import_reviews_live
         assert run(*args, "--yes")["status"] == "changed"
         assert service.presentation().owner_contact.text == "Help"
         assert ClusterConfig.load().topology_intent == current
+
+
+def test_real_fleet_export_and_import_distinguish_omitted_partial_and_empty_contact(tmp_home: Path) -> None:
+    with deployed(tmp_home) as admin:
+        run("fleet", "contact", "--text", "Original", "--link", "https://example.test/help", "--yes")
+        export = run("fleet", "export")["data"]["document"]
+        file = tmp_home / "roundtrip.yml"
+        args = ("fleet", "import", str(file))
+        file.write_text(dump_fleet_document(export))
+        assert run(*args, "--yes")["status"] == "no_changes"
+        assert admin.presentation().owner_contact.link == "https://example.test/help"
+        export["delivery"]["owner_contact"] = {"text": "Phone help"}
+        file.write_text(dump_fleet_document(export))
+        review = run(*args, "--dry-run")["data"]["changes"]
+        change = next(row for row in review if row["field"] == "owner_contact.link")
+        assert (change["before"], change["after"]) == ("https://example.test/help", "")
+        assert admin.presentation().owner_contact.link == "https://example.test/help"
+        run(*args, "--yes")
+        assert admin.presentation().owner_contact.model_dump() == {"text": "Phone help", "link": ""}
+        export["delivery"]["owner_contact"] = {}
+        file.write_text(dump_fleet_document(export))
+        assert run(*args, "--dry-run")["data"]["changes"][0]["after"] == ""
+        run(*args, "--yes")
+        assert admin.presentation().owner_contact.is_empty
+        export["delivery"]["profile_title"] = "Must not partially save"
+        export["server_metadata"] = {"missing": {"provider": "Unknown server"}}
+        file.write_text(dump_fleet_document(export))
+        before = admin.presentation()
+        refused = run(*args, "--yes", code=2)
+        assert "new server topology" in refused["errors"][0]["message"]
+        assert admin.presentation() == before
