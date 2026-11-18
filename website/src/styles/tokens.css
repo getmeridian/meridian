@@ -55,6 +55,18 @@
   --amber-bg: light-dark(#c4882a0a, #e5a44e12);
   --amber-br: light-dark(#c4882a25, #e5a44e30);
 
+  /* Landing illustrations, specimen mounts and calls to action */
+  --landing-action: light-dark(#202a36, #e7c280);
+  --landing-action-hover: light-dark(#344455, #f2d6a2);
+  --landing-action-text: light-dark(#fffaf1, #1c2430);
+  --atlas-mount: light-dark(#eae4d7, #30353d);
+  --atlas-grid: light-dark(#d8cfbd, #444a51);
+  --atlas-night: #202b38;
+  --atlas-night-line: #384452;
+  --atlas-paper: #fbf7ef;
+  --atlas-brass: #e3b972;
+  --atlas-silver: #c6cdd2;
+
   /* Shadows — ink-tinted in light, deeper black in dark */
   --shadow-sm: 0 1px 2px light-dark(rgba(26, 29, 46, 0.05), rgba(0, 0, 0, 0.25));
   --shadow-md: 0 2px 8px light-dark(rgba(26, 29, 46, 0.07), rgba(0, 0, 0, 0.3));

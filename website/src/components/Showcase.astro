@@ -1,138 +1,89 @@
 ---
-/**
- * Screenshots of both website demos, each linking to the live, clickable version.
- * Images come from scripts/showcase_screenshots.py; the People shot follows the site theme.
- */
+/** Both plates use recorded product screens and open the matching localized demo. */
 import { landingT, type Locale } from '../i18n';
+import AtlasIcon from './AtlasIcon.astro';
 
-interface Props {
-  locale: Locale;
-}
-
+interface Props { locale: Locale }
 const { locale } = Astro.props;
 const t = landingT(locale);
-const img = (name: string) => `/img/showcase/${name}.webp`;
-const page = `/demo/?lang=${locale}`;
-const console = `/demo/console/?lang=${locale}`;
-const more = [
-  { name: 'console-person', route: '#/people/Luma', caption: t('showcase.person') },
-  { name: 'console-servers', route: '#/servers', caption: t('showcase.servers') },
-  { name: 'console-settings', route: '#/settings', caption: t('showcase.settings') },
-];
+const views = [
+  { key: 'console', url: `/demo/console/?lang=${locale}#/people` },
+  { key: 'page', url: `/demo/?lang=${locale}` },
+] as const;
 ---
 
 <div class="showcase">
-  <figure class="showcase__card card">
-    <a href={page} class="showcase__shot showcase__shot--phone" tabindex="-1" aria-hidden="true">
-      <img src={img('connection-page-phone')} alt={t('showcase.page.alt')} width="780" height="1328" loading="lazy" decoding="async" />
-    </a>
-    <figcaption class="showcase__text">
-      <h3>{t('showcase.page.title')}</h3>
-      <p>{t('showcase.page.text')}</p>
-      <a href={page} class="btn btn--primary">{t('showcase.page.try')}</a>
-    </figcaption>
-  </figure>
-  <figure class="showcase__card card">
-    <a href={console} class="showcase__shot" tabindex="-1" aria-hidden="true">
-      <img class="showcase__light" src={img('console-people')} alt={t('showcase.console.alt')} width="1600" height="1075" loading="lazy" decoding="async" />
-      <img class="showcase__dark" src={img('console-people-dark')} alt={t('showcase.console.alt')} width="1600" height="1075" loading="lazy" decoding="async" />
-    </a>
-    <figcaption class="showcase__text">
-      <h3>{t('showcase.console.title')}</h3>
-      <p>{t('showcase.console.text')}</p>
-      <a href={console} class="btn btn--primary">{t('showcase.console.try')}</a>
-    </figcaption>
-  </figure>
-</div>
-<ul class="showcase__more">
-  {more.map((shot) => (
-    <li>
-      <a href={console + shot.route} class="showcase__link">
-        <span class="showcase__shot"><img src={img(shot.name)} alt="" width="1600" height="1075" loading="lazy" decoding="async" /></span>
-        <p>{shot.caption}</p>
+  {views.map(({key, url}) => (
+    <article class={`showcase__card showcase__card--${key}`}>
+      <a class="showcase__mount" href={url} aria-hidden="true" tabindex="-1">
+        {key === 'console' ? (
+          <div class="showcase__window">
+            <div class="showcase__chrome"><i></i><i></i><i></i></div>
+            <img class="showcase__screen--light" src="/img/showcase/console-people.webp" alt="" width="1600" height="1075" loading="lazy" decoding="async" />
+            <img class="showcase__screen--dark" src="/img/showcase/console-people-dark.webp" alt="" width="1600" height="1075" loading="lazy" decoding="async" />
+          </div>
+        ) : (
+          <div class="showcase__phone">
+            <div class="showcase__earpiece"></div>
+            <img src="/img/showcase/connection-page-phone.webp" alt="" width="780" height="1328" loading="lazy" decoding="async" />
+          </div>
+        )}
       </a>
-    </li>
+      <div class="showcase__body">
+        <p class="atlas-label">{t(`showcase.${key}.role`)}</p>
+        <h3>{t(`showcase.${key}.title`)}</h3>
+        <p class="showcase__desc">{t(`showcase.${key}.text`)}</p>
+        <a href={url} class="atlas-link">{t(`showcase.${key}.try`)} <span class="atlas-forward"><AtlasIcon name="arrow" size={16} /></span></a>
+      </div>
+    </article>
   ))}
-</ul>
+</div>
 
 <style>
-  .showcase {
-    display: grid;
-    gap: 24px;
-  }
+  .showcase { display: grid; grid-template-columns: minmax(0, 1.17fr) minmax(0, 1fr); gap: clamp(16px, 2.3vw, 32px); }
   .showcase__card {
-    display: grid;
-    gap: 20px;
-    margin: 0;
-    padding: 20px;
-    align-content: start;
+    min-width: 0; display: flex; flex-direction: column;
+    border: 1px solid var(--b1); border-radius: var(--r2); overflow: hidden; background: var(--s1);
   }
-  .showcase__shot {
-    display: block;
-    overflow: hidden;
-    border: 1px solid var(--b1);
-    border-radius: var(--r2);
-    box-shadow: var(--shadow-md);
+  .showcase__mount {
+    position: relative; display: flex; justify-content: center; align-items: start;
+    height: clamp(190px, 21vw, 300px); overflow: hidden; direction: ltr;
+    border-bottom: 1px solid var(--b1); background-color: var(--atlas-mount);
+    background-image: linear-gradient(var(--atlas-grid) 1px, transparent 1px), linear-gradient(90deg, var(--atlas-grid) 1px, transparent 1px);
+    background-size: 25px 25px; background-position: center;
   }
-  .showcase__shot img {
-    display: block;
-    width: 100%;
-    height: auto;
+  .showcase__mount img { width: 100%; height: auto; display: block; }
+  .showcase__window {
+    width: 84%; margin-top: clamp(20px, 2.6vw, 37px); overflow: hidden;
+    border: 1px solid var(--b2); border-radius: 8px 8px 0 0; background: var(--s1); box-shadow: var(--shadow-lg);
   }
-  .showcase__shot--phone {
-    max-width: 300px;
-    justify-self: center;
-    border-radius: 28px;
+  .showcase__chrome { height: 21px; display: flex; align-items: center; gap: 4px; padding: 0 11px; border-bottom: 1px solid var(--b1); }
+  .showcase__chrome i { height: 5px; width: 5px; background: var(--b2); border-radius: 50%; }
+  .showcase__card--page .showcase__mount {
+    background-color: var(--atlas-night);
+    background-size: auto;
+    background-image: repeating-radial-gradient(circle at 50% 90%, transparent 0 40px, var(--atlas-night-line) 41px, transparent 42px);
   }
-  .showcase__text h3 {
-    margin: 0 0 6px;
+  .showcase__phone {
+    width: clamp(175px, 19vw, 240px); margin-top: 26px; padding: 0 3px 4px;
+    border: 3px solid var(--atlas-night-line); border-radius: 26px; overflow: hidden;
+    background: var(--atlas-night); box-shadow: var(--shadow-lg);
   }
-  .showcase__text p {
-    margin: 0 0 16px;
-    color: var(--t2);
-  }
-  /* The People shot follows the reader's theme: the system's, unless they chose one. */
-  .showcase__dark {
-    display: none !important;
-  }
+  .showcase__earpiece { margin: 5px auto 7px; width: 35px; height: 3px; border-radius: 8px; background: var(--atlas-night-line); }
+  .showcase__phone img { border-radius: 13px; }
+  .showcase__body { display: flex; align-items: start; flex-direction: column; flex: 1; padding: clamp(20px, 2.2vw, 32px); }
+  .showcase__body h3 { font-size: clamp(1.6rem, 2.3vw, 2.1rem); margin: 7px 0; letter-spacing: -.035em; }
+  .showcase__desc { color: var(--t2); max-width: 55ch; margin-bottom: 12px; line-height: 1.55; }
+  .showcase__body .atlas-link { margin-top: auto; }
+  .showcase__mount .showcase__screen--dark { display: none; }
+  :global(:root[data-theme='dark']) .showcase__screen--light { display: none; }
+  :global(:root[data-theme='dark']) .showcase__screen--dark { display: block; }
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme='light']) .showcase__light {
-      display: none !important;
-    }
-    :root:not([data-theme='light']) .showcase__dark {
-      display: block !important;
-    }
+    :global(:root:not([data-theme='light'])) .showcase__screen--light { display: none; }
+    :global(:root:not([data-theme='light'])) .showcase__screen--dark { display: block; }
   }
-  :root[data-theme='dark'] .showcase__light {
-    display: none !important;
-  }
-  :root[data-theme='dark'] .showcase__dark {
-    display: block !important;
-  }
-  .showcase__more {
-    display: grid;
-    gap: 24px;
-    margin: 32px 0 0;
-    padding: 0;
-    list-style: none;
-  }
-  .showcase__link {
-    display: block;
-    color: inherit;
-    text-decoration: none;
-  }
-  .showcase__more p {
-    margin: 10px 0 0;
-    font-size: 0.94rem;
-    color: var(--t2);
-  }
-  @media (min-width: 860px) {
-    .showcase {
-      grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
-      align-items: start;
-    }
-    .showcase__more {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
+  @media (max-width: 700px) {
+    .showcase { grid-template-columns: minmax(0, 1fr); }
+    .showcase__mount { height: clamp(180px, 50vw, 265px); }
   }
 </style>

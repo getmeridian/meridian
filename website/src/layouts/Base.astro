@@ -11,7 +11,7 @@ import path from 'node:path';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import { LOCALE_INFO, LOCALES, dirOf, type Locale } from '../i18n/locales';
-import type { ShellKey } from '../i18n/shell';
+import { shell, type ShellKey } from '../i18n/shell';
 
 interface Props {
   title: string;
@@ -54,7 +54,7 @@ const bodyFont = {
 ---
 
 <!doctype html>
-<html lang={info.lang} dir={dirOf(locale)}>
+<html lang={info.lang} dir={dirOf(locale)} class={localized ? 'landing-page' : undefined}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -109,7 +109,7 @@ const bodyFont = {
     <slot name="head" />
   </head>
   <body data-title-key={titleKey}>
-    <a href="#main" class="skip-link" data-t="skip">Skip to content</a>
+    <a href="#main" class="skip-link" data-t="skip">{shell[locale].skip}</a>
     <Nav locale={locale} localized={localized} />
     <slot />
     <Footer locale={locale} version={version} />

@@ -10,6 +10,8 @@
 
 **Shared building blocks in `global.css`** — `.container`, `.section`, `.eyebrow` + `.section-head`, `.btn--primary/--secondary`, `.card`, `.pill`; landing, blog, and 404 reuse them instead of per-page copies.
 
+**Landing layout** — `landing.css` scopes the wider measure, numbered sections, and buttons to the four home pages. Set home-only layout tokens on `:root.landing-page` so base tokens cannot override them by stylesheet order.
+
 **Fonts are script subsets** — `fonts.css` serves Fraunces (headings), Source Sans 3 (body), and JetBrains Mono (code) as Latin and Cyrillic files with `unicode-range`; Russian headings use Source Serif 4 (Fraunces has no Cyrillic), Farsi uses Vazirmatn, Chinese the system CJK fonts. `scripts/subset_fonts.py` rebuilds them from the upstream GitHub releases; licenses ship in `public/fonts/licenses/`.
 
 **Docs share the look** — `starlight.css` maps the palette onto Starlight's `--sl-color-*` scale (inverted for light), heading families and weights, and the header's logo size and translucency. `prose.css` gives blog posts the docs' text color and lends Expressive Code the same `--sl-color-*` values. Change all three when the palette moves.

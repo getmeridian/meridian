@@ -5,6 +5,7 @@
  */
 interface Props {
   eyebrow?: string;
+  index?: string;
   title: string;
   desc?: string;
   level?: 1 | 2;
@@ -12,12 +13,12 @@ interface Props {
   id?: string;
 }
 
-const { eyebrow, title, desc, level = 2, center = false, id } = Astro.props;
+const { eyebrow, index, title, desc, level = 2, center = false, id } = Astro.props;
 const Heading = level === 1 ? 'h1' : 'h2';
 ---
 
 <header class:list={['section-head', { 'section-head--center': center }]}>
-  {eyebrow && <p class="eyebrow">{eyebrow}</p>}
+  {eyebrow && <p class="eyebrow">{index && <span class="section-head__index" aria-hidden="true">{index}</span>}{eyebrow}</p>}
   <Heading id={id}>{title}</Heading>
   {desc && <p class="section-head__desc" set:html={desc} />}
   <slot />

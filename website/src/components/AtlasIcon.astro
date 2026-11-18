@@ -1,0 +1,15 @@
+---
+/** Small line symbols for the landing page. Their adjacent text names the action. */
+const paths = {
+  arrow: 'M4 12h15m-6-6 6 6-6 6',
+  down: 'M12 4v15m-6-6 6 6 6-6',
+  server: 'M4 4h16v7H4zM4 14h16v6H4zM7 7.5h1m-1 9.5h1',
+  protocol: 'M3 8h14m-4-4 4 4-4 4M21 16H7m4-4-4 4 4 4',
+  source: 'm8 6-6 6 6 6m8-12 6 6-6 6m-3-15-3 18',
+} as const;
+interface Props { name: keyof typeof paths; size?: number }
+const { name, size = 18 } = Astro.props;
+---
+<svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  <path d={paths[name]} />
+</svg>

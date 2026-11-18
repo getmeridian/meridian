@@ -25,7 +25,7 @@ const t = shellT(locale);
     <nav class="footer__links" aria-label="Footer">
       <a href={`/${locale}/getting-started/`} data-docs-link data-t="nav.docs">{t('nav.docs')}</a>
       <a href="/blog/" data-t="nav.blog">{t('nav.blog')}</a>
-      <a href="/demo/" data-t="nav.demo">{t('nav.demo')}</a>
+      <a href={locale === 'en' ? '/demo/' : `/demo/?lang=${locale}`} data-t="nav.demo">{t('nav.demo')}</a>
       <a href="https://github.com/getmeridian/meridian">GitHub</a>
       <a href="https://github.com/getmeridian/meridian/issues" data-t="footer.issues">{t('footer.issues')}</a>
       <a href="/blog/rss.xml" data-t="footer.rss">{t('footer.rss')}</a>
