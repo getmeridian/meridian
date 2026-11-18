@@ -1,5 +1,6 @@
 """An owner follows health and billing findings to their respective controls."""
 
+from axe_playwright_python.sync_playwright import Axe
 from playwright.sync_api import Page, expect
 
 from tests.e2e.helpers import ready
@@ -41,3 +42,24 @@ def test_phone_filters_keep_search_and_current_choices_in_reach(owner: Page, bas
     owner.locator("[data-remove-filter=status]").click()
     expect(toggle).to_be_focused()
     expect(owner.locator(".people-row").first).to_be_visible()
+
+
+def test_owner_can_read_daily_values_without_the_chart_in_either_direction(owner: Page, base_url: str) -> None:
+    for locale, theme, width in (("en", "light", 1280), ("fa", "dark", 390)):
+        owner.set_viewport_size({"width": width, "height": 844})
+        owner.evaluate(
+            "([lang, theme]) => { localStorage.setItem('mrd.lang', lang); localStorage.setItem('mrd.theme', theme) }",
+            [locale, theme],
+        )
+        owner.goto(base_url + "/#/overview")
+        owner.reload()
+        ready(owner, "overview")
+        daily = owner.locator(".overview-traffic")
+        daily.locator("summary").focus()
+        owner.keyboard.press("Enter")
+        expect(daily.get_by_role("table")).to_be_visible()
+        assert daily.locator("tbody tr").count() == 30
+        review = Axe().run(
+            owner, options={"runOnly": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"], "resultTypes": ["violations"]}
+        )
+        assert not review.response["violations"], review.generate_report()
