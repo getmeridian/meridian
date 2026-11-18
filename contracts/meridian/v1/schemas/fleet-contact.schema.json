@@ -450,6 +450,11 @@
         }
       ],
       "default": null
+    },
+    "version": {
+      "default": 0,
+      "title": "Version",
+      "type": "integer"
     }
   },
   "required": [

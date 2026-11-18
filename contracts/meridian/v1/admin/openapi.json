@@ -1975,6 +1975,7 @@
                   "backup.read",
                   "backup.edit",
                   "settings.edit",
+                  "settings.presentation",
                   "tokens.read",
                   "tokens.issue",
                   "tokens.revoke",
@@ -2066,6 +2067,7 @@
               "backup.read",
               "backup.edit",
               "settings.edit",
+              "settings.presentation",
               "tokens.read",
               "tokens.issue",
               "tokens.revoke",
@@ -2135,6 +2137,7 @@
               "backup.read",
               "backup.edit",
               "settings.edit",
+              "settings.presentation",
               "tokens.read",
               "tokens.issue",
               "tokens.revoke",
@@ -4595,6 +4598,9 @@
                 "$ref": "#/components/schemas/BulkEventDetail"
               },
               {
+                "$ref": "#/components/schemas/PresentationFieldsDetail"
+              },
+              {
                 "$ref": "#/components/schemas/EmptyEventDetail"
               },
               {
@@ -4654,6 +4660,7 @@
               "command.result",
               "privacy.changed",
               "notice.changed",
+              "presentation.changed",
               "language.changed",
               "token.created",
               "token.revoked"
@@ -5309,6 +5316,7 @@
                 "backup.read",
                 "backup.edit",
                 "settings.edit",
+                "settings.presentation",
                 "tokens.read",
                 "tokens.issue",
                 "tokens.revoke",
@@ -7127,6 +7135,7 @@
                   "backup.read",
                   "backup.edit",
                   "settings.edit",
+                  "settings.presentation",
                   "tokens.read",
                   "tokens.issue",
                   "tokens.revoke",
@@ -8160,6 +8169,149 @@
           "values"
         ],
         "title": "PortMatch",
+        "type": "object"
+      },
+      "PresentationFieldsDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "fields": {
+            "items": {
+              "enum": [
+                "profile_title",
+                "update_interval_hours",
+                "owner_contact",
+                "servers"
+              ],
+              "type": "string"
+            },
+            "maxItems": 4,
+            "minItems": 1,
+            "title": "Fields",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fields"
+        ],
+        "title": "PresentationFieldsDetail",
+        "type": "object"
+      },
+      "PresentationPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "minimum": 0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "owner_contact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OwnerContact"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "profile_title": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "pattern": "^[^\\r\\n\\t]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile Title"
+          },
+          "servers": {
+            "patternProperties": {
+              "^[^\\r\\n\\t]+$": {
+                "$ref": "#/components/schemas/ServerMetadataChange"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 120,
+              "minLength": 1
+            },
+            "title": "Servers",
+            "type": "object"
+          },
+          "update_interval_hours": {
+            "anyOf": [
+              {
+                "maximum": 168,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Update Interval Hours"
+          }
+        },
+        "required": [
+          "expected_version"
+        ],
+        "title": "PresentationPatch",
+        "type": "object"
+      },
+      "PresentationState": {
+        "additionalProperties": false,
+        "properties": {
+          "owner_contact": {
+            "$ref": "#/components/schemas/OwnerContact"
+          },
+          "profile_title": {
+            "title": "Profile Title",
+            "type": "string"
+          },
+          "seeded": {
+            "default": false,
+            "title": "Seeded",
+            "type": "boolean"
+          },
+          "servers": {
+            "patternProperties": {
+              "^[^\\r\\n\\t]+$": {
+                "$ref": "#/components/schemas/ServerMetadata"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 120,
+              "minLength": 1
+            },
+            "title": "Servers",
+            "type": "object"
+          },
+          "update_interval_hours": {
+            "maximum": 168,
+            "minimum": 1,
+            "title": "Update Interval Hours",
+            "type": "integer"
+          },
+          "version": {
+            "minimum": 0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "profile_title",
+          "update_interval_hours",
+          "owner_contact",
+          "servers"
+        ],
+        "title": "PresentationState",
         "type": "object"
       },
       "PreviewEntry": {
@@ -9781,9 +9933,6 @@
             "title": "Node Id"
           }
         },
-        "required": [
-          "metadata"
-        ],
         "title": "ServerAllowanceSpec",
         "type": "object"
       },
@@ -9883,6 +10032,84 @@
           }
         },
         "title": "ServerMetadata",
+        "type": "object"
+      },
+      "ServerMetadataChange": {
+        "additionalProperties": false,
+        "description": "Only explicitly set fields change; null clears an allowance, payment date, or repeat.",
+        "properties": {
+          "allowance_bytes": {
+            "anyOf": [
+              {
+                "maximum": 9223372036854775807,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Allowance Bytes"
+          },
+          "pay_every": {
+            "anyOf": [
+              {
+                "enum": [
+                  "month",
+                  "year"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Pay Every"
+          },
+          "pay_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Pay On"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provider"
+          },
+          "reset_day": {
+            "anyOf": [
+              {
+                "maximum": 31,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reset Day"
+          }
+        },
+        "title": "ServerMetadataChange",
         "type": "object"
       },
       "ServerUsage": {
@@ -10305,6 +10532,11 @@
             "title": "Access Profiles",
             "type": "object"
           },
+          "adopt_presentation": {
+            "default": false,
+            "title": "Adopt Presentation",
+            "type": "boolean"
+          },
           "client_routing": {
             "default": "ru-split",
             "enum": [
@@ -10375,6 +10607,19 @@
             "default": null,
             "title": "Expected Access Hash"
           },
+          "expected_presentation_version": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expected Presentation Version"
+          },
           "expected_profile_declarations_hash": {
             "anyOf": [
               {
@@ -10411,6 +10656,7 @@
             "type": "object"
           },
           "profile_title": {
+            "default": "Meridian",
             "maxLength": 100,
             "minLength": 1,
             "title": "Profile Title",
@@ -10465,9 +10711,6 @@
             "type": "integer"
           }
         },
-        "required": [
-          "profile_title"
-        ],
         "title": "ServiceSettingsWrite",
         "type": "object"
       },
@@ -10876,6 +11119,7 @@
                     "backup.read",
                     "backup.edit",
                     "settings.edit",
+                    "settings.presentation",
                     "tokens.read",
                     "tokens.issue",
                     "tokens.revoke",
@@ -10888,7 +11132,7 @@
                   ],
                   "type": "string"
                 },
-                "maxItems": 37,
+                "maxItems": 38,
                 "minItems": 1,
                 "type": "array"
               },
@@ -11003,6 +11247,7 @@
                 "backup.read",
                 "backup.edit",
                 "settings.edit",
+                "settings.presentation",
                 "tokens.read",
                 "tokens.issue",
                 "tokens.revoke",
@@ -11103,6 +11348,7 @@
                 "backup.read",
                 "backup.edit",
                 "settings.edit",
+                "settings.presentation",
                 "tokens.read",
                 "tokens.issue",
                 "tokens.revoke",
@@ -11202,6 +11448,7 @@
                 "backup.read",
                 "backup.edit",
                 "settings.edit",
+                "settings.presentation",
                 "tokens.read",
                 "tokens.issue",
                 "tokens.revoke",
@@ -19452,9 +19699,11 @@
             "x-meridian-error-codes": [
               "conflicting_delivery_policies",
               "delivery_policy_in_use",
+              "presentation_adopted",
               "profile_in_use",
               "profile_review_required",
               "stale_access",
+              "stale_presentation",
               "stale_profile_declarations"
             ]
           },
@@ -19496,6 +19745,221 @@
         ],
         "x-meridian-capabilities": [
           "fleet.apply"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "admin"
+        ]
+      }
+    },
+    "/api/settings/presentation": {
+      "get": {
+        "description": "Requires fleet.read capabilities. Compatible presets: read, including scopes that cover them.",
+        "operationId": "get_presentation",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresentationState"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "x-meridian-credentials": false
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Read the fleet presentation and server billing settings.",
+        "tags": [
+          "settings"
+        ],
+        "x-meridian-capabilities": [
+          "fleet.read"
+        ],
+        "x-meridian-capability-mode": "all",
+        "x-meridian-credentials": false,
+        "x-meridian-scope-mode": "any",
+        "x-meridian-scopes": [
+          "read"
+        ]
+      },
+      "patch": {
+        "description": "Requires settings.presentation capabilities. Compatible presets: admin, including scopes that cover them.",
+        "operationId": "patch_presentation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresentationPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresentationState"
+                }
+              }
+            },
+            "description": "Successful response.",
+            "headers": {
+              "X-Meridian-Version": {
+                "description": "Installed service version; sent only after API authentication.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "x-meridian-credentials": false
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-meridian-error-codes": [
+              "invalid_request"
+            ]
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "x-meridian-error-codes": [
+              "unauthenticated"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-meridian-error-codes": [
+              "insufficient_scope"
+            ]
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "x-meridian-error-codes": [
+              "stale_presentation"
+            ]
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large",
+            "x-meridian-error-codes": [
+              "payload_too_large"
+            ]
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "x-meridian-error-codes": [
+              "internal"
+            ]
+          }
+        },
+        "security": [
+          {
+            "meridianToken": []
+          }
+        ],
+        "summary": "Save reviewed owner settings at the expected version; contact edits require a recent owner sign-in.",
+        "tags": [
+          "settings"
+        ],
+        "x-meridian-capabilities": [
+          "settings.presentation"
         ],
         "x-meridian-capability-mode": "all",
         "x-meridian-credentials": false,
@@ -23313,6 +23777,7 @@
       "revisions.propose",
       "revisions.read",
       "settings.edit",
+      "settings.presentation",
       "tokens.issue",
       "tokens.read",
       "tokens.revoke",

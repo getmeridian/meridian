@@ -243,8 +243,9 @@ class TestExport:
         apply, _ = _import(tmp_path, json.dumps(document), _cluster())
         restored = _applied(apply)
 
-        assert restored.delivery.model_dump_json().encode() == delivery.model_dump_json().encode()
-        assert document["delivery"] == delivery.to_data()
+        omitted = {"profile_title", "update_interval_hours", "owner_contact"}
+        assert restored.delivery.model_dump_json(exclude=omitted) == delivery.model_dump_json(exclude=omitted)
+        assert document["delivery"] == delivery.model_dump(mode="json", exclude=omitted)
         for secret in (XHTTP_TOKEN, PRIVATE_KEY, API_TOKEN, "alloc-secret-path"):
             assert secret not in output
 
@@ -273,7 +274,7 @@ class TestExport:
         assert _applied(apply).delivery.client_routing == policy
 
     @pytest.mark.parametrize("json_mode", [False, True])
-    def test_export_and_import_keep_the_subscription_refresh_interval(
+    def test_export_and_import_omit_the_service_owned_subscription_refresh_interval(
         self, registry: ServerRegistry, tmp_path: Path, capsys: pytest.CaptureFixture[str], json_mode: bool
     ) -> None:
         intent = _intent(delivery=DeliveryIntent(update_interval_hours=24))
@@ -284,11 +285,11 @@ class TestExport:
             run_export()
         output = capsys.readouterr().out
         document = json.loads(output)["data"]["document"] if json_mode else yaml.safe_load(output)
-        assert document["delivery"]["update_interval_hours"] == 24
+        assert "update_interval_hours" not in document["delivery"]
 
         apply, _cluster_after = _import(tmp_path, yaml.safe_dump(document), _cluster())
 
-        assert _applied(apply).delivery.update_interval_hours == 24
+        apply.assert_not_called()
 
     def test_names_servers_by_saved_name_or_address(self, registry: ServerRegistry) -> None:
         document = yaml.safe_load(_document_text(registry))
@@ -429,11 +430,15 @@ class TestImportApplies:
         schema_model("fleet-import-envelope").model_validate_json(output)
         changes = json.loads(output)["data"]["changes"]
 
-        assert changes == [change.to_data() for change in intent_changes(before, after)]
+        assert changes == [
+            change.to_data() for change in intent_changes(before, after) if change.field != "owner_contact"
+        ]
         if dry_run:
             apply.assert_not_called()
         else:
-            assert _applied(apply).delivery == after.delivery
+            assert _applied(apply).delivery == after.delivery.model_copy(
+                update={"owner_contact": before.delivery.owner_contact}
+            )
 
     def test_dry_run_reviews_without_applying(
         self, registry: ServerRegistry, tmp_path: Path, capsys: pytest.CaptureFixture[str]

@@ -74,6 +74,7 @@ class FakeControl:
         # Each node() call pops the next scripted status; the last one repeats.
         self.reports: list[dict[str, Any]] = []
         self.current_settings = ServiceSettings(profile_title="Meridian")
+        self.seeded = False
 
     def __enter__(self) -> FakeControl:
         return self
@@ -110,6 +111,11 @@ class FakeControl:
         self.endpoints[endpoint_id] = endpoint
         return endpoint
 
+    def presentation(self):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(seeded=self.seeded)
+
     def settings(self) -> ServiceSettings:
         return self.current_settings
 
@@ -120,6 +126,7 @@ class FakeControl:
         expected_profile_declarations_hash: str | None = None,
         adopt_presentation: bool = False,
     ) -> ServiceSettings:
+        self.seeded = adopt_presentation
         self.current_settings = settings
         return settings
 

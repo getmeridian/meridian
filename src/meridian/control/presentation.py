@@ -20,6 +20,7 @@ OWNED_KEY = "presentation_adopted"
 def read_presentation(store: Store) -> PresentationState:
     with store.lock:
         return PresentationState(
+            seeded=store.meta(OWNED_KEY) == "1",
             version=int(store.meta(VERSION_KEY) or "0"),
             profile_title=store.meta("profile_title") or "Meridian",
             update_interval_hours=update_interval_hours(store),

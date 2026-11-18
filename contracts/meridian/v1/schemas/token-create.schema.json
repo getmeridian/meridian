@@ -35,6 +35,7 @@
               "backup.read",
               "backup.edit",
               "settings.edit",
+              "settings.presentation",
               "tokens.read",
               "tokens.issue",
               "tokens.revoke",
@@ -47,7 +48,7 @@
             ],
             "type": "string"
           },
-          "maxItems": 37,
+          "maxItems": 38,
           "minItems": 1,
           "type": "array"
         },

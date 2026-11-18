@@ -26,6 +26,7 @@ from meridian.core.delivery_preview import (
 )
 from meridian.core.fleet_contact import FleetContactRequest, FleetContactResult
 from meridian.core.owner_contact import OwnerContact
+from meridian.core.presentation import PresentationValueResult
 from meridian.core.schema_envelopes import make_command_envelope
 
 
@@ -52,6 +53,18 @@ def delivery_schemas(
         doc="Envelope schema for `meridian fleet contact --json`.",
     )
     return {
+        "presentation-value": PresentationValueResult,
+        **{
+            f"fleet-{key}-envelope": make_command_envelope(
+                "Fleet" + key.title(),
+                "fleet." + key,
+                PresentationValueResult,
+                envelope_base=envelope_base,
+                failure_data_type=failure_data_type,
+                success_statuses=Literal["ok", "changed", "no_changes"],
+            )[2]
+            for key in ("title", "refresh")
+        },
         "delivery-destination": DeliveryDestination,
         "delivery-explain-request": DeliveryExplainRequest,
         "delivery-explanation": DeliveryExplanation,

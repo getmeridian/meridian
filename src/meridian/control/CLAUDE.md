@@ -23,6 +23,8 @@ Owner console assets: `ui/CLAUDE.md`. Formats: `formats/CLAUDE.md`.
 - A missing endpoint or late report cannot recreate a removed person; unknown traffic identities are discarded.
 - Bulk deletion passes every retired identity to one document composition so revocation receipts match individual deletion.
 - Restored snapshots preserve account state while rotating service access and the fleet CA.
+- Presentation changes compare the version and write their event in the same transaction. An owner session needs fresh confirmation for the public contact. Topology changes only server membership and node associations after the initial seed.
+
 ## Pitfalls
 - Re-check session and token liveness inside each write transaction; pre-body authorization alone permits a revoked tab to write.
 - Declare every API operation and add runnable `ROUTE_SAMPLES`; include conditional credentials and private membership grants.

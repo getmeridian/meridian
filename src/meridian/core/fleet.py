@@ -524,6 +524,7 @@ def build_fleet_status(
     else:
         health = "healthy"
     allowance_usage = server_usage.servers if server_usage is not None else []
+    current_billing = {server.server_ref: server.metadata for server in allowance_usage}
     server_attention = (
         derive_server_attention(allowance_usage, AttentionThresholds(), server_usage.observed_at)
         if server_usage
@@ -556,7 +557,9 @@ def build_fleet_status(
         panel=PanelStatus(url=topology.panel_url, healthy=panel_healthy),
         summary=summary,
         sources=sources,
-        servers=build_server_inventory(topology),
+        servers=[
+            row.model_copy(update={"metadata": current_billing.get(row.id)}) for row in build_server_inventory(topology)
+        ],
         nodes=nodes,
         relays=relays,
     )

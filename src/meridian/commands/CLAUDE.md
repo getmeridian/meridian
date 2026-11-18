@@ -17,6 +17,8 @@
 - CLI and console account paths share service contracts, generation checks and frozen bulk receipts.
 - Secrets appear only in the producing handoff or explicit detail views; confirmations remain readable and content-free events stay typed.
 - `meridian help agents` prints the packaged agent guide, which tests check against the public CLI.
+- Edit title, refresh, contact and server billing through the control service without SSH. Review against the live version, and never use local seed values as current billing information.
+
 ## Pitfalls
 - An account lookup must read current service names; topology names and full `list_users()` reads miss panel renames or widen the read needlessly.
 - People tokens cannot read fleet health; account writes check the authenticated API version header without requiring broader rights.

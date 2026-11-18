@@ -35,6 +35,7 @@ class FleetContactRequest(CoreModel):
 
 class FleetContactResult(CoreModel):
     owner_contact: OwnerContact
+    version: int = 0
     dry_run: bool = False
     review: CompiledApplyPreview | None = None
     applied: CompiledApplyResult | None = None

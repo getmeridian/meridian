@@ -169,7 +169,10 @@ def _run(
 
 
 def _panel(*, ping_ok: bool = True, nodes=(), users=()) -> MagicMock:
+    from meridian.core.server_allowances import ServerUsageList
+
     panel = _make_panel_mock(ping_ok=ping_ok)
+    panel.server_usage.return_value = ServerUsageList(observed_at="2026-10-01T00:00:00Z", servers=[])
     panel.list_nodes.return_value = list(nodes)
     panel.list_users.return_value = list(users)
     return panel
@@ -277,6 +280,7 @@ class TestFleetStatus:
             "nodes": "available",
             "panel": "available",
             "relays": "available",
+            "server_usage": "available",
             "users": "available",
         }
         assert data["panel"]["healthy"] is True

@@ -84,6 +84,47 @@ def test_settings_driver_carries_the_reviewed_interval_to_subscription_headers(t
             assert response.headers["profile-update-interval"] == "24"
 
 
+def test_topology_client_sends_seeds_once_then_only_server_membership(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json
+
+    from meridian.core.presentation import PresentationPatch
+
+    with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN, report_mutations=False) as client:
+        seed = ServiceSettings.model_validate(
+            {
+                "profile_title": "Initial title",
+                "update_interval_hours": 42,
+                "owner_contact": {"text": "Initial contact"},
+                "servers": {"edge": {"node_id": "main", "metadata": {"provider": "Initial provider"}}},
+            }
+        )
+        call = client._call
+        writes = []
+
+        def record(method, path, body=None):
+            if method == "PUT" and path == "api/settings":
+                writes.append(body)
+            return call(method, path, body)
+
+        monkeypatch.setattr(client, "_call", record)
+        client.put_settings(seed, adopt_presentation=True)
+        before = client.presentation()
+        assert before.seeded and writes[0]["expected_presentation_version"] == 0
+        saved = client.patch_presentation(
+            PresentationPatch(expected_version=before.version, profile_title="Owner title")
+        )
+        client.put_settings(seed, adopt_presentation=True)
+        assert (
+            not {"profile_title", "owner_contact", "update_interval_hours", "expected_presentation_version"}
+            & writes[-1].keys()
+        )
+        assert writes[-1]["servers"] == {"edge": {"node_id": "main"}}
+        assert "Initial provider" not in json.dumps(writes[-1])
+        assert client.presentation() == saved
+
+
 def test_payment_only_edit_preserves_exact_allowance_and_survives_topology_writes(tmp_path: Path) -> None:
     from meridian.control.errors import ServiceError
     from meridian.core.presentation import PresentationPatch

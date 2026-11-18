@@ -34,6 +34,7 @@ def save_settings(
     compose: Callable[[], None] | None = None,
     now: Callable[[], str] = utc_now,
     adopt_presentation: bool = False,
+    expected_presentation_version: int | None = None,
     expected_access_hash: str | None = None,
     expected_profile_declarations_hash: str | None = None,
 ) -> ServiceSettings:
@@ -48,6 +49,12 @@ def save_settings(
             expected_profile_declarations_hash=expected_profile_declarations_hash,
         )
         previous = read_presentation(store)
+        if (
+            adopt_presentation
+            and (not previous.seeded or expected_presentation_version is not None)
+            and expected_presentation_version != previous.version
+        ):
+            raise ServiceError("stale_presentation", "Presentation changed before handover. Review again.", 409)
         settings = merge_topology_settings(store, settings, adopt=adopt_presentation)
         save_access_profiles(store, settings.access_profiles)
         save_profile_declarations_hash(store, settings.access_profile_declarations_hash)

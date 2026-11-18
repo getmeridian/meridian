@@ -122,7 +122,13 @@ def _import(source: str, *, dry_run: bool, yes: bool, forget_unreachable: bool, 
     current = require_intent(cluster)
     registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     try:
-        updated = intent_from_document(parse_fleet_document(text), current, registry)
+        document = parse_fleet_document(text)
+        from meridian.commands.presentation_import import split_presentation
+
+        topology, fields = (
+            split_presentation(document, registry) if current.control.backend == "meridian" else (document, {})
+        )
+        updated = intent_from_document(topology, current, registry)
         require_profile_backend(updated)
         labels = server_labels(registry, [*intent_server_refs(current), *intent_server_refs(updated)])
     except CoreInputError as exc:
@@ -130,6 +136,23 @@ def _import(source: str, *, dry_run: bool, yes: bool, forget_unreachable: bool, 
     except MeridianError as exc:
         fail(exc)
     changes = intent_changes(relabel_servers(current, labels), relabel_servers(updated, labels))
+    if fields:
+        from meridian.commands.presentation_import import import_presentation
+
+        try:
+            edits = import_presentation(cluster, fields, topology_changed=bool(changes), dry_run=dry_run, yes=yes)
+        except MeridianError as exc:
+            fail(exc)
+        if edits:
+            _emit_result(
+                FleetImportResult(dry_run=dry_run, changes=edits),
+                operation,
+                text="Reviewed presentation settings" if dry_run else "Saved presentation settings",
+                changed=not dry_run,
+            )
+            if not is_json_mode():
+                info(t("presentation.saved") if not dry_run else t("fleet_import.dry_run", file=source))
+            return
     if not changes:
         _emit_result(FleetImportResult(dry_run=dry_run), operation, text="No changes")
         if not is_json_mode():

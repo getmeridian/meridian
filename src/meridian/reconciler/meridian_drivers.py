@@ -588,9 +588,10 @@ class ServiceSettingsDriver:
     def observe(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceObservation:
         with self.context.client() as client:
             current = client.settings()
+            equal = self._topology(current) == self._topology(self._settings(action)) and client.presentation().seeded
         return _observation(
             action,
-            exists=self._topology(current) == self._topology(self._settings(action)),
+            exists=equal,
             connected=False,
             remote_id="settings",
         )

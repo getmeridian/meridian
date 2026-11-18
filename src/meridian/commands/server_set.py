@@ -1,28 +1,22 @@
-"""Edit server metadata only through an exact reviewed topology apply."""
+"""Review and update current server billing in the control service."""
 
 from __future__ import annotations
 
-import typer
 from pydantic import ValidationError
-from rich.markup import escape
 
 from meridian import config, console
-from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, require_intent, reviewed_runtime
+from meridian.commands._helpers import load_topology_cluster, require_intent
 from meridian.commands._validation import validate_command_input
 from meridian.commands.server_display import print_metadata
-from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_result
 from meridian.core.errors import MeridianError
-from meridian.core.fleet_document import change_line, intent_changes
 from meridian.core.models import OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.server_allowances import (
-    ServerMetadata,
     ServerMetadataError,
     ServerSetRequest,
     ServerSetResult,
     build_server_metadata_change,
 )
-from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
 from meridian.i18n import t
 from meridian.renderers import emit_json
@@ -92,76 +86,52 @@ def _run(request: ServerSetRequest, operation: OperationContext) -> None:
         console.fail(t("server_set.needs_service"), hint_type="user")
     registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     ref = _server_ref(current, registry, request.query)
-    previous = current.server_metadata.get(ref, ServerMetadata())
-    metadata = request.change.apply_to(previous)
-    result = ServerSetResult(server_ref=ref, metadata=metadata, dry_run=request.dry_run)
-    if not request.change.model_fields_set:
-        if request.dry_run:
-            console.fail(t("server_set.choose_for_review"), hint_type="user")
-        _emit(result, operation, "ok", "Read reviewed server metadata")
-        print_metadata(metadata)
-        return
-    if metadata == previous:
-        _emit(result, operation, "no_changes", "Server metadata is unchanged")
-        if not console.is_json_mode():
-            console.ok(t("server_set.unchanged", name=request.query))
-            print_metadata(metadata)
-        return
-    if not request.dry_run and not request.yes and (console.is_json_mode() or not console.has_tty()):
-        console.fail(
-            t("server_set.needs_yes"), hint=t("server_set.needs_yes_hint", name=request.query), hint_type="user"
-        )
-    data = current.model_dump(mode="json")
-    data.setdefault("server_metadata", {})[ref] = metadata.model_dump(mode="json")
-    if metadata == ServerMetadata():
-        data["server_metadata"].pop(ref)
-    updated = SetupIntent.model_validate(data)
-    review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(updated), cluster=cluster)
-    preview = CompiledApplyPreview(
-        plan_hash=review.plan.plan_hash,
-        resource_count=len(review.plan.resources),
-        review_hash=review.review_hash,
-        retiring_resources=[binding.logical_id for binding in review.retiring],
-    )
-    result = ServerSetResult(server_ref=ref, metadata=metadata, dry_run=request.dry_run, review=preview)
-    if not console.is_json_mode():
-        console.info(t("server_set.review", name=request.query))
-        for change in intent_changes(current, updated):
-            console.err_console.print("    " + escape(change_line(change)))
-        print_metadata(metadata)
-        if metadata.allowance_bytes is not None and (
-            previous.allowance_bytes is None or previous.reset_day != metadata.reset_day
-        ):
-            console.info(t("server_set.tracking_starts"))
-        for logical_id in preview.retiring_resources:
-            console.err_console.print(f"    [red]remove[/red] {escape(logical_id)}")
-        console.err_console.print(f"  [dim]Review {preview.review_hash}[/dim]")
-    if request.dry_run:
-        _emit(result, operation, "ok", "Reviewed server metadata")
-        return
-    if not request.yes and not console.confirm(t("server_set.confirm", name=request.query), default=False):
-        raise typer.Exit(1)
-    execution = apply_reviewed_intent(
-        cluster,
-        registry,
-        updated,
-        failure=t("server_set.failed"),
-        hint=t("server_set.failed_hint"),
-        expected_plan_hash=review.review_hash,
+    from meridian.commands.fleet_presentation import live_presentation, presentation_client, review_presentation
+    from meridian.core.presentation import PresentationPatch, PresentationState
+
+    if request.dry_run and not request.change.model_fields_set:
+        console.fail(t("server_set.choose_for_review"), hint_type="user")
+    with presentation_client(cluster) as client:
+        before = live_presentation(client)
+        if ref not in before.servers:
+            console.fail(
+                t("server_set.unknown", name=request.query), hint=t("server_set.unknown_hint"), hint_type="user"
+            )
+        state, changed = before, False
+        if request.change.model_fields_set:
+
+            def show(old: PresentationState, new: PresentationState) -> None:
+                console.info(t("fleet_contact.before"))
+                print_metadata(old.servers[ref])
+                console.info(t("fleet_contact.after"))
+                print_metadata(new.servers[ref])
+
+            state, changed = review_presentation(
+                client,
+                before,
+                PresentationPatch(expected_version=before.version, servers={ref: request.change}),
+                dry_run=request.dry_run,
+                yes=request.yes,
+                show=show,
+            )
+    metadata = state.servers[ref]
+    status: OutputStatus = (
+        "changed"
+        if changed
+        else "no_changes"
+        if request.change.model_fields_set and metadata == before.servers[ref]
+        else "ok"
     )
     _emit(
-        ServerSetResult(
-            server_ref=ref,
-            metadata=metadata,
-            review=preview,
-            applied=build_compiled_apply_result(execution, exit_code=0, summary="Topology converged."),
-        ),
+        ServerSetResult(server_ref=ref, metadata=metadata, version=state.version, dry_run=request.dry_run),
         operation,
-        "changed",
-        "Applied reviewed server metadata",
+        status,
+        "Server allowance and payment settings",
     )
-    if not console.is_json_mode():
-        console.ok(t("server_set.changed", name=request.query))
+    if not request.change.model_fields_set:
+        print_metadata(metadata)
+    elif changed and not console.is_json_mode():
+        console.ok(t("presentation.saved"))
 
 
 def _emit(result: ServerSetResult, operation: OperationContext, status: OutputStatus, text: str) -> None:

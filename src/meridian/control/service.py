@@ -215,6 +215,7 @@ class ControlService:
         settings: ServiceSettings,
         *,
         adopt_presentation: bool = False,
+        expected_presentation_version: int | None = None,
         expected_access_hash: str | None = None,
         expected_profile_declarations_hash: str | None = None,
     ) -> ServiceSettings:
@@ -222,6 +223,7 @@ class ControlService:
             self._store,
             settings,
             adopt_presentation=adopt_presentation,
+            expected_presentation_version=expected_presentation_version,
             compose=self._compose_all,
             now=self.now,
             expected_access_hash=expected_access_hash,

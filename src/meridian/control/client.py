@@ -286,15 +286,24 @@ class ControlClient:
         expected_access_hash: str | None = None,
         expected_profile_declarations_hash: str | None = None,
     ) -> ServiceSettings:
+        state = self.presentation() if adopt_presentation else None
         request = ServiceSettingsWrite.model_validate(
             {
                 **settings.to_data(),
                 "adopt_presentation": adopt_presentation,
+                "expected_presentation_version": state.version if state and not state.seeded else None,
                 "expected_access_hash": expected_access_hash,
                 "expected_profile_declarations_hash": expected_profile_declarations_hash,
             }
         )
-        return ServiceSettings.model_validate(self._call("PUT", "api/settings", request.to_data()))
+        body = request.to_data()
+        if state and state.seeded:
+            # Never transmit old deployer copies of owner settings, even when applying unrelated topology.
+            for key in ("profile_title", "update_interval_hours", "owner_contact"):
+                body.pop(key, None)
+            for spec in body.get("servers", {}).values():
+                spec.pop("metadata", None)
+        return ServiceSettings.model_validate(self._call("PUT", "api/settings", body))
 
     def access_profiles(self) -> AccessProfileCatalog:
         return AccessProfileCatalog.model_validate(self._call("GET", "api/access-profiles"))

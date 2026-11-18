@@ -305,9 +305,7 @@ def _run_status(*, operation: OperationContext) -> int:
             check_relays=_check_relays_health,
             classify_error=_classify_panel_error,
             read_node_evidence=panel.node_evidence,
-            read_server_usage=panel.server_usage
-            if cluster.topology_intent and cluster.topology_intent.server_metadata
-            else None,
+            read_server_usage=panel.server_usage,
         )
     except MeridianError as exc:
         fail(exc)

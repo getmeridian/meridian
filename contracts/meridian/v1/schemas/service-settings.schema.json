@@ -867,9 +867,6 @@
           "title": "Node Id"
         }
       },
-      "required": [
-        "metadata"
-      ],
       "title": "ServerAllowanceSpec",
       "type": "object"
     },

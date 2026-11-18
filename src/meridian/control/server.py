@@ -353,10 +353,16 @@ class _Handler(BaseHTTPRequestHandler):
         return self._service.put_settings(
             ServiceSettings.model_validate(
                 request.model_dump(
-                    exclude={"expected_access_hash", "expected_profile_declarations_hash", "adopt_presentation"}
+                    exclude={
+                        "expected_access_hash",
+                        "expected_profile_declarations_hash",
+                        "adopt_presentation",
+                        "expected_presentation_version",
+                    }
                 )
             ),
             adopt_presentation=request.adopt_presentation,
+            expected_presentation_version=request.expected_presentation_version,
             expected_access_hash=request.expected_access_hash,
             expected_profile_declarations_hash=request.expected_profile_declarations_hash,
         )

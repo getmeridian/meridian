@@ -3034,6 +3034,78 @@
     {
       "argv": [
         "fleet",
+        "refresh",
+        "[HOURS]"
+      ],
+      "command": "fleet.refresh",
+      "data_schema": "presentation-value",
+      "description": "Read or edit the interval between subscription refreshes",
+      "envelope_schema": "fleet-refresh-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "the setting was read or previewed; the setting is unchanged; the reviewed setting was saved",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "the setting was read or previewed",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "the setting is unchanged",
+          "status": "no_changes"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "the reviewed setting was saved",
+          "status": "changed"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "no_changes",
+        "changed",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "fleet",
         "response-rules",
         "test"
       ],
@@ -3368,6 +3440,78 @@
       "stability": "stable",
       "statuses": [
         "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "fleet",
+        "title",
+        "[TITLE]"
+      ],
+      "command": "fleet.title",
+      "data_schema": "presentation-value",
+      "description": "Read or edit the title shown in subscribers' apps",
+      "envelope_schema": "fleet-title-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "the setting was read or previewed; the setting is unchanged; the reviewed setting was saved",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "the setting was read or previewed",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "the setting is unchanged",
+          "status": "no_changes"
+        },
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "the reviewed setting was saved",
+          "status": "changed"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "no_changes",
+        "changed",
         "failed"
       ]
     },

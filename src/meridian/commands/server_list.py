@@ -1,4 +1,4 @@
-"""Read saved profiles and their reviewed allowance metadata without remote requests."""
+"""Read saved profiles and their reviewed allowance metadata without contacting the fleet’s individual servers."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from rich.markup import escape
 from meridian import config, console
 from meridian.commands._helpers import fail_meridian_v3_state, has_meridian_v3_state, load_cluster
 from meridian.commands.server_display import print_metadata
-from meridian.core.errors import LocalStateError
+from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.server_allowances import ServerListEntry, ServerListResult
@@ -37,11 +37,23 @@ def run_list() -> None:
             console.fail(exc)
         if not entries and has_meridian_v3_state():
             fail_meridian_v3_state()
+        from meridian.commands.fleet_presentation import live_presentation, presentation_client
+        from meridian.core.server_allowances import ServerMetadata
+
+        metadata_by_ref: dict[str, ServerMetadata] = {}
+        unavailable = False
+        if refs and cluster.panel.url and cluster.panel.api_token:
+            try:
+                with presentation_client(cluster) as client:
+                    metadata_by_ref = live_presentation(client).servers
+            except MeridianError:
+                # The SSH shelf is usable offline, but historic seeds are not current billing data.
+                unavailable = True
         servers: list[ServerListEntry] = []
         today = datetime.now(UTC).date()
         for entry in entries:
             ref = by_profile.get(entry.id, entry.id)
-            metadata = intent.server_metadata.get(ref) if intent is not None else None
+            metadata = metadata_by_ref.get(ref)
             servers.append(
                 ServerListEntry(
                     server_ref=ref,
@@ -60,11 +72,16 @@ def run_list() -> None:
                 command_envelope(
                     command="server.list",
                     data=result.to_data(),
+                    warnings=[MeridianError("Current server billing settings are unavailable.").to_error_model()]
+                    if unavailable
+                    else [],
                     summary=Summary(text="Read saved servers and reviewed metadata", counts={"servers": len(servers)}),
                     timer=operation.timer,
                 )
             )
             return
+        if unavailable:
+            console.warn(t("server_metadata.unavailable"))
         if not servers:
             console.info(t("server_metadata.empty"))
             return

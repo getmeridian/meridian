@@ -199,6 +199,8 @@ API_ROUTES: tuple[ApiRoute, ...] = (
                 (
                     "profile_in_use",
                     "stale_access",
+                    "presentation_adopted",
+                    "stale_presentation",
                     "stale_profile_declarations",
                     "profile_review_required",
                     "delivery_policy_in_use",

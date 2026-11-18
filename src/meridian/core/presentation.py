@@ -17,6 +17,7 @@ class PresentationValueResult(CoreModel):
 
 
 class PresentationState(CoreModel):
+    seeded: bool = False
     version: int = Field(ge=0)
     # Old APIs accepted titles up to 100 characters; edits use the current wizard's validation.
     profile_title: str
