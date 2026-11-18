@@ -124,7 +124,12 @@ The drill then creates a post-snapshot witness account, stops the control servic
 this disposable VM, and restores the saved snapshot to its original address from an
 empty managing home containing only the device key. The witness must disappear;
 the old identities, links, documents, limits, and a working connection must return
-at a newer epoch. These real-VM results are distinct from unit and Docker evidence.
+at a newer epoch. Set `REALVM_RELEASE_CHECKS=1` as well to test a live panel settings
+edit while the node agent is stopped, stale-write protection, and persistence after
+a reviewed apply. The agent is restarted even on failure. The same run checks
+that each restored person's no-JavaScript page gives them their own usable app
+subscription without a panel token. These real-VM results are distinct from unit
+and Docker evidence.
 
 **Exit 75 is inconclusive:** PyPI cannot be reached or Let's Encrypt refuses
 issuance because of a rate limit, even if setup reports a self-signed fallback.

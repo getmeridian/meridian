@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import ipaddress
 import os
 import shlex
@@ -31,6 +30,7 @@ from meridian.ssh import CommandResult
 from meridian.update import get_pypi_releases
 from tests.realvm import handover_drill
 from tests.realvm.domain_support import is_rate_limited, verification_counts
+from tests.realvm.release_checks import verify_release_changes
 from tests.realvm.upgrade_support import (
     SUBSCRIPTION_CASES,
     SubscriptionSnapshot,
@@ -74,7 +74,10 @@ def preflight_upgrade(root: Path, env: Mapping[str, str]) -> tuple[str, str]:
         raise VerificationError(f"{exc} {exc.hint}", exit_code=2) from None
     if not expected_agent:
         raise VerificationError("The checkout agent build has no .version sidecar. Run make agent first.", exit_code=2)
-    return select_previous_version((root / "VERSION").read_text(), env), expected_agent
+    version = select_previous_version((root / "VERSION").read_text(), env)
+    if env.get("REALVM_RELEASE_CHECKS") == "1" and version != handover_drill.SOURCE:
+        raise VerificationError("Release checks require REALVM_UPGRADE_FROM=4.0.0b12.", exit_code=2)
+    return version, expected_agent
 
 
 def preflight_published_cli(root: Path, env: Mapping[str, str], version: str) -> None:
@@ -468,7 +471,7 @@ class UpgradeVerifier:
             handover.unchanged_apply()
         self.verify_traffic()
         if self.env.get("REALVM_RELEASE_CHECKS") == "1":
-            importlib.import_module("tests.realvm.release_checks").verify_release_changes(self)
+            verify_release_changes(self)
         self.say(f"PASS: {self.passed}  FAIL: 0")
 
     def verify_accounts(
