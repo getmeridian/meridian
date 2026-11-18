@@ -11,6 +11,7 @@
       disabled: "overview.event_disabled", reissued: "overview.event_reissued", credentials_rotated: "overview.event_rotated",
       removed: "overview.event_removed", traffic_reset: "overview.event_reset", expired: "overview.event_expired",
       limited: "overview.event_limited", restored: "overview.event_restored", flow_blocking: "overview.event_blocking" },
+    presentation: { changed: "overview.event_presentation" },
     privacy: { changed: "overview.event_privacy" }, notice: { changed: "overview.event_notice" }, language: { changed: "overview.event_language" },
     token: { created: "overview.event_token_created", revoked: "overview.event_token_revoked" },
     command: { issued: "overview.event_command_issued", result: "overview.event_command_result" },
@@ -132,6 +133,12 @@
       }).concat(events.filter(function (event) { return eventLabel(event.kind); }).map(function (event) {
         var family = event.kind.split(".")[0];
         var href = "#/settings" + (["privacy", "notice", "language"].indexOf(family) >= 0 ? "/" + family : "");
+        if (event.kind === "presentation.changed") {
+          var fields = event.detail.fields;
+          return { kind: event.kind, time: event.time,
+            href: fields.length === 1 && fields[0] === "servers" ? "#/servers" : "#/settings/general",
+            label: M.t(eventLabel(event.kind)), subject: fields.map(function (field) { return M.t("events.field." + field); }).join(" · ") };
+        }
         if (event.kind.indexOf("user.") === 0) href = "#/people?q=" + encodeURIComponent(event.subject);
         else if (event.kind === "people.bulk") href = "#/people";
         else if (event.kind.indexOf("token.") === 0) href = "#/tokens";

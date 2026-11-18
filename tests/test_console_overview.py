@@ -212,6 +212,63 @@ def test_history_notices_and_recent_settings_edits_link_to_their_sections(locale
     }
 
 
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_recent_presentation_changes_use_translated_field_names_and_open_the_right_editor(
+    tmp_path: Path, locale: str
+) -> None:
+    import json
+
+    from meridian.control.models import ServiceSettings
+    from meridian.core.presentation import PresentationPatch
+
+    service = ControlService(
+        tmp_path / "events.db",
+        fleet_id=FLEET_ID,
+        version="4.0.0",
+        clock=lambda: datetime.fromisoformat(NOW).timestamp(),
+    )
+    try:
+        service.put_settings(
+            ServiceSettings.model_validate({"profile_title": "Old title", "servers": {"edge": {"metadata": {}}}})
+        )
+        with service.events.as_actor("owner"):
+            current = service.presentation()
+            current = service.update_presentation(
+                PresentationPatch.model_validate(
+                    {
+                        "expected_version": current.version,
+                        "profile_title": "Private title",
+                        "update_interval_hours": 24,
+                        "owner_contact": {"text": "Private contact"},
+                    }
+                )
+            )
+            service.update_presentation(
+                PresentationPatch.model_validate(
+                    {"expected_version": current.version, "servers": {"edge": {"provider": "Private provider"}}}
+                )
+            )
+        events = service.events.list().to_data()["events"]
+    finally:
+        service.close()
+    result = run_console("overview-attention", locale, {"storage": {"mrd.mode": "detailed"}, "events": events})
+    labels = json.loads(
+        (Path(__file__).resolve().parents[1] / "src/meridian/control/ui/locales" / (locale + ".json")).read_text()
+    )
+    assert sorted(result["presentationChanges"]) == sorted(
+        [
+            [
+                "#/settings/general",
+                labels["overview.event_presentation"],
+                " · ".join(
+                    labels["events.field." + f] for f in ("profile_title", "update_interval_hours", "owner_contact")
+                ),
+            ],
+            ["#/servers", labels["overview.event_presentation"], labels["events.field.servers"]],
+        ]
+    )
+
+
 def test_detailed_recent_changes_merge_newest_revisions_and_owner_edits() -> None:
     result = run_console(
         "overview-attention",

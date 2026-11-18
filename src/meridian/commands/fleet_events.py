@@ -17,6 +17,7 @@ from meridian.core.fleet_events import (
     BulkEventDetail,
     FleetEvent,
     NodeEventDetail,
+    PresentationFieldsDetail,
     PrivacyEventDetail,
     TokenEventDetail,
     UserFieldsDetail,
@@ -76,7 +77,7 @@ def run_events(*, since: str = "0", limit: str = "100") -> None:
                 str(event.id),
                 event.time.replace("T", " ").removesuffix("Z") + " UTC",
                 escape(t(f"events.kind.{event.kind}")),
-                escape(event.subject),
+                escape(t("events.subject.presentation") if event.kind == "presentation.changed" else event.subject),
                 escape(actor),
                 escape(_detail(event)),
             )
@@ -98,7 +99,7 @@ def _detail(event: FleetEvent) -> str:
             targeted=detail.targeted,
             cli_required=detail.cli_required,
         )
-    if isinstance(detail, UserFieldsDetail):
+    if isinstance(detail, (UserFieldsDetail, PresentationFieldsDetail)):
         return t("events.changed", fields=", ".join(t(f"events.field.{field}") for field in detail.fields))
     if isinstance(detail, UserFlowBlockDetail):
         labels = {
