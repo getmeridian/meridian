@@ -137,7 +137,7 @@ def test_bad_settings_edits_fail_the_rehearsal_and_restart_the_agent(fault) -> N
 @pytest.mark.parametrize("fault", ["wrong-person", "script-only", "cacheable", "app-empty", "none"])
 def test_only_the_visible_personal_field_that_delivers_an_app_profile_passes(fault) -> None:
     expected = "https://example.test/private?x=a&y=b"
-    field = '<input readonly aria-labelledby="manual-setup-title" value="{}">'
+    field = '<textarea readonly aria-labelledby="manual-setup-title">{}</textarea>'
     seen = []
 
     def handle(request):

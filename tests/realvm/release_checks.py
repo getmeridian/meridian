@@ -30,7 +30,8 @@ class ManualFields(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
         self.depth = 0
-        self.values: list[str | None] = []
+        self.values: list[str] = []
+        self.field: list[str] | None = None
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag == "noscript":
@@ -38,13 +39,20 @@ class ManualFields(HTMLParser):
         fields = dict(attrs)
         if (
             self.depth
-            and tag == "input"
+            and tag == "textarea"
             and "readonly" in fields
             and fields.get("aria-labelledby") == "manual-setup-title"
         ):
-            self.values.append(fields.get("value"))
+            self.field = []
+
+    def handle_data(self, data: str) -> None:
+        if self.field is not None:
+            self.field.append(data)
 
     def handle_endtag(self, tag: str) -> None:
+        if tag == "textarea" and self.field is not None:
+            self.values.append("".join(self.field))
+            self.field = None
         if tag == "noscript":
             self.depth = max(0, self.depth - 1)
 
