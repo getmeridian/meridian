@@ -14,6 +14,8 @@ from zipfile import ZipFile
 import pytest
 from pydantic import ValidationError
 
+from meridian import pwa
+from meridian.control.connection_pages import packaged_assets
 from meridian.control.ui_routes import UI_DIR
 from scripts.build_showcase import export_showcase, validate_recordings
 
@@ -103,6 +105,20 @@ def test_both_demos_share_people_individual_connections_notice_and_contact(showc
     assert info["user"]["username"] == user["username"]
     assert (showcase / "sub" / user["sub_token"] / "info").is_file()
     assert "SW disabled" in (showcase / "sub/~pwa/sw.js").read_text()
+
+
+def test_demo_keeps_the_servable_assets_when_the_checkout_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A running service already has an immutable release; a concurrent checkout changes only the files on disk.
+    packaged_assets()
+    changed = pwa.load_pwa_static_assets()
+    changed["app.js"] += b"\n// new checkout"
+    monkeypatch.setattr(pwa, "load_pwa_static_assets", changed.copy)
+    export_showcase(tmp_path)
+    html = next((tmp_path / "sub").glob("*/index.html")).read_text()
+    assets = re.findall(r'(?:src|href)="/demo/(sub/~pwa/[^"]+)"', html)
+    assert assets and all((tmp_path / asset).is_file() for asset in assets)
 
 
 def test_a_built_wheel_and_sdist_exclude_demo_shim_data_and_seeder(showcase: Path, tmp_path: Path) -> None:

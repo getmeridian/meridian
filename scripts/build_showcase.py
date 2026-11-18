@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "src"), str(ROOT)]
 
 from meridian import __version__  # noqa: E402
+from meridian.control.connection_pages import packaged_assets  # noqa: E402
 from meridian.control.enrollment import token_sha256  # noqa: E402
 from meridian.control.models import TokenCreate, UserCreate, UserUpdate  # noqa: E402
 from meridian.control.passkey_models import PasskeyList  # noqa: E402
@@ -34,7 +35,6 @@ from meridian.control.ui_models import AuthState, FleetView, SessionList, ShareV
 from meridian.control.ui_routes import SESSION_COOKIE, UI_DIR  # noqa: E402
 from meridian.core.account_schedule import FINITE_EXPIRY_YEAR  # noqa: E402
 from meridian.core.client_limits import CalendarExpiryPreview  # noqa: E402
-from meridian.pwa import load_pwa_assets  # noqa: E402
 from scripts.showcase_recordings import (  # noqa: E402
     record_interactive_templates,
     record_people_queries,
@@ -262,7 +262,8 @@ def write_recordings(directory: Path, client: httpx.Client, service: ControlServ
             separators=(",", ":"),
         )
     )
-    assets = load_pwa_assets()
+    # Use the same immutable snapshot that the service referenced in the exported HTML.
+    assets = packaged_assets()
     shared = directory / "sub/~pwa" / assets.version
     shared.mkdir(parents=True, exist_ok=True)
     for name, content in assets.files.items():
